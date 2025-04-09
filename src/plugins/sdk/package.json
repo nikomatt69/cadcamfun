@@ -1,0 +1,51 @@
+{
+  "name": "@cadcamfun/cadcam-fun-sdk",
+  "version": "0.2.0",
+  "description": "SDK for building plugins for CAD/CAM FUN",
+  "author": "Niko Matt",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nikomatt69/cadcam-fun-sdk.git",
+    "directory": "src/plugins/sdk"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "types/*.d.ts",
+    "templates",
+    "README.md",
+    "docs"
+  ],
+  "bin": {
+    "cadcam-plugin-cli": "dist/cli/plugin-cli.js"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "archiver": "^6.0.0",
+    "chalk": "^5.0.0",
+    "commander": "^11.0.0",
+    "fs-extra": "^11.0.0",
+    "inquirer": "^9.0.0",
+    "zod": "^3.20.0"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.0",
+    "@types/fs-extra": "^11.0.0",
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
