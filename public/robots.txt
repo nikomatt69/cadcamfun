@@ -1,0 +1,18 @@
+# robots.txt for CAD/CAM FUN
+
+User-agent: *
+Allow: /
+
+# Disallow admin and auth-related pages
+Disallow: /admin/
+Disallow: /auth/signin
+Disallow: /auth/signup
+Disallow: /auth/verify
+Disallow: /auth/reset-password
+
+# Disallow private user pages
+Disallow: /profile/settings
+Disallow: /profile/billing
+
+# Sitemap location
+Sitemap: https://[your-domain.com]/sitemap.xml

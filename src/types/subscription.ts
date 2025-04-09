@@ -1,0 +1,1 @@
+export type SubscriptionStatus = 'active' | 'canceled' | 'incomplete' | 'trialing';

@@ -1,0 +1,851 @@
+// src/components/cad/core/CADCanvas.tsx
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+import { useCADStore } from '@/src/store/cadStore';
+import { useElementsStore } from '@/src/store/elementsStore';
+import { useLayerStore } from '@/src/store/layerStore';
+import StatusBar from '../StatusBar';
+import { useSnap } from '@/src/hooks/useSnap';
+import { useKeyboardShortcuts } from '@/src/hooks/useKeyboardShortcuts';
+import { CanvasRenderer } from '@/src/lib/canvas/renderer';
+import { SelectionManager } from '@/src/lib/canvas/selection-manager';
+import { CADToolController } from '@/src/lib/canvas/cad-tool-controller';
+import { ViewMode } from '@/src/types/cad';
+import { Element } from '@/src/store/elementsStore';
+import { useLOD } from '@/src/hooks/useLOD';
+import { useThreePerformance } from '@/src/hooks/useThreePerformance';
+import { ToolbarPosition } from '@/src/types/ui';
+
+// Import UI components
+import CanvasToolbar from '../toolbar/CanvasToolbar';
+import CADViewControls from './CADViewControls';
+import ViewCube from './ViewCube';
+import { NotificationBar } from '../ui/NotificationBar';
+import { CoordinateDisplay } from '../ui/CoordinateDisplay';
+import SnapIndicator from '../ui/SnapIndicator';
+import DragDropIndicator from '../ui/DragDropIndicator';
+import ContextMenu from '../menus/ContextMenu';
+import ToolOptionsPanel from '../panels/ToolOptionsPanel';
+import MeasurementOverlay from '../overlays/MeasurementOverlay';
+import StatusMessage from '../ui/StatusMessage';
+import CanvasPerformanceStats from '../debug/CanvasPerformanceStats';
+
+export interface CADCanvasProps {
+  width?: string | number;
+  height?: string | number;
+  previewComponent?: string | null;
+  onComponentPlaced?: (component: string, position: {x: number, y: number, z: number}) => void;
+  allowDragDrop?: boolean;
+  showToolbar?: boolean;
+  showStatusBar?: boolean;
+  showViewCube?: boolean;
+  toolbarPosition?: ToolbarPosition;
+  showPerformanceStats?: boolean;
+  darkMode?: boolean;
+  className?: string;
+}
+
+/**
+ * Professional CAD Canvas component
+ * Renders a Three.js scene with CAD elements and provides interaction tools
+ */
+const CADCanvas: React.FC<CADCanvasProps> = ({
+  width = '100%',
+  height = '100%',
+  previewComponent = null,
+  onComponentPlaced,
+  allowDragDrop = true,
+  showToolbar = true,
+  showStatusBar = true,
+  showViewCube = true,
+  toolbarPosition = 'left',
+  showPerformanceStats = false,
+  darkMode = false,
+  className = '',
+}) => {
+  // Refs
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<CanvasRenderer | null>(null);
+  const selectionManagerRef = useRef<SelectionManager | null>(null);
+  const toolControllerRef = useRef<CADToolController | null>(null);
+  
+  // States
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [activeContextMenu, setActiveContextMenu] = useState<{
+    x: number;
+    y: number;
+    elementId?: string;
+  } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [isDraggingComponent, setIsDraggingComponent] = useState(false);
+  const [dropPosition, setDropPosition] = useState<{x: number, y: number, z: number}>({x: 0, y: 0, z: 0});
+  const [dropScreenPosition, setDropScreenPosition] = useState<{ x: number, y: number } | undefined>(undefined);
+  const [viewMode, setViewMode] = useState<ViewMode>('3d');
+  const [measurementPoints, setMeasurementPoints] = useState<THREE.Vector3[]>([]);
+  const [isMeasuring, setIsMeasuring] = useState(false);
+  const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
+  const [sceneStatistics, setSceneStatistics] = useState({ triangles: 0, objects: 0, drawCalls: 0, fps: 0 });
+  
+  // Custom hooks
+  const { gridVisible, axisVisible, originOffset, toggleGrid, toggleAxis } = useCADStore();
+  const { 
+    elements, 
+    selectedElement, 
+    selectElement, 
+    setMousePosition, 
+    updateElement, 
+    addElement, 
+    addElements,
+    deleteElement,
+    saveHistoryState,
+    undo,
+    redo 
+  } = useElementsStore();
+  const { layers, activeLayer } = useLayerStore();
+  const { snapToPoint, snapIndicator, snapSettings } = useSnap();
+  const { optimizeScene } = useThreePerformance(rendererRef);
+  const { applyLOD } = useLOD();
+  
+  // Initialize canvas and renderer
+  useEffect(() => {
+    if (!canvasRef.current || isInitialized) return;
+    
+    // Create renderer
+    const renderer = new CanvasRenderer({
+      onSceneInitialized: (scene, camera) => {
+        // Initialize selection manager
+        const selectionManager = new SelectionManager(scene, camera, {
+          highlightColor: '#2196f3',
+          hoverColor: '#4caf50',
+          showBoundingBox: true
+        });
+        selectionManagerRef.current = selectionManager;
+        
+        // Initialize tool controller
+        const toolController = new CADToolController({
+          scene,
+          camera,
+          useSnap: true,
+          defaultLayer: activeLayer ? layers.find(l => l.id === activeLayer) || undefined : undefined,
+          onToolChanged: (toolType) => {
+            console.log('Tool changed:', toolType);
+          },
+          onElementCreated: (element) => {
+            addElement(element);
+            saveHistoryState();
+          },
+          onPreviewUpdated: (preview) => {
+            // Handle preview updates
+          },
+          onToolStatusMessage: (message) => {
+            setStatusMessage(message);
+          }
+        });
+        toolControllerRef.current = toolController;
+        
+        // Set origin offset
+        renderer.setOriginOffset(originOffset);
+        
+        // Set theme mode
+        renderer.setThemeMode(darkMode);
+        
+        // Set view mode
+        renderer.setViewMode(viewMode);
+        
+        // Set grid and axis visibility
+        renderer.setGridVisible(gridVisible);
+        renderer.setAxesVisible(axisVisible);
+        
+        // Store canvas dimensions
+        if (canvasRef.current) {
+          setCanvasDimensions({
+            width: canvasRef.current.clientWidth,
+            height: canvasRef.current.clientHeight
+          });
+        }
+        
+        // Mark as initialized
+        setIsInitialized(true);
+      },
+      onSceneRender: (scene, camera) => {
+        // Update statistics for performance panel
+        if (showPerformanceStats && rendererRef.current) {
+          const renderer = rendererRef.current.getRenderer();
+          if (renderer) {
+            setSceneStatistics({
+              triangles: renderer.info.render.triangles,
+              objects: renderer.info.render.frame,
+              drawCalls: renderer.info.render.calls,
+              fps: Math.round(1000 / (renderer.info.render.frame || 1))
+            });
+          }
+        }
+      }
+    });
+    
+    // Initialize the renderer with the canvas container
+    renderer.initialize(canvasRef.current);
+    rendererRef.current = renderer;
+    
+    // Update viewMode in the store
+    setViewMode(viewMode);
+    
+    // Clean up on unmount
+    return () => {
+      if (rendererRef.current) {
+        rendererRef.current.destroy();
+        rendererRef.current = null;
+      }
+      
+      if (selectionManagerRef.current) {
+       selectionManagerRef.current.dispose();
+       selectionManagerRef.current = null;
+     }
+     
+     if (toolControllerRef.current) {
+       // No dispose method on toolController yet
+       toolControllerRef.current = null;
+     }
+     
+     setIsInitialized(false);
+   };
+ }, [
+   axisVisible, 
+   gridVisible, 
+   originOffset, 
+   viewMode, 
+   isInitialized, 
+   activeLayer, 
+   layers, 
+   addElement,
+   saveHistoryState,
+   darkMode,
+   showPerformanceStats
+ ]);
+ 
+ // Update elements in the scene when they change
+ useEffect(() => {
+   if (!rendererRef.current || !selectionManagerRef.current || !isInitialized) return;
+   
+   const scene = rendererRef.current.getScene();
+   if (!scene) return;
+   
+   // Clear previous element-to-object mapping
+   selectionManagerRef.current.clearElementMapping();
+   
+   // Create new element objects
+   elements.forEach(element => {
+     // Skip if layer is not visible
+     const layer = layers.find(l => l.id === element.layerId);
+     if (!layer || !layer.visible) return;
+     
+     const object = rendererRef.current!.createSceneElement(element, layers, originOffset);
+     if (object) {
+       // Map element to object
+       selectionManagerRef.current!.mapElementToObject(element, object);
+       
+       // Highlight if selected
+       if (selectedElement && element.id === selectedElement.id) {
+         selectionManagerRef.current!.selectElementById(element.id);
+       }
+     }
+   });
+   
+   // Apply optimization techniques
+   applyLOD();
+   optimizeScene();
+   
+ }, [elements, layers, originOffset, selectedElement, applyLOD, optimizeScene, isInitialized]);
+ 
+ // Update view mode when it changes
+ useEffect(() => {
+   if (!rendererRef.current || !isInitialized) return;
+   rendererRef.current.setViewMode(viewMode);
+ }, [viewMode, isInitialized]);
+ 
+ // Update grid visibility when it changes
+ useEffect(() => {
+   if (!rendererRef.current || !isInitialized) return;
+   rendererRef.current.setGridVisible(gridVisible);
+ }, [gridVisible, isInitialized]);
+ 
+ // Update axis visibility when it changes
+ useEffect(() => {
+   if (!rendererRef.current || !isInitialized) return;
+   rendererRef.current.setAxesVisible(axisVisible);
+ }, [axisVisible, isInitialized]);
+ 
+ // Update origin offset when it changes
+ useEffect(() => {
+   if (!rendererRef.current || !isInitialized) return;
+   rendererRef.current.setOriginOffset(originOffset);
+   
+   if (toolControllerRef.current) {
+     toolControllerRef.current.setOriginOffset(originOffset);
+   }
+ }, [originOffset, isInitialized]);
+ 
+ // Handle keyboard shortcuts
+ useKeyboardShortcuts({
+   onDelete: () => {
+     if (selectedElement) {
+       deleteElement(selectedElement.id);
+       saveHistoryState();
+     }
+   },
+   onEscape: () => {
+     // Cancel active operations
+     if (toolControllerRef.current) {
+       const activeTool = toolControllerRef.current.getActiveToolType();
+       if (activeTool && activeTool !== 'select') {
+         toolControllerRef.current.cancelOperation();
+         toolControllerRef.current.activateTool('select');
+       }
+     }
+     
+     // Close active menus
+     if (activeContextMenu) {
+       setActiveContextMenu(null);
+     }
+     
+     // Cancel measurement
+     if (isMeasuring) {
+       setIsMeasuring(false);
+       setMeasurementPoints([]);
+     }
+     
+     // Hide shortcuts panel
+     if (showShortcutsPanel) {
+       setShowShortcutsPanel(false);
+     }
+     
+     // Clear selection
+     if (selectedElement) {
+       selectElement(null);
+     }
+   },
+   onUndo: () => {
+     undo();
+   },
+   onRedo: () => {
+     redo();
+   },
+   onSave: () => {
+     saveHistoryState();
+     // Handle save functionality
+   }
+ });
+ 
+ // Handle window resize
+ useEffect(() => {
+   const handleResize = () => {
+     if (!canvasRef.current) return;
+     
+     const width = canvasRef.current.clientWidth;
+     const height = canvasRef.current.clientHeight;
+     
+     setCanvasDimensions({ width, height });
+     
+     if (rendererRef.current) {
+       rendererRef.current.getRenderer()?.setSize(width, height);
+     }
+   };
+   
+   window.addEventListener('resize', handleResize);
+   
+   return () => {
+     window.removeEventListener('resize', handleResize);
+   };
+ }, []);
+ 
+ // Handle mouse move for regular interactions
+ const handleMouseMove = useCallback((event: React.MouseEvent) => {
+   if (!canvasRef.current || !rendererRef.current || !isInitialized) return;
+   
+   const rect = canvasRef.current.getBoundingClientRect();
+   const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+   const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+   
+   // Update the selection manager
+   if (selectionManagerRef.current) {
+     selectionManagerRef.current.updateMouse(mouseX, mouseY);
+     
+     // Handle hover effects
+     const camera = rendererRef.current.getCamera();
+     const scene = rendererRef.current.getScene();
+     
+     if (camera && scene) {
+       // Create raycaster
+       const raycaster = new THREE.Raycaster();
+       raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+       
+       // Get selectable objects
+       const selectableObjects: THREE.Object3D[] = [];
+       scene.traverse((obj) => {
+         if (obj.userData.isCADElement) {
+           selectableObjects.push(obj);
+         }
+       });
+       
+       // Raycast to find intersections
+       const intersects = raycaster.intersectObjects(selectableObjects, true);
+       
+       // Update selection manager
+       selectionManagerRef.current.handleHover(intersects);
+       
+       // Get world position for mouse cursor
+       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+       const mouse3D = new THREE.Vector3();
+       raycaster.ray.intersectPlane(plane, mouse3D);
+       
+       // Apply snapping if enabled
+       if (snapSettings.enabled) {
+         const snappedPoint = snapToPoint({
+           x: mouse3D.x,
+           y: mouse3D.y,
+           z: mouse3D.z
+         });
+         
+         if (snappedPoint) {
+           mouse3D.set(snappedPoint.x, snappedPoint.y, snappedPoint.z);
+         }
+       }
+       
+       // Update tool controller
+       if (toolControllerRef.current) {
+         toolControllerRef.current.handleMouseMove(
+           mouse3D, 
+           snapIndicator.visible ? new THREE.Vector3(
+             snapIndicator.x, 
+             snapIndicator.y, 
+             mouse3D.z
+           ) : undefined
+         );
+       }
+       
+       // Update mouse position in store
+       setMousePosition({
+         x: Math.round(mouse3D.x * 100) / 100,
+         y: Math.round(mouse3D.y * 100) / 100,
+         z: Math.round(mouse3D.z * 100) / 100
+       });
+       
+       // Update measurement points
+       if (isMeasuring && measurementPoints.length === 1) {
+         setMeasurementPoints([
+           measurementPoints[0],
+           new THREE.Vector3(mouse3D.x, mouse3D.y, mouse3D.z)
+         ]);
+       }
+     }
+   }
+ }, [
+   isInitialized,
+   snapSettings.enabled,
+   snapToPoint,
+   setMousePosition,
+   snapIndicator,
+   isMeasuring,
+   measurementPoints
+ ]);
+ 
+ // Handle mouse down for selection and interaction
+ const handleMouseDown = useCallback((event: React.MouseEvent) => {
+   if (!canvasRef.current || !rendererRef.current || !isInitialized) return;
+   
+   // Handle right click for context menu
+   if (event.button === 2) {
+     event.preventDefault();
+     
+     setActiveContextMenu({
+       x: event.clientX,
+       y: event.clientY
+     });
+     
+     return;
+   }
+   
+   // Close context menu on left click
+   if (activeContextMenu) {
+     setActiveContextMenu(null);
+   }
+   
+   // Handle element click
+   const rect = canvasRef.current.getBoundingClientRect();
+   const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+   const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+   
+   if (selectionManagerRef.current) {
+     const camera = rendererRef.current.getCamera();
+     const scene = rendererRef.current.getScene();
+     
+     if (camera && scene) {
+       // Create raycaster
+       const raycaster = new THREE.Raycaster();
+       raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+       
+       // Get selectable objects
+       const selectableObjects: THREE.Object3D[] = [];
+       scene.traverse((obj) => {
+         if (obj.userData.isCADElement) {
+           selectableObjects.push(obj);
+         }
+       });
+       
+       // Raycast to find intersections
+       const intersects = raycaster.intersectObjects(selectableObjects, true);
+       
+       // Handle selection
+       const selectedId = selectionManagerRef.current.handleClick(intersects, event.shiftKey);
+       if (selectedId) {
+         selectElement(selectedId);
+       } else if (!event.shiftKey) {
+         selectElement(null);
+       }
+       
+       // Get world position for click
+       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+       const mouse3D = new THREE.Vector3();
+       raycaster.ray.intersectPlane(plane, mouse3D);
+       
+       // Apply snapping if enabled
+       if (snapSettings.enabled) {
+         const snappedPoint = snapToPoint({
+           x: mouse3D.x,
+           y: mouse3D.y,
+           z: mouse3D.z
+         });
+         
+         if (snappedPoint) {
+           mouse3D.set(snappedPoint.x, snappedPoint.y, snappedPoint.z);
+         }
+       }
+       
+       // Handle tool click
+       if (toolControllerRef.current) {
+         const element = toolControllerRef.current.handleClick(
+           mouse3D,
+           snapIndicator.visible ? new THREE.Vector3(
+             snapIndicator.x,
+             snapIndicator.y,
+             mouse3D.z
+           ) : undefined
+         );
+         
+         // If element was created, save history state
+         if (element) {
+           saveHistoryState();
+         }
+       }
+       
+       // Handle measurement click
+       if (isMeasuring) {
+         if (measurementPoints.length === 0) {
+           setMeasurementPoints([new THREE.Vector3(mouse3D.x, mouse3D.y, mouse3D.z)]);
+         } else if (measurementPoints.length === 1) {
+           const p1 = measurementPoints[0];
+           const p2 = new THREE.Vector3(mouse3D.x, mouse3D.y, mouse3D.z);
+           setMeasurementPoints([p1, p2]);
+           
+           // Calculate distance
+           const distance = p1.distanceTo(p2);
+           
+           // Show distance in notification
+           // Add notification code here
+           
+           // Reset measurement after a delay
+           setTimeout(() => {
+             setMeasurementPoints([]);
+           }, 2000);
+         }
+       }
+     }
+   }
+ }, [
+   isInitialized,
+   activeContextMenu,
+   snapSettings.enabled,
+   snapToPoint,
+   snapIndicator,
+   selectElement,
+   isMeasuring,
+   measurementPoints,
+   saveHistoryState
+ ]);
+ 
+ // Handle component drag over
+ const handleComponentDragOver = useCallback((event: React.DragEvent) => {
+   if (!allowDragDrop || !isInitialized) return;
+   
+   event.preventDefault();
+   setIsDraggingComponent(true);
+   
+   if (!canvasRef.current || !rendererRef.current) return;
+   
+   // Calculate drop position
+   const rect = canvasRef.current.getBoundingClientRect();
+   const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+   const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+   
+   const camera = rendererRef.current.getCamera();
+   if (!camera) return;
+   
+   // Create raycaster
+   const raycaster = new THREE.Raycaster();
+   raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), camera);
+   
+   // Get drop position
+   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+   const mouse3D = new THREE.Vector3();
+   raycaster.ray.intersectPlane(plane, mouse3D);
+   
+   // Apply snapping if enabled
+   if (snapSettings.enabled) {
+     const snappedPoint = snapToPoint({
+       x: mouse3D.x,
+       y: mouse3D.y,
+       z: mouse3D.z
+     });
+     
+     if (snappedPoint) {
+       mouse3D.set(snappedPoint.x, snappedPoint.y, snappedPoint.z);
+     }
+   }
+   
+   setDropPosition({
+     x: mouse3D.x - originOffset.x,
+     y: mouse3D.y - originOffset.y,
+     z: mouse3D.z - originOffset.z
+   });
+   
+   // Calculate screen position for the indicator
+   const worldPos = new THREE.Vector3(mouse3D.x, mouse3D.y, mouse3D.z);
+   
+   if (camera instanceof THREE.PerspectiveCamera) {
+     const screenPos = worldPos.clone().project(camera);
+     
+     setDropScreenPosition({
+       x: (screenPos.x * 0.5 + 0.5) * canvasDimensions.width,
+       y: (-screenPos.y * 0.5 + 0.5) * canvasDimensions.height
+     });
+   }
+ }, [
+   allowDragDrop,
+   isInitialized,
+   snapSettings.enabled,
+   snapToPoint,
+   originOffset,
+   canvasDimensions
+ ]);
+ 
+ // Handle component drop
+ const handleComponentDrop = useCallback((event: React.DragEvent) => {
+   if (!allowDragDrop || !isInitialized) return;
+   
+   event.preventDefault();
+   
+   const componentId = event.dataTransfer.getData('component/id');
+   if (!componentId) return;
+   
+   // Create element from component
+   if (onComponentPlaced) {
+     onComponentPlaced(componentId, dropPosition);
+   }
+   
+   // Reset drag state
+   setIsDraggingComponent(false);
+   setDropScreenPosition(undefined);
+ }, [
+   allowDragDrop,
+   isInitialized,
+   onComponentPlaced,
+   dropPosition
+ ]);
+ 
+ // Handle component drag leave
+ const handleComponentDragLeave = useCallback(() => {
+   setIsDraggingComponent(false);
+   setDropScreenPosition(undefined);
+ }, []);
+ 
+ // Handle context menu to prevent browser default
+ const handleContextMenu = useCallback((event: React.MouseEvent) => {
+   event.preventDefault();
+ }, []);
+ 
+ // Toggle fullscreen
+ const toggleFullscreen = useCallback(() => {
+   if (!canvasRef.current) return;
+   
+   if (!isFullscreen) {
+     if (canvasRef.current.requestFullscreen) {
+       canvasRef.current.requestFullscreen();
+     } else if ((canvasRef.current as any).webkitRequestFullscreen) {
+       (canvasRef.current as any).webkitRequestFullscreen();
+     } else if ((canvasRef.current as any).mozRequestFullScreen) {
+       (canvasRef.current as any).mozRequestFullScreen();
+     } else if ((canvasRef.current as any).msRequestFullscreen) {
+       (canvasRef.current as any).msRequestFullscreen();
+     }
+   } else {
+     if (document.exitFullscreen) {
+       document.exitFullscreen();
+     } else if ((document as any).webkitExitFullscreen) {
+       (document as any).webkitExitFullscreen();
+     } else if ((document as any).mozCancelFullScreen) {
+       (document as any).mozCancelFullScreen();
+     } else if ((document as any).msExitFullscreen) {
+       (document as any).msExitFullscreen();
+     }
+   }
+ }, [isFullscreen]);
+ 
+ // Handle fullscreen change
+ const handleFullscreenChange = useCallback(() => {
+   setIsFullscreen(!!document.fullscreenElement);
+ }, []);
+ 
+ // Add fullscreen change event listeners
+ useEffect(() => {
+   document.addEventListener('fullscreenchange', handleFullscreenChange);
+   document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+   document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+   document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+   
+   return () => {
+     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+     document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+     document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+     document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+   };
+ }, [handleFullscreenChange]);
+ 
+ // Activate tool in the tool controller
+ const activateTool = useCallback((toolId: string) => {
+   if (!toolControllerRef.current || !isInitialized) return;
+   
+   toolControllerRef.current.activateTool(toolId as any);
+   
+   // Handle special tools
+   if (toolId === 'measure') {
+     setIsMeasuring(true);
+     setMeasurementPoints([]);
+   } else {
+     setIsMeasuring(false);
+   }
+ }, [isInitialized]);
+ 
+ return (
+   <div 
+     ref={canvasRef}
+     style={{
+       width: width,
+       height: height,
+       position: 'relative',
+       overflow: 'hidden'
+     }}
+     className={`cad-canvas relative bg-gradient-to-b from-gray-900 to-black ${
+       isDraggingComponent ? 'cursor-cell' : ''
+     } ${className}`}
+     onMouseMove={handleMouseMove}
+     onMouseDown={handleMouseDown}
+     onContextMenu={handleContextMenu}
+     onDragOver={handleComponentDragOver}
+     onDrop={handleComponentDrop}
+     onDragLeave={handleComponentDragLeave}
+   >
+     {/* Snap indicator */}
+     <SnapIndicator 
+       x={snapIndicator.x} 
+       y={snapIndicator.y} 
+       type={snapIndicator.type} 
+       visible={snapIndicator.visible} 
+     />
+     
+     {/* Status message */}
+     <StatusMessage 
+       message={statusMessage} 
+       visible={!!statusMessage} 
+     />
+     
+     {/* Drag & drop indicator */}
+     {isDraggingComponent && (
+       <DragDropIndicator 
+         position={dropPosition} 
+         screenPosition={dropScreenPosition}
+       />
+     )}
+     
+     {/* Measurement overlay */}
+     {isMeasuring && measurementPoints.length > 0 && (
+       <MeasurementOverlay 
+         points={measurementPoints} 
+         camera={rendererRef.current?.getCamera() || null} 
+       />
+     )}
+     
+     {/* Context menu */}
+     {activeContextMenu && (
+       <ContextMenu
+         x={activeContextMenu.x}
+         y={activeContextMenu.y}
+         elementId={activeContextMenu.elementId}
+         onClose={() => setActiveContextMenu(null)}
+         onSelectTool={activateTool}
+       />
+     )}
+     
+     {/* Canvas toolbar */}
+     {showToolbar && (
+       <CanvasToolbar
+         position={toolbarPosition}
+         onToolSelect={activateTool}
+         onToggleGrid={toggleGrid}
+         onToggleAxis={toggleAxis}
+         onToggleViewMode={() => setViewMode(viewMode === '2d' ? '3d' : '2d')}
+       />
+     )}
+     
+     {/* View cube */}
+     {showViewCube && viewMode === '3d' && isInitialized && (
+       <ViewCube 
+         camera={rendererRef.current?.getCamera() || null}
+         controls={rendererRef.current?.getControls() || null}
+       />
+     )}
+     
+     {/* View controls */}
+     <CADViewControls
+       onToggleFullscreen={toggleFullscreen}
+       isFullscreen={isFullscreen}
+       viewMode={viewMode}
+       onChangeViewMode={(mode) => setViewMode(mode)}
+     />
+     
+     {/* Tool options panel */}
+     <ToolOptionsPanel
+       toolController={toolControllerRef.current}
+       activeTool={toolControllerRef.current?.getActiveToolType() || null}
+     />
+     
+     {/* Coordinate display */}
+     <CoordinateDisplay />
+     
+     {/* Performance stats */}
+     {showPerformanceStats && (
+       <CanvasPerformanceStats statistics={sceneStatistics} />
+     )}
+     
+     {/* Status bar */}
+     {showStatusBar && (
+       <StatusBar />
+     )}
+   </div>
+ );
+};
+
+export default CADCanvas;

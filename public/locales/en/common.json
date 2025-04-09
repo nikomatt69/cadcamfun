@@ -1,0 +1,32 @@
+{
+  "home": {
+    "title": "CAD/CAM App",
+    "subtitle": "Design and Manufacturing Solution",
+    "description": "Professional CAD/CAM software for your design needs"
+  },
+  "navigation": {
+    "home": "Home",
+    "projects": "Projects",
+    "library": "Library",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "actions": {
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "import": "Import",
+    "export": "Export"
+  },
+  "tools": {
+    "select": "Select",
+    "move": "Move",
+    "rotate": "Rotate",
+    "scale": "Scale",
+    "draw": "Draw",
+    "measure": "Measure"
+  }
+}

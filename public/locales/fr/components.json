@@ -1,0 +1,88 @@
+{
+  "ai": {
+    "componentGenerator": {
+      "title": "Générateur de Composants IA",
+      "categories": {
+        "mechanical": "Mécanique",
+        "electronic": "Électronique",
+        "structural": "Structurel",
+        "fixture": "Fixation",
+        "enclosure": "Boîtier",
+        "fastener": "Attache"
+      },
+      "manufacturing": {
+        "title": "Méthode de Fabrication",
+        "3d-printing": "Impression 3D",
+        "cnc-machining": "Usinage CNC",
+        "injection-molding": "Moulage par Injection",
+        "laser-cutting": "Découpe Laser",
+        "sheet-metal": "Tôlerie",
+        "extrusion": "Extrusion"
+      },
+      "materials": {
+        "title": "Catégorie de Matériau",
+        "metal": "Métal",
+        "plastic": "Plastique",
+        "composite": "Composite",
+        "wood": "Bois",
+        "ceramic": "Céramique"
+      }
+    },
+    "feedback": {
+      "title": "Retour IA",
+      "confidence": "Niveau de Confiance",
+      "suggestions": "Suggestions",
+      "warnings": "Avertissements"
+    }
+  },
+  "cam": {
+    "toolpath": {
+      "title": "Générateur de Trajectoire",
+      "operations": {
+        "mill": "Fraisage",
+        "lathe": "Tournage",
+        "facing": "Dressage",
+        "turning": "Tournage",
+        "boring": "Alésage",
+        "threading": "Filetage",
+        "grooving": "Rainurage",
+        "parting": "Tronçonnage",
+        "knurling": "Moletage"
+      },
+      "settings": {
+        "coolant": "Liquide de Refroidissement",
+        "temperature": "Température",
+        "bedTemp": "Température du Plateau"
+      }
+    }
+  },
+  "library": {
+    "title": "Bibliothèque de Composants",
+    "filters": {
+      "search": "Rechercher des Composants",
+      "type": "Type de Composant",
+      "category": "Catégorie"
+    },
+    "actions": {
+      "import": "Importer des Composants",
+      "export": "Exporter des Composants",
+      "add": "Ajouter un Composant",
+      "remove": "Supprimer un Composant"
+    }
+  },
+  "transform": {
+    "title": "Outils de Transformation",
+    "tools": {
+      "move": "Déplacer",
+      "rotate": "Pivoter",
+      "scale": "Redimensionner",
+      "copy": "Copier",
+      "paste": "Coller"
+    },
+    "axis": {
+      "x": "Axe X",
+      "y": "Axe Y",
+      "z": "Axe Z"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+---
+description: Italian Comments Translation Detects Italian comments in your code Suggests English translations Triggers on save Italian UI Strings Translation Finds Italian text in UI strings Preserves JSX/HTML tags and variables Triggers on save TypeScript Type Improvements Suggests type annotations for variables Helps maintain type safety Manual trigger Tailwind CSS Optimization Optimizes long className strings Improves readability Manual trigger Next.js API Route Improvements Reviews API handlers Suggests error handling and type safety improvements Manual trigger React Hook Dependencies Checks for missing dependencies in hooks Helps prevent bugs Manual trigger Server Component Check Identifies client-side code in server components Helps maintain proper component boundaries Manual trigger Type-Safe API Calls Improves type safety in fetch calls Suggests better error handling Manual trigger These rules are already well-suited for your Next.js TypeScript project with Tailwind CSS. They cover: Code quality Type safety Performance Best practices Internationalization Component architecture Would you like me to: Add any additional rules for specific needs? Modify any of the existing rules? Add more specific patterns for your CAD/CAM application domain? Please let me know what aspects you'd like to enhance or modif
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+Italian Comments Translation
+Detects Italian comments in your code
+Suggests English translations
+Triggers on save
+Italian UI Strings Translation
+Finds Italian text in UI strings
+Preserves JSX/HTML tags and variables
+Triggers on save
+TypeScript Type Improvements
+Suggests type annotations for variables
+Helps maintain type safety
+Manual trigger
+Tailwind CSS Optimization
+Optimizes long className strings
+Improves readability
+Manual trigger
+Next.js API Route Improvements
+Reviews API handlers
+Suggests error handling and type safety improvements
+Manual trigger
+React Hook Dependencies
+Checks for missing dependencies in hooks
+Helps prevent bugs
+Manual trigger
+Server Component Check
+Identifies client-side code in server components
+Helps maintain proper component boundaries
+Manual trigger
+Type-Safe API Calls
+Improves type safety in fetch calls
+Suggests better error handling
+Manual trigger
+These rules are already well-suited for your Next.js TypeScript project with Tailwind CSS. They cover:
+Code quality
+Type safety
+Performance
+Best practices
+Internationalization
+Component architecture
+Would you like me to:
+Add any additional rules for specific needs?
+Modify any of the existing rules?
+Add more specific patterns for your CAD/CAM application domain?
+Please let me know what aspects you'd like to enhance or modif

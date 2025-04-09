@@ -1,0 +1,26 @@
+{
+  "id": "com.example.entitycounter",
+  "name": "example-entity-counter-plugin",
+  "version": "0.1.0",
+  "description": "Counts entities in the current model.",
+  "author": "Test User",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build" 
+  },
+  "keywords": [
+    "cadcamfun",
+    "plugin",
+    "example"
+  ],
+  "engines": {
+    "cadcam": ">=1.0.0"
+  },
+  "permissions": [
+    "model:read",
+    "system:notifications"
+  ],
+  "contributes": {
+  }
+} 

@@ -1,0 +1,32 @@
+{
+  "home": {
+    "title": "Application CAD/CAM",
+    "subtitle": "Solution de Conception et Fabrication",
+    "description": "Logiciel CAD/CAM professionnel pour vos besoins en conception"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "projects": "Projets",
+    "library": "Bibliothèque",
+    "settings": "Paramètres",
+    "profile": "Profil",
+    "logout": "Déconnexion"
+  },
+  "actions": {
+    "create": "Créer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "import": "Importer",
+    "export": "Exporter"
+  },
+  "tools": {
+    "select": "Sélectionner",
+    "move": "Déplacer",
+    "rotate": "Pivoter",
+    "scale": "Redimensionner",
+    "draw": "Dessiner",
+    "measure": "Mesurer"
+  }
+}

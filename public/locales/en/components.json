@@ -1,0 +1,88 @@
+{
+  "ai": {
+    "componentGenerator": {
+      "title": "AI Component Generator",
+      "categories": {
+        "mechanical": "Mechanical",
+        "electronic": "Electronic",
+        "structural": "Structural",
+        "fixture": "Fixture",
+        "enclosure": "Enclosure",
+        "fastener": "Fastener"
+      },
+      "manufacturing": {
+        "title": "Manufacturing Method",
+        "3d-printing": "3D Printing",
+        "cnc-machining": "CNC Machining",
+        "injection-molding": "Injection Molding",
+        "laser-cutting": "Laser Cutting",
+        "sheet-metal": "Sheet Metal",
+        "extrusion": "Extrusion"
+      },
+      "materials": {
+        "title": "Material Category",
+        "metal": "Metal",
+        "plastic": "Plastic",
+        "composite": "Composite",
+        "wood": "Wood",
+        "ceramic": "Ceramic"
+      }
+    },
+    "feedback": {
+      "title": "AI Feedback",
+      "confidence": "Confidence Score",
+      "suggestions": "Suggestions",
+      "warnings": "Warnings"
+    }
+  },
+  "cam": {
+    "toolpath": {
+      "title": "Toolpath Generator",
+      "operations": {
+        "mill": "Mill",
+        "lathe": "Lathe",
+        "facing": "Facing",
+        "turning": "Turning",
+        "boring": "Boring",
+        "threading": "Threading",
+        "grooving": "Grooving",
+        "parting": "Parting",
+        "knurling": "Knurling"
+      },
+      "settings": {
+        "coolant": "Coolant",
+        "temperature": "Temperature",
+        "bedTemp": "Bed Temperature"
+      }
+    }
+  },
+  "library": {
+    "title": "Component Library",
+    "filters": {
+      "search": "Search Components",
+      "type": "Component Type",
+      "category": "Category"
+    },
+    "actions": {
+      "import": "Import Components",
+      "export": "Export Components",
+      "add": "Add Component",
+      "remove": "Remove Component"
+    }
+  },
+  "transform": {
+    "title": "Transform Tools",
+    "tools": {
+      "move": "Move",
+      "rotate": "Rotate",
+      "scale": "Scale",
+      "copy": "Copy",
+      "paste": "Paste"
+    },
+    "axis": {
+      "x": "X Axis",
+      "y": "Y Axis",
+      "z": "Z Axis"
+    }
+  }
+}

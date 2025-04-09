@@ -1,0 +1,62 @@
+// src/pages/components/[id].tsx BACKUP
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
+import Layout from '@/src/components/layout/Layout';
+import { 
+  Save, 
+  ArrowLeft, 
+  Code, 
+  Image, 
+  Info, 
+  Trash2, 
+  AlertCircle, 
+  Check, 
+  Cpu, 
+  ExternalLink,
+  Copy,
+  Layers,
+  Activity,
+  MessageCircle,
+  BarChart2,
+  Share,
+  Edit3,
+  Calendar,
+  Clock,
+  Clipboard,
+  Link2,
+  Eye,
+  Zap,
+  Shield,
+  Settings,
+  Sliders,
+  Download,
+  UploadCloud,
+  Edit,
+  Grid,
+  List,
+  Share2,
+  Maximize2,
+  Minimize2
+} from 'react-feather';
+import { fetchComponentById, updateComponent, deleteComponent } from '@/src/lib/api/components';
+import Loading from '@/src/components/ui/Loading';
+import { Component ,  ComponentVersion , ComponentComment , } from '@prisma/client';
+import Metatags from '@/src/components/layout/Metatags';
+import { useLocalComponentsLibraryStore } from '@/src/store/localComponentsLibraryStore';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
+import { cn } from '@/src/lib/utils';
+import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+import Split from 'react-split';
+import { format } from 'date-fns';
+import { useDebounce } from 'use-debounce';
+import { Chart as ChartJS } from 'chart.js/auto';
+import { Graph } from 'react-d3-graph';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import React from 'react';
+import { useProjectDrawings } from '@/src/hooks/useDrawings';
+import { useCADStore } from '@/src/store/cadStore';
+
+// ... existing code ... 

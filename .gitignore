@@ -1,0 +1,10 @@
+.env
+.env.development
+.env.production
+.vercel
+.next
+node-modules
+node_modules
+tsconfig.9ltn2umbwod.tsbuildinfo
+.DS_Store
+src/pages/2.tsx

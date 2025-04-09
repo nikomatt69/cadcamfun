@@ -1,0 +1,88 @@
+{
+  "ai": {
+    "componentGenerator": {
+      "title": "Generador de Componentes IA",
+      "categories": {
+        "mechanical": "Mecánico",
+        "electronic": "Electrónico",
+        "structural": "Estructural",
+        "fixture": "Fijación",
+        "enclosure": "Carcasa",
+        "fastener": "Sujetador"
+      },
+      "manufacturing": {
+        "title": "Método de Fabricación",
+        "3d-printing": "Impresión 3D",
+        "cnc-machining": "Mecanizado CNC",
+        "injection-molding": "Moldeo por Inyección",
+        "laser-cutting": "Corte Láser",
+        "sheet-metal": "Chapa Metálica",
+        "extrusion": "Extrusión"
+      },
+      "materials": {
+        "title": "Categoría de Material",
+        "metal": "Metal",
+        "plastic": "Plástico",
+        "composite": "Compuesto",
+        "wood": "Madera",
+        "ceramic": "Cerámica"
+      }
+    },
+    "feedback": {
+      "title": "Retroalimentación IA",
+      "confidence": "Nivel de Confianza",
+      "suggestions": "Sugerencias",
+      "warnings": "Advertencias"
+    }
+  },
+  "cam": {
+    "toolpath": {
+      "title": "Generador de Trayectoria",
+      "operations": {
+        "mill": "Fresado",
+        "lathe": "Torneado",
+        "facing": "Refrentado",
+        "turning": "Torneado",
+        "boring": "Mandrinado",
+        "threading": "Roscado",
+        "grooving": "Ranurado",
+        "parting": "Tronzado",
+        "knurling": "Moleteado"
+      },
+      "settings": {
+        "coolant": "Refrigerante",
+        "temperature": "Temperatura",
+        "bedTemp": "Temperatura de Cama"
+      }
+    }
+  },
+  "library": {
+    "title": "Biblioteca de Componentes",
+    "filters": {
+      "search": "Buscar Componentes",
+      "type": "Tipo de Componente",
+      "category": "Categoría"
+    },
+    "actions": {
+      "import": "Importar Componentes",
+      "export": "Exportar Componentes",
+      "add": "Añadir Componente",
+      "remove": "Eliminar Componente"
+    }
+  },
+  "transform": {
+    "title": "Herramientas de Transformación",
+    "tools": {
+      "move": "Mover",
+      "rotate": "Rotar",
+      "scale": "Escalar",
+      "copy": "Copiar",
+      "paste": "Pegar"
+    },
+    "axis": {
+      "x": "Eje X",
+      "y": "Eje Y",
+      "z": "Eje Z"
+    }
+  }
+}

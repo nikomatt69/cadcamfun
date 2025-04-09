@@ -1,0 +1,53 @@
+name: "Italian UI Translation"
+description: "Automatically translates Italian text in UI components and render sections to English"
+glob: "src/**/*.{tsx,jsx}"
+triggers:
+  - on: "file_open"
+  - on: "save"
+
+rules:
+  - name: "Translate UI Text"
+    pattern: |
+      // Matches any Italian text in JSX/TSX render sections and components
+      (?<=(?:return|render)\s*\(\s*(?:<.*?>)?\s*|(?:title|label|placeholder|description|text|value|aria-label)=|<(?:button|a|Link|option|span|p|h[1-6]|div)[^>]*>)['"]([^'"]*(?:[A-Z][a-z]+(?:zione|mento|tura|sione|zione|ggio|tore|enza|ità|are|ere|ire)|(?:della|dello|degli|delle|nella|nelle|negli|nel|dal|dallo|dagli|dalle|al|allo|agli|alle|sul|sullo|sugli|sulle|con|per|tra|fra|questo|questa|questi|queste|quello|quella|quelli|quelle|nostro|nostra|nostri|nostre|vostro|vostra|vostri|vostre|loro|suo|sua|suoi|sue|mio|mia|miei|mie)[^'"]*))['"]\s*(?:>|\}|,|\)|\s)
+
+    suggestion:
+      text: "Translate the matched Italian text to English"
+      action: "translate"
+      options:
+        from: "it"
+        to: "en"
+        preserveTags: true
+        preserveFormatting: true
+        autoApply: true
+
+  - name: "Translate Comments"
+    pattern: |
+      // Matches Italian comments
+      (?:\/\/|\/\*|\*\s)([^*\/\n]*(?:[A-Z][a-z]+(?:zione|mento|tura|sione|zione|ggio|tore|enza|ità|are|ere|ire)|(?:della|dello|degli|delle|nella|nelle|negli|nel|dal|dallo|dagli|dalle|al|allo|agli|alle|sul|sullo|sugli|sulle|con|per|tra|fra|questo|questa|questi|queste|quello|quella|quelli|quelle|nostro|nostra|nostri|nostre|vostro|vostra|vostri|vostre|loro|suo|sua|suoi|sue|mio|mia|miei|mie)[^\n]*))(?:\*\/|\n|$)
+
+    suggestion:
+      text: "Translate the Italian comment to English"
+      action: "translate"
+      options:
+        from: "it"
+        to: "en"
+        preserveFormatting: true
+        autoApply: true
+
+settings:
+  ignoreComments: false
+  ignoreStrings: false
+  ignoreRegExp: true
+  translateOnSave: true
+  backupFiles: true
+  excludePatterns:
+    - "**/*.test.{tsx,jsx}"
+    - "**/*.spec.{tsx,jsx}"
+    - "**/node_modules/**"
+  includePatterns:
+    - "**/components/**/*.{tsx,jsx}"
+    - "**/pages/**/*.{tsx,jsx}"
+    - "**/views/**/*.{tsx,jsx}"
+  translationCache: true
+  cacheExpiration: 604800 # 7 days in seconds 

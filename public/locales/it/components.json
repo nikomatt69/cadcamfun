@@ -1,0 +1,88 @@
+{
+  "ai": {
+    "componentGenerator": {
+      "title": "Generatore Componenti IA",
+      "categories": {
+        "mechanical": "Meccanico",
+        "electronic": "Elettronico",
+        "structural": "Strutturale",
+        "fixture": "Fissaggio",
+        "enclosure": "Involucro",
+        "fastener": "Elemento di Fissaggio"
+      },
+      "manufacturing": {
+        "title": "Metodo di Produzione",
+        "3d-printing": "Stampa 3D",
+        "cnc-machining": "Lavorazione CNC",
+        "injection-molding": "Stampaggio a Iniezione",
+        "laser-cutting": "Taglio Laser",
+        "sheet-metal": "Lamiera",
+        "extrusion": "Estrusione"
+      },
+      "materials": {
+        "title": "Categoria Materiale",
+        "metal": "Metallo",
+        "plastic": "Plastica",
+        "composite": "Composito",
+        "wood": "Legno",
+        "ceramic": "Ceramica"
+      }
+    },
+    "feedback": {
+      "title": "Feedback IA",
+      "confidence": "Livello di Confidenza",
+      "suggestions": "Suggerimenti",
+      "warnings": "Avvertenze"
+    }
+  },
+  "cam": {
+    "toolpath": {
+      "title": "Generatore Percorso Utensile",
+      "operations": {
+        "mill": "Fresatura",
+        "lathe": "Tornitura",
+        "facing": "Sfacciatura",
+        "turning": "Tornitura",
+        "boring": "Alesatura",
+        "threading": "Filettatura",
+        "grooving": "Scanalatura",
+        "parting": "Troncatura",
+        "knurling": "Zigrinatura"
+      },
+      "settings": {
+        "coolant": "Refrigerante",
+        "temperature": "Temperatura",
+        "bedTemp": "Temperatura Piano"
+      }
+    }
+  },
+  "library": {
+    "title": "Libreria Componenti",
+    "filters": {
+      "search": "Cerca Componenti",
+      "type": "Tipo Componente",
+      "category": "Categoria"
+    },
+    "actions": {
+      "import": "Importa Componenti",
+      "export": "Esporta Componenti",
+      "add": "Aggiungi Componente",
+      "remove": "Rimuovi Componente"
+    }
+  },
+  "transform": {
+    "title": "Strumenti di Trasformazione",
+    "tools": {
+      "move": "Sposta",
+      "rotate": "Ruota",
+      "scale": "Scala",
+      "copy": "Copia",
+      "paste": "Incolla"
+    },
+    "axis": {
+      "x": "Asse X",
+      "y": "Asse Y",
+      "z": "Asse Z"
+    }
+  }
+}

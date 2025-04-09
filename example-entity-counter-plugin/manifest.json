@@ -1,0 +1,17 @@
+{
+  "id": "com.example.entitycounter",
+  "name": "Entity Counter Plugin",
+  "version": "0.1.0",
+  "description": "Counts entities in the current model.",
+  "author": "Test User",
+  "main": "dist/main.js",
+  "engines": {
+    "cadcam": ">=1.0.0"
+  },
+  "permissions": [
+    "model:read", 
+    "system:notifications" 
+  ],
+  "contributes": {
+  }
+} 
