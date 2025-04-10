@@ -1,6 +1,6 @@
 {
-  "name": "@cadcamfun/cadcam-fun-sdk",
-  "version": "0.3.0",
+  "name": "@cadcamfun/cadcamfun-plugins-sdk",
+  "version": "0.4.0",
   "description": "SDK for building plugins for CAD/CAM FUN",
   "author": "Niko Matt",
   "license": "MIT",
@@ -20,7 +20,7 @@
     "docs"
   ],
   "bin": {
-    "cadcam-plugin-cli": "dist/cli/plugin-cli.js"
+    "cadcamfun-plugin-cli": "dist/cli/plugin-cli.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
