@@ -1,6 +1,6 @@
 {
   "name": "@cadcamfun/cadcam-fun-sdk",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "SDK for building plugins for CAD/CAM FUN",
   "author": "Niko Matt",
   "license": "MIT",
