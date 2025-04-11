@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
-import { Sun, Moon, Bell, Settings, User, LogOut, Menu, X, Users, Globe, BookOpen } from 'react-feather';
+import { Sun, Moon, Bell, Settings, User, LogOut, Menu, X, Users, Globe, BookOpen, ToggleLeft } from 'react-feather';
 import useUserProfileStore from 'src/store/userProfileStore';
 import NotificationCenter from '../notifications/NotificationCenter';
 import OrganizationChatPage from '@/src/pages/organizations/[id]/chat';
@@ -15,7 +15,7 @@ const Navbar = () => {
   const { profileImage } = useUserProfileStore(); // Get image from global store
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Close any open dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -93,7 +93,13 @@ const Navbar = () => {
             >
               {isDarkMode ? <Sun className="h-5 w-5 sm:h-6 sm:w-6" /> : <Moon className="h-5 w-5 sm:h-6 sm:w-6" />}
             </button>
-
+            <button
+            onClick={() => setSidebarOpen(sidebarOpen)}
+            className="flex items-center px-4 py-2  text-emerald-400  transition-colors"
+          >
+            
+            <ToggleLeft size={18} className="ml-1" />
+          </button>
             {/* Notifications - hide on smallest screens */}
             <button
               className=" sm:inline-flex items-center justify-center p-1 sm:p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none"

@@ -1,8 +1,9 @@
 import { PluginManifest, validateManifest } from './pluginManifest';
-import { PluginLifecycle, PluginState } from './pluginLifecycle';
+import { PluginLifecycle } from './pluginLifecycle';
 import { PluginStorage } from './pluginStorage';
 import { EventEmitter } from 'events';
 import { IPluginHost } from '../host/pluginHost';
+import { PluginState } from '../registry';
 
 /**
  * Interface for plugin metadata stored in the registry
@@ -15,6 +16,7 @@ export interface PluginRegistryEntry {
   version: string;
   installedAt: Date;
   updatedAt: Date;
+  config?: { [key: string]: any };
   configurationId?: string;
   errorCount: number;
   lastError?: string;
@@ -39,13 +41,12 @@ export enum PluginRegistryEvent {
  */
 export class PluginRegistry extends EventEmitter {
   private plugins: Map<string, PluginRegistryEntry> = new Map();
-  private lifecycle: PluginLifecycle;
+  private lifecycle: PluginLifecycle | null = null;
   private storage: PluginStorage;
 
   constructor(storage: PluginStorage) {
     super();
     this.storage = storage;
-    this.lifecycle = new PluginLifecycle(this);
     this.init();
   }
 
@@ -60,9 +61,9 @@ export class PluginRegistry extends EventEmitter {
           this.plugins.set(plugin.id, plugin);
         }
       }
-      console.log(`Plugin registry initialized with ${this.plugins.size} plugins`);
+      console.log(`[Registry] Initialized with ${this.plugins.size} plugins from storage: ${this.storage.constructor.name}`);
     } catch (error) {
-      console.error('Failed to initialize plugin registry:', error);
+      console.error(`[Registry] Failed to initialize from storage (${this.storage.constructor.name}):`, error);
     }
   }
 
@@ -84,13 +85,14 @@ export class PluginRegistry extends EventEmitter {
    * Install a new plugin from its manifest
    */
   public async installPlugin(manifest: PluginManifest, packagePath: string): Promise<PluginRegistryEntry> {
-    // Validate the manifest
+    if (!this.lifecycle) {
+      throw new Error('Plugin installation can only be performed on the server-side registry instance.');
+    }
+    
     const validationResult = validateManifest(manifest);
     if (!validationResult.valid) {
       throw new Error(`Invalid plugin manifest: ${validationResult.errors?.join(', ')}`);
     }
-
-    // Check if plugin already exists
     if (this.plugins.has(manifest.id)) {
       throw new Error(`Plugin ${manifest.id} is already installed`);
     }
@@ -107,10 +109,11 @@ export class PluginRegistry extends EventEmitter {
     }
 
     try {
-      // Let lifecycle handler do the installation
-      await this.lifecycle.installPlugin(manifest, packagePath);
+      const installResult = await this.lifecycle.installPlugin(manifest, packagePath);
+       if (!installResult.success) {
+           throw new Error(`Lifecycle failed to install plugin: ${installResult.error}`);
+       }
 
-      // Create registry entry
       const now = new Date();
       const entry: PluginRegistryEntry = {
         id: manifest.id,
@@ -123,19 +126,15 @@ export class PluginRegistry extends EventEmitter {
         errorCount: 0,
       };
 
-      // Add to registry
       this.plugins.set(manifest.id, entry);
-
-      // Persist to storage
       await this.storage.savePlugin(entry);
       
-      // Emit event
       this.emit(PluginRegistryEvent.PLUGIN_INSTALLED, entry);
       this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
 
-      return entry;
+      return entry; 
     } catch (error) {
-      console.error(`Failed to install plugin ${manifest.id}:`, error);
+      console.error(`[Registry] Failed to install plugin ${manifest.id}:`, error);
       throw error;
     }
   }
@@ -144,10 +143,11 @@ export class PluginRegistry extends EventEmitter {
    * Uninstall a plugin by ID
    */
   public async uninstallPlugin(id: string): Promise<void> {
-    const plugin = this.plugins.get(id);
-    if (!plugin) {
-      throw new Error(`Plugin ${id} is not installed`);
+    if (!this.lifecycle) {
+      throw new Error('Plugin uninstallation can only be performed on the server-side registry instance.');
     }
+    const plugin = this.plugins.get(id);
+    if (!plugin) { throw new Error(`Plugin ${id} is not installed`); }
 
     // Check for dependent plugins
     const dependentPlugins = this.findDependentPlugins(id);
@@ -158,20 +158,14 @@ export class PluginRegistry extends EventEmitter {
     }
 
     try {
-      // Let lifecycle handler manage uninstallation
       await this.lifecycle.uninstallPlugin(plugin);
-
-      // Remove from registry
       this.plugins.delete(id);
-
-      // Remove from storage
       await this.storage.removePlugin(id);
-
-      // Emit event
       this.emit(PluginRegistryEvent.PLUGIN_UNINSTALLED, id);
       this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+      console.log(`[Registry] Plugin ${id} uninstalled.`);
     } catch (error) {
-      console.error(`Failed to uninstall plugin ${id}:`, error);
+      console.error(`[Registry] Failed to uninstall plugin ${id}:`, error);
       throw error;
     }
   }
@@ -181,40 +175,18 @@ export class PluginRegistry extends EventEmitter {
    */
   public async enablePlugin(id: string): Promise<void> {
     const plugin = this.plugins.get(id);
-    if (!plugin) {
-      throw new Error(`Plugin ${id} is not installed`);
+    if (!plugin) { throw new Error(`Plugin ${id} is not installed`); }
+    if (plugin.enabled) {
+       console.log(`[Registry] Plugin ${id} is already enabled.`);
+       return;
     }
-
-    if (plugin.enabled && plugin.state === PluginState.ACTIVATED) {
-      return; // Already enabled and activated
-    }
-
-    try {
-      // Let lifecycle handler load and activate the plugin
-      await this.lifecycle.loadAndActivatePlugin(plugin);
-
-      // Update registry entry
-      plugin.enabled = true;
-      plugin.state = PluginState.ACTIVATED;
-      plugin.updatedAt = new Date();
-
-      // Update storage
-      await this.storage.savePlugin(plugin);
-
-      // Emit event
-      this.emit(PluginRegistryEvent.PLUGIN_ENABLED, plugin);
-      this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
-    } catch (error) {
-      console.error(`Failed to enable plugin ${id}:`, error);
-      this.recordPluginError(id, `Failed to enable: ${error instanceof Error ? error.message : String(error)}`);
-      if (plugin.state !== PluginState.ERROR) {
-        plugin.state = PluginState.ERROR;
-        plugin.enabled = false;
-        await this.storage.savePlugin(plugin);
-        this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
-      }
-      throw error;
-    }
+    plugin.enabled = true;
+    plugin.state = PluginState.ENABLED;
+    plugin.updatedAt = new Date();
+    await this.storage.savePlugin(plugin);
+    this.emit(PluginRegistryEvent.PLUGIN_ENABLED, plugin);
+    this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+    console.log(`[Registry] Plugin ${id} enabled.`);
   }
 
   /**
@@ -222,15 +194,11 @@ export class PluginRegistry extends EventEmitter {
    */
   public async disablePlugin(id: string): Promise<void> {
     const plugin = this.plugins.get(id);
-    if (!plugin) {
-      throw new Error(`Plugin ${id} is not installed`);
-    }
-
+    if (!plugin) { throw new Error(`Plugin ${id} is not installed`); }
     if (!plugin.enabled) {
-      return; // Already disabled
+       console.log(`[Registry] Plugin ${id} is already disabled.`);
+       return; 
     }
-
-    // Check for dependent plugins
     const dependentPlugins = this.findDependentPlugins(id);
     const enabledDependents = dependentPlugins.filter(p => p.enabled);
     if (enabledDependents.length > 0) {
@@ -239,24 +207,33 @@ export class PluginRegistry extends EventEmitter {
       );
     }
 
+    const wasEnabled = plugin.enabled;
+    const previousState = plugin.state;
+
     try {
-      // Let lifecycle handler deactivate and unload the plugin
-      await this.lifecycle.deactivateAndUnloadPlugin(plugin);
-
-      // Update registry entry
       plugin.enabled = false;
-      plugin.state = PluginState.DEACTIVATED;
+      plugin.state = PluginState.DISABLED;
       plugin.updatedAt = new Date();
-
-      // Update storage
       await this.storage.savePlugin(plugin);
+      
+      if (this.lifecycle) {
+         console.log(`[Registry] Plugin ${id} disabled, attempting to deactivate and unload host...`);
+         try {
+            await this.lifecycle.deactivateAndUnloadPlugin(plugin);
+            console.log(`[Registry] Host for ${id} successfully deactivated and unloaded after disabling.`);
+         } catch (unloadError) {
+            console.error(`[Registry] Error during host unload after disabling plugin ${id} (non-fatal):`, unloadError);
+         }
+      }
 
-      // Emit event
       this.emit(PluginRegistryEvent.PLUGIN_DISABLED, plugin);
       this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+      console.log(`[Registry] Plugin ${id} marked as disabled.`); 
     } catch (error) {
-      console.error(`Failed to disable plugin ${id}:`, error);
-      this.recordPluginError(id, `Failed to disable: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[Registry] Failed to mark plugin ${id} as disabled:`, error);
+      plugin.enabled = true; 
+      plugin.state = previousState;
+      plugin.updatedAt = plugin.updatedAt;
       throw error;
     }
   }
@@ -265,55 +242,37 @@ export class PluginRegistry extends EventEmitter {
    * Update a plugin to a new version
    */
   public async updatePlugin(id: string, newManifest: PluginManifest, packagePath: string): Promise<PluginRegistryEntry> {
-    const plugin = this.plugins.get(id);
-    if (!plugin) {
-      throw new Error(`Plugin ${id} is not installed`);
+    if (!this.lifecycle) {
+      throw new Error('Plugin update can only be performed on the server-side registry instance.');
     }
-
-    // Validate the manifest
+    const plugin = this.plugins.get(id);
+    if (!plugin) { throw new Error(`Plugin ${id} not found for update.`); }
+    if (id !== newManifest.id) { throw new Error(`Manifest ID (${newManifest.id}) doesn't match update target (${id})`); }
     const validationResult = validateManifest(newManifest);
     if (!validationResult.valid) {
-      throw new Error(`Invalid plugin manifest: ${validationResult.errors?.join(', ')}`);
-    }
-
-    // Ensure IDs match
-    if (id !== newManifest.id) {
-      throw new Error(`Manifest ID (${newManifest.id}) doesn't match the plugin being updated (${id})`);
+      throw new Error(`Invalid new plugin manifest: ${validationResult.errors?.join(', ')}`);
     }
 
     try {
-      // Check if plugin is currently enabled
-      const wasEnabled = plugin.enabled;
-
-      // Disable if necessary
-      if (wasEnabled) {
-        await this.disablePlugin(id);
-      }
-
-      // Let lifecycle handler update the plugin
       await this.lifecycle.updatePlugin(plugin, newManifest, packagePath);
 
-      // Update registry entry
       plugin.manifest = newManifest;
       plugin.version = newManifest.version;
       plugin.updatedAt = new Date();
       plugin.state = PluginState.INSTALLED;
+      plugin.enabled = false;
+      plugin.lastError = undefined;
+      plugin.errorCount = 0;
 
-      // Re-enable if it was enabled before
-      if (wasEnabled) {
-        await this.enablePlugin(id);
-      }
-
-      // Update storage
       await this.storage.savePlugin(plugin);
 
-      // Emit event
       this.emit(PluginRegistryEvent.PLUGIN_UPDATED, plugin);
       this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+      console.log(`[Registry] Plugin ${id} updated to version ${newManifest.version}.`);
 
       return plugin;
     } catch (error) {
-      console.error(`Failed to update plugin ${id}:`, error);
+      console.error(`[Registry] Failed to update plugin ${id}:`, error);
       this.recordPluginError(id, `Failed to update: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
@@ -324,23 +283,19 @@ export class PluginRegistry extends EventEmitter {
    */
   public recordPluginError(id: string, errorMessage: string): void {
     const plugin = this.plugins.get(id);
-    if (!plugin) {
-      console.warn(`Attempted to record error for non-existent plugin ${id}: ${errorMessage}`);
-      return;
+    if (plugin) {
+      plugin.errorCount = (plugin.errorCount || 0) + 1;
+      plugin.lastError = errorMessage;
+      plugin.updatedAt = new Date();
+      plugin.state = PluginState.ERROR;
+      this.storage.savePlugin(plugin).catch(err => {
+        console.error(`[Registry] Failed to persist plugin error state for ${id}:`, err);
+      });
+      this.emit(PluginRegistryEvent.PLUGIN_ERROR, { id, error: errorMessage, count: plugin.errorCount });
+      this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+    } else {
+      console.warn(`[Registry] Attempted to record error for non-existent plugin: ${id}`);
     }
-
-    // Update error information
-    plugin.errorCount += 1;
-    plugin.lastError = errorMessage;
-    plugin.updatedAt = new Date();
-
-    // Try to persist, but don't wait
-    this.storage.savePlugin(plugin).catch(err => {
-      console.error(`Failed to persist plugin error for ${id}:`, err);
-    });
-
-    // Emit event
-    this.emit(PluginRegistryEvent.PLUGIN_ERROR, { id, error: errorMessage, count: plugin.errorCount });
   }
 
   /**
@@ -356,7 +311,11 @@ export class PluginRegistry extends EventEmitter {
   /**
    * Get the lifecycle handler
    */
-  public getLifecycle(): PluginLifecycle {
+  public getLifecycle(): PluginLifecycle | null {
+    if (!this.lifecycle) {
+       // Non è un errore grave chiamarlo sul client, semplicemente non c'è
+       // console.warn("[Registry] Attempted to get lifecycle, but it was not set (likely client-side).");
+    }
     return this.lifecycle;
   }
 
@@ -366,33 +325,12 @@ export class PluginRegistry extends EventEmitter {
    * Consider if a separate method to just retrieve without activating is needed.
    */
   public async getPluginHost(pluginId: string): Promise<IPluginHost | undefined> {
-    const pluginEntry = this.plugins.get(pluginId);
-    if (!pluginEntry) {
-      console.warn(`Attempted to get host for non-existent plugin: ${pluginId}`);
+    if (!this.lifecycle) {
+      console.warn('[Registry] Cannot get plugin host on the client side or without lifecycle manager.');
       return undefined;
     }
-    
-    if (!pluginEntry.enabled) {
-       console.warn(`Attempted to get host for disabled plugin: ${pluginId}. Enabling first.`);
-       // Decide if enabling automatically is desired here
-       try {
-         await this.enablePlugin(pluginId); // Enable implicitly might be needed for UI components
-       } catch (error) {
-         console.error(`Failed to auto-enable plugin ${pluginId} before getting host:`, error);
-         return undefined; // Failed to enable, can't get host
-       }
-    }
-    
-    // Now that it should be enabled, get/create the host via lifecycle
-    try {
-      // Use loadAndActivatePlugin which handles creation and activation
-      const host = await this.lifecycle.loadAndActivatePlugin(pluginEntry);
-      return host;
-    } catch (error) {
-      console.error(`Failed to get or activate host for plugin ${pluginId}:`, error);
-      // Error is already recorded by lifecycle
-      return undefined;
-    }
+    const host = await this.lifecycle.getOrCreateHost(pluginId);
+    return host ?? undefined;
   }
 
   /**
@@ -400,5 +338,25 @@ export class PluginRegistry extends EventEmitter {
    */
   public getStorage(): PluginStorage {
     return this.storage;
+  }
+
+  public async updateState(id: string, state: PluginState): Promise<void> {
+    const plugin = this.plugins.get(id);
+    if (plugin) {
+      plugin.state = state;
+      plugin.updatedAt = new Date();
+      await this.storage.savePlugin(plugin);
+      this.emit(PluginRegistryEvent.REGISTRY_UPDATED);
+    }
+  }
+
+  // Metodo per iniettare il lifecycle (solo server)
+  public setLifecycle(lifecycle: PluginLifecycle): void {
+      if (this.lifecycle) {
+          console.warn("[Registry] Lifecycle instance already set.");
+          return;
+      }
+      this.lifecycle = lifecycle;
+      console.log("[Registry] Lifecycle instance injected.");
   }
 }

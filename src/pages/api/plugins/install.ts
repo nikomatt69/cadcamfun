@@ -19,29 +19,53 @@ export const config = {
 async function readManifestFromPackage(filePath: string): Promise<PluginManifest> {
   return new Promise((resolve, reject) => {
     const stream = fsSync.createReadStream(filePath);
+    let manifestFound = false;
+
     stream.pipe(unzipper.Parse())
       .on('entry', (entry: unzipper.Entry) => {
-        if (entry.path === 'manifest.json' && entry.type === 'File') {
+        // Match manifest.json at root OR inside a single top-level directory
+        // Regex: Optional non-slash characters (directory name), followed by /manifest.json
+        const isManifestPath = /^([^\/]+\/)?manifest\.json$/i.test(entry.path);
+        
+        if (isManifestPath && entry.type === 'File' && !manifestFound) {
+           manifestFound = true; // Process only the first match
+           console.log(`[Install API] Found manifest entry at path: ${entry.path}`);
            entry.buffer()
             .then((buffer: Buffer) => {
               try {
                 const manifest = JSON.parse(buffer.toString('utf-8'));
-                 if (!manifest.id || !manifest.version || !manifest.main) {
-                   reject(new Error("Extracted manifest is missing required fields (id, version, main)."));
+                 // --- MODIFIED VALIDATION ---
+                 // Check for presence AND non-empty string for id
+                 if (!manifest.id || typeof manifest.id !== 'string' || manifest.id.trim() === '' || !manifest.version || !manifest.main) {
+                   reject(new Error("Extracted manifest is missing required fields (non-empty id, version, main)."));
                  } else {
                    resolve(manifest);
                  }
+                 // --- END MODIFIED VALIDATION ---
               } catch (parseError) {
                 reject(new Error(`Failed to parse manifest.json: ${parseError instanceof Error ? parseError.message : String(parseError)}`));
               }
             })
-            .catch(reject);
+            .catch(err => {
+                 console.error(`[Install API] Error buffering manifest entry ${entry.path}:`, err);
+                 reject(new Error(`Failed to buffer manifest entry: ${err.message}`));
+             });
         } else {
+          // Drain other entries to allow processing to continue
           entry.autodrain();
         }
       })
-      .on('error', (err: Error) => reject(new Error(`Error reading package archive: ${err.message}`)))
-      .on('close', () => reject(new Error('manifest.json not found in package root.')));
+      .on('error', (err: Error) => {
+           console.error("[Install API] Error piping or parsing package stream:", err);
+           reject(new Error(`Error reading package archive: ${err.message}`));
+       })
+      .on('close', () => {
+         // Only reject if the stream closes *without* having found and resolved the manifest
+         if (!manifestFound) {
+             console.error("[Install API] Stream closed, manifest.json not found at root or one level deep.");
+             reject(new Error('manifest.json not found in package root or a single sub-directory.'));
+         }
+      });
   });
 }
 

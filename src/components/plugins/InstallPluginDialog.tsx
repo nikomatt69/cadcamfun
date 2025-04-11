@@ -1,7 +1,6 @@
 // src/components/plugins/InstallPluginDialog.tsx
-import React, { useState, useRef } from 'react';
-import { usePluginRegistry } from '../../hooks/usePluginRegistry';
-import  Dialog  from '../../components/ui/Dialog';
+import React, { useState, useRef, useEffect } from 'react';
+import Dialog from '../../components/ui/Dialog';
 import { Loader, Upload, AlertCircle, CheckCircle } from 'react-feather';
 
 interface InstallPluginDialogProps {
@@ -10,7 +9,6 @@ interface InstallPluginDialogProps {
 }
 
 const InstallPluginDialog: React.FC<InstallPluginDialogProps> = ({ isOpen, onClose }) => {
-  const { installPlugin } = usePluginRegistry();
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
   const [url, setUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -75,20 +73,54 @@ const InstallPluginDialog: React.FC<InstallPluginDialogProps> = ({ isOpen, onClo
     setSuccess(false);
     
     try {
+      let response: Response;
+
       if (activeTab === 'upload' && file) {
-        // Install from file - pass File object and type
-        await installPlugin(file, 'file'); 
+        // Install from file using FormData
+        const formData = new FormData();
+        formData.append('file', file); // Use key 'file' to match backend
+
+        response = await fetch('/api/plugins/install', {
+          method: 'POST',
+          body: formData,
+          // Content-Type is set automatically by browser for FormData
+        });
+
       } else if (activeTab === 'url' && url) {
-        // Install from URL - pass URL string and type
-        await installPlugin(url, 'url'); 
+        // Install from URL using JSON
+        response = await fetch('/api/plugins/install', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url }),
+        });
+
       } else {
         throw new Error('Please provide a plugin package file or URL');
       }
-      
+
+      if (!response.ok) {
+        // Try to parse error message from response
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch {
+            errorData = { message: `Installation failed with status: ${response.statusText}` };
+        }
+        throw new Error(errorData?.message || 'Installation failed');
+      }
+
+      const result = await response.json();
+       console.log('Install result:', result);
+
       setSuccess(true);
+     
+
       setTimeout(() => {
-        onClose();
+        onClose(); // Close dialog after a short delay
       }, 1500);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

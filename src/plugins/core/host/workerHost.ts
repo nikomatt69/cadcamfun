@@ -1,9 +1,10 @@
 // src/plugins/core/host/worker-host.ts
 import { PluginManifest } from '../registry/pluginManifest';
 import { PluginHostBase } from './pluginHost';
-import { PluginState } from '../registry/pluginLifecycle';
+import { PluginState } from '../registry';
 import { SandboxOptions, PluginSandbox } from './sandbox';
 import { IPluginConnection } from './pluginBridge';
+import path from 'path'; // Importa path per normalizzare
 
 /**
  * Connection implementation for Web Workers
@@ -153,13 +154,29 @@ export class WorkerPluginHost extends PluginHostBase {
   }
 
   /**
-   * Get the URL to load the plugin code from
+   * Get the URL to load the plugin code from via the serving API
    */
   private getPluginUrl(): string {
-    // In production, this would be the absolute URL to the plugin code
-    // For development, we might use a local path or a dev server URL
-    const baseUrl = process.env.NEXT_PUBLIC_PLUGIN_BASE_URL || '';
-    return `${baseUrl}/plugins/${this.manifest.id}/${this.manifest.main}`;
+    // L'endpoint API per servire i file è /api/plugins/serve
+    // Ha bisogno dell'ID del plugin e del percorso relativo del file (manifest.main)
+    
+    // Assicurati che manifest.main sia definito e sia un percorso relativo valido
+    if (!this.manifest.main || typeof this.manifest.main !== 'string') {
+       throw new Error(`Plugin ${this.manifest.id} manifest does not specify a valid 'main' entry point.`);
+    }
+    
+    // Sanitizza/normalizza il percorso main per sicurezza (anche se dovrebbe essere sicuro dal manifest)
+    const relativeMainPath = path.normalize(this.manifest.main).replace(/^(\.\.(\/|\\|\$))+/, '');
+     if (relativeMainPath.includes('..')) {
+       throw new Error(`Invalid 'main' path in manifest for plugin ${this.manifest.id}: ${this.manifest.main}`);
+    }
+
+    // Costruisci l'URL per l'API serve.ts
+    // Non serve NEXT_PUBLIC_PLUGIN_BASE_URL qui, usiamo un percorso API relativo.
+    const apiUrl = `/api/plugins/serve?id=${encodeURIComponent(this.manifest.id)}&file=${encodeURIComponent(relativeMainPath)}`;
+    
+    console.log(`[WorkerHost] Generated plugin code URL for ${this.manifest.id}: ${apiUrl}`);
+    return apiUrl;
   }
 
   /**

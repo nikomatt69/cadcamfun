@@ -20,7 +20,7 @@ type PluginManifest = {
 };
 
 // Base directory for plugin registry
-const PLUGINS_REGISTRY_DIR = process.env.PLUGINS_REGISTRY_DIR || path.join(process.cwd(), 'public', 'plugins');
+const PLUGINS_REGISTRY_DIR = process.env.PLUGINS_REGISTRY_DIR || path.join(process.cwd(), 'public', 'plugins','plugins-data');
 
 export default async function handler(
   req: NextApiRequest,

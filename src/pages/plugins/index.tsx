@@ -3,12 +3,17 @@ import { PluginRegistryEntry } from '@/src/plugins/core/registry';
 import { Loader, AlertTriangle, Trash2, ToggleLeft, ToggleRight, Upload, Info } from 'react-feather';
 import InstallPluginDialog from '@/src/components/plugins/InstallPluginDialog'; // Adjust path
 import Link from 'next/link';
+import Layout from '@/src/components/layout/Layout';
+import router from 'next/router';
+import { useSession } from 'next-auth/react';
 
 const PluginsPage = () => {
   const [plugins, setPlugins] = useState<PluginRegistryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInstallDialogOpen, setIsInstallDialogOpen] = useState(false);
+ 
+  const { status } = useSession();
 
   const fetchPlugins = async () => {
     setLoading(true);
@@ -60,9 +65,10 @@ const PluginsPage = () => {
          alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
      }
   };
-
+  
 
   return (
+    <Layout>
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
@@ -145,6 +151,7 @@ const PluginsPage = () => {
          }}
       />
     </div>
+    </Layout>
   );
 };
 

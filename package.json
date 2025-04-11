@@ -1,5 +1,5 @@
 {
-  "name": "cad-cam-system",
+  "name": "cad-cam-fun",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -18,7 +18,8 @@
     "prebuild": "yarn optimize",
     "analyze": "cross-env ANALYZE=true next build",
     "test:component": "ts-node --esm --require tsconfig-paths/register src/pages/test-component.ts",
-    "build-plugins": "node scripts/build-plugins.js"
+    "build-plugins": "node scripts/build-plugins.js",
+    "docs:sdk": "npx typedoc --options src/plugins/sdk/typedoc.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
@@ -48,6 +49,7 @@
     "@types/formidable": "^3.4.5",
     "@types/react-d3-graph": "^2.6.7",
     "@types/semver": "^7.7.0",
+    "@types/stream-buffers": "^3.0.7",
     "@types/unzipper": "^0.10.11",
     "@types/web-push": "^3.6.4",
     "@vercel/analytics": "^1.5.0",
@@ -96,12 +98,14 @@
     "react-split": "^2.0.14",
     "react-use-measure": "^2.1.1",
     "recharts": "^2.15.1",
+    "remark-gfm": "^4.0.1",
     "resend": "^4.1.2",
     "semver": "^7.7.1",
     "sharp": "^0.33.5",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "stats.js": "^0.17.0",
+    "stream-buffers": "^3.0.3",
     "stripe": "^17.7.0",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^3.3.5",
@@ -136,6 +140,8 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "typedoc": "^0.28.2",
+    "typedoc-plugin-markdown": "^4.6.2",
     "typescript": "^5.1.6"
   }
 }

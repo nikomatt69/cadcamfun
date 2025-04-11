@@ -286,3 +286,4 @@ async function validatePluginPackage(file: string): Promise<ValidationResult> {
     manifest
   };
 }
+

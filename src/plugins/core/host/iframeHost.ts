@@ -1,9 +1,10 @@
 // src/plugins/core/host/iframe-host.ts
 import { PluginManifest, PluginPermission } from '../registry/pluginManifest';
 import { PluginHostBase } from './pluginHost';
-import { PluginState } from '../registry/pluginLifecycle';
+import { PluginState } from '../registry';
 import { SandboxOptions, PluginSandbox } from './sandbox';
 import { IPluginConnection } from './pluginBridge';
+import path from 'path';
 
 /**
  * Connection implementation for iFrames using PostMessage
@@ -279,13 +280,25 @@ export class IFramePluginHost extends PluginHostBase {
   }
   
   /**
-   * Get the URL to load the plugin code from
+   * Get the URL to load the plugin code from via the serving API
    */
   private getPluginUrl(): string {
-    // In production, this would be the absolute URL to the plugin code
-    // For development, we might use a local path or a dev server URL
-    const baseUrl = process.env.NEXT_PUBLIC_PLUGIN_BASE_URL || '';
-    return `${baseUrl}/plugins/${this.manifest.id}/${this.manifest.main}`;
+    // L'endpoint API per servire i file è /api/plugins/serve
+    // Ha bisogno dell'ID del plugin e del percorso relativo del file (manifest.main)
+    
+    if (!this.manifest.main || typeof this.manifest.main !== 'string') {
+       throw new Error(`Plugin ${this.manifest.id} manifest does not specify a valid 'main' entry point.`);
+    }
+    
+    const relativeMainPath = path.normalize(this.manifest.main).replace(/^(\.\.(\/|\\|\$))+/, '');
+     if (relativeMainPath.includes('..')) {
+       throw new Error(`Invalid 'main' path in manifest for plugin ${this.manifest.id}: ${this.manifest.main}`);
+    }
+
+    const apiUrl = `/api/plugins/serve?id=${encodeURIComponent(this.manifest.id)}&file=${encodeURIComponent(relativeMainPath)}`;
+    
+    console.log(`[IFrameHost] Generated plugin code URL for ${this.manifest.id}: ${apiUrl}`);
+    return apiUrl;
   }
   
   /**

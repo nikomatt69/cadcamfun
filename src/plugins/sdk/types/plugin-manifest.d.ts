@@ -859,3 +859,5 @@ export interface PluginManifest {
     | `onModelCreate`
     | `onSelection`
     | `onWebviewPanel:${string}`;
+
+    export {};

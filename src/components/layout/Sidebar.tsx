@@ -51,6 +51,22 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({ isOpen, setIsOpen }) 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
+
+  const PluginIcon = () => (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 20 20" 
+      fill="none" 
+      stroke="currentColor" 
+      stroke-width="2" 
+  stroke-linecap="round" 
+  stroke-linejoin="round"
+  width="20" 
+  height="20"
+>
+  <path d="M 4 4 L 10 4 C 10 2 14 2 14 4 L 20 4 L 20 10 C 22 10 22 14 20 14 L 20 20 L 4 20 Z" />
+</svg>
+  )
   // Generate navigation items with current route indicated
   const getNavigation = (): NavItem[] => {
     return [
@@ -74,9 +90,9 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({ isOpen, setIsOpen }) 
           },
           { 
             name: 'New Project', 
-            href: '/projects/index', 
+            href: '/projects', 
             icon: <PlusSquare size={16} />, 
-            current: router.pathname === '/projects/index' 
+            current: router.pathname === '/projects' 
           }
         ]
       },
@@ -145,6 +161,12 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({ isOpen, setIsOpen }) 
         current: router.pathname.startsWith('/organizations')
       },
       { 
+        name: 'Plugins', 
+        href: '/plugins', 
+        icon: <PluginIcon />, 
+        current: router.pathname.startsWith('/plugins')
+      },
+      { 
         name: 'Website', 
         href: 'https://site.cadcamfun.xyz', 
         icon: <Globe  size={20} />, 
@@ -204,6 +226,7 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({ isOpen, setIsOpen }) 
       }
     ];
   };
+  
   
   const navigation = getNavigation();
   

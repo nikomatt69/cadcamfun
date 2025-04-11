@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PluginRegistry, PluginRegistryEvent, PluginRegistryEntry, PluginManifest } from '../plugins/core/registry';
+import { PluginRegistry, PluginRegistryEvent, PluginManifest } from '../plugins/core/registry';
+import { PluginRegistryEntry } from '../plugins/core/registry';
 
 // Singleton instance of the registry
 let globalRegistry: PluginRegistry | null = null;

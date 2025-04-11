@@ -8,7 +8,7 @@
 
 import { Command } from 'commander';
 import * as inquirer from 'inquirer';
-import * as chalk from 'chalk';
+import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,9 +20,8 @@ import { packagePlugin } from './package-plugin';
 import { validatePlugin } from '../validation/validate-plugin';
 import { getApiVersion } from '../utils';
 
-// Get the directory where this script is located
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Fix for __dirname in ES modules - Removed as it's not used
+// const __dirname = path.dirname(fileURLToPath(import.meta.url)); 
 
 // Create a new command program
 const program = new Command();

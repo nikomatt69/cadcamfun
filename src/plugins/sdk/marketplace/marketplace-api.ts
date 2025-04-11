@@ -308,3 +308,4 @@ export class PluginUpdater {
 }
 
 // Export the API and Updater for use in the application
+export {};

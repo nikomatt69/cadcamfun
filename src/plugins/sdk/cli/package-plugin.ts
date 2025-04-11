@@ -8,8 +8,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as crypto from 'crypto';
-import * as chalk from 'chalk';
-import AdmZip from 'adm-zip';
+import chalk from 'chalk';
+import * as AdmZip from 'adm-zip';
 import { validateManifest } from '../validation/plugin-schema-validator';
 
 /**
@@ -79,7 +79,7 @@ async function createPackage(
   manifest: any
 ): Promise<void> {
   // Create a new zip file
-  const zip = new AdmZip();
+  const zip = new AdmZip.default();
   
   // Add the manifest
   zip.addLocalFile(path.join(pluginDir, 'plugin.json'));
@@ -189,7 +189,7 @@ async function addDirectoryToZip(
  */
 async function verifyPackage(packageFile: string, expectedManifest: any): Promise<void> {
   // Open the package
-  const zip = new AdmZip(packageFile);
+  const zip = new AdmZip.default(packageFile);
   
   // Check for required files
   const requiredFiles = [

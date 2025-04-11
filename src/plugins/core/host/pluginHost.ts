@@ -1,7 +1,7 @@
 // src/plugins/core/host/plugin-host.ts
 import { PluginManifest } from '../registry/pluginManifest';
 import { PluginBridge } from './pluginBridge';
-import { PluginState } from '../registry/pluginLifecycle';
+import { PluginState } from '../registry';
 import { SandboxOptions } from './sandbox';
 
 /**
@@ -138,24 +138,5 @@ export abstract class PluginHostBase implements IPluginHost {
     });
     
     window.dispatchEvent(errorEvent);
-  }
-  
-  /**
-   * Create a plugin host factory based on the plugin requirements
-   */
-  public static create(
-    manifest: PluginManifest,
-    sandboxOptions: SandboxOptions
-  ): IPluginHost {
-    // Determine the best host type based on the plugin's needs
-    if (manifest.contributes?.sidebar || (manifest.contributes as any)?.views) {
-      // If the plugin needs UI, use an iFrame host
-      const { IFramePluginHost } = require('./iframeHost');
-      return new IFramePluginHost(manifest, sandboxOptions);
-    } else {
-      // For plugins without UI, use a Worker host for better isolation
-      const { WorkerPluginHost } = require('./workerHost');
-      return new WorkerPluginHost(manifest, sandboxOptions);
-    }
   }
 }

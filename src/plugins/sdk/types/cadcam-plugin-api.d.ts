@@ -1285,3 +1285,6 @@ declare namespace CADCAM {
    * Plugin entry point
    */
   declare function definePlugin(plugin: CADCAM.PluginExports): CADCAM.PluginExports;
+  
+  // Add an empty export to ensure this file is treated as a module
+  export {};

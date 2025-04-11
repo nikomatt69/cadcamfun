@@ -1038,3 +1038,4 @@ async function installDeps(config: TemplateConfig): Promise<void> {
     console.warn('Failed to install dependencies:', error);
   }
 }
+

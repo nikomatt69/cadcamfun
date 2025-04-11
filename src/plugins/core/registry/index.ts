@@ -3,20 +3,13 @@
  * Centralizes exports for the plugin registry system
  */
 
-import { PluginRegistry } from './pluginRegistry';
-import { PluginStorage } from './pluginStorage';
-
 // Main Components
 export { PluginRegistry, PluginRegistryEvent, type PluginRegistryEntry } from './pluginRegistry';
 export { validateManifest, hasPermission, createDefaultManifest, type PluginManifest, PluginPermission } from './pluginManifest';
-export { PluginLifecycle, PluginState } from './pluginLifecycle';
-export { PluginStorage, FileSystemPluginStorage, InMemoryPluginStorage, type PluginStorageProvider } from './pluginStorage';
+// export { PluginLifecycle } from './pluginLifecycle';
+// Export only the main class and the provider type from pluginStorage
+export { PluginStorage, type PluginStorageProvider } from './pluginStorage';
+export { PluginState } from './pluginTypes';
 
-/**
- * Create and initialize a new plugin registry with default configuration
- */
-export function createPluginRegistry() {
-  const storage = new PluginStorage();
-  const registry = new PluginRegistry(storage);
-  return registry;
-}
+// Removed the createPluginRegistry helper function as its default behavior is ambiguous
+// Server/client instances should be created with explicit storage providers.

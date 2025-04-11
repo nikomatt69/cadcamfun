@@ -15,7 +15,8 @@ import {
   BookOpen,
   Package,
   Settings,
-  ExternalLink
+  ExternalLink,
+  ToggleLeft
 } from 'react-feather';
 import { useRouter } from 'next/router';
 import { useElementsStore } from 'src/store/elementsStore';
@@ -30,6 +31,7 @@ import AIBottomSheet from '../components/AIBottomSheet';
 
 import { useToolState } from '@/src/store/toolStore';
 import { usePluginRegistry } from '@/src/hooks/usePluginRegistry';
+import PluginToolbarButton from '../plugins/PluginToolbarButton';
 
 interface EnhancedToolbarProps {
   sidebarOpen: boolean;
@@ -66,7 +68,7 @@ const EnhancedToolbar: React.FC<EnhancedToolbarProps> = ({
   const { elements, selectedElement, undo, redo, selectedElements } = useElementsStore();
   const [showPluginsMenu, setShowPluginsMenu] = useState(false);
   const pluginsMenuRef = useRef<HTMLDivElement>(null);
-  
+  const [showPluginSidebar, setShowPluginSidebar] = useState(false);
   // Get active plugins
   const { plugins, registry } = usePluginRegistry();
   const activePlugins = plugins?.filter((p: any) => p.state === 'active') || [];
@@ -250,6 +252,13 @@ const EnhancedToolbar: React.FC<EnhancedToolbarProps> = ({
                 </span>
               )}
             </button>
+            <button
+            onClick={() => setSidebarOpen(sidebarOpen)}
+            className="flex items-center px-4 py-2  text-emerald-400  transition-colors"
+          >
+            
+            <ToggleLeft size={18} className="ml-1" />
+          </button>
             
            </div>
           {/* --- End Example --- */}

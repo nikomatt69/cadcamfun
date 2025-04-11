@@ -1,16 +1,18 @@
-// src/pages/api/plugins/serve.ts (enhanced)
+// src/pages/api/plugins/serve.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
 import path from 'path';
-import { createHash } from 'crypto';
+import { PassThrough } from 'stream'; // Per pipe dello stream
+// Importa la funzione per scaricare lo stream dal bucket
+import { downloadStreamFromBucket } from '@/src/lib/storageService'; 
 
-// Base directory for plugin registry
-const PLUGINS_REGISTRY_DIR = process.env.PLUGINS_REGISTRY_DIR || path.join(process.cwd(), 'public', 'plugins');
+// Rimuovi dipendenze fs e crypto se non più usate
 
-// Map of file extensions to MIME types
+// Rimuovi PLUGINS_REGISTRY_DIR
+
+// Mappa MIME types rimane utile
 const MIME_TYPES: Record<string, string> = {
   '.js': 'application/javascript',
-  '.ts': 'application/typescript',
+  '.ts': 'application/typescript', // Considera se servire TS direttamente o solo JS compilato
   '.json': 'application/json',
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
@@ -21,107 +23,84 @@ const MIME_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.html': 'text/html',
   '.txt': 'text/plain',
+  // Aggiungi altri tipi se necessario
 };
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
   
-  // Get plugin ID and file path from the request
   const { id, file } = req.query;
   
   if (!id || Array.isArray(id) || !file || Array.isArray(file)) {
-    return res.status(400).json({ error: 'Invalid request parameters' });
+    return res.status(400).json({ error: 'Invalid request parameters: id and file path are required.' });
   }
   
   try {
-    // Sanitize the plugin ID and file path to prevent directory traversal attacks
-    const sanitizedId = id.replace(/[^a-zA-Z0-9-_]/g, '');
-    const sanitizedFile = file.replace(/\.\./g, ''); // Remove attempts to navigate up
+    // Sanitize - importante mantenere la sanificazione per prevenire path traversal nel bucket key
+    // Assumiamo che l'ID sia sicuro (validato all'installazione)
+    // Sanifichiamo solo il percorso del file relativo
+    const sanitizedRelativePath = path.normalize(file).replace(/^(\.\.(\/|\\|\$))+/, ''); // Rimuovi ../ all'inizio
+    if (sanitizedRelativePath.includes('..')) {
+       return res.status(400).json({ error: 'Invalid file path.' });
+    }
+
+    // Costruisci la chiave per il bucket
+    const bucketKey = `plugins/${id}/${sanitizedRelativePath}`;
     
-    // Construct the full file path
-    const filePath = path.join(PLUGINS_REGISTRY_DIR, sanitizedId, sanitizedFile);
-    
-    // Check if the file exists
-    if (!fs.existsSync(filePath)) {
+    console.log(`[Serve API] Attempting to serve file from bucket key: ${bucketKey}`);
+
+    // Ottieni lo stream dal bucket
+    const fileStream = await downloadStreamFromBucket(bucketKey);
+
+    // Se lo stream non esiste (file non trovato nel bucket)
+    if (!fileStream) {
+      console.warn(`[Serve API] File not found in bucket: ${bucketKey}`);
       return res.status(404).json({ error: 'File not found' });
     }
-    
-    // Get file extension to determine MIME type
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
-    
-    // Read the file content
-    const content = fs.readFileSync(filePath, 'utf-8');
-    
-    // For JavaScript files, wrap in a security wrapper
-    if (ext === '.js' || ext === '.ts') {
-      // Generate a content hash for integrity checks
-      const contentHash = createHash('sha256').update(content).digest('hex');
-      
-      // Wrap the code in a security wrapper
-      const wrappedContent = `
-        // CAD/CAM FUN Plugin Security Wrapper
-        // Plugin ID: ${sanitizedId}
-        // File: ${sanitizedFile}
-        // Content Hash: ${contentHash}
-        // Timestamp: ${new Date().toISOString()}
-        
-        (function(window) {
-          // Create a restricted window object
-          const restrictedWindow = {
-            // Allow limited access to the window object
-            setTimeout: window.setTimeout,
-            clearTimeout: window.clearTimeout,
-            setInterval: window.setInterval,
-            clearInterval: window.clearInterval,
-            console: {
-              log: (...args) => console.log(\`[Plugin ${sanitizedId}]\`, ...args),
-              warn: (...args) => console.warn(\`[Plugin ${sanitizedId}]\`, ...args),
-              error: (...args) => console.error(\`[Plugin ${sanitizedId}]\`, ...args),
-              info: (...args) => console.info(\`[Plugin ${sanitizedId}]\`, ...args)
-            },
-            
-            // Plugin registry
-            plugin_${sanitizedId}: null
-          };
-          
-          // Execute the plugin code with the restricted window
-          try {
-            (function(window) {
-              ${content}
-            })(restrictedWindow);
-            
-            // Expose the plugin to the global window
-            window.plugin_${sanitizedId} = restrictedWindow.plugin_${sanitizedId};
-          } catch (error) {
-            console.error(\`[Plugin ${sanitizedId}] Error executing plugin code:\`, error);
-          }
-        })(window);
-      `;
-      
-      // Set headers
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Security-Policy', "script-src 'self'");
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      
-      // Return the wrapped content
-      return res.status(200).send(wrappedContent);
-    }
-    
-    // For non-JavaScript files, serve as-is
-    // Set headers
+
+    // Determina il MIME type dall'estensione
+    const ext = path.extname(sanitizedRelativePath).toLowerCase();
+    const mimeType = MIME_TYPES[ext] || 'application/octet-stream'; // Default sicuro
+
+    // Imposta gli header della risposta
     res.setHeader('Content-Type', mimeType);
+    // Aggiungi altri header utili come Cache-Control se appropriato
+    // res.setHeader('Cache-Control', 'public, max-age=3600'); // Esempio: cache per 1 ora
+
+    // Esegui il pipe dello stream dal bucket alla risposta HTTP
+    // Usa PassThrough per gestire errori nel pipe
+    const passThrough = new PassThrough();
     
-    // Return the content
-    return res.status(200).send(content);
+    passThrough.on('error', (err) => {
+        console.error(`[Serve API] Error piping stream for ${bucketKey}:`, err);
+        // Cerca di terminare la risposta se non è già stata inviata
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to stream file' });
+        } else {
+            res.end(); // Termina la connessione se possibile
+        }
+    });
+
+    // Gestione stream (adattata per Node.js Readable)
+    if (typeof (fileStream as any).pipe === 'function') { 
+       (fileStream as any).pipe(passThrough).pipe(res);
+    } else {
+         // Qui si potrebbe gestire ReadableStream per ambienti web/Deno, se necessario
+         console.error("[Serve API] Stream type from storage is not a Node.js Readable stream.");
+         return res.status(500).json({ error: 'Server error handling stream type.' });
+    }
+
+    // --- RIMOZIONE WRAPPER JS --- (Confermato rimosso)
+    
   } catch (error) {
-    console.error(`Failed to serve plugin file ${id}/${file}:`, error);
-    return res.status(500).json({ error: 'Failed to serve plugin file' });
+    console.error(`[Serve API] Failed processing request for ${id}/${file}:`, error);
+    // Evita di inviare dettagli dell'errore interno al client
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

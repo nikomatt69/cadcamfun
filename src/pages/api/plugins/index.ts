@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PluginRegistryEntry } from '@/src/plugins/core/registry';
-import { getRegistryInstance } from '@/src/server/pluginRegistryInstance'; // Adjust path as needed
+import { getRegistryInstance } from '@/src/server/pluginRegistryInstance'; // Needed to get storage
+import { DatabasePluginStorage } from '@/src/server/storage/DatabasePluginStorage'; // Assuming direct access or via registry
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,11 +12,18 @@ export default async function handler(
   }
 
   try {
+    // Get storage provider directly or via registry instance
+    // Option 1: Direct (if you export DatabasePluginStorage instance or have a singleton)
+    // const storage = getDatabaseStorageInstance(); 
+    // Option 2: Via Registry (safer if registry manages storage lifecycle)
     const registry = getRegistryInstance();
-    // Ensure registry is loaded (if init is async and not awaited in constructor)
-    // await registry.waitForInitialization(); // Example if needed
-    const plugins = registry.getAllPlugins();
-    // We only send the serializable registry entries, not live host instances
+    const storage = registry.getStorage(); // Assumes getStorage() exists on registry
+    
+    if (!storage) { throw new Error('Storage provider not available.'); }
+
+    // Fetch directly from storage (which queries the database)
+    const plugins = await storage.getPlugins(); 
+
     res.status(200).json(plugins);
   } catch (error) {
     console.error('Failed to get plugins:', error);

@@ -1,7 +1,9 @@
 // src/components/plugins/PluginSidebar.tsx
 import React, { useState, useEffect } from 'react';
 import { X, Maximize2, Minimize2, Settings } from 'react-feather';
-import { usePluginRegistry } from '../../hooks/usePluginRegistry';
+// import { usePluginRegistry } from '../../hooks/usePluginRegistry'; // Remove
+import { usePluginClient } from '../../context/PluginClientContext'; // Import client context hook
+import { PluginRegistryEntry } from 'src/plugins/core/registry'; // Import type
 import PluginHostContainer from './PluginHostContainer'; 
 
 interface PluginSidebarProps {
@@ -15,27 +17,31 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
   onClose, 
   width = 320 
 }) => {
-  const { plugins, registry } = usePluginRegistry();
+  // const { plugins, registry } = usePluginRegistry(); // Remove
+  const { plugins } = usePluginClient(); // Use client context hook
   const [activePluginId, setActivePluginId] = useState<string | null>(null);
-  const [sidebarPlugins, setSidebarPlugins] = useState<any[]>([]);
+  const [sidebarPlugins, setSidebarPlugins] = useState<PluginRegistryEntry[]>([]); // Use correct type
   const [expanded, setExpanded] = useState(false);
   
   // Filter plugins that contribute to sidebar
   useEffect(() => {
-    if (plugins) {
-      const filtered = plugins.filter(plugin => 
-        plugin.enabled && 
-        plugin.manifest.contributes?.sidebar
-      );
-      
-      setSidebarPlugins(filtered);
-      
-      // Auto-select the first plugin if none is selected
-      if (filtered.length > 0 && !activePluginId) {
-        setActivePluginId(filtered[0].id);
-      }
+    // Filter directly from context plugins
+    const filtered = plugins.filter(plugin => 
+      plugin.enabled && // Check if enabled via context state
+      plugin.manifest.contributes?.sidebar
+    );
+    
+    setSidebarPlugins(filtered);
+    
+    // Auto-select the first plugin if none is selected or selected is no longer valid
+    const currentSelectionValid = filtered.some(p => p.id === activePluginId);
+    if (filtered.length > 0 && (!activePluginId || !currentSelectionValid)) {
+      setActivePluginId(filtered[0].id);
+    } else if (filtered.length === 0) {
+        setActivePluginId(null); // Clear selection if no sidebar plugins are enabled
     }
-  }, [plugins, activePluginId]);
+
+  }, [plugins, activePluginId]); // Depend on context plugins list
   
   if (!isOpen) return null;
   
@@ -43,7 +49,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
   
   return (
     <div 
-      className="fixed right-0 top-0 bottom-0 bg-white dark:bg-gray-900 shadow-lg border-l border-gray-200 dark:border-gray-700 flex flex-col z-40 transition-all duration-300"
+      className="fixed right-0 top-0 rounded-l-xl bottom-0 bg-white dark:bg-gray-900 shadow-lg border-l border-gray-200 dark:border-gray-700 flex flex-col z-40 transition-all duration-300"
       style={{ width: expandedWidth }}
     >
       {/* Header */}

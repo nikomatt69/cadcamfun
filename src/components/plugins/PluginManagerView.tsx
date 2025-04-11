@@ -1,253 +1,283 @@
 // src/components/plugins/PluginManagerView.tsx
 import React, { useState, useEffect } from 'react';
-import { usePluginRegistry } from '../../hooks/usePluginRegistry';
-import { 
-  Power, 
-  Trash2, 
-  Download, 
-  Settings, 
-  AlertCircle, 
-  Info, 
-  ExternalLink, 
-  RefreshCw, 
-  Loader
-} from 'react-feather';
-import { formatDistanceToNow } from 'date-fns';
+// Rimuovi o commenta usePluginRegistry se non serve più per la lista
+// import { usePluginRegistry } from '@/src/hooks/usePluginRegistry'; 
+import { PluginRegistryEntry, PluginState } from '@/src/plugins/core/registry'; // Importa tipi
+import { Loader, AlertCircle, Plus, Upload, RefreshCw, Search, Settings, Trash2, ToggleLeft, ToggleRight } from 'react-feather'; // Aggiunte icone
 import InstallPluginDialog from './InstallPluginDialog';
 import PluginSettingsDialog from './PluginSettingsDialog';
+import toast from 'react-hot-toast';
 
-interface PluginManagerViewProps {
-  className?: string;
-}
+const PluginManagerView: React.FC = () => {
+  // Stati per UI
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectedPlugin, setSelectedPlugin] = useState<PluginRegistryEntry | null>(null);
 
-const PluginManagerView: React.FC<PluginManagerViewProps> = ({ className = '' }) => {
-  const { 
-    plugins, 
-    loading, 
-    error, 
-    enablePlugin, 
-    disablePlugin, 
-    uninstallPlugin, 
-    refreshPlugins 
-  } = usePluginRegistry();
-  
-  const [showInstallDialog, setShowInstallDialog] = useState(false);
-  const [selectedPlugin, setSelectedPlugin] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [confirmUninstall, setConfirmUninstall] = useState<string | null>(null);
-  
-  const handleTogglePlugin = async (pluginId: string, currentState: boolean) => {
-    setProcessingId(pluginId);
-    
+  // --- INIZIO MODIFICA: Gestione stato plugin da API ---
+  const [plugins, setPlugins] = useState<PluginRegistryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Funzione per recuperare i plugin dall'API
+  const fetchPlugins = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      if (currentState) {
-        await disablePlugin(pluginId);
-      } else {
-        await enablePlugin(pluginId);
+      const response = await fetch('/api/plugins'); // Chiama l'API GET
+      if (!response.ok) {
+         const errorData = await response.json().catch(() => ({ message: `Failed to fetch plugins: ${response.statusText}` }));
+         throw new Error(errorData?.message || `Failed to fetch plugins: ${response.statusText}`);
       }
-    } catch (error) {
-      console.error(`Failed to ${currentState ? 'disable' : 'enable'} plugin:`, error);
+      const data: PluginRegistryEntry[] = await response.json();
+      // Converte date stringa in oggetti Date se necessario (dipende da come serializza Prisma)
+      const pluginsWithDates = data.map(p => ({
+          ...p,
+          // Assicurati che le date siano valide prima di creare new Date()
+          installedAt: p.installedAt ? new Date(p.installedAt) : new Date(), 
+          updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
+          // Assicura che lo stato sia uno dei valori validi dell'enum
+          state: Object.values(PluginState).includes(p.state) ? p.state : PluginState.INSTALLED,
+      }));
+      setPlugins(pluginsWithDates);
+    } catch (err) {
+      console.error("Error fetching plugins:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error(`Could not load plugins: ${errorMessage}`);
     } finally {
-      setProcessingId(null);
+      setIsLoading(false);
     }
   };
+
+  // Recupera i plugin al montaggio del componente
+  useEffect(() => {
+    fetchPlugins();
+  }, []);
   
-  const handleUninstall = async (pluginId: string) => {
-    if (confirmUninstall !== pluginId) {
-      setConfirmUninstall(pluginId);
-      return;
-    }
-    
-    setProcessingId(pluginId);
-    setConfirmUninstall(null);
-    
+  // Ricarica quando il dialog di installazione si chiude
+  const handleInstallDialogClose = () => {
+      setIsInstallOpen(false);
+      fetchPlugins(); // Ricarica sempre per riflettere il nuovo plugin
+  };
+  // --- FINE MODIFICA ---
+
+  // Rimuovi l'uso diretto di usePluginRegistry per la lista
+  // const registry = usePluginRegistry();
+  // const plugins = registry?.getAllPlugins() || []; // Vecchia logica
+
+  const handleEnable = async (id: string) => {
+    const originalPlugins = [...plugins];
+    // Ottimisticamente aggiorna UI
+    setPlugins(prev => prev.map(p => p.id === id ? { ...p, enabled: true, state: PluginState.ENABLED } : p));
     try {
-      await uninstallPlugin(pluginId);
-    } catch (error) {
-      console.error('Failed to uninstall plugin:', error);
-    } finally {
-      setProcessingId(null);
+        const response = await fetch(`/api/plugins/${id}/enable`, { method: 'PUT' });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to enable plugin' }));
+            throw new Error(errorData?.message || 'Failed to enable plugin');
+        }
+        toast.success('Plugin enabled');
+        fetchPlugins(); // Ricarica per stato definitivo
+    } catch (err) {
+        toast.error(`Error enabling plugin: ${err instanceof Error ? err.message : String(err)}`);
+        setPlugins(originalPlugins); // Rollback UI ottimistica
+    }
+  };
+
+  const handleDisable = async (id: string) => {
+    const originalPlugins = [...plugins];
+    // Ottimisticamente aggiorna UI
+    setPlugins(prev => prev.map(p => p.id === id ? { ...p, enabled: false, state: PluginState.DISABLED } : p));
+    try {
+        const response = await fetch(`/api/plugins/${id}/disable`, { method: 'PUT' });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to disable plugin' }));
+            throw new Error(errorData?.message || 'Failed to disable plugin');
+        }
+        toast.success('Plugin disabled');
+        fetchPlugins(); // Ricarica per stato definitivo
+    } catch (err) {
+        toast.error(`Error disabling plugin: ${err instanceof Error ? err.message : String(err)}`);
+        setPlugins(originalPlugins); // Rollback UI ottimistica
+    }
+  };
+
+  const handleUninstall = async (id: string) => {
+    // Conferma
+    if (window.confirm(`Are you sure you want to uninstall plugin "${id}"? This action cannot be undone.`)) {
+       const originalPlugins = [...plugins];
+       // Ottimisticamente rimuovi da UI
+       setPlugins(prev => prev.filter(p => p.id !== id));
+       try {
+           const response = await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
+           if (!response.ok) {
+               const errorData = await response.json().catch(() => ({ message: 'Failed to uninstall plugin' }));
+               throw new Error(errorData?.message || 'Failed to uninstall plugin');
+           }
+           toast.success('Plugin uninstalled');
+           // Non serve fetchPlugins perché abbiamo già rimosso dall'UI
+       } catch (err) {
+           toast.error(`Error uninstalling plugin: ${err instanceof Error ? err.message : String(err)}`);
+           setPlugins(originalPlugins); // Rollback UI ottimistica
+       }
     }
   };
   
-  const handleShowSettings = (pluginId: string) => {
-    setSelectedPlugin(pluginId);
-    setShowSettings(true);
+  const handleOpenSettings = (plugin: PluginRegistryEntry) => {
+    setSelectedPlugin(plugin);
+    setIsSettingsOpen(true);
   };
-  
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center h-64 ${className}`}>
-        <Loader className="animate-spin text-blue-500 mr-2" />
-        <span className="text-gray-600 dark:text-gray-300">Loading plugins...</span>
+
+  // Filtra i plugin basati sulla ricerca
+  const filteredPlugins = plugins.filter(plugin =>
+    plugin.manifest?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    plugin.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    plugin.manifest?.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getPluginStateColor = (state: PluginState): string => {
+     switch (state) {
+        case PluginState.ENABLED: return 'text-green-500';
+        case PluginState.DISABLED: return 'text-yellow-500';
+        case PluginState.ERROR: return 'text-red-500';
+        case PluginState.INSTALLED: return 'text-blue-500';
+        default: return 'text-gray-500';
+     }
+  };
+
+  return (
+    <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">Plugin Manager</h1>
+      
+      {/* Barra Azioni */}
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+         <div className="relative flex-grow">
+             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              <input
+                  type="text"
+                  name="search"
+                  id="search"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Search plugins..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+              />
+         </div>
+         <div className="flex items-center justify-end sm:justify-start space-x-2 flex-shrink-0">
+              <button 
+                onClick={fetchPlugins} 
+                className="p-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+                title="Refresh list"
+              >
+                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+              </button>
+             <button 
+                onClick={() => setIsInstallOpen(true)}
+                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 flex items-center space-x-1.5 transition-colors"
+              >
+                 <Upload size={16} />
+                 <span>Install</span>
+             </button>
+          </div>
       </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <div className={`p-4 border border-red-200 rounded-md bg-red-50 dark:bg-red-900/20 dark:border-red-800 ${className}`}>
-        <div className="flex items-start">
-          <AlertCircle className="text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+
+      {/* --- INIZIO MODIFICA: Gestione stati caricamento/errore --- */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10 text-gray-500 dark:text-gray-400">
+          <Loader className="animate-spin mr-2" size={20} /> Loading plugins...
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded relative mb-4 flex items-start" role="alert">
+           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
           <div>
-            <h3 className="text-red-600 dark:text-red-400 font-medium mb-1">Error loading plugins</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">{error.message}</p>
+             <strong className="font-bold block">Error loading plugins:</strong>
+             <span className="block sm:inline">{error}</span>
           </div>
         </div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className={`${className}`}>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Plugins</h1>
-        <div className="flex space-x-2">
-          <button
-            onClick={refreshPlugins}
-            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            title="Refresh plugins"
-          >
-            <RefreshCw size={18} />
-          </button>
-          <button
-            onClick={() => setShowInstallDialog(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-md flex items-center shadow-sm transition-colors"
-          >
-            <Download size={18} className="mr-2" />
-            Install Plugin
-          </button>
-        </div>
-      </div>
-      
-      {plugins.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow-sm border border-gray-200 dark:border-gray-700 text-center">
-          <Info size={36} className="text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">No plugins installed</h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            Plugins extend the functionality of your application with new features.
-          </p>
-          <button
-            onClick={() => setShowInstallDialog(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md inline-flex items-center"
-          >
-            <Download size={16} className="mr-2" />
-            Install your first plugin
-          </button>
-        </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          {plugins.map((plugin) => (
-            <div 
-              key={plugin.id}
-              className="border-b border-gray-200 dark:border-gray-700 last:border-b-0 p-4 flex flex-col sm:flex-row sm:items-center gap-4"
-            >
-              <div className="flex-1">
-                <div className="flex items-center">
-                  <h3 className="text-lg font-medium text-gray-800 dark:text-white mr-2">
-                    {plugin.manifest.name}
-                  </h3>
-                  <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                    v{plugin.manifest.version}
-                  </span>
-                  
-                  {plugin.errorCount > 0 && (
-                    <span className="ml-2 text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                      {plugin.errorCount} errors
-                    </span>
-                  )}
-                </div>
-                
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-2">
-                  {plugin.manifest.description}
-                </p>
-                
-                <div className="flex items-center text-xs text-gray-500 dark:text-gray-500 space-x-4">
-                  <span>By {plugin.manifest.author}</span>
-                  {plugin.manifest.repository && (
-                    <a 
-                      href={plugin.manifest.repository}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                    >
-                      Repository <ExternalLink size={12} className="ml-1" />
-                    </a>
-                  )}
-                  <span>Updated {formatDistanceToNow(new Date(plugin.updatedAt))} ago</span>
-                </div>
-                
-                {plugin.lastError && (
-                  <div className="mt-2 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-800/30">
-                    <strong>Last error:</strong> {plugin.lastError}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-2 sm:flex-col sm:items-end sm:space-x-0 sm:space-y-2">
-                <button
-                  onClick={() => handleTogglePlugin(plugin.id, plugin.enabled)}
-                  disabled={processingId === plugin.id}
-                  className={`p-2 rounded-md ${
-                    plugin.enabled 
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50' 
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  } transition-colors flex items-center`}
-                  title={plugin.enabled ? "Disable plugin" : "Enable plugin"}
-                >
-                  {processingId === plugin.id ? (
-                    <Loader size={16} className="animate-spin" />
-                  ) : (
-                    <Power size={16} />
-                  )}
-                  <span className="ml-1 hidden sm:inline text-xs">
-                    {plugin.enabled ? "Enabled" : "Disabled"}
-                  </span>
-                </button>
-                
-                <button
-                  onClick={() => handleShowSettings(plugin.id)}
-                  className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  title="Plugin settings"
-                >
-                  <Settings size={16} />
-                </button>
-                
-                <button
-                  onClick={() => handleUninstall(plugin.id)}
-                  disabled={processingId === plugin.id}
-                  className={`p-2 ${
-                    confirmUninstall === plugin.id
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                  } rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors`}
-                  title={confirmUninstall === plugin.id ? "Click again to confirm" : "Uninstall plugin"}
-                >
-                  {processingId === plugin.id ? (
-                    <Loader size={16} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={16} />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
+      // --- FINE MODIFICA ---
+
+        <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
+          <ul role="list" className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredPlugins.length > 0 ? filteredPlugins.map((plugin) => (
+              <li key={plugin.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">
+                 <div className="flex items-center justify-between">
+                    <div className="truncate flex-1 mr-4">
+                       <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{plugin.manifest?.name || plugin.id}</p>
+                       <p className="text-xs text-gray-500 dark:text-gray-400">{plugin.id} - v{plugin.version}</p>
+                       <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{plugin.manifest?.description || 'No description'}</p>
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getPluginStateColor(plugin.state)} bg-opacity-10 ${plugin.state === PluginState.ENABLED ? 'bg-green-100 dark:bg-green-900/30' : plugin.state === PluginState.DISABLED ? 'bg-yellow-100 dark:bg-yellow-900/30' : plugin.state === PluginState.ERROR ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-700/30'}`}>
+                            {plugin.state}
+                        </span>
+                        {plugin.enabled ? (
+                            <button 
+                                onClick={() => handleDisable(plugin.id)} 
+                                className="p-1.5 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors" 
+                                title="Disable Plugin"
+                             >
+                                <ToggleRight size={18} />
+                             </button>
+                         ) : (
+                             <button 
+                                onClick={() => handleEnable(plugin.id)} 
+                                className="p-1.5 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors" 
+                                title="Enable Plugin"
+                             >
+                                 <ToggleLeft size={18} />
+                             </button>
+                         )}
+                         <button 
+                            onClick={() => handleOpenSettings(plugin)} 
+                            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700/30 transition-colors" 
+                            title="Plugin Settings"
+                         >
+                             <Settings size={16} />
+                         </button>
+                         <button 
+                            onClick={() => handleUninstall(plugin.id)} 
+                            className="p-1.5 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors" 
+                            title="Uninstall Plugin"
+                         >
+                            <Trash2 size={16} />
+                         </button>
+                    </div>
+                 </div>
+                 {plugin.state === PluginState.ERROR && plugin.lastError && (
+                     <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">Error: {plugin.lastError}</p>
+                 )}
+              </li>
+            )) : (
+              <li className="px-4 py-8 sm:px-6 text-center text-gray-500 dark:text-gray-400">
+                No plugins found {searchTerm && 'matching your search'}.
+              </li>
+            )}
+          </ul>
         </div>
+      // --- INIZIO MODIFICA: Chiusura blocco condizionale ---
       )}
-      
-      {/* Install Plugin Dialog */}
+      {/* --- FINE MODIFICA --- */}
+
+      {/* Dialogs */}
       <InstallPluginDialog 
-        isOpen={showInstallDialog} 
-        onClose={() => setShowInstallDialog(false)} 
+        isOpen={isInstallOpen} 
+        onClose={handleInstallDialogClose} // Usa handler modificato
       />
       
-      {/* Plugin Settings Dialog */}
       {selectedPlugin && (
         <PluginSettingsDialog 
-          isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
-          pluginId={selectedPlugin}
+           isOpen={isSettingsOpen} 
+           onClose={() => {
+               setIsSettingsOpen(false);
+               setSelectedPlugin(null);
+               // Non serve fetchPlugins qui a meno che le impostazioni non cambino lo stato visualizzato
+           }}
+           pluginId={selectedPlugin.id}
         />
       )}
     </div>

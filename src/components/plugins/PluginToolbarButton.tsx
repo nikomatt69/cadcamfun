@@ -18,7 +18,7 @@ const PluginToolbarButton: React.FC<PluginToolbarButtonProps> = ({
   
   // Find the plugin and command
   const plugin = plugins?.find(p => p.id === pluginId);
-  const command = plugin?.manifest.contributes?.commands?.find(cmd => cmd.id === commandId);
+  const command = plugin?.manifest.contributes?.commands?.find((cmd: { id: string; }) => cmd.id === commandId);
   
   if (!plugin || !command) return null;
   

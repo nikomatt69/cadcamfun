@@ -9,8 +9,8 @@ const ASSETS_PATH = path.join(process.cwd(), 'public');
 
 // Register fonts - make sure these files exist in your public/fonts directory
 try {
-  registerFont(path.join(FONTS_PATH, 'Inter-Bold.ttf'), { family: 'Inter', weight: 'bold' });
-  registerFont(path.join(FONTS_PATH, 'Inter-Regular.ttf'), { family: 'Inter', weight: 'normal' });
+  registerFont(path.join(FONTS_PATH, 'helvetica-rounded-bold-5871d05ead8de.ttf'), { family: 'Helvetica', weight: 'bold' });
+  registerFont(path.join(FONTS_PATH, 'helvetica-rounded-bold-5871d05ead8de.ttf'), { family: 'Helvetica', weight: 'normal' });
 } catch (error) {
   console.error('Error registering fonts for OG image:', error);
 }
@@ -80,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ctx.fillRect(width / 2, 0, width / 2, height);
     
     // Draw title text
-    ctx.font = 'bold 60px Inter';
+    ctx.font = 'bold 60px Helvetica';
     ctx.fillStyle = '#1e293b'; // Dark slate for text
     ctx.textBaseline = 'middle';
     
@@ -95,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     
     // Draw description text
-    ctx.font = 'normal 30px Inter';
+    ctx.font = 'normal 30px Helvetica';
     ctx.fillStyle = '#475569'; // Lighter text for description
     
     // Handle long description with text wrapping
@@ -109,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     
     // Draw URL at bottom
-    ctx.font = 'normal 24px Inter';
+    ctx.font = 'normal 24px Helvetica';
     ctx.fillStyle = '#64748b';
     ctx.fillText('cadcamfun.xyz', 60, height - 60);
     

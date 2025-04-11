@@ -14,7 +14,7 @@ import { disconnectWebSocket, initializeWebSocket } from '@/src/lib/websocket';
 import { AIAssistant, AIAssistantButton } from '../ai/ai-new';
 import ToastContainer from '../ui/ToastContainer';
 import NotificationPermissionPrompt from '../notifications/NotificationPermissionPrompt';
-import { PluginSidebar } from '@/src/plugins/components/PluginSidebar';
+import  PluginSidebar  from 'src/components/plugins/PluginSidebar';
 
 
 type EnhancedLayoutProps = {
@@ -32,7 +32,7 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
   fullWidth = false,
   showBreadcrumbs = true
 }) => {
-  const [showPluginSidebar, setShowPluginSidebar] = useState(true);
+  const [showPluginSidebar, setShowPluginSidebar] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -225,7 +225,14 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
             <div className={`${contentWidthClass} mx-auto mb-1 rounded-xl overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6`}>
               {children}
             </div>
-            
+            <>
+              
+              <PluginSidebar 
+             isOpen={sidebarOpen}
+             onClose={() => setSidebarOpen(false)}
+              /> 
+              
+              </>
             <Toaster
               position="bottom-right"
               containerStyle={{ 
@@ -240,6 +247,8 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
                   fontSize: '0.875rem'
                 }
               }}
+             
+              
             />
             <ToastContainer />
             {/* Footer */}

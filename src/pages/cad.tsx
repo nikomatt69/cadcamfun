@@ -28,6 +28,7 @@ import { useAI } from '../components/ai/ai-new/AIContextProvider';
 import CADCanvas from '../components/cad/CADCanvas';
 import DrawingEnabledCADCanvas from '../components/cam/DrawingEnabledCADCanvas';
 import { AIHub, AIProcessingIndicator, TextToCADPanel } from '../components/ai/ai-new';
+import PluginSidebar from '../components/plugins/PluginSidebar';
 
 
 // Define structure for cross-window subscription
@@ -66,7 +67,7 @@ export default function CADPage() {
   
   const { addElements , addElement} = useElementsStore();
   
-  const [showPluginSidebar, setShowPluginSidebar] = useState(true);
+  const [showPluginSidebar, setShowPluginSidebar] = useState(false);
   const [showLeftSidebar, setShowLeftSidebar] = useState(true);
   
   
@@ -326,7 +327,10 @@ export default function CADPage() {
   }
 
   
-  
+  if (status === 'unauthenticated') {
+    router.push('/auth/signin');
+    return null;
+  }
  
   
   return (
@@ -385,8 +389,12 @@ export default function CADPage() {
                 onClose={() => setShowFloatingToolbar(false)}
               />
             )}
+       
           </div>
-          
+          <><PluginSidebar 
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      /></>
           {/* Right sidebar for properties */}
           
 

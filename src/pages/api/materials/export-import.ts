@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         case 'bucket':
           // Save to bucket and return path
           const exportPath = generateObjectPath('material', userId!);
-          await uploadToBucket(exportPath, exportData);
+          await uploadToBucket(exportPath, JSON.stringify(exportData, null, 2));
           
           return sendSuccessResponse(
             res, 

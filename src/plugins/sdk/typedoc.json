@@ -1,0 +1,23 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "./types/cadcam-plugin-api.d.ts",
+    "./types/plugin-manifest.d.ts",
+    "./cli/plugin-cli.ts",
+    "./cli/build-plugin.ts",
+    "./cli/package-plugin.ts",
+    "./validation/validate-plugin.ts",
+    "./test/test-plugin.ts",
+    "./utils.ts"
+  ],
+  "out": "./dist-docs",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "./docs/README.md",
+  "name": "CAD/CAM FUN Plugin SDK",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "theme": "default",
+  "skipErrorChecking": true
+} 

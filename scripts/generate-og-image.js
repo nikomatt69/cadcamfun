@@ -10,8 +10,8 @@ async function generateOGImage() {
 
   // Register fonts
   try {
-    registerFont(path.join(process.cwd(), 'public', 'fonts', 'Inter-Bold.ttf'), { family: 'Inter', weight: 'bold' });
-    registerFont(path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'), { family: 'Inter', weight: 'normal' });
+    registerFont(path.join(process.cwd(), 'public', 'fonts', 'helvetica-rounded-bold-5871d05ead8de.ttf'), { family: 'Helvetica', weight: 'bold' });
+    registerFont(path.join(process.cwd(), 'public', 'fonts', 'helvetica-rounded-bold-5871d05ead8de.ttf'), { family: 'Helvetica', weight: 'normal' });
   } catch (error) {
     console.error('Error registering fonts:', error);
     console.log('Using system fonts instead');
@@ -42,24 +42,24 @@ async function generateOGImage() {
     console.error('Error loading logo:', error);
     
     // Draw placeholder text instead
-    ctx.font = 'bold 80px Inter';
+    ctx.font = 'bold 80px Helvetica';
     ctx.fillStyle = 'white';
     ctx.fillText('CAD/CAM', 100, 160);
     ctx.fillText('FUN', 100, 240);
   }
 
   // Draw title
-  ctx.font = 'bold 72px Inter';
+  ctx.font = 'bold 72px Helvetica';
   ctx.fillStyle = 'white';
   ctx.fillText('Modern CAD/CAM System', 100, 350);
 
   // Draw subtitle
-  ctx.font = '32px Inter';
+  ctx.font = '32px Helvetica';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
   ctx.fillText('Design • Model • Manufacture • Collaborate', 100, 410);
 
   // Draw features
-  ctx.font = 'bold 28px Inter';
+  ctx.font = 'bold 28px Helvetica';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
   const features = ['2D/3D Design', 'CNC Machining', 'AI-Powered Tools', 'Cloud Collaboration'];
   features.forEach((feature, index) => {
@@ -67,7 +67,7 @@ async function generateOGImage() {
   });
 
   // Draw URL
-  ctx.font = 'normal 24px Inter';
+  ctx.font = 'normal 24px Helvetica';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
   ctx.fillText('cadcamfun.xyz', width - 200, height - 40);
 

@@ -26,6 +26,8 @@ import { AnalyticsProvider } from '../contexts/AnalyticsContext';
 import ViewportMeta from '../components/layout/ViewportMeta';
 import { AIContextProvider } from '../components/ai/ai-new/AIContextProvider';
 import { CursorProvider } from '../contexts/CursorContext';
+import { PluginClientProvider } from '../context/PluginClientContext';
+import Layout from '@/src/components/layout/Layout';
 
 // --- Plugin System Imports ---
 // Assume createPluginRegistry exists and potentially needs adjustment for client-side storage
@@ -33,12 +35,12 @@ import { CursorProvider } from '../contexts/CursorContext';
 // Import the function to set the global instance for the hook
 import { initializePluginRegistry } from '@/src/hooks/usePluginRegistry';
 // Import client-side storage and registry implementation
-import { PluginRegistry, InMemoryPluginStorage, PluginStorage } from '@/src/plugins/core/registry';
+import { PluginRegistry, PluginStorage } from '@/src/plugins/core/registry'; // Get Registry and main Storage class from index
+import { InMemoryPluginStorage } from '@/src/plugins/core/registry/pluginStorage'; // Import InMemory from its definition file
 // --- End Plugin System Imports ---
 
 import { useElementsStore } from 'src/store/elementsStore';
 
-const inter = Inter({ subsets: ['latin'] });
 
 // Ensure this initialization runs only once client-side
 let pluginSystemInitialized = false;
@@ -108,7 +110,7 @@ export default function App({ Component, pageProps: { session, ...pageProps }, r
       >
         <AuthProvider>
           <LanguageProvider>
-            <main className={`${inter.className} antialiased`}>
+            <main className={`${camFont.style.fontFamily} antialiased`}>
               <NotificationProvider>
                 <ToastProvider>
                   <AnimatePresence mode="wait">
@@ -123,7 +125,11 @@ export default function App({ Component, pageProps: { session, ...pageProps }, r
                               }
                             `}</style>
                             <ViewportMeta />
-                            <Component {...pageProps} />
+                            <PluginClientProvider>
+                             
+                                <Component {...pageProps} />
+                              
+                            </PluginClientProvider>
                           </AIContextProvider>
                         </CursorProvider>
                       </AnalyticsProvider>

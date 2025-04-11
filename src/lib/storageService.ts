@@ -1,20 +1,33 @@
 // src/lib/services/storageService.ts
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { 
+  S3Client, 
+  PutObjectCommand, 
+  GetObjectCommand, 
+  DeleteObjectCommand, 
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+  ListObjectsV2CommandOutput,
+  DeleteObjectsCommandOutput,
+  _Object as S3Object
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Readable } from 'stream';
+
 export const EVER_API = 'https://endpoint.4everland.co';
 // Configuration for S3 Client
 const s3Client = new S3Client({
   endpoint: EVER_API,
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'us-west-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string || '',
+    accessKeyId: process.env.EVER_API_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.EVER_API_KEY_SECRET || process.env.AWS_SECRET_ACCESS_KEY || '',
   },
+  forcePathStyle: true
 });
 
 // Bucket name
-const bucketName = process.env.S3_BUCKET_NAME as string || 'cadcamfun';
+const bucketName = process.env.EVER_BUCKET_NAME || process.env.S3_BUCKET_NAME || 'cadcamfun';
 
 /**
  * Generate a unique path for an object in the bucket
@@ -36,70 +49,69 @@ export function generateObjectPath(
 /**
  * Upload an object to S3 bucket
  * @param path Unique path in the bucket
- * @param data Data to upload
- * @param contentType Optional content type (defaults to JSON)
+ * @param data Data to upload (string, Buffer, or ReadableStream)
+ * @param contentType Optional content type
  * @returns Path of the uploaded object
  */
 export async function uploadToBucket(
   path: string, 
-  data: any, 
-  contentType = 'application/json'
+  data: string | Buffer | Readable | ReadableStream,
+  contentType?: string
 ): Promise<string> {
   try {
-    const content = typeof data === 'string' 
-      ? data 
-      : JSON.stringify(data, null, 2);
-    
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: path,
-        Body: content,
-        ContentType: contentType,
-      })
-    );
-    
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: path,
+      Body: data,
+      ContentType: contentType,
+    });
+    await s3Client.send(command);
     return path;
   } catch (error) {
-    console.error('Error uploading to bucket:', error);
-    throw new Error(`Failed to upload data to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`[StorageService] Error uploading ${path} to bucket:`, error);
+    throw new Error(`Failed to upload data to storage: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 /**
- * Download an object from S3 bucket
+ * Download an object from S3 bucket as a Buffer
  * @param path Path of the object in the bucket
- * @returns Downloaded data
+ * @returns Downloaded data as Buffer or null if not found
  */
-export async function downloadFromBucket(path: string): Promise<any> {
+export async function downloadFromBucket(path: string): Promise<Buffer | null> {
   try {
-    const response = await s3Client.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: path,
-      })
-    );
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: path,
+    });
+    const response = await s3Client.send(command);
     
-    // Convert stream to string
-    const streamToString = (stream : any): Promise<string> =>
-      new Promise((resolve, reject) => {
-        const chunks: any[] = [];
-        stream.on('data', (chunk:any) => chunks.push(chunk));
-        stream.on('error', reject);
-        stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      });
-    
-    const bodyContents = await streamToString(response.Body);
-    
-    // Try to parse JSON, otherwise return string
-    try {
-      return JSON.parse(bodyContents);
-    } catch (e) {
-      return bodyContents;
+    if (!response.Body) {
+        console.warn(`[StorageService] No response body for path: ${path}`);
+        return null;
     }
+    
+    if (response.Body instanceof Readable) {
+       const streamToBuffer = (stream: Readable): Promise<Buffer> =>
+         new Promise((resolve, reject) => {
+           const chunks: Buffer[] = [];
+           stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+           stream.on('error', reject);
+           stream.on('end', () => resolve(Buffer.concat(chunks)));
+         });
+       return await streamToBuffer(response.Body);
+    } else {
+        console.error(`[StorageService] Unhandled response body type for path: ${path}. Expected Node.js Readable stream.`);
+        return null;
+    }
+
   } catch (error) {
-    console.error('Error downloading from bucket:', error);
-    throw new Error(`Failed to download data from storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+     if ((error as any).name === 'NoSuchKey') {
+         console.warn(`[StorageService] Object not found at path: ${path}`);
+         return null;
+      }
+    console.error(`[StorageService] Error downloading from bucket for path ${path}:`, error);
+    throw new Error(`Failed to download data from storage: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -115,9 +127,12 @@ export async function deleteFromBucket(path: string): Promise<void> {
         Key: path,
       })
     );
+    console.log(`[StorageService] Deleted object: ${path}`);
   } catch (error) {
-    console.error('Error deleting from bucket:', error);
-    throw new Error(`Failed to delete data from storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if ((error as any).name !== 'NoSuchKey') {
+        console.error(`[StorageService] Error deleting ${path} from bucket:`, error);
+        throw new Error(`Failed to delete data from storage: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 
@@ -169,3 +184,105 @@ export async function listObjectsByType(
     throw new Error(`Failed to list objects: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+/**
+ * List all object keys under a specific prefix.
+ * Handles pagination automatically.
+ * @param prefix The prefix to search for (e.g., 'plugins/my-plugin/')
+ * @returns Array of object keys
+ */
+export async function listObjectKeysByPrefix(prefix: string): Promise<string[]> {
+  console.log(`[StorageService] Listing objects with prefix: ${prefix}`);
+  const keys: string[] = [];
+  let continuationToken: string | undefined = undefined;
+
+  try {
+    do {
+      const command = new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      });
+      const response: ListObjectsV2CommandOutput = await s3Client.send(command);
+      
+      if (response.Contents) {
+        response.Contents.forEach((item: S3Object) => {
+          if (item.Key) {
+            keys.push(item.Key);
+          }
+        });
+      }
+      continuationToken = response.NextContinuationToken;
+    } while (continuationToken);
+
+    console.log(`[StorageService] Found ${keys.length} objects with prefix ${prefix}`);
+    return keys;
+  } catch (error) {
+    console.error(`[StorageService] Error listing objects by prefix ${prefix}:`, error);
+    throw new Error(`Failed to list objects by prefix: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Delete multiple objects from the S3 bucket in batches.
+ * @param keys Array of object keys to delete
+ */
+export async function deleteMultipleObjects(keys: string[]): Promise<void> {
+  if (!keys || keys.length === 0) {
+    console.log('[StorageService] No keys provided for multiple delete.');
+    return;
+  }
+  console.log(`[StorageService] Attempting to delete ${keys.length} objects...`);
+  const batchSize = 1000;
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batchKeys = keys.slice(i, i + batchSize);
+    const deleteParams = {
+      Bucket: bucketName,
+      Delete: {
+        Objects: batchKeys.map(key => ({ Key: key })),
+        Quiet: false,
+      },
+    };
+
+    try {
+      const command = new DeleteObjectsCommand(deleteParams);
+      const output: DeleteObjectsCommandOutput = await s3Client.send(command);
+      
+      console.log(`[StorageService] Batch delete processed for ${batchKeys.length} keys.`);
+      
+      if (output.Errors && output.Errors.length > 0) {
+        console.error('[StorageService] Errors occurred during batch delete:');
+        output.Errors.forEach(err => {
+          console.error(`  - Key: ${err.Key}, Code: ${err.Code}, Message: ${err.Message}`);
+        });
+      }
+    } catch (error) {
+      console.error(`[StorageService] Error during batch delete operation (batch starting index ${i}):`, error);
+      throw new Error(`Failed during batch delete: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  console.log(`[StorageService] Finished deleting ${keys.length} objects.`);
+}
+
+/**
+ * Get an object stream from S3 bucket
+ * @param path Path of the object in the bucket
+ * @returns ReadableStream | null
+ */
+export async function downloadStreamFromBucket(path: string): Promise<Readable | ReadableStream | null> {
+   try {
+     const command = new GetObjectCommand({
+       Bucket: bucketName,
+       Key: path,
+     });
+     const response = await s3Client.send(command);
+     return response.Body ? (response.Body as Readable | ReadableStream) : null;
+   } catch (error) {
+      if ((error as any).name === 'NoSuchKey') {
+         console.warn(`[StorageService] Object not found at path: ${path}`);
+         return null;
+      }
+     console.error(`[StorageService] Error downloading stream from bucket for path ${path}:`, error);
+     return null; 
+   }
+ }

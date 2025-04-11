@@ -500,3 +500,28 @@ model Token {
   @@index([userId])
   @@index([token])
 }
+
+// Model to store core plugin metadata
+model PluginRegistryEntry {
+  id              String  @id // Plugin ID (e.g., com.example.myplugin)
+  manifestJson    String  @db.Text // Store the full manifest as a JSON string
+  state           String  // Store PluginState enum as string (e.g., "ENABLED", "DISABLED", "ERROR")
+  enabled         Boolean
+  version         String
+  installedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  errorCount      Int      @default(0)
+  lastError       String?
+
+  // Relation to configuration (one-to-one optional)
+  configuration   PluginConfiguration?
+}
+
+// Model to store plugin-specific configuration
+model PluginConfiguration {
+  pluginId      String  @id // Foreign key referencing PluginRegistryEntry.id
+  configJson    String  @db.Text // Store the configuration object as a JSON string
+
+  // Explicit relation back to PluginRegistryEntry
+  plugin        PluginRegistryEntry @relation(fields: [pluginId], references: [id], onDelete: Cascade) // Cascade delete config if plugin is removed
+}
