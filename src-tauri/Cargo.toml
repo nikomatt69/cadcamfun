@@ -35,7 +35,7 @@ tauri-plugin-store = "2.0"
 tauri-plugin-window-state = "2.0"
 tauri-plugin-single-instance = "2.0"
 tauri-plugin-log = "2.0"
-tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
+tauri-plugin-sql = { version = "2.0", features = ["postgres"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
