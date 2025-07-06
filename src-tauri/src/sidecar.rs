@@ -2,7 +2,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{anyhow, Result};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tokio::time::{sleep, timeout};
 use tracing::{info, warn, error, debug};
 use local_ip_address::local_ip;
@@ -36,10 +36,12 @@ impl SidecarManager {
         let port = self.find_available_port().await?;
         
         // Get the app directory
-        let app_dir = app_handle
+        let resource_dir = app_handle
             .path()
             .resource_dir()
-            .ok_or_else(|| anyhow!("Failed to get app resource directory"))?
+            .map_err(|e| anyhow!("Failed to get app resource directory: {}", e))?;
+        
+        let app_dir = resource_dir
             .parent()
             .ok_or_else(|| anyhow!("Failed to get parent directory"))?;
 

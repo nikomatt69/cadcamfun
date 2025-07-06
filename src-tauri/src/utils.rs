@@ -5,9 +5,14 @@ use tracing::{info, warn, error};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub info: String,
+}
 /// Get system information
 #[tauri::command]
-pub async fn get_app_info<T>() -> Result<T, String> {
+pub async fn get_app_info() -> Result<AppInfo, String> {
     let mut sys = System::new_all();
     sys.refresh_all();
 
