@@ -6221,13 +6221,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@lemonsqueezy/lemonsqueezy.js@npm:^3.2.1":
-  version: 3.3.1
-  resolution: "@lemonsqueezy/lemonsqueezy.js@npm:3.3.1"
-  checksum: 10c0/f8016b44de162494775a59de6e026f0b1b6a43173792a2a38405365254d68cfeb1f995438d3c756dbe02b37872aabb5027cd744183e887e7aab3871b5c987892
-  languageName: node
-  linkType: hard
-
 "@levischuck/tiny-cbor@npm:^0.2.2":
   version: 0.2.11
   resolution: "@levischuck/tiny-cbor@npm:0.2.11"
@@ -18095,7 +18088,6 @@ __metadata:
     "@graphql-tools/graphql-file-loader": "npm:^8.0.19"
     "@graphql-tools/load": "npm:^8.1.0"
     "@headlessui/react": "npm:^2.2.0"
-    "@lemonsqueezy/lemonsqueezy.js": "npm:^3.2.1"
     "@million/lint": "npm:^1.0.14"
     "@modelcontextprotocol/sdk": "npm:^1.11.0"
     "@monaco-editor/react": "npm:^4.7.0"
@@ -18202,7 +18194,6 @@ __metadata:
     ioredis: "npm:^5.3.2"
     jsonwebtoken: "npm:^9.0.0"
     jszip: "npm:^3.10.1"
-    lemonsqueezy: "npm:^0.0.1-claimed"
     lucide-react: "npm:^0.509.0"
     micro-cors: "npm:^0.1.1"
     minimist: "npm:^1.2.8"
@@ -24627,13 +24618,6 @@ __metadata:
   version: 0.6.0
   resolution: "leac@npm:0.6.0"
   checksum: 10c0/5257781e10791ef8462eb1cbe5e48e3cda7692486f2a775265d6f5216cc088960c62f138163b8df0dcf2119d18673bfe7b050d6b41543d92a7b7ac90e4eb1e8b
-  languageName: node
-  linkType: hard
-
-"lemonsqueezy@npm:^0.0.1-claimed":
-  version: 0.0.1-claimed
-  resolution: "lemonsqueezy@npm:0.0.1-claimed"
-  checksum: 10c0/f974dbf11337100f8e1486b9335a023c260aab47d7f710c2679fdd9a71f439bd4c53c63227fb0e49911547e99899e52f635cdd0cedd77dc328ccacf620080a24
   languageName: node
   linkType: hard
 
