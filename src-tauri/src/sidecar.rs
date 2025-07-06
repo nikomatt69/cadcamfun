@@ -37,7 +37,6 @@ impl SidecarManager {
         let app_dir = app_handle
             .path()
             .resource_dir()
-            .or_else(|_| anyhow!("Failed to get app resource directory"))?
             .parent()
             .ok_or_else(|| anyhow!("Failed to get parent directory"))?;
 
@@ -204,7 +203,6 @@ impl SidecarManager {
         let resource_path = app_handle
             .path()
             .resource_dir()
-            .or_else(|_| anyhow!("Failed to get app resource directory"))?
             .join("bin/mcp-server");
         
         debug!("MCP server path: {:?}", resource_path);
@@ -213,7 +211,7 @@ impl SidecarManager {
 
     pub fn start_mcp_server(&mut self, app_handle: AppHandle) -> Result<u16> {
         // ... existing code ...
-        Ok(self.port)
+        Ok(self.port.unwrap_or(3001))
     }
 
     pub fn stop_mcp_server(&mut self) -> Result<()> {

@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tracing::{info, warn};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {

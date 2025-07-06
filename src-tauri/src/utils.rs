@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 /// Get system information
 #[tauri::command]
-pub async fn get_app_info() -> Result<AppInfo, String> {
+pub async fn get_app_info<T>() -> Result<T, String> {
     let mut sys = System::new_all();
     sys.refresh_all();
 
