@@ -1,0 +1,191 @@
+{
+  "machining": {
+    "settings": {
+      "title": "Machining Settings",
+      "general": {
+        "units": "Units",
+        "precision": "Precision",
+        "tolerance": "Tolerance",
+        "safetyDistance": "Safety Distance"
+      },
+      "tool": {
+        "title": "Tool",
+        "diameter": "Diameter",
+        "length": "Length",
+        "type": "Type",
+        "material": "Material",
+        "flutes": "Flutes",
+        "cuttingEdgeAngle": "Cutting Edge Angle",
+        "cuttingEdgeHeight": "Cutting Edge Height",
+        "shank": "Shank",
+        "taper": "Taper",
+        "cornerRadius": "Corner Radius",
+        "toolNumber": "Tool Number",
+        "toolOffset": "Tool Offset",
+        "toolLife": "Tool Life"
+      },
+      "speeds": {
+        "title": "Speeds and Feeds",
+        "spindleSpeed": "Spindle Speed",
+        "feedRate": "Feed Rate",
+        "plungeRate": "Plunge Rate",
+        "rapidTraverse": "Rapid Traverse",
+        "acceleration": "Acceleration",
+        "deceleration": "Deceleration",
+        "maxSpeed": "Maximum Speed",
+        "optimalSpeed": "Optimal Speed"
+      },
+      "cuts": {
+        "title": "Cutting Parameters",
+        "depthOfCut": "Depth of Cut",
+        "stepover": "Stepover",
+        "stepdown": "Stepdown",
+        "roughingAllowance": "Roughing Allowance",
+        "finishingAllowance": "Finishing Allowance",
+        "entryMethod": "Entry Method",
+        "exitMethod": "Exit Method",
+        "rampAngle": "Ramp Angle",
+        "helixDiameter": "Helix Diameter",
+        "helixPitch": "Helix Pitch"
+      },
+      "coolant": {
+        "title": "Coolant",
+        "type": "Coolant Type",
+        "pressure": "Pressure",
+        "flow": "Flow",
+        "temperature": "Temperature",
+        "options": {
+          "flood": "Flood",
+          "mist": "Mist",
+          "air": "Air",
+          "minimal": "Minimal Quantity Lubrication",
+          "disabled": "Disabled"
+        }
+      },
+      "workholding": {
+        "title": "Workholding",
+        "type": "Workholding Type",
+        "position": "Position",
+        "orientation": "Orientation",
+        "clampingForce": "Clamping Force",
+        "options": {
+          "vise": "Vise",
+          "chuck": "Chuck",
+          "clamps": "Clamps",
+          "fixture": "Fixture",
+          "vacuum": "Vacuum",
+          "magneticTable": "Magnetic Table"
+        }
+      }
+    }
+  },
+  "3dPrinting": {
+    "settings": {
+      "title": "3D Printing Settings",
+      "general": {
+        "printQuality": "Print Quality",
+        "layerHeight": "Layer Height",
+        "wallThickness": "Wall Thickness",
+        "infillDensity": "Infill Density",
+        "infillPattern": "Infill Pattern"
+      },
+      "temperature": {
+        "hotend": "Hotend Temperature",
+        "bed": "Bed Temperature",
+        "chamber": "Chamber Temperature",
+        "filamentDrying": "Filament Drying"
+      },
+      "speed": {
+        "printSpeed": "Print Speed",
+        "travelSpeed": "Travel Speed",
+        "retraction": "Retraction Speed",
+        "firstLayer": "First Layer Speed",
+        "outerWall": "Outer Wall Speed",
+        "innerWall": "Inner Wall Speed",
+        "infill": "Infill Speed",
+        "support": "Support Speed"
+      },
+      "support": {
+        "generateSupport": "Generate Support",
+        "supportPlacement": "Support Placement",
+        "supportDensity": "Support Density",
+        "supportInterface": "Support Interface",
+        "supportOverhang": "Support Overhang Angle",
+        "treSupport": "Tree Support"
+      },
+      "adhesion": {
+        "type": "Adhesion Type",
+        "skirtDistance": "Skirt Distance",
+        "skirtLines": "Skirt Lines",
+        "brimWidth": "Brim Width",
+        "raftLayers": "Raft Layers",
+        "raftMargin": "Raft Margin"
+      },
+      "material": {
+        "type": "Material Type",
+        "diameter": "Filament Diameter",
+        "flow": "Flow Rate",
+        "density": "Density",
+        "options": {
+          "pla": "PLA",
+          "abs": "ABS",
+          "petg": "PETG",
+          "tpu": "TPU",
+          "nylon": "Nylon",
+          "pc": "Polycarbonate",
+          "asa": "ASA",
+          "carbon": "Carbon Fiber",
+          "metal": "Metal"
+        }
+      }
+    }
+  },
+  "laserCutting": {
+    "settings": {
+      "title": "Laser Cutting Settings",
+      "general": {
+        "laserPower": "Laser Power",
+        "laserType": "Laser Type",
+        "beamDiameter": "Beam Diameter",
+        "focusHeight": "Focus Height",
+        "pulseFrequency": "Pulse Frequency"
+      },
+      "cutting": {
+        "cuttingSpeed": "Cutting Speed",
+        "powerPercentage": "Power Percentage",
+        "passes": "Number of Passes",
+        "assistGas": "Assist Gas",
+        "gasPressure": "Gas Pressure",
+        "pierceTime": "Pierce Time",
+        "kerf": "Kerf Compensation"
+      },
+      "engraving": {
+        "engravingSpeed": "Engraving Speed",
+        "powerPercentage": "Power Percentage",
+        "lineSpacing": "Line Spacing",
+        "scanningMode": "Scanning Mode",
+        "dithering": "Dithering",
+        "resolution": "Resolution",
+        "depth": "Depth"
+      },
+      "material": {
+        "type": "Material Type",
+        "thickness": "Thickness",
+        "density": "Density",
+        "reflectivity": "Reflectivity",
+        "options": {
+          "wood": "Wood",
+          "acrylic": "Acrylic",
+          "paper": "Paper",
+          "cardboard": "Cardboard",
+          "fabric": "Fabric",
+          "leather": "Leather",
+          "glass": "Glass",
+          "metal": "Metal",
+          "rubber": "Rubber",
+          "ceramic": "Ceramic"
+        }
+      }
+    }
+  }
+}

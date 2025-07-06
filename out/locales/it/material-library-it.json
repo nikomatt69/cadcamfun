@@ -1,0 +1,273 @@
+{
+  "materials": {
+    "title": "Libreria Materiali",
+    "categories": {
+      "metal": {
+        "title": "Metalli",
+        "steel": {
+          "title": "Acciaio",
+          "types": {
+            "carbonSteel": "Acciaio al Carbonio",
+            "stainlessSteel": "Acciaio Inossidabile",
+            "toolSteel": "Acciaio per Utensili",
+            "springSteel": "Acciaio per Molle",
+            "highSpeedSteel": "Acciaio Rapido",
+            "structuralSteel": "Acciaio Strutturale"
+          },
+          "grades": {
+            "aisi1018": "AISI 1018",
+            "aisi1045": "AISI 1045",
+            "aisi4140": "AISI 4140",
+            "aisi304": "AISI 304",
+            "aisi316": "AISI 316",
+            "aisi440c": "AISI 440C",
+            "a36": "A36",
+            "s355": "S355"
+          }
+        },
+        "aluminum": {
+          "title": "Alluminio",
+          "types": {
+            "cast": "Alluminio da Fonderia",
+            "wrought": "Alluminio da Lavorazione",
+            "extruded": "Alluminio Estruso",
+            "forged": "Alluminio Forgiato"
+          },
+          "grades": {
+            "6061": "6061",
+            "7075": "7075",
+            "5052": "5052",
+            "2024": "2024",
+            "3003": "3003",
+            "a356": "A356",
+            "a380": "A380"
+          }
+        },
+        "titanium": {
+          "title": "Titanio",
+          "types": {
+            "commercial": "Titanio Commercialmente Puro",
+            "alpha": "Titanio Alpha",
+            "alphaBeta": "Titanio Alpha-Beta",
+            "beta": "Titanio Beta"
+          },
+          "grades": {
+            "grade1": "Grado 1",
+            "grade2": "Grado 2",
+            "grade5": "Grado 5 (Ti-6Al-4V)",
+            "grade7": "Grado 7",
+            "grade9": "Grado 9",
+            "grade23": "Grado 23 (Ti-6Al-4V ELI)"
+          }
+        },
+        "copper": {
+          "title": "Rame",
+          "types": {
+            "pure": "Rame Puro",
+            "bronze": "Bronzo",
+            "brass": "Ottone",
+            "berylliumCopper": "Rame al Berillio"
+          },
+          "grades": {
+            "c101": "C101",
+            "c110": "C110",
+            "c260": "C260 (Ottone)",
+            "c360": "C360 (Ottone)",
+            "c510": "C510 (Bronzo Fosforoso)",
+            "c630": "C630 (Rame al Berillio)"
+          }
+        }
+      },
+      "plastic": {
+        "title": "Plastiche",
+        "thermoplastic": {
+          "title": "Termoplastiche",
+          "types": {
+            "abs": "ABS",
+            "pla": "PLA",
+            "petg": "PETG",
+            "nylon": "Nylon",
+            "pc": "Policarbonato",
+            "pp": "Polipropilene",
+            "pe": "Polietilene",
+            "ps": "Polistirene",
+            "pmma": "PMMA (Acrilico)",
+            "pom": "POM (Acetale)",
+            "peek": "PEEK",
+            "pei": "PEI (ULTEM)",
+            "psu": "PSU (Polisulfone)",
+            "pps": "PPS",
+            "pvdf": "PVDF"
+          }
+        },
+        "thermoset": {
+          "title": "Termoindurenti",
+          "types": {
+            "epoxy": "Resina Epossidica",
+            "polyurethane": "Poliuretano",
+            "phenolic": "Fenolica",
+            "silicone": "Silicone",
+            "melamine": "Melamina"
+          }
+        },
+        "elastomer": {
+          "title": "Elastomeri",
+          "types": {
+            "tpu": "TPU",
+            "rubber": "Gomma",
+            "siliconeRubber": "Gomma Siliconica",
+            "neoprene": "Neoprene",
+            "epdm": "EPDM",
+            "viton": "Viton"
+          }
+        }
+      },
+      "composite": {
+        "title": "Compositi",
+        "fiberReinforced": {
+          "title": "Rinforzati con Fibre",
+          "types": {
+            "cfrp": "Fibra di Carbonio (CFRP)",
+            "gfrp": "Fibra di Vetro (GFRP)",
+            "afrp": "Fibra di Aramide (AFRP)",
+            "nfrp": "Fibra Naturale (NFRP)"
+          }
+        },
+        "particleReinforced": {
+          "title": "Rinforzati con Particelle",
+          "types": {
+            "mmcs": "Compositi a Matrice Metallica",
+            "cmcs": "Compositi a Matrice Ceramica",
+            "pmcs": "Compositi a Matrice Polimerica"
+          }
+        },
+        "sandwich": {
+          "title": "Strutture Sandwich",
+          "types": {
+            "honeycomb": "Struttura a Nido d'Ape",
+            "foam": "Struttura con Anima in Schiuma",
+            "corrugated": "Struttura Ondulata"
+          }
+        }
+      },
+      "ceramic": {
+        "title": "Ceramici",
+        "types": {
+          "oxide": "Ceramici Ossidi",
+          "nonOxide": "Ceramici non Ossidi",
+          "glass": "Vetro",
+          "porcelain": "Porcellana",
+          "refractory": "Refrattari",
+          "concrete": "Cemento",
+          "technical": "Ceramici Tecnici"
+        },
+        "specificTypes": {
+          "alumina": "Allumina",
+          "zirconia": "Zirconia",
+          "silica": "Silice",
+          "sic": "Carburo di Silicio",
+          "si3n4": "Nitruro di Silicio",
+          "aln": "Nitruro di Alluminio"
+        }
+      },
+      "wood": {
+        "title": "Legno",
+        "hardwood": {
+          "title": "Legni Duri",
+          "types": {
+            "oak": "Quercia",
+            "maple": "Acero",
+            "walnut": "Noce",
+            "cherry": "Ciliegio",
+            "mahogany": "Mogano",
+            "teak": "Teak",
+            "birch": "Betulla",
+            "ash": "Frassino"
+          }
+        },
+        "softwood": {
+          "title": "Legni Teneri",
+          "types": {
+            "pine": "Pino",
+            "cedar": "Cedro",
+            "fir": "Abete",
+            "spruce": "Abete Rosso",
+            "redwood": "Sequoia",
+            "hemlock": "Tsuga"
+          }
+        },
+        "engineered": {
+          "title": "Legni Ingegnerizzati",
+          "types": {
+            "plywood": "Compensato",
+            "mdf": "MDF",
+            "particleBoard": "Truciolare",
+            "osb": "OSB",
+            "lvl": "LVL",
+            "glulam": "Legno Lamellare"
+          }
+        }
+      }
+    },
+    "properties": {
+      "mechanical": {
+        "title": "Proprietà Meccaniche",
+        "density": "Densità",
+        "tensileStrength": "Resistenza a Trazione",
+        "yieldStrength": "Carico di Snervamento",
+        "compressiveStrength": "Resistenza a Compressione",
+        "hardness": "Durezza",
+        "impact": "Resistenza all'Impatto",
+        "elasticModulus": "Modulo Elastico",
+        "shearModulus": "Modulo di Taglio",
+        "poissonsRatio": "Coefficiente di Poisson",
+        "elongation": "Allungamento",
+        "fatigueStrength": "Resistenza a Fatica",
+        "fractureToughness": "Tenacità alla Frattura"
+      },
+      "thermal": {
+        "title": "Proprietà Termiche",
+        "thermalConductivity": "Conducibilità Termica",
+        "thermalExpansion": "Espansione Termica",
+        "specificHeat": "Calore Specifico",
+        "meltingPoint": "Punto di Fusione",
+        "maxServiceTemp": "Temperatura Massima di Servizio",
+        "minServiceTemp": "Temperatura Minima di Servizio",
+        "flameResistance": "Resistenza alla Fiamma",
+        "thermalShock": "Resistenza allo Shock Termico"
+      },
+      "electrical": {
+        "title": "Proprietà Elettriche",
+        "electricalConductivity": "Conducibilità Elettrica",
+        "electricalResistivity": "Resistività Elettrica",
+        "dielectricStrength": "Rigidità Dielettrica",
+        "dielectricConstant": "Costante Dielettrica",
+        "dissipationFactor": "Fattore di Dissipazione",
+        "arcResistance": "Resistenza all'Arco",
+        "volumeResistivity": "Resistività di Volume"
+      },
+      "chemical": {
+        "title": "Proprietà Chimiche",
+        "corrosionResistance": "Resistenza alla Corrosione",
+        "uv": "Resistenza UV",
+        "oxidation": "Resistenza all'Ossidazione",
+        "acidResistance": "Resistenza agli Acidi",
+        "alkaliResistance": "Resistenza agli Alcali",
+        "solventResistance": "Resistenza ai Solventi",
+        "waterResistance": "Resistenza all'Acqua",
+        "oilResistance": "Resistenza agli Oli"
+      },
+      "manufacturing": {
+        "title": "Proprietà di Fabbricazione",
+        "machinability": "Lavorabilità",
+        "weldability": "Saldabilità",
+        "formability": "Formabilità",
+        "castability": "Colabilità",
+        "hardenability": "Temprabilità",
+        "joinability": "Facilità di Giunzione",
+        "printability": "Stampabilità",
+        "recycling": "Riciclabilità"
+      }
+    }
+  }
+}

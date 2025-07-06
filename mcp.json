@@ -1,0 +1,13 @@
+{
+  "mcpServers": [
+    {
+      "id": "prisma-db-server",
+      "name": "Prisma Database Server",
+      "type": "stdio",
+      "command": "node",
+      "args": ["node_modules/cadcamfun-db-mcp-server/dist/server.js"],
+      "workingDirectory": "",
+      "enabled": true
+    }
+  ]
+}

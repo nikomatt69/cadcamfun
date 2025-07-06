@@ -1,0 +1,216 @@
+/* src/styles/gcode-editor.css */
+
+/* Custom styles for the GCode editor and AI Agent */
+
+/* Editor enhancements */
+.monaco-editor .line-numbers {
+  color: rgba(128, 128, 128, 0.8) !important;
+}
+
+.monaco-editor .current-line-highlight {
+  background-color: rgba(65, 105, 225, 0.1) !important;
+  border-left: 2px solid #4169e1 !important;
+}
+
+/* GCode syntax highlighting enhancements */
+.monaco-editor .gcode-rapid {
+  color: #4fc1ff !important;
+  font-weight: 500;
+}
+
+.monaco-editor .gcode-linear {
+  color: #4ec9b0 !important;
+  font-weight: 500;
+}
+
+.monaco-editor .gcode-arc {
+  color: #c586c0 !important;
+  font-weight: 500;
+}
+
+.monaco-editor .gcode-machine {
+  color: #dcdcaa !important;
+  font-weight: 500;
+}
+
+.monaco-editor .gcode-comment {
+  color: #6a9955 !important;
+  font-style: italic;
+}
+
+.monaco-editor .gcode-parameter {
+  color: #9cdcfe !important;
+}
+
+/* Custom scrollbar for editor components */
+.editor-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.editor-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(155, 155, 155, 0.7);
+}
+
+/* AI Agent Panel Styles */
+.ai-agent-panel {
+  transition:
+    width 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.ai-agent-collapsed {
+  width: 48px;
+  overflow: hidden;
+}
+
+.ai-agent-expanded {
+  width: 320px;
+}
+
+/* Animated elements */
+.pulse-animation {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+/* Code block styles */
+.code-block {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  background-color: rgba(40, 44, 52, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.code-block-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.code-block-content {
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Dark theme overrides */
+.dark .code-block {
+  background-color: rgba(40, 44, 52, 0.5);
+  border-color: rgba(128, 128, 128, 0.3);
+}
+
+.dark .monaco-editor .current-line-highlight {
+  background-color: rgba(100, 100, 255, 0.2) !important;
+}
+
+/* Badges and labels */
+.severity-badge {
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.severity-critical {
+  background-color: rgba(255, 0, 0, 0.15);
+  color: #ff5252;
+}
+
+.severity-warning {
+  background-color: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.severity-info {
+  background-color: rgba(3, 169, 244, 0.15);
+  color: #03a9f4;
+}
+
+/* AI suggestion popover */
+.ai-suggestion-popover {
+  position: absolute;
+  z-index: 10;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 8px 12px;
+  font-size: 13px;
+  max-width: 400px;
+}
+
+.dark .ai-suggestion-popover {
+  background-color: #2d2d2d;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ai-agent-expanded {
+    width: 280px;
+  }
+
+  .code-block-content {
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,1814 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom animations for waitlist page */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 3s ease infinite;
+}
+
+.bg-300\% {
+  background-size: 300% 300%;
+}
+
+/* Import Electron specific styles */
+
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --secondary: #f59e0b;
+  --secondary-dark: #d97706;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --foreground: #1f2937;
+  --background: #f9fafb;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f6;
+  
+  /* Z-Index System */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+  --z-ai-toolbar: 1090;
+}
+
+/* Base styles */
+@layer base {
+  body {
+    @apply bg-[#F9FCFF] dark:bg-gradient-to-b from-gray-800 to-gray-600 text-gray-900 dark:text-gray-100 antialiased;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  }
+
+  /* Set default text color for dark mode */
+  html.dark {
+    color: theme('colors.blue.400');
+  }
+  .main-content-shrink {
+    margin-right: 4px;
+  }
+  /* Dark mode form styles - text color will now inherit from html.dark */
+  html.dark input[type="text"],
+  html.dark input[type="email"],
+  html.dark input[type="number"],
+  html.dark textarea {
+    @apply bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-500;
+  }
+
+  html.dark input[type="email"]:disabled {
+     @apply bg-gray-700 border-gray-600 text-gray-400 cursor-not-allowed;
+  }
+
+  html.dark input[type="checkbox"],
+  html.dark input[type="radio"] {
+     @apply bg-gray-700 border-gray-600;
+  }
+
+  /* Default hover styles for dark mode */
+  html.dark a:not(.btn):hover,
+  html.dark button:not([class*=" hover:bg-"]):not([class*=" bg-"]):not(.btn):hover,
+  html.dark tr[onclick]:hover,
+  html.dark tr[role="button"]:hover,
+  html.dark li[onclick]:hover,
+  html.dark li[role="button"]:hover,
+  html.dark div[role="button"]:hover,
+  html.dark div[role="option"]:hover,
+  html.dark .sidebar-tab:hover
+  {
+    /* Apply a subtle light blue background tint */
+    /* background-color: theme('colors.blue.900 / 30%'); */
+    box-shadow: inset 0 0 0 9999px theme('colors.blue.900 / 15%'); /* Use inset shadow instead */
+  }
+
+  /* Ensure outline buttons also use a less bright hover */
+  html.dark .btn-outline:hover,
+  html.dark .btn-outline-primary:hover {
+     /* background-color: theme('colors.blue.900 / 20%'); */
+     box-shadow: inset 0 0 0 9999px theme('colors.blue.900 / 10%'); /* Use inset shadow instead */
+     border-color: theme('colors.gray.500');
+  }
+  html.dark .btn-outline-primary:hover {
+     border-color: theme('colors.blue.400');
+  }
+
+  .fixed-cycle-editor {
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .fixed-cycle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+  }
+  
+  .fixed-cycle-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .fixed-cycle-gcode {
+    font-family: monospace;
+    background-color: #1e1e1e;
+    color: #dcdcdc;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .fixed-cycle-params {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  
+  .param-field {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .param-field label {
+    @apply font-medium mb-1 flex items-center text-gray-700 dark:text-gray-300;
+  }
+  
+  .param-field .required {
+    color: #e53935;
+    margin-left: 4px;
+  }
+  
+  .param-input-group {
+    display: flex;
+    align-items: center;
+  }
+  
+  .param-input-group input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .param-input-group .unit {
+    margin-left: 8px;
+    color: #666;
+    font-size: 14px;
+  }
+  
+  .param-description {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+  }
+  
+  .fixed-cycle-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .apply-button {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .apply-button:hover {
+    background-color: #1976d2;
+  }
+  
+  .apply-button:active {
+    background-color: #0d47a1;
+  }
+  
+  /* Styles for the fixed cycles info panel */
+  .fixed-cycles-info-panel {
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .fixed-cycles-info-panel h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .cycles-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  
+  .cycle-item {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+  }
+  
+  .cycle-item:hover {
+    background-color: #f0f7ff;
+    border-color: #bbdefb;
+  }
+  
+  .cycle-position {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .cycle-depth, .cycle-increment {
+    font-size: 13px;
+    color: #666;
+  }
+  
+  /* Styles for toolpath generator integration */
+  .toolpath-generator-integration {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+  }
+  
+  .fixed-cycles-actions {
+    margin-bottom: 16px;
+  }
+  
+  .fixed-cycles-actions h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+  }
+
+/* GCode Editor uses unified scrollbar styles */
+  
+  .cycle-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .cycle-buttons button {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .cycle-buttons button:hover {
+    background-color: #388e3c;
+  }
+  
+  .cycle-buttons button:disabled {
+    background-color: #a5d6a7;
+    cursor: not-allowed;
+  }
+  
+  .cycle-editor {
+    margin-top: 20px;
+  }
+  /* Transform Gizmo Styles */
+.transform-gizmo-container {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.transform-gizmo {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.gizmo-handle {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.gizmo-handle:hover {
+  filter: brightness(1.2);
+}
+
+.gizmo-handle:active {
+  filter: brightness(0.9);
+  transform: scale(0.95);
+}
+
+.gizmo-arrow {
+  position: relative;
+}
+
+.gizmo-ring {
+  border-style: solid;
+  box-sizing: border-box;
+}
+
+.transform-info {
+  font-family: system-ui, -apple-system, sans-serif;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Disable text selection on gizmo */
+.transform-gizmo-container * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Ensure proper layering */
+.transform-gizmo-container {
+  isolation: isolate;
+}
+
+body.cursor-default { cursor: default !important; }
+body.cursor-pointer { cursor: pointer !important; }
+body.cursor-move { cursor: move !important; }
+body.cursor-grab { cursor: grab !important; }
+body.cursor-grabbing { cursor: grabbing !important; }
+body.cursor-crosshair { cursor: crosshair !important; }
+body.cursor-text { cursor: text !important; }
+body.cursor-wait { cursor: wait !important; }
+body.cursor-not-allowed { cursor: not-allowed !important; }
+body.cursor-zoom-in { cursor: zoom-in !important; }
+body.cursor-zoom-out { cursor: zoom-out !important; }
+body.cursor-ns-resize { cursor: ns-resize !important; }
+body.cursor-ew-resize { cursor: ew-resize !important; }
+body.cursor-nesw-resize { cursor: nesw-resize !important; }
+body.cursor-nwse-resize { cursor: nwse-resize !important; }
+body.cursor-col-resize { cursor: col-resize !important; }
+body.cursor-row-resize { cursor: row-resize !important; }
+
+/* Custom tool cursors */
+body.cursor-draw-line { cursor: url('/cursors/draw-line.svg') 12 12, crosshair !important; }
+body.cursor-draw-rectangle { cursor: url('/cursors/draw-rectangle.svg') 12 12, crosshair !important; }
+body.cursor-draw-circle { cursor: url('/cursors/draw-circle.svg') 12 12, crosshair !important; }
+body.cursor-draw-polygon { cursor: url('/cursors/draw-polygon.svg') 12 12, crosshair !important; }
+body.cursor-draw-arc { cursor: url('/cursors/draw-arc.svg') 12 12, crosshair !important; }
+body.cursor-measure { cursor: url('/cursors/measure.svg') 12 12, crosshair !important; }
+body.cursor-cut { cursor: url('/cursors/cut.svg') 12 12, crosshair !important; }
+body.cursor-extrude { cursor: url('/cursors/extrude.svg') 12 12, crosshair !important; }
+body.cursor-revolve { cursor: url('/cursors/revolve.svg') 12 12, crosshair !important; }
+body.cursor-drill { cursor: url('/cursors/drill.svg') 12 12, crosshair !important; }
+body.cursor-mill { cursor: url('/cursors/mill.svg') 12 12, crosshair !important; }
+body.cursor-add-text { cursor: url('/cursors/text.svg') 12 12, text !important; }
+body.cursor-dimension { cursor: url('/cursors/dimension.svg') 12 12, crosshair !important; }
+body.cursor-fillet { cursor: url('/cursors/fillet.svg') 12 12, crosshair !important; }
+body.cursor-chamfer { cursor: url('/cursors/chamfer.svg') 12 12, crosshair !important; }
+body.cursor-mirror { cursor: url('/cursors/mirror.svg') 12 12, crosshair !important; }
+body.cursor-scale { cursor: url('/cursors/scale.svg') 12 12, crosshair !important; }
+body.cursor-rotate { cursor: url('/cursors/rotate.svg') 12 12, crosshair !important; }
+body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !important; }
+
+/* Modifier classes for contextual states */
+.cursor-editable { cursor: url('/cursors/editable.svg') 12 12, pointer !important; }
+.cursor-selectable { cursor: url('/cursors/selectable.svg') 12 12, pointer !important; }
+.cursor-draggable { cursor: grab !important; }
+.cursor-dragging { cursor: grabbing !important; }
+.cursor-rotatable { cursor: url('/cursors/rotate.svg') 12 12, move !important; }
+.cursor-resizable { cursor: nwse-resize !important; }
+
+  .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
+  .animate-slideDown { animation: slideDown 0.3s ease-in-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  .text-xxs { font-size: 0.65rem; }
+  .sidebar-container {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Gestione dell'orientamento mobile */
+  @media (max-width: 768px) {
+    .sidebar-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 50;
+    }
+    
+    .sidebar-right {
+      left: auto;
+      right: 0;
+    }
+    
+    /* Ottimizzazione per orientamento orizzontale su mobile */
+    @media (orientation: landscape) {
+      .sidebar-content {
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+  }
+  
+  .table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Ensure AI message content wraps properly */
+  .ai-message-content {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  /* Handle long URLs and code snippets in messages */
+  .ai-message-content a,
+  .ai-message-content code {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+
+  /* Ensure pre elements don't overflow */
+  .ai-message-content pre {
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  /* Context panel uses unified scrollbar styles */
+  /* Styles to ensure scrolling works well on iOS */
+  .sidebar-scrollable {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+  
+  /* Hidden scrollbar utility - uses unified styles */
+  .hide-scrollbar,
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar,
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Ottimizzazioni per touch */
+  .touch-friendly {
+    min-height: 40px; /* Dimensione minima per target touch */
+  }
+  
+  /* Animazioni di transizione per l'apertura/chiusura della sidebar */
+  .sidebar-enter {
+    transform: translateX(-100%);
+  }
+  
+  .sidebar-enter-active {
+    transform: translateX(0);
+    transition: transform 300ms;
+  }
+  
+  .sidebar-exit {
+    transform: translateX(0);
+  }
+  
+  .sidebar-exit-active {
+    transform: translateX(-100%);
+    transition: transform 300ms;
+  }
+  
+  .sidebar-right-enter {
+    transform: translateX(100%);
+  }
+  
+  .sidebar-right-enter-active {
+    transform: translateX(0);
+    transition: transform 300ms;
+  }
+  
+  .sidebar-right-exit {
+    transform: translateX(0);
+  }
+  
+  .sidebar-right-exit-active {
+    transform: translateX(100%);
+    transition: transform 300ms;
+  }
+  
+  /* Varianti dello stile di visualizzazione per gestire meglio l'orientamento */
+  .sidebar-expanded {
+    width: 280px;
+  }
+  
+  .sidebar-collapsed {
+    width: 64px;
+  }
+  
+  /* Al variare dell'orientamento, adatta la larghezza della sidebar */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .sidebar-expanded {
+      width: 240px;
+    }
+    
+    .sidebar-collapsed {
+      width: 56px;
+    }
+  }
+  
+  /* Pulsanti e controlli più facili da toccare su mobile */
+  .button-touch-friendly {
+    padding: 12px 8px;
+  }
+}
+
+/* Component styles */
+@layer components {
+  /* Form elements with improved styling */
+  .form-input,
+  .form-select,
+  .form-textarea {
+    @apply block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500;
+    @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-blue-400;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+    @apply sm:text-sm;
+  }
+
+  .form-input-error {
+    @apply border-red-300 text-red-900 placeholder-red-300;
+    @apply focus:outline-none focus:ring-red-500 focus:border-red-500;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 dark:text-blue-400 mb-1;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+
+  /* Button variants with improved styling */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent;
+    @apply text-sm font-medium rounded-md shadow-sm;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply transition-colors duration-150 ease-in-out;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white;
+    @apply focus:ring-blue-500;
+  }
+
+  .btn-primary:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+  }
+
+  .btn-secondary {
+    @apply bg-gray-600 text-white;
+    @apply focus:ring-gray-500;
+  }
+
+  .btn-secondary:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+  }
+
+  .btn-success {
+    @apply bg-green-600 text-white;
+    @apply focus:ring-green-500;
+  }
+
+  .btn-success:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white;
+    @apply focus:ring-red-500;
+  }
+
+  .btn-danger:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+  }
+
+  .btn-warning {
+    @apply bg-yellow-500 text-gray-900; /* Ensure contrast */
+    @apply focus:ring-yellow-500;
+  }
+
+  .btn-warning:hover {
+    @apply shadow-[inset_0_0_0_200px_rgba(0,0,0,0.1)]; /* Subtle black inner shadow for light bg */
+  }
+
+  .btn-info {
+    @apply bg-sky-600 text-white; /* Changed to sky for better contrast */
+    @apply focus:ring-sky-500;
+  }
+
+  .btn-info:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+  }
+
+  .btn-outline {
+    @apply bg-transparent border border-gray-300 text-gray-700;
+    @apply hover:bg-gray-50 focus:ring-gray-500;
+  }
+
+  .btn-outline-primary {
+    @apply border border-blue-500 text-blue-400;
+    @apply focus:ring-blue-500;
+  }
+
+  .btn-disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* Card with improved styling */
+  .card {
+    @apply card-glass rounded-lg overflow-hidden;
+    @apply border border-gray-200 dark:border-gray-700;
+    @apply transition-shadow duration-150 ease-in-out;
+  }
+
+  /* Add dark mode specific hover for card */
+  .dark .card:hover {
+    @apply shadow-[0_1px_3px_0_rgba(255,255,255,0.1),0_1px_2px_-1px_rgba(255,255,255,0.1)]; /* Subtle white shadow */
+  }
+
+  .card-header {
+    @apply px-4 py-3 bg-gray-50 border-b border-gray-200;
+  }
+
+  .card-body {
+    @apply p-4;
+  }
+
+  .card-footer {
+    @apply px-4 py-3 bg-gray-50 border-t border-gray-200;
+  }
+
+  /* Badge/tag styling */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  .badge-secondary {
+    @apply bg-gray-100 text-gray-800;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  /* =================================================================== */
+  /* GLASSMORPHISM UTILITY CLASSES - Non-invasive integration */
+  /* =================================================================== */
+  
+  /* Base glassmorphism effects - From https://css.glass */
+  .glass-light {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  
+  .glass-medium {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* Hover glassmorphism effects - From https://css.glass */
+  .glass-hover-light:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .glass-hover-medium:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .glass-hover-strong:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced card variants with glassmorphism - From https://css.glass */
+  .card-glass {
+    @apply overflow-hidden transition-all duration-300 ease-in-out;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  
+  .card-glass:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+  }
+
+  /* Interactive glassmorphism states - From https://css.glass */
+  .glass-interactive {
+    @apply cursor-pointer transition-all duration-300 ease-in-out;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  .glass-interactive:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+  }
+  
+  .glass-interactive:active {
+    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+
+  /* =================================================================== */
+  /* END GLASSMORPHISM UTILITIES */
+  /* =================================================================== */
+
+  /* Tooltip styling */
+  .tooltip {
+    @apply relative inline-block;
+  }
+
+  .tooltip .tooltip-text {
+    @apply invisible absolute z-10 px-3 py-2 text-sm text-white bg-gray-900 rounded-md opacity-0;
+    @apply transition-opacity duration-300;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  /* Improved alert styling */
+  .alert {
+    @apply p-4 rounded-md border;
+    @apply mb-4;
+  }
+
+  .alert-primary {
+    @apply bg-blue-50 border-blue-300 text-blue-800;
+  }
+
+  .alert-success {
+    @apply bg-green-50 border-green-300 text-green-800;
+  }
+
+  .alert-danger {
+    @apply bg-red-50 border-red-300 text-red-800;
+  }
+
+  .alert-warning {
+    @apply bg-yellow-50 border-yellow-300 text-yellow-800;
+  }
+
+  .alert-info {
+    @apply bg-blue-50 border-blue-300 text-blue-800;
+  }
+
+  /* Improved table styling */
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+
+  .table thead {
+    @apply bg-gray-50;
+  }
+
+  .table th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  .table tbody {
+    @apply bg-[#F8FBFF] divide-y divide-gray-200;
+  }
+
+  .table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500;
+  }
+
+  .table tr:hover {
+    @apply bg-gray-50;
+  }
+
+  /* Modern loading spinner */
+  .loading-spinner {
+    @apply inline-block h-6 w-6;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: #3b82f6;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* CAD specific styles */
+  .cad-canvas {
+    @apply bg-gray-100 outline-none cursor-crosshair;
+    @apply border border-gray-300 rounded-md;
+  }
+
+  .cad-toolbox {
+    @apply bg-[#F8FBFF] shadow-md rounded-md p-2;
+    @apply grid grid-cols-4 gap-1;
+  }
+
+  .cad-tool {
+    @apply flex flex-col items-center justify-center p-2 text-xs rounded;
+    @apply transition-colors duration-150;
+    @apply hover:bg-gray-100;
+  }
+
+  .cad-tool.active {
+    @apply bg-blue-500 text-white;
+    @apply hover:bg-blue-600;
+  }
+
+  .cad-property-panel {
+    @apply bg-[#F8FBFF] shadow-md rounded-md p-4;
+    @apply divide-y divide-gray-200;
+  }
+
+  .cad-property-group {
+    @apply py-3;
+  }
+
+  .cad-property-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  .cad-property-input {
+    @apply block w-full border-gray-300 rounded-md shadow-sm;
+    @apply focus:ring-blue-500 focus:border-blue-500;
+    @apply sm:text-sm;
+  }
+
+  /* Custom styles for CAD/CAM features */
+  .cad-toolbar-separator {
+    @apply h-8 border-l border-gray-300 mx-1;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  .tooltip .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1f2937 transparent transparent transparent;
+  }
+
+  .tooltip:hover .tooltip-text {
+    @apply visible opacity-100;
+  }
+}
+
+/* Dark mode styles */
+.dark {
+  --foreground: #272b30;
+  --background: #161616;
+  --surface: #545454;
+  --surface-hover: #374151;
+  @apply hover:bg-gray-700;
+}
+
+.dark body {
+  @apply bg-gray-800 text-white hover:bg-gray-700;
+}
+
+.dark .card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .card-header,
+.dark .card-footer {
+  @apply bg-gray-900 border-gray-700;
+}
+
+.dark .btn-outline {
+  @apply border-gray-600 text-gray-300;
+  @apply hover:bg-gray-700;
+}
+
+.dark .table thead {
+  @apply bg-gray-800;
+}
+
+.dark .table th {
+  @apply text-gray-300;
+}
+
+.dark .table tbody {
+  @apply bg-gray-800 divide-y divide-gray-700;
+}
+
+.dark .table td {
+  @apply text-gray-300;
+}
+
+/* Keyframe animations - defined if not using Tailwind's built-in animations */
+/* DUPLICATE REMOVED - spin animation already defined at line 1042 */
+
+html, body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Only hide horizontal overflow to prevent layout shifts */
+  box-sizing: border-box;
+}
+
+/* Ensure the main app container fills the screen */
+#__next {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Better styling for buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.btn-outline {
+  border: 1px solid #d1d5db;
+  background-color: transparent;
+  color: #374151;
+}
+
+.btn-outline:hover {
+  background-color: #f3f4f6;
+}
+
+.btn-outline-primary {
+  border: 1px solid #2563eb;
+  color: #2563eb;
+}
+
+.btn-outline-primary:hover {
+  background-color: #eff6ff;
+}
+
+/* Ensure canvas fills the available space */
+.cad-canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Add to your global.css file */
+
+/* Custom styling for the sidebar */
+.sidebar-tab {
+  transition: all 0.2s ease-in-out;
+}
+
+.sidebar-tab:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.sidebar-tab.active {
+  color: #2563eb;
+  border-left: 3px solid #2563eb;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Improved toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #2563eb;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Tool button styling */
+.tool-button {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+  color: #4b5563;
+}
+
+.tool-button:hover {
+  background-color: #f3f4f6;
+}
+
+.tool-button.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.tool-button .icon {
+  margin-right: 0.5rem;
+}
+
+/* Collapsed sidebar tool icons */
+.collapsed-tool-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.collapsed-tool-button:hover {
+  background-color: #f3f4f6;
+}
+
+.collapsed-tool-button.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+/* Sidebar section headers */
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-section-header .icon {
+  margin-right: 0.5rem;
+}
+
+.toolButton {
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.toolButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.toolButton:active {
+  transform: translateY(0);
+}
+
+.toolButtonActive {
+  background-color: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.dark .toolButtonActive {
+  background-color: #15395b;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* Tool icons */
+.iconCircle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  display: inline-block;
+}
+
+.iconLine {
+  width: 16px;
+  height: 2px;
+  background-color: currentColor;
+  display: inline-block;
+}
+
+.iconRectangle {
+  width: 16px;
+  height: 12px;
+  border: 2px solid currentColor;
+  display: inline-block;
+}
+
+/* Tooltip styles */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 1000;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Tool groups */
+.toolGroup {
+  border-bottom: 1px solid #e6e6e6;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.dark .toolGroup {
+  border-bottom-color: #444;
+}
+
+.toolGroupTitle {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Animation for active operations */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(24, 144, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 144, 255, 0);
+  }
+}
+
+.toolActive {
+  animation: pulse 1.5s infinite;
+}
+
+.sidebar {
+  padding: 12px;
+}
+
+.sidebarTitle {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.toolOptionSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e6e6e6;
+}
+
+.dark .toolOptionSection {
+  border-top-color: #444;
+}
+
+.toolOptionTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #777;
+  margin-bottom: 8px;
+}
+
+/* Adjust default border colors in dark mode */
+.dark .border {
+  @apply border-gray-700;
+}
+.dark [class*=" border-"]:not([class*="border-opacity"]) {
+  @apply border-gray-700;
+}
+
+/* Dark Mode Component Adjustments */
+.dark .form-label {
+  /* Inherits color from html.dark */
+}
+
+.dark .form-input,
+.dark .form-select,
+.dark .form-textarea {
+  @apply bg-gray-700 border-gray-600 placeholder-gray-400; /* Removed text-blue-400 */
+  /* Color will inherit from html.dark */
+  @apply focus:ring-blue-500 focus:border-blue-500;
+}
+
+.dark .form-input-error,
+.dark .form-select-error,
+.dark .form-textarea-error {
+  @apply border-red-500 text-red-400 placeholder-red-500;
+  @apply focus:ring-red-500 focus:border-red-500;
+}
+
+.dark .form-error {
+  @apply text-red-400;
+}
+
+.dark .btn-primary {
+  @apply bg-blue-600 text-white;
+  @apply focus:ring-blue-500;
+}
+
+.dark .btn-primary:hover {
+  @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .btn-secondary {
+  @apply bg-gray-600 text-white;
+  @apply focus:ring-gray-500;
+}
+
+.dark .btn-secondary:hover {
+  @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .btn-success {
+  @apply bg-green-600 text-white;
+  @apply focus:ring-green-500;
+}
+
+.dark .btn-success:hover {
+  @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .btn-danger {
+  @apply bg-red-600 text-white;
+  @apply focus:ring-red-500;
+}
+
+.dark .btn-danger:hover {
+  @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .btn-warning {
+  @apply bg-yellow-500 text-gray-900; /* Ensure contrast */
+  @apply focus:ring-yellow-500;
+}
+
+.dark .btn-warning:hover {
+   @apply shadow-[inset_0_0_0_200px_rgba(0,0,0,0.1)]; /* Subtle black inner shadow for light bg */
+}
+
+.dark .btn-info {
+  @apply bg-sky-600 text-white; /* Changed to sky for better contrast */
+  @apply focus:ring-sky-500;
+}
+
+.dark .btn-info:hover {
+  @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+/* .dark .btn-outline already styled */
+
+.dark .btn-outline-primary {
+  @apply border-blue-500 text-blue-400;
+  @apply focus:ring-blue-500;
+}
+
+.dark .btn-disabled {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+.dark .badge-primary {
+  @apply bg-blue-900 text-blue-300;
+}
+
+.dark .badge-secondary {
+  @apply bg-gray-700 text-gray-300;
+}
+
+.dark .badge-success {
+  @apply bg-green-900 text-green-300;
+}
+
+.dark .badge-danger {
+  @apply bg-red-900 text-red-300;
+}
+
+.dark .badge-warning {
+  @apply bg-yellow-900 text-yellow-300;
+}
+
+.dark .badge-info {
+  @apply bg-sky-900 text-sky-300; /* Changed to sky */
+}
+
+.dark .alert {
+  @apply border-gray-600;
+}
+
+.dark .alert-primary {
+  @apply bg-blue-900/50 border-blue-700 text-blue-300;
+}
+
+.dark .alert-success {
+  @apply bg-green-900/50 border-green-700 text-green-300;
+}
+
+.dark .alert-danger {
+  @apply bg-red-900/50 border-red-700 text-red-300;
+}
+
+.dark .alert-warning {
+  @apply bg-yellow-900/50 border-yellow-700 text-yellow-300;
+}
+
+.dark .alert-info {
+  @apply bg-sky-900/50 border-sky-700 text-sky-300; /* Changed to sky */
+}
+
+
+.dark .loading-spinner {
+    border-top-color: var(--primary); /* Use CSS variable */
+    border-color: rgba(255, 255, 255, 0.2);
+    border-top-color: var(--primary);
+}
+
+/* Keyframe animations - defined if not using Tailwind's built-in animations */
+/* DUPLICATE REMOVED - spin animation already defined at line 1042 */
+
+/* Additions for default text elements */
+.dark h3, .dark h4 {
+  @apply text-gray-200;
+}
+
+/* Target specific component classes */
+.dark .fixed-cycle-header h3,
+.dark .fixed-cycles-info-panel h3 {
+  @apply text-gray-200;
+}
+
+.dark .param-field label {
+   @apply text-gray-300;
+}
+
+.dark .param-description,
+.dark .param-input-group .unit,
+.dark .cycle-depth,
+.dark .cycle-increment {
+  @apply text-gray-400;
+}
+
+.dark .fixed-cycle-gcode {
+    @apply bg-gray-700 text-gray-300;
+}
+
+.dark .fixed-cycle-editor,
+.dark .fixed-cycles-info-panel {
+    @apply bg-gray-800 shadow-md;
+}
+
+.dark .cycle-item {
+    @apply bg-gray-700 border-gray-600 text-gray-300;
+}
+.dark .cycle-item:hover {
+    @apply shadow-[inset_0_0_0_200px_rgba(255,255,255,0.05)]; /* Subtle white inner shadow */
+    @apply border-gray-500; /* Keep border change */
+}
+
+.dark .apply-button {
+    @apply bg-blue-600 text-white;
+}
+
+.dark .apply-button:hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .cycle-buttons button {
+    @apply bg-green-600 text-white;
+}
+
+.dark .cycle-buttons button:not(:disabled):hover {
+    @apply shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.1)]; /* Subtle white inner shadow */
+}
+
+.dark .cycle-buttons button:disabled {
+    @apply bg-gray-600 text-gray-400 cursor-not-allowed;
+}
+
+/* Default SVG text color */
+.dark svg text {
+  fill: theme('colors.gray.300');
+}
+
+/* Style for option elements in dark mode */
+.dark select option {
+  background-color: theme('colors.gray.700');
+  color: theme('colors.gray.200');
+}
+
+/* Style for select elements without .form-select in dark mode */
+.dark select:not(.form-select) {
+  background-color: theme('colors.gray.700');
+  /* Color inherits from html.dark */
+  border-color: theme('colors.gray.600');
+}
+
+/* Keyframe animations - defined if not using Tailwind's built-in animations */
+/* DUPLICATE REMOVED - spin animation already defined at line 1042 */
+
+
+/* Note: html/body height and overflow already set at lines 1048-1055 */
+
+/* You might want to ensure specific elements that you intend to scroll also have overflow: auto or scroll; */ 
+
+/* AI Agent Toolbar Styles */
+.ai-agent-toolbar {
+  /* Ensure proper layering above all other elements */
+  z-index: var(--z-ai-toolbar);
+}
+
+/* Responsive adjustments for AI Agent Toolbar */
+@media (max-width: 768px) {
+  .ai-agent-toolbar .fixed {
+    /* On mobile, position to avoid conflicts with mobile navigation */
+    left: 8px !important;
+    top: 50% !important;
+  }
+  
+  /* When expanded on mobile, adjust positioning */
+  .ai-agent-toolbar .w-96 {
+    width: calc(100vw - 32px) !important;
+    max-width: 380px !important;
+  }
+}
+
+/* Smooth animations for toolbar expand/collapse */
+.ai-agent-toolbar .transition-all {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tooltip enhancements */
+.ai-agent-toolbar .group:hover .absolute {
+  transform: translateY(-50%);
+  animation: tooltipSlide 0.2s ease-out;
+}
+
+@keyframes tooltipSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) translateY(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
+  }
+}
+
+/* Dark mode optimizations for AI Agent Toolbar */
+@media (prefers-color-scheme: dark) {
+  .ai-agent-toolbar {
+    /* Enhanced shadow for dark mode */
+    filter: drop-shadow(0 20px 25px rgba(0, 0, 0, 0.5));
+  }
+}
+
+/* =================================================================== */
+/* DARK MODE GLASSMORPHISM SUPPORT */
+/* =================================================================== */
+
+/* Dark mode glassmorphism variants - From https://css.glass */
+.dark .glass-light {
+  background: rgba(30, 41, 59, 0.02);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.dark .glass-medium {
+  background: rgba(30, 41, 59, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.dark .glass-strong {
+  background: rgba(30, 41, 59, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Dark mode hover effects - From https://css.glass */
+.dark .glass-hover-light:hover {
+  background: rgba(30, 41, 59, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.dark .glass-hover-medium:hover {
+  background: rgba(30, 41, 59, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.dark .glass-hover-strong:hover {
+  background: rgba(30, 41, 59, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+/* Dark mode card glass - From https://css.glass */
+.dark .card-glass {
+  background: rgba(30, 41, 59, 0.02);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.dark .card-glass:hover {
+  background: rgba(30, 41, 59, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* Dark mode interactive glass - From https://css.glass */
+.dark .glass-interactive {
+  background: rgba(30, 41, 59, 0.02);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.dark .glass-interactive:hover {
+  background: rgba(30, 41, 59, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* =================================================================== */
+/* END DARK MODE GLASSMORPHISM */
+/* =================================================================== */
+
+/* DUPLICATE REMOVED - see lines 1633-1666 for scrollbar and AI toolbar styles */
+
+/* Responsive adjustments for AI Agent Toolbar */
+@media (max-width: 768px) {
+  .ai-agent-toolbar .fixed {
+    /* On mobile, position to avoid conflicts with mobile navigation */
+    left: 8px !important;
+    top: 50% !important;
+  }
+  
+  /* When expanded on mobile, adjust positioning */
+  .ai-agent-toolbar .w-96 {
+    width: calc(100vw - 32px) !important;
+    max-width: 380px !important;
+  }
+}
+
+/* =================================================================== */
+/* UNIFIED SCROLLBAR STYLES - SINGLE DEFINITION */
+/* =================================================================== */
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+/* Dark mode scrollbars */
+.dark ::-webkit-scrollbar-track {
+  background: rgb(31 41 55);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(75 85 99);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(107 114 128);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.dark * {
+  scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+}
+
+/* =================================================================== */
+/* CSS CLEANUP COMPLETED */
+/* =================================================================== */

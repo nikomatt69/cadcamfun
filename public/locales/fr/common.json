@@ -1,0 +1,84 @@
+{
+  "home": {
+    "title": "Application CAD/CAM",
+    "subtitle": "Solution de Conception et Fabrication",
+    "description": "Logiciel CAD/CAM professionnel pour vos besoins en conception",
+    "welcome": "Bienvenue sur CAD/CAM FUN",
+    "getStarted": "Commencer",
+    "recentProjects": "Projets récents",
+    "featuredTools": "Outils en vedette"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "projects": "Projets",
+    "library": "Bibliothèque",
+    "settings": "Paramètres",
+    "profile": "Profil",
+    "logout": "Déconnexion",
+    "help": "Aide",
+    "documentation": "Documentation",
+    "tutorials": "Tutoriels",
+    "community": "Communauté"
+  },
+  "actions": {
+    "create": "Créer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "import": "Importer",
+    "export": "Exporter",
+    "duplicate": "Dupliquer",
+    "preview": "Aperçu",
+    "share": "Partager",
+    "download": "Télécharger",
+    "print": "Imprimer",
+    "undo": "Annuler",
+    "redo": "Rétablir",
+    "apply": "Appliquer",
+    "reset": "Réinitialiser"
+  },
+  "tools": {
+    "select": "Sélectionner",
+    "move": "Déplacer",
+    "rotate": "Pivoter",
+    "scale": "Redimensionner",
+    "draw": "Dessiner",
+    "measure": "Mesurer",
+    "cut": "Couper",
+    "extrude": "Extruder",
+    "fillet": "Congé",
+    "chamfer": "Chanfrein",
+    "pattern": "Motif",
+    "mirror": "Miroir",
+    "align": "Aligner",
+    "group": "Grouper",
+    "ungroup": "Dégrouper"
+  },
+  "project": {
+    "new": "Nouveau projet",
+    "open": "Ouvrir un projet",
+    "recent": "Projets récents",
+    "templates": "Modèles",
+    "settings": "Paramètres du projet",
+    "properties": "Propriétés",
+    "history": "Historique",
+    "collaboration": "Collaboration",
+    "sharing": "Partage"
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite",
+    "notFound": "Élément non trouvé",
+    "permissionDenied": "Permission refusée",
+    "connectionFailed": "Échec de connexion",
+    "fileNotSupported": "Fichier non pris en charge",
+    "invalidOperation": "Opération non valide"
+  },
+  "notifications": {
+    "saved": "Enregistré avec succès",
+    "deleted": "Supprimé avec succès",
+    "exported": "Exporté avec succès",
+    "imported": "Importé avec succès",
+    "updated": "Mis à jour avec succès"
+  }
+}

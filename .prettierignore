@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Generated files
+*.min.js
+*.min.css
+
+# Config files (preserve existing formatting)
+*.config.js
+*.config.ts
+next.config.js
+tailwind.config.js
+postcss.config.js
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Environment files
+.env*
+
+# Documentation that should preserve formatting
+README.md
+CHANGELOG.md
+
+# Prisma generated files
+prisma/generated/
+
+# WASM files
+public/wasm/
+*.wasm
+
+# Specific files with custom formatting
+src/styles/globals.css 

@@ -1,0 +1,273 @@
+{
+  "materials": {
+    "title": "Material Library",
+    "categories": {
+      "metal": {
+        "title": "Metals",
+        "steel": {
+          "title": "Steel",
+          "types": {
+            "carbonSteel": "Carbon Steel",
+            "stainlessSteel": "Stainless Steel",
+            "toolSteel": "Tool Steel",
+            "springSteel": "Spring Steel",
+            "highSpeedSteel": "High Speed Steel",
+            "structuralSteel": "Structural Steel"
+          },
+          "grades": {
+            "aisi1018": "AISI 1018",
+            "aisi1045": "AISI 1045",
+            "aisi4140": "AISI 4140",
+            "aisi304": "AISI 304",
+            "aisi316": "AISI 316",
+            "aisi440c": "AISI 440C",
+            "a36": "A36",
+            "s355": "S355"
+          }
+        },
+        "aluminum": {
+          "title": "Aluminum",
+          "types": {
+            "cast": "Cast Aluminum",
+            "wrought": "Wrought Aluminum",
+            "extruded": "Extruded Aluminum",
+            "forged": "Forged Aluminum"
+          },
+          "grades": {
+            "6061": "6061",
+            "7075": "7075",
+            "5052": "5052",
+            "2024": "2024",
+            "3003": "3003",
+            "a356": "A356",
+            "a380": "A380"
+          }
+        },
+        "titanium": {
+          "title": "Titanium",
+          "types": {
+            "commercial": "Commercially Pure Titanium",
+            "alpha": "Alpha Titanium",
+            "alphaBeta": "Alpha-Beta Titanium",
+            "beta": "Beta Titanium"
+          },
+          "grades": {
+            "grade1": "Grade 1",
+            "grade2": "Grade 2",
+            "grade5": "Grade 5 (Ti-6Al-4V)",
+            "grade7": "Grade 7",
+            "grade9": "Grade 9",
+            "grade23": "Grade 23 (Ti-6Al-4V ELI)"
+          }
+        },
+        "copper": {
+          "title": "Copper",
+          "types": {
+            "pure": "Pure Copper",
+            "bronze": "Bronze",
+            "brass": "Brass",
+            "berylliumCopper": "Beryllium Copper"
+          },
+          "grades": {
+            "c101": "C101",
+            "c110": "C110",
+            "c260": "C260 (Brass)",
+            "c360": "C360 (Brass)",
+            "c510": "C510 (Phosphor Bronze)",
+            "c630": "C630 (Beryllium Copper)"
+          }
+        }
+      },
+      "plastic": {
+        "title": "Plastics",
+        "thermoplastic": {
+          "title": "Thermoplastics",
+          "types": {
+            "abs": "ABS",
+            "pla": "PLA",
+            "petg": "PETG",
+            "nylon": "Nylon",
+            "pc": "Polycarbonate",
+            "pp": "Polypropylene",
+            "pe": "Polyethylene",
+            "ps": "Polystyrene",
+            "pmma": "PMMA (Acrylic)",
+            "pom": "POM (Acetal)",
+            "peek": "PEEK",
+            "pei": "PEI (ULTEM)",
+            "psu": "PSU (Polysulfone)",
+            "pps": "PPS",
+            "pvdf": "PVDF"
+          }
+        },
+        "thermoset": {
+          "title": "Thermosets",
+          "types": {
+            "epoxy": "Epoxy",
+            "polyurethane": "Polyurethane",
+            "phenolic": "Phenolic",
+            "silicone": "Silicone",
+            "melamine": "Melamine"
+          }
+        },
+        "elastomer": {
+          "title": "Elastomers",
+          "types": {
+            "tpu": "TPU",
+            "rubber": "Rubber",
+            "siliconeRubber": "Silicone Rubber",
+            "neoprene": "Neoprene",
+            "epdm": "EPDM",
+            "viton": "Viton"
+          }
+        }
+      },
+      "composite": {
+        "title": "Composites",
+        "fiberReinforced": {
+          "title": "Fiber Reinforced",
+          "types": {
+            "cfrp": "Carbon Fiber (CFRP)",
+            "gfrp": "Glass Fiber (GFRP)",
+            "afrp": "Aramid Fiber (AFRP)",
+            "nfrp": "Natural Fiber (NFRP)"
+          }
+        },
+        "particleReinforced": {
+          "title": "Particle Reinforced",
+          "types": {
+            "mmcs": "Metal Matrix Composites",
+            "cmcs": "Ceramic Matrix Composites",
+            "pmcs": "Polymer Matrix Composites"
+          }
+        },
+        "sandwich": {
+          "title": "Sandwich Structures",
+          "types": {
+            "honeycomb": "Honeycomb Structure",
+            "foam": "Foam Core Structure",
+            "corrugated": "Corrugated Structure"
+          }
+        }
+      },
+      "ceramic": {
+        "title": "Ceramics",
+        "types": {
+          "oxide": "Oxide Ceramics",
+          "nonOxide": "Non-Oxide Ceramics",
+          "glass": "Glass",
+          "porcelain": "Porcelain",
+          "refractory": "Refractory",
+          "concrete": "Concrete",
+          "technical": "Technical Ceramics"
+        },
+        "specificTypes": {
+          "alumina": "Alumina",
+          "zirconia": "Zirconia",
+          "silica": "Silica",
+          "sic": "Silicon Carbide",
+          "si3n4": "Silicon Nitride",
+          "aln": "Aluminum Nitride"
+        }
+      },
+      "wood": {
+        "title": "Wood",
+        "hardwood": {
+          "title": "Hardwood",
+          "types": {
+            "oak": "Oak",
+            "maple": "Maple",
+            "walnut": "Walnut",
+            "cherry": "Cherry",
+            "mahogany": "Mahogany",
+            "teak": "Teak",
+            "birch": "Birch",
+            "ash": "Ash"
+          }
+        },
+        "softwood": {
+          "title": "Softwood",
+          "types": {
+            "pine": "Pine",
+            "cedar": "Cedar",
+            "fir": "Fir",
+            "spruce": "Spruce",
+            "redwood": "Redwood",
+            "hemlock": "Hemlock"
+          }
+        },
+        "engineered": {
+          "title": "Engineered Wood",
+          "types": {
+            "plywood": "Plywood",
+            "mdf": "MDF",
+            "particleBoard": "Particle Board",
+            "osb": "OSB",
+            "lvl": "LVL",
+            "glulam": "Glulam"
+          }
+        }
+      }
+    },
+    "properties": {
+      "mechanical": {
+        "title": "Mechanical Properties",
+        "density": "Density",
+        "tensileStrength": "Tensile Strength",
+        "yieldStrength": "Yield Strength",
+        "compressiveStrength": "Compressive Strength",
+        "hardness": "Hardness",
+        "impact": "Impact Resistance",
+        "elasticModulus": "Elastic Modulus",
+        "shearModulus": "Shear Modulus",
+        "poissonsRatio": "Poisson's Ratio",
+        "elongation": "Elongation",
+        "fatigueStrength": "Fatigue Strength",
+        "fractureToughness": "Fracture Toughness"
+      },
+      "thermal": {
+        "title": "Thermal Properties",
+        "thermalConductivity": "Thermal Conductivity",
+        "thermalExpansion": "Thermal Expansion",
+        "specificHeat": "Specific Heat",
+        "meltingPoint": "Melting Point",
+        "maxServiceTemp": "Maximum Service Temperature",
+        "minServiceTemp": "Minimum Service Temperature",
+        "flameResistance": "Flame Resistance",
+        "thermalShock": "Thermal Shock Resistance"
+      },
+      "electrical": {
+        "title": "Electrical Properties",
+        "electricalConductivity": "Electrical Conductivity",
+        "electricalResistivity": "Electrical Resistivity",
+        "dielectricStrength": "Dielectric Strength",
+        "dielectricConstant": "Dielectric Constant",
+        "dissipationFactor": "Dissipation Factor",
+        "arcResistance": "Arc Resistance",
+        "volumeResistivity": "Volume Resistivity"
+      },
+      "chemical": {
+        "title": "Chemical Properties",
+        "corrosionResistance": "Corrosion Resistance",
+        "uv": "UV Resistance",
+        "oxidation": "Oxidation Resistance",
+        "acidResistance": "Acid Resistance",
+        "alkaliResistance": "Alkali Resistance",
+        "solventResistance": "Solvent Resistance",
+        "waterResistance": "Water Resistance",
+        "oilResistance": "Oil Resistance"
+      },
+      "manufacturing": {
+        "title": "Manufacturing Properties",
+        "machinability": "Machinability",
+        "weldability": "Weldability",
+        "formability": "Formability",
+        "castability": "Castability",
+        "hardenability": "Hardenability",
+        "joinability": "Joinability",
+        "printability": "Printability",
+        "recycling": "Recyclability"
+      }
+    }
+  }
+}

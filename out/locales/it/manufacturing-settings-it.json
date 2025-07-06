@@ -1,0 +1,191 @@
+{
+  "machining": {
+    "settings": {
+      "title": "Impostazioni di Lavorazione",
+      "general": {
+        "units": "Unità",
+        "precision": "Precisione",
+        "tolerance": "Tolleranza",
+        "safetyDistance": "Distanza di Sicurezza"
+      },
+      "tool": {
+        "title": "Utensile",
+        "diameter": "Diametro",
+        "length": "Lunghezza",
+        "type": "Tipo",
+        "material": "Materiale",
+        "flutes": "Taglienti",
+        "cuttingEdgeAngle": "Angolo di Taglio",
+        "cuttingEdgeHeight": "Altezza di Taglio",
+        "shank": "Gambo",
+        "taper": "Conicità",
+        "cornerRadius": "Raggio d'Angolo",
+        "toolNumber": "Numero Utensile",
+        "toolOffset": "Offset Utensile",
+        "toolLife": "Durata Utensile"
+      },
+      "speeds": {
+        "title": "Velocità e Avanzamenti",
+        "spindleSpeed": "Velocità Mandrino",
+        "feedRate": "Velocità di Avanzamento",
+        "plungeRate": "Velocità di Penetrazione",
+        "rapidTraverse": "Movimento Rapido",
+        "acceleration": "Accelerazione",
+        "deceleration": "Decelerazione",
+        "maxSpeed": "Velocità Massima",
+        "optimalSpeed": "Velocità Ottimale"
+      },
+      "cuts": {
+        "title": "Parametri di Taglio",
+        "depthOfCut": "Profondità di Taglio",
+        "stepover": "Passo Laterale",
+        "stepdown": "Passo Verticale",
+        "roughingAllowance": "Sovrametallo per Sgrossatura",
+        "finishingAllowance": "Sovrametallo per Finitura",
+        "entryMethod": "Metodo di Entrata",
+        "exitMethod": "Metodo di Uscita",
+        "rampAngle": "Angolo di Rampa",
+        "helixDiameter": "Diametro Elica",
+        "helixPitch": "Passo Elica"
+      },
+      "coolant": {
+        "title": "Refrigerante",
+        "type": "Tipo di Refrigerante",
+        "pressure": "Pressione",
+        "flow": "Flusso",
+        "temperature": "Temperatura",
+        "options": {
+          "flood": "Abbondante",
+          "mist": "Nebulizzazione",
+          "air": "Aria",
+          "minimal": "Lubrificazione Minimale",
+          "disabled": "Disabilitato"
+        }
+      },
+      "workholding": {
+        "title": "Bloccaggio",
+        "type": "Tipo di Bloccaggio",
+        "position": "Posizione",
+        "orientation": "Orientamento",
+        "clampingForce": "Forza di Serraggio",
+        "options": {
+          "vise": "Morsa",
+          "chuck": "Mandrino",
+          "clamps": "Morsetti",
+          "fixture": "Attrezzatura",
+          "vacuum": "Sottovuoto",
+          "magneticTable": "Tavola Magnetica"
+        }
+      }
+    }
+  },
+  "laserCutting": {
+    "settings": {
+      "title": "Impostazioni Taglio Laser",
+      "general": {
+        "laserPower": "Potenza Laser",
+        "laserType": "Tipo di Laser",
+        "beamDiameter": "Diametro Fascio",
+        "focusHeight": "Altezza di Messa a Fuoco",
+        "pulseFrequency": "Frequenza di Impulso"
+      },
+      "cutting": {
+        "cuttingSpeed": "Velocità di Taglio",
+        "powerPercentage": "Percentuale Potenza",
+        "passes": "Numero di Passate",
+        "assistGas": "Gas di Assistenza",
+        "gasPressure": "Pressione Gas",
+        "pierceTime": "Tempo di Perforazione",
+        "kerf": "Compensazione Kerf"
+      },
+      "engraving": {
+        "engravingSpeed": "Velocità di Incisione",
+        "powerPercentage": "Percentuale Potenza",
+        "lineSpacing": "Spaziatura Linee",
+        "scanningMode": "Modalità di Scansione",
+        "dithering": "Dithering",
+        "resolution": "Risoluzione",
+        "depth": "Profondità"
+      },
+      "material": {
+        "type": "Tipo di Materiale",
+        "thickness": "Spessore",
+        "density": "Densità",
+        "reflectivity": "Riflettività",
+        "options": {
+          "wood": "Legno",
+          "acrylic": "Acrilico",
+          "paper": "Carta",
+          "cardboard": "Cartone",
+          "fabric": "Tessuto",
+          "leather": "Pelle",
+          "glass": "Vetro",
+          "metal": "Metallo",
+          "rubber": "Gomma",
+          "ceramic": "Ceramica"
+        }
+      }
+    }
+  },
+  "3dPrinting": {
+    "settings": {
+      "title": "Impostazioni Stampa 3D",
+      "general": {
+        "printQuality": "Qualità di Stampa",
+        "layerHeight": "Altezza Strato",
+        "wallThickness": "Spessore Parete",
+        "infillDensity": "Densità Riempimento",
+        "infillPattern": "Pattern Riempimento"
+      },
+      "temperature": {
+        "hotend": "Temperatura Ugello",
+        "bed": "Temperatura Piano",
+        "chamber": "Temperatura Camera",
+        "filamentDrying": "Asciugatura Filamento"
+      },
+      "speed": {
+        "printSpeed": "Velocità di Stampa",
+        "travelSpeed": "Velocità di Spostamento",
+        "retraction": "Velocità di Retrazione",
+        "firstLayer": "Velocità Primo Strato",
+        "outerWall": "Velocità Parete Esterna",
+        "innerWall": "Velocità Parete Interna",
+        "infill": "Velocità Riempimento",
+        "support": "Velocità Supporto"
+      },
+      "support": {
+        "generateSupport": "Genera Supporti",
+        "supportPlacement": "Posizionamento Supporti",
+        "supportDensity": "Densità Supporto",
+        "supportInterface": "Interfaccia Supporto",
+        "supportOverhang": "Angolo Sporgenza",
+        "treSupport": "Supporto ad Albero"
+      },
+      "adhesion": {
+        "type": "Tipo di Adesione",
+        "skirtDistance": "Distanza Skirt",
+        "skirtLines": "Linee Skirt",
+        "brimWidth": "Larghezza Brim",
+        "raftLayers": "Strati Raft",
+        "raftMargin": "Margine Raft"
+      },
+      "material": {
+        "type": "Tipo di Materiale",
+        "diameter": "Diametro Filamento",
+        "flow": "Flusso",
+        "density": "Densità",
+        "options": {
+          "pla": "PLA",
+          "abs": "ABS",
+          "petg": "PETG",
+          "tpu": "TPU",
+          "nylon": "Nylon",
+          "pc": "Policarbonato",
+          "asa": "ASA",
+          "carbon": "Fibra di Carbonio",
+          "metal": "Metallo"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,997 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  bio           String? // User bio/description
+  location      String? // User location
+  website       String? // User website URL
+  company       String? // User company
+  title         String? // Job title
+  publicProfile Boolean   @default(true) // Whether profile is public
+  showEmail     Boolean   @default(false) // Whether to show email publicly
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  organizations           UserOrganization[]
+  projects                Project[]
+  accounts                Account[]
+  sessions                Session[] // Better Auth sessions
+  materials               Material[] // Add ownership relationship
+  tools                   Tool[] // Add ownership relationship
+  machineConfigs          MachineConfig[]
+  activityLogs            ActivityLog[]
+  aiAnalysisLogs          AIAnalysisLog[]
+  LibraryItem             LibraryItem[]
+  subscription            Subscription? // Relation to subscription
+  ConversationParticipant ConversationParticipant[]
+  Message                 Message[]
+  tokens                  Token[] // Magic link and other tokens
+  notifications           Notification[] // Aggiunti per il sistema di notifiche
+  pushSubscriptions       PushSubscription[]
+  ComponentVersion        ComponentVersion[]
+  ComponentComment        ComponentComment[]
+  Toolpath                Toolpath[]
+  ToolpathVersion         ToolpathVersion[]
+  ToolpathComment         ToolpathComment[]
+  apiKey                  ApiKey[] // Add relation to ApiKey
+  authenticators          Authenticator[] // Relation to passkeys authenticators
+
+  // Production costs relationships
+  toolWearCosts           ToolWearCost[]
+  materialCosts           MaterialCost[]
+  operationCosts          OperationCost[]
+  productionCostEstimates ProductionCostEstimate[]
+  costSettings            CostSettings?
+
+  // Marketplace relationships
+  marketplaceSeller    MarketplaceSeller?
+  marketplaceOrders    MarketplaceOrder[]    @relation("MarketplaceBuyer")
+  marketplaceReviews   MarketplaceReview[]   @relation("MarketplaceReviewer")
+  marketplaceWishlists MarketplaceWishlist[] @relation("MarketplaceWishlist")
+}
+
+// Model for WebAuthn/Passkeys authentication
+model Authenticator {
+  id                   String  @id @default(cuid())
+  userId               String
+  credentialID         String  @unique
+  credentialPublicKey  Bytes
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("authenticators")
+}
+
+// Model for email verification and password reset tokens
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Subscription model for Stripe integration
+model Subscription {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  plan        String    @default("FREE") // Will store LS Variant ID or 'free'
+  status      String    @default("inactive") // e.g., active, past_due, trialing, cancelled, expired
+  trialEndsAt DateTime? // Added specifically for trial end tracking
+
+  // Stripe fields (mantieni per compatibilità)
+  stripeCustomerId         String?
+  stripeSubscriptionId     String?
+  stripePriceId            String?
+  stripeCurrentPeriodStart DateTime?
+  stripeCurrentPeriodEnd   DateTime?
+
+  // LemonSqueezy fields
+  lsCustomerId       String?
+  lsSubscriptionId   String?
+  lsVariantId        String?
+  lsCurrentPeriodEnd DateTime?
+
+  cancelAtPeriodEnd Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Auth models remain unchanged
+// Better Auth Account model for OAuth providers
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  accountId         String
+  providerId        String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope             String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+}
+
+// Better Auth Session model for JWT sessions
+model Session {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  ipAddress String?
+  userAgent String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Organization related models
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  users         UserOrganization[]
+  projects      Project[]
+  invitations   OrganizationInvitation[]
+  materials     Material[] // Add organization materials
+  tools         Tool[] // Add organization tools
+  LibraryItem   LibraryItem[]
+  Conversation  Conversation[]
+  notifications Notification[] // Aggiunto per il sistema di notifiche
+
+  // Production costs relationships
+  toolWearCosts           ToolWearCost[]
+  materialCosts           MaterialCost[]
+  operationCosts          OperationCost[]
+  productionCostEstimates ProductionCostEstimate[]
+  costSettings            CostSettings?
+}
+
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  email          String
+  role           UserRole     @default(MEMBER)
+  token          String       @unique
+  organizationId String
+  createdAt      DateTime     @default(now())
+  expiresAt      DateTime
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model UserOrganization {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           UserRole     @default(MEMBER)
+  joinedAt       DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+// Project related models
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ownerId        String
+  organizationId String?
+  isPublic       Boolean  @default(false) // Add public flag
+
+  // Relationships
+  owner         User           @relation(fields: [ownerId], references: [id])
+  organization  Organization?  @relation(fields: [organizationId], references: [id])
+  drawings      Drawing[]
+  components    Component[]
+  notifications Notification[] // Aggiunto per il sistema di notifiche
+  Toolpath      Toolpath[]
+}
+
+model Drawing {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  data        Json // Stores the drawing elements
+  thumbnail   String? // URL to thumbnail image
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  projectId   String
+
+  // Relationships
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions  DrawingVersion[]
+  toolpaths Toolpath[]
+}
+
+model DrawingVersion {
+  id        String   @id @default(cuid())
+  version   Int
+  data      Json // Stores the drawing elements for this version
+  createdAt DateTime @default(now())
+  drawingId String
+  drawing   Drawing  @relation(fields: [drawingId], references: [id], onDelete: Cascade)
+}
+
+model Component {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  data        Json // Stores the component definition
+  thumbnail   String? // URL to thumbnail image
+  type        String? // Add component type
+  isPublic    Boolean  @default(false) // Add public flag
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  projectId   String
+
+  // Relationships
+  project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  notifications    Notification[] // Aggiunto per il sistema di notifiche
+  ComponentVersion ComponentVersion[]
+  ComponentComment ComponentComment[]
+}
+
+model Material {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  properties     Json // Density, hardness, etc.
+  isPublic       Boolean  @default(false) // Add public flag
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ownerId        String? // Add owner relationship
+  organizationId String? // Add organization relationship
+
+  // Relationships
+  owner         User?          @relation(fields: [ownerId], references: [id])
+  organization  Organization?  @relation(fields: [organizationId], references: [id])
+  toolpaths     Toolpath[]
+  materialCosts MaterialCost[]
+}
+
+model Tool {
+  id             String   @id @default(cuid())
+  name           String
+  type           String // endmill, drillbit, turningTool, etc.
+  diameter       Float
+  material       String // HSS, Carbide, etc.
+  numberOfFlutes Int?
+  maxRPM         Int?
+  coolantType    String? // none, flood, mist
+  cuttingLength  Float?
+  totalLength    Float?
+  shankDiameter  Float?
+  notes          String?
+  isPublic       Boolean  @default(false) // Add public flag
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ownerId        String? // Add owner relationship
+  organizationId String? // Add organization relationship
+
+  // Relationships
+  owner         User?          @relation(fields: [ownerId], references: [id])
+  organization  Organization?  @relation(fields: [organizationId], references: [id])
+  toolpaths     Toolpath[]
+  toolWearCosts ToolWearCost[]
+}
+
+model Toolpath {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  data            Json?
+  type            String? // e.g., 'mill', 'lathe', '3dprinter'
+  operationType   String? // e.g., 'contour', 'pocket', 'drill'
+  gcode           String? // Stored G-code
+  thumbnail       String? // URL to thumbnail image
+  isPublic        Boolean           @default(false)
+  projectId       String
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  createdBy       String
+  user            User              @relation(fields: [createdBy], references: [id])
+  versions        ToolpathVersion[]
+  comments        ToolpathComment[]
+  Drawing         Drawing?          @relation(fields: [drawingId], references: [id])
+  drawingId       String?
+  Material        Material?         @relation(fields: [materialId], references: [id])
+  materialId      String?
+  Tool            Tool?             @relation(fields: [toolId], references: [id])
+  toolId          String?
+  MachineConfig   MachineConfig?    @relation(fields: [machineConfigId], references: [id])
+  machineConfigId String?
+
+  // Production costs relationship
+  productionCostEstimates ProductionCostEstimate[]
+}
+
+model ToolpathVersion {
+  id            String   @id @default(cuid())
+  toolpathId    String
+  toolpath      Toolpath @relation(fields: [toolpathId], references: [id], onDelete: Cascade)
+  data          Json?
+  gcode         String?
+  changeMessage String?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model ToolpathComment {
+  id         String   @id @default(cuid())
+  toolpathId String
+  toolpath   Toolpath @relation(fields: [toolpathId], references: [id], onDelete: Cascade)
+  content    String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model MachineConfig {
+  id          String   @id @default(cuid())
+  name        String
+  type        String // mill, lathe, printer
+  description String?
+  config      Json // Machine configuration parameters
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ownerId     String
+
+  // Relationships
+  owner     User       @relation(fields: [ownerId], references: [id])
+  toolpaths Toolpath[]
+}
+
+// Logging models
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  itemId    String
+  itemType  String // project, drawing, component, etc.
+  action    String // created, updated, deleted, etc.
+  details   Json?
+  timestamp DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AIAnalysisLog {
+  id           String   @id @default(cuid())
+  userId       String
+  objectId     String
+  objectType   String
+  analysisType String
+  result       Json
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id])
+}
+
+model FileUpload {
+  id             String   @id @default(cuid())
+  fileName       String
+  s3Key          String // S3 key for the file
+  s3Bucket       String // S3 bucket name
+  s3ContentType  String // Content type of the file
+  s3Size         Int // Size of the file in bytes
+  objectId       String? // ID of the related object (drawing, component, etc.)
+  objectType     String? // Type of related object
+  ownerId        String
+  organizationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Aggiungi questa relazione per i messaggi
+  messages Message[]
+}
+
+model LibraryItem {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  category       String // 'component', 'tool', 'material', 'machine'
+  type           String
+  data           Json // Store the complex structure with elements
+  properties     Json?
+  tags           String[]
+  thumbnail      String?
+  isPublic       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ownerId        String?
+  organizationId String?
+
+  // Relationships
+  owner        User?         @relation(fields: [ownerId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model Conversation {
+  id             String   @id @default(cuid())
+  name           String?
+  organizationId String
+  isGroupChat    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  userId         String
+  conversationId String
+  joinedAt       DateTime  @default(now())
+  lastReadAt     DateTime?
+
+  // Relationships
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  content        String   @db.Text
+  senderId       String
+  conversationId String
+  fileId         String? // Aggiungi questo campo
+  fileUrl        String? // Aggiungi questo campo
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  sender        User           @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversation  Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  notifications Notification[] // Aggiunto per il sistema di notifiche
+  fileUpload    FileUpload?    @relation(fields: [fileId], references: [id], onDelete: SetNull) // Aggiungi questa relazione
+
+  @@index([conversationId])
+}
+
+// Modello per le notifiche
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  content   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Riferimenti alle entità correlate
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Riferimenti opzionali
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  componentId    String?
+  component      Component?    @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  // Attributi per il routing
+  linkUrl String?
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  PROJECT_CREATED
+  COMPONENT_CREATED
+  MEMBER_JOINED
+  ORGANIZATION_INVITATION
+}
+
+model ComponentVersion {
+  id            String   @id @default(cuid())
+  componentId   String
+  data          Json
+  changeMessage String?
+  userId        String
+  createdAt     DateTime @default(now())
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model ComponentComment {
+  id          String   @id @default(cuid())
+  componentId String
+  content     String   @db.Text
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Token {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  type      String // 'email', 'password', 'invitation', etc.
+  expiresAt DateTime
+  userId    String
+  metadata  Json? // For storing additional data like newEmail, newPassword, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// Model to store core plugin metadata
+model PluginRegistryEntry {
+  id           String   @id // Plugin ID (e.g., com.example.myplugin)
+  manifestJson String   @db.Text // Store the full manifest as a JSON string
+  state        String // Store PluginState enum as string (e.g., "ENABLED", "DISABLED", "ERROR")
+  enabled      Boolean
+  version      String
+  installedAt  DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  errorCount   Int      @default(0)
+  lastError    String?
+
+  // Relation to configuration (one-to-one optional)
+  configuration PluginConfiguration?
+}
+
+// Model to store plugin-specific configuration
+model PluginConfiguration {
+  pluginId   String @id // Foreign key referencing PluginRegistryEntry.id
+  configJson String @db.Text // Store the configuration object as a JSON string
+
+  // Explicit relation back to PluginRegistryEntry
+  plugin PluginRegistryEntry @relation(fields: [pluginId], references: [id], onDelete: Cascade) // Cascade delete config if plugin is removed
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  keyHash   String    @unique // Store a hash of the key, not the key itself
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  lastUsed  DateTime? // Optional: Track last usage
+  expiresAt DateTime? // Optional: Set an expiry date
+
+  @@index([userId])
+}
+
+// Costi di usura utensili
+model ToolWearCost {
+  id                   String   @id @default(cuid())
+  toolId               String
+  wearRatePerMeter     Float // Tasso di usura in percentuale per metro
+  replacementCost      Float // Costo di sostituzione
+  replacementThreshold Float    @default(100) // Soglia di usura quando sostituire (0-100%)
+  currencyCode         String   @default("EUR")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ownerId              String?
+  organizationId       String?
+
+  // Relazioni
+  tool         Tool          @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  owner        User?         @relation(fields: [ownerId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// Costi dei materiali
+model MaterialCost {
+  id             String   @id @default(cuid())
+  materialId     String
+  costPerUnit    Float // Costo per unità volumetrica
+  wasteFactor    Float    @default(0) // Fattore di scarto (percentuale)
+  minimumCharge  Float    @default(0) // Tariffa minima
+  currencyCode   String   @default("EUR")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ownerId        String?
+  organizationId String?
+
+  // Relazioni
+  material     Material      @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  owner        User?         @relation(fields: [ownerId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+// Costi delle operazioni
+model OperationCost {
+  id                 String   @id @default(cuid())
+  name               String
+  machineHourlyRate  Float
+  operatorHourlyRate Float
+  setupTime          Float    @default(30) // Tempo di setup in minuti
+  currencyCode       String   @default("EUR")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  ownerId            String
+  organizationId     String?
+
+  // Relazioni
+  owner               User                     @relation(fields: [ownerId], references: [id])
+  organization        Organization?            @relation(fields: [organizationId], references: [id])
+  productionEstimates ProductionCostEstimate[]
+}
+
+// Stime dei costi di produzione
+model ProductionCostEstimate {
+  id               String   @id @default(cuid())
+  toolpathId       String
+  materialCost     Float
+  toolWearCost     Float
+  machineTime      Float // Tempo macchina in minuti
+  machineTimeCost  Float
+  operatorTime     Float // Tempo operatore in minuti
+  operatorTimeCost Float
+  setupCost        Float
+  totalCost        Float
+  currencyCode     String   @default("EUR")
+  details          Json     @default("{}") // Dettagli aggiuntivi (percorso, volume materiale, ecc.)
+  operationCostId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  ownerId          String
+  organizationId   String?
+
+  // Relazioni
+  owner         User           @relation(fields: [ownerId], references: [id])
+  organization  Organization?  @relation(fields: [organizationId], references: [id])
+  toolpath      Toolpath       @relation(fields: [toolpathId], references: [id], onDelete: Cascade)
+  operationCost OperationCost? @relation(fields: [operationCostId], references: [id])
+}
+
+// Impostazioni dei costi
+model CostSettings {
+  id                        String   @id @default(cuid())
+  defaultCurrencyCode       String   @default("EUR")
+  defaultMachineHourlyRate  Float    @default(50)
+  defaultOperatorHourlyRate Float    @default(30)
+  defaultSetupTime          Float    @default(30)
+  calculateAutomatically    Boolean  @default(true)
+  additionalSettings        Json?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  ownerId                   String   @unique
+  organizationId            String?  @unique
+
+  // Relazioni
+  owner        User          @relation(fields: [ownerId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model MCPServerConfig {
+  id               String   @id @default(cuid())
+  name             String
+  type             String   @default("sse") // 'sse' or 'stdio'
+  url              String? // Optional - only for SSE servers
+  command          String? // Optional - only for stdio servers
+  args             Json? // Optional - arguments for stdio servers
+  workingDirectory String? // Optional - working directory for stdio servers
+  enabled          Boolean  @default(true)
+  userId           String? // Optional user ID for user-specific configurations
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ===============================
+// MARKETPLACE MODELS
+// ===============================
+
+enum MarketplaceItemType {
+  COMPONENT
+  DRAWING
+  PROJECT
+  GCODE
+  TOOLPATH
+  ASSEMBLY
+}
+
+enum LicenseType {
+  PERSONAL
+  COMMERCIAL
+  EXTENDED
+  ROYALTY_FREE
+}
+
+enum MarketplaceOrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum MarketplaceItemStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model MarketplaceItem {
+  id               String                @id @default(cuid())
+  title            String
+  description      String?
+  shortDescription String?
+  type             MarketplaceItemType
+  price            Decimal               @db.Decimal(10, 2)
+  currencyCode     String                @default("USD")
+  licenseType      LicenseType           @default(PERSONAL)
+  tags             String[]
+  category         String?
+  subcategory      String?
+  thumbnailUrl     String?
+  previewImages    String[]
+  downloadUrl      String?
+  fileSize         Int?
+  downloadCount    Int                   @default(0)
+  viewCount        Int                   @default(0)
+  rating           Decimal?              @db.Decimal(3, 2)
+  reviewCount      Int                   @default(0)
+  status           MarketplaceItemStatus @default(DRAFT)
+  featured         Boolean               @default(false)
+  polarProductId   String?               @unique
+  sellerId         String
+  originalItemId   String? // ID of original Component/Drawing/Project
+  originalItemType String? // Type of original item
+  metadata         Json                  @default("{}")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  approvedAt       DateTime?
+  approvedBy       String?
+
+  // Relationships
+  seller          MarketplaceSeller           @relation(fields: [sellerId], references: [id])
+  orders          MarketplaceOrder[]
+  reviews         MarketplaceReview[]
+  collectionItems MarketplaceCollectionItem[]
+  wishlists       MarketplaceWishlist[]
+
+  @@index([sellerId])
+  @@index([type])
+  @@index([status])
+  @@index([category])
+  @@index([featured])
+}
+
+model MarketplaceSeller {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  storeName        String
+  storeDescription String?
+  storeUrl         String?  @unique
+  avatar           String?
+  banner           String?
+  rating           Decimal? @db.Decimal(3, 2)
+  reviewCount      Int      @default(0)
+  totalSales       Int      @default(0)
+  totalRevenue     Decimal  @default(0) @db.Decimal(10, 2)
+  commissionRate   Decimal  @default(15.00) @db.Decimal(5, 2)
+  payoutEmail      String?
+  taxInfo          Json     @default("{}")
+  verified         Boolean  @default(false)
+  suspended        Boolean  @default(false)
+  polarCustomerId  String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relationships
+  user        User                    @relation(fields: [userId], references: [id])
+  items       MarketplaceItem[]
+  orders      MarketplaceOrder[]
+  collections MarketplaceCollection[]
+  payouts     MarketplacePayout[]
+}
+
+model MarketplaceOrder {
+  id                String                 @id @default(cuid())
+  orderNumber       String                 @unique
+  buyerId           String
+  sellerId          String
+  itemId            String
+  quantity          Int                    @default(1)
+  unitPrice         Decimal                @db.Decimal(10, 2)
+  totalPrice        Decimal                @db.Decimal(10, 2)
+  commissionAmount  Decimal                @db.Decimal(10, 2)
+  sellerAmount      Decimal                @db.Decimal(10, 2)
+  currencyCode      String                 @default("USD")
+  status            MarketplaceOrderStatus @default(PENDING)
+  polarCheckoutId   String?                @unique
+  polarPaymentId    String?
+  downloadUrl       String?
+  downloadExpiresAt DateTime?
+  downloadCount     Int                    @default(0)
+  maxDownloads      Int?                   @default(3)
+  licenseKey        String?
+  metadata          Json                   @default("{}")
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  completedAt       DateTime?
+
+  // Relationships
+  buyer  User               @relation("MarketplaceBuyer", fields: [buyerId], references: [id])
+  seller MarketplaceSeller  @relation(fields: [sellerId], references: [id])
+  item   MarketplaceItem    @relation(fields: [itemId], references: [id])
+  review MarketplaceReview?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([itemId])
+  @@index([status])
+}
+
+model MarketplaceReview {
+  id        String   @id @default(cuid())
+  itemId    String
+  buyerId   String
+  orderId   String   @unique
+  rating    Int
+  title     String?
+  comment   String?
+  helpful   Int      @default(0)
+  reported  Boolean  @default(false)
+  verified  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  item  MarketplaceItem  @relation(fields: [itemId], references: [id])
+  buyer User             @relation("MarketplaceReviewer", fields: [buyerId], references: [id])
+  order MarketplaceOrder @relation(fields: [orderId], references: [id])
+
+  @@index([itemId])
+  @@index([buyerId])
+}
+
+model MarketplaceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  parentId    String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  parent   MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children MarketplaceCategory[] @relation("CategoryHierarchy")
+
+  @@index([parentId])
+}
+
+model MarketplaceCollection {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  slug         String   @unique
+  thumbnailUrl String?
+  sellerId     String
+  featured     Boolean  @default(false)
+  itemCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  seller MarketplaceSeller           @relation(fields: [sellerId], references: [id])
+  items  MarketplaceCollectionItem[]
+
+  @@index([sellerId])
+}
+
+model MarketplaceCollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  itemId       String
+  sortOrder    Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  // Relationships
+  collection MarketplaceCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  item       MarketplaceItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, itemId])
+}
+
+model MarketplaceWishlist {
+  id      String   @id @default(cuid())
+  userId  String
+  itemId  String
+  addedAt DateTime @default(now())
+
+  // Relationships
+  user User            @relation("MarketplaceWishlist", fields: [userId], references: [id], onDelete: Cascade)
+  item MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+}
+
+model MarketplacePayout {
+  id            String    @id @default(cuid())
+  sellerId      String
+  amount        Decimal   @db.Decimal(10, 2)
+  currencyCode  String    @default("USD")
+  status        String    @default("PENDING")
+  payoutMethod  String
+  transactionId String?
+  processedAt   DateTime?
+  failureReason String?
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  seller MarketplaceSeller @relation(fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+}

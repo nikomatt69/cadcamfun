@@ -1,0 +1,218 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "productName": "CADCAM FUN",
+  "version": "1.1.0",
+  "identifier": "com.cadcamfun.app",
+  "build": {
+    "beforeDevCommand": "yarn dev",
+    "beforeBuildCommand": "yarn build:export",
+    "devUrl": "http://localhost:5661",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "CAD/CAM FUN - Professional CAD/CAM Software",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "center": true,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "theme": null,
+        "titleBarStyle": "Visible",
+        "hiddenTitle": false,
+        "acceptFirstMouse": false,
+        "tabbingIdentifier": "cadcamfun"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": [
+          "'self'",
+          "localhost:*",
+          "127.0.0.1:*",
+          "tauri:",
+          "cadcamfun.xyz",
+          "*.cadcamfun.xyz"
+        ],
+        "script-src": [
+          "'self'",
+          "'unsafe-eval'",
+          "'unsafe-inline'",
+          "localhost:*",
+          "127.0.0.1:*",
+          "cadcamfun.xyz",
+          "*.cadcamfun.xyz"
+        ],
+        "connect-src": [
+          "'self'",
+          "localhost:*",
+          "127.0.0.1:*",
+          "ws://localhost:*",
+          "wss://localhost:*",
+          "https://cadcamfun.xyz",
+          "wss://cadcamfun.xyz",
+          "https://api.openai.com",
+          "https://api.anthropic.com"
+        ],
+        "img-src": [
+          "'self'",
+          "data:",
+          "blob:",
+          "https:",
+          "localhost:*",
+          "127.0.0.1:*"
+        ],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https:",
+          "localhost:*",
+          "127.0.0.1:*"
+        ],
+        "font-src": [
+          "'self'",
+          "data:",
+          "https:",
+          "localhost:*",
+          "127.0.0.1:*"
+        ]
+      }
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false,
+      "tooltip": "CAD/CAM FUN"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "DeveloperTool",
+    "shortDescription": "Professional CAD/CAM Software",
+    "longDescription": "Advanced Computer-Aided Design and Manufacturing software with integrated toolpath generation, 3D modeling, and CNC machining capabilities.",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "plugins": {
+    "dialog": {
+      "all": true,
+      "ask": true,
+      "confirm": true,
+      "message": true,
+      "open": true,
+      "save": true
+    },
+    "fs": {
+      "all": true,
+      "readFile": true,
+      "writeFile": true,
+      "readDir": true,
+      "copyFile": true,
+      "createDir": true,
+      "removeDir": true,
+      "removeFile": true,
+      "renameFile": true,
+      "exists": true,
+      "scope": [
+        "$HOME/**",
+        "$APPDATA/**",
+        "$APPLOCALDATA/**",
+        "$APPCONFIG/**",
+        "$APPLOG/**",
+        "$APPCACHE/**",
+        "$TEMP/**",
+        "$DESKTOP/**",
+        "$DOCUMENT/**",
+        "$DOWNLOAD/**",
+        "$PICTURE/**",
+        "$VIDEO/**",
+        "$AUDIO/**"
+      ]
+    },
+    "path": {
+      "all": true
+    },
+    "clipboard": {
+      "all": true,
+      "readText": true,
+      "writeText": true
+    },
+    "globalShortcut": {
+      "all": true
+    },
+    "notification": {
+      "all": true
+    },
+    "app": {
+      "all": true,
+      "show": true,
+      "hide": true
+    },
+    "menu": {
+      "all": true
+    },
+    "tray": {
+      "all": true
+    },
+    "nativeIcon": {
+      "all": true
+    },
+    "process": {
+      "all": false,
+      "relaunch": true,
+      "exit": true
+    },
+    "os": {
+      "all": true
+    },
+    "http": {
+      "all": true,
+      "request": true,
+      "scope": [
+        "http://localhost:*",
+        "https://localhost:*",
+        "http://127.0.0.1:*",
+        "https://127.0.0.1:*",
+        "https://cadcamfun.xyz/**",
+        "https://*.cadcamfun.xyz/**",
+        "https://api.openai.com/**",
+        "https://api.anthropic.com/**"
+      ]
+    },
+    "shell": {
+      "all": false,
+      "open": true
+    },
+    "window": {
+      "all": true
+    }
+  }
+}
