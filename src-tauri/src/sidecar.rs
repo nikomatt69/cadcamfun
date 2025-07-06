@@ -1,11 +1,10 @@
-use anyhow::{anyhow, Result};
-use tauri::{AppHandle, Manager};
-use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use tracing::{info, warn, debug};
 use std::sync::Arc;
 use std::time::Duration;
+use anyhow::{anyhow, Result};
+use tauri::AppHandle;
 use tokio::time::{sleep, timeout};
+use tracing::{info, warn, error, debug};
 use local_ip_address::local_ip;
 
 #[derive(Debug)]
@@ -31,26 +30,30 @@ impl SidecarManager {
             return Ok(self.port.unwrap_or(3001));
         }
 
-        info!("Starting sidecar server...");
+        info!("Starting Next.js sidecar server...");
 
-        // Get the resource directory path
+        // Find an available port
+        let port = self.find_available_port().await?;
+        
+        // Get the app directory
         let app_dir = app_handle
             .path()
             .resource_dir()
+            .ok_or_else(|| anyhow!("Failed to get app resource directory"))?
             .parent()
             .ok_or_else(|| anyhow!("Failed to get parent directory"))?;
 
         info!("App directory: {:?}", app_dir);
         
         // Try different approaches to start the server
-        let mut command = self.create_server_command(&app_dir, 3001)?;
+        let mut command = self.create_server_command(&app_dir, port)?;
         
         // Set environment variables for desktop mode
         command
             .env("NODE_ENV", "production")
             .env("IS_DESKTOP", "true")
             .env("NEXT_PUBLIC_IS_DESKTOP", "true")
-            .env("PORT", "3001")
+            .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -78,17 +81,17 @@ impl SidecarManager {
         }
 
         // Wait for the server to be ready
-        if let Err(e) = self.wait_for_server_ready(3001).await {
+        if let Err(e) = self.wait_for_server_ready(port).await {
             warn!("Server may not be fully ready: {}", e);
             // Continue anyway, the server might still work
         }
 
         self.process = Some(child);
-        self.port = Some(3001);
+        self.port = Some(port);
         self.is_running = true;
 
-        info!("Sidecar server started successfully on port 3001");
-        Ok(3001)
+        info!("Sidecar server started successfully on port {}", port);
+        Ok(port)
     }
 
     /// Stop the sidecar server
@@ -152,75 +155,81 @@ impl SidecarManager {
     }
 
     /// Create the appropriate command to start the server
-    fn create_server_command(&self, app_dir: &Path, _port: u16) -> Result<Command> {
+    fn create_server_command(&self, app_dir: &std::path::Path, port: u16) -> Result<Command> {
         let mut command;
 
-        // Try npm first
-        command = Command::new("npm");
-        command
-            .args(&["run", "start"])
-            .current_dir(app_dir)
-            .env("NODE_ENV", "production");
+        // First, try to use yarn/npm in production mode
+        if app_dir.join("package.json").exists() {
+            // Try yarn first
+            if which::which("yarn").is_ok() {
+                command = Command::new("yarn");
+                command.arg("start").current_dir(app_dir);
+            } else if which::which("npm").is_ok() {
+                command = Command::new("npm");
+                command.arg("start").current_dir(app_dir);
+            } else {
+                return Err(anyhow!("Neither yarn nor npm found in PATH"));
+            }
+        } else {
+            return Err(anyhow!("package.json not found in app directory"));
+        }
 
         Ok(command)
     }
 
     /// Find an available port
     async fn find_available_port(&self) -> Result<u16> {
-        // Simple port finding logic
-        let port = 3001;
-        Ok(port)
+        // Try common ports for development
+        let preferred_ports = [3001, 3002, 3003, 3004, 3005];
+        
+        for &port in &preferred_ports {
+            if self.is_port_available(port).await {
+                return Ok(port);
+            }
+        }
+
+        // Try random ports if preferred ones are taken
+        for port in 3006..4000 {
+            if self.is_port_available(port).await {
+                return Ok(port);
+            }
+        }
+
+        Err(anyhow!("No available ports found"))
+    }
+
+    /// Check if a port is available
+    async fn is_port_available(&self, port: u16) -> bool {
+        use std::net::{SocketAddr, TcpListener};
+        
+        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        TcpListener::bind(addr).is_ok()
     }
 
     /// Wait for the server to be ready
     async fn wait_for_server_ready(&self, port: u16) -> Result<()> {
-        let url = format!("http://127.0.0.1:{}/api/health", port);
+        let url = format!("http://127.0.0.1:{}/api", port);
         let client = reqwest::Client::new();
-        let max_attempts = 30;
-        let delay = Duration::from_millis(1000);
-
-        for attempt in 1..=max_attempts {
-            if let Ok(response) = timeout(Duration::from_secs(5), client.get(&url).send()).await {
-                if let Ok(resp) = response {
-                    if resp.status().is_success() {
-                        info!("Server is ready after {} attempts", attempt);
+        
+        for attempt in 1..=30 {
+            debug!("Checking server readiness, attempt {}/30", attempt);
+            
+            match client.get(&url).timeout(Duration::from_secs(2)).send().await {
+                Ok(response) => {
+                    if response.status().is_success() || response.status().as_u16() == 404 {
+                        info!("Server is ready on port {}", port);
                         return Ok(());
                     }
                 }
+                Err(e) => {
+                    debug!("Server not ready yet: {}", e);
+                }
             }
             
-            if attempt < max_attempts {
-                sleep(delay).await;
-            }
+            sleep(Duration::from_secs(1)).await;
         }
 
-        Err(anyhow!("Server failed to become ready after {} attempts", max_attempts))
-    }
-
-    fn get_mcp_server_path(&self, app_handle: &AppHandle) -> Result<PathBuf> {
-        info!("Attempting to get MCP server path.");
-        // The path is now resolved using resource_dir() which returns a Result
-        let resource_path = app_handle
-            .path()
-            .resource_dir()
-            .join("bin/mcp-server");
-        
-        debug!("MCP server path: {:?}", resource_path);
-        Ok(resource_path)
-    }
-
-    pub fn start_mcp_server(&mut self, app_handle: AppHandle) -> Result<u16> {
-        // ... existing code ...
-        Ok(self.port.unwrap_or(3001))
-    }
-
-    pub fn stop_mcp_server(&mut self) -> Result<()> {
-        if let Some(mut child) = self.process.take() {
-            info!("Stopping MCP server...");
-            let _ = child.kill();
-            self.is_running = false;
-        }
-        Ok(())
+        Err(anyhow!("Server did not become ready within timeout"))
     }
 }
 
