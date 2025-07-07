@@ -18,12 +18,12 @@ This guide will help you set up GitHub OAuth authentication in your CAD/CAM FUN 
 
 3. Fill in the application details:
    - **Application name**: CAD/CAM FUN
-   - **Homepage URL**: 
-     - Development: `https://localhost:3000`
+   - **Homepage URL**:
+     - Development: `http://localhost:3000`
      - Production: `https://cadcamfun.xyz`
    - **Application description**: Advanced CAD/CAM workspace with AI-powered design capabilities
-   - **Authorization callback URL**: 
-     - Development: `https://localhost:3000/api/auth/callback/github`
+   - **Authorization callback URL**:
+     - Development: `http://localhost:3000/api/auth/callback/github`
      - Production: `https://cadcamfun.xyz/api/auth/callback/github`
 
 4. Click "Register application"
@@ -35,11 +35,13 @@ This guide will help you set up GitHub OAuth authentication in your CAD/CAM FUN 
 ## Step 2: Configure Environment Variables
 
 1. Copy `.env.example` to `.env.local`:
+
    ```bash
    cp .env.example .env.local
    ```
 
 2. Add your GitHub OAuth credentials to `.env.local`:
+
    ```env
    GITHUB_CLIENT_ID="your_github_client_id_here"
    GITHUB_CLIENT_SECRET="your_github_client_secret_here"
@@ -47,7 +49,7 @@ This guide will help you set up GitHub OAuth authentication in your CAD/CAM FUN 
 
 3. Ensure other required variables are set:
    ```env
-   NEXTAUTH_URL="https://localhost:3000"  # or your production URL
+   NEXTAUTH_URL="http://localhost:3000"  # or your production URL
    NEXTAUTH_SECRET="your-secret-key-here"
    DATABASE_URL="your-database-connection-string"
    ```
@@ -57,6 +59,7 @@ This guide will help you set up GitHub OAuth authentication in your CAD/CAM FUN 
 The GitHub OAuth integration uses Better Auth's built-in account linking system. Ensure your database has the required tables:
 
 1. Run Prisma migrations:
+
    ```bash
    npm run prisma:migrate
    ```
@@ -69,11 +72,12 @@ The GitHub OAuth integration uses Better Auth's built-in account linking system.
 ## Step 4: Test the Integration
 
 1. Start your development server:
+
    ```bash
    npm run dev
    ```
 
-2. Navigate to the sign-in page: `https://localhost:3000/auth/signin`
+2. Navigate to the sign-in page: `http://localhost:3000/auth/signin`
 
 3. Click "Continue with GitHub" button
 
@@ -84,6 +88,7 @@ The GitHub OAuth integration uses Better Auth's built-in account linking system.
 ## Features Included
 
 ### Authentication
+
 - ✅ GitHub OAuth sign-in
 - ✅ GitHub OAuth sign-up
 - ✅ Account linking for existing users
@@ -91,12 +96,14 @@ The GitHub OAuth integration uses Better Auth's built-in account linking system.
 - ✅ Session management
 
 ### User Interface
+
 - ✅ GitHub sign-in button on login page
 - ✅ GitHub sign-up button on registration page
 - ✅ Loading states and error handling
 - ✅ Responsive design with animations
 
 ### Profile Integration
+
 - ✅ GitHub profile information sync
 - ✅ Avatar image from GitHub
 - ✅ GitHub username display
@@ -105,6 +112,7 @@ The GitHub OAuth integration uses Better Auth's built-in account linking system.
 ## Configuration Options
 
 ### Scopes
+
 The default configuration requests basic user information. To request additional scopes, modify the auth configuration in `src/lib/auth.ts`:
 
 ```typescript
@@ -118,6 +126,7 @@ socialProviders: {
 ```
 
 ### Custom User Mapping
+
 To customize how GitHub profile data maps to your user model:
 
 ```typescript
@@ -143,11 +152,13 @@ socialProviders: {
 ## Production Deployment
 
 ### Vercel
+
 1. Add environment variables in Vercel dashboard
 2. Update the GitHub OAuth app callback URL to your production domain
 3. Deploy your application
 
 ### Other Platforms
+
 1. Set environment variables in your hosting platform
 2. Update callback URLs in GitHub OAuth app settings
 3. Ensure HTTPS is enabled for production
@@ -174,11 +185,13 @@ socialProviders: {
    - Run migrations if tables are missing
 
 5. **CORS issues in development**
-   - Ensure you're using `https://localhost:3000` (not `http://`)
+   - Ensure you're using `http://localhost:3000` (not `http://`)
    - Check that `NEXTAUTH_URL` matches your development URL
 
 ### Debug Mode
+
 Enable debug logging by setting in your environment:
+
 ```env
 NODE_ENV=development
 ```
@@ -196,6 +209,7 @@ Check the browser console and server logs for detailed error messages.
 ## Next Steps
 
 After setting up GitHub OAuth, you can:
+
 1. Add additional OAuth providers (Google, Discord, etc.)
 2. Implement team/organization features using GitHub organizations
 3. Sync repositories or project data from GitHub
@@ -204,6 +218,7 @@ After setting up GitHub OAuth, you can:
 ## Support
 
 If you encounter issues:
+
 1. Check the [Better Auth documentation](https://www.better-auth.com/docs)
 2. Review GitHub OAuth documentation
 3. Check the application logs for detailed error messages

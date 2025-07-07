@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build:export",
-    "devUrl": "https://localhost:3001",
+    "devUrl": "http://localhost:3000",
     "frontendDist": "../out"
   },
   "plugins": {
@@ -57,6 +57,9 @@
           "'unsafe-inline'",
           "localhost:*",
           "127.0.0.1:*",
+          "http://localhost:3000",
+          "https://localhost:3000",
+          "tauri:",
           "cadcamfun.xyz",
           "*.cadcamfun.xyz"
         ],
@@ -69,13 +72,16 @@
           "https://cadcamfun.xyz",
           "wss://cadcamfun.xyz",
           "https://api.openai.com",
-          "https://api.anthropic.com"
+          "https://api.anthropic.com",
+          "ipc:",
+          "tauri:"
         ],
         "img-src": [
           "'self'",
           "data:",
           "blob:",
           "https:",
+          "tauri:",
           "localhost:*",
           "127.0.0.1:*"
         ],
@@ -84,6 +90,7 @@
           "'unsafe-inline'",
           "https:",
           "localhost:*",
+          "tauri:",
           "127.0.0.1:*"
         ],
         "font-src": [

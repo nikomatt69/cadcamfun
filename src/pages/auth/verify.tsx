@@ -5,12 +5,14 @@ import { CheckCircleIcon, XCircleIcon } from "lucide-react";
 import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
+import { useTauri } from "@/src/hooks/useTauri";
 
 export default function VerifyEmail() {
   const router = useRouter();
   const { token } = router.query;
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const { httpFetch } = useTauri();
 
   useEffect(() => {
     if (token && typeof token === "string") {
@@ -20,7 +22,7 @@ export default function VerifyEmail() {
 
   const verifyEmail = async (emailToken: string) => {
     try {
-      const response = await fetch("/api/auth/verify-email", {
+      const response = await httpFetch("/api/auth/verify-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

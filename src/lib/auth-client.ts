@@ -1,5 +1,7 @@
 // src/lib/auth-client.ts
 import { createAuthClient } from "better-auth/react";
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { open } from '@tauri-apps/plugin-shell';
 
 // Detect desktop environment
 const isDesktop = typeof window !== 'undefined' &&
@@ -7,12 +9,15 @@ const isDesktop = typeof window !== 'undefined' &&
     window.location.protocol === 'tauri:' ||
     window.location.hostname === 'localhost' && window.location.port === '1420');
 
+// Unified fetch function that works in both web and desktop environments
+const unifiedFetch = isDesktop ? tauriFetch : fetch;
+
 export const authClient = createAuthClient({
   baseURL: isDesktop
-    ? "https://localhost:3000"  // Desktop sempre usa localhost
+    ? "http://localhost:3001"  // Desktop sempre usa localhost
     : process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
       ? "https://cadcamfun.xyz"
-      : "https://localhost:3000"),
+      : "http://localhost:3001"),
 
   // Enhanced configuration for desktop compatibility
   fetchOptions: {
@@ -43,10 +48,10 @@ const refreshSession = async (): Promise<any> => {
   try {
     // Build full URL for desktop compatibility
     const baseURL = isDesktop
-      ? "https://localhost:3000"
+      ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await fetch(`${baseURL}/api/auth/get-session`, {
+    const response = await unifiedFetch(`${baseURL}/api/auth/get-session`, {
       method: 'GET',
       headers: {
         'Cache-Control': 'no-cache',
@@ -65,8 +70,20 @@ const refreshSession = async (): Promise<any> => {
       throw new Error(`Session fetch failed: ${response.status}`);
     }
 
-    const sessionData = await response.json();
-    return sessionData.session;
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.warn('Server response is not JSON, treating as no session');
+      return null;
+    }
+
+    try {
+      const sessionData = await response.json();
+      return sessionData.session;
+    } catch (jsonError) {
+      console.error('Failed to parse session JSON:', jsonError);
+      return null;
+    }
   } catch (error) {
     console.error("Error fetching session:", error);
     return null;
@@ -201,20 +218,38 @@ export const useSession = () => {
 // Enhanced auth functions con desktop compatibility e cache management
 export const signIn = async (credentials: { email: string; password: string }) => {
   try {
-    const response = await fetch('/api/auth/signin', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(credentials),
-      credentials: 'include' // Important per desktop compatibility
-    });
+    const isDesktop = typeof window !== 'undefined' && (window as any).__TAURI__;
 
+    let response;
+
+    if (isDesktop) {
+      // Usa l'API HTTP di Tauri per le chiamate desktop
+      response = await fetch('http://localhost:3001/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(credentials),
+      });
+    } else {
+      // Usa il fetch standard per il web
+      response = await window.fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(credentials),
+        credentials: 'include' // Important per web compatibility
+      });
+    }
+
+    // Con il nuovo plugin http, la risposta si parsa sempre con .json()
     const result = await response.json();
 
     // Se login successful, invalida cache per refresh session
-    if (response.ok && result.success) {
+    if (response.ok && (result as any).success) {
       // Invalida session cache per forzare refresh
       if (sessionCache) {
         sessionCache.isValid = false;
@@ -274,10 +309,15 @@ export const signUp = async (data: { name: string; email: string; password: stri
 
 export const forgetPassword = async (email: string) => {
   try {
-    const response = await fetch('/api/auth/forget-password', {
+    const baseURL = isDesktop
+      ? "http://localhost:3001"
+      : (typeof window !== 'undefined' ? window.location.origin : "");
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/forget-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
+      credentials: 'include'
     });
     return { data: await response.json(), error: !response.ok };
   } catch (error) {
@@ -288,10 +328,15 @@ export const forgetPassword = async (email: string) => {
 
 export const resetPassword = async (token: string, password: string) => {
   try {
-    const response = await fetch('/api/auth/reset-password', {
+    const baseURL = isDesktop
+      ? "http://localhost:3001"
+      : (typeof window !== 'undefined' ? window.location.origin : "");
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password }),
+      credentials: 'include'
     });
     return { data: await response.json(), error: !response.ok };
   } catch (error) {
@@ -302,10 +347,15 @@ export const resetPassword = async (token: string, password: string) => {
 
 export const verifyEmail = async (token: string) => {
   try {
-    const response = await fetch('/api/auth/verify-email', {
+    const baseURL = isDesktop
+      ? "http://localhost:3001"
+      : (typeof window !== 'undefined' ? window.location.origin : "");
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/verify-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
+      credentials: 'include'
     });
     return { data: await response.json(), error: !response.ok };
   } catch (error) {
@@ -317,9 +367,14 @@ export const verifyEmail = async (token: string) => {
 // Passkey functions - fallback to API calls
 export const signInWithPasskey = async () => {
   try {
-    const response = await fetch('/api/auth/passkey/authenticate', {
+    const baseURL = isDesktop
+      ? "http://localhost:3001"
+      : (typeof window !== 'undefined' ? window.location.origin : "");
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/passkey/authenticate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     });
     return { data: await response.json(), error: !response.ok };
   } catch (error) {
@@ -330,9 +385,14 @@ export const signInWithPasskey = async () => {
 
 export const addPasskey = async () => {
   try {
-    const response = await fetch('/api/auth/passkey/register', {
+    const baseURL = isDesktop
+      ? "http://localhost:3001"
+      : (typeof window !== 'undefined' ? window.location.origin : "");
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/passkey/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
     });
     return { data: await response.json(), error: !response.ok };
   } catch (error) {
@@ -345,27 +405,27 @@ export const addPasskey = async () => {
 export const sendMagicLink = async (email: string) => {
   try {
     // Call Better Auth magic link endpoint
-    const baseURL = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : (process.env.NEXTAUTH_URL || 'https://localhost:3000');
-      
-    const response = await fetch(`${baseURL}/api/auth/magic-link`, {
+    const baseURL = typeof window !== 'undefined'
+      ? window.location.origin
+      : (process.env.NEXTAUTH_URL || 'http://localhost:3001');
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/magic-link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
       credentials: 'include'
     });
-    
+
     if (response.ok) {
       const result = await response.json();
-      return { 
-        data: { 
-          success: true, 
+      return {
+        data: {
+          success: true,
           message: "Magic link generated! Check browser console for the link.",
           showConsoleHint: true,
           ...result
-        }, 
-        error: false 
+        },
+        error: false
       };
     } else {
       const errorData = await response.json();
@@ -373,12 +433,12 @@ export const sendMagicLink = async (email: string) => {
     }
   } catch (error) {
     console.error("Send magic link error:", error);
-    return { 
-      data: { 
-        success: false, 
-        message: "Failed to generate magic link" 
-      }, 
-      error: true 
+    return {
+      data: {
+        success: false,
+        message: "Failed to generate magic link"
+      },
+      error: true
     };
   }
 };
@@ -386,25 +446,32 @@ export const sendMagicLink = async (email: string) => {
 // GitHub OAuth functions
 export const signInWithGitHub = async (callbackURL?: string) => {
   try {
-    const baseURL = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : (process.env.NEXTAUTH_URL || 'https://localhost:3000');
-      
-    const response = await fetch(`${baseURL}/api/auth/sign-in/social`, {
+    const isDesktop = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    const baseURL = isDesktop
+      ? 'http://localhost:3001'
+      : (window.location.origin || process.env.NEXTAUTH_URL);
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/sign-in/social`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         provider: 'github',
         callbackURL: callbackURL || '/'
       }),
-      credentials: 'include'
+      // credentials: 'include' non è necessario con il fetch di Tauri
     });
-    
+
     if (response.ok) {
       const result = await response.json();
-      // If there's a redirect URL, redirect the user
+      // Se c'è un URL di reindirizzamento, aprilo
       if (result.url) {
-        window.location.href = result.url;
+        if (isDesktop) {
+          // Usa l'API shell di Tauri per aprire l'URL esterno
+          await open(result.url);
+        } else {
+          window.location.href = result.url;
+        }
       }
       return { data: result, error: false };
     } else {
@@ -413,32 +480,32 @@ export const signInWithGitHub = async (callbackURL?: string) => {
     }
   } catch (error) {
     console.error("GitHub sign in error:", error);
-    return { 
-      data: { 
-        success: false, 
-        message: "Failed to sign in with GitHub" 
-      }, 
-      error: true 
+    return {
+      data: {
+        success: false,
+        message: "Failed to sign in with GitHub"
+      },
+      error: true
     };
   }
 };
 
 export const linkGitHubAccount = async (callbackURL?: string) => {
   try {
-    const baseURL = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : (process.env.NEXTAUTH_URL || 'https://localhost:3000');
-      
-    const response = await fetch(`${baseURL}/api/auth/link-social`, {
+    const baseURL = typeof window !== 'undefined'
+      ? window.location.origin
+      : (process.env.NEXTAUTH_URL || 'http://localhost:3001');
+
+    const response = await unifiedFetch(`${baseURL}/api/auth/link-social`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         provider: 'github',
         callbackURL: callbackURL || '/'
       }),
       credentials: 'include'
     });
-    
+
     if (response.ok) {
       const result = await response.json();
       // If there's a redirect URL, redirect the user
@@ -452,12 +519,12 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
     }
   } catch (error) {
     console.error("GitHub link account error:", error);
-    return { 
-      data: { 
-        success: false, 
-        message: "Failed to link GitHub account" 
-      }, 
-      error: true 
+    return {
+      data: {
+        success: false,
+        message: "Failed to link GitHub account"
+      },
+      error: true
     };
   }
 };

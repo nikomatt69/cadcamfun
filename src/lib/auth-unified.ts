@@ -1,5 +1,6 @@
 // src/lib/auth-unified.ts
 // Unified authentication system for both web and desktop platforms
+import { fetch } from '@tauri-apps/plugin-http';
 
 interface AuthEnvironment {
   isDesktop: boolean;
@@ -60,10 +61,10 @@ class UnifiedAuth {
     );
 
     const baseURL = isDesktop
-      ? "https://localhost:3000"
+      ? "http://localhost:3001"
       : (typeof window !== 'undefined'
         ? window.location.origin
-        : process.env.NEXTAUTH_URL || "https://localhost:3000");
+        : process.env.NEXTAUTH_URL || "http://localhost:3001");
 
     return {
       isDesktop,
@@ -108,6 +109,10 @@ class UnifiedAuth {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'X-Forwarded-Host': window.location.hostname,
+        'X-Forwarded-Port': window.location.port,
+        'X-Forwarded-Proto': window.location.protocol,
+        'X-Forwarded-For': window.location.hostname,
         // Add platform identifier for backend handling
         'X-Platform': this.environment.platform,
         ...options.headers

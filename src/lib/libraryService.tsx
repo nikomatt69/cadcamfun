@@ -1,5 +1,10 @@
 // src/lib/libraryService.ts
 import { transformLibraryItemToCADElement } from "./libraryTransform";
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { getEnvironment } from '@/src/hooks/useTauri';
+
+const env = getEnvironment();
+const customFetch = env === 'desktop' ? tauriFetch : window.fetch;
 
 // Interface for library item
 export interface LibraryItem {
@@ -19,11 +24,11 @@ export class LibraryService {
   private static instance: LibraryService;
   private predefinedItems: Record<string, LibraryItem[]>;
   private userItems: Record<string, LibraryItem[]>;
-  
+
   // Cache per le richieste API con timestamp
   private apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minuti
-  
+
   // Tracking richieste in corso per evitare duplicati
   private pendingRequests = new Map<string, Promise<any>>();
 
@@ -56,49 +61,52 @@ export class LibraryService {
   private async cachedFetch(url: string, options?: RequestInit): Promise<any> {
     const cacheKey = `${url}-${JSON.stringify(options || {})}`;
     const now = Date.now();
-    
+
     // Check cache first
     const cached = this.apiCache.get(cacheKey);
     if (cached && (now - cached.timestamp) < cached.ttl) {
       console.log(`🎯 LibraryService cache HIT for ${url}`);
       return cached.data;
     }
-    
+
     // Check if request is already pending
     const pendingRequest = this.pendingRequests.get(cacheKey);
     if (pendingRequest) {
       console.log(`⏳ LibraryService request pending for ${url}`);
       return await pendingRequest;
     }
-    
+
     console.log(`🔄 LibraryService cache MISS for ${url}`);
-    
+
     // Create the fetch promise
     const fetchPromise = (async () => {
       try {
-        const response = await fetch(url, options);
+        const response = await customFetch(url, options);
         if (!response.ok) {
           throw new Error(`Failed to fetch from ${url}: ${response.statusText}`);
         }
         const data = await response.json();
-        
+
         // Store in cache
-        this.apiCache.set(cacheKey, { 
-          data, 
-          timestamp: now, 
-          ttl: this.CACHE_TTL 
+        this.apiCache.set(cacheKey, {
+          data,
+          timestamp: now,
+          ttl: this.CACHE_TTL
         });
-        
+
         return data;
+      } catch (error) {
+        this.apiCache.delete(cacheKey);
+        throw error;
       } finally {
         // Remove from pending requests
         this.pendingRequests.delete(cacheKey);
       }
     })();
-    
+
     // Store the promise to prevent concurrent requests
     this.pendingRequests.set(cacheKey, fetchPromise);
-    
+
     return await fetchPromise;
   }
 

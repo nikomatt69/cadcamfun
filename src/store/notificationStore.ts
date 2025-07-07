@@ -1,5 +1,10 @@
 // src/store/notificationStore.ts
 import { create } from "zustand";
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { getEnvironment } from '@/src/hooks/useTauri';
+
+const env = getEnvironment();
+const customFetch = env === 'desktop' ? tauriFetch : window.fetch;
 
 export interface Notification {
   id: string;
@@ -42,7 +47,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async (limit = 20, offset = 0, onlyUnread = false) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/notifications?limit=${limit}&offset=${offset}&onlyUnread=${onlyUnread}`);
+      const response = await customFetch(`/api/notifications?limit=${limit}&offset=${offset}&onlyUnread=${onlyUnread}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch notifications");
@@ -66,7 +71,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAsRead: async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      const response = await customFetch(`/api/notifications/${notificationId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -91,7 +96,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAllAsRead: async () => {
     try {
-      const response = await fetch("/api/notifications/mark-all-read", {
+      const response = await customFetch("/api/notifications/mark-all-read", {
         method: "POST"
       });
 
@@ -113,7 +118,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   deleteNotification: async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      const response = await customFetch(`/api/notifications/${notificationId}`, {
         method: "DELETE"
       });
 

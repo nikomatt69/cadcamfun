@@ -4,12 +4,13 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import { passkey } from "better-auth/plugins/passkey";
 import { magicLink } from "better-auth/plugins/magic-link";
+import { oAuthProxy } from "better-auth/plugins";
 
 export const auth = betterAuth({
   // Base URL configuration
   baseURL: process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
     ? "https://cadcamfun.xyz"
-    : "https://localhost:3000"),
+    : "http://localhost:3001"),
 
   // Database adapter
   database: prismaAdapter(prisma, {
@@ -32,9 +33,7 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      redirectURI: process.env.NODE_ENV === "production" 
-        ? "https://cadcamfun.xyz/api/auth/callback/github"
-        : "https://localhost:3000/api/auth/callback/github",
+      redirectURI: "https://cadcamfun.xyz/api/auth/callback/github",
     },
   },
 
@@ -50,10 +49,16 @@ export const auth = betterAuth({
 
   // Enhanced plugins for Tauri compatibility
   plugins: [
+    // OAuth Proxy - MUST BE FIRST
+    oAuthProxy({
+      productionURL: "https://cadcamfun.xyz",
+      currentURL: "http://localhost:3001",
+    }),
+
     // Passkeys - Perfect for desktop apps
     passkey({
       rpName: "CAD/CAM FUN",
-      rpID: process.env.NODE_ENV === "production" ? "cadcamfun.xyz" : "localhost",
+      rpID: process.env.NODE_ENV === "production" ? "http://localhost:3001" : "http://localhost:3001",
     }),
 
     // Magic Links - Email-based auth without redirects
@@ -63,15 +68,15 @@ export const auth = betterAuth({
         console.log(`\n🔗 MAGIC LINK for ${email}:`);
         console.log(`${url}`);
         console.log(`Copy this link to sign in\n`);
-        
+
         // Store in database for UI retrieval
         try {
-          const response = await fetch(`${process.env.NEXTAUTH_URL || 'https://localhost:3000'}/api/auth/magic-link/store`, {
+          const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3001'}/api/auth/magic-link/store`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, url }),
           });
-          
+
           console.log(`Magic link stored for UI display`);
         } catch (error) {
           console.log('Fallback: Magic link available in console only');

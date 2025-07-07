@@ -1,1 +1,0 @@
-(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[3265],{34766:function(n,u,_){(window.__NEXT_P=window.__NEXT_P||[]).push(["/opensearch.xml",function(){return _(93822)}])},93822:function(n,u,_){"use strict";_.r(u),_.d(u,{__N_SSP:function(){return t}});var t=!0;u.default=()=>null}},function(n){n.O(0,[2888,9774,179],function(){return n(n.s=34766)}),_N_E=n.O()}]);

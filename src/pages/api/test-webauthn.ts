@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Test configuration
     const rpID = process.env.NODE_ENV === 'development' ? 'localhost' : 'cadcamfun.xyz';
-    const origin = process.env.NODE_ENV === 'development' ? 'https://localhost:3000' : 'https://cadcamfun.xyz';
+    const origin = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://cadcamfun.xyz';
 
     // Test basic option generation
     const options = await generateAuthenticationOptions({

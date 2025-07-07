@@ -1,9 +1,9 @@
 // src/hooks/useAnalytics.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
 import { ActivityItemType, ActivityAction } from "@/src/lib/activityTracking";
 import { useSession } from "@/src/lib/auth-client";
 import { analyticsCoordinator } from "@/src/lib/analyticsCoordinator";
+import { useTauri } from "./useTauri";
 
 interface AnalyticsFilters {
   startDate?: Date;
@@ -33,7 +33,8 @@ export function useAnalytics(filters: AnalyticsFilters = {}, options: { enablePo
   const [error, setError] = useState<any>(null);
   const pollerIdRef = useRef<string>(`analytics-${Math.random().toString(36).substr(2, 9)}`);
   const { data: session } = useSession();
-  
+  const { httpFetch } = useTauri();
+
   // Genera chiave cache basata sui filtri
   const getCacheKey = useCallback(() => {
     return JSON.stringify({
@@ -55,7 +56,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}, options: { enablePo
 
     const cacheKey = getCacheKey();
     const now = Date.now();
-    
+
     // Controlla cache se non è un refresh forzato
     if (!forceRefresh) {
       const cached = analyticsCache.get(cacheKey);
@@ -96,20 +97,28 @@ export function useAnalytics(filters: AnalyticsFilters = {}, options: { enablePo
         params.append("userFilter", filters.userFilter);
       }
 
-      const response = await axios.get(`/api/analytics?${params.toString()}`, {
-        timeout: 10000,
+      const response = await httpFetch(`/api/analytics?${params.toString()}`, {
+        method: 'GET',
         headers: { "Cache-Control": "no-cache" }
       });
-      
-      const responseData = response.data;
+
+      if (!response.ok) {
+        // Handle non-ok responses
+        if (response.status === 401) {
+          throw new Error("Analytics fetch failed: User not authenticated");
+        }
+        throw new Error(`Analytics fetch failed with status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
       setData(responseData);
-      
+
       // Salva in cache
       analyticsCache.set(cacheKey, { data: responseData, timestamp: now });
-      
+
     } catch (err: any) {
       // Handle 401 errors specifically to avoid spamming
-      if (err?.response?.status === 401) {
+      if (err.message.includes("401") || err.message.includes("not authenticated")) {
         console.warn("Analytics fetch failed: User not authenticated");
         setError(null); // Don't show error for auth issues
       } else {
@@ -119,7 +128,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}, options: { enablePo
     } finally {
       setIsLoading(false);
     }
-  }, [filters, data, getCacheKey, session]);
+  }, [filters, data, getCacheKey, session, httpFetch]);
 
   useEffect(() => {
     // Only start polling if user is authenticated
@@ -181,6 +190,7 @@ export function useUserHistory(initialFilters: UserHistoryFilters = {}): UseUser
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<any>(null);
   const { data: session } = useSession();
+  const { httpFetch } = useTauri();
 
   const fetchHistory = useCallback(async () => {
     // Only fetch if user is authenticated
@@ -218,19 +228,29 @@ export function useUserHistory(initialFilters: UserHistoryFilters = {}): UseUser
         });
       }
 
-      const response = await axios.get(`/api/analytics/user-history?${params.toString()}`);
+      const response = await httpFetch(`/api/analytics/user-history?${params.toString()}`);
+
+      if (!response.ok) {
+        // Handle non-ok responses
+        if (response.status === 401) {
+          throw new Error("User history fetch failed: User not authenticated");
+        }
+        throw new Error(`User history fetch failed with status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
 
       if (filters.offset && filters.offset > 0) {
         setHistory(prev => ({
-          logs: [...prev.logs, ...response.data.logs],
-          total: response.data.total
+          logs: [...prev.logs, ...responseData.logs],
+          total: responseData.total
         }));
       } else {
-        setHistory(response.data);
+        setHistory(responseData);
       }
     } catch (err: any) {
       // Handle 401 errors specifically to avoid spamming
-      if (err?.response?.status === 401) {
+      if (err.message.includes("401") || err.message.includes("not authenticated")) {
         console.warn("User history fetch failed: User not authenticated");
         setError(null); // Don't show error for auth issues
       } else {
@@ -240,7 +260,7 @@ export function useUserHistory(initialFilters: UserHistoryFilters = {}): UseUser
     } finally {
       setIsLoading(false);
     }
-  }, [filters, session]);
+  }, [filters, session, httpFetch]);
 
   useEffect(() => {
     fetchHistory();

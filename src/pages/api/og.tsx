@@ -10,7 +10,7 @@ export const config = {
 // Adjust the path if necessary.
 async function getLogoData() {
   try {
-    const logoUrl = new URL("/logo.png", process.env.NEXTAUTH_URL || "https://localhost:3000");
+    const logoUrl = new URL("/logo.png", process.env.NEXTAUTH_URL || "http://localhost:3000");
     const response = await fetch(logoUrl.toString());
     if (!response.ok) throw new Error("Failed to fetch logo");
     const buffer = await response.arrayBuffer();

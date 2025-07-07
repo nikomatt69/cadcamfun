@@ -91,52 +91,52 @@ export default function App({ Component, pageProps, router }: AppProps) {
 
   return (
     <ErrorBoundary>
-        <AuthProvider>
-          <AuthLoadingProvider>
-            <AuthWrapper>
-              <LanguageProvider>
-            <MetaTags ogImage="/og-image.png" />
-            <main className={`${camFont.style.fontFamily} antialiased bg-white dark:bg-gray-900`}>
-              <div id="plugin-container-root" style={{ position: "relative", zIndex: 1000 }} />
-              <ThemeProvider>
-                <SubscriptionProvider>
-                  <NotificationProvider>
-                    <ToastProvider>
-                      <AnimatePresence mode="wait">
-                        <PageTransition key={router.route}>
-                          <PageViewTracker />
-                          <AnalyticsProvider>
-                            <CursorProvider>
-                              <MCPProvider>
-                                <ConstraintProvider>
-                                  <AIContextProvider addElementsToCanvas={addElements}>
-                                    {/* Add event handlers for CAD/CAM integration */}
-                                    <style jsx global>{`
+      <AuthProvider>
+        <AuthLoadingProvider>
+          <AuthWrapper>
+            <LanguageProvider>
+              <MetaTags ogImage="/og-image.png" />
+              <main className={`${camFont.style.fontFamily} antialiased bg-white dark:bg-gray-900`}>
+                <div id="plugin-container-root" style={{ position: "relative", zIndex: 1000 }} />
+                <ThemeProvider>
+                  <SubscriptionProvider>
+                    <NotificationProvider>
+                      <ToastProvider>
+                        <AnimatePresence mode="wait">
+                          <PageTransition key={router.route}>
+                            <PageViewTracker />
+                            <AnalyticsProvider>
+                              <CursorProvider>
+                                <MCPProvider>
+                                  <ConstraintProvider>
+                                    <AIContextProvider addElementsToCanvas={addElements}>
+                                      {/* Add event handlers for CAD/CAM integration */}
+                                      <style jsx global>{`
                                       body {
                                         font-family: ${camFont.style.fontFamily};
                                       }
                                     `}</style>
-                                    <ViewportMeta />
-                                    <PluginClientProvider>
-                                      <Component {...pageProps} />
-                                    </PluginClientProvider>
-                                  </AIContextProvider>
-                                </ConstraintProvider>
-                              </MCPProvider>
-                            </CursorProvider>
-                          </AnalyticsProvider>
-                          <PWAInstallPrompt />
-                        </PageTransition>
-                      </AnimatePresence>
-                    </ToastProvider>
-                  </NotificationProvider>
-                </SubscriptionProvider>
-              </ThemeProvider>
-            </main>
-              </LanguageProvider>
-            </AuthWrapper>
-          </AuthLoadingProvider>
-        </AuthProvider>
+                                      <ViewportMeta />
+                                      <PluginClientProvider>
+                                        <Component {...pageProps} />
+                                      </PluginClientProvider>
+                                    </AIContextProvider>
+                                  </ConstraintProvider>
+                                </MCPProvider>
+                              </CursorProvider>
+                            </AnalyticsProvider>
+                            <PWAInstallPrompt />
+                          </PageTransition>
+                        </AnimatePresence>
+                      </ToastProvider>
+                    </NotificationProvider>
+                  </SubscriptionProvider>
+                </ThemeProvider>
+              </main>
+            </LanguageProvider>
+          </AuthWrapper>
+        </AuthLoadingProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

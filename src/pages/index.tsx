@@ -9,10 +9,10 @@ import Loading from "../components/ui/Loading";
 import MetaTags from "../components/layout/Metatags";
 import ActivityChart from "../components/analytics/ActivityChart";
 import dynamic from "next/dynamic";
-import axios from "axios";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
 import { useAuthRedirect } from "@/src/hooks/useAuthRedirect";
+import { useTauri } from "../hooks/useTauri";
 
 // Holographic Card Component
 interface HolographicCardProps {
@@ -170,7 +170,10 @@ export default function Home() {
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   // Use enhanced auth redirect system
   const { isLoading: authLoading, canAccess, user } = useAuthRedirect({ requireAuth: true });
-  
+  const { httpFetch, isDesktop } = useTauri();
+
+  // In desktop environment, we simplify the interface by hiding analytics
+
   // Framer Motion scroll and spring animations
   const { scrollYProgress } = useScroll();
   const yHero = useTransform(scrollYProgress, [0, 0.3], [0, -50]);
@@ -227,7 +230,7 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch("/api/dashboard");
+      const response = await httpFetch("/api/dashboard");
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -248,8 +251,6 @@ export default function Home() {
   });
 
   const isAdmin = false;
-
-  // Use mock data if API isn't implemented yet
 
   // L'auth redirect viene gestito dal hook useAuthRedirect automaticamente
   const toggleChartType = () => {
@@ -312,120 +313,59 @@ export default function Home() {
   interface UserMetricsApiResponse {
     summary: UserMetricsSummary;
   }
-  const [metricsSummary, setMetricsSummary] = useState<UserMetricsSummary | null>(null);
-  const [isSummaryLoading, setIsSummaryLoading] = useState<boolean>(true);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [userMetrics, setUserMetrics] = useState<UserMetricsSummary | null>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // New analytics and system metrics state
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [lastActivity, setLastActivity] = useState<Activity | null>(null);
-  const [isMetricsLoading, setIsMetricsLoading] = useState(true);
+  const [loadingSystemMetrics, setLoadingSystemMetrics] = useState<boolean>(true);
 
   // Effect to fetch user metrics summary data con throttling
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
     const fetchMetricsSummary = async () => {
-      setIsSummaryLoading(true);
-      setSummaryError(null);
+      if (!user?.id) return;
       try {
-        const params = {
-          startDate: new Date().toISOString(),
-          endDate: new Date().toISOString()
-        };
-        const response = await axios.get<UserMetricsApiResponse>("/api/analytics/user-metrics", {
-          params,
-          headers: { "Cache-Control": "max-age=300" } // Cache per 5 minuti
-        });
-        if (response.data && response.data.summary) {
-          setMetricsSummary(response.data.summary);
-        } else {
-          throw new Error("Summary data not found in API response");
+        const response = await httpFetch(`/api/user/${user.id}/metrics-summary`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch user metrics summary");
         }
+        const data: UserMetricsApiResponse = await response.json();
+        setUserMetrics(data.summary);
       } catch (err) {
-        console.error("Failed to fetch user metrics summary:", err);
-        setSummaryError(err instanceof Error ? err.message : "Failed to load metrics summary");
+        console.error("Error fetching metrics summary:", err);
+        setError("Failed to load user metrics.");
       } finally {
-        setIsSummaryLoading(false);
+        setLoadingMetrics(false);
       }
     };
 
-    // Throttle chiamata con delay di 1 secondo
-    timeoutId = setTimeout(fetchMetricsSummary, 1000);
-    
-    return () => clearTimeout(timeoutId);
-  }, []);
+    fetchMetricsSummary();
+  }, [user?.id, httpFetch]);
 
   // Effect to fetch system metrics and analytics data
   useEffect(() => {
     const fetchSystemData = async () => {
-      setIsMetricsLoading(true);
+      if (!isAdmin) return;
+      setLoadingSystemMetrics(true);
       try {
-        // Fetch real system metrics con cache
-        const systemMetricsResponse = await axios.get<SystemMetrics>("/api/analytics/system-metrics", {
-          headers: { "Cache-Control": "max-age=120" } // Cache per 2 minuti
-        });
-
-        // Fetch analytics data con cache
-        const analyticsResponse = await axios.get<AnalyticsData>("/api/analytics/dashboard-data", {
-          headers: { "Cache-Control": "max-age=300" } // Cache per 5 minuti
-        });
-
-        // Fetch last activity con cache
-        const activityResponse = await axios.get<Activity[]>("/api/analytics/recent-activity", {
-          params: { limit: 1 },
-          headers: { "Cache-Control": "max-age=60" } // Cache per 1 minuto
-        });
-
-        if (systemMetricsResponse.data) {
-          setSystemMetrics(systemMetricsResponse.data);
+        const response = await httpFetch("/api/system/metrics");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch system metrics: ${response.statusText}`);
         }
-
-        if (analyticsResponse.data) {
-          setAnalyticsData(analyticsResponse.data);
-        }
-
-        if (activityResponse.data && activityResponse.data.length > 0) {
-          setLastActivity(activityResponse.data[0]);
-        }
-
-      } catch (error) {
-        console.error("Error fetching system data:", error);
-        // Set fallback data based on existing metrics summary
-        if (metricsSummary) {
-          setAnalyticsData({
-            components: {
-              total: metricsSummary.totalComponents || 0,
-              trend: 0,
-              recentActivity: 0
-            },
-            projects: {
-              total: metricsSummary.totalProjects || 0,
-              trend: 0,
-              activeProjects: 0
-            },
-            tools: {
-              total: metricsSummary.totalToolpaths || 0,
-              trend: 0,
-              mostUsed: "N/A"
-            },
-            materials: {
-              total: metricsSummary.totalCadDrawings || 0,
-              trend: 0,
-              lowStock: 0
-            }
-          });
-        }
+        const data: SystemMetrics = await response.json();
+        setSystemMetrics(data);
+      } catch (err) {
+        console.error("Error fetching system data:", err);
+        setError("Failed to load system metrics.");
       } finally {
-        setIsMetricsLoading(false);
+        setLoadingSystemMetrics(false);
       }
     };
-
-    if (user) {
-      fetchSystemData();
-    }
-  }, [user, metricsSummary]);
+    fetchSystemData();
+  }, [isAdmin, httpFetch]);
 
   // Real-time updates for system metrics - ridotto polling
   useEffect(() => {
@@ -433,11 +373,10 @@ export default function Home() {
 
     const interval = setInterval(async () => {
       try {
-        const response = await axios.get<SystemMetrics>("/api/analytics/system-metrics", {
-          headers: { "Cache-Control": "max-age=60" } // Cache per 60 secondi
-        });
-        if (response.data) {
-          setSystemMetrics(response.data);
+        const response = await httpFetch("/api/system/metrics");
+        if (response.ok) {
+          const data = await response.json();
+          setSystemMetrics(data);
         }
       } catch (error) {
         console.error("Error updating system metrics:", error);
@@ -445,7 +384,7 @@ export default function Home() {
     }, 5 * 60 * 1000); // Update ogni 5 minuti coordinato con altri analytics
 
     return () => clearInterval(interval);
-  }, [systemMetrics]);
+  }, [systemMetrics, httpFetch]);
 
   if (authLoading || !canAccess) {
     return (
@@ -606,8 +545,52 @@ export default function Home() {
             />
           </motion.div>
 
-          {/* Holographic Analytics Grid */}
-
+          {/* Holographic Analytics Grid - Hidden in Desktop */}
+          {!isDesktop && (
+            <motion.div
+              className="grid grid-cols-1 rounded-2xl md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, staggerChildren: 0.1 }}
+            >
+              {analyticsData && (
+                <>
+                  <MetricCard
+                    icon={Box}
+                    title="Components"
+                    value={analyticsData.components.total}
+                    change={`+${analyticsData.components.trend}%`}
+                    gradient="blue"
+                    delay={0}
+                  />
+                  <MetricCard
+                    icon={File}
+                    title="Projects"
+                    value={analyticsData.projects.total}
+                    change={`+${analyticsData.projects.trend}%`}
+                    gradient="purple"
+                    delay={0.1}
+                  />
+                  <MetricCard
+                    icon={Tool}
+                    title="Toolpaths"
+                    value={analyticsData.tools.total}
+                    change={`+${analyticsData.tools.trend}%`}
+                    gradient="green"
+                    delay={0.2}
+                  />
+                  <MetricCard
+                    icon={Layers}
+                    title="Materials"
+                    value={analyticsData.materials.total}
+                    change={`+${analyticsData.materials.trend}%`}
+                    gradient="orange"
+                    delay={0.3}
+                  />
+                </>
+              )}
+            </motion.div>
+          )}
 
           {/* Main application modules - Holographic Style */}
           <motion.div
@@ -750,174 +733,176 @@ export default function Home() {
             </Link>
           </motion.div>
 
-          {/* System Performance Metrics */}
-          <motion.div
-            className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
-            {/* System Performance Card */}
-            <HolographicCard className="" delay={0.4}>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 flex items-center justify-center mr-3">
-                      <Monitor className="h-5 w-5 text-cyan-600" />
+          {/* System Performance Metrics - Hidden in Desktop */}
+          {!isDesktop && (
+            <motion.div
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              {/* System Performance Card */}
+              <HolographicCard className="" delay={0.4}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 flex items-center justify-center mr-3">
+                        <Monitor className="h-5 w-5 text-cyan-600" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">System Performance</h3>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">System Performance</h3>
+                    <motion.div
+                      className="flex items-center text-green-600"
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Activity className="h-4 w-4" />
+                    </motion.div>
                   </div>
-                  <motion.div
-                    className="flex items-center text-green-600"
-                    animate={{ rotate: [0, 360] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Activity className="h-4 w-4" />
-                  </motion.div>
-                </div>
 
-                {systemMetrics && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      {/* CPU Usage */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">CPU</span>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.cpuUsage}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <motion.div
-                            className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${systemMetrics.cpuUsage}%` }}
-                            transition={{ duration: 1, delay: 0.5 }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Memory Usage */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">Memory</span>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.memoryUsage}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <motion.div
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${systemMetrics.memoryUsage}%` }}
-                            transition={{ duration: 1, delay: 0.6 }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Storage */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">Storage</span>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.storageUsed}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <motion.div
-                            className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${systemMetrics.storageUsed}%` }}
-                            transition={{ duration: 1, delay: 0.7 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* Network Latency */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Latency</span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.networkLatency}ms</span>
-                      </div>
-
-                      {/* Active Connections */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Connections</span>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.activeConnections}</span>
-                      </div>
-
-                      {/* Cache Hit Ratio */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Cache Hit</span>
-                        <span className="text-sm font-medium text-green-600">{systemMetrics.cacheHitRatio}%</span>
-                      </div>
-
-                      {/* Error Rate */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Error Rate</span>
-                        <span className="text-sm font-medium text-red-600">{systemMetrics.errorRate}%</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </HolographicCard>
-
-            {/* Last Activity Card */}
-            <HolographicCard className="" delay={0.5}>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 flex items-center justify-center mr-3">
-                      <Clock className="h-5 w-5 text-green-600" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Last Activity</h3>
-                  </div>
-                  <motion.div
-                    className="h-3 w-3 bg-green-500 rounded-full"
-                    animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                </div>
-
-                {lastActivity && (
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        {getActivityIcon(lastActivity)}
-                      </div>
-                      <div className="flex-1">
-                        <motion.p
-                          className="text-sm font-medium text-gray-900 dark:text-white"
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.6 }}
-                        >
-                          {lastActivity.action.charAt(0).toUpperCase() + lastActivity.action.slice(1)} {lastActivity.itemName}
-                        </motion.p>
-                        <motion.p
-                          className="text-xs text-gray-500 dark:text-gray-400"
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.7 }}
-                        >
-                          {formatDate(lastActivity.timestamp)}
-                        </motion.p>
-                      </div>
-                    </div>
-
-                    {analyticsData && (
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {systemMetrics && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        {/* CPU Usage */}
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Active Projects</p>
-                          <p className="text-lg font-bold text-gray-900 dark:text-white">{analyticsData.projects.activeProjects}</p>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-600 dark:text-gray-300">CPU</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.cpuUsage}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <motion.div
+                              className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${systemMetrics.cpuUsage}%` }}
+                              transition={{ duration: 1, delay: 0.5 }}
+                            />
+                          </div>
                         </div>
+
+                        {/* Memory Usage */}
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Recent Components</p>
-                          <p className="text-lg font-bold text-gray-900 dark:text-white">{analyticsData.components.recentActivity}</p>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-600 dark:text-gray-300">Memory</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.memoryUsage}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <motion.div
+                              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${systemMetrics.memoryUsage}%` }}
+                              transition={{ duration: 1, delay: 0.6 }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Storage */}
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-600 dark:text-gray-300">Storage</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.storageUsed}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <motion.div
+                              className="bg-gradient-to-r from-orange-500 to-red-500 h-2 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${systemMetrics.storageUsed}%` }}
+                              transition={{ duration: 1, delay: 0.7 }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      <div className="space-y-3">
+                        {/* Network Latency */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Latency</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.networkLatency}ms</span>
+                        </div>
+
+                        {/* Active Connections */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Connections</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{systemMetrics.activeConnections}</span>
+                        </div>
+
+                        {/* Cache Hit Ratio */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Cache Hit</span>
+                          <span className="text-sm font-medium text-green-600">{systemMetrics.cacheHitRatio}%</span>
+                        </div>
+
+                        {/* Error Rate */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-300">Error Rate</span>
+                          <span className="text-sm font-medium text-red-600">{systemMetrics.errorRate}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </HolographicCard>
+
+              {/* Last Activity Card */}
+              <HolographicCard className="" delay={0.5}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 flex items-center justify-center mr-3">
+                        <Clock className="h-5 w-5 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Last Activity</h3>
+                    </div>
+                    <motion.div
+                      className="h-3 w-3 bg-green-500 rounded-full"
+                      animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
                   </div>
-                )}
-              </div>
-            </HolographicCard>
-          </motion.div>
+
+                  {lastActivity && (
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          {getActivityIcon(lastActivity)}
+                        </div>
+                        <div className="flex-1">
+                          <motion.p
+                            className="text-sm font-medium text-gray-900 dark:text-white"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.6 }}
+                          >
+                            {lastActivity.action.charAt(0).toUpperCase() + lastActivity.action.slice(1)} {lastActivity.itemName}
+                          </motion.p>
+                          <motion.p
+                            className="text-xs text-gray-500 dark:text-gray-400"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.7 }}
+                          >
+                            {formatDate(lastActivity.timestamp)}
+                          </motion.p>
+                        </div>
+                      </div>
+
+                      {analyticsData && (
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Active Projects</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{analyticsData.projects.activeProjects}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Recent Components</p>
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{analyticsData.components.recentActivity}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </HolographicCard>
+            </motion.div>
+          )}
 
           {/* Resources and Quick Actions - Holographic Style */}
           <motion.div
@@ -980,7 +965,7 @@ export default function Home() {
                         <div>
                           <h4 className="font-medium text-gray-900 dark:text-white">Drawings</h4>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {metricsSummary?.totalCadDrawings || 0} CAD drawings
+                            {userMetrics?.totalCadDrawings || 0} CAD drawings
                           </p>
                         </div>
                       </Link>
@@ -1086,202 +1071,161 @@ export default function Home() {
             </div>
 
           </motion.div>
-          <motion.div
-            className="grid grid-cols-1 rounded-2xl md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, staggerChildren: 0.1 }}
-          >
-            {analyticsData && (
-              <>
-                <MetricCard
-                  icon={Box}
-                  title="Components"
-                  value={analyticsData.components.total}
-                  change={`+${analyticsData.components.trend}%`}
-                  gradient="blue"
-                  delay={0}
-                />
-                <MetricCard
-                  icon={File}
-                  title="Projects"
-                  value={analyticsData.projects.total}
-                  change={`+${analyticsData.projects.trend}%`}
-                  gradient="purple"
-                  delay={0.1}
-                />
-                <MetricCard
-                  icon={Tool}
-                  title="Toolpaths"
-                  value={analyticsData.tools.total}
-                  change={`+${analyticsData.tools.trend}%`}
-                  gradient="green"
-                  delay={0.2}
-                />
-                <MetricCard
-                  icon={Layers}
-                  title="Materials"
-                  value={analyticsData.materials.total}
-                  change={`+${analyticsData.materials.trend}%`}
-                  gradient="orange"
-                  delay={0.3}
-                />
-              </>
-            )}
-          </motion.div>
 
 
-          {/* Analytics Dashboard - Enhanced */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-          >
-            <HolographicCard className="rounded-xl flex flex-col overflow-auto z-30" delay={0.8}>
-              <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 flex items-center justify-center mr-3">
-                      <BarChart2 className="h-5 w-5 text-indigo-600" />
+          {/* Analytics Dashboard - Enhanced - Hidden in Desktop */}
+          {!isDesktop && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
+            >
+              <HolographicCard className="rounded-xl flex flex-col overflow-auto z-30" delay={0.8}>
+                <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 flex items-center justify-center mr-3">
+                        <BarChart2 className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Analytics Dashboard</h2>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Analytics Dashboard</h2>
+                    <motion.button
+                      onClick={toggleChartType}
+                      className="flex items-center cursor-pointer z-60 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-white/50 dark:bg-gray-800/50 px-3 py-2 rounded-2xl border-0 transition-all duration-300"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      tabIndex={0}
+                    >
+                      {chartType === "line" ? <BarChart2 className="h-4 w-4 mr-2" /> : <TrendingUp className="h-4 w-4 mr-2" />}
+                      {chartType === "line" ? "Bar Chart" : "Line Chart"}
+                    </motion.button>
                   </div>
-                  <motion.button
-                    onClick={toggleChartType}
-                    className="flex items-center cursor-pointer z-60 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-white/50 dark:bg-gray-800/50 px-3 py-2 rounded-2xl border-0 transition-all duration-300"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    tabIndex={0}
-                  >
-                    {chartType === "line" ? <BarChart2 className="h-4 w-4 mr-2" /> : <TrendingUp className="h-4 w-4 mr-2" />}
-                    {chartType === "line" ? "Bar Chart" : "Line Chart"}
-                  </motion.button>
                 </div>
-              </div>
 
-              <div className="p-6 bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-cyan-50/30 dark:from-gray-800/30 dark:via-gray-900/20 dark:to-gray-800/30">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  {/* Activity Overview */}
-                  <div className="lg:col-span-2">
+                <div className="p-6 bg-gradient-to-br from-blue-50/30 via-purple-50/20 to-cyan-50/30 dark:from-gray-800/30 dark:via-gray-900/20 dark:to-gray-800/30">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Activity Overview */}
+                    <div className="lg:col-span-2">
+                      <motion.div
+                        className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border-0"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.9 }}
+                      >
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Activity Trends</h3>
+                          <motion.div
+                            className="flex items-center text-green-600"
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          >
+                            <Wifi className="h-4 w-4 mr-1" />
+                            <span className="text-sm">Live</span>
+                          </motion.div>
+                        </div>
+                        <ActivityChart startDate={dateRange.startDate} endDate={dateRange.endDate} chartType={chartType} />
+                      </motion.div>
+                    </div>
+
+                    {/* Real-time Stats */}
                     <motion.div
                       className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border-0"
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.9 }}
+                      transition={{ delay: 1.0 }}
                     >
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Activity Trends</h3>
-                        <motion.div
-                          className="flex items-center text-green-600"
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <Wifi className="h-4 w-4 mr-1" />
-                          <span className="text-sm">Live</span>
-                        </motion.div>
-                      </div>
-                      <ActivityChart startDate={dateRange.startDate} endDate={dateRange.endDate} chartType={chartType} />
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Real-time Metrics</h3>
+
+                      {systemMetrics && analyticsData && (
+                        <div className="space-y-4">
+                          <motion.div
+                            className="p-4 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl"
+                            whileHover={{ scale: 1.02 }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-300">System Health</span>
+                              <motion.div
+                                className="h-2 w-2 bg-green-500 rounded-full"
+                                animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                              />
+                            </div>
+                            <div className="text-xl font-bold text-gray-900 dark:text-white">
+                              {100 - Math.round((systemMetrics.cpuUsage + systemMetrics.memoryUsage) / 2)}%
+                            </div>
+                            <div className="text-xs text-gray-500">Optimal Performance</div>
+                          </motion.div>
+
+                          <motion.div
+                            className="p-4 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl"
+                            whileHover={{ scale: 1.02 }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-300">Active Projects</span>
+                              <Zap className="h-4 w-4 text-green-600" />
+                            </div>
+                            <div className="text-xl font-bold text-gray-900 dark:text-white">
+                              {analyticsData.projects.activeProjects}
+                            </div>
+                            <div className="text-xs text-gray-500">Currently in progress</div>
+                          </motion.div>
+
+                          <motion.div
+                            className="p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl"
+                            whileHover={{ scale: 1.02 }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-300">Cache Efficiency</span>
+                              <Database className="h-4 w-4 text-purple-600" />
+                            </div>
+                            <div className="text-xl font-bold text-gray-900 dark:text-white">
+                              {systemMetrics.cacheHitRatio}%
+                            </div>
+                            <div className="text-xs text-gray-500">Hit ratio</div>
+                          </motion.div>
+                        </div>
+                      )}
                     </motion.div>
                   </div>
 
-                  {/* Real-time Stats */}
+                  {/* Performance Summary */}
                   <motion.div
                     className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border-0"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 1.0 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.1 }}
                   >
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Real-time Metrics</h3>
-
-                    {systemMetrics && analyticsData && (
-                      <div className="space-y-4">
-                        <motion.div
-                          className="p-4 bg-gradient-to-r from-blue-50/50 to-cyan-50/50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl"
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-gray-600 dark:text-gray-300">System Health</span>
-                            <motion.div
-                              className="h-2 w-2 bg-green-500 rounded-full"
-                              animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
-                              transition={{ duration: 2, repeat: Infinity }}
-                            />
-                          </div>
-                          <div className="text-xl font-bold text-gray-900 dark:text-white">
-                            {100 - Math.round((systemMetrics.cpuUsage + systemMetrics.memoryUsage) / 2)}%
-                          </div>
-                          <div className="text-xs text-gray-500">Optimal Performance</div>
-                        </motion.div>
-
-                        <motion.div
-                          className="p-4 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl"
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-gray-600 dark:text-gray-300">Active Projects</span>
-                            <Zap className="h-4 w-4 text-green-600" />
-                          </div>
-                          <div className="text-xl font-bold text-gray-900 dark:text-white">
-                            {analyticsData.projects.activeProjects}
-                          </div>
-                          <div className="text-xs text-gray-500">Currently in progress</div>
-                        </motion.div>
-
-                        <motion.div
-                          className="p-4 bg-gradient-to-r from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl"
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm text-gray-600 dark:text-gray-300">Cache Efficiency</span>
-                            <Database className="h-4 w-4 text-purple-600" />
-                          </div>
-                          <div className="text-xl font-bold text-gray-900 dark:text-white">
-                            {systemMetrics.cacheHitRatio}%
-                          </div>
-                          <div className="text-xs text-gray-500">Hit ratio</div>
-                        </motion.div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Performance Summary</h3>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        Last updated: {new Date().toLocaleTimeString()}
                       </div>
-                    )}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: "Response Time", value: `${systemMetrics?.responseTime || 0}ms`, color: "blue" },
+                        { label: "Uptime", value: "99.9%", color: "green" },
+                        { label: "Active Users", value: systemMetrics?.activeConnections || 0, color: "purple" },
+                        { label: "Data Processed", value: "2.4GB", color: "orange" }
+                      ].map((metric, index) => (
+                        <motion.div
+                          key={metric.label}
+                          className="text-center p-3 bg-gray-50/50 dark:bg-gray-700/50 rounded-2xl"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 1.2 + index * 0.1 }}
+                        >
+                          <div className={`text-lg font-bold text-${metric.color}-600`}>{metric.value}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{metric.label}</div>
+                        </motion.div>
+                      ))}
+                    </div>
                   </motion.div>
                 </div>
-
-                {/* Performance Summary */}
-                <motion.div
-                  className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border-0"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.1 }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Performance Summary</h3>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      Last updated: {new Date().toLocaleTimeString()}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { label: "Response Time", value: `${systemMetrics?.responseTime || 0}ms`, color: "blue" },
-                      { label: "Uptime", value: "99.9%", color: "green" },
-                      { label: "Active Users", value: systemMetrics?.activeConnections || 0, color: "purple" },
-                      { label: "Data Processed", value: "2.4GB", color: "orange" }
-                    ].map((metric, index) => (
-                      <motion.div
-                        key={metric.label}
-                        className="text-center p-3 bg-gray-50/50 dark:bg-gray-700/50 rounded-2xl"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 1.2 + index * 0.1 }}
-                      >
-                        <div className={`text-lg font-bold text-${metric.color}-600`}>{metric.value}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{metric.label}</div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              </div>
-            </HolographicCard>
-          </motion.div>
+              </HolographicCard>
+            </motion.div>
+          )}
 
           {/* Space at the end to ensure scrolling */}
           <div className="h-4 sm:h-6"></div>
