@@ -45,10 +45,10 @@ serde_json = "1.0"
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
-# HTTP client for API communication
-reqwest = { version = "0.12", features = ["json", "stream"] }
+# HTTP client for API communication with Better Auth + Neon
+reqwest = { version = "0.12", features = ["json", "stream", "cookies"] }
 
-# Database connectivity (SQLite for local storage)
+# Database connectivity (keeping SQLx for potential local operations)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "sqlite", "migrate", "chrono", "uuid"] }
 
 # Date and time handling
@@ -74,8 +74,11 @@ directories = "5.0"
 # JWT handling for authentication
 jsonwebtoken = "9.0"
 
-# Password hashing
-argon2 = "0.5"
+# Environment variables support
+dotenv = "0.15"
+
+# URL encoding for API requests
+urlencoding = "2.1"
 
 # Cross-platform system information
 sysinfo = "0.30"
