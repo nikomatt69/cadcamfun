@@ -5,6 +5,7 @@ import Link from "next/link";
 import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
+import { useTauri } from "@/src/hooks/useTauri";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -12,13 +13,30 @@ export default function ForgotPassword() {
   const [status, setStatus] = useState<"form" | "success">("form");
   const [error, setError] = useState("");
 
+  const getHttpFetch = async () => {
+    if (typeof window !== 'undefined' && window) {
+      // Check if we're in Tauri environment
+      const isTauri = (window as any).__TAURI__ !== undefined;
+      if (isTauri) {
+        try {
+          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+          return tauriFetch;
+        } catch (error) {
+          console.warn('Failed to load Tauri fetch:', error);
+        }
+      }
+    }
+    return fetch;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
     try {
-      const response = await fetch("/api/auth/forgot-password", {
+      const httpFetch = await getHttpFetch();
+      const response = await httpFetch("/api/auth/forgot-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

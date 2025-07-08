@@ -8,7 +8,7 @@ const Sitemap = () => {
 };
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
-  const baseUrl = process.env.NEXTAUTH_URL || "https://localhost:3000";
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
   // Define static routes
   const staticPages = [
@@ -54,8 +54,8 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
     <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
       ${staticPages
-        .map(page => {
-          return `
+      .map(page => {
+        return `
             <url>
               <loc>${baseUrl}${page}</loc>
               <lastmod>${new Date().toISOString()}</lastmod>
@@ -63,11 +63,11 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
               <priority>${page === "" ? "1.0" : "0.8"}</priority>
             </url>
           `;
-        })
-        .join("")}
+      })
+      .join("")}
       ${projects
-        .map(({ id, updatedAt }) => {
-          return `
+      .map(({ id, updatedAt }) => {
+        return `
             <url>
               <loc>${baseUrl}/projects/${id}</loc>
               <lastmod>${new Date(updatedAt).toISOString()}</lastmod>
@@ -75,11 +75,11 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
               <priority>0.7</priority>
             </url>
           `;
-        })
-        .join("")}
+      })
+      .join("")}
       ${components
-        .map(({ id, updatedAt }) => {
-          return `
+      .map(({ id, updatedAt }) => {
+        return `
             <url>
               <loc>${baseUrl}/components/${id}</loc>
               <lastmod>${new Date(updatedAt).toISOString()}</lastmod>
@@ -87,11 +87,11 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
               <priority>0.6</priority>
             </url>
           `;
-        })
-        .join("")}
+      })
+      .join("")}
       ${organizations
-        .map(({ id, updatedAt }) => {
-          return `
+      .map(({ id, updatedAt }) => {
+        return `
             <url>
               <loc>${baseUrl}/organizations/${id}</loc>
               <lastmod>${new Date(updatedAt).toISOString()}</lastmod>
@@ -99,8 +99,8 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
               <priority>0.6</priority>
             </url>
           `;
-        })
-        .join("")}
+      })
+      .join("")}
     </urlset>
   `;
 

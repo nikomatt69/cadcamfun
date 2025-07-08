@@ -9,7 +9,7 @@ export type MCPEnvironment = "production" | "development";
 
 export function getMCPEndpoints(env: MCPEnvironment) {
   return {
-    baseUrl: env === "production" ? "https://cadcamfun.xyz/api/mcp" : "https://localhost:3000/api/mcp",
+    baseUrl: env === "production" ? "https://cadcamfun.xyz/api/mcp" : "http://localhost:3000/api/mcp",
     authEndpoint: "/auth/v1",
     resourceEndpoint: "/resources/v2"
   };

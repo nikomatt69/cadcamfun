@@ -28,6 +28,15 @@ tauri-plugin-notification = "2.0"
 tauri-plugin-os = "2.0"
 tauri-plugin-process = "2.0"
 tauri-plugin-shell = "2.0"
+tauri-plugin-updater = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-global-shortcut = "2.0"
+tauri-plugin-store = "2.0"
+tauri-plugin-window-state = "2.0"
+tauri-plugin-single-instance = "2.0"
+tauri-plugin-log = "2.0"
+tauri-plugin-sql = { version = "2.0", features = ["postgres"] }
+tauri-plugin-deep-link = "2.0"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -113,4 +122,3 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
-panic = "abort"

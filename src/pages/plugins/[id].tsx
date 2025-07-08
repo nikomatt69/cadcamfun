@@ -729,7 +729,7 @@ export const getServerSideProps: GetServerSideProps<PluginPageProps> = async con
 
   try {
     // Fetch from the API endpoint that should return the combined registry data + manifest
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const apiUrl = `${baseUrl}/api/plugins/${pluginId}`;
     console.log(`[SSR Plugin ${pluginId}] Fetching from: ${apiUrl}`);
 

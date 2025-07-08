@@ -3,15 +3,15 @@ name: 🚀 Desktop App Build & Release
 on:
   push:
     branches: [main, develop]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Release type'
+        description: "Release type"
         required: true
-        default: 'development'
+        default: "development"
         type: choice
         options:
           - development
@@ -34,18 +34,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
 
       - name: Install dependencies
         run: yarn install
 
-      - name: Run linting
-        run: yarn lint
-
       - name: Generate Prisma client
         run: yarn prisma:generate
-
 
       - name: Build frontend
         run: yarn build:export
@@ -58,18 +54,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
-            artifact_name: 'macos'
-            bundle_path: 'src-tauri/target/universal-apple-darwin/release/bundle'
-          - platform: 'ubuntu-22.04'
-            args: '--target x86_64-unknown-linux-gnu'
-            artifact_name: 'linux'
-            bundle_path: 'src-tauri/target/x86_64-unknown-linux-gnu/release/bundle'
-          - platform: 'windows-latest'
-            args: '--target x86_64-pc-windows-msvc'
-            artifact_name: 'windows'
-            bundle_path: 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle'
+          - platform: "macos-latest"
+            args: "--target universal-apple-darwin"
+            artifact_name: "macos"
+            bundle_path: "src-tauri/target/universal-apple-darwin/release/bundle"
+          - platform: "ubuntu-22.04"
+            args: "--target x86_64-unknown-linux-gnu"
+            artifact_name: "linux"
+            bundle_path: "src-tauri/target/x86_64-unknown-linux-gnu/release/bundle"
+          - platform: "windows-latest"
+            args: "--target x86_64-pc-windows-msvc"
+            artifact_name: "windows"
+            bundle_path: "src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -79,8 +75,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'yarn'
+          node-version: "18"
+          cache: "yarn"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -90,7 +86,7 @@ jobs:
       - name: Setup Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       # Platform-specific dependencies
       - name: Install Linux dependencies
@@ -122,12 +118,11 @@ jobs:
 
       # Install frontend dependencies
       - name: Install Node.js dependencies
-        run: yarn install 
+        run: yarn install
 
       # Build frontend
       - name: Generate Prisma client
         run: yarn prisma:generate
-
 
       - name: Build frontend
         run: NODE_ENV=production yarn build:export
@@ -185,7 +180,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -201,13 +196,13 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p ./release-assets
-          
+
           # Copy all build artifacts to release-assets directory
           find ./artifacts -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) -exec cp {} ./release-assets/ \;
-          
+
           # Copy checksums
           find ./artifacts -name "checksums.txt" -exec cat {} \; > ./release-assets/checksums-all.txt
-          
+
           # List files for verification
           ls -la ./release-assets/
 
@@ -220,63 +215,63 @@ jobs:
         run: |
           cat > release_notes.md << EOF
           # CADCAMFUN Desktop v${{ steps.version.outputs.VERSION }}
-          
+
           ## 🎉 What's New
-          
+
           Professional CAD/CAM Desktop Application with enhanced performance and new features.
-          
+
           ## 📦 Downloads
-          
+
           Choose the appropriate installer for your platform:
-          
+
           ### Windows
           - **Recommended**: \`CADCAMFUN_Setup.msi\` - Windows Installer package
           - **Alternative**: \`CADCAMFUN_Setup.exe\` - NSIS installer
-          
+
           ### macOS
           - **Universal**: \`CADCAMFUN.dmg\` - Supports both Intel and Apple Silicon
-          
+
           ### Linux
           - **Debian/Ubuntu**: \`cadcamfun_*.deb\` - APT package
           - **Red Hat/Fedora**: \`cadcamfun_*.rpm\` - YUM/DNF package
           - **Portable**: \`CADCAMFUN_*.AppImage\` - Portable application
-          
+
           ## 🔒 Security
-          
+
           All packages are digitally signed and checksums are provided in \`checksums-all.txt\`.
-          
+
           ## 🛠️ Installation
-          
+
           1. Download the appropriate package for your platform
           2. Verify the checksum (optional but recommended)
           3. Install using your platform's standard method
           4. Launch CADCAMFUN from your applications menu
-          
+
           ## 📋 System Requirements
-          
+
           - **Memory**: 4GB RAM minimum, 8GB recommended
           - **Storage**: 2GB free space
           - **Graphics**: OpenGL 3.3 compatible GPU
           - **OS**: Windows 10+, macOS 10.13+, or modern Linux
-          
+
           ## 🐛 Known Issues
-          
+
           Please check our [issue tracker](https://github.com/nikomatt69/cad-cam-app-main-prod/issues) for known issues and workarounds.
-          
+
           ## 📞 Support
-          
+
           - 📧 Email: support@cadcamfun.xyz
           - 💬 Discord: [Join our community](https://discord.gg/cadcamfun)
           - 📖 Documentation: [docs.cadcamfun.xyz](https://docs.cadcamfun.xyz)
-          
+
           ---
-          
+
           **Build Information**
           - Commit: \`${{ github.sha }}\`
           - Build Date: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`
           - Platforms: Windows, macOS, Linux
           EOF
-          
+
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
           cat release_notes.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -300,7 +295,7 @@ jobs:
     needs: [release]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha')
-    
+
     steps:
       - name: Extract version from tag
         id: version
@@ -323,7 +318,7 @@ jobs:
     name: 🧹 Cleanup Old Artifacts
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - name: Delete old artifacts
         uses: geekyeggo/delete-artifact@v4

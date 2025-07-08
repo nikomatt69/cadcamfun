@@ -344,7 +344,8 @@ impl UpdateManager {
         
         // Restart the app
         self.app_handle.restart();
-        
+        // Note: The app will restart, so this code will never be reached
+        #[allow(unreachable_code)]
         Ok(())
     }
 

@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const io = new SocketIOServer((res.socket as any).server, {
     path: "/api/websocket",
     cors: {
-      origin: process.env.NEXTAUTH_URL || "https://localhost:3000",
+      origin: process.env.NEXTAUTH_URL || "http://localhost:3000",
       methods: ["GET", "POST"],
       credentials: true
     }

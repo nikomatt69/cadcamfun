@@ -14,10 +14,27 @@ export default function MagicLinkVerify() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'expired'>('loading');
   const [message, setMessage] = useState('');
 
+  // Safe fetch function that works in both environments
+  const getHttpFetch = async () => {
+    if (typeof window !== 'undefined' && window) {
+      // Check if we're in Tauri environment
+      const isTauri = (window as any).__TAURI__ !== undefined;
+      if (isTauri) {
+        try {
+          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+          return tauriFetch;
+        } catch (error) {
+          console.warn('Failed to load Tauri fetch:', error);
+        }
+      }
+    }
+    return fetch;
+  };
+
   useEffect(() => {
     const verifyToken = async () => {
       const { token, email } = router.query;
-      
+
       if (!token || !email) {
         setStatus('error');
         setMessage('Invalid magic link');
@@ -25,31 +42,33 @@ export default function MagicLinkVerify() {
       }
 
       try {
-        const response = await fetch('/api/auth/magic-link/verify', {
+        const httpFetch = await getHttpFetch();
+        const response = await httpFetch('/api/auth/magic-link/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, email }),
           credentials: 'include'
         });
 
-        const result = await response.json();
+        const result = await response;
 
-        if (response.ok && result.success) {
+        if (response.ok) {
+          const result = await response.json();
           setStatus('success');
           setMessage('Successfully signed in!');
-          
+
           // Refresh session and redirect
           await refreshSession();
           setTimeout(() => {
             router.push('/');
           }, 2000);
         } else {
-          if (result.error?.includes('expired')) {
+          if (result.headers.get('expired')) {
             setStatus('expired');
             setMessage('Magic link has expired');
           } else {
             setStatus('error');
-            setMessage(result.error || 'Invalid magic link');
+            setMessage(result.headers.get('error') || 'Invalid magic link');
           }
         }
       } catch (error) {
@@ -71,7 +90,7 @@ export default function MagicLinkVerify() {
         description="Verifying your secure sign-in link"
       />
       <Navbar />
-      
+
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 flex items-center justify-center py-12 px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -79,7 +98,7 @@ export default function MagicLinkVerify() {
           className="max-w-md w-full"
         >
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-8 text-center">
-            
+
             {status === 'loading' && (
               <>
                 <motion.div
@@ -161,7 +180,7 @@ export default function MagicLinkVerify() {
           </div>
         </motion.div>
       </div>
-      
+
       <Footer />
     </>
   );

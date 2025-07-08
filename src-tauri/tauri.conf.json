@@ -6,12 +6,28 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build:export",
-    "devUrl": "http://localhost:5661",
+    "devUrl": "http://localhost:3000",
     "frontendDist": "../out"
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://cadcamfun.xyz/api/updates"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cadcamfun"]
+      }
+    }
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "fullscreen": false,
         "resizable": true,
         "title": "CAD/CAM FUN - Professional CAD/CAM Software",
@@ -46,6 +62,9 @@
           "'unsafe-inline'",
           "localhost:*",
           "127.0.0.1:*",
+          "http://localhost:3000",
+          "https://localhost:3000",
+          "tauri:",
           "cadcamfun.xyz",
           "*.cadcamfun.xyz"
         ],
@@ -58,13 +77,19 @@
           "https://cadcamfun.xyz",
           "wss://cadcamfun.xyz",
           "https://api.openai.com",
-          "https://api.anthropic.com"
+          "https://api.anthropic.com",
+          "https://github.com",
+          "https://api.github.com",
+          "cadcamfun:",
+          "ipc:",
+          "tauri:"
         ],
         "img-src": [
           "'self'",
           "data:",
           "blob:",
           "https:",
+          "tauri:",
           "localhost:*",
           "127.0.0.1:*"
         ],
@@ -73,6 +98,7 @@
           "'unsafe-inline'",
           "https:",
           "localhost:*",
+          "tauri:",
           "127.0.0.1:*"
         ],
         "font-src": [
@@ -119,100 +145,6 @@
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": ""
-    }
-  },
-  "plugins": {
-    "dialog": {
-      "all": true,
-      "ask": true,
-      "confirm": true,
-      "message": true,
-      "open": true,
-      "save": true
-    },
-    "fs": {
-      "all": true,
-      "readFile": true,
-      "writeFile": true,
-      "readDir": true,
-      "copyFile": true,
-      "createDir": true,
-      "removeDir": true,
-      "removeFile": true,
-      "renameFile": true,
-      "exists": true,
-      "scope": [
-        "$HOME/**",
-        "$APPDATA/**",
-        "$APPLOCALDATA/**",
-        "$APPCONFIG/**",
-        "$APPLOG/**",
-        "$APPCACHE/**",
-        "$TEMP/**",
-        "$DESKTOP/**",
-        "$DOCUMENT/**",
-        "$DOWNLOAD/**",
-        "$PICTURE/**",
-        "$VIDEO/**",
-        "$AUDIO/**"
-      ]
-    },
-    "path": {
-      "all": true
-    },
-    "clipboard": {
-      "all": true,
-      "readText": true,
-      "writeText": true
-    },
-    "globalShortcut": {
-      "all": true
-    },
-    "notification": {
-      "all": true
-    },
-    "app": {
-      "all": true,
-      "show": true,
-      "hide": true
-    },
-    "menu": {
-      "all": true
-    },
-    "tray": {
-      "all": true
-    },
-    "nativeIcon": {
-      "all": true
-    },
-    "process": {
-      "all": false,
-      "relaunch": true,
-      "exit": true
-    },
-    "os": {
-      "all": true
-    },
-    "http": {
-      "all": true,
-      "request": true,
-      "scope": [
-        "http://localhost:*",
-        "https://localhost:*",
-        "http://127.0.0.1:*",
-        "https://127.0.0.1:*",
-        "https://cadcamfun.xyz/**",
-        "https://*.cadcamfun.xyz/**",
-        "https://api.openai.com/**",
-        "https://api.anthropic.com/**"
-      ]
-    },
-    "shell": {
-      "all": false,
-      "open": true
-    },
-    "window": {
-      "all": true
     }
   }
 }

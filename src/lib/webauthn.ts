@@ -1,5 +1,5 @@
-import { 
-  generateRegistrationOptions, 
+import {
+  generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
   verifyAuthenticationResponse
@@ -8,8 +8,8 @@ import { prisma } from './prisma';
 
 const rpName = 'CAD/CAM FUN';
 const rpID = process.env.NODE_ENV === 'development' ? 'localhost' : 'cadcamfun.xyz';
-const origin = process.env.NODE_ENV === 'development' 
-  ? 'https://localhost:3000'
+const origin = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:3000'
   : 'https://cadcamfun.xyz';
 
 export async function generatePasskeyRegistration(userId: string) {
@@ -44,7 +44,7 @@ export async function generatePasskeyRegistration(userId: string) {
 }
 
 export async function verifyPasskeyRegistration(
-  userId: string, 
+  userId: string,
   response: any,
   expectedChallenge: string
 ) {

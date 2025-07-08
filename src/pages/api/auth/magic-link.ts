@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create magic link URL
     const baseURL = process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
       ? "https://cadcamfun.xyz"
-      : "https://localhost:3000");
+      : "http://localhost:3000");
 
     const magicLinkUrl = `${baseURL}/auth/magic-link/verify?token=${token}&email=${encodeURIComponent(email)}`;
 

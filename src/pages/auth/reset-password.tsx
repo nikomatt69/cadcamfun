@@ -5,6 +5,7 @@ import { KeyIcon, EyeIcon, EyeOffIcon, CheckCircleIcon } from "lucide-react";
 import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
+import { useTauri } from "@/src/hooks/useTauri";
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -17,6 +18,21 @@ export default function ResetPassword() {
   const [status, setStatus] = useState<"form" | "success" | "error">("form");
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const getHttpFetch = async () => {
+    if (typeof window !== 'undefined' && window) {
+      // Check if we're in Tauri environment
+      const isTauri = (window as any).__TAURI__ !== undefined;
+      if (isTauri) {
+        try {
+          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
+          return tauriFetch;
+        } catch (error) {
+          console.warn('Failed to load Tauri fetch:', error);
+        }
+      }
+    }
+    return fetch;
+  };
 
   useEffect(() => {
     if (!token) {
@@ -53,7 +69,8 @@ export default function ResetPassword() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/reset-password", {
+      const httpFetch = await getHttpFetch();
+      const response = await httpFetch("/api/auth/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
