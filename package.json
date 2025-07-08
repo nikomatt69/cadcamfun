@@ -43,6 +43,7 @@
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@chakra-ui/react": "^3.17.0",
+    "@daveyplate/better-auth-tauri": "^0.0.24",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@google-cloud/translate": "^9.0.1",
