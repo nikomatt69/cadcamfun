@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { ratelimit } from '@/lib/ratelimit';
+import { auth } from '../../../../lib/auth';
+import { prisma } from '../../../../lib/prisma';
+import { rateLimiters } from '../../../../lib/rateLimit';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -32,10 +32,10 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse<ProjectData | ProjectData[]>>
 ) {
-  try {
-    // Rate limiting per IP
-    const identifier = req.ip || 'anonymous';
-    const { success: rateLimitSuccess } = await ratelimit.limit(identifier);
+      try {
+      // Rate limiting per IP
+      const rateLimitResult = await rateLimiters.api.isAllowed(req);
+      const rateLimitSuccess = rateLimitResult.allowed;
     
     if (!rateLimitSuccess) {
       return res.status(429).json({
@@ -129,7 +129,7 @@ async function handleGetProjects(
       }
     });
 
-    const projectsData: ProjectData[] = projects.map(project => ({
+    const projectsData: ProjectData[] = projects.map((project: any) => ({
       id: project.id,
       name: project.name,
       description: project.description,
@@ -259,7 +259,7 @@ async function handleCreateProject(
     console.error('Create project error:', error);
     
     // Handle unique constraint violations
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return res.status(409).json({
         success: false,
         error: 'A project with this name already exists'

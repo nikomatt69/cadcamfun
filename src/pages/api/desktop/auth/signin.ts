@@ -1,9 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { ratelimit } from '@/lib/ratelimit';
+import { auth } from '../../../../lib/auth';
+import { prisma } from '../../../../lib/prisma';
+import * as jose from 'jose';
+import * as bcrypt from 'bcryptjs';
+import { rateLimiters } from '../../../../lib/rateLimit';
 
 interface DesktopSignInRequest {
   email: string;
@@ -41,8 +41,9 @@ export default async function handler(
 
   try {
     // Rate limiting per IP
-    const identifier = req.ip || 'anonymous';
-    const { success: rateLimitSuccess } = await ratelimit.limit(identifier);
+    const identifier = req.headers['x-forwarded-for'] as string || req.connection?.remoteAddress || 'anonymous';
+    const rateLimitResult = await rateLimiters.auth.isAllowed(req);
+    const rateLimitSuccess = rateLimitResult.allowed;
     
     if (!rateLimitSuccess) {
       return res.status(429).json({
@@ -96,19 +97,18 @@ export default async function handler(
       throw new Error('JWT secret not configured');
     }
 
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        platform: 'desktop',
-        deviceId: deviceId || 'unknown',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 giorni
-      },
-      jwtSecret,
-      { algorithm: 'HS256' }
-    );
+    const secret = new TextEncoder().encode(jwtSecret);
+    const token = await new jose.SignJWT({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      platform: 'desktop',
+      deviceId: deviceId || 'unknown',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(secret);
 
     // Log dell'accesso desktop
     await prisma.activityLog.create({
@@ -120,7 +120,7 @@ export default async function handler(
         details: {
           platform: platform || 'desktop',
           deviceId: deviceId || 'unknown',
-          ip: req.ip,
+          ip: req.headers['x-forwarded-for'] as string || req.connection?.remoteAddress || 'anonymous',
           userAgent: req.headers['user-agent'],
         }
       }

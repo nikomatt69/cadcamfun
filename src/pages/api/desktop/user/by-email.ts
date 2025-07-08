@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { ratelimit } from '@/lib/ratelimit';
+import { auth } from '../../../../lib/auth';
+import { prisma } from '../../../../lib/prisma';
+import { rateLimiters } from '../../../../lib/rateLimit';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -30,10 +30,10 @@ export default async function handler(
     });
   }
 
-  try {
-    // Rate limiting per IP
-    const identifier = req.ip || 'anonymous';
-    const { success: rateLimitSuccess } = await ratelimit.limit(identifier);
+      try {
+      // Rate limiting per IP
+      const rateLimitResult = await rateLimiters.api.isAllowed(req);
+      const rateLimitSuccess = rateLimitResult.allowed;
     
     if (!rateLimitSuccess) {
       return res.status(429).json({
