@@ -10,7 +10,7 @@ export const auth = betterAuth({
   // Base URL configuration
   baseURL: process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
     ? "https://cadcamfun.xyz"
-    : "http://localhost:3001"),
+    : "http://localhost:3000"),
 
   // Database adapter
   database: prismaAdapter(prisma, {
@@ -35,7 +35,7 @@ export const auth = betterAuth({
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
       redirectURI: process.env.NODE_ENV === "production" 
         ? "https://cadcamfun.xyz/api/auth/callback/github"
-        : "http://localhost:3001/api/auth/callback/github",
+        : "http://localhost:3000/api/auth/callback/github",
     },
   },
 
