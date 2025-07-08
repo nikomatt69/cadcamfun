@@ -33,7 +33,9 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      redirectURI: "https://cadcamfun.xyz/api/auth/callback/github",
+      redirectURI: process.env.NODE_ENV === "production" 
+        ? "https://cadcamfun.xyz/api/auth/callback/github"
+        : "http://localhost:3001/api/auth/callback/github",
     },
   },
 
@@ -49,7 +51,7 @@ export const auth = betterAuth({
 
   // Enhanced plugins for Tauri compatibility
   plugins: [
-    // OAuth Proxy - MUST BE FIRST
+    // OAuth Proxy - Handles web OAuth flows (Tauri plugin integration will be added separately)
     oAuthProxy({
       productionURL: "https://cadcamfun.xyz",
       currentURL: "http://localhost:3001",
@@ -58,7 +60,7 @@ export const auth = betterAuth({
     // Passkeys - Perfect for desktop apps
     passkey({
       rpName: "CAD/CAM FUN",
-      rpID: process.env.NODE_ENV === "production" ? "http://localhost:3001" : "http://localhost:3001",
+      rpID: process.env.NODE_ENV === "production" ? "cadcamfun.xyz" : "localhost",
     }),
 
     // Magic Links - Email-based auth without redirects
@@ -83,6 +85,14 @@ export const auth = betterAuth({
         }
       },
     }),
+  ],
+
+  // Trusted origins for OAuth flows
+  trustedOrigins: [
+    "http://localhost:3001",
+    "https://cadcamfun.xyz", 
+    "https://github.com",
+    "cadcamfun://", // Add custom scheme for Tauri
   ],
 
   // Logging

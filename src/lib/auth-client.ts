@@ -2,6 +2,7 @@
 import { createAuthClient } from "better-auth/react";
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { open } from '@tauri-apps/plugin-shell';
+import { setupBetterAuthTauri, signInSocial } from "@daveyplate/better-auth-tauri";
 
 // Detect desktop environment
 const isDesktop = typeof window !== 'undefined' &&
@@ -28,6 +29,25 @@ export const authClient = createAuthClient({
     }
   }
 });
+
+// Initialize Tauri OAuth setup for desktop
+if (isDesktop) {
+  setupBetterAuthTauri({
+    authClient,
+    scheme: "cadcamfun",
+    debugLogs: process.env.NODE_ENV === "development",
+    onError: (error) => {
+      console.error("Tauri OAuth error:", error);
+    },
+    onSuccess: (result) => {
+      console.log("Tauri OAuth success:", result);
+      // Force session refresh after successful OAuth
+      if (sessionCache) {
+        sessionCache.isValid = false;
+      }
+    }
+  });
+}
 
 // Enhanced session management with caching and desktop compatibility
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -443,40 +463,40 @@ export const sendMagicLink = async (email: string) => {
   }
 };
 
-// GitHub OAuth functions
+// Enhanced GitHub OAuth functions with Tauri integration
 export const signInWithGitHub = async (callbackURL?: string) => {
   try {
-    const isDesktop = typeof window !== 'undefined' && (window as any).__TAURI__;
+    if (isDesktop) {
+      // Use better-auth-tauri for desktop OAuth
+      return await signInSocial({
+        authClient,
+        provider: "github",
+        callbackURL: callbackURL || "/"
+      });
+    } else {
+      // Web flow remains the same
+      const baseURL = window.location.origin || process.env.NEXTAUTH_URL;
 
-    const baseURL = isDesktop
-      ? 'http://localhost:3001'
-      : (window.location.origin || process.env.NEXTAUTH_URL);
+      const response = await unifiedFetch(`${baseURL}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'github',
+          callbackURL: callbackURL || '/'
+        }),
+        credentials: 'include'
+      });
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/sign-in/social`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: 'github',
-        callbackURL: callbackURL || '/'
-      }),
-      // credentials: 'include' non è necessario con il fetch di Tauri
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      // Se c'è un URL di reindirizzamento, aprilo
-      if (result.url) {
-        if (isDesktop) {
-          // Usa l'API shell di Tauri per aprire l'URL esterno
-          await open(result.url);
-        } else {
+      if (response.ok) {
+        const result = await response.json();
+        if (result.url) {
           window.location.href = result.url;
         }
+        return { data: result, error: false };
+      } else {
+        const errorData = await response.json();
+        return { data: errorData, error: true };
       }
-      return { data: result, error: false };
-    } else {
-      const errorData = await response.json();
-      return { data: errorData, error: true };
     }
   } catch (error) {
     console.error("GitHub sign in error:", error);
@@ -508,9 +528,12 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
 
     if (response.ok) {
       const result = await response.json();
-      // If there's a redirect URL, redirect the user
       if (result.url) {
-        window.location.href = result.url;
+        if (isDesktop) {
+          await open(result.url);
+        } else {
+          window.location.href = result.url;
+        }
       }
       return { data: result, error: false };
     } else {
@@ -518,7 +541,7 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
       return { data: errorData, error: true };
     }
   } catch (error) {
-    console.error("GitHub link account error:", error);
+    console.error("Link GitHub account error:", error);
     return {
       data: {
         success: false,
@@ -529,7 +552,7 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
   }
 };
 
-// Additional exports for compatibility
+// Utility hooks for easier usage
 export const useSignIn = () => ({ mutate: signIn });
 export const useSignUp = () => ({ mutate: signUp });
 

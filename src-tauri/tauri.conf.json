@@ -17,6 +17,11 @@
       ],
       "dialog": true,
       "pubkey": ""
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cadcamfun"]
+      }
     }
   },
   "app": {
@@ -73,6 +78,9 @@
           "wss://cadcamfun.xyz",
           "https://api.openai.com",
           "https://api.anthropic.com",
+          "https://github.com",
+          "https://api.github.com",
+          "cadcamfun:",
           "ipc:",
           "tauri:"
         ],

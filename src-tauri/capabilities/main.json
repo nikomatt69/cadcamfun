@@ -124,7 +124,12 @@
     "sql:allow-load",
     "sql:allow-execute",
     "sql:allow-select",
-    "sql:allow-close"
+    "sql:allow-close",
+    "deep-link:default",
+    "deep-link:allow-is-registered",
+    "deep-link:allow-register",
+    "deep-link:allow-unregister",
+    "deep-link:allow-get-current"
   ],
   "deny": []
 }
