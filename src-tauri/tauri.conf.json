@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build:export",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:3001",
     "frontendDist": "../out"
   },
   "plugins": {
@@ -72,6 +72,8 @@
           "'self'",
           "localhost:*",
           "127.0.0.1:*",
+          "http://localhost:3001",
+          "https://localhost:3001",
           "ws://localhost:*",
           "wss://localhost:*",
           "https://cadcamfun.xyz",
