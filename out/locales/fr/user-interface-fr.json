@@ -1,0 +1,163 @@
+{
+  "dialogs": {
+    "confirmation": {
+      "title": "Confirmation",
+      "message": "Êtes-vous sûr de vouloir continuer ?",
+      "yes": "Oui",
+      "no": "Non",
+      "cancel": "Annuler"
+    },
+    "delete": {
+      "title": "Confirmer la suppression",
+      "message": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+      "warning": "Cette action ne peut pas être annulée",
+      "confirm": "Supprimer",
+      "cancel": "Annuler"
+    },
+    "save": {
+      "title": "Enregistrer les modifications",
+      "message": "Voulez-vous enregistrer les modifications apportées ?",
+      "saveAndExit": "Enregistrer et quitter",
+      "dontSave": "Ne pas enregistrer",
+      "cancel": "Annuler"
+    },
+    "export": {
+      "title": "Exporter le projet",
+      "formats": "Formats d'exportation",
+      "options": "Options d'exportation",
+      "quality": "Qualité",
+      "resolution": "Résolution",
+      "includeMetadata": "Inclure les métadonnées",
+      "selectionOnly": "Sélection seulement",
+      "exportAs": "Exporter sous",
+      "cancel": "Annuler"
+    }
+  },
+  "notifications": {
+    "fileOperations": {
+      "saving": "Enregistrement en cours...",
+      "saved": "Fichier enregistré avec succès",
+      "savingFailed": "Erreur lors de l'enregistrement",
+      "importing": "Importation en cours...",
+      "imported": "Fichier importé avec succès",
+      "importFailed": "Erreur lors de l'importation",
+      "exporting": "Exportation en cours...",
+      "exported": "Fichier exporté avec succès",
+      "exportFailed": "Erreur lors de l'exportation",
+      "loading": "Chargement en cours...",
+      "loaded": "Fichier chargé avec succès",
+      "loadingFailed": "Erreur lors du chargement"
+    },
+    "actions": {
+      "processing": "Traitement en cours...",
+      "completed": "Opération terminée",
+      "failed": "Échec de l'opération",
+      "cancelled": "Opération annulée",
+      "undone": "Opération annulée",
+      "redone": "Opération rétablie"
+    },
+    "sharing": {
+      "generating": "Génération du lien de partage...",
+      "linkCopied": "Lien copié dans le presse-papiers",
+      "shareSuccess": "Projet partagé avec succès",
+      "shareFailed": "Impossible de partager le projet"
+    }
+  },
+  "tooltips": {
+    "tools": {
+      "select": "Sélectionner et modifier des objets",
+      "move": "Déplacer les objets sélectionnés",
+      "rotate": "Faire pivoter les objets sélectionnés",
+      "scale": "Redimensionner les objets sélectionnés",
+      "draw": "Dessiner de nouvelles formes",
+      "extrude": "Extruder le long d'un chemin ou d'une direction",
+      "cut": "Couper un objet avec un autre",
+      "fillet": "Créer des coins arrondis entre les arêtes",
+      "chamfer": "Créer des bords biseautés",
+      "pattern": "Créer des matrices de copies selon un motif",
+      "mirror": "Créer une copie en miroir",
+      "measure": "Mesurer des distances et des angles"
+    },
+    "actions": {
+      "save": "Enregistrer le projet actuel",
+      "undo": "Annuler la dernière opération",
+      "redo": "Rétablir l'opération précédente",
+      "group": "Grouper les objets sélectionnés",
+      "ungroup": "Dégrouper le groupe sélectionné",
+      "align": "Aligner les objets sélectionnés",
+      "distribute": "Distribuer uniformément les objets",
+      "lock": "Verrouiller les objets sélectionnés",
+      "unlock": "Déverrouiller les objets sélectionnés",
+      "hide": "Masquer les objets sélectionnés",
+      "show": "Afficher les objets masqués"
+    },
+    "view": {
+      "zoomIn": "Zoomer",
+      "zoomOut": "Dézoomer",
+      "zoomToFit": "Ajuster à la vue",
+      "panView": "Déplacer la vue",
+      "orbit": "Orbiter la vue 3D",
+      "front": "Vue de face",
+      "top": "Vue de dessus",
+      "right": "Vue de droite",
+      "perspective": "Vue en perspective",
+      "orthographic": "Vue orthographique"
+    }
+  },
+  "contextMenu": {
+    "general": {
+      "cut": "Couper",
+      "copy": "Copier",
+      "paste": "Coller",
+      "delete": "Supprimer",
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "properties": "Propriétés"
+    },
+    "object": {
+      "edit": "Modifier",
+      "duplicate": "Dupliquer",
+      "hide": "Masquer",
+      "lock": "Verrouiller",
+      "group": "Grouper",
+      "ungroup": "Dégrouper",
+      "bringToFront": "Mettre au premier plan",
+      "sendToBack": "Mettre à l'arrière-plan",
+      "convertTo": "Convertir en",
+      "addToLibrary": "Ajouter à la bibliothèque"
+    }
+  },
+  "shortcuts": {
+    "title": "Raccourcis clavier",
+    "fileOperations": {
+      "newProject": "Nouveau projet",
+      "openProject": "Ouvrir un projet",
+      "saveProject": "Enregistrer le projet",
+      "saveProjectAs": "Enregistrer le projet sous",
+      "importFile": "Importer un fichier",
+      "exportFile": "Exporter un fichier",
+      "print": "Imprimer"
+    },
+    "editOperations": {
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "cut": "Couper",
+      "copy": "Copier",
+      "paste": "Coller",
+      "delete": "Supprimer",
+      "selectAll": "Tout sélectionner",
+      "deselectAll": "Tout désélectionner",
+      "searchReplace": "Rechercher et remplacer"
+    },
+    "viewOperations": {
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "zoomToFit": "Ajuster à la vue",
+      "actualSize": "Taille réelle",
+      "toggleGrid": "Activer/désactiver la grille",
+      "toggleSnap": "Activer/désactiver l'accrochage",
+      "toggleRulers": "Activer/désactiver les règles",
+      "toggleWireframe": "Activer/désactiver le fil de fer"
+    }
+  }
+}

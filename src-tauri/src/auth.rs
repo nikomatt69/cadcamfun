@@ -17,7 +17,7 @@ pub struct Claims {
     pub aud: String, // Audience
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize ,Clone)]
 pub struct BetterAuthSession {
     pub id: String,
     pub user_id: String,
@@ -25,7 +25,7 @@ pub struct BetterAuthSession {
     pub user: BetterAuthUser,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize , Clone)]
 pub struct BetterAuthUser {
     pub id: String,
     pub name: Option<String>,

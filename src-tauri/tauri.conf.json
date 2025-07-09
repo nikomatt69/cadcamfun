@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build:export",
-    "devUrl": "http://localhost:3001",
+    "devUrl": "http://localhost:3000",
     "frontendDist": "../out"
   },
   "plugins": {
@@ -20,7 +20,22 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["cadcamfun"]
+        "schemes": [
+          "cadcamfun"
+        ]
+      }
+    },
+    "sql": {
+      "preload": [
+        "sqlite:cadcamfun.db"
+      ],
+      "postgres": {
+        "enabled": true,
+        "maxConnections": 10
+      },
+      "sqlite": {
+        "enabled": true,
+        "inMemory": false
       }
     }
   },

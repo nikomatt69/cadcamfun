@@ -1,10 +1,34 @@
 // src/store/notificationStore.ts
 import { create } from "zustand";
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { getEnvironment } from '@/src/hooks/useTauri';
 
-const env = getEnvironment();
-const customFetch = env === 'desktop' ? tauriFetch : window.fetch;
+// Dynamic import for Tauri fetch to avoid SSR issues
+let tauriFetch: any = null;
+
+const loadTauriFetch = async () => {
+  if (typeof window !== 'undefined' && getEnvironment() === 'desktop' && !tauriFetch) {
+    try {
+      const { fetch } = await import('@tauri-apps/plugin-http');
+      tauriFetch = fetch;
+    } catch (error) {
+      console.warn('Failed to load Tauri HTTP plugin:', error);
+    }
+  }
+};
+
+const getCustomFetch = async () => {
+  if (typeof window === 'undefined') {
+    // SSR environment
+    return fetch;
+  }
+  
+  const env = getEnvironment();
+  if (env === 'desktop') {
+    await loadTauriFetch();
+    return tauriFetch || fetch;
+  }
+  return window.fetch;
+};
 
 export interface Notification {
   id: string;
@@ -47,7 +71,8 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async (limit = 20, offset = 0, onlyUnread = false) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await customFetch(`/api/notifications?limit=${limit}&offset=${offset}&onlyUnread=${onlyUnread}`);
+      const fetchFn = await getCustomFetch();
+      const response = await fetchFn(`/api/notifications?limit=${limit}&offset=${offset}&onlyUnread=${onlyUnread}`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch notifications");
@@ -71,7 +96,8 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAsRead: async (notificationId: string) => {
     try {
-      const response = await customFetch(`/api/notifications/${notificationId}`, {
+      const fetchFn = await getCustomFetch();
+      const response = await fetchFn(`/api/notifications/${notificationId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -96,7 +122,8 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAllAsRead: async () => {
     try {
-      const response = await customFetch("/api/notifications/mark-all-read", {
+      const fetchFn = await getCustomFetch();
+      const response = await fetchFn("/api/notifications/mark-all-read", {
         method: "POST"
       });
 
@@ -118,7 +145,8 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
 
   deleteNotification: async (notificationId: string) => {
     try {
-      const response = await customFetch(`/api/notifications/${notificationId}`, {
+      const fetchFn = await getCustomFetch();
+      const response = await fetchFn(`/api/notifications/${notificationId}`, {
         method: "DELETE"
       });
 

@@ -7,30 +7,19 @@ import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useTauri } from "@/src/hooks/useTauri";
 
 export default function MagicLinkVerify() {
   const router = useRouter();
   const { refreshSession } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'expired'>('loading');
   const [message, setMessage] = useState('');
+  const { httpFetch } = useTauri();
+  const [isClient, setIsClient] = useState(false);
 
-  // Safe fetch function that works in both environments
-  const getHttpFetch = async () => {
-    if (typeof window !== 'undefined' && window) {
-      // Check if we're in Tauri environment
-      const isTauri = (window as any).__TAURI__ !== undefined;
-      if (isTauri) {
-        try {
-          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-          return tauriFetch;
-        } catch (error) {
-          console.warn('Failed to load Tauri fetch:', error);
-        }
-      }
-    }
-    return fetch;
-  };
-
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   useEffect(() => {
     const verifyToken = async () => {
       const { token, email } = router.query;
@@ -42,7 +31,6 @@ export default function MagicLinkVerify() {
       }
 
       try {
-        const httpFetch = await getHttpFetch();
         const response = await httpFetch('/api/auth/magic-link/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -50,10 +38,9 @@ export default function MagicLinkVerify() {
           credentials: 'include'
         });
 
-        const result = await response;
+        const result = await response.json();
 
-        if (response.ok) {
-          const result = await response.json();
+        if (response.ok && result.success) {
           setStatus('success');
           setMessage('Successfully signed in!');
 
@@ -63,12 +50,12 @@ export default function MagicLinkVerify() {
             router.push('/');
           }, 2000);
         } else {
-          if (result.headers.get('expired')) {
+          if (result.error?.includes('expired')) {
             setStatus('expired');
             setMessage('Magic link has expired');
           } else {
             setStatus('error');
-            setMessage(result.headers.get('error') || 'Invalid magic link');
+            setMessage(result.error || 'Invalid magic link');
           }
         }
       } catch (error) {
@@ -78,10 +65,10 @@ export default function MagicLinkVerify() {
       }
     };
 
-    if (router.isReady) {
+    if (isClient && router.isReady) {
       verifyToken();
     }
-  }, [router.isReady, router.query, refreshSession, router]);
+  }, [isClient, router.isReady, router.query, refreshSession, router, httpFetch]);
 
   return (
     <>

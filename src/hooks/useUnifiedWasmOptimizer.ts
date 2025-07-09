@@ -273,7 +273,7 @@ export function useUnifiedWasmOptimizer(
             frameTime: avgFrameTime,
             triangleCount: Math.floor(triangleCount),
             drawCalls,
-            memoryUsage: window.performance?.memory?.usedJSHeapSize || 0,
+            memoryUsage: (typeof window !== 'undefined' && window.performance?.memory?.usedJSHeapSize) || 0,
             gpuUsage: rendererRef.current.info.memory.textures + rendererRef.current.info.memory.geometries
           };
 

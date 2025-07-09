@@ -8,12 +8,10 @@ import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useTauri } from '@/src/hooks/useTauri';
 
 export default function SignUp() {
   const router = useRouter();
   const { signInWithGitHub } = useAuth();
-  const { httpFetch } = useTauri();
 
   // Redirect to waitlist for new registrations
 
@@ -76,7 +74,7 @@ export default function SignUp() {
     setServerError("");
 
     try {
-      const response = await httpFetch("/api/auth/signup", {
+      const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

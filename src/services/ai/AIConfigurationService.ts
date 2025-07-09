@@ -361,13 +361,15 @@ export class AIConfigurationService {
   private getAvailableFeatures(): string[] {
     const features = ["proactive-analysis", "insights-dashboard", "code-suggestions"];
 
-    // Add conditional features based on browser capabilities
-    if ("speechRecognition" in window || "webkitSpeechRecognition" in window) {
-      features.push("voice-interaction");
-    }
+    // Add conditional features based on browser capabilities (SSR-safe)
+    if (typeof window !== 'undefined') {
+      if ("speechRecognition" in window || "webkitSpeechRecognition" in window) {
+        features.push("voice-interaction");
+      }
 
-    if ("speechSynthesis" in window) {
-      features.push("speech-synthesis");
+      if ("speechSynthesis" in window) {
+        features.push("speech-synthesis");
+      }
     }
 
     return features;

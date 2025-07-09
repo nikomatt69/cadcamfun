@@ -73,9 +73,9 @@ interface MarketplaceState {
   createCheckout: (itemId: string) => Promise<string>;
 }
 
-// Scegli la funzione fetch corretta in base all'ambiente
+// Scegli la funzione fetch corretta in base all'ambiente (SSR-safe)
 const env = getEnvironment();
-const customFetch = env === 'desktop' ? tauriFetch : window.fetch;
+const customFetch = env === 'desktop' ? tauriFetch : (typeof window !== 'undefined' ? window.fetch : globalThis.fetch);
 
 export const useMarketplaceStore = create<MarketplaceState>()(
   subscribeWithSelector((set, get) => {

@@ -1,0 +1,163 @@
+{
+  "dialogs": {
+    "confirmation": {
+      "title": "Confirmation",
+      "message": "Are you sure you want to proceed?",
+      "yes": "Yes",
+      "no": "No",
+      "cancel": "Cancel"
+    },
+    "delete": {
+      "title": "Confirm Deletion",
+      "message": "Are you sure you want to delete this item?",
+      "warning": "This action cannot be undone",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "save": {
+      "title": "Save Changes",
+      "message": "Do you want to save the changes you made?",
+      "saveAndExit": "Save & Exit",
+      "dontSave": "Don't Save",
+      "cancel": "Cancel"
+    },
+    "export": {
+      "title": "Export Project",
+      "formats": "Export Formats",
+      "options": "Export Options",
+      "quality": "Quality",
+      "resolution": "Resolution",
+      "includeMetadata": "Include Metadata",
+      "selectionOnly": "Selection Only",
+      "exportAs": "Export As",
+      "cancel": "Cancel"
+    }
+  },
+  "notifications": {
+    "fileOperations": {
+      "saving": "Saving...",
+      "saved": "File saved successfully",
+      "savingFailed": "Error saving file",
+      "importing": "Importing...",
+      "imported": "File imported successfully",
+      "importFailed": "Error importing file",
+      "exporting": "Exporting...",
+      "exported": "File exported successfully",
+      "exportFailed": "Error exporting file",
+      "loading": "Loading...",
+      "loaded": "File loaded successfully",
+      "loadingFailed": "Error loading file"
+    },
+    "actions": {
+      "processing": "Processing...",
+      "completed": "Operation completed",
+      "failed": "Operation failed",
+      "cancelled": "Operation cancelled",
+      "undone": "Operation undone",
+      "redone": "Operation redone"
+    },
+    "sharing": {
+      "generating": "Generating sharing link...",
+      "linkCopied": "Link copied to clipboard",
+      "shareSuccess": "Project shared successfully",
+      "shareFailed": "Unable to share project"
+    }
+  },
+  "tooltips": {
+    "tools": {
+      "select": "Select and edit objects",
+      "move": "Move selected objects",
+      "rotate": "Rotate selected objects",
+      "scale": "Scale selected objects",
+      "draw": "Draw new shapes",
+      "extrude": "Extrude along a path or direction",
+      "cut": "Cut one object with another",
+      "fillet": "Create rounded corners between edges",
+      "chamfer": "Create beveled edges",
+      "pattern": "Create arrays of copies in a pattern",
+      "mirror": "Create a mirrored copy",
+      "measure": "Measure distances and angles"
+    },
+    "actions": {
+      "save": "Save current project",
+      "undo": "Undo last operation",
+      "redo": "Redo previous operation",
+      "group": "Group selected objects",
+      "ungroup": "Ungroup selected group",
+      "align": "Align selected objects",
+      "distribute": "Distribute objects evenly",
+      "lock": "Lock selected objects",
+      "unlock": "Unlock selected objects",
+      "hide": "Hide selected objects",
+      "show": "Show hidden objects"
+    },
+    "view": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "zoomToFit": "Zoom to fit",
+      "panView": "Pan view",
+      "orbit": "Orbit 3D view",
+      "front": "Front view",
+      "top": "Top view",
+      "right": "Right view",
+      "perspective": "Perspective view",
+      "orthographic": "Orthographic view"
+    }
+  },
+  "contextMenu": {
+    "general": {
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "delete": "Delete",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "properties": "Properties"
+    },
+    "object": {
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "hide": "Hide",
+      "lock": "Lock",
+      "group": "Group",
+      "ungroup": "Ungroup",
+      "bringToFront": "Bring to Front",
+      "sendToBack": "Send to Back",
+      "convertTo": "Convert To",
+      "addToLibrary": "Add to Library"
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "fileOperations": {
+      "newProject": "New Project",
+      "openProject": "Open Project",
+      "saveProject": "Save Project",
+      "saveProjectAs": "Save Project As",
+      "importFile": "Import File",
+      "exportFile": "Export File",
+      "print": "Print"
+    },
+    "editOperations": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "delete": "Delete",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "searchReplace": "Search & Replace"
+    },
+    "viewOperations": {
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "zoomToFit": "Zoom to Fit",
+      "actualSize": "Actual Size",
+      "toggleGrid": "Toggle Grid",
+      "toggleSnap": "Toggle Snap",
+      "toggleRulers": "Toggle Rulers",
+      "toggleWireframe": "Toggle Wireframe"
+    }
+  }
+}

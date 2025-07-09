@@ -1,0 +1,84 @@
+{
+  "home": {
+    "title": "CAD/CAM App",
+    "subtitle": "Design and Manufacturing Solution",
+    "description": "Professional CAD/CAM software for your design needs",
+    "welcome": "Welcome to CAD/CAM FUN",
+    "getStarted": "Get Started",
+    "recentProjects": "Recent Projects",
+    "featuredTools": "Featured Tools"
+  },
+  "navigation": {
+    "home": "Home",
+    "projects": "Projects",
+    "library": "Library",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Logout",
+    "help": "Help",
+    "documentation": "Documentation",
+    "tutorials": "Tutorials",
+    "community": "Community"
+  },
+  "actions": {
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "import": "Import",
+    "export": "Export",
+    "duplicate": "Duplicate",
+    "preview": "Preview",
+    "share": "Share",
+    "download": "Download",
+    "print": "Print",
+    "undo": "Undo",
+    "redo": "Redo",
+    "apply": "Apply",
+    "reset": "Reset"
+  },
+  "tools": {
+    "select": "Select",
+    "move": "Move",
+    "rotate": "Rotate",
+    "scale": "Scale",
+    "draw": "Draw",
+    "measure": "Measure",
+    "cut": "Cut",
+    "extrude": "Extrude",
+    "fillet": "Fillet",
+    "chamfer": "Chamfer",
+    "pattern": "Pattern",
+    "mirror": "Mirror",
+    "align": "Align",
+    "group": "Group",
+    "ungroup": "Ungroup"
+  },
+  "project": {
+    "new": "New Project",
+    "open": "Open Project",
+    "recent": "Recent Projects",
+    "templates": "Templates",
+    "settings": "Project Settings",
+    "properties": "Properties",
+    "history": "History",
+    "collaboration": "Collaboration",
+    "sharing": "Sharing"
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "notFound": "Item not found",
+    "permissionDenied": "Permission denied",
+    "connectionFailed": "Connection failed",
+    "fileNotSupported": "File not supported",
+    "invalidOperation": "Invalid operation"
+  },
+  "notifications": {
+    "saved": "Successfully saved",
+    "deleted": "Successfully deleted",
+    "exported": "Successfully exported",
+    "imported": "Successfully imported",
+    "updated": "Successfully updated"
+  }
+}

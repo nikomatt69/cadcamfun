@@ -8,12 +8,10 @@ import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAuthRedirect } from "@/src/hooks/useAuthRedirect";
-import { useTauri } from "@/src/hooks/useTauri";
 
 export default function SignIn() {
   const router = useRouter();
   const { signIn, signInWithPasskey, signInWithGitHub, sendMagicLink, authError, clearAuthError, isAuthenticated } = useAuth();
-  const { isDesktop } = useTauri();
 
   // Use redirect hook per gestire auth redirects intelligentemente
   const { isRedirecting } = useAuthRedirect();

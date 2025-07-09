@@ -81,7 +81,10 @@ export default function InvitationPage({ invitation, error, expired }: Invitatio
 
     router.push({
       pathname: "/auth/signin",
-      query: { email: invitation.email, redirect: window.location.pathname }
+      query: { 
+        email: invitation.email, 
+        redirect: typeof window !== 'undefined' ? window.location.pathname : '/' 
+      }
     });
   };
 
@@ -91,7 +94,10 @@ export default function InvitationPage({ invitation, error, expired }: Invitatio
 
     router.push({
       pathname: "/auth/signup",
-      query: { email: invitation.email, redirect: window.location.pathname }
+      query: { 
+        email: invitation.email, 
+        redirect: typeof window !== 'undefined' ? window.location.pathname : '/' 
+      }
     });
   };
 

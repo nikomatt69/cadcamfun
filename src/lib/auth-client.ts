@@ -1,53 +1,113 @@
 // src/lib/auth-client.ts
 import { createAuthClient } from "better-auth/react";
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import { open } from '@tauri-apps/plugin-shell';
-import { setupBetterAuthTauri, signInSocial } from "@daveyplate/better-auth-tauri";
 
-// Detect desktop environment
-const isDesktop = typeof window !== 'undefined' &&
-  (window.navigator.userAgent.includes('Tauri') ||
+// SSR-safe desktop environment detection
+const isDesktop = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  return (
+    window.navigator.userAgent.includes('Tauri') ||
     window.location.protocol === 'tauri:' ||
-    window.location.hostname === 'localhost' && window.location.port === '1420');
+    (window.location.hostname === 'localhost' && window.location.port === '1420')
+  );
+};
 
-// Unified fetch function that works in both web and desktop environments
-const unifiedFetch = isDesktop ? tauriFetch : fetch;
+// Dynamic imports for Tauri packages to avoid SSR issues
+let tauriFetch: any = null;
+let tauriOpen: any = null;
 
-export const authClient = createAuthClient({
-  baseURL: isDesktop
-    ? "http://localhost:3001"  // Desktop sempre usa localhost
-    : process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
-      ? "https://cadcamfun.xyz"
-      : "http://localhost:3001"),
+const loadTauriDeps = async () => {
+  if (isDesktop() && !tauriFetch) {
+    try {
+      const [httpPlugin, shellPlugin] = await Promise.all([
+        import('@tauri-apps/plugin-http'),
+        import('@tauri-apps/plugin-shell'),
 
-  // Enhanced configuration for desktop compatibility
-  fetchOptions: {
-    credentials: 'include', // Important for desktop cookie handling
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
+      ]);
+
+      tauriFetch = httpPlugin.fetch;
+      tauriOpen = shellPlugin.open;
+
+    } catch (error) {
+      console.warn('Failed to load Tauri plugins:', error);
     }
   }
-});
+};
 
-// Initialize Tauri OAuth setup for desktop
-if (isDesktop) {
-  setupBetterAuthTauri({
-    authClient,
-    scheme: "cadcamfun",
-    debugLogs: process.env.NODE_ENV === "development",
-    onError: (error) => {
-      console.error("Tauri OAuth error:", error);
-    },
-    onSuccess: (result) => {
-      console.log("Tauri OAuth success:", result);
-      // Force session refresh after successful OAuth
-      if (sessionCache) {
-        sessionCache.isValid = false;
+// Create auth client lazily to avoid SSR issues
+let _authClient: any = null;
+
+export const getAuthClient = () => {
+  if (!_authClient) {
+    _authClient = createAuthClient({
+      baseURL: typeof window !== 'undefined' && isDesktop()
+        ? "http://localhost:3001"  // Desktop sempre usa localhost
+        : process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
+          ? "https://cadcamfun.xyz"
+          : "http://localhost:3001"),
+
+      // Enhanced configuration for desktop compatibility
+      fetchOptions: {
+        credentials: 'include', // Important for desktop cookie handling
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       }
+    });
+  }
+  return _authClient;
+};
+
+// Export for backward compatibility
+export const authClient = typeof window !== 'undefined' ? getAuthClient() : null;
+
+// Initialize Tauri OAuth setup for desktop (client-side only)
+const initializeTauriAuth = async () => {
+  if (typeof window !== 'undefined' && isDesktop()) {
+    await loadTauriDeps();
+
+    if (tauriOpen) {
+      tauriOpen({
+        authClient: getAuthClient(),
+        scheme: "cadcamfun",
+        debugLogs: process.env.NODE_ENV === "development",
+        onError: (error: any) => {
+          console.error("Tauri OAuth error:", error);
+        },
+        onSuccess: (result: any) => {
+          console.log("Tauri OAuth success:", result);
+          // Force session refresh after successful OAuth
+          if (sessionCache) {
+            sessionCache.isValid = false;
+          }
+        }
+      });
     }
-  });
+  }
+};
+
+// Initialize when component mounts (client-side only) - use a different approach
+const initializeWhenReady = () => {
+  if (typeof window !== 'undefined') {
+    initializeTauriAuth();
+  }
+};
+
+// Only initialize on the client side
+if (typeof window !== 'undefined') {
+  // Use setTimeout to ensure DOM is ready
+  setTimeout(initializeWhenReady, 0);
 }
+
+// Unified fetch function that works in both web and desktop environments
+const getUnifiedFetch = async () => {
+  if (typeof window !== 'undefined' && isDesktop()) {
+    await loadTauriDeps();
+    return tauriFetch || fetch;
+  }
+  return fetch;
+};
 
 // Enhanced session management with caching and desktop compatibility
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -67,11 +127,12 @@ let sessionCache: SessionCache | null = null;
 const refreshSession = async (): Promise<any> => {
   try {
     // Build full URL for desktop compatibility
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/get-session`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/get-session`, {
       method: 'GET',
       headers: {
         'Cache-Control': 'no-cache',
@@ -238,11 +299,11 @@ export const useSession = () => {
 // Enhanced auth functions con desktop compatibility e cache management
 export const signIn = async (credentials: { email: string; password: string }) => {
   try {
-    const isDesktop = typeof window !== 'undefined' && (window as any).__TAURI__;
+    const isDesktopEnv = typeof window !== 'undefined' && (window as any).__TAURI__;
 
     let response;
 
-    if (isDesktop) {
+    if (isDesktopEnv) {
       // Usa l'API HTTP di Tauri per le chiamate desktop
       response = await fetch('http://localhost:3001/api/auth/signin', {
         method: 'POST',
@@ -254,7 +315,8 @@ export const signIn = async (credentials: { email: string; password: string }) =
       });
     } else {
       // Usa il fetch standard per il web
-      response = await window.fetch('/api/auth/signin', {
+      const fetchFn = typeof window !== 'undefined' ? window.fetch : fetch;
+      response = await fetchFn('/api/auth/signin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -329,11 +391,12 @@ export const signUp = async (data: { name: string; email: string; password: stri
 
 export const forgetPassword = async (email: string) => {
   try {
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/forget-password`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/forget-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -348,11 +411,12 @@ export const forgetPassword = async (email: string) => {
 
 export const resetPassword = async (token: string, password: string) => {
   try {
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/reset-password`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password }),
@@ -367,11 +431,12 @@ export const resetPassword = async (token: string, password: string) => {
 
 export const verifyEmail = async (token: string) => {
   try {
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/verify-email`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/verify-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
@@ -387,11 +452,12 @@ export const verifyEmail = async (token: string) => {
 // Passkey functions - fallback to API calls
 export const signInWithPasskey = async () => {
   try {
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/passkey/authenticate`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/passkey/authenticate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -405,11 +471,12 @@ export const signInWithPasskey = async () => {
 
 export const addPasskey = async () => {
   try {
-    const baseURL = isDesktop
+    const baseURL = typeof window !== 'undefined' && isDesktop()
       ? "http://localhost:3001"
       : (typeof window !== 'undefined' ? window.location.origin : "");
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/passkey/register`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/passkey/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
@@ -429,7 +496,8 @@ export const sendMagicLink = async (email: string) => {
       ? window.location.origin
       : (process.env.NEXTAUTH_URL || 'http://localhost:3001');
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/magic-link`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/magic-link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -466,18 +534,18 @@ export const sendMagicLink = async (email: string) => {
 // Enhanced GitHub OAuth functions with Tauri integration
 export const signInWithGitHub = async (callbackURL?: string) => {
   try {
-    if (isDesktop) {
-      // Use better-auth-tauri for desktop OAuth
-      return await signInSocial({
-        authClient,
-        provider: "github",
-        callbackURL: callbackURL || "/"
-      });
+    if (typeof window !== 'undefined' && isDesktop()) {
+      // Load Tauri dependencies and use better-auth-tauri for desktop OAuth
+      await loadTauriDeps();
+      if (tauriOpen) {
+        return await tauriOpen(callbackURL || "/");
+      }
     } else {
       // Web flow remains the same
-      const baseURL = window.location.origin || process.env.NEXTAUTH_URL;
+      const baseURL = typeof window !== 'undefined' ? window.location.origin : process.env.NEXTAUTH_URL;
 
-      const response = await unifiedFetch(`${baseURL}/api/auth/sign-in/social`, {
+      const fetchFn = await getUnifiedFetch();
+      const response = await fetchFn(`${baseURL}/api/auth/sign-in/social`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -489,7 +557,7 @@ export const signInWithGitHub = async (callbackURL?: string) => {
 
       if (response.ok) {
         const result = await response.json();
-        if (result.url) {
+        if (result.url && typeof window !== 'undefined') {
           window.location.href = result.url;
         }
         return { data: result, error: false };
@@ -516,7 +584,8 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
       ? window.location.origin
       : (process.env.NEXTAUTH_URL || 'http://localhost:3001');
 
-    const response = await unifiedFetch(`${baseURL}/api/auth/link-social`, {
+    const fetchFn = await getUnifiedFetch();
+    const response = await fetchFn(`${baseURL}/api/auth/link-social`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -529,9 +598,12 @@ export const linkGitHubAccount = async (callbackURL?: string) => {
     if (response.ok) {
       const result = await response.json();
       if (result.url) {
-        if (isDesktop) {
-          await open(result.url);
-        } else {
+        if (typeof window !== 'undefined' && isDesktop()) {
+          await loadTauriDeps();
+          if (tauriOpen) {
+            await tauriOpen(result.url);
+          }
+        } else if (typeof window !== 'undefined') {
           window.location.href = result.url;
         }
       }

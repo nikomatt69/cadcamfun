@@ -12,22 +12,8 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<"form" | "success">("form");
   const [error, setError] = useState("");
+  const { httpFetch } = useTauri();
 
-  const getHttpFetch = async () => {
-    if (typeof window !== 'undefined' && window) {
-      // Check if we're in Tauri environment
-      const isTauri = (window as any).__TAURI__ !== undefined;
-      if (isTauri) {
-        try {
-          const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-          return tauriFetch;
-        } catch (error) {
-          console.warn('Failed to load Tauri fetch:', error);
-        }
-      }
-    }
-    return fetch;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +21,7 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const httpFetch = await getHttpFetch();
+
       const response = await httpFetch("/api/auth/forgot-password", {
         method: "POST",
         headers: {

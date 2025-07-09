@@ -12,7 +12,6 @@ import { AuthLoadingProvider } from "../contexts/AuthLoadingContext";
 import AuthWrapper from "../components/auth/AuthWrapper";
 import { LanguageProvider } from "../contexts/LanguageContext";
 import { camFont } from "src/lib/camFont";
-import { useEffect } from "react";
 import ErrorBoundary from "../components/ui/ErrorBonduary";
 import { SubscriptionProvider } from "../contexts/SubscriptionContext";
 import PageViewTracker from "../components/analytics/PageViewTracker";
@@ -29,6 +28,12 @@ import { useElementsStore } from "src/store/elementsStore";
 import { ThemeProvider } from "../contexts/ThemeProvider";
 import { ConstraintProvider } from "../contexts/ConstraintContext";
 import { MCPProvider } from "../contexts/MCPContext";
+import InitialOnboarding from "../components/auth/InitialOnboarding";
+import { useAuth } from "../contexts/AuthContext";
+import { useState, useCallback, useEffect } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { authClient } from "../lib/auth-client";
+import { initializeSqlClient } from '../lib/database/sqlClient';
 // Import the event handlers
 
 // Ensure this initialization runs only once client-side
@@ -37,6 +42,44 @@ let pluginSystemInitialized = false;
 export default function App({ Component, pageProps, router }: AppProps) {
   // Get the function to add elements from the Zustand store
   const addElements = useElementsStore(state => state.addElements);
+  const [sqlClientReady, setSqlClientReady] = useState(false);
+
+  // Welcome onboarding state - shows BEFORE signin
+
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Check if user should see welcome onboarding
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    // Show onboarding only for non-authenticated users who haven't seen it
+    const checkOnboarding = async () => {
+      try {
+        if (authClient && authClient.getSession) {
+          const session = await authClient.getSession();
+          if (!session) {
+            const hasSeenOnboarding = localStorage.getItem('cadcam-onboarding-seen');
+            if (!hasSeenOnboarding) {
+              setShowWelcome(true);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+      }
+    };
+    
+    checkOnboarding();
+  }, []);
+
+  // Handle onboarding completion - redirect to signin
+  const handleOnboardingComplete = useCallback(() => {
+    setShowWelcome(false);
+    localStorage.setItem('cadcam-onboarding-seen', 'true');
+    // Redirect to signin page
+    router.push('/auth/signin');
+  }, [router]);
 
   // Service Worker Registration Effect (existing)
   useEffect(() => {
@@ -89,9 +132,25 @@ export default function App({ Component, pageProps, router }: AppProps) {
     }
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  // Initialize SQL client on app startup
+  useEffect(() => {
+    const initSqlClient = async () => {
+      try {
+        await initializeSqlClient();
+        setSqlClientReady(true);
+        console.log('✅ SQL Client initialized in app startup');
+      } catch (error) {
+        console.warn('⚠️ SQL Client initialization failed:', error);
+        setSqlClientReady(true); // Continue without SQL client
+      }
+    };
+
+    initSqlClient();
+  }, []);
+
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <AuthProvider >
         <AuthLoadingProvider>
           <AuthWrapper>
             <LanguageProvider>
@@ -137,6 +196,12 @@ export default function App({ Component, pageProps, router }: AppProps) {
           </AuthWrapper>
         </AuthLoadingProvider>
       </AuthProvider>
+
+      {/* Initial Onboarding - appears before signin for new users */}
+      <InitialOnboarding
+        isVisible={showWelcome}
+        onComplete={handleOnboardingComplete}
+      />
     </ErrorBoundary>
   );
 }

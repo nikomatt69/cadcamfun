@@ -88,12 +88,6 @@ export const useTauri = () => {
     // Initialize Tauri detection and APIs
     useEffect(() => {
         const initTauri = async () => {
-            // Only run on client side
-            if (typeof window === 'undefined') {
-                setIsLoading(false);
-                return;
-            }
-
             const desktop = isTauri();
             setIsDesktop(desktop);
 
@@ -183,7 +177,7 @@ export const useTauri = () => {
     const showNotification = useCallback(async (title: string, body: string) => {
         if (!isDesktop || !tauriApi) {
             // Fallback to web notification
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification(title, { body });
             }
             return;
@@ -290,18 +284,21 @@ export const useTauri = () => {
     // Generic HTTP fetch for desktop
     const httpFetch = useCallback(async (url: string, options?: RequestInit): Promise<any> => {
         if (!isDesktop || !tauriApi?.http) {
-            // Fallback to global fetch if not on desktop or if http api is not available
-            if (typeof window !== 'undefined' && window) {
+            // Fallback to globalThis.fetch if not on desktop or if http api is not available
+            if (typeof globalThis !== 'undefined' && globalThis.fetch) {
+                return globalThis.fetch(url, options);
+            }
+            // Additional fallback for environments where globalThis.fetch might not be available
+            if (typeof window !== 'undefined' && window.fetch) {
                 return window.fetch(url, options);
             }
-            // Fallback for SSR or environments without window.fetch
-            return fetch(url, options);
+            throw new Error('Fetch API not available');
         }
 
         // Use Tauri's HTTP fetch - si allinea con l'API fetch standard
-        const { fetch: tauriFetch } = tauriApi.http;
+        const { fetch } = tauriApi.http;
 
-        return tauriFetch(url, {
+        return fetch(url, {
             ...options,
         });
     }, [isDesktop, tauriApi]);

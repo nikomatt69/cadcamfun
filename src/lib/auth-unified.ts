@@ -1,6 +1,6 @@
 // src/lib/auth-unified.ts
 // Unified authentication system for both web and desktop platforms
-import { fetch } from '@tauri-apps/plugin-http';
+
 
 interface AuthEnvironment {
   isDesktop: boolean;
@@ -51,7 +51,18 @@ class UnifiedAuth {
   }
 
   private detectEnvironment(): AuthEnvironment {
-    const isDesktop = typeof window !== 'undefined' && (
+    // SSR-safe environment detection
+    if (typeof window === 'undefined') {
+      // Server-side rendering
+      return {
+        isDesktop: false,
+        isWeb: true,
+        baseURL: process.env.NEXTAUTH_URL || "http://localhost:3001",
+        platform: 'web'
+      };
+    }
+
+    const isDesktop = (
       window.navigator.userAgent.includes('Tauri') ||
       window.location.protocol === 'tauri:' ||
       (window.location.hostname === 'localhost' && window.location.port === '1420') ||
@@ -62,9 +73,7 @@ class UnifiedAuth {
 
     const baseURL = isDesktop
       ? "http://localhost:3001"
-      : (typeof window !== 'undefined'
-        ? window.location.origin
-        : process.env.NEXTAUTH_URL || "http://localhost:3001");
+      : window.location.origin;
 
     return {
       isDesktop,
@@ -75,6 +84,11 @@ class UnifiedAuth {
   }
 
   private async initializeAuth() {
+    // Skip initialization during SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
       this.updateState({ loading: true, error: null });
       const session = await this.validateSession();
@@ -104,19 +118,25 @@ class UnifiedAuth {
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
     const url = `${this.environment.baseURL}${endpoint}`;
 
+    // SSR-safe headers construction
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Platform': this.environment.platform,
+      ...options.headers as Record<string, string>
+    };
+
+    // Add client-side headers only when window is available
+    if (typeof window !== 'undefined') {
+      headers['X-Forwarded-Host'] = window.location.hostname;
+      headers['X-Forwarded-Port'] = window.location.port;
+      headers['X-Forwarded-Proto'] = window.location.protocol;
+      headers['X-Forwarded-For'] = window.location.hostname;
+    }
+
     const defaultOptions: RequestInit = {
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Forwarded-Host': window.location.hostname,
-        'X-Forwarded-Port': window.location.port,
-        'X-Forwarded-Proto': window.location.protocol,
-        'X-Forwarded-For': window.location.hostname,
-        // Add platform identifier for backend handling
-        'X-Platform': this.environment.platform,
-        ...options.headers
-      },
+      headers,
       ...options
     };
 
