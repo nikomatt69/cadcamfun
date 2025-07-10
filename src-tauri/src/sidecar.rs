@@ -1,11 +1,9 @@
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{anyhow, Result};
 use tauri::{AppHandle, Manager};
 use tokio::time::{sleep, timeout};
-use tracing::{info, warn, error, debug};
-use local_ip_address::local_ip;
+use tracing::{info, warn, debug};
 
 #[derive(Debug)]
 pub struct SidecarManager {

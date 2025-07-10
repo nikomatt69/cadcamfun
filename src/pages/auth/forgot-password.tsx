@@ -22,7 +22,7 @@ export default function ForgotPassword() {
 
     try {
 
-      const response = await httpFetch("/api/auth/forgot-password", {
+      const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

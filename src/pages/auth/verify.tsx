@@ -26,7 +26,7 @@ export default function VerifyEmail() {
 
   const verifyEmail = async (emailToken: string) => {
     try {
-      const response = await httpFetch("/api/auth/verify-email", {
+      const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/verify-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -42,7 +42,7 @@ export default function VerifyEmail() {
 
         // Redirect to signin after 3 seconds
         setTimeout(() => {
-          router.push("/auth/signin");
+          router.push(`${process.env.NEXTAUTH_URL}/auth/signin`);
         }, 3000);
       } else {
         setStatus("error");

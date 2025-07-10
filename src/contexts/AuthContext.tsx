@@ -13,7 +13,8 @@ import {
   verifyEmail,
   sendMagicLink,
   signInWithGitHub,
-  linkGitHubAccount
+  linkGitHubAccount,
+  signUp as authClientSignUp
 } from "@/src/lib/auth-client";
 import { useAuthStore } from '@/src/store/authStore';
 import { usePostLoginRedirect } from '@/src/hooks/useAuthRedirect';
@@ -36,12 +37,13 @@ interface AuthContextType {
   authError: string | null;
   showOnboarding: boolean;
   hasRole: (role: Role | Role[]) => boolean;
-  signIn: (credentials?: any) => Promise<any>;
+  signIn: (credentials: any) => Promise<any>;
+  signUp: (credentials: any) => Promise<any>;
+  signOut: () => Promise<any>;
   signInWithPasskey: () => Promise<void>;
   signInWithGitHub: (callbackURL?: string) => Promise<void>;
   linkGitHubAccount: (callbackURL?: string) => Promise<{ success: boolean; message: string }>;
   registerPasskey: () => Promise<{ success: boolean; message: string }>;
-  signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
   resetPassword: (token: string, password: string) => Promise<{ success: boolean; message: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
@@ -115,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user.roles.includes(role);
   };
 
-  const handleSignIn = async (credentials?: any) => {
+  const handleSignIn = async (credentials: any) => {
     try {
       setAuthError(null);
 
@@ -142,6 +144,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthError(errorMessage);
       console.error("Sign in error:", error);
       throw error;
+    }
+  };
+
+  const signUp = async (credentials: any) => {
+    try {
+      setAuthError(null);
+      const result = await authClientSignUp({
+        provider: "credentials",
+        data: credentials,
+      });
+      if (result.error) throw new Error(result.error);
+      // After sign up, better-auth automatically signs the user in.
+      // The session change will be picked up by useSession, triggering a re-render.
+      return result;
+    } catch (err: any) {
+      setAuthError(err.message || "Sign up failed");
+      return { error: err.message };
     }
   };
 
@@ -184,13 +203,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Logout successful');
 
       // Navigate to signin
-      router.push("/auth/signin");
+      router.push(`/auth/signin`);
     } catch (error) {
       console.error("Logout error:", error);
 
       // Still clear local session and redirect even if server logout fails
       clear();
-      router.push("/auth/signin");
+      router.push(`/auth/signin`);
 
       throw error;
     }
@@ -332,11 +351,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authError,
         hasRole,
         signIn: handleSignIn,
+        signUp: signUp,
+        signOut: handleSignOut,
         signInWithPasskey: handleSignInWithPasskey,
         signInWithGitHub: handleSignInWithGitHub,
         linkGitHubAccount: handleLinkGitHubAccount,
         registerPasskey,
-        signOut: handleSignOut,
         requestPasswordReset,
         resetPassword: handleResetPassword,
         verifyEmail: handleVerifyEmail,

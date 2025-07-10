@@ -1,10 +1,8 @@
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{anyhow, Result};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppInfo {

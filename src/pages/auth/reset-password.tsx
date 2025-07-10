@@ -61,7 +61,7 @@ export default function ResetPassword() {
 
     try {
 
-      const response = await httpFetch("/api/auth/reset-password", {
+      const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -78,7 +78,7 @@ export default function ResetPassword() {
         setStatus("success");
         // Redirect to signin after 3 seconds
         setTimeout(() => {
-          router.push("/auth/signin");
+          router.push(`${process.env.NEXTAUTH_URL}/auth/signin`);
         }, 3000);
       } else {
         setError(data.message || "Failed to reset password");

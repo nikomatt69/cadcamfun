@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "CADCAM FUN",
   "version": "1.1.0",
-  "identifier": "com.cadcamfun.app",
+  "identifier": "com.cadcamfun.desktop",
   "build": {
     "beforeDevCommand": "yarn dev",
     "beforeBuildCommand": "yarn build:export",
@@ -21,21 +21,18 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "cadcamfun"
+          "cadcamfun",
+          "cadcamfun-desktop",
+          "tauri"
         ]
       }
     },
     "sql": {
-      "preload": [
-        "sqlite:cadcamfun.db"
-      ],
       "postgres": {
         "enabled": true,
-        "maxConnections": 10
-      },
-      "sqlite": {
-        "enabled": true,
-        "inMemory": false
+        "maxConnections": 20,
+        "connectionTimeout": 30000,
+        "idleTimeout": 600000
       }
     }
   },
@@ -69,7 +66,9 @@
           "127.0.0.1:*",
           "tauri:",
           "cadcamfun.xyz",
-          "*.cadcamfun.xyz"
+          "*.cadcamfun.xyz",
+          "http://localhost:3001",
+          "https://localhost:3001"
         ],
         "script-src": [
           "'self'",
@@ -79,6 +78,8 @@
           "127.0.0.1:*",
           "http://localhost:3000",
           "https://localhost:3000",
+          "http://localhost:3001",
+          "https://localhost:3001",
           "tauri:",
           "cadcamfun.xyz",
           "*.cadcamfun.xyz"
@@ -99,7 +100,15 @@
           "https://api.github.com",
           "cadcamfun:",
           "ipc:",
-          "tauri:"
+          "tauri:",
+          "*.neon.tech",
+          "*.auth0.com",
+          "*.s3.*.amazonaws.com",
+          "https://api.resend.com",
+          "https://endpoint.4everland.co",
+          "https://api.lemonsqueezy.com",
+          "https://*.lemonsqueezy.com",
+          "https://api.polar.sh"
         ],
         "img-src": [
           "'self'",
@@ -108,7 +117,8 @@
           "https:",
           "tauri:",
           "localhost:*",
-          "127.0.0.1:*"
+          "127.0.0.1:*",
+          "*.s3.*.amazonaws.com"
         ],
         "style-src": [
           "'self'",
@@ -116,14 +126,16 @@
           "https:",
           "localhost:*",
           "tauri:",
-          "127.0.0.1:*"
+          "127.0.0.1:*",
+          "*.auth0.com"
         ],
         "font-src": [
           "'self'",
           "data:",
           "https:",
           "localhost:*",
-          "127.0.0.1:*"
+          "127.0.0.1:*",
+          "*.auth0.com"
         ]
       }
     },

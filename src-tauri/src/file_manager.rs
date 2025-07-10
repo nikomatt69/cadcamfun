@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use directories::ProjectDirs;
-use std::fs::{self, File};
+use std::fs::{self};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 use zip::write::{FileOptions, ZipWriter};
-use zip::{CompressionMethod, ZipArchive};
+use zip::ZipArchive;
 
 #[derive(Debug)]
 pub struct FileManager {

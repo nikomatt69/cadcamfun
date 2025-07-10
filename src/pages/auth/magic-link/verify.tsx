@@ -31,7 +31,7 @@ export default function MagicLinkVerify() {
       }
 
       try {
-        const response = await httpFetch('/api/auth/magic-link/verify', {
+        const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/magic-link/verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, email }),

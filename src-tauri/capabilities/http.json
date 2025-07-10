@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "http",
   "description": "HTTP client capabilities with specific scopes",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     {
       "identifier": "http:default",
@@ -30,6 +32,48 @@
         },
         {
           "url": "https://api.anthropic.com/**"
+        },
+        {
+          "url": "https://api.github.com/**"
+        },
+        {
+          "url": "https://api.resend.com/**"
+        },
+        {
+          "url": "https://api.lemonsqueezy.com/**"
+        },
+        {
+          "url": "https://api.polar.sh/**"
+        },
+        {
+          "url": "https://*.s3.*.amazonaws.com/**"
+        },
+        {
+          "url": "https://*.auth0.com/**"
+        },
+        {
+          "url": "https://endpoint.4everland.co/**"
+        },
+        {
+          "url": "https://*.neon.tech/**"
+        },
+        {
+          "url": "https://*.auth0.com/**"
+        },
+        {
+          "url": "https://*.auth0.com/**"
+        },
+        {
+          "url": "https://*.auth0.com/**"
+        },
+        {
+          "url": "https://*.auth0.com/**"
+        },
+        {
+          "url": "https://better-auth.com/**"
+        },
+        {
+          "url": "https://*.better-auth.com/**"
         }
       ]
     }

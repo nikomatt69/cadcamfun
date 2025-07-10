@@ -173,14 +173,14 @@ package_app() {
     
     # Copy build artifacts
     if [[ "$PLATFORM" == "macos" ]]; then
-        cp -r "src-tauri/target/release/bundle/macos/"*.app "$BUILD_DIR/"
-        cp -r "src-tauri/target/release/bundle/dmg/"*.dmg "$BUILD_DIR/" 2>/dev/null || true
+        cp -r "src-tauri/target/universal-apple-darwin/release/bundle/macos/"*.app "$BUILD_DIR/"
+        cp -r "src-tauri/target/universal-apple-darwin/release/bundle/dmg/"*.dmg "$BUILD_DIR/" 2>/dev/null || true
     elif [[ "$PLATFORM" == "windows" ]]; then
-        cp -r "src-tauri/target/release/bundle/msi/"*.msi "$BUILD_DIR/" 2>/dev/null || true
-        cp -r "src-tauri/target/release/bundle/nsis/"*.exe "$BUILD_DIR/" 2>/dev/null || true
+        cp -r "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/"*.msi "$BUILD_DIR/" 2>/dev/null || true
+        cp -r "src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/"*.exe "$BUILD_DIR/" 2>/dev/null || true
     elif [[ "$PLATFORM" == "linux" ]]; then
-        cp -r "src-tauri/target/release/bundle/deb/"*.deb "$BUILD_DIR/" 2>/dev/null || true
-        cp -r "src-tauri/target/release/bundle/rpm/"*.rpm "$BUILD_DIR/" 2>/dev/null || true
+        cp -r "src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/"*.deb "$BUILD_DIR/" 2>/dev/null || true
+        cp -r "src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/"*.rpm "$BUILD_DIR/" 2>/dev/null || true
         cp -r "src-tauri/target/release/bundle/appimage/"*.AppImage "$BUILD_DIR/" 2>/dev/null || true
     fi
     

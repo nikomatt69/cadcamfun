@@ -6,17 +6,17 @@ export interface UserPreferences {
   biometricEnabled: boolean;
   autoLogin: boolean;
   rememberDevice: boolean;
-  
+
   // UI preferences
   theme: 'light' | 'dark' | 'system';
   language: string;
   timezone: string;
-  
+
   // Security preferences
   sessionTimeout: number; // minutes
   twoFactorEnabled: boolean;
   emailNotifications: boolean;
-  
+
   // App preferences
   defaultView: '2d' | '3d';
   gridVisible: boolean;
@@ -49,59 +49,59 @@ interface AuthState {
   user: any | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
   // Session management
   session: AuthSession | null;
   sessionCheckInterval: NodeJS.Timeout | null;
-  
+
   // Passkey state
   passkeys: PasskeyInfo[];
   passkeySupported: boolean;
   passkeyLoading: boolean;
-  
+
   // UI state
   showLoginModal: boolean;
   showPasskeySetup: boolean;
   loginError: string | null;
   passkeyError: string | null;
-  
+
   // User preferences (persisted locally)
   preferences: UserPreferences;
-  
+
   // Device and security
   deviceTrusted: boolean;
   lastLoginMethod: 'password' | 'passkey' | 'oauth' | null;
-  
+
   // Actions - Session sync (called from AuthContext)
   syncSession: (session: any) => void;
   clearSession: () => void;
   updateLastActivity: () => void;
-  
+
   // Actions - UI state
   setLoginModal: (show: boolean) => void;
   setPasskeySetup: (show: boolean) => void;
   setLoginError: (error: string | null) => void;
   setPasskeyError: (error: string | null) => void;
-  
+
   // Actions - Preferences
   updatePreferences: (updates: Partial<UserPreferences>) => void;
   resetPreferences: () => void;
-  
+
   // Actions - Passkey management
   loadPasskeys: () => Promise<void>;
   addPasskey: (passkey: PasskeyInfo) => void;
   removePasskey: (id: string) => Promise<void>;
   updatePasskeyNickname: (id: string, nickname: string) => Promise<void>;
   checkPasskeySupport: () => Promise<void>;
-  
+
   // Actions - Security
   setDeviceTrusted: (trusted: boolean) => void;
   recordLoginMethod: (method: 'password' | 'passkey' | 'oauth') => void;
-  
+
   // Actions - Session monitoring
   startSessionMonitoring: () => void;
   stopSessionMonitoring: () => void;
-  
+
   // Utility getters
   getTimeUntilExpiry: () => number | null;
   isSessionExpiringSoon: () => boolean;
@@ -113,19 +113,19 @@ const defaultPreferences: UserPreferences = {
   biometricEnabled: true,
   autoLogin: false,
   rememberDevice: true,
-  
+
   // UI
   theme: 'system',
   language: 'en',
-  timezone: typeof window !== 'undefined' 
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone 
+  timezone: typeof window !== 'undefined'
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
     : 'UTC',
-  
+
   // Security
   sessionTimeout: 480, // 8 hours
   twoFactorEnabled: false,
   emailNotifications: true,
-  
+
   // App
   defaultView: '3d',
   gridVisible: true,
@@ -136,23 +136,23 @@ const detectDeviceInfo = () => {
   if (typeof window === 'undefined') {
     return { browser: 'unknown', os: 'unknown', isMobile: false };
   }
-  
+
   const userAgent = navigator.userAgent;
   const isMobile = /Mobile|Android|iPhone|iPad/.test(userAgent);
-  
+
   let browser = 'unknown';
   if (userAgent.includes('Chrome')) browser = 'Chrome';
   else if (userAgent.includes('Firefox')) browser = 'Firefox';
   else if (userAgent.includes('Safari')) browser = 'Safari';
   else if (userAgent.includes('Edge')) browser = 'Edge';
-  
+
   let os = 'unknown';
   if (userAgent.includes('Windows')) os = 'Windows';
   else if (userAgent.includes('Mac')) os = 'macOS';
   else if (userAgent.includes('Linux')) os = 'Linux';
   else if (userAgent.includes('Android')) os = 'Android';
   else if (userAgent.includes('iOS')) os = 'iOS';
-  
+
   return { browser, os, isMobile };
 };
 
@@ -163,28 +163,28 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: false,
-      
+
       session: null,
       sessionCheckInterval: null,
-      
+
       passkeys: [],
       passkeySupported: false,
       passkeyLoading: false,
-      
+
       showLoginModal: false,
       showPasskeySetup: false,
       loginError: null,
       passkeyError: null,
-      
+
       preferences: defaultPreferences,
-      
+
       deviceTrusted: false,
       lastLoginMethod: null,
-      
+
       // Session sync
       syncSession: (session) => {
         const deviceInfo = detectDeviceInfo();
-        
+
         set({
           user: session?.user || null,
           isAuthenticated: !!session?.user,
@@ -197,7 +197,7 @@ export const useAuthStore = create<AuthState>()(
           } : null,
           loginError: null
         });
-        
+
         // Start session monitoring if authenticated
         if (session?.user) {
           get().startSessionMonitoring();
@@ -205,7 +205,7 @@ export const useAuthStore = create<AuthState>()(
           get().stopSessionMonitoring();
         }
       },
-      
+
       clearSession: () => {
         get().stopSessionMonitoring();
         set({
@@ -217,7 +217,7 @@ export const useAuthStore = create<AuthState>()(
           lastLoginMethod: null
         });
       },
-      
+
       updateLastActivity: () => {
         const { session } = get();
         if (session) {
@@ -229,28 +229,28 @@ export const useAuthStore = create<AuthState>()(
           });
         }
       },
-      
+
       // UI actions
       setLoginModal: (show) => set({ showLoginModal: show }),
       setPasskeySetup: (show) => set({ showPasskeySetup: show }),
       setLoginError: (error) => set({ loginError: error }),
       setPasskeyError: (error) => set({ passkeyError: error }),
-      
+
       // Preferences
       updatePreferences: (updates) => {
         set(state => ({
           preferences: { ...state.preferences, ...updates }
         }));
       },
-      
+
       resetPreferences: () => set({ preferences: defaultPreferences }),
-      
+
       // Passkey management
       loadPasskeys: async () => {
         set({ passkeyLoading: true, passkeyError: null });
-        
+
         try {
-          const response = await fetch('/api/auth/passkey/list');
+          const response = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/passkey/list`);
           if (response.ok) {
             const data = await response.json();
             const passkeys = data.passkeys?.map((p: any) => ({
@@ -262,33 +262,33 @@ export const useAuthStore = create<AuthState>()(
               lastUsed: p.lastUsed,
               nickname: p.nickname
             })) || [];
-            
+
             set({ passkeys, passkeyLoading: false });
           } else {
             throw new Error('Failed to load passkeys');
           }
         } catch (error) {
-          set({ 
+          set({
             passkeyError: error instanceof Error ? error.message : 'Failed to load passkeys',
-            passkeyLoading: false 
+            passkeyLoading: false
           });
         }
       },
-      
+
       addPasskey: (passkey) => {
         set(state => ({
           passkeys: [...state.passkeys, passkey]
         }));
       },
-      
+
       removePasskey: async (id) => {
         try {
-          const response = await fetch('/api/auth/passkey/delete', {
+          const response = await fetch(`${process.env.NEXTAUTH_URL}/api/auth/passkey/delete`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ passkeyId: id })
           });
-          
+
           if (response.ok) {
             set(state => ({
               passkeys: state.passkeys.filter(p => p.id !== id)
@@ -300,18 +300,18 @@ export const useAuthStore = create<AuthState>()(
           set({ passkeyError: error instanceof Error ? error.message : 'Failed to remove passkey' });
         }
       },
-      
+
       updatePasskeyNickname: async (id, nickname) => {
         // Update locally first
         set(state => ({
-          passkeys: state.passkeys.map(p => 
+          passkeys: state.passkeys.map(p =>
             p.id === id ? { ...p, nickname } : p
           )
         }));
-        
+
         // Could add API call here if backend supports nicknames
       },
-      
+
       checkPasskeySupport: async () => {
         if (typeof window !== 'undefined' && window.PublicKeyCredential) {
           try {
@@ -324,43 +324,43 @@ export const useAuthStore = create<AuthState>()(
           set({ passkeySupported: false });
         }
       },
-      
+
       // Security
       setDeviceTrusted: (trusted) => set({ deviceTrusted: trusted }),
-      
+
       recordLoginMethod: (method) => set({ lastLoginMethod: method }),
-      
+
       // Session monitoring
       startSessionMonitoring: () => {
         const { sessionCheckInterval } = get();
         if (sessionCheckInterval) return; // Already monitoring
-        
+
         const interval = setInterval(() => {
           const { session, preferences } = get();
           if (!session?.isActive) return;
-          
+
           const now = new Date();
           const lastActivity = session.lastActivity;
-          
+
           if (lastActivity) {
             const minutesSinceActivity = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
-            
+
             if (minutesSinceActivity > preferences.sessionTimeout) {
               // Session expired due to inactivity
               get().clearSession();
               return;
             }
           }
-          
+
           // Check if session expired
           if (session.expiresAt && now > session.expiresAt) {
             get().clearSession();
           }
         }, 60000); // Check every minute
-        
+
         set({ sessionCheckInterval: interval });
       },
-      
+
       stopSessionMonitoring: () => {
         const { sessionCheckInterval } = get();
         if (sessionCheckInterval) {
@@ -368,31 +368,31 @@ export const useAuthStore = create<AuthState>()(
           set({ sessionCheckInterval: null });
         }
       },
-      
+
       // Utility getters
       getTimeUntilExpiry: () => {
         const { session } = get();
         if (!session?.expiresAt) return null;
-        
+
         const now = new Date();
         const expiry = session.expiresAt;
         return Math.max(0, expiry.getTime() - now.getTime());
       },
-      
+
       isSessionExpiringSoon: () => {
         const timeUntilExpiry = get().getTimeUntilExpiry();
         if (!timeUntilExpiry) return false;
-        
+
         // Consider session as expiring soon if less than 30 minutes
         return timeUntilExpiry < (30 * 60 * 1000);
       },
-      
+
       shouldShowPasskeyPrompt: () => {
         const { passkeySupported, passkeys, preferences, lastLoginMethod } = get();
-        return passkeySupported && 
-               passkeys.length === 0 && 
-               preferences.biometricEnabled && 
-               lastLoginMethod === 'password';
+        return passkeySupported &&
+          passkeys.length === 0 &&
+          preferences.biometricEnabled &&
+          lastLoginMethod === 'password';
       }
     }),
     {

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { signIn } from "@/src/lib/auth-client";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { motion, AnimatePresence, Variants } from "framer-motion";
@@ -11,7 +10,8 @@ import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function SignUp() {
   const router = useRouter();
-  const { signInWithGitHub } = useAuth();
+  // Estrai `signUp` dal contesto
+  const { signUp, signInWithGitHub } = useAuth();
 
   // Redirect to waitlist for new registrations
 
@@ -74,35 +74,22 @@ export default function SignUp() {
     setServerError("");
 
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Something went wrong");
-      }
-
-      // Sign in the user after successful registration
-      const result = await signIn({
+      // Usa la funzione `signUp` unificata dal contesto
+      const result = await signUp({
+        name: formData.name,
         email: formData.email,
         password: formData.password
       });
 
       if (result?.error) {
-        throw new Error(typeof result.error === 'string' ? result.error : 'Registration failed');
+        throw new Error(result.error);
       }
 
+      // Se la registrazione ha successo, il redirect viene gestito
+      // dal contesto o dal flusso di autenticazione.
+      // Non è più necessario un `signIn` manuale.
       router.push("/");
+
     } catch (error: any) {
       setServerError(error.message || "Something went wrong");
     } finally {

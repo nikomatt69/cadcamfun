@@ -32,7 +32,7 @@ import InitialOnboarding from "../components/auth/InitialOnboarding";
 import { useAuth } from "../contexts/AuthContext";
 import { useState, useCallback, useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { authClient } from "../lib/auth-client";
+import { authClient, initializeTauriAuth } from "../lib/auth-client";
 import { initializeSqlClient } from '../lib/database/sqlClient';
 // Import the event handlers
 
@@ -52,7 +52,7 @@ export default function App({ Component, pageProps, router }: AppProps) {
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return;
-    
+
     // Show onboarding only for non-authenticated users who haven't seen it
     const checkOnboarding = async () => {
       try {
@@ -69,7 +69,7 @@ export default function App({ Component, pageProps, router }: AppProps) {
         console.error('Error checking onboarding status:', error);
       }
     };
-    
+
     checkOnboarding();
   }, []);
 
@@ -131,6 +131,19 @@ export default function App({ Component, pageProps, router }: AppProps) {
       initializePluginSystem();
     }
   }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Initialize Tauri-specific listeners
+  useEffect(() => {
+    const initTauri = async () => {
+      if (await isTauri()) {
+        console.log("[_app] Tauri environment detected. Initializing Tauri auth listener...");
+        initializeTauriAuth();
+      } else {
+        console.log("[_app] Not in Tauri environment.");
+      }
+    };
+    initTauri();
+  }, []);
 
   // Initialize SQL client on app startup
   useEffect(() => {

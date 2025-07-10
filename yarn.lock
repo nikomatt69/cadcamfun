@@ -3407,6 +3407,35 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@daveyplate/better-auth-tauri@npm:^0.0.24":
+  version: 0.0.24
+  resolution: "@daveyplate/better-auth-tauri@npm:0.0.24"
+  peerDependencies:
+    "@daveyplate/tauri-fetch": ">=1.0.4"
+    "@tauri-apps/api": ">=2.5.0"
+    "@tauri-apps/plugin-deep-link": ">=2.2.1"
+    "@tauri-apps/plugin-http": ">=2.4.3"
+    "@tauri-apps/plugin-opener": ">=2.2.6"
+    "@tauri-apps/plugin-os": ">=2.2.1"
+    better-auth: ">=1.2.7"
+    react: ">=18.0.0"
+    react-dom: ">=18.0.0"
+  checksum: 10c0/f1835152eb07e2444d3c2ce9cb31c1853b06d6578705e1c00f42140b5b3b30156e1c5be7f15981dd7e11e4038469e811e1201617ff69eef85392e6e5065f43df
+  languageName: node
+  linkType: hard
+
+"@daveyplate/tauri-fetch@npm:^1.0.4":
+  version: 1.0.4
+  resolution: "@daveyplate/tauri-fetch@npm:1.0.4"
+  peerDependencies:
+    "@tauri-apps/api": ">=2.5.0"
+    "@tauri-apps/plugin-http": ">=2.4.3"
+    react: ">=18.0.0"
+    react-dom: ">=18.0.0"
+  checksum: 10c0/ba24679e251b32223406da2f65857412292bb125c96583bd28faccd5e230b4d48ef08cc1050cf0d65b4e4382289e02433907dfdd9b8a9415d51d4a9fb741800d
+  languageName: node
+  linkType: hard
+
 "@discoveryjs/json-ext@npm:0.5.7":
   version: 0.5.7
   resolution: "@discoveryjs/json-ext@npm:0.5.7"
@@ -18044,6 +18073,8 @@ __metadata:
     "@aws-sdk/client-s3": "npm:^3.758.0"
     "@aws-sdk/s3-request-presigner": "npm:^3.758.0"
     "@chakra-ui/react": "npm:^3.17.0"
+    "@daveyplate/better-auth-tauri": "npm:^0.0.24"
+    "@daveyplate/tauri-fetch": "npm:^1.0.4"
     "@emotion/react": "npm:^11.14.0"
     "@emotion/styled": "npm:^11.14.0"
     "@google-cloud/translate": "npm:^9.0.1"

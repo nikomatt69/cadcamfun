@@ -113,10 +113,10 @@ export default function SignIn() {
     setGithubLoading(true);
     setLocalError("");
     clearAuthError();
-
     try {
+      // Usa la funzione unificata dal contesto
       await signInWithGitHub("/");
-      // The redirect will be handled by the OAuth flow
+      // Il redirect è gestito dal flusso OAuth e dal listener Tauri
     } catch (error: any) {
       console.error("GitHub sign in error:", error);
       setLocalError(error.message || "Failed to sign in with GitHub. Please try again.");

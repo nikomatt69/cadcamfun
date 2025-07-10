@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 import { passkey } from "better-auth/plugins/passkey";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { oAuthProxy } from "better-auth/plugins";
-
+const { tauri } = require("@daveyplate/better-auth-tauri/plugin");
 export const auth = betterAuth({
   // Base URL configuration
   baseURL: process.env.NEXTAUTH_URL || (process.env.NODE_ENV === "production"
@@ -33,7 +33,14 @@ export const auth = betterAuth({
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
       clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-      redirectURI: "https://cadcamfun.xyz/api/auth/callback/github",
+      redirectURI: `${process.env.NEXTAUTH_URL}/api/auth/callback/github`,
+      scopes: ["user:email"],
+      schema: {
+        name: {
+          type: "string",
+          required: true,
+        },
+      },
     },
   },
 
@@ -54,11 +61,18 @@ export const auth = betterAuth({
       productionURL: "https://cadcamfun.xyz",
       currentURL: "http://localhost:3001",
     }),
+    tauri({
+      scheme: "cadcamfun", // Your app's deep link scheme
+      callbackURL: "/", // Optional: Where to redirect after auth (default: "/")
+      successText: "Authentication successful! You can close this window.", // Optional
+      // Optional: Custom success page URL that will receive a ?tauriRedirect search parameter
+      debugLogs: false, // Optional: Enable debug logs
+    }),
 
     // Passkeys - Perfect for desktop apps
     passkey({
       rpName: "CAD/CAM FUN",
-      rpID: process.env.NODE_ENV === "production" ? "http://localhost:3001" : "http://localhost:3001",
+      rpID: process.env.NODE_ENV === "production" ? "https://cadcamfun.xyz" : "http://localhost:3001",
     }),
 
     // Magic Links - Email-based auth without redirects
@@ -69,37 +83,33 @@ export const auth = betterAuth({
         console.log(`${url}`);
         console.log(`Copy this link to sign in\n`);
 
-        // Store in database for UI retrieval - only if not in server build
-        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-          try {
-            // Use dynamic import to avoid build-time fetch issues
-            const { httpFetch } = await import('./httpClient');
-            await httpFetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3001'}/api/auth/magic-link/store`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, url }),
-            });
+        // Store in database for UI retrieval
+        try {
+          const user = await prisma.user.findUnique({ where: { email } });
+          if (user) {
+            const urlObject = new URL(url);
+            const token = urlObject.searchParams.get('token');
 
-            console.log(`Magic link stored for UI display`);
-          } catch (error) {
-            console.log('Fallback: Magic link available in console only');
+            if (token) {
+              await prisma.token.create({
+                data: {
+                  userId: user.id,
+                  type: 'MAGIC_LINK',
+                  token: token,
+                  expiresAt: new Date(Date.now() + 20 * 60 * 1000), // 20 minutes
+                },
+              });
+              console.log(`Magic link token stored for UI display`);
+            }
           }
+        } catch (error) {
+          console.error('Failed to store magic link token:', error);
         }
       },
     }),
   ],
 
   // Trusted origins for OAuth flows
-  trustedOrigins: [
-    "http://localhost:3001",
-    "https://cadcamfun.xyz",
-    "https://github.com",
-    "cadcamfun://",
-    "tauri://",
-    "http://localhost:3000",
-    "http://localhost:3000/api/auth/callback/github",
-    "http://localhost:3000/api/auth/callback/github",
-  ],
 
   // Logging
   logger: {

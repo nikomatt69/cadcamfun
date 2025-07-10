@@ -11,7 +11,7 @@ const nextConfig = {
   output: process.env.NEXT_EXPORT === 'true' ? 'export' : undefined,
   // Fix: Use absolute path for Tauri builds
   assetPrefix: process.env.NEXT_EXPORT === 'true' ? '/' : '',
-  
+
   // Export path mapping for static export - exclude problematic pages
   ...(process.env.NEXT_EXPORT === 'true' && {
     exportPathMap: async function (defaultPathMap, { dev, dir, outDir, distDir, buildId }) {
@@ -24,11 +24,11 @@ const nextConfig = {
         '/plugins/[id]': _5,
         ...exportPathMap
       } = defaultPathMap;
-      
+
       return exportPathMap;
     }
   }),
-  
+
   // Configure images for static export
   images: {
     unoptimized: process.env.NEXT_EXPORT === 'true',
@@ -61,10 +61,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'cadcamfun.xyz/api/websocket',
       },
-      
+
     ], // Domini consentiti per il caricamento delle immagini
   },
-  
+
   // Configurazione di webpack per Next.js
   webpack: (config, { isServer, buildId, dev }) => {
     // Imposta il fallback di risoluzione dei moduli per il modulo fs su false
@@ -94,7 +94,7 @@ const nextConfig = {
     // config.output.webassemblyModuleFilename = (
     //   isServer ? '../' : ''
     // ) + 'static/wasm/[modulehash].wasm'
-    
+
     // Rule to handle WASM files (might be needed if experiments flag isn't enough)
     // config.module.rules.push({
     //   test: /\.wasm$/,
@@ -130,6 +130,7 @@ const nextConfig = {
             { key: 'X-XSS-Protection', value: '1; mode=block' },
             { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
             { key: 'Access-Control-Allow-Origin', value: '*' },
+            { key: 'Access-Control-Allow-Credentials', value: 'true' },
             { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
           ],
           source: '/(.*)'

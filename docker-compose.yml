@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cadcam_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cadcam_db
+      POSTGRES_USER: cadcam_user
+      POSTGRES_PASSWORD: cadcam_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - cadcam_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cadcam_user -d cadcam_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Opzionale: pgAdmin per gestire il database con GUI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cadcam_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@cadcam.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - cadcam_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  cadcam_network:
+    driver: bridge

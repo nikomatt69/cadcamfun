@@ -21,7 +21,7 @@ const getCustomFetch = async () => {
     // SSR environment
     return fetch;
   }
-  
+
   const env = getEnvironment();
   if (env === 'desktop') {
     await loadTauriFetch();
@@ -123,7 +123,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
   markAllAsRead: async () => {
     try {
       const fetchFn = await getCustomFetch();
-      const response = await fetchFn("/api/notifications/mark-all-read", {
+      const response = await fetchFn(`/api/notifications/mark-all-read`, {
         method: "POST"
       });
 
@@ -146,7 +146,7 @@ const useNotificationStore = create<NotificationState>((set, get) => ({
   deleteNotification: async (notificationId: string) => {
     try {
       const fetchFn = await getCustomFetch();
-      const response = await fetchFn(`/api/notifications/${notificationId}`, {
+      const response = await fetchFn(`${process.env.NEXTAUTH_URL}/api/notifications/${notificationId}`, {
         method: "DELETE"
       });
 
