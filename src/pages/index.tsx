@@ -1,5 +1,8 @@
 // src/pages/index.tsx
 import Image from 'next/image';
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { useEffect, useState, useRef } from 'react';
 import Head from 'next/head';
 import { useSession } from 'next-auth/react';
@@ -20,6 +23,7 @@ import {
   BarChart2
 } from 'react-feather';
 import Loading from '../components/ui/Loading';
+import { logger, metrics } from '@/src/lib';
 import MetaTags from '../components/layout/Metatags';
 import { UserHistory } from '@/src/components/analytics/UserHistory';
 import { AnalyticsOverview } from '../components/analytics/AnalyticsOverview';
@@ -50,12 +54,29 @@ const Layout = dynamic(
 );
 
 export default function Home() {
+  // Enterprise: Track page views
+  useEffect(() => {
+    logger.info('Page viewed', { 
+      page: window.location.pathname,
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views');
+  }, []);
+
   const { data: session, status } = useSession();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Enterprise: Track page views
+  useEffect(() => {
+    logger.info('Dashboard accessed', { 
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views.dashboard');
+  }, []);
+
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
   
   // Handle scroll to show/hide "back to top" button

@@ -759,11 +759,54 @@ export class CADToolController {
   }
   
   /**
+   * Properly dispose Three.js resources to prevent memory leaks
+   */
+  private disposeObject(obj: THREE.Object3D): void {
+    if (!obj) return;
+    
+    obj.traverse((child: THREE.Object3D) => {
+      if (child instanceof THREE.Mesh) {
+        if (child.geometry) {
+          child.geometry.dispose();
+        }
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((mat: THREE.Material) => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
+      if (child instanceof THREE.Line) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((mat: THREE.Material) => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
+      if (child instanceof THREE.LineSegments) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((mat: THREE.Material) => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      }
+    });
+  }
+
+  /**
    * Remove the preview object
    */
   private removePreview(): void {
     if (this.previewObject && this.scene) {
       this.scene.remove(this.previewObject);
+      this.disposeObject(this.previewObject);
       this.previewObject = null;
       
       // Notify listeners

@@ -5,8 +5,10 @@ import { useCADStore } from 'src/store/cadStore';
 import { useElementsStore } from 'src/store/elementsStore';
 
 const StatusBar: React.FC = () => {
-  const { viewMode, workpiece } = useCADStore();
-  const { selectedElement, mousePosition } = useElementsStore();
+  const viewMode = useCADStore((state) => state.viewMode);
+  const workpiece = useCADStore((state) => state.workpiece);
+  const selectedElement = useElementsStore((state) => state.selectedElement);
+  const mousePosition = useElementsStore((state) => state.mousePosition);
   
   const statusItemVariants = {
     hidden: { opacity: 0, y: 20 },

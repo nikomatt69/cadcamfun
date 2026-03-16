@@ -1,3 +1,6 @@
+// src/lib/ai/unifiedAIService.ts
+// Unified AI Service - Now using AIProvider with multi-provider support
+
 import { AIModelType, AIRequest, AIResponse, TextToCADRequest, AIDesignSuggestion, MCPRequestParams, MCPResponse } from '@/src/types/AITypes';
 import { aiCache } from './ai-new/aiCache';
 import { aiAnalytics } from './ai-new/aiAnalytics';
@@ -5,10 +8,58 @@ import { promptTemplates } from './promptTemplates';
 import { Element } from '@/src/store/elementsStore';
 import { mcpService } from './ai-new/mcpService';
 import { aiConfigManager } from './ai-new/aiConfigManager';
+import { AIProvider, createAIProvider, type ProviderType, type AIProviderConfig } from './AIProvider';
+
+// Cache for provider instances
+const providerCache = new Map<string, AIProvider>();
+
+function getProviderFromConfig(config: {
+  provider?: ProviderType;
+  apiKey?: string;
+  model?: string;
+}): AIProvider {
+  const providerKey = config.provider || 'openrouter';
+  const apiKey = config.apiKey || '';
+  
+  // Check cache
+  const cacheKey = `${providerKey}-${apiKey.slice(0, 8)}`;
+  if (providerCache.has(cacheKey)) {
+    return providerCache.get(cacheKey)!;
+  }
+
+  // Create new provider
+  const providerConfig: AIProviderConfig = {
+    provider: providerKey,
+    apiKey: apiKey || getDefaultApiKey(providerKey),
+    model: config.model,
+  };
+
+  const provider = createAIProvider(providerConfig);
+  providerCache.set(cacheKey, provider);
+  
+  return provider;
+}
+
+function getDefaultApiKey(provider: ProviderType): string {
+  switch (provider) {
+    case 'openrouter':
+      return process.env.OPENROUTER_API_KEY || '';
+    case 'openai':
+      return process.env.OPENAI_API_KEY || '';
+    case 'anthropic':
+      return process.env.ANTHROPIC_API_KEY || '';
+    case 'google':
+      return process.env.GOOGLE_API_KEY || '';
+    default:
+      return process.env.OPENAI_API_KEY || '';
+  }
+}
 
 /**
  * Servizio AI unificato che gestisce tutte le interazioni con i modelli AI
  * e fornisce metodi specializzati per i diversi casi d'uso dell'applicazione.
+ * 
+ * Ora supporta provider multipli: OpenAI, Anthropic, Google, OpenRouter
  */
 export class UnifiedAIService {
   private apiKey: string;
@@ -17,7 +68,9 @@ export class UnifiedAIService {
   private defaultMaxTokens: number = 6000;
   private mcpEnabled: boolean = false;
   private mcpStrategy: 'aggressive' | 'balanced' | 'conservative' = 'balanced';
-  private mcpCacheLifetime: number = 3600000; // 1 ora in millisecondi
+  private mcpCacheLifetime: number = 3600000;
+  private currentProvider: ProviderType = 'openrouter'; // Default to openrouter
+  private aiProvider: AIProvider | null = null;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || '';
@@ -30,7 +83,6 @@ export class UnifiedAIService {
       this.allowBrowser = config.allowBrowser ?? this.allowBrowser;
       this.mcpEnabled = config.mcpEnabled ?? this.mcpEnabled;
       
-      // Carica le impostazioni MCP se disponibili
       if (config.mcpStrategy) {
         this.mcpStrategy = config.mcpStrategy as 'aggressive' | 'balanced' | 'conservative';
       }
@@ -38,6 +90,43 @@ export class UnifiedAIService {
         this.mcpCacheLifetime = config.mcpCacheLifetime;
       }
     }
+    
+    // Initialize the AI provider
+    this.initializeProvider();
+  }
+
+  private initializeProvider(): void {
+    try {
+      this.aiProvider = getProviderFromConfig({
+        provider: this.currentProvider,
+        apiKey: this.apiKey,
+        model: this.defaultModel,
+      });
+    } catch (error) {
+      console.warn('Failed to initialize AI provider, will use proxy:', error);
+    }
+  }
+
+  /**
+   * Set the current AI provider
+   */
+  setProvider(provider: ProviderType, apiKey?: string): void {
+    this.currentProvider = provider;
+    this.aiProvider = getProviderFromConfig({
+      provider,
+      apiKey: apiKey || this.apiKey,
+      model: this.defaultModel,
+    });
+  }
+
+  /**
+   * Get current provider info
+   */
+  getProviderInfo(): { provider: ProviderType; model: string } {
+    return {
+      provider: this.currentProvider,
+      model: this.defaultModel,
+    };
   }
 
   /**
@@ -55,10 +144,9 @@ export class UnifiedAIService {
     useMCP,
     mcpParams
   }: AIRequest): Promise<AIResponse<T>> {
-    // Determina se utilizzare MCP
+    // Check if MCP is enabled and should be used
     const shouldUseMCP = useMCP ?? this.mcpEnabled;
     
-    // Se MCP è abilitato, utilizza il servizio MCP
     if (shouldUseMCP) {
       return this.processMCPRequest<T>({
         prompt,
@@ -73,7 +161,7 @@ export class UnifiedAIService {
       });
     }
     
-    // Genera una chiave di cache basata sui parametri della richiesta
+    // Generate cache key
     const cacheKey = aiCache.getKeyForRequest({ 
       prompt, 
       model, 
@@ -81,7 +169,7 @@ export class UnifiedAIService {
       temperature 
     });
     
-    // Verifica se la risposta è già in cache
+    // Check cache
     const cachedResponse = aiCache.get<AIResponse<T>>(cacheKey);
     if (cachedResponse) {
       return {
@@ -90,7 +178,7 @@ export class UnifiedAIService {
       };
     }
     
-    // Traccia l'inizio della richiesta per analytics
+    // Track request start
     const requestId = aiAnalytics.trackRequestStart(
       'ai_request', 
       model, 
@@ -100,14 +188,58 @@ export class UnifiedAIService {
     const startTime = Date.now();
     
     try {
-      let fullResponse = '';
-      let tokenUsage = {
-        promptTokens: Math.round(prompt.length / 4), // stima approssimativa
-        completionTokens: 0,
-        totalTokens: Math.round(prompt.length / 4)
-      };
-      
-      // Usa il proxy API invece di chiamare direttamente Anthropic
+      // Try to use the new AIProvider first
+      if (this.aiProvider) {
+        const result = await this.aiProvider.generateText({
+          prompt,
+          system: systemPrompt,
+          temperature,
+          maxTokens,
+        });
+
+        const processingTime = Date.now() - startTime;
+        
+        aiAnalytics.trackRequestComplete(
+          requestId,
+          processingTime,
+          true,
+          result.usage?.promptTokens || 0,
+          result.usage?.completionTokens || 0
+        );
+
+        let parsedData: T | null = null;
+        let parsingError: Error | null = null;
+        
+        if (parseResponse && result.text) {
+          try {
+            parsedData = await parseResponse(result.text);
+          } catch (err) {
+            parsingError = err instanceof Error ? err : new Error('Failed to parse response');
+          }
+        }
+
+        const finalResponse: AIResponse<T> = {
+          rawResponse: result.text,
+          data: parsedData,
+          error: parsingError?.message,
+          parsingError,
+          processingTime,
+          model,
+          success: !parsingError,
+          usage: result.usage,
+          metadata: {
+            ...metadata,
+            requestId,
+            provider: this.currentProvider,
+          }
+        };
+
+        aiCache.set(cacheKey, finalResponse);
+        
+        return finalResponse;
+      }
+
+      // Fallback to proxy API
       const response = await fetch('/api/ai/proxy', {
         method: 'POST',
         headers: {
@@ -118,7 +250,8 @@ export class UnifiedAIService {
           messages: [{ role: 'user', content: prompt }],
           max_tokens: maxTokens,
           temperature,
-          system: systemPrompt
+          system: systemPrompt,
+          provider: this.currentProvider,
         })
       });
       
@@ -128,29 +261,20 @@ export class UnifiedAIService {
       }
       
       const data = await response.json();
+      const fullResponse = data.content?.[0]?.text || data.content?.[0]?.type === 'text' ? data.content[0].text : '';
       
-      // Estrai il testo dalla risposta
-      fullResponse = data.content[0]?.type === 'text' 
-        ? data.content[0].text 
-        : '';
-        
-      // Ottieni l'utilizzo dei token dalla risposta
-      if (data.usage) {
-        tokenUsage = {
-          promptTokens: data.usage.input_tokens,
-          completionTokens: data.usage.output_tokens,
-          totalTokens: data.usage.input_tokens + data.usage.output_tokens
-        };
-      } else {
-        // Stima dei token se non disponibile nella risposta
-        tokenUsage.completionTokens = Math.round(fullResponse.length / 4);
-        tokenUsage.totalTokens = tokenUsage.promptTokens + tokenUsage.completionTokens;
-      }
-      
-      // Calcola il tempo di elaborazione
+      const tokenUsage = data.usage ? {
+        promptTokens: data.usage.input_tokens,
+        completionTokens: data.usage.output_tokens,
+        totalTokens: data.usage.input_tokens + data.usage.output_tokens
+      } : {
+        promptTokens: Math.round(prompt.length / 4),
+        completionTokens: Math.round(fullResponse.length / 4),
+        totalTokens: Math.round(prompt.length / 4) + Math.round(fullResponse.length / 4)
+      };
+
       const processingTime = Date.now() - startTime;
       
-      // Registra il completamento della richiesta
       aiAnalytics.trackRequestComplete(
         requestId,
         processingTime,
@@ -158,8 +282,7 @@ export class UnifiedAIService {
         tokenUsage.promptTokens,
         tokenUsage.completionTokens
       );
-      
-      // Analizza la risposta se è fornita una funzione di parsing
+
       let parsedData: T | null = null;
       let parsingError: Error | null = null;
       
@@ -168,21 +291,9 @@ export class UnifiedAIService {
           parsedData = await parseResponse(fullResponse);
         } catch (err) {
           parsingError = err instanceof Error ? err : new Error('Failed to parse response');
-          
-          // Traccia l'errore di parsing
-          aiAnalytics.trackEvent({
-            eventType: 'error',
-            eventName: 'parsing_error',
-            success: false,
-            metadata: { 
-              requestId, 
-              error: parsingError.message 
-            }
-          });
         }
       }
-      
-      // Prepara la risposta finale
+
       const finalResponse: AIResponse<T> = {
         rawResponse: fullResponse,
         data: parsedData,
@@ -194,16 +305,15 @@ export class UnifiedAIService {
         usage: tokenUsage,
         metadata: {
           ...metadata,
-          requestId
+          requestId,
+          provider: this.currentProvider,
         }
       };
-      
-      // Memorizza la risposta nella cache
+
       aiCache.set(cacheKey, finalResponse);
       
       return finalResponse;
     } catch (error) {
-      // Traccia l'errore
       aiAnalytics.trackEvent({
         eventType: 'error',
         eventName: 'api_error',
@@ -214,8 +324,7 @@ export class UnifiedAIService {
           message: error instanceof Error ? error.message : 'Unknown error' 
         }
       });
-      
-      // Restituisci una risposta di errore
+
       return {
         rawResponse: null,
         data: null,
@@ -238,29 +347,22 @@ export class UnifiedAIService {
    * Elabora una richiesta tramite il protocollo MCP
    */
   private async processMCPRequest<T>(request: AIRequest): Promise<AIResponse<T>> {
-    // Configura parametri MCP basati sulla strategia selezionata
     const defaultMCPParams: MCPRequestParams = this.getMCPParamsFromStrategy();
     
-    // Unisci i parametri di default con quelli forniti (se presenti)
     const mcpParams: MCPRequestParams = {
       ...defaultMCPParams,
       ...(request.mcpParams || {})
     };
-    
-    // Aggiungi parametri MCP alla richiesta
+
     const mcpRequest: AIRequest = {
       ...request,
       mcpParams
     };
-    
+
     try {
-      // Determina la priorità in base al tipo di richiesta
       const priority = this.getMCPPriorityFromMetadata(request.metadata);
-      
-      // Invia la richiesta tramite MCP service
       const mcpResponse = await mcpService.enqueue<T>(mcpRequest, priority);
-      
-      // Registra analisi MCP se è stata utilizzata la cache
+
       if (mcpResponse.cacheHit) {
         aiAnalytics.trackEvent({
           eventType: 'mcp',
@@ -272,23 +374,17 @@ export class UnifiedAIService {
           }
         });
       }
-      
+
       return mcpResponse.response;
     } catch (error) {
       console.error('MCP request failed:', error);
-      
-      // Fallback al processamento standard in caso di errore MCP
       console.log('Falling back to standard request processing');
       
-      // Rimuovi i parametri MCP e riprova con il processamento standard
       const { mcpParams, useMCP, ...standardRequest } = request;
       return this.processRequest<T>(standardRequest);
     }
   }
   
-  /**
-   * Determina i parametri MCP basati sulla strategia configurata
-   */
   private getMCPParamsFromStrategy(): MCPRequestParams {
     switch (this.mcpStrategy) {
       case 'aggressive':
@@ -319,31 +415,17 @@ export class UnifiedAIService {
     }
   }
   
-  /**
-   * Determina la priorità MCP in base ai metadati della richiesta
-   */
   private getMCPPriorityFromMetadata(metadata: Record<string, any> = {}): 'high' | 'normal' | 'low' {
     const requestType = metadata?.type || '';
     
-    // Richieste ad alta priorità
-    if (
-      requestType.includes('message') || 
-      requestType.includes('critical') ||
-      requestType.includes('interactive')
-    ) {
+    if (requestType.includes('message') || requestType.includes('critical') || requestType.includes('interactive')) {
       return 'high';
     }
     
-    // Richieste a bassa priorità
-    if (
-      requestType.includes('background') || 
-      requestType.includes('batch') ||
-      requestType.includes('analysis')
-    ) {
+    if (requestType.includes('background') || requestType.includes('batch') || requestType.includes('analysis')) {
       return 'low';
     }
     
-    // Priorità normale di default
     return 'normal';
   }
 
@@ -359,28 +441,20 @@ export class UnifiedAIService {
       context = [] 
     } = request;
     
-    // Costruisce il prompt di sistema utilizzando il template
     const systemPrompt = promptTemplates.textToCAD.system
       .replace('{{complexity}}', complexity)
       .replace('{{style}}', style);
     
-    // Costruisce il prompt utente
     let prompt = promptTemplates.textToCAD.user.replace('{{description}}', description);
     
-    // Aggiunge i vincoli se presenti
     if (constraints) {
       prompt += '\n\nConstraints:\n' + JSON.stringify(constraints, null, 2);
     }
     
-    // Aggiunge il contesto se presente
     if (context && context.length > 0) {
-      prompt += '\n\nReference Context:\n';
-      
-      // Limita la dimensione di ciascun contesto per evitare di superare i limiti di token
-      const maxContextLength = 3000; // Dimensione massima in caratteri per documento
+      const maxContextLength = 3000;
       
       context.forEach((contextItem, index) => {
-        // Tronca il contesto se troppo lungo
         const truncatedContext = contextItem.length > maxContextLength 
           ? contextItem.substring(0, maxContextLength) + '... [content truncated]' 
           : contextItem;
@@ -388,16 +462,13 @@ export class UnifiedAIService {
         prompt += `\n--- Context Document ${index + 1} ---\n${truncatedContext}\n`;
       });
       
-      // Aggiunge istruzioni specifiche per l'utilizzo del contesto
-      prompt += '\n\nPlease consider the above reference context when generating the CAD model. ' +
-                'Use relevant specifications, measurements, and design principles from the context ' +
-                'to inform your design, while adhering to the provided constraints.';
+      prompt += '\n\nPlease consider the above reference context when generating the CAD model.';
     }
     
     return this.processRequest<Element[]>({
       prompt,
       systemPrompt,
-      model: 'claude-3-7-sonnet-20250219', // Usa il modello più potente per generazione CAD
+      model: 'claude-3-7-sonnet-20250219',
       temperature: complexity === 'creative' ? 0.8 : 0.5,
       maxTokens: this.defaultMaxTokens,
       parseResponse: this.parseTextToCADResponse,
@@ -411,8 +482,6 @@ export class UnifiedAIService {
     });
   }
 
-
-
   /**
    * Analizza progetti CAD e fornisce suggerimenti
    */
@@ -423,8 +492,8 @@ export class UnifiedAIService {
     return this.processRequest<AIDesignSuggestion[]>({
       prompt,
       systemPrompt: promptTemplates.designAnalysis.system,
-      model: 'claude-3-7-sonnet-20250219', // Usa il modello più potente per analisi approfondite
-      temperature: 0.3, // Temperatura bassa per risposte più analitiche
+      model: 'claude-3-7-sonnet-20250219',
+      temperature: 0.3,
       maxTokens: this.defaultMaxTokens,
       parseResponse: this.parseDesignResponse,
       metadata: {
@@ -458,7 +527,7 @@ export class UnifiedAIService {
       model: 'claude-3-5-sonnet-20240229',
       temperature: 0.3,
       maxTokens: this.defaultMaxTokens,
-      parseResponse: (text) => Promise.resolve(text), // Non serve parsing speciale
+      parseResponse: (text) => Promise.resolve(text),
       metadata: {
         type: 'gcode_optimization',
         machineType,
@@ -477,12 +546,12 @@ export class UnifiedAIService {
     Context details:
     ${context}
     
-    Provide suggestions as a JSON array of strings. Each suggestion should be clear, specific, and actionable.`;
+    Provide suggestions as a JSON array of strings.`;
     
     return this.processRequest<string[]>({
       prompt,
-      systemPrompt: `You are an AI CAD/CAM assistant helping users with ${mode} tasks. Generate helpful context-aware suggestions.`,
-      model: 'claude-3-haiku-20240229', // Usa il modello più veloce per suggerimenti
+      systemPrompt: `You are an AI CAD/CAM assistant helping users with ${mode} tasks.`,
+      model: 'claude-3-haiku-20240229',
       temperature: 0.7,
       maxTokens: 1000,
       parseResponse: this.parseSuggestionsResponse,
@@ -494,7 +563,7 @@ export class UnifiedAIService {
   }
 
   /**
-   * Ottimizza parametri di lavorazione in base al materiale e all'utensile
+   * Ottimizza parametri di lavorazione
    */
   async optimizeMachiningParameters(material: string, toolType: string, operation: string): Promise<AIResponse<any>> {
     const prompt = promptTemplates.machiningParameters.user
@@ -520,39 +589,11 @@ export class UnifiedAIService {
   }
 
   /**
-   * Genera completamenti per G-code durante l'editing
-   */
-  async completeGCode(context: string, cursorPosition: any): Promise<AIResponse<string>> {
-    const prompt = `Complete the following G-code at the cursor position.
-    
-    Current G-code:
-    ${context}
-    
-    Cursor position: line ${cursorPosition.lineNumber}, column ${cursorPosition.column}
-    
-    Provide only the completion text, no explanations.`;
-    
-    return this.processRequest<string>({
-      prompt,
-      systemPrompt: `You are a CNC programming expert. Complete G-code accurately and efficiently.`,
-      model: 'claude-3-haiku-20240229', // Modello veloce per completamenti in tempo reale
-      temperature: 0.2,
-      maxTokens: 100,
-      parseResponse: (text) => Promise.resolve(text.trim()),
-      metadata: {
-        type: 'gcode_completion',
-        contextLength: context.length
-      }
-    });
-  }
-
-  /**
    * Processa un messaggio diretto dall'assistente AI
    */
   async processMessage(message: string, mode: string): Promise<AIResponse<string>> {
     let contextPrefix = '';
     
-    // Aggiunge contesto in base alla modalità
     switch (mode) {
       case 'cad':
         contextPrefix = 'You are an expert CAD design assistant helping with 3D modeling. ';
@@ -572,7 +613,7 @@ export class UnifiedAIService {
     
     return this.processRequest<string>({
       prompt: message,
-      systemPrompt: contextPrefix + 'Provide helpful, concise, and accurate responses to the user.',
+      systemPrompt: contextPrefix + 'Provide helpful, concise, and accurate responses.',
       model: 'claude-3-5-sonnet-20240229',
       temperature: 0.7,
       maxTokens: 4000,
@@ -595,23 +636,24 @@ export class UnifiedAIService {
     mcpEnabled?: boolean;
     mcpStrategy?: 'aggressive' | 'balanced' | 'conservative';
     mcpCacheLifetime?: number;
+    provider?: ProviderType;
+    apiKey?: string;
   }): void {
     if (config.defaultModel) this.defaultModel = config.defaultModel;
     if (config.defaultMaxTokens) this.defaultMaxTokens = config.defaultMaxTokens;
     if (config.allowBrowser !== undefined) this.allowBrowser = config.allowBrowser;
-    
-    // Aggiungi configurazioni MCP
     if (config.mcpEnabled !== undefined) this.mcpEnabled = config.mcpEnabled;
     if (config.mcpStrategy) this.mcpStrategy = config.mcpStrategy;
     if (config.mcpCacheLifetime) this.mcpCacheLifetime = config.mcpCacheLifetime;
+    
+    if (config.provider) {
+      this.setProvider(config.provider, config.apiKey);
+    }
   }
 
-  /**
-   * Parser: Converti testo in elementi CAD
-   */
+  // Private parsing methods
   private parseTextToCADResponse = async (text: string): Promise<Element[]> => {
     try {
-      // Cerca blocchi JSON nella risposta
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
                         text.match(/\[\s*\{[\s\S]*\}\s*\]/);
                         
@@ -622,7 +664,6 @@ export class UnifiedAIService {
       const json = jsonMatch[1] || jsonMatch[0];
       const elements = JSON.parse(json);
       
-      // Valida e arricchisce gli elementi con valori predefiniti
       return elements.map((el: any) => ({
         type: el.type || 'cube',
         x: el.x ?? 0,
@@ -648,16 +689,12 @@ export class UnifiedAIService {
     }
   };
 
-  /**
-   * Parser: Analisi del design
-   */
   private parseDesignResponse = async (text: string): Promise<AIDesignSuggestion[]> => {
     try {
-      // Cerca JSON in diversi formati
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
                         text.match(/```\n([\s\S]*?)\n```/) ||
                         text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-                        
+      
       if (!jsonMatch) {
         throw new Error('No valid JSON found in response');
       }
@@ -665,7 +702,6 @@ export class UnifiedAIService {
       const json = jsonMatch[1] || jsonMatch[0];
       const parsed = JSON.parse(json);
       
-      // Gestisce sia array diretti che oggetti annidati
       if (Array.isArray(parsed)) {
         return parsed;
       } else if (parsed.suggestions) {
@@ -679,24 +715,18 @@ export class UnifiedAIService {
     }
   };
 
-  /**
-   * Parser: Suggerimenti
-   */
   private parseSuggestionsResponse = async (text: string): Promise<string[]> => {
     try {
-      // Cerca JSON in diversi formati
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
                         text.match(/\[\s*"[\s\S]*"\s*\]/) ||
                         text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-                        
+      
       if (!jsonMatch) {
-        // Se non trova JSON, estrae elenchi puntati
         const bulletPoints = text.match(/[-*]\s+([^\n]+)/g);
         if (bulletPoints) {
           return bulletPoints.map(point => point.replace(/^[-*]\s+/, '').trim());
         }
         
-        // Altrimenti divide per righe
         return text.split('\n')
           .map(line => line.trim())
           .filter(line => line.length > 0);
@@ -705,12 +735,11 @@ export class UnifiedAIService {
       const json = jsonMatch[1] || jsonMatch[0];
       const parsed = JSON.parse(json);
       
-      // Gestisce sia array di stringhe che array di oggetti
       if (Array.isArray(parsed)) {
         if (typeof parsed[0] === 'string') {
           return parsed;
         } else if (typeof parsed[0] === 'object') {
-          return parsed.map(item => item.text || item.suggestion || item.description || JSON.stringify(item));
+          return parsed.map((item: any) => item.text || item.suggestion || item.description || JSON.stringify(item));
         }
       }
       
@@ -721,24 +750,18 @@ export class UnifiedAIService {
     }
   };
 
-  /**
-   * Parser: Parametri di lavorazione
-   */
   private parseMachiningResponse = async (text: string): Promise<any> => {
     try {
-      // Cerca JSON in diversi formati
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
                         text.match(/\{[\s\S]*\}/);
-                        
+      
       if (jsonMatch) {
         const json = jsonMatch[1] || jsonMatch[0];
         return JSON.parse(json);
       }
       
-      // Se non trova JSON, crea un oggetto strutturato
       const params: any = {};
       
-      // Estrae velocità di taglio (SFM o m/min)
       const speedMatch = text.match(/cutting speed:?\s*([\d.]+)\s*(sfm|m\/min)/i);
       if (speedMatch) {
         params.cuttingSpeed = {
@@ -747,7 +770,6 @@ export class UnifiedAIService {
         };
       }
       
-      // Estrae avanzamento (feed rate)
       const feedMatch = text.match(/feed(?:\s*rate)?:?\s*([\d.]+)\s*(ipr|mm\/rev)/i);
       if (feedMatch) {
         params.feedRate = {
@@ -756,7 +778,6 @@ export class UnifiedAIService {
         };
       }
       
-      // Estrae profondità di taglio
       const depthMatch = text.match(/depth of cut:?\s*([\d.]+)\s*(in|mm)/i);
       if (depthMatch) {
         params.depthOfCut = {
@@ -764,13 +785,7 @@ export class UnifiedAIService {
           unit: depthMatch[2].toLowerCase()
         };
       }
-      
-      // Estrae step-over
-      const stepoverMatch = text.match(/step(?:\s*over|\-over):?\s*([\d.]+)(?:\s*%)?/i);
-      if (stepoverMatch) {
-        params.stepover = parseFloat(stepoverMatch[1]);
-      }
-      
+
       return params;
     } catch (error) {
       console.error('Failed to parse machining parameters:', error);

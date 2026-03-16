@@ -16,7 +16,7 @@ import { LanguageProvider } from '../contexts/LanguageContext';
 import { camFont } from 'src/lib/camFont';
 
 import { useEffect } from 'react';
-import ErrorBoundary from '../components/ui/ErrorBonduary';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { SubscriptionProvider } from '../contexts/SubscriptionContext';
 import PageViewTracker from '../components/analytics/PageViewTracker';
 import usePageTracker from '../hooks/usePageTracker';
@@ -41,6 +41,10 @@ import { InMemoryPluginStorage } from '@/src/plugins/core/registry/pluginStorage
 
 import { useElementsStore } from 'src/store/elementsStore';
 
+
+// Enterprise: Initialize logging and monitoring
+import { logger } from '@/src/lib/error/logger';
+import { monitoring } from '@/src/lib/monitoring';
 
 // Ensure this initialization runs only once client-side
 let pluginSystemInitialized = false;

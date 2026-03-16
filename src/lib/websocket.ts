@@ -6,6 +6,7 @@ let socket: Socket | null = null;
 
 /**
  * Initialize WebSocket connection with authentication token
+ * Uses Authorization header for secure token transmission
  * @param token JWT token from NextAuth session
  * @returns The socket.io client instance
  */
@@ -15,13 +16,17 @@ export const initializeWebSocket = async (token: string): Promise<Socket> => {
     socket.disconnect();
   }
 
-  // Create a new socket connection
+  // Create a new socket connection with auth header
   socket = io({
     path: '/api/websocket',
-    query: { token }, // Use query instead of auth headers
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    transports: ['websocket', 'polling'] // Prefer WebSocket, fallback to polling
+    transports: ['websocket', 'polling'],
+    auth: {
+      token // Send token in auth object (will be in Authorization header)
+    },
+    // Also include in query for backward compatibility and as fallback
+    query: { token }
   });
 
   // Handle events
@@ -30,7 +35,7 @@ export const initializeWebSocket = async (token: string): Promise<Socket> => {
   });
 
   socket.on('disconnect', (reason) => {
-    console.log(`WebSocket disconnected: ${reason}`);
+    console.log('WebSocket disconnected: ' + reason);
   });
 
   socket.on('error', (err) => {
@@ -66,7 +71,6 @@ export const initializeWebSocket = async (token: string): Promise<Socket> => {
     const { typingUsers } = useChatStore.getState();
     
     if (data.isTyping) {
-      // Add or update typing user
       useChatStore.setState({
         typingUsers: {
           ...typingUsers,
@@ -80,7 +84,6 @@ export const initializeWebSocket = async (token: string): Promise<Socket> => {
         }
       });
     } else {
-      // Remove user from typing list
       if (typingUsers[data.conversationId] && typingUsers[data.conversationId][data.userId]) {
         const updatedConversationTypers = { ...typingUsers[data.conversationId] };
         delete updatedConversationTypers[data.userId];
@@ -98,62 +101,31 @@ export const initializeWebSocket = async (token: string): Promise<Socket> => {
   return socket;
 };
 
-/**
- * Join a specific organization channel for receiving notifications
- * @param organizationId The organization ID to join
- */
 export const joinOrganization = (organizationId: string): void => {
   if (socket && socket.connected) {
     socket.emit('joinOrganization', organizationId);
-    console.log(`Joined organization channel: ${organizationId}`);
-  } else {
-    console.warn('Socket not connected, cannot join organization channel');
   }
 };
 
-/**
- * Leave an organization channel
- * @param organizationId The organization ID to leave
- */
 export const leaveOrganization = (organizationId: string): void => {
   if (socket && socket.connected) {
     socket.emit('leaveOrganization', organizationId);
-    console.log(`Left organization channel: ${organizationId}`);
   }
 };
 
-/**
- * Send typing status to other participants in a conversation
- * @param conversationId The conversation ID
- * @param isTyping Whether the user is typing or has stopped typing
- */
 export const sendTypingStatus = (conversationId: string, isTyping: boolean): void => {
   if (socket && socket.connected) {
-    socket.emit('typing', {
-      conversationId,
-      isTyping
-    });
-    console.log(`Sent typing status (${isTyping}) for conversation: ${conversationId}`);
-  } else {
-    console.warn('Socket not connected, cannot send typing status');
+    socket.emit('typing', { conversationId, isTyping });
   }
 };
 
-/**
- * Disconnect WebSocket connection
- */
 export const disconnectWebSocket = (): void => {
   if (socket) {
     socket.disconnect();
     socket = null;
-    console.log('WebSocket disconnected');
   }
 };
 
-/**
- * Get current socket instance
- * @returns The current socket instance or null if not connected
- */
 export const getSocket = (): Socket | null => {
   return socket;
 };

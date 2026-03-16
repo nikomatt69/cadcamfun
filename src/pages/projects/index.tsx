@@ -1,5 +1,8 @@
 // src/pages/projects/index.tsx
 import { useState, useEffect } from 'react';
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { DynamicLayout } from 'src/components/dynamic-imports';
@@ -308,6 +311,15 @@ const ProjectCard = ({ project, onClick }: { project: Project, onClick: () => vo
 };
 
 export default function ProjectsPage() {
+  // Enterprise: Track page views
+  useEffect(() => {
+    logger.info('Page viewed', { 
+      page: window.location.pathname,
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views');
+  }, []);
+
   const { data: session, status } = useSession();
   const router = useRouter();
   const shouldReduceMotion = useReducedMotion();

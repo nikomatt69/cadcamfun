@@ -38,7 +38,10 @@ const Tool: React.FC<ToolProps> = ({ name, icon, onClick, active }) => {
 };
 
 const ToolSelector: React.FC = () => {
-  const { activeTool, setActiveTool, toggleGrid, toggleAxis } = useCADStore();
+  const activeTool = useCADStore((state) => state.activeTool);
+  const setActiveTool = useCADStore((state) => state.setActiveTool);
+  const toggleGrid = useCADStore((state) => state.toggleGrid);
+  const toggleAxis = useCADStore((state) => state.toggleAxis);
   
   const tools: any[] = [
     // ... existing tools array

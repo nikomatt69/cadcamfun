@@ -1,0 +1,21 @@
+/* CSS Variables - Design Tokens */
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --secondary: #f59e0b;
+  --secondary-dark: #d97706;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --foreground: #1f2937;
+  --background: #f9fafb;
+  --surface: #ffffff;
+  --surface-hover: #f3f4f6;
+  
+  /* CAD-specific colors */
+  --cad-grid: #e5e7eb;
+  --cad-selection: #3b82f6;
+  --cad-preview: #4caf50;
+  --cad-error: #ef4444;
+}

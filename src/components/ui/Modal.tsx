@@ -1,144 +1,133 @@
-import React, { ReactNode, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// src/components/ui/Modal.tsx
+// Unified Modal component using Headless UI for accessibility
+import React, { Fragment, ReactNode } from 'react';
+import { Dialog as HeadlessDialog, Transition } from '@headlessui/react';
 import { X } from 'react-feather';
 
-interface ModalProps {
+export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | '2xl' | '3xl' | '4xl' | '5xl';
+  showCloseButton?: boolean;
   preventBackdropClose?: boolean;
+  className?: string;
+  closeOnEscape?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ 
+/**
+ * Unified Modal component
+ * Uses Headless UI for better accessibility
+ * Replaces both the old Modal and Dialog components
+ */
+export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
   children,
   size = 'md',
-  preventBackdropClose = false
+  showCloseButton = true,
+  preventBackdropClose = false,
+  className = '',
+  closeOnEscape = true,
 }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-  
-  // Handle escape key to close modal
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !preventBackdropClose) {
-        onClose();
-      }
-    };
-    
-    if (isOpen) {
-      window.addEventListener('keydown', handleEscape);
-    }
-    
-    return () => {
-      window.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen, onClose, preventBackdropClose]);
-  
-  // Size classes for different screen sizes
-  const sizeClasses = {
+  // Size mapping for max-width
+  const sizeMap: Record<string, string> = {
     sm: 'max-w-sm',
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
-    full: 'max-w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl w-full'
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    full: 'max-w-full',
   };
 
-  const modalVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
-    visible: { opacity: 1, y: 0, scale: 1 }
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    // Only close if clicking directly on the backdrop, not on modal content
-    if (!preventBackdropClose && e.target === e.currentTarget) {
+  const handleClose = () => {
+    if (!preventBackdropClose) {
       onClose();
     }
   };
 
-  const isMobileFullScreen = size === 'full';
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
+    <Transition appear show={isOpen} as={Fragment}>
+      <HeadlessDialog 
+        as="div" 
+        className={`relative z-50 ${className}`} 
+        onClose={handleClose}
+        static={preventBackdropClose}
+      >
+        {/* Backdrop */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          {/* Backdrop */}
-          <motion.div 
-            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleBackdropClick}
-          />
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+        </Transition.Child>
 
-          {/* Modal panel */}
-          <motion.div
-            className={`bg-white dark:bg-gray-800 dark:text-white 
-              ${isMobileFullScreen ? 'fixed bottom-0 left-0 right-0 sm:relative sm:rounded-lg rounded-t-xl' : 'rounded-xl'} 
-              text-left overflow-hidden shadow-xl transform transition-all
-              ${sizeClasses[size]} w-full z-10`}
-            variants={modalVariants}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxHeight: isMobileFullScreen ? '90vh' : undefined
-            }}
-          >
-            <div className="sticky top-0 z-10 px-4 pt-5 pb-4 sm:p-6 sm:pb-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <motion.h3 
-                  className="text-lg font-medium text-gray-900 dark:text-white truncate pr-8"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                >
-                  {title}
-                </motion.h3>
-                <motion.button
-                  className="rounded-full p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
-                  onClick={onClose}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <span className="sr-only">Close</span>
-                  <X size={20} />
-                </motion.button>
-              </div>
-            </div>
-            <motion.div 
-              ref={contentRef}
-              className={`px-4 pt-4 pb-6 sm:p-6 ${isMobileFullScreen ? 'overflow-y-auto max-h-[70vh] sm:max-h-[60vh]' : ''}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
+        {/* Modal container */}
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95 translate-y-4"
+              enterTo="opacity-100 scale-100 translate-y-0"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100 translate-y-0"
+              leaveTo="opacity-0 scale-95 translate-y-4"
             >
-              {children}
-            </motion.div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+              <HeadlessDialog.Panel 
+                className={`
+                  w-full ${sizeMap[size]} 
+                  transform overflow-hidden 
+                  rounded-2xl 
+                  bg-white dark:bg-gray-800 
+                  p-6 
+                  text-left 
+                  align-middle 
+                  shadow-2xl 
+                  transition-all
+                  border border-gray-100 dark:border-gray-700
+                `}
+              >
+                {/* Header */}
+                {(title || showCloseButton) && (
+                  <div className="flex items-center justify-between mb-4">
+                    {title && (
+                      <HeadlessDialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {title}
+                      </HeadlessDialog.Title>
+                    )}
+                    {showCloseButton && (
+                      <button
+                        onClick={onClose}
+                        className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Close modal"
+                      >
+                        <X size={20} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="mt-2">
+                  {children}
+                </div>
+              </HeadlessDialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </HeadlessDialog>
+    </Transition>
   );
 };
 

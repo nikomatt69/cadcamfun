@@ -1,0 +1,88 @@
+/* CAD Editor Styles */
+
+/* Ensure canvas fills available space */
+.canvas-container {
+  @apply w-full h-full relative;
+}
+
+.canvas-container canvas {
+  @apply w-full h-full block;
+}
+
+/* Custom tool cursors */
+.cursor-crosshair { cursor: crosshair; }
+.cursor-move { cursor: move; }
+.cursor-grab { cursor: grab; }
+.cursor-grabbing { cursor: grabbing; }
+.cursor-text { cursor: text; }
+.cursor-wait { cursor: wait; }
+.cursor-not-allowed { cursor: not-allowed; }
+.cursor-line { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cline x1='5' y1='12' x2='19' y2='12'/%3E%3C/svg%3E") 12 12, auto; }
+.cursor-circle { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E") 12 12, auto; }
+.cursor-rectangle { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='4' y='4' width='16' height='16'/%3E%3C/svg%3E") 4 4, auto; }
+.cursor-polygon { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpolygon points='12,2 22,20 2,20'/%3E%3C/svg%3E") 12 2, auto; }
+.cursor-arc { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M12 2a10 10 0 0 1 0 20'/%3E%3C/svg%3E") 12 12, auto; }
+.cursor-cube { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3C/svg%3E") 12 12, auto; }
+.cursor-select { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z'/%3E%3C/svg%3E") 0 0, auto; }
+
+/* Grid and axis visibility */
+.grid-visible {
+  background-image: 
+    linear-gradient(to right, var(--cad-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--cad-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Snap indicator */
+.snap-indicator {
+  @apply absolute pointer-events-none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--cad-selection);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Selection box */
+.selection-box {
+  @apply absolute border-2 border-blue-500 bg-blue-500 bg-opacity-10 pointer-events-none;
+}
+
+/* CAD element styles */
+.cad-element {
+  @apply absolute inset-0;
+}
+
+.cad-element.selected {
+  @apply ring-2 ring-blue-500;
+}
+
+.cad-element:hover {
+  @apply opacity-90;
+}
+
+/* Tool panels */
+.tool-panel {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4;
+}
+
+.tool-group {
+  @apply flex flex-col gap-2;
+}
+
+.tool-button {
+  @apply p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors;
+}
+
+.tool-button.active {
+  @apply bg-blue-500 text-white;
+}
+
+/* Property panel */
+.property-panel {
+  @apply bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700;
+}
+
+.property-input {
+  @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}

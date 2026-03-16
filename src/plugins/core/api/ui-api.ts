@@ -2,6 +2,18 @@
 import { EventEmitter } from 'events';
 import { PluginPermission } from '../registry';
 import { requirePermission } from './capabilities';
+import { getPluginAPI } from './pluginApiRegistry';
+
+/**
+ * Get the UI API (works with or without window global)
+ */
+function getUIAPI() {
+  try {
+    return getPluginAPI().ui;
+  } catch {
+    return (window as any).__CAD_APP__?.ui;
+  }
+}
 
 /**
  * Notification options
@@ -93,7 +105,9 @@ export class UIAPI extends EventEmitter {
     message: string, 
     options: NotificationOptions = {}
   ): Promise<void> {
-    await window.__CAD_APP__.ui.showNotification(
+    const api = getUIAPI();
+    if (!api) throw new Error('UI API not available');
+    await api.showNotification(
       this.pluginName,
       message,
       options
@@ -106,7 +120,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_MODAL)
   public async showModal(options: ModalOptions): Promise<void> {
-    return window.__CAD_APP__.ui.showModal({
+    return getUIAPI().showModal({
       ...options,
       source: this.pluginId
     });
@@ -121,7 +135,7 @@ export class UIAPI extends EventEmitter {
     title: string,
     message: string
   ): Promise<boolean> {
-    return window.__CAD_APP__.ui.showConfirmation(title, message);
+    return getUIAPI().showConfirmation(title, message);
   }
   
   /**
@@ -134,7 +148,7 @@ export class UIAPI extends EventEmitter {
     message: string,
     defaultValue: string = ''
   ): Promise<string | null> {
-    return window.__CAD_APP__.ui.showInputDialog(title, message, defaultValue);
+    return getUIAPI().showInputDialog(title, message, defaultValue);
   }
   
   /**
@@ -143,7 +157,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_SIDEBAR)
   public async registerSidebarPanel(options: SidebarPanelOptions): Promise<string> {
-    return window.__CAD_APP__.ui.registerSidebarPanel({
+    return getUIAPI().registerSidebarPanel({
       ...options,
       pluginId: this.pluginId
     });
@@ -155,7 +169,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_SIDEBAR)
   public async removeSidebarPanel(id: string): Promise<void> {
-    await window.__CAD_APP__.ui.removeSidebarPanel(id);
+    await getUIAPI().removeSidebarPanel(id);
   }
   
   /**
@@ -164,7 +178,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_SIDEBAR)
   public async openSidebarPanel(id: string): Promise<void> {
-    await window.__CAD_APP__.ui.openSidebarPanel(id);
+    await getUIAPI().openSidebarPanel(id);
   }
   
   /**
@@ -173,7 +187,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_TOOLBAR)
   public async registerToolbarButton(options: ToolbarButtonOptions): Promise<string> {
-    return window.__CAD_APP__.ui.registerToolbarButton({
+    return getUIAPI().registerToolbarButton({
       ...options,
       pluginId: this.pluginId
     });
@@ -185,7 +199,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_TOOLBAR)
   public async removeToolbarButton(id: string): Promise<void> {
-    await window.__CAD_APP__.ui.removeToolbarButton(id);
+    await getUIAPI().removeToolbarButton(id);
   }
   
   /**
@@ -194,7 +208,7 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_CONTEXT_MENU)
   public async registerContextMenuItem(item: ContextMenuItem): Promise<string> {
-    return window.__CAD_APP__.ui.registerContextMenuItem({
+    return getUIAPI().registerContextMenuItem({
       ...item,
       pluginId: this.pluginId
     });
@@ -206,14 +220,14 @@ export class UIAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.UI_CONTEXT_MENU)
   public async removeContextMenuItem(id: string): Promise<void> {
-    await window.__CAD_APP__.ui.removeContextMenuItem(id);
+    await getUIAPI().removeContextMenuItem(id);
   }
   
   /**
    * Get current theme information
    */
   public async getTheme(): Promise<ThemeInfo> {
-    return window.__CAD_APP__.ui.getTheme();
+    return getUIAPI().getTheme();
   }
   
   /**

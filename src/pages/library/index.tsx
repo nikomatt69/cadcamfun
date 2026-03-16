@@ -1,5 +1,8 @@
 // src/pages/library/index.tsx
 import React, { useState } from 'react';
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { NextPage } from 'next';
 import Head from 'next/head';
 import { useSession } from 'next-auth/react';

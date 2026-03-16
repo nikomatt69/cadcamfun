@@ -1,0 +1,68 @@
+/* Dark Mode Styles */
+
+.dark {
+  --foreground: #f9fafb;
+  --background: #111827;
+  --surface: #1f2937;
+  --surface-hover: #374151;
+}
+
+.dark body {
+  @apply bg-gray-900 text-white;
+}
+
+.dark .card {
+  @apply bg-gray-800;
+}
+
+.dark .card-header {
+  @apply border-gray-700;
+}
+
+.dark .card-footer {
+  @apply bg-gray-900 border-gray-700;
+}
+
+.dark .input {
+  @apply bg-gray-800 border-gray-600 text-white;
+}
+
+.dark .btn-secondary {
+  @apply bg-gray-700 text-gray-200 hover:bg-gray-600;
+}
+
+.dark .tool-btn:hover {
+  @apply bg-gray-700;
+}
+
+.dark .sidebar-section-header {
+  @apply text-gray-400;
+}
+
+.dark .tooltip {
+  @apply bg-gray-700 text-white;
+}
+
+.dark .tooltip::before {
+  @apply border-t-gray-700;
+}
+
+.dark .param-input-group input {
+  @apply bg-gray-800 border-gray-600 text-white;
+}
+
+.dark .fixed-cycle-editor {
+  @apply bg-gray-800;
+}
+
+.dark .fixed-cycle-header {
+  @apply border-gray-600;
+}
+
+.dark .fixed-cycle-header h3 {
+  @apply text-gray-200;
+}
+
+.dark .toggle-switch .toggle-slider {
+  @apply bg-gray-400;
+}

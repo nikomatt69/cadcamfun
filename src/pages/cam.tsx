@@ -1,5 +1,8 @@
 // src/pages/cam.tsx
 import React, { useState, useEffect } from 'react';
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -39,6 +42,10 @@ import Loading from '../components/ui/Loading';
 import MetaTags from '../components/layout/Metatags';
 import OriginControls from '../components/cad/OriginControls';
 
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
+
 import Link from 'next/link';
 
 import GenericPostProcessor from '../components/cam/postprocessor/GenericPostProcessor';
@@ -66,7 +73,25 @@ export const DynamicPostProcessors = {
   Heidenhain: dynamic(() => import('src/components/cam/postprocessor/HeidenhainPostProcessor'), { ssr: true })
 };
 
+// Enterprise: Track CAM page usage
+import { useEffect } from 'react';
+
 export default function CAMPage() {
+  // Enterprise: Track page views
+  useEffect(() => {
+    logger.info('Page viewed', { 
+      page: window.location.pathname,
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views');
+  }, []);
+
+  useEffect(() => {
+    logger.info('CAM Hub accessed', { 
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views.cam');
+  }, []);
   const { data: session, status } = useSession();
   const router = useRouter();
   

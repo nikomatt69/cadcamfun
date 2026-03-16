@@ -2,6 +2,18 @@
 import { PluginPermission } from '../registry';
 import { requirePermission } from './capabilities';
 import { EventEmitter } from 'events';
+import { getPluginAPI } from './pluginApiRegistry';
+
+/**
+ * Get the Network API (works with or without window global)
+ */
+function getNetworkAPI() {
+  try {
+    return getPluginAPI().network;
+  } catch {
+    return (window as any).__CAD_APP__?.network;
+  }
+}
 
 /**
  * Request headers
@@ -65,7 +77,7 @@ export class NetworkAPI extends EventEmitter {
     url: string, 
     options: RequestOptions = {}
   ): Promise<ResponseData<T>> {
-    return window.__CAD_APP__.network.request(url, {
+    return getNetworkAPI().request(url, {
       ...options,
       pluginId: this.pluginId
     });

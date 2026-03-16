@@ -244,20 +244,30 @@ export class PluginLifecycle {
     }
     
     try {
-      // if (host.getState() === PluginState.ACTIVATED) { // Usa PluginState
-      //   await host.deactivate();
-      // }
-      // await host.unload(); 
-      // Temporaneamente commentato per evitare errori se getState non esiste o PluginState non importato correttamente
-      console.warn(`[Lifecycle] Deactivate/Unload logic for host needs review/implementation.`);
+      // Deactivate the plugin if it's in ACTIVATED state
+      const currentState = host.getState();
+      if (currentState === PluginState.ACTIVATED) {
+        const deactivated = await host.deactivate();
+        if (!deactivated) {
+          console.warn(`Plugin ${id} deactivation returned false, continuing with unload`);
+        }
+      }
       
+      // Unload the plugin and clean up resources
+      await host.unload();
+      
+      // Remove from active hosts map
       this.activeHosts.delete(id);
       
-      console.log(`Successfully deactivated and unloaded plugin ${id} (host removed from active map)`);
+      // Update registry state
+      await this.registry.updateState(id, PluginState.LOADED);
+      
+      console.log(`Successfully deactivated and unloaded plugin ${id}`);
     } catch (error) {
       console.error(`Failed to deactivate/unload plugin ${id}:`, error);
       this.registry.recordPluginError(id, `Deactivation/Unload error: ${error instanceof Error ? error.message : String(error)}`);
-      this.activeHosts.delete(id); 
+      // Force remove from active hosts even on error
+      this.activeHosts.delete(id);
       throw error;
     }
   }

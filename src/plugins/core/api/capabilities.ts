@@ -74,8 +74,6 @@ export class PermissionManager {
   
   /**
    * Check or request a permission at runtime
-   * - If the plugin already has the permission, returns true immediately
-   * - If not, prompts the user for permission if possible
    */
   public async checkOrRequestPermission(
     pluginId: string, 
@@ -83,32 +81,20 @@ export class PermissionManager {
     permission: PluginPermission,
     reason?: string
   ): Promise<PermissionCheckResult> {
-    // Check if permission is already granted
     if (this.hasPermission(pluginId, permission)) {
       return { granted: true };
     }
     
-    // If no listeners, permission is denied
     if (this.permissionListeners.size === 0) {
-      return { 
-        granted: false, 
-        reason: 'No permission handlers available' 
-      };
+      return { granted: false, reason: 'No permission handlers available' };
     }
     
-    // Create permission request
-    const request: PermissionRequest = {
-      pluginId,
-      pluginName,
-      permission,
-      reason
-    };
-    // Ask all listeners (in practice, usually just one UI handler)
+    const request: PermissionRequest = { pluginId, pluginName, permission, reason };
+    
     for (const listener of Array.from(this.permissionListeners)) {
       try {
         const granted = await listener(request);
         if (granted) {
-          // Store the dynamically granted permission
           if (!this.userGrantedPermissions.has(pluginId)) {
             this.userGrantedPermissions.set(pluginId, new Set());
           }
@@ -120,10 +106,7 @@ export class PermissionManager {
       }
     }
     
-    return { 
-      granted: false, 
-      reason: 'Permission denied by user' 
-    };
+    return { granted: false, reason: 'Permission denied by user' };
   }
   
   /**
@@ -149,19 +132,14 @@ export class PermissionManager {
   public getPluginPermissions(pluginId: string): PluginPermission[] {
     const result = new Set<PluginPermission>();
     
-    // Add declared permissions
     const declaredPermissions = this.pluginPermissions.get(pluginId);
     if (declaredPermissions) {
-      Array.from(declaredPermissions).forEach((permission) => {
-        result.add(permission);
-      });
+      Array.from(declaredPermissions).forEach((permission) => result.add(permission));
     }
-    // Add dynamically granted permissions
+    
     const grantedPermissions = this.userGrantedPermissions.get(pluginId);
     if (grantedPermissions) {
-      Array.from(grantedPermissions).forEach((permission) => {
-        result.add(permission);
-      });
+      Array.from(grantedPermissions).forEach((permission) => result.add(permission));
     }
     
     return Array.from(result);
@@ -172,7 +150,7 @@ export class PermissionManager {
 export const permissionManager = new PermissionManager();
 
 /**
- * Decorator for API methods that checks permissions
+ * Decorator for API methods that checks permissions at runtime
  * @param permission Required permission
  */
 export function requirePermission(permission: PluginPermission) {
@@ -183,11 +161,31 @@ export function requirePermission(permission: PluginPermission) {
   ) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = function (...args: any[]) {
-      // Check for permission here
-      const instance = this as { pluginId: string };
-      if (!permissionManager.hasPermission(instance.pluginId, permission)) {
-        throw new Error(`Permission ${permission} is required`);
+    descriptor.value = async function (...args: any[]) {
+      // Get pluginId from the instance
+      const instance = this as { pluginId?: string };
+      const pluginId = instance.pluginId;
+      
+      // If no pluginId, skip permission check (development mode)
+      if (!pluginId) {
+        return originalMethod.apply(this, args);
+      }
+      
+      // Check permission using the manager
+      const hasPermission = permissionManager.hasPermission(pluginId, permission);
+      
+      if (!hasPermission) {
+        // Try to request permission dynamically
+        const result = await permissionManager.checkOrRequestPermission(
+          pluginId,
+          instance.pluginName || 'Unknown Plugin',
+          permission,
+          'Permission required for this operation'
+        );
+        
+        if (!result.granted) {
+          throw new Error(`Permission denied: ${permission} - ${result.reason || 'Permission not granted'}`);
+        }
       }
 
       // Call the original method
@@ -196,9 +194,4 @@ export function requirePermission(permission: PluginPermission) {
 
     return descriptor;
   };
-}
-
-function hasPermission(permission: PluginPermission): boolean {
-  // Implement your permission checking logic here
-  return true; // Placeholder
 }

@@ -2,6 +2,7 @@
 import { PluginPermission } from '../registry';
 import { requirePermission } from './capabilities';
 import { EventEmitter } from 'events';
+import { getPluginAPI } from './pluginApiRegistry';
 
 // Types based on your CAD system structure
 import {
@@ -39,6 +40,18 @@ export interface ModelTransformParams {
 }
 
 /**
+ * Get the model API (works with or without window global)
+ */
+function getModelAPI() {
+  try {
+    return getPluginAPI().model;
+  } catch {
+    // Fallback to window for backward compatibility
+    return (window as any).__CAD_APP__?.model;
+  }
+}
+
+/**
  * Model API provides access to the CAD model
  */
 export class ModelAPI extends EventEmitter {
@@ -57,9 +70,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_READ)
   public async getEntities(options: EntityQueryOptions = {}): Promise<ComponentElement[]> {
-    // This would be implemented by the host application
-    // accessing the actual CAD model
-    return window.__CAD_APP__.model.getEntities(options);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.getEntities(options);
   }
   
   /**
@@ -68,7 +81,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_READ)
   public async getEntityById(id: string): Promise<ComponentElement | null> {
-    return window.__CAD_APP__.model.getEntityById(id);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.getEntityById(id);
   }
   
   /**
@@ -77,7 +92,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_SELECTION)
   public async getSelection(): Promise<ModelSelection> {
-    return window.__CAD_APP__.model.getSelection();
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.getSelection();
   }
   
   /**
@@ -86,7 +103,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_SELECTION)
   public async setSelection(selection: ModelSelection): Promise<void> {
-    await window.__CAD_APP__.model.setSelection(selection);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.setSelection(selection);
   }
   
   /**
@@ -95,7 +114,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_SELECTION)
   public async addToSelection(elementIds: string[]): Promise<void> {
-    await window.__CAD_APP__.model.addToSelection(elementIds);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.addToSelection(elementIds);
   }
   
   /**
@@ -104,7 +125,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_SELECTION)
   public async clearSelection(): Promise<void> {
-    await window.__CAD_APP__.model.clearSelection();
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.clearSelection();
   }
   
   /**
@@ -113,7 +136,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_WRITE)
   public async createElement(element: Partial<ComponentElement>): Promise<string> {
-    return window.__CAD_APP__.model.createElement(element);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.createElement(element);
   }
   
   /**
@@ -122,7 +147,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_WRITE)
   public async updateElement(id: string, updates: Partial<ComponentElement>): Promise<void> {
-    await window.__CAD_APP__.model.updateElement(id, updates);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.updateElement(id, updates);
   }
   
   /**
@@ -131,7 +158,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_WRITE)
   public async deleteElements(elementIds: string[]): Promise<void> {
-    await window.__CAD_APP__.model.deleteElements(elementIds);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.deleteElements(elementIds);
   }
   
   /**
@@ -140,7 +169,9 @@ export class ModelAPI extends EventEmitter {
   // @ts-ignore
   @requirePermission(PluginPermission.MODEL_WRITE)
   public async transformElements(params: ModelTransformParams): Promise<void> {
-    await window.__CAD_APP__.model.transformElements(params);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    await api.transformElements(params);
   }
   
   /**
@@ -153,7 +184,9 @@ export class ModelAPI extends EventEmitter {
     elementIds: string[], 
     isPublic: boolean = false
   ): Promise<string> {
-    return window.__CAD_APP__.model.createComponent(name, elementIds, isPublic);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.createComponent(name, elementIds, isPublic);
   }
   
   /**
@@ -165,7 +198,9 @@ export class ModelAPI extends EventEmitter {
     fromElementId: string, 
     toElementId: string
   ): Promise<number> {
-    return window.__CAD_APP__.model.measureDistance(fromElementId, toElementId);
+    const api = getModelAPI();
+    if (!api) throw new Error('Model API not available');
+    return api.measureDistance(fromElementId, toElementId);
   }
   
   /**

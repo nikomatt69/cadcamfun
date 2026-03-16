@@ -20,11 +20,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
   (res.socket as any).server.io = io;
 
-  // Update middleware to get token from query
+  // Updated middleware to support both auth header and query param
   io.use(async (socket, next) => {
     try {
-      // Get token from query parameters instead of auth headers
-      const token = socket.handshake.query.token as string;
+      // Try to get token from auth header first (more secure)
+      let token = socket.handshake.auth.token as string;
+      
+      // Fallback to query param for backward compatibility
+      if (!token) {
+        token = socket.handshake.query.token as string;
+      }
+      
       if (!token) {
         return next(new Error('Authentication error: Token missing'));
       }
@@ -34,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return next(new Error('Server configuration error: Missing NEXTAUTH_SECRET'));
       }
 
-      // Create a minimal JWT verification approach to avoid excessive data
+      // Verify the token
       const decoded = await getToken({ 
         req: { cookies: { 'next-auth.session-token': token } } as any,
         secret
@@ -52,7 +58,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  // Rest of the server implementation
   io.on('connection', async (socket) => {
     const userId = socket.data.userId;
     
@@ -62,11 +67,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     connectedUsers.get(userId)?.push(socket.id);
 
     socket.on('joinOrganization', (organizationId) => {
-      socket.join(`org:${organizationId}`);
+      socket.join('org:' + organizationId);
     });
 
     socket.on('leaveOrganization', (organizationId) => {
-      socket.leave(`org:${organizationId}`);
+      socket.leave('org:' + organizationId);
     });
 
     socket.on('disconnect', () => {
@@ -101,8 +106,8 @@ export const sendNotificationToOrganization = (organizationId: string, notificat
   if (!io) return;
 
   if (excludeUserId) {
-    io.to(`org:${organizationId}`).except(connectedUsers.get(excludeUserId) || []).emit('notification', notification);
+    io.to('org:' + organizationId).except(connectedUsers.get(excludeUserId) || []).emit('notification', notification);
   } else {
-    io.to(`org:${organizationId}`).emit('notification', notification);
+    io.to('org:' + organizationId).emit('notification', notification);
   }
 };

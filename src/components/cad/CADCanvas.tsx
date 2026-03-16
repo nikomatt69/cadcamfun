@@ -79,9 +79,17 @@ const CADCanvas: React.FC<CADCanvasProps> = ({
   const controlPointsRef = useRef<THREE.Object3D[]>([]);
   const { snapToPoint, snapIndicator, snapSettings } = useSnap();
   const [previewObject, setPreviewObject] = useState<THREE.Object3D | null>(null);
-  const { viewMode, gridVisible, axisVisible, originOffset } = useCADStore();
-  const { elements, selectedElement, setMousePosition, updateElement, addElement ,selectElement} = useElementsStore();
-  const { layers } = useLayerStore();
+  const viewMode = useCADStore((state) => state.viewMode);
+  const gridVisible = useCADStore((state) => state.gridVisible);
+  const axisVisible = useCADStore((state) => state.axisVisible);
+  const originOffset = useCADStore((state) => state.originOffset);
+  const elements = useElementsStore((state) => state.elements);
+  const selectedElement = useElementsStore((state) => state.selectedElement);
+  const setMousePosition = useElementsStore((state) => state.setMousePosition);
+  const updateElement = useElementsStore((state) => state.updateElement);
+  const addElement = useElementsStore((state) => state.addElement);
+  const selectElement = useElementsStore((state) => state.selectElement);
+  const layers = useLayerStore((state) => state.layers);
   const selectedObjectsRef = useRef<THREE.Object3D[]>([]);
   // Nuovo stato per tracciare l'anteprima del componente e il suo posizionamento
   const [isPlacingComponent, setIsPlacingComponent] = useState<boolean>(false);

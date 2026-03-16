@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+// Enterprise imports
+import { logger, metrics } from '@/src/lib';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { 
@@ -40,6 +43,15 @@ const Layout = dynamic(
   { ssr: false }
 );  
 export default function ToolsList() {
+  // Enterprise: Track page views
+  useEffect(() => {
+    logger.info('Page viewed', { 
+      page: window.location.pathname,
+      timestamp: new Date().toISOString() 
+    });
+    metrics.increment('page.views');
+  }, []);
+
   const { data: session, status } = useSession();
   const router = useRouter();
   
