@@ -1,13 +1,9 @@
 // src/pages/index.tsx
-import Image from 'next/image';
-// Enterprise imports
-import { logger, metrics } from '@/src/lib';
-import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 import { useEffect, useState, useRef } from 'react';
-import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
 import { 
   Grid, 
@@ -16,19 +12,16 @@ import {
   Box, 
   Layers, 
   Settings, 
-  Users, 
-  Clock, 
-  AlertTriangle,
   ChevronUp,
   BarChart2
 } from 'react-feather';
-import Loading from '../components/ui/Loading';
 import { logger, metrics } from '@/src/lib';
 import MetaTags from '../components/layout/Metatags';
-import { UserHistory } from '@/src/components/analytics/UserHistory';
-import { AnalyticsOverview } from '../components/analytics/AnalyticsOverview';
-import ActivityChart from '../components/analytics/ActivityChart';
-import dynamic from 'next/dynamic';
+
+const Loading = dynamic(() => import('../components/ui/Loading'), { ssr: false });
+const UserHistory = dynamic(() => import('@/src/components/analytics/UserHistory'), { ssr: false });
+const AnalyticsOverview = dynamic(() => import('../components/analytics/AnalyticsOverview'), { ssr: false });
+const ActivityChart = dynamic(() => import('../components/analytics/ActivityChart'), { ssr: false });
 
 interface DashboardStats {
   totalProjects: number;
@@ -133,7 +126,7 @@ export default function Home() {
         setStats(data);
       }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      logger.error('Error fetching dashboard data:', error);
     } finally {
       setIsLoading(false);
     }

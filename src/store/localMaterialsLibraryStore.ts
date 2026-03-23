@@ -115,17 +115,7 @@ export const useLocalMaterialsLibraryStore = create<MaterialsLibraryState>((set,
       materials: [...state.materials, newMaterial]
     }));
     
-    // Save the updated library
     get().saveLibrary();
-    
-    // Force refresh the library
-    setTimeout(() => {
-      get().loadLibrary();
-      // Dispatch refresh event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('material-library-updated'));
-      }
-    }, 100);
     
     return newMaterial.id;
   },
@@ -152,7 +142,6 @@ export const useLocalMaterialsLibraryStore = create<MaterialsLibraryState>((set,
     
     set({ materials: updatedMaterials });
     
-    // Save the updated library
     return get().saveLibrary();
   },
   
@@ -161,7 +150,6 @@ export const useLocalMaterialsLibraryStore = create<MaterialsLibraryState>((set,
     const { materials } = get();
     const filteredMaterials = materials.filter(m => m.id !== id);
     
-    // If no materials were removed, the ID was invalid
     if (filteredMaterials.length === materials.length) {
       set({ error: `Material with ID ${id} not found` });
       return false;
@@ -169,7 +157,6 @@ export const useLocalMaterialsLibraryStore = create<MaterialsLibraryState>((set,
     
     set({ materials: filteredMaterials });
     
-    // Save the updated library
     return get().saveLibrary();
   },
   

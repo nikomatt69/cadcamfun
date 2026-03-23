@@ -117,17 +117,7 @@ export const useLocalToolsLibraryStore = create<ToolsLibraryState>((set, get) =>
       tools: [...state.tools, newTool]
     }));
     
-    // Save the updated library
     get().saveLibrary();
-    
-    // Force refresh the library
-    setTimeout(() => {
-      get().loadLibrary();
-      // Dispatch refresh event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('tool-library-updated'));
-      }
-    }, 100);
     
     return newTool.id;
   },

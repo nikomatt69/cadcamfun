@@ -1,11 +1,10 @@
 // src/pages/cam.tsx
 import React, { useState, useEffect } from 'react';
-// Enterprise imports
 import { logger, metrics } from '@/src/lib';
-import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
-import Head from 'next/head';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
 import GCodeViewer from 'src/components/cam/GCodeViewer';
 import GCodeEditor from 'src/components/cam/GCodeEditor';
@@ -20,40 +19,26 @@ import {
   Save, 
   Upload, 
   Menu, 
-  ArrowLeft, 
-  ArrowRight, 
   ChevronLeft,
   ChevronRight,
   Play,
   Pause,
   Eye,
   Code,
-  Tool,
+  Tool as ToolIcon,
   Settings,
   Box,
   Folder,
   X
 } from 'react-feather';
 import EnhancedSidebar from '../components/cad/EnanchedSidebar';
-
 import AIToolpathOptimizer from '../components/ai/AIToolpathOptimizer';
 import Loading from '../components/ui/Loading';
-
 import MetaTags from '../components/layout/Metatags';
 import OriginControls from '../components/cad/OriginControls';
-
-// Enterprise imports
-import { logger, metrics } from '@/src/lib';
-import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
-
-import Link from 'next/link';
-
 import GenericPostProcessor from '../components/cam/postprocessor/GenericPostProcessor';
 import { isMobile } from 'react-device-detect';
-import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import FixedCyclesUIRenderer from '../components/cam/FixedCyclesUIRenderer';
-import EnhancedToolpathVisualizer from '../components/cam/EnhancedToolpathVisualizer';
 import ToolpathVisualizer from 'src/components/cam/ToolpathVisualizer2';
 
 // Tipi di post-processor supportati
@@ -73,23 +58,14 @@ export const DynamicPostProcessors = {
   Heidenhain: dynamic(() => import('src/components/cam/postprocessor/HeidenhainPostProcessor'), { ssr: true })
 };
 
-// Enterprise: Track CAM page usage
-import { useEffect } from 'react';
-
 export default function CAMPage() {
-  // Enterprise: Track page views
   useEffect(() => {
     logger.info('Page viewed', { 
       page: window.location.pathname,
       timestamp: new Date().toISOString() 
     });
     metrics.increment('page.views');
-  }, []);
-
-  useEffect(() => {
-    logger.info('CAM Hub accessed', { 
-      timestamp: new Date().toISOString() 
-    });
+    logger.info('CAM Hub accessed', { timestamp: new Date().toISOString() });
     metrics.increment('page.views.cam');
   }, []);
   const { data: session, status } = useSession();
@@ -120,8 +96,7 @@ export default function CAMPage() {
 
   // Handler for material selection from unified library
   const handleMaterialSelection = (material: MaterialLibraryItem) => {
-    // Handle material selection if needed
-    console.log("Selected material:", material);
+    logger.debug("Selected material:", material);
     setShowUnifiedLibrary(false);
   };
   
@@ -136,7 +111,7 @@ export default function CAMPage() {
         const content = e.target?.result as string;
         setGcode(content);
       } catch (err) {
-        console.error('Failed to read the file', err);
+        logger.error('Failed to read the file', err);
       }
     };
     reader.readAsText(file);

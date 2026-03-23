@@ -398,23 +398,22 @@ export function useUnifiedLibrary<T extends LibraryItem>(
       } else {
         // Delete from local store
         const localStore = getLocalStore();
-        let result;
+        let result = false;
         switch (entityType) {
           case 'components':
-            result = (id);
+            result = localStore.deleteComponent ? localStore.deleteComponent(id) : false;
             break;
           case 'materials':
-            result = (id);
+            result = localStore.deleteMaterial ? localStore.deleteMaterial(id) : false;
             break;
           case 'tools':
-            result = (id);
+            result = localStore.deleteTool ? localStore.deleteTool(id) : false;
             break;
           default:
             result = false;
         }
-        // Refresh to get updated items
         await refreshLibrary();
-        return typeof result === 'boolean' ? result : false;
+        return result;
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';

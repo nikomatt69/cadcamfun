@@ -192,16 +192,16 @@ export const useThreePerformanceVisualizer = (
   }, []);
 
   useEffect(() => {
-    // Avvia l'aggiornamento solo se stats è visibile
     if (statsRef.current && statsRef.current.dom.style.display !== 'none') {
       animationFrameRef.current = requestAnimationFrame(updateStats);
-      
-      return () => {
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-      };
     }
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
+      }
+    };
   }, [updateStats]);
   
   // Funzione per mostrare/nascondere stats.js
