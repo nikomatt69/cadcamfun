@@ -112,15 +112,6 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
     // Save the updated library
     get().saveLibrary();
     
-    // Force a reload of the library to ensure all components are updated
-    setTimeout(() => {
-      get().loadLibrary();
-      // Dispatch a custom event to notify listeners that a component was added
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('component-library-updated'));
-      }
-    }, 100);
-    
     return newComponent.id;
   },
   
@@ -143,15 +134,7 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
     
     set({ components: updatedComponents });
     
-    // Save the updated library
-    const success = get().saveLibrary();
-    
-    // Force a reload of the library
-    if (success && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('component-library-updated'));
-    }
-    
-    return success;
+    return get().saveLibrary();
   },
   
   // Delete a component from the library
@@ -159,7 +142,6 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
     const { components } = get();
     const filteredComponents = components.filter(c => c.id !== id);
     
-    // If no components were removed, the ID was invalid
     if (filteredComponents.length === components.length) {
       set({ error: `Component with ID ${id} not found` });
       return false;
@@ -167,15 +149,7 @@ export const useLocalComponentsLibraryStore = create<ComponentsLibraryState>((se
     
     set({ components: filteredComponents });
     
-    // Save the updated library
-    const success = get().saveLibrary();
-    
-    // Force a reload of the library
-    if (success && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('component-library-updated'));
-    }
-    
-    return success;
+    return get().saveLibrary();
   },
   
   // Clear the entire library

@@ -121,9 +121,10 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     set((state) => {
       const newElements = [...state.elements, newElement];
       
-      // Save state to history
+      // Save state to history with limit of 50 entries
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(newElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: newElements,
@@ -153,15 +154,15 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     set((state) => {
       const updatedElements = [...state.elements, ...newElements];
       
-      // Save state to history
+      // Save state to history with limit
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(updatedElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: updatedElements,
         history: newHistory,
         currentHistoryIndex: state.currentHistoryIndex + 1,
-        // Optionally select the last element added
         selectedElement: newElements.length > 0 ? newElements[newElements.length - 1] : state.selectedElement
       };
     });
@@ -182,9 +183,10 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
         element.id === id ? { ...element, ...updates } : element
       );
       
-      // Save state to history
+      // Save state to history with limit
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(updatedElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: updatedElements,
@@ -221,9 +223,10 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       
       const filteredElements = state.elements.filter((element) => element.id !== id);
       
-      // Save state to history
+      // Save state to history with limit
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(filteredElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: filteredElements,
@@ -264,8 +267,8 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       return undefined;
     }
     
-    // Create a deep copy to ensure all nested objects are also duplicated
-    const elementCopy = JSON.parse(JSON.stringify(element));
+    // Create a deep copy using structuredClone
+    const elementCopy = structuredClone(element);
     const { id: _, ...elementWithoutId } = elementCopy;
     
     // Add slight offset to make the duplicate visible
@@ -423,8 +426,8 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     const { selectedElement } = get();
     if (!selectedElement) return;
     
-    // Store a deep copy of the element in the clipboard
-    set({ clipboard: JSON.parse(JSON.stringify(selectedElement)) });
+    // Store a deep copy of the element in the clipboard using structuredClone
+    set({ clipboard: structuredClone(selectedElement) });
   },
 
   // Paste the previously copied element
@@ -458,6 +461,7 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     set((state) => {
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push([...state.elements]);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         history: newHistory,
@@ -572,9 +576,10 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       const newElements = state.elements.filter(el => !ids.includes(el.id));
       newElements.push(groupElement);
       
-      // Save state to history
+      // Save state to history with limit
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(newElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: newElements,
@@ -595,10 +600,9 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     
     // Extract the group's elements and restore their original IDs
     const ungroupedElements = group.elements.map((el: { originalId: any; }) => {
-      // Create new IDs to avoid conflicts
       return {
         ...el,
-        id: el.originalId || uuidv4() // Use original ID if available, otherwise create new
+        id: el.originalId || uuidv4()
       };
     });
     
@@ -607,9 +611,10 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       const newElements = state.elements.filter(el => el.id !== groupId);
       newElements.push(...ungroupedElements);
       
-      // Save state to history
+      // Save state to history with limit
       const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
       newHistory.push(newElements);
+      if (newHistory.length > 50) newHistory.shift();
       
       return {
         elements: newElements,

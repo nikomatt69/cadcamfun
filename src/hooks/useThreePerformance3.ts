@@ -56,15 +56,21 @@ export const useThreePerformance = (sceneRef: React.RefObject<THREE.Scene>) => {
   }, [sceneRef]);
 
   // Aggiorna stats.js in ogni frame se visibile
+  const rafRef = useRef<number>();
   const updateStats = useCallback(() => {
     if (statsRef.current) {
       statsRef.current.update();
     }
-    requestAnimationFrame(updateStats);
+    rafRef.current = requestAnimationFrame(updateStats);
   }, []);
 
   useEffect(() => {
-    updateStats();
+    rafRef.current = requestAnimationFrame(updateStats);
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, [updateStats]);
 
   // Funzione per ottimizzare la scena

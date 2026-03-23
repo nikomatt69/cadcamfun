@@ -6,6 +6,10 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  swcMinify: true,
+  experimental: {
+    optimizePackageImports: ['lodash-es', 'radix-ui', 'lucide-react'],
+  },
 
   
   // Configurazione per le API di Next.js
