@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { PrismaClient, Prisma } from "@prisma/client";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 // Best practice for serverless environments - avoid global PrismaClient instances
 const prisma = new PrismaClient({
@@ -165,7 +165,7 @@ export default async function handler(
 
     // 10. Delete subscription data
     try {
-      await prisma.subscription.deleteMany({ where: { userId: userId } });
+      await prisma.subscription.deleteMany({ where: { id: userId } });
       console.log("✓ Subscription data deleted");
     } catch (error) {
       console.warn("Failed to delete subscription data:", error);

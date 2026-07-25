@@ -41,7 +41,7 @@ export function withProtectedApi(requiredPlan: string = SUBSCRIPTION_PLANS.FREE)
 
         // Get user's subscription
         const subscription = await prisma.subscription.findUnique({
-          where: { userId }
+          where: { id: userId }
         });
 
         // Default to free plan if no subscription exists

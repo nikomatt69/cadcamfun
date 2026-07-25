@@ -1,13 +1,21 @@
 // src/pages/api/components/[id]/relationships/index.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
-import { sendErrorResponse, sendSuccessResponse, handleApiError } from "src/lib/api/helpers";
-import { requireAuth } from "@/src/lib/api/auth";
+import {
+  sendErrorResponse,
+  sendSuccessResponse,
+  handleApiError,
+} from "src/lib/api/helpers";
+import { requireAuth } from "src/lib/api/auth";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   try {
     // Ensure user is authenticated
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     const { id } = req.query;
@@ -23,33 +31,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         OR: [
           { project: { ownerId: userId } },
           { project: { organization: { users: { some: { userId } } } } },
-          { isPublic: true }
-        ]
-      }
+          { isPublic: true },
+        ],
+      },
     });
 
     if (!component) {
-      return sendErrorResponse(res, "Component not found or access denied", 404);
+      return sendErrorResponse(
+        res,
+        "Component not found or access denied",
+        404,
+      );
     }
 
     // Handle GET request - Get relationships
     if (req.method === "GET") {
       // Find components that reference this component
-      const referencingComponents = await prisma.component.findMany({
-        where: {
-          data: {
-            path: ["references"],
-            array_contains: id
-          }
-        },
+      const allComponents = await prisma.component.findMany({
         select: {
           id: true,
           name: true,
           description: true,
           type: true,
           projectId: true,
-          isPublic: true
+          isPublic: true,
+          data: true,
+        },
+      });
+      const referencingComponents = allComponents.filter((c) => {
+        try {
+          const data = typeof c.data === "string" ? JSON.parse(c.data) : c.data;
+          if (
+            typeof data === "object" &&
+            data !== null &&
+            "references" in data
+          ) {
+            const refs = (data as { references?: string[] }).references;
+            return Array.isArray(refs) && refs.includes(id);
+          }
+        } catch {
+          /* ignore */
         }
+        return false;
       });
 
       // Find components referenced by this component
@@ -63,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (references.length > 0) {
           referencedComponents = await prisma.component.findMany({
             where: {
-              id: { in: references }
+              id: { in: references },
             },
             select: {
               id: true,
@@ -71,34 +94,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               description: true,
               type: true,
               projectId: true,
-              isPublic: true
-            }
+              isPublic: true,
+            },
           });
         }
       }
 
       // Combine all related components
-      const relatedComponents = [...referencingComponents, ...referencedComponents];
+      const relatedComponents = [
+        ...referencingComponents,
+        ...referencedComponents,
+      ];
 
       // Create relationship edges
       const relationships = [
         // Components referencing this component
-        ...referencingComponents.map(comp => ({
+        ...referencingComponents.map((comp) => ({
           sourceId: comp.id,
           targetId: id,
-          type: "references"
+          type: "references",
         })),
         // Components referenced by this component
-        ...referencedComponents.map(comp => ({
+        ...referencedComponents.map((comp) => ({
           sourceId: id,
           targetId: comp.id,
-          type: "references"
-        }))
+          type: "references",
+        })),
       ];
 
       return sendSuccessResponse(res, {
         relatedComponents,
-        relationships
+        relationships,
       });
     }
 

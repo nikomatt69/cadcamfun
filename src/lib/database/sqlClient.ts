@@ -48,8 +48,19 @@ export class TauriSqlClient {
     private initPromise: Promise<void> | null = null;
 
     constructor() {
-        // Initialize on first use
+        // Do not automatically initialize in the constructor
+    }
+
+    /**
+     * Initialize the SQL client with proper connection detection.
+     * This should be called explicitly.
+     */
+    async init(): Promise<void> {
+        if (this.isInitialized) return;
+        if (this.initPromise) return this.initPromise;
+
         this.initPromise = this.initialize();
+        return this.initPromise;
     }
 
     /**
@@ -79,6 +90,8 @@ export class TauriSqlClient {
         } catch (error) {
             console.error('❌ Failed to initialize SQL client:', error);
             this.isInitialized = true; // Mark as initialized even on failure
+        } finally {
+            this.initPromise = null;
         }
     }
 
@@ -442,15 +455,20 @@ export const getSqlClient = (): TauriSqlClient => {
 };
 
 /**
- * Initialize SQL client and setup lifecycle events
+ * Initializes and returns the SQL client instance.
+ * Ensures that initialization is only attempted once.
+ * @returns {Promise<TauriSqlClient>}
  */
 export const initializeSqlClient = async (): Promise<TauriSqlClient> => {
-    const client = getSqlClient();
+    const sqlClient = getSqlClient();
+    await sqlClient.init(); // Explicitly call init
 
-    // Setup cleanup on page unload
-    if (typeof window !== 'undefined') {
+    // Setup cleanup on page unload, ensuring it runs only once
+    if (typeof window !== 'undefined' && !(window as any).__SQL_CLIENT_LIFECYCLE_SET__) {
+        (window as any).__SQL_CLIENT_LIFECYCLE_SET__ = true;
+
         window.addEventListener('beforeunload', () => {
-            client.close();
+            sqlClient.close();
         });
 
         // Setup Tauri close event handler
@@ -458,7 +476,7 @@ export const initializeSqlClient = async (): Promise<TauriSqlClient> => {
             try {
                 const { listen } = await import('@tauri-apps/api/event');
                 listen('tauri://close-requested', () => {
-                    client.close();
+                    sqlClient.close();
                 });
             } catch (error) {
                 console.warn('⚠️ Could not setup Tauri close handler:', error);
@@ -466,7 +484,7 @@ export const initializeSqlClient = async (): Promise<TauriSqlClient> => {
         }
     }
 
-    return client;
+    return sqlClient;
 };
 
 // Export default client

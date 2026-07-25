@@ -11,21 +11,9 @@ import Footer from "../ui/Footer";
 import useRefreshToken from "@/src/hooks/useRefreshToken";
 import BottomNavigation from "../components/BottomNavigation";
 import CookieConsentBanner from "../components/CookieConsentBanner";
-import { disconnectWebSocket, initializeWebSocket } from "@/src/lib/websocket";
-import { AIAssistant, AIAssistantButton } from "../ai/ai-new";
 import ToastContainer from "../ui/ToastContainer";
 import NotificationPermissionPrompt from "../notifications/NotificationPermissionPrompt";
-import dynamic from "next/dynamic";
-import { AIAssistantOpenai } from "../ai/ai-new/OpenaiAssistant/AIAssistantOpenai";
-import PluginSidebar from "src/components/plugins/PluginSidebar";
-import { AIAgentToolbar } from "../ai/AIAgentToolbar";
-import { useElementsStore } from "@/src/store/elementsStore";
 import { useSession } from "@/src/lib/auth-client";
-import ChatPanel from "./ChatPanel";
-import { PanelRightIcon, PanelRightInactiveIcon } from "lucide-react";
-
-// Dynamically import PluginSidebar with SSR disabled
-const DynamicPluginSidebar = dynamic(() => import("src/components/plugins/PluginSidebar"), { ssr: false });
 
 // Animation variants
 const layoutVariants = {
@@ -181,22 +169,14 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
   fullWidth = false,
   showBreadcrumbs = true
 }) => {
-  const [showPluginSidebar, setShowPluginSidebar] = useState(false);
   const { data: session } = useSession();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [welcomeBanner, setWelcomeBanner] = useState(true);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
-  const [showChatPanel, setShowChatPanel] = useState(false);
-
-  // AI Agent Toolbar integration
-  const elements = useElementsStore(state => state.elements);
-  const addElements = useElementsStore(state => state.addElements);
+  const maintenanceMode = false;
 
   // Detect mobile device and handle sidebar toggle based on screen size
   useEffect(() => {
@@ -222,7 +202,7 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
 
   // Close sidebar when navigating on mobile
   useEffect(() => {
-    if (isMobile && sidebarOpen) {
+    if (isMobile) {
       setSidebarOpen(false);
     }
   }, [router.pathname, isMobile]); // Close sidebar when route changes on mobile
@@ -454,7 +434,7 @@ const EnhancedLayout: React.FC<EnhancedLayoutProps> = ({
 
             <motion.main
               ref={mainRef}
-              className={`flex-1 flex-grow overflow-y-auto backdrop-blur-sm bg-gradient-to-br from-gray-50/70 via-white/60 to-blue-50/50 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-purple-900/50 dark:text-white scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent rounded-md transition-all duration-300 ease-in-out ${showChatPanel ? "main-content-shrink" : ""}`}
+              className="flex-1 flex-grow overflow-y-auto backdrop-blur-sm bg-gradient-to-br from-gray-50/70 via-white/60 to-blue-50/50 dark:from-gray-900/70 dark:via-gray-800/60 dark:to-purple-900/50 dark:text-white scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent rounded-md transition-all duration-300 ease-in-out"
               style={{ scrollBehavior: "smooth" }}
               variants={mainContentVariants as Variants}
             >

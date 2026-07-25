@@ -2,7 +2,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
 import { withActivityTracking } from "@/src/lib/api/withActivityTracking";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 // Original handler function
 async function handler(req: NextApiRequest, res: NextApiResponse) {

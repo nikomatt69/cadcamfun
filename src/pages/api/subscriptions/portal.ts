@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
-import { requireAuth } from "src/lib/api/auth";
+
 import stripe from "src/lib/stripe-server";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(
   req: NextApiRequest,
@@ -24,7 +25,7 @@ export default async function handler(
 
     // Get user's subscription
     const subscription = await prisma.subscription.findUnique({
-      where: { userId },
+      where: { id: userId },
     });
 
     if (!subscription || !subscription.stripeCustomerId) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Easing } from 'framer-motion';
 import { ChevronRight, Zap, Cog, Share2, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 
 interface InitialOnboardingProps {
     isVisible: boolean;
@@ -70,9 +71,11 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
         if (!isAutoAdvancing || !isVisible) return;
 
         const timer = setTimeout(() => {
-            if (currentSlide < slides.length - 1) {
+            // Advance up to and including the final logo slide
+            if (currentSlide < slides.length) {
                 setCurrentSlide(currentSlide + 1);
             } else {
+                // We are on the final slide, stop advancing
                 setIsAutoAdvancing(false);
             }
         }, 4000); // 4 seconds per slide
@@ -86,10 +89,9 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
 
     const handleNext = () => {
         setIsAutoAdvancing(false);
-        if (currentSlide < slides.length - 1) {
+        // We can go one past the last slide for the logo screen
+        if (currentSlide < slides.length) {
             setCurrentSlide(currentSlide + 1);
-        } else {
-            handleGetStarted();
         }
     };
 
@@ -98,7 +100,9 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
         handleGetStarted();
     };
 
-    const currentSlideData = slides[currentSlide];
+    // Use a safe index to prevent crashing on the final slide
+    const slideIndex = Math.min(currentSlide, slides.length - 1);
+    const currentSlideData = slides[slideIndex];
 
     return (
         <AnimatePresence>
@@ -107,7 +111,7 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 overflow-hidden"
+                    className="fixed inset-0 z-50 overflow-hidden bg-gray-950 rounded-lg my-40 mx-32"
                 >
                     {/* Animated Background */}
                     <motion.div
@@ -147,7 +151,7 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
                     </div>
 
                     {/* Content */}
-                    <div className="relative z-10 flex items-center justify-center min-h-screen p-8">
+                    <div className="relative z-10 flex h-full items-center justify-center p-8">
                         <div className="w-full max-w-4xl mx-auto text-center text-white">
 
                             {/* Skip Button */}
@@ -160,86 +164,118 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
                                 Skip
                             </motion.button>
 
-                            <AnimatePresence mode="wait">
-                                <motion.div
-                                    key={currentSlide}
-                                    initial={{ opacity: 0, y: 50, scale: 0.9 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: -50, scale: 1.1 }}
-                                    transition={{ duration: 0.8, ease: "easeOutCubic" as Easing }}
-                                >
-                                    {/* Icon */}
+                            {currentSlide < slides.length ? (
+                                <>
+                                    <AnimatePresence mode="wait">
+                                        <motion.div
+                                            key={currentSlide}
+                                            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -50, scale: 1.1 }}
+                                            transition={{ duration: 0.8, ease: "easeOut" as Easing }}
+                                        >
+                                            {/* Icon */}
+                                            <motion.div
+                                                initial={{ scale: 0, rotate: -180 }}
+                                                animate={{ scale: 1, rotate: 0 }}
+                                                transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" as Easing }}
+                                                className="mb-8"
+                                            >
+                                                <div className="w-24 h-24 mx-auto bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                                                    <currentSlideData.icon className="w-12 h-12 text-white" />
+                                                </div>
+                                            </motion.div>
+
+                                            {/* Title */}
+                                            <motion.h1
+                                                initial={{ opacity: 0, y: 30 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.5, duration: 0.6 }}
+                                                className="text-5xl md:text-7xl font-bold mb-4"
+                                            >
+                                                {currentSlideData.title}
+                                            </motion.h1>
+
+                                            {/* Subtitle */}
+                                            <motion.h2
+                                                initial={{ opacity: 0, y: 30 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.7, duration: 0.6 }}
+                                                className="text-2xl md:text-3xl font-light mb-6 text-white/90"
+                                            >
+                                                {currentSlideData.subtitle}
+                                            </motion.h2>
+
+                                            {/* Description */}
+                                            <motion.p
+                                                initial={{ opacity: 0, y: 30 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.9, duration: 0.6 }}
+                                                className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed"
+                                            >
+                                                {currentSlideData.description}
+                                            </motion.p>
+                                        </motion.div>
+                                    </AnimatePresence>
+
+                                    {/* Navigation */}
                                     <motion.div
-                                        initial={{ scale: 0, rotate: -180 }}
-                                        animate={{ scale: 1, rotate: 0 }}
-                                        transition={{ delay: 0.3, duration: 0.8, ease: "easeOutBack" as Easing }}
-                                        className="mb-8"
+                                        initial={{ opacity: 0, y: 50 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 1.1, duration: 0.6 }}
+                                        className="mt-12 flex flex-col items-center space-y-8"
                                     >
-                                        <div className="w-24 h-24 mx-auto bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                                            <currentSlideData.icon className="w-12 h-12 text-white" />
+                                        {/* Progress Dots */}
+                                        <div className="flex space-x-3">
+                                            {slides.map((_, index) => (
+                                                <motion.button
+                                                    key={index}
+                                                    onClick={() => {
+                                                        setIsAutoAdvancing(false);
+                                                        setCurrentSlide(index);
+                                                    }}
+                                                    className={`w-3 h-3 rounded-full transition-all duration-300 ${index <= currentSlide
+                                                        ? 'bg-white scale-110'
+                                                        : 'bg-white/40 hover:bg-white/60'
+                                                        }`}
+                                                    whileHover={{ scale: 1.2 }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                />
+                                            ))}
                                         </div>
+
+                                        {/* Action Button */}
+                                        <motion.button
+                                            onClick={handleNext}
+                                            className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all duration-200 flex items-center space-x-2"
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                        >
+                                            <span>Next</span>
+                                            <ChevronRight className="w-4 h-4" />
+                                        </motion.button>
+                                    </motion.div>
+                                </>
+                            ) : (
+                                // Final Logo Screen
+                                <motion.div
+                                    key="final-slide"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.8, ease: "easeOut" as Easing }}
+                                    className="flex flex-col items-center justify-center space-y-12 my-auto"
+                                >
+                                    <motion.div
+                                        animate={{ scale: [1, 1.05, 1] }}
+                                        transition={{
+                                            duration: 2.5,
+                                            repeat: Infinity,
+                                            ease: 'easeInOut',
+                                        }}
+                                    >
+                                        <Image src="/logo.png" width={600} height={600} alt="CAD/CAM FUN Logo" />
                                     </motion.div>
 
-                                    {/* Title */}
-                                    <motion.h1
-                                        initial={{ opacity: 0, y: 30 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.5, duration: 0.6 }}
-                                        className="text-5xl md:text-7xl font-bold mb-4"
-                                    >
-                                        {currentSlideData.title}
-                                    </motion.h1>
-
-                                    {/* Subtitle */}
-                                    <motion.h2
-                                        initial={{ opacity: 0, y: 30 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.7, duration: 0.6 }}
-                                        className="text-2xl md:text-3xl font-light mb-6 text-white/90"
-                                    >
-                                        {currentSlideData.subtitle}
-                                    </motion.h2>
-
-                                    {/* Description */}
-                                    <motion.p
-                                        initial={{ opacity: 0, y: 30 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.9, duration: 0.6 }}
-                                        className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed"
-                                    >
-                                        {currentSlideData.description}
-                                    </motion.p>
-                                </motion.div>
-                            </AnimatePresence>
-
-                            {/* Navigation */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 50 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 1.1, duration: 0.6 }}
-                                className="mt-12 flex flex-col items-center space-y-8"
-                            >
-                                {/* Progress Dots */}
-                                <div className="flex space-x-3">
-                                    {slides.map((_, index) => (
-                                        <motion.button
-                                            key={index}
-                                            onClick={() => {
-                                                setIsAutoAdvancing(false);
-                                                setCurrentSlide(index);
-                                            }}
-                                            className={`w-3 h-3 rounded-full transition-all duration-300 ${index <= currentSlide
-                                                ? 'bg-white scale-110'
-                                                : 'bg-white/40 hover:bg-white/60'
-                                                }`}
-                                            whileHover={{ scale: 1.2 }}
-                                            whileTap={{ scale: 0.9 }}
-                                        />
-                                    ))}
-                                </div>
-
-                                {/* Action Button */}
-                                {currentSlide === slides.length - 1 ? (
                                     <motion.button
                                         onClick={handleGetStarted}
                                         className="bg-white text-gray-900 px-8 py-4 rounded-2xl text-lg font-semibold hover:bg-white/90 transition-all duration-200 flex items-center space-x-2 shadow-2xl"
@@ -249,30 +285,21 @@ const InitialOnboarding: React.FC<InitialOnboardingProps> = ({
                                         <span>Get Started</span>
                                         <ChevronRight className="w-5 h-5" />
                                     </motion.button>
-                                ) : (
-                                    <motion.button
-                                        onClick={handleNext}
-                                        className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all duration-200 flex items-center space-x-2"
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                    >
-                                        <span>Next</span>
-                                        <ChevronRight className="w-4 h-4" />
-                                    </motion.button>
-                                )}
-                            </motion.div>
-
-                            {/* Auto-advance progress bar */}
-                            {isAutoAdvancing && currentSlide < slides.length - 1 && (
-                                <motion.div
-                                    initial={{ width: "0%" }}
-                                    animate={{ width: "100%" }}
-                                    transition={{ duration: 4, ease: "linear" }}
-                                    className="fixed bottom-0 left-0 h-1 bg-white/50"
-                                />
+                                </motion.div>
                             )}
                         </div>
                     </div>
+
+                    {/* Auto-advance progress bar */}
+                    {isAutoAdvancing && currentSlide < slides.length && (
+                        <motion.div
+                            key={`progress-${currentSlide}`}
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 4, ease: "linear" }}
+                            className="fixed bottom-0 left-0 h-1 bg-white/50"
+                        />
+                    )}
                 </motion.div>
             )}
         </AnimatePresence>

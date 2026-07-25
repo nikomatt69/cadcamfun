@@ -2,6 +2,11 @@
 .env.development
 .env.production
 .env.local
+.env.desktop
+cadcamfun-desktop
+.env.production.local
+env.example
+optimized-env-config.txt
 .env.development
 .env.example
 .vercel

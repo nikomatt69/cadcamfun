@@ -17,7 +17,8 @@ export default function PricingPlans() {
     trialEndDate,
     createCheckoutSession,
     isLoading,
-    startTrial
+    startTrial,
+    betterAuth
   } = useSubscription();
   const router = useRouter();
   const [processingPlan, setProcessingPlan] = React.useState<string | null>(null);
@@ -34,12 +35,11 @@ export default function PricingPlans() {
       setProcessingPlan(priceId);
 
       if (useTrial) {
-        // Use the enhanced subscription context trial method
-        await startTrial();
-        router.push('/settings/subscription');
+        // Use Better Auth Stripe service for trial - with 14 day trial for Pro plan
+        await betterAuth.createCheckoutSessionBA(priceId, { trialDays: 14 });
       } else {
-        // Regular checkout flow
-        await createCheckoutSession(priceId);
+        // Use Better Auth Stripe service for regular checkout
+        await betterAuth.createCheckoutSessionBA(priceId);
       }
     } catch (error) {
       console.error("Error handling subscription:", error);

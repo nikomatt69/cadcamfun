@@ -1,10 +1,27 @@
 // src/hooks/useUnifiedLibrary.ts
 import { useState, useEffect, useCallback } from "react";
-import { fetchComponents, fetchMaterials, fetchTools } from "src/lib/api/libraries";
-import { predefinedComponents, predefinedMaterials, predefinedTools } from "@/src/lib/predefinedLibraries";
-import { ComponentsLibraryState, useLocalComponentsLibraryStore } from "@/src/store/localComponentsLibraryStore";
-import { MaterialsLibraryState, useLocalMaterialsLibraryStore } from "@/src/store/localMaterialsLibraryStore";
-import { ToolsLibraryState, useLocalToolsLibraryStore } from "@/src/store/localToolsLibraryStore";
+import {
+  fetchComponents,
+  fetchMaterials,
+  fetchTools,
+} from "src/lib/api/libraries";
+import {
+  predefinedComponents,
+  predefinedMaterials,
+  predefinedTools,
+} from "@/src/lib/predefinedLibraries";
+import {
+  ComponentsLibraryState,
+  useLocalComponentsLibraryStore,
+} from "@/src/store/localComponentsLibraryStore";
+import {
+  MaterialsLibraryState,
+  useLocalMaterialsLibraryStore,
+} from "@/src/store/localMaterialsLibraryStore";
+import {
+  ToolsLibraryState,
+  useLocalToolsLibraryStore,
+} from "@/src/store/localToolsLibraryStore";
 
 // Library source types
 export type LibrarySource = "api" | "local" | "predefined";
@@ -91,13 +108,14 @@ export interface UnifiedLibraryResult<T extends LibraryItem> {
  */
 export function useUnifiedLibrary<T extends LibraryItem>(
   entityType: LibraryEntityType,
-  initialSource: LibrarySource = "api"
+  initialSource: LibrarySource = "api",
 ): UnifiedLibraryResult<T> {
   // State for library data
   const [items, setItems] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSource, setActiveSource] = useState<LibrarySource>(initialSource);
+  const [activeSource, setActiveSource] =
+    useState<LibrarySource>(initialSource);
 
   // Get access to local library stores
   const componentsStore = useLocalComponentsLibraryStore();
@@ -105,11 +123,13 @@ export function useUnifiedLibrary<T extends LibraryItem>(
   const toolsStore = useLocalToolsLibraryStore();
 
   // Stats for each source
-  const [sourceStats, setSourceStats] = useState<Record<LibrarySource, number>>({
-    api: 0,
-    local: 0,
-    predefined: 0
-  });
+  const [sourceStats, setSourceStats] = useState<Record<LibrarySource, number>>(
+    {
+      api: 0,
+      local: 0,
+      predefined: 0,
+    },
+  );
 
   // Get the right local store based on entity type
   const getLocalStore = useCallback(() => {
@@ -142,14 +162,14 @@ export function useUnifiedLibrary<T extends LibraryItem>(
   // Normalize API items to match our interface
   const normalizeApiItems = useCallback(
     (apiItems: any[]): T[] => {
-      return apiItems.map(item => {
+      return apiItems.map((item) => {
         // Create a base normalized item
         const normalizedItem: Record<string, any> = {
           id: item.id,
           name: item.name,
           description: item.description || "",
           updatedAt: item.updatedAt,
-          createdAt: item.createdAt
+          createdAt: item.createdAt,
         };
 
         // Add entity-specific properties
@@ -180,12 +200,12 @@ export function useUnifiedLibrary<T extends LibraryItem>(
         return normalizedItem as T;
       });
     },
-    [entityType]
+    [entityType],
   );
 
   // Normalize local items to match our interface
   const normalizeLocalItems = useCallback((localItems: any[]): T[] => {
-    return localItems.map(item => {
+    return localItems.map((item) => {
       // Already in the right format
       return item as T;
     });
@@ -218,7 +238,7 @@ export function useUnifiedLibrary<T extends LibraryItem>(
     const stats: Record<LibrarySource, number> = {
       api: 0,
       local: 0,
-      predefined: 0
+      predefined: 0,
     };
 
     try {
@@ -272,7 +292,7 @@ export function useUnifiedLibrary<T extends LibraryItem>(
               ? (localStore as ComponentsLibraryState).components
               : entityType === "materials"
                 ? (localStore as MaterialsLibraryState).materials
-                : (localStore as ToolsLibraryState).tools
+                : (localStore as ToolsLibraryState).tools,
           );
           break;
         case "predefined":
@@ -285,8 +305,13 @@ export function useUnifiedLibrary<T extends LibraryItem>(
       // Stats will be updated by separate useEffect
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(`Error loading ${entityType} from ${activeSource} source: ${errorMessage}`);
-      console.error(`Error loading ${entityType} from ${activeSource} source:`, err);
+      setError(
+        `Error loading ${entityType} from ${activeSource} source: ${errorMessage}`,
+      );
+      console.error(
+        `Error loading ${entityType} from ${activeSource} source:`,
+        err,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -296,7 +321,7 @@ export function useUnifiedLibrary<T extends LibraryItem>(
     getLocalStore,
     normalizeLocalItems,
     entityType,
-    getPredefinedItems
+    getPredefinedItems,
   ]);
 
   // Fetch stats for all sources
@@ -308,14 +333,18 @@ export function useUnifiedLibrary<T extends LibraryItem>(
 
       const lowerQuery = query.toLowerCase();
       return items.filter(
-        item =>
+        (item) =>
           item.name.toLowerCase().includes(lowerQuery) ||
-          (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
+          (item.description &&
+            item.description.toLowerCase().includes(lowerQuery)) ||
           (item.type && item.type.toLowerCase().includes(lowerQuery)) ||
-          (item.tags && item.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
+          (Array.isArray(item.tags) &&
+            item.tags.some((tag) =>
+              (tag as string).toLowerCase().includes(lowerQuery),
+            )),
       );
     },
-    [items]
+    [items],
   );
 
   // Filter items by criteria
@@ -323,7 +352,7 @@ export function useUnifiedLibrary<T extends LibraryItem>(
     (filter: LibraryFilter): T[] => {
       if (!filter || Object.keys(filter).length === 0) return items;
 
-      return items.filter(item => {
+      return items.filter((item) => {
         // Check each filter criteria
         for (const [key, value] of Object.entries(filter)) {
           if (!value) continue;
@@ -331,15 +360,25 @@ export function useUnifiedLibrary<T extends LibraryItem>(
           if (key === "search") {
             const searchQuery = value.toLowerCase();
             const nameMatch = item.name.toLowerCase().includes(searchQuery);
-            const descMatch = item.description && item.description.toLowerCase().includes(searchQuery);
-            const tagMatch = item.tags && item.tags.some(tag => tag.toLowerCase().includes(searchQuery));
+            const descMatch =
+              item.description &&
+              item.description.toLowerCase().includes(searchQuery);
+            const tagMatch =
+              Array.isArray(item.tags) &&
+              item.tags.some((tag) =>
+                (tag as string).toLowerCase().includes(searchQuery),
+              );
 
             if (!nameMatch && !descMatch && !tagMatch) return false;
           } else if (key === "type" && item.type !== value) {
             return false;
           } else if (key === "category") {
             // Handle category-specific filtering
-            if (entityType === "materials" && (item as unknown as MaterialLibraryItem).properties?.category !== value) {
+            if (
+              entityType === "materials" &&
+              (item as unknown as MaterialLibraryItem).properties?.category !==
+                value
+            ) {
               return false;
             }
           }
@@ -349,15 +388,15 @@ export function useUnifiedLibrary<T extends LibraryItem>(
         return true;
       });
     },
-    [items, entityType]
+    [items, entityType],
   );
 
   // Get a single item by ID
   const getItem = useCallback(
     (id: string): T | null => {
-      return items.find(item => item.id === id) || null;
+      return items.find((item) => item.id === id) || null;
     },
-    [items]
+    [items],
   );
 
   // Save an item to the appropriate store
@@ -386,14 +425,17 @@ export function useUnifiedLibrary<T extends LibraryItem>(
           return savedItem as unknown as T;
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setError(`Error saving ${entityType} to ${activeSource} source: ${errorMessage}`);
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
+        setError(
+          `Error saving ${entityType} to ${activeSource} source: ${errorMessage}`,
+        );
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    [activeSource, entityType, getLocalStore, refreshLibrary]
+    [activeSource, entityType, getLocalStore, refreshLibrary],
   );
 
   // Delete an item
@@ -434,14 +476,17 @@ export function useUnifiedLibrary<T extends LibraryItem>(
           return typeof result === "boolean" ? result : false;
         }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        setError(`Error deleting ${entityType} from ${activeSource} source: ${errorMessage}`);
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
+        setError(
+          `Error deleting ${entityType} from ${activeSource} source: ${errorMessage}`,
+        );
         return false;
       } finally {
         setIsLoading(false);
       }
     },
-    [activeSource, entityType, getLocalStore, refreshLibrary]
+    [activeSource, entityType, getLocalStore, refreshLibrary],
   );
 
   // Import an item to the main library (API)
@@ -454,14 +499,15 @@ export function useUnifiedLibrary<T extends LibraryItem>(
         setError("API import not implemented");
         return null;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
         setError(`Error importing ${entityType} to API: ${errorMessage}`);
         return null;
       } finally {
         setIsLoading(false);
       }
     },
-    [entityType]
+    [entityType],
   );
 
   // Update items when active source changes
@@ -482,10 +528,16 @@ export function useUnifiedLibrary<T extends LibraryItem>(
       }
     };
 
-    window.addEventListener(`${entityType}-library-updated`, handleLocalLibraryUpdate);
+    window.addEventListener(
+      `${entityType}-library-updated`,
+      handleLocalLibraryUpdate,
+    );
 
     return () => {
-      window.removeEventListener(`${entityType}-library-updated`, handleLocalLibraryUpdate);
+      window.removeEventListener(
+        `${entityType}-library-updated`,
+        handleLocalLibraryUpdate,
+      );
     };
   }, [entityType, activeSource]); // Rimosso fetchSourceStats e refreshLibrary dalle dipendenze
 
@@ -516,6 +568,6 @@ export function useUnifiedLibrary<T extends LibraryItem>(
     importToMain,
 
     // Statistics
-    sourceStats
+    sourceStats,
   };
 }

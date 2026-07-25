@@ -3,6 +3,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 import { requireAuth } from "src/lib/api/auth";
 
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
   if (!userId) return;
@@ -41,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (search && typeof search === "string") {
         whereCondition.user = {
           OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } }
+            { name: { contains: search } },
+            { email: { contains: search } }
           ]
         };
       }

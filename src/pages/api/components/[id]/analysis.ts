@@ -1,14 +1,22 @@
 // src/pages/api/components/[id]/analysis.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
-import { sendErrorResponse, sendSuccessResponse, handleApiError } from "src/lib/api/helpers";
-import { requireAuth } from "@/src/lib/api/auth";
+import {
+  sendErrorResponse,
+  sendSuccessResponse,
+  handleApiError,
+} from "src/lib/api/helpers";
+import { requireAuth } from "src/lib/api/auth";
 import { Component } from "@prisma/client";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   try {
     // Ensure user is authenticated
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     const { id } = req.query;
@@ -24,13 +32,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         OR: [
           { project: { ownerId: userId } },
           { project: { organization: { users: { some: { userId } } } } },
-          { isPublic: true }
-        ]
-      }
+          { isPublic: true },
+        ],
+      },
     });
 
     if (!component) {
-      return sendErrorResponse(res, "Component not found or access denied", 404);
+      return sendErrorResponse(
+        res,
+        "Component not found or access denied",
+        404,
+      );
     }
 
     // Handle GET request - Get component analysis
@@ -68,7 +80,7 @@ async function analyzeComponent(component: Component) {
     complexity,
     performance,
     compatibility,
-    usage
+    usage,
   };
 }
 
@@ -85,7 +97,11 @@ function calculateComplexity(data: any) {
   // Calculate complexity score (example algorithm)
   const score = Math.max(
     0,
-    100 - 5 * (Math.max(0, nestingDepth - 3) + Math.max(0, (propertyCount - 10) / 5) + Math.max(0, dependencies - 2))
+    100 -
+      5 *
+        (Math.max(0, nestingDepth - 3) +
+          Math.max(0, (propertyCount - 10) / 5) +
+          Math.max(0, dependencies - 2)),
   );
 
   return {
@@ -93,8 +109,8 @@ function calculateComplexity(data: any) {
     factors: [
       { name: "Nesting Depth", value: nestingDepth, benchmark: 3 },
       { name: "Property Count", value: propertyCount, benchmark: 15 },
-      { name: "Dependencies", value: dependencies, benchmark: 2 }
-    ]
+      { name: "Dependencies", value: dependencies, benchmark: 2 },
+    ],
   };
 }
 
@@ -104,7 +120,11 @@ function calculateNestingDepth(obj: any, currentDepth = 0) {
   let maxDepth = currentDepth;
 
   for (const key in obj) {
-    if (obj.hasOwnProperty(key) && typeof obj[key] === "object" && obj[key] !== null) {
+    if (
+      obj.hasOwnProperty(key) &&
+      typeof obj[key] === "object" &&
+      obj[key] !== null
+    ) {
       const depth = calculateNestingDepth(obj[key], currentDepth + 1);
       maxDepth = Math.max(maxDepth, depth);
     }
@@ -148,15 +168,31 @@ function estimatePerformance(data: any, type: string) {
   const loadTime = 20 + renderTime / 2;
 
   // Calculate performance score
-  const score = Math.max(0, 100 - ((memoryUsage > 300 ? 5 : 0) + (renderTime > 20 ? 10 : 0) + (loadTime > 50 ? 5 : 0)));
+  const score = Math.max(
+    0,
+    100 -
+      ((memoryUsage > 300 ? 5 : 0) +
+        (renderTime > 20 ? 10 : 0) +
+        (loadTime > 50 ? 5 : 0)),
+  );
 
   return {
     score: Math.round(score),
     metrics: [
       { name: "Memory Usage", value: memoryUsage, unit: "KB", benchmark: 300 },
-      { name: "Render Time", value: Math.round(renderTime), unit: "ms", benchmark: 20 },
-      { name: "Load Time", value: Math.round(loadTime), unit: "ms", benchmark: 50 }
-    ]
+      {
+        name: "Render Time",
+        value: Math.round(renderTime),
+        unit: "ms",
+        benchmark: 20,
+      },
+      {
+        name: "Load Time",
+        value: Math.round(loadTime),
+        unit: "ms",
+        benchmark: 50,
+      },
+    ],
   };
 }
 
@@ -181,7 +217,11 @@ function checkCompatibility(data: any, type: string) {
   }
 
   // Calculate compatibility score
-  const compatibleCount = [webCompatible, mobileCompatible, desktopCompatible].filter(Boolean).length;
+  const compatibleCount = [
+    webCompatible,
+    mobileCompatible,
+    desktopCompatible,
+  ].filter(Boolean).length;
   const score = Math.round((compatibleCount / 3) * 100);
 
   return {
@@ -189,55 +229,74 @@ function checkCompatibility(data: any, type: string) {
     platforms: [
       { name: "Web", compatible: webCompatible },
       { name: "Mobile", compatible: mobileCompatible },
-      { name: "Desktop", compatible: desktopCompatible }
-    ]
+      { name: "Desktop", compatible: desktopCompatible },
+    ],
   };
 }
 
 async function getUsageStatistics(componentId: string | null) {
-  if (!componentId) return { references: 0, lastUsed: new Date().toISOString().split("T")[0], projects: [] };
+  if (!componentId)
+    return {
+      references: 0,
+      lastUsed: new Date().toISOString().split("T")[0],
+      projects: [],
+    };
 
   // Count references in other components
-  const referencingComponents = await prisma.component.findMany({
-    where: {
-      data: {
-        path: ["references"],
-        array_contains: componentId
-      }
-    },
+  const allComponentsRaw = await prisma.component.findMany({
     select: {
       id: true,
       name: true,
       projectId: true,
-      updatedAt: true
+      updatedAt: true,
+      data: true,
+    },
+  });
+  const refComponents = allComponentsRaw.filter((c) => {
+    try {
+      const data = typeof c.data === "string" ? JSON.parse(c.data) : c.data;
+      if (typeof data === "object" && data !== null && "references" in data) {
+        const refs = (data as { references?: string[] }).references;
+        return Array.isArray(refs) && refs.includes(componentId);
+      }
+    } catch {
+      /* ignore */
     }
+    return false;
   });
 
   // Get list of projects using this component
-  const projectUsage = referencingComponents.reduce(
-    (acc: Record<string, { id: string; name: string; usageCount: number }>, comp) => {
+  const projectUsage = refComponents.reduce(
+    (
+      acc: Record<string, { id: string; name: string; usageCount: number }>,
+      comp,
+    ) => {
       if (!acc[comp.projectId]) {
         acc[comp.projectId] = {
           id: comp.projectId,
           name: "Project " + comp.projectId.substring(0, 6), // This would be replaced with actual project names
-          usageCount: 0
+          usageCount: 0,
         };
       }
       acc[comp.projectId].usageCount++;
       return acc;
     },
-    {}
+    {},
   );
 
   // Find the most recent usage date
   const lastUsed =
-    referencingComponents.length > 0
-      ? new Date(Math.max(...referencingComponents.map(c => new Date(c.updatedAt).getTime())))
+    refComponents.length > 0
+      ? new Date(
+          Math.max(
+            ...refComponents.map((c) => new Date(c.updatedAt).getTime()),
+          ),
+        )
       : new Date(); // Default to current date if no references
 
   return {
-    references: referencingComponents.length,
+    references: refComponents.length,
     lastUsed: lastUsed.toISOString().split("T")[0],
-    projects: Object.values(projectUsage)
+    projects: Object.values(projectUsage),
   };
 }

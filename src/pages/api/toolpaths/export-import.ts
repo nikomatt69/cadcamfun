@@ -1,8 +1,9 @@
 // src/pages/api/toolpaths/export-import.ts
 import { NextApiRequest, NextApiResponse } from "next";
+import { requireAuth } from "src/lib/api/auth";
 import { prisma } from "src/lib/prisma";
 import { sendSuccessResponse, sendErrorResponse, handleApiError } from "src/lib/api/helpers";
-import { requireAuth } from "src/lib/api/auth";
+
 import JSZip from "jszip";
 import { generateObjectPath, uploadToBucket, downloadFromBucket, listObjectsByType } from "src/lib/storageService";
 
@@ -28,6 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Authentication check
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     // EXPORT - GET
@@ -40,11 +42,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ? ids
           : [ids]
         : (
-            await prisma.toolpath.findMany({
-              where: { createdBy: userId },
-              select: { id: true }
-            })
-          ).map(tp => tp.id);
+          await prisma.toolpath.findMany({
+            where: { createdBy: userId },
+            select: { id: true }
+          })
+        ).map(tp => tp.id);
 
       // Retrieve toolpaths
       const toolpaths = await prisma.toolpath.findMany({

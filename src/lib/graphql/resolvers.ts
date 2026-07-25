@@ -21,7 +21,7 @@ export interface Context {
   userId: string | null;
   prisma: PrismaClient;
   pubsub: PubSub;
-  user?: { id: string; email?: string | null; [key: string]: any };
+  user?: { id: string; email?: string | null;[key: string]: any };
 }
 
 // Helper to derive the old 'user' object if needed by isAuthenticated
@@ -605,7 +605,7 @@ export const resolvers = {
 
     subscription: (parent: any, _: any, context: Context) => {
       return context.prisma.subscription.findUnique({
-        where: { userId: parent.id }
+        where: { id: parent.id }
       });
     }
 

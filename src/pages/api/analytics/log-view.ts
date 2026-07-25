@@ -1,7 +1,7 @@
 // src/pages/api/analytics/log-view.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { logPageView } from "@/src/lib/activityTracking";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);

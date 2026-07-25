@@ -2,6 +2,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 import { requireAuth } from "src/lib/api/auth";
+
 import { NotificationService } from "@/src/lib/notificationService";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

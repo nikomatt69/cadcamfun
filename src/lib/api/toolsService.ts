@@ -89,8 +89,8 @@ export class ToolsService {
           AND: [
             {
               OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { notes: { contains: search, mode: "insensitive" } }
+                { name: { contains: search } },
+                { notes: { contains: search } }
               ]
             }
           ]

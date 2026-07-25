@@ -75,14 +75,11 @@ class CADaiService {
   };
 
   constructor() {
-    this.apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-    this.apiUrl = "https://api.anthropic.com/v1/messages";
+    // Requests are proxied through /api/ai/proxy → LLMClient (unified provider);
+    // no API key or upstream URL is used on the client anymore.
+    this.apiKey = undefined;
+    this.apiUrl = "/api/ai/proxy";
     this.defaultModel = "claude-sonnet-4-20250514";
-
-    // Check if we're in browser environment and handle accordingly
-    if (typeof window !== "undefined" && !this.apiKey) {
-      console.warn("No API key found for CAD AI Service. Set NEXT_PUBLIC_ANTHROPIC_API_KEY environment variable.");
-    }
   }
 
   /**
@@ -402,39 +399,28 @@ class CADaiService {
   }
 
   /**
-   * Make an API request to Claude API
+   * Make an AI request through the single unified provider.
+   *
+   * Routes to the server-side `/api/ai/proxy` (Anthropic-compatible, backed by
+   * `LLMClient` on the Vercel AI SDK) instead of calling api.anthropic.com
+   * directly with a client-exposed key.
    * @private
    */
   private async makeAIRequest(prompt: string): Promise<string> {
-    if (!this.apiKey) {
-      throw new Error("API key not configured for CAD AI Service");
-    }
-
     try {
-      const response = await axios.post(
-        this.apiUrl,
-        {
-          model: this.defaultModel,
-          max_tokens: 4000,
-          messages: [{ role: "user", content: prompt }]
-        },
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "application/json",
-            "x-api-key": this.apiKey,
-            "anthropic-version": "2025-02-19"
-          }
-        }
-      );
+      const response = await axios.post("/api/ai/proxy", {
+        model: this.defaultModel,
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }]
+      });
 
-      // Extract the text content from the response
-      return response.data.content[0]?.text || "";
+      // Anthropic-shaped response from the proxy: { content: [{ type, text }] }
+      return response.data.content?.[0]?.text || "";
     } catch (error) {
       console.error("AI API request failed:", error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
-          `API Error (${error.response.status}): ${error.response.data?.error?.message || "Unknown API error"}`
+          `API Error (${error.response.status}): ${error.response.data?.message || error.response.data?.error?.message || "Unknown API error"}`
         );
       }
       throw error;

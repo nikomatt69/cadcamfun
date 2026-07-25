@@ -221,7 +221,7 @@ export class EnterpriseStripeService {
 
       // Create or update DB record
       await prisma.subscription.upsert({
-        where: { userId: params.userId },
+        where: { id: params.userId },
         update: {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscription.id,
@@ -239,7 +239,7 @@ export class EnterpriseStripeService {
             : null,
         },
         create: {
-          userId: params.userId,
+          id: params.userId,
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscription.id,
           stripePriceId: params.priceId,
@@ -254,6 +254,7 @@ export class EnterpriseStripeService {
           trialEndsAt: subscription.trial_end
             ? new Date(subscription.trial_end * 1000)
             : null,
+          user: { connect: { id: params.userId } },
         },
       });
 
@@ -305,13 +306,13 @@ export class EnterpriseStripeService {
       subscription_data:
         params.mode === "subscription"
           ? {
-              metadata: {
-                userId: params.userId,
-                customerType: params.customerType || "individual",
-                ...params.metadata,
-              },
-              trial_period_days: params.trialPeriodDays,
-            }
+            metadata: {
+              userId: params.userId,
+              customerType: params.customerType || "individual",
+              ...params.metadata,
+            },
+            trial_period_days: params.trialPeriodDays,
+          }
           : undefined,
     };
 

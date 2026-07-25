@@ -295,9 +295,9 @@ const ConversationDetail: React.FC<ConversationDetailProps> = ({ conversationId,
 
         {isCurrentUser && (
           <div className="flex-shrink-0 ml-2">
-            {session?.user?.image ? (
+            {session?.user?.name ? (
               <Image
-                src={session.user.image}
+                src={"https://ui-avatars.com/api/?name=" + session.user.name.charAt(0)}
                 alt={session?.user?.name || "You"}
                 width={36}
                 height={36}

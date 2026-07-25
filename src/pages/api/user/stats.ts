@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth } from '@/src/lib/api/auth';
 import { prisma } from '@/src/lib/prisma';
+import { getAuthenticatedUserId } from '@/src/middlewares/withApiAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -10,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const userId = await requireAuth(req, res);
+
     if (!userId) {
       return; // requireAuth already sent the response
     }
@@ -73,10 +75,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error) {
     console.error('Error fetching user stats:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
-      message: process.env.NODE_ENV === 'development' ? 
-        (error instanceof Error ? error.message : 'Unknown error') : 
+      message: process.env.NODE_ENV === 'development' ?
+        (error instanceof Error ? error.message : 'Unknown error') :
         'Failed to fetch stats'
     });
   }

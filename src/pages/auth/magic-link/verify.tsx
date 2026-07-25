@@ -6,46 +6,36 @@ import Link from "next/link";
 import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
-import { useAuth } from "@/src/contexts/AuthContext";
-import { useTauri } from "@/src/hooks/useTauri";
+import { verifyMagicLink } from "@/src/lib/auth-client";
 
 export default function MagicLinkVerify() {
   const router = useRouter();
-  const { refreshSession } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'expired'>('loading');
   const [message, setMessage] = useState('');
-  const { httpFetch } = useTauri();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
   useEffect(() => {
     const verifyToken = async () => {
-      const { token, email } = router.query;
+      const { token } = router.query;
 
-      if (!token || !email) {
+      if (!token) {
         setStatus('error');
-        setMessage('Invalid magic link');
+        setMessage('Invalid magic link - no token provided');
         return;
       }
 
       try {
-        const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/magic-link/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, email }),
-          credentials: 'include'
-        });
+        const result = await verifyMagicLink(token as string);
 
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (result.success) {
           setStatus('success');
           setMessage('Successfully signed in!');
 
-          // Refresh session and redirect
-          await refreshSession();
+          // Redirect to home page
           setTimeout(() => {
             router.push('/');
           }, 2000);
@@ -58,17 +48,17 @@ export default function MagicLinkVerify() {
             setMessage(result.error || 'Invalid magic link');
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Magic link verification error:', error);
         setStatus('error');
-        setMessage('Failed to verify magic link');
+        setMessage(error.message || 'Failed to verify magic link');
       }
     };
 
     if (isClient && router.isReady) {
       verifyToken();
     }
-  }, [isClient, router.isReady, router.query, refreshSession, router, httpFetch]);
+  }, [isClient, router.isReady, router.query, router]);
 
   return (
     <>

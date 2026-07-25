@@ -3,8 +3,10 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 import { requireAuth } from "src/lib/api/auth";
 
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
+
   if (!userId) return;
 
   const { id: organizationId } = req.query;
@@ -121,12 +123,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           isGroupChat: conv.isGroupChat,
           lastMessage: lastMessage
             ? {
-                id: lastMessage.id,
-                content: lastMessage.content,
-                createdAt: lastMessage.createdAt,
-                senderId: lastMessage.senderId,
-                sender: lastMessage.sender
-              }
+              id: lastMessage.id,
+              content: lastMessage.content,
+              createdAt: lastMessage.createdAt,
+              senderId: lastMessage.senderId,
+              sender: lastMessage.sender
+            }
             : null,
           messageCount: conv._count.messages,
           createdAt: conv.createdAt,

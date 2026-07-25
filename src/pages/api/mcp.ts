@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { createServer } from "@/src/lib/modelcontextprotocol";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { v4 as uuidv4 } from "uuid";
 import { aiDesignService } from "@/src/lib/ai/aiDesignService";
 

@@ -2,8 +2,9 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { prisma } from "src/lib/prisma";
-import { requireAuth } from "src/lib/api/auth";
+
 import { sendInvitationEmail } from "src/lib/email";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Authenticate the request
@@ -95,18 +96,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const invitation = existingInvitation
       ? await prisma.organizationInvitation.update({
-          where: { id: existingInvitation.id },
-          data: { role, token, expiresAt }
-        })
+        where: { id: existingInvitation.id },
+        data: { role, token, expiresAt }
+      })
       : await prisma.organizationInvitation.create({
-          data: {
-            email,
-            role,
-            token,
-            organizationId,
-            expiresAt
-          }
-        });
+        data: {
+          email,
+          role,
+          token,
+          organizationId,
+          expiresAt
+        }
+      });
 
     // Send the invitation email
     const inviterName = inviter?.name || "Someone";

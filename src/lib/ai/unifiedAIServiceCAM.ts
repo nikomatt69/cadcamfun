@@ -25,7 +25,6 @@ import { camPromptTemplates } from "./cam-new/camPromptTemplates";
 import { aiAnalytics } from "./ai-new/aiAnalytics";
 import { ToolpathOptimizer } from "./cam-new/toolpathOptimizer";
 import { CostEstimator } from "./cam-new/costEstimator";
-import openai from "openai";
 
 /**
  * Estensione di UnifiedAIService con metodi specifici CAM

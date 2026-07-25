@@ -1,5 +1,5 @@
 // src/context/NotificationContext.tsx
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 
 type NotificationType = "success" | "error" | "warning" | "info";
 
@@ -17,28 +17,48 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+let notificationIdSequence = 0;
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const timeoutRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const addNotification = ({ type, message, duration = 5000 }: Omit<Notification, "id">) => {
-    const id = Date.now().toString();
+  const removeNotification = useCallback((id: string) => {
+    const timeoutId = timeoutRefs.current[id];
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      delete timeoutRefs.current[id];
+    }
+
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
+  const addNotification = useCallback(({ type, message, duration = 5000 }: Omit<Notification, "id">) => {
+    const id = `${Date.now()}-${notificationIdSequence++}`;
     setNotifications(prev => [...prev, { id, type, message, duration }]);
 
     // Rimuovi automaticamente la notifica dopo la durata specificata
     if (duration > 0) {
-      setTimeout(() => {
+      timeoutRefs.current[id] = setTimeout(() => {
         removeNotification(id);
       }, duration);
     }
-  };
+  }, [removeNotification]);
 
-  const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  };
+  useEffect(() => {
+    return () => {
+      Object.values(timeoutRefs.current).forEach(clearTimeout);
+      timeoutRefs.current = {};
+    };
+  }, []);
+
+  const value = useMemo(
+    () => ({ notifications, addNotification, removeNotification }),
+    [addNotification, notifications, removeNotification]
+  );
 
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, removeNotification }}>
+    <NotificationContext.Provider value={value}>
       {children}
       <NotificationList />
     </NotificationContext.Provider>

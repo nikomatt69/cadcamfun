@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { prisma } from "@/src/lib/prisma";
 import { MarketplaceFilters } from "@/src/types/marketplace";
 import { POLAR_CONFIG } from "@/src/lib/polar/config";
@@ -36,7 +36,8 @@ async function autoValidateItem(data: {
       "MATERIAL",
     ].includes(data.type),
     sellerVerified: data.seller && !data.seller.suspended,
-    hasPreviewImages: data.previewImages && data.previewImages.length > 0,
+    hasPreviewImages:
+      Array.isArray(data.previewImages) && data.previewImages.length > 0,
   };
 
   // Content quality checks
@@ -83,7 +84,7 @@ function calculateContentScore(data: {
   }
 
   // Images quality (0-30 points)
-  if (data.previewImages && data.previewImages.length > 0) {
+  if (Array.isArray(data.previewImages) && data.previewImages.length > 0) {
     score += Math.min(data.previewImages.length * 10, 30);
   }
 
@@ -92,13 +93,14 @@ function calculateContentScore(data: {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   try {
     if (req.method === "GET") {
       return await getMarketplaceItems(req, res);
     } else if (req.method === "POST") {
       const userId = await requireAuth(req, res);
+
       if (!userId) return;
       return await createMarketplaceItem(req, res, userId);
     }
@@ -143,8 +145,8 @@ async function getMarketplaceItems(req: NextApiRequest, res: NextApiResponse) {
 
   if (search) {
     where.OR = [
-      { title: { contains: search, mode: "insensitive" } },
-      { description: { contains: search, mode: "insensitive" } },
+      { title: { contains: search } },
+      { description: { contains: search } },
       { tags: { hasSome: [search] } },
     ];
   }
@@ -232,7 +234,7 @@ async function getMarketplaceItems(req: NextApiRequest, res: NextApiResponse) {
 async function createMarketplaceItem(
   req: NextApiRequest,
   res: NextApiResponse,
-  userId: string
+  userId: string,
 ) {
   const {
     title,
@@ -282,7 +284,7 @@ async function createMarketplaceItem(
     // Items will be created without payment integration for now
     let polarProductId: string | null = null;
     console.log(
-      "⚠️ Polar integration disabled - SDK requires recurringInterval for one-time products"
+      "⚠️ Polar integration disabled - SDK requires recurringInterval for one-time products",
     );
 
     // Auto-validate and approve item

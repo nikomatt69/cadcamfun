@@ -15,6 +15,7 @@ interface ApiToken {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
+
   if (!userId) {
     return; // requireAuth already sent the response
   }
@@ -71,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Generate token
       const tokenId = `token_${Date.now()}`;
       const tokenPrefix = `cad_${name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 8)}`;
-      
+
       const expiresAt = expiresIn ? new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000) : null;
 
       const newToken: ApiToken = {
@@ -87,7 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // In production, save to database
       // await prisma.apiToken.create({ data: newToken });
 
-      return res.status(201).json({ 
+      return res.status(201).json({
         token: newToken,
         fullToken: `${tokenPrefix}_${Math.random().toString(36).substring(2, 20)}` // Only show once
       });
@@ -98,4 +99,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
-} 
+}

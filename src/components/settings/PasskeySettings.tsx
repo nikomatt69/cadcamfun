@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  FingerprintIcon, 
-  PlusIcon, 
-  TrashIcon, 
+import {
+  FingerprintIcon,
+  PlusIcon,
+  TrashIcon,
   ShieldCheckIcon,
   LucidePhone,
   ComputerIcon,
   AlertTriangleIcon,
-    
+
 } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useAuthPasskeys, useAuthUI } from '@/src/store/authStore';
+
 
 interface Passkey {
   id: string;
@@ -22,8 +23,8 @@ interface Passkey {
 }
 
 export default function PasskeySettings() {
-  const { user, registerPasskey } = useAuth();
-  
+  const { user, handleSignInWithPasskey, handleAddPasskey } = useAuth();
+
   // Use auth store for passkey management
   const {
     passkeys,
@@ -34,12 +35,12 @@ export default function PasskeySettings() {
     removePasskey: removePasskeyFromStore,
     checkPasskeySupport
   } = useAuthPasskeys();
-  
+
   const {
     passkeyError: storeError,
     setPasskeyError
   } = useAuthUI();
-  
+
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export default function PasskeySettings() {
     setSuccess(null);
 
     try {
-      const result = await registerPasskey();
+      const result = await handleAddPasskey('Passkey');
       if (result.success) {
         setSuccess(result.message);
         await loadPasskeys(); // Refresh the list
@@ -153,7 +154,7 @@ export default function PasskeySettings() {
             Secure passwordless authentication using your device&apos;s biometrics or security keys
           </p>
         </div>
-        
+
         <motion.button
           onClick={handleRegisterPasskey}
           disabled={registering}
@@ -191,7 +192,7 @@ export default function PasskeySettings() {
             {error}
           </motion.div>
         )}
-        
+
         {success && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -236,11 +237,11 @@ export default function PasskeySettings() {
                 className="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
               >
                 <div className="flex items-center space-x-4">
-                  {getDeviceIcon(passkey.transports || [])} 
-                  
+                  {getDeviceIcon(passkey.transports || [])}
+
                   <div>
                     <h4 className="font-medium text-gray-900 dark:text-white">
-                      {getDeviceType(passkey.transports || [])} 
+                      {getDeviceType(passkey.transports || [])}
                     </h4>
                     <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                       {passkey.lastUsed && (

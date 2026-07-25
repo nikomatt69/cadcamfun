@@ -50,6 +50,7 @@ export function useAnalytics(filters: AnalyticsFilters = {}, options: { enablePo
   const fetchAnalytics = useCallback(async (forceRefresh = false) => {
     // Only fetch if user is authenticated
     if (!session?.user?.id) {
+      console.log("User not authenticated");
       setIsLoading(false);
       return;
     }

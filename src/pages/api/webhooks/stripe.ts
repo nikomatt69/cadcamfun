@@ -7,6 +7,7 @@ import stripe, {
 } from "src/lib/stripe-server";
 import { prisma } from "src/lib/prisma";
 import { stripeService } from "src/lib/stripe/stripeService";
+import { SUBSCRIPTION_PLANS } from "@/src/lib/stripe";
 
 // Disable body parsing as we need raw body for webhook verification
 export const config = {
@@ -302,13 +303,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Create or update subscription record
   await prisma.subscription.upsert({
-    where: { userId },
+    where: { id: userId },
     update: {
       stripeCustomerId: customerId,
     },
     create: {
-      userId,
+      id: userId,
+      user: { connect: { id: userId } },
       stripeCustomerId: customerId,
+      plan: SUBSCRIPTION_PLANS.FREE,
       status: "active",
     },
   });

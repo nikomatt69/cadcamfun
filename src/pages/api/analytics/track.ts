@@ -1,7 +1,7 @@
 // src/pages/api/analytics/track.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { logActivity, ActivityItemType, ActivityAction } from "@/src/lib/activityTracking";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);

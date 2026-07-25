@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import Layout from '@/src/components/layout/Layout';
-import { useMarketplaceStore } from '@/src/store/marketplaceStore';
-import { MarketplaceItemWithSeller } from '@/src/types/marketplace';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import Layout from "@/src/components/layout/Layout";
+import { useMarketplaceStore } from "@/src/store/marketplaceStore";
+import { MarketplaceItemWithSeller } from "@/src/types/marketplace";
 import {
   Star,
   Download,
@@ -17,13 +17,13 @@ import {
   AlertCircle,
   ArrowLeft,
   Share2,
-  Flag
-} from 'react-feather';
-import { motion } from 'framer-motion';
-import { cn } from '@/src/lib/utils';
-import toast from 'react-hot-toast';
-import Image from 'next/image';
-import { useSession } from '@/src/lib/auth-client';
+  Flag,
+} from "react-feather";
+import { motion } from "framer-motion";
+import { cn } from "@/src/lib/utils";
+import toast from "react-hot-toast";
+import Image from "next/image";
+import { useSession } from "@/src/lib/auth-client";
 export default function MarketplaceItemPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -46,12 +46,12 @@ export default function MarketplaceItemPage() {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/marketplace/items/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch item');
+      if (!response.ok) throw new Error("Failed to fetch item");
       const data = await response.json();
       setItem(data);
     } catch (error) {
-      setError('Failed to load item');
-      console.error('Error fetching item:', error);
+      setError("Failed to load item");
+      console.error("Error fetching item:", error);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +59,7 @@ export default function MarketplaceItemPage() {
 
   const handleWishlistToggle = async () => {
     if (!session) {
-      router.push('/auth/signin');
+      router.push("/auth/signin");
       return;
     }
 
@@ -69,20 +69,20 @@ export default function MarketplaceItemPage() {
       if (isInWishlist) {
         await removeFromWishlist(item.id);
         setIsInWishlist(false);
-        toast.success('Removed from wishlist');
+        toast.success("Removed from wishlist");
       } else {
         await addToWishlist(item.id);
         setIsInWishlist(true);
-        toast.success('Added to wishlist');
+        toast.success("Added to wishlist");
       }
     } catch (error) {
-      toast.error('Failed to update wishlist');
+      toast.error("Failed to update wishlist");
     }
   };
 
   const handlePurchase = async () => {
     if (!session) {
-      router.push('/auth/signin');
+      router.push("/auth/signin");
       return;
     }
 
@@ -90,10 +90,10 @@ export default function MarketplaceItemPage() {
 
     try {
       // Create checkout session
-      const response = await fetch('/api/marketplace/checkout', {
-        method: 'POST',
+      const response = await fetch("/api/marketplace/checkout", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           itemId: item.id,
@@ -101,12 +101,12 @@ export default function MarketplaceItemPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to create checkout');
+      if (!response.ok) throw new Error("Failed to create checkout");
 
       const { checkoutUrl } = await response.json();
       window.location.href = checkoutUrl;
     } catch (error) {
-      toast.error('Failed to start checkout process');
+      toast.error("Failed to start checkout process");
     }
   };
 
@@ -124,13 +124,17 @@ export default function MarketplaceItemPage() {
     } else {
       // Fallback to copying URL
       navigator.clipboard.writeText(window.location.href);
-      toast.success('Link copied to clipboard');
+      toast.success("Link copied to clipboard");
     }
   };
 
-  const averageRating = item?.reviews && item.reviews.length > 0
-    ? item.reviews.reduce((sum: number, review: any) => sum + Number(review.rating), 0) / item.reviews.length
-    : 0;
+  const averageRating =
+    item?.reviews && item.reviews.length > 0
+      ? item.reviews.reduce(
+          (sum: number, review: any) => sum + Number(review.rating),
+          0,
+        ) / item.reviews.length
+      : 0;
 
   if (isLoading) {
     return (
@@ -165,10 +169,10 @@ export default function MarketplaceItemPage() {
               Item Not Found
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              {error || 'The item you\'re looking for doesn\'t exist.'}
+              {error || "The item you're looking for doesn't exist."}
             </p>
             <button
-              onClick={() => router.push('/marketplace')}
+              onClick={() => router.push("/marketplace")}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
             >
               Back to Marketplace
@@ -203,9 +207,10 @@ export default function MarketplaceItemPage() {
             >
               {/* Main Image */}
               <div className="relative h-96 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                {item.previewImages && item.previewImages.length > 0 ? (
+                {Array.isArray(item.previewImages) &&
+                item.previewImages.length > 0 ? (
                   <Image
-                    src={item.previewImages[selectedImageIndex]}
+                    src={item.previewImages[selectedImageIndex] as string}
                     alt={item.title}
                     fill
                     className="object-cover"
@@ -214,36 +219,39 @@ export default function MarketplaceItemPage() {
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                       <div className="text-6xl mb-2">📦</div>
-                      <p className="text-gray-500 dark:text-gray-400">No preview available</p>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        No preview available
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Thumbnail Images */}
-              {item.previewImages && item.previewImages.length > 1 && (
-                <div className="flex space-x-2 overflow-x-auto">
-                  {item.previewImages.map((image, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setSelectedImageIndex(index)}
-                      className={cn(
-                        "relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2",
-                        selectedImageIndex === index
-                          ? "border-blue-500"
-                          : "border-gray-200 dark:border-gray-700"
-                      )}
-                    >
-                      <Image
-                        src={image}
-                        alt={`Preview ${index + 1}`}
-                        fill
-                        className="object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
+              {Array.isArray(item.previewImages) &&
+                item.previewImages.length > 1 && (
+                  <div className="flex space-x-2 overflow-x-auto">
+                    {item.previewImages.map((image, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedImageIndex(index)}
+                        className={cn(
+                          "relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2",
+                          selectedImageIndex === index
+                            ? "border-blue-500"
+                            : "border-gray-200 dark:border-gray-700",
+                        )}
+                      >
+                        <Image
+                          src={image as string}
+                          alt={`Preview ${index + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
             </motion.div>
 
             {/* Item Info */}
@@ -258,7 +266,7 @@ export default function MarketplaceItemPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                      {item.type.replace('_', ' ')}
+                      {item.type.replace("_", " ")}
                     </span>
                     {item.featured && (
                       <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
@@ -282,7 +290,7 @@ export default function MarketplaceItemPage() {
                         className={cn(
                           isInWishlist
                             ? "fill-red-500 text-red-500"
-                            : "text-gray-600 dark:text-gray-400"
+                            : "text-gray-600 dark:text-gray-400",
                         )}
                       />
                     </button>
@@ -305,12 +313,15 @@ export default function MarketplaceItemPage() {
                             className={cn(
                               star <= averageRating
                                 ? "text-yellow-400 fill-current"
-                                : "text-gray-300"
+                                : "text-gray-300",
                             )}
                           />
                         ))}
                       </div>
-                      <span>{averageRating.toFixed(1)} ({item.reviews?.length || 0} reviews)</span>
+                      <span>
+                        {averageRating.toFixed(1)} ({item.reviews?.length || 0}{" "}
+                        reviews)
+                      </span>
                     </div>
                   )}
                   <div className="flex items-center space-x-1">
@@ -326,7 +337,9 @@ export default function MarketplaceItemPage() {
 
               {/* Description */}
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Description</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                  Description
+                </h3>
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
                   {item.description}
                 </p>
@@ -337,9 +350,14 @@ export default function MarketplaceItemPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="flex items-center space-x-2 mb-1">
-                      <DollarSign size={24} className="text-green-600 dark:text-green-400" />
+                      <DollarSign
+                        size={24}
+                        className="text-green-600 dark:text-green-400"
+                      />
                       <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {Number(item.price) === 0 ? 'Free' : `$${Number(item.price).toFixed(2)}`}
+                        {Number(item.price) === 0
+                          ? "Free"
+                          : `$${Number(item.price).toFixed(2)}`}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -357,7 +375,11 @@ export default function MarketplaceItemPage() {
                   className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
                 >
                   <ShoppingCart size={20} />
-                  <span>{Number(item.price) === 0 ? 'Download Free' : 'Purchase Now'}</span>
+                  <span>
+                    {Number(item.price) === 0
+                      ? "Download Free"
+                      : "Purchase Now"}
+                  </span>
                 </button>
 
                 <div className="mt-4 flex items-center justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
@@ -374,13 +396,15 @@ export default function MarketplaceItemPage() {
 
               {/* Seller Info */}
               <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Seller Information</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+                  Seller Information
+                </h3>
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
                     {item.seller.user.image ? (
                       <Image
                         src={item.seller.user.image}
-                        alt={item.seller.user.name || 'Seller'}
+                        alt={item.seller.user.name || "Seller"}
                         width={48}
                         height={48}
                         className="rounded-full"
@@ -391,7 +415,7 @@ export default function MarketplaceItemPage() {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {item.seller.user.name || 'Anonymous Seller'}
+                      {item.seller.user.name || "Anonymous Seller"}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {item.seller.storeName}
@@ -409,29 +433,37 @@ export default function MarketplaceItemPage() {
               {/* Additional Info */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Added:</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Added:
+                  </span>
                   <div className="flex items-center space-x-1 text-gray-900 dark:text-white">
                     <Calendar size={14} />
                     <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
                 <div>
-                  <span className="text-gray-500 dark:text-gray-400">Category:</span>
-                  <p className="text-gray-900 dark:text-white">{item.category || 'General'}</p>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Category:
+                  </span>
+                  <p className="text-gray-900 dark:text-white">
+                    {item.category || "General"}
+                  </p>
                 </div>
               </div>
 
               {/* Tags */}
-              {item.tags && item.tags.length > 0 && (
+              {Array.isArray(item.tags) && item.tags.length > 0 && (
                 <div>
-                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-2 block">Tags:</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-2 block">
+                    Tags:
+                  </span>
                   <div className="flex flex-wrap gap-2">
                     {item.tags.map((tag, index) => (
                       <span
                         key={index}
                         className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded"
                       >
-                        {tag}
+                        {tag as string}
                       </span>
                     ))}
                   </div>
@@ -453,7 +485,10 @@ export default function MarketplaceItemPage() {
               </h3>
               <div className="space-y-4">
                 {item.reviews.slice(0, 5).map((review: any, index: number) => (
-                  <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0">
+                  <div
+                    key={index}
+                    className="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
                         <div className="flex items-center">
@@ -464,13 +499,13 @@ export default function MarketplaceItemPage() {
                               className={cn(
                                 star <= review.rating
                                   ? "text-yellow-400 fill-current"
-                                  : "text-gray-300"
+                                  : "text-gray-300",
                               )}
                             />
                           ))}
                         </div>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {review.reviewer?.name || 'Anonymous'}
+                          {review.reviewer?.name || "Anonymous"}
                         </span>
                       </div>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -497,4 +532,4 @@ export default function MarketplaceItemPage() {
       </div>
     </Layout>
   );
-} 
+}

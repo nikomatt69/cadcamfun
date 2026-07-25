@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { prisma } from "@/src/lib/prisma";
 
 export default async function handler(
@@ -17,10 +17,12 @@ export default async function handler(
       return await getMarketplaceItem(req, res, id);
     } else if (req.method === "DELETE") {
       const userId = await requireAuth(req, res);
+
       if (!userId) return;
       return await deleteMarketplaceItem(req, res, userId, id);
     } else if (req.method === "PUT") {
       const userId = await requireAuth(req, res);
+
       if (!userId) return;
       return await updateMarketplaceItem(req, res, userId, id);
     }
@@ -84,6 +86,7 @@ async function getMarketplaceItem(
   // Only show approved items to non-owners
   if (item.status !== "APPROVED" && req.headers.authorization) {
     const userId = await requireAuth(req, res);
+
     if (userId !== item.seller.userId) {
       return res.status(404).json({ message: "Item not found" });
     }

@@ -59,7 +59,7 @@ export default async function handler(
 
           // Upload to OpenAI using the files API
           const uploadedFile = await openai.files.create({
-            file: new File([fileContent], file.originalFilename || "uploaded_file", {
+            file: new File([new Uint8Array(fileContent)], file.originalFilename || "uploaded_file", {
               type: file.mimetype || "application/octet-stream"
             }),
             purpose: "assistants"

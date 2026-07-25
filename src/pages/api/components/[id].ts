@@ -1,8 +1,9 @@
 // src/pages/api/components/[id].ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
-import { requireAuth } from "src/lib/api/auth";
+
 import { validateComponentData, normalizeComponentData } from "src/types/component";
+import { requireAuth } from "src/lib/api/auth";
 
 /**
  * Improved API handler for component operations by ID
@@ -13,6 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Ensure user is authenticated
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     // Get component ID from query

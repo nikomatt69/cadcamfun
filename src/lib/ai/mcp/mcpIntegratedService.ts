@@ -5,7 +5,10 @@ import { getExtendedThinkingService } from "../ai-new/extendedThinkingService";
 import { aiAnalytics } from "../aiAnalytics";
 import { aiCache } from "../aiCache";
 import { AIRequest, AIResponse } from "../../../types/ai";
-import Anthropic from "@anthropic-ai/sdk";
+
+// Local message shape (structurally compatible with the Anthropic MCP client's
+// MessageParam) so this module no longer depends on the `@anthropic-ai/sdk` type.
+type MessageParam = { role: "user" | "assistant"; content: string };
 
 export interface MCPIntegratedRequest {
   message: string;
@@ -155,7 +158,7 @@ export class MCPIntegratedService {
 
       // 4. Prepare messages for Claude API
       const systemPrompt = this.buildSystemPrompt(context, enableMCP, mcpServers, serverStatuses);
-      const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: message }];
+      const messages: MessageParam[] = [{ role: "user", content: message }];
 
       // Add conversation history if available
       if (context.previousMessages && context.previousMessages.length > 0) {

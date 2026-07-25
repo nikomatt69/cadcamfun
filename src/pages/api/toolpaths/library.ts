@@ -6,7 +6,7 @@ import {
   sendSuccessResponse,
   handleApiError,
 } from "src/lib/api/helpers";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,6 +15,7 @@ export default async function handler(
   try {
     // Ensure user is authenticated
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     // Only support GET for library access

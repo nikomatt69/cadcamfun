@@ -1,6 +1,6 @@
 // Cleanup stdio server processes
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { stdioProcessManager } from "@/src/server/mcp/StdioProcessManager";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

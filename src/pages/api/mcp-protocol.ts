@@ -1,6 +1,6 @@
 import { createServer } from "@/src/lib/modelcontextprotocol";
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { useElementsStore, Element } from "@/src/store/elementsStore";
 import { useLocalMaterialsLibraryStore, LocalMaterial } from "@/src/store/localMaterialsLibraryStore";
 import { useCADStore } from "@/src/store/cadStore";

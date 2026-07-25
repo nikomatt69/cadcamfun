@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 interface AnalyticsData {
   components: {
@@ -36,14 +36,15 @@ export default async function handler(
   try {
     // Skip auth for now to fix the issues
     const userId = await requireAuth(req, res);
-  if (!userId) return
+
+    if (!userId) return
     const now = new Date();
     const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get component analytics
     const [totalComponents, componentsLastMonth] = await Promise.all([
       prisma.component.count({
-        where: { 
+        where: {
           project: { ownerId: userId }
         }
       }),
@@ -55,7 +56,7 @@ export default async function handler(
       })
     ]);
 
-    const componentTrend = totalComponents > 0 
+    const componentTrend = totalComponents > 0
       ? Math.round((componentsLastMonth / totalComponents) * 100)
       : 0;
 
@@ -111,7 +112,7 @@ export default async function handler(
     // Get material analytics (using drawings as materials proxy)
     const [totalMaterials, materialsLastMonth] = await Promise.all([
       prisma.drawing.count({
-        where: { 
+        where: {
           project: { ownerId: userId }
         }
       }),

@@ -4,6 +4,8 @@
  */
 import { NextApiRequest, NextApiResponse } from "next";
 import { logger } from "src/server/mcp/logger";
+import { LLMClient } from "@/src/lib/ai/provider";
+import { toCoreMessages, toAISDKTools } from "@/src/lib/ai/provider/compat";
 
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL! || "http://localhost:3001";
 
@@ -15,12 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { message, context, sessionId, action, model = "gpt-4" } = req.body;
-
-    // Get OpenAI API key
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "OpenAI API key is missing" });
-    }
 
     // Step 1: Process context through MCP server
     let enrichedContext;
@@ -182,32 +178,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }));
 
-    // Call OpenAI API
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: tools.length > 0 ? tools : undefined,
-        tool_choice: tools.length > 0 ? "auto" : undefined
-      })
+    // Call the model through the single unified provider (Vercel AI SDK).
+    const result = await LLMClient.generate({
+      model,
+      messages: toCoreMessages(messages),
+      tools: tools.length > 0 ? toAISDKTools(tools) : undefined,
+      toolChoice: tools.length > 0 ? "auto" : undefined
     });
 
-    if (!openaiResponse.ok) {
-      const errorData = await openaiResponse.json();
-      return res.status(openaiResponse.status).json({
-        success: false,
-        error: errorData.error.message || "OpenAI API error",
-        details: errorData
-      });
-    }
-
-    const openaiData = await openaiResponse.json();
-    const assistantMessage = openaiData.choices[0].message;
+    // Reshape to the OpenAI chat-completion shape this handler already speaks.
+    const assistantMessage = LLMClient.toOpenAIChatResponse(result, model).choices[0].message;
 
     // Check if the assistant wants to use a tool
     const responseData: any = {

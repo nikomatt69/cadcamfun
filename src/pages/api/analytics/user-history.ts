@@ -2,7 +2,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
 import { getUserActivityHistory } from "@/src/lib/activityTracking";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication

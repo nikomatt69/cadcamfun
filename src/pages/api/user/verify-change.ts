@@ -3,7 +3,7 @@ import { prisma } from "@/src/lib/prisma";
 import { hash } from "bcrypt";
 import crypto from "crypto";
 import { sendEmail } from "@/src/lib/email";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);

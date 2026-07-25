@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 interface SystemMetrics {
   cpuUsage: number;
@@ -20,7 +20,8 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
   const userId = await requireAuth(req, res);
-  if (!userId) return   
+
+  if (!userId) return
   try {
     // Get actual system metrics - you would typically integrate with monitoring tools
     // For now, using Node.js built-in modules to get some real metrics
@@ -31,14 +32,14 @@ export default async function handler(
     const cpus = os.cpus();
     let totalIdle = 0;
     let totalTick = 0;
-    
+
     cpus.forEach((cpu: any) => {
       for (let type in cpu.times) {
         totalTick += cpu.times[type];
       }
       totalIdle += cpu.times.idle;
     });
-    
+
     const cpuUsage = Math.round(100 - (totalIdle / totalTick) * 100);
 
     // Memory usage

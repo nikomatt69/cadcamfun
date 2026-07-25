@@ -1,5 +1,13 @@
 // src/lib/ai/mcp/mcpOfficialClient.ts
 // MCP Client conforme alla specifica ufficiale Anthropic - BROWSER SAFE
+//
+// INTENTIONAL EXCEPTION to the "single unified provider" rule: this client uses
+// Anthropic's native remote-MCP connector (the `mcp_servers` request param + the
+// `anthropic-beta: mcp-client-2025-04-04` header and `mcp_tool_call` /
+// `mcp_tool_result` content blocks). That capability is NOT exposed by the
+// pinned `@ai-sdk/anthropic`, so it must call `@anthropic-ai/sdk` directly. It is
+// server-side only (the API key is never sent to the browser). Plain text/chat
+// generation everywhere else goes through src/lib/ai/provider (LLMClient).
 import Anthropic from "@anthropic-ai/sdk";
 
 import os from "os";

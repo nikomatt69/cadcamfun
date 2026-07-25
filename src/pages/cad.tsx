@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 
 import { useRouter } from "next/router";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import PropertyPanel from "../components/cad/PropertyPanel";
 import StatusBar from "../components/cad/StatusBar";
 import FloatingToolbar from "../components/cad/FloatingToolbar";
 import {
@@ -14,56 +14,22 @@ import {
   Eye,
   Grid
 } from "react-feather";
-import { PanelRightIcon, PanelRightInactiveIcon, PuzzleIcon, SettingsIcon } from "lucide-react";
-import LocalCadLibraryView from "src/components/library/LocalCadLibraryView";
-import ImportExportDialog from "src/components/cad/ImportExportDialog";
+import { PuzzleIcon, SettingsIcon } from "lucide-react";
 import { useCADStore } from "src/store/cadStore";
 import { useElementsStore } from "src/store/elementsStore";
 import { useLayerStore } from "src/store/layerStore";
-import Loading from "../components/ui/Loading";
 import EnhancedSidebarCad from "../components/cad/EnanchedSidebarCad";
 import MetaTags from "../components/layout/Metatags";
 import { useLocalLibrary } from "../hooks/useLocalLibrary";
-import UnifiedLibraryModal from "../components/library/UnifiedLibraryModal";
 import { ComponentLibraryItem, ToolLibraryItem } from "@/src/hooks/useUnifiedLibrary";
 import toast from "react-hot-toast";
 import EnhancedToolbar from "../components/cad/EnhancedToolbar";
-import { useAI } from "../components/ai/ai-new/AIContextProvider";
 
-import DrawingEnabledCADCanvas from "../components/cam/DrawingEnabledCADCanvas";
 import { CADAssistantButton } from "../components/ai/ai-new/OpenaiAssistant/CADAssistantButton";
-import { CADAssistantBridge } from "../components/ai/ai-new/OpenaiAssistant/CADAssistantBridge";
 import { useSelectionStore } from "src/store/selectorStore";
-
-// Simulation Imports
-import { BufferGeometry, NormalBufferAttributes, Material, Mesh, Mesh as ThreeMesh } from "three";
-import PluginHostContainer from "../components/plugins/PluginHostContainer";
 import { usePluginClient } from "@/src/contexts/PluginClientContext";
 
-import { usePluginRegistry } from "../hooks/usePluginRegistry";
 import { PluginRegistryEntry } from "../plugins/core/registry";
-import { AIAgentToolbar } from "../components/ai/AIAgentToolbar";
-import { CADAssistantToolbar } from "../components/ai/CADAssistantToolbar";
-import WorkpieceSetup from "../components/cad/WorkpieceSetup";
-import SnapSettings from "../components/cad/SnapSettings";
-import OriginControls from "../components/cad/OriginControls";
-
-// Assuming a type for results
-
-// Define structure for cross-window subscription
-interface CrossWindowSubscription {
-  pluginId: string;
-  eventType: string;
-  handlerId: string;
-  sourceWindow: Window;
-}
-
-// Add interface for window augmentation (if not already present globally)
-// This is needed for the component exposure workaround
-interface CustomWindow extends Window {
-  __pluginComponents?: Record<string, Record<string, React.ComponentType<any>>>;
-}
-declare const window: CustomWindow;
 
 // Animation variants
 const pageVariants = {
@@ -77,15 +43,49 @@ const cardVariants = {
   visible: { opacity: 1, scale: 1 }
 };
 
-const sidebarVariants = {
-  open: { x: 0, opacity: 1 },
-  closed: { x: -300, opacity: 0.7 }
-};
-
 const rightSidebarVariants = {
   open: { x: 0, opacity: 1 },
   closed: { x: 300, opacity: 0.7 }
 };
+
+const panelSkeleton = <div className="h-full w-full rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />;
+
+const DynamicDrawingEnabledCADCanvas = dynamic<any>(() => import("../components/cam/DrawingEnabledCADCanvas"), {
+  ssr: false,
+  loading: () => panelSkeleton
+});
+
+const DynamicPropertyPanel = dynamic<any>(() => import("../components/cad/PropertyPanel"), {
+  ssr: false,
+  loading: () => panelSkeleton
+});
+
+const DynamicImportExportDialog = dynamic<any>(() => import("../components/cad/ImportExportDialog"), {
+  ssr: false
+});
+
+const DynamicLocalCadLibraryView = dynamic<any>(() => import("src/components/library/LocalCadLibraryView"), {
+  ssr: false,
+  loading: () => panelSkeleton
+});
+
+const DynamicUnifiedLibraryModal = dynamic<any>(() => import("../components/library/UnifiedLibraryModal"), {
+  ssr: false
+});
+
+const DynamicPluginHostContainer = dynamic<any>(() => import("../components/plugins/PluginHostContainer"), {
+  ssr: false,
+  loading: () => panelSkeleton
+});
+
+const DynamicOriginControls = dynamic<any>(() => import("../components/cad/OriginControls"), { ssr: false });
+const DynamicWorkpieceSetup = dynamic<any>(() => import("../components/cad/WorkpieceSetup"), { ssr: false });
+const DynamicSnapSettings = dynamic<any>(() => import("../components/cad/SnapSettings"), { ssr: false });
+
+const DynamicCADAssistantBridge = dynamic<any>(
+  () => import("../components/ai/ai-new/OpenaiAssistant/CADAssistantBridge").then(mod => mod.CADAssistantBridge),
+  { ssr: false }
+);
 
 export default function CADPage() {
 
@@ -94,7 +94,8 @@ export default function CADPage() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [activeSidebarTab, setActiveSidebarTab] = useState<"tools" | "layers" | "explorer">("explorer");
   const { viewMode, gridVisible, axisVisible } = useCADStore();
-  const { elements, selectedElement, selectElement, undo, redo } = useElementsStore();
+  const elements = useElementsStore(state => state.elements);
+  const addElement = useElementsStore(state => state.addElement);
   const { layers, activeLayer } = useLayerStore();
   const [showImportExportDialog, setShowImportExportDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<"import" | "export">("export");
@@ -103,66 +104,15 @@ export default function CADPage() {
   const [showLibraryView, setShowLibraryView] = useState(false);
   // Add state for the unified library modal
   const [showUnifiedLibrary, setShowUnifiedLibrary] = useState(false);
-  const [isPlacingComponent, setIsPlacingComponent] = useState(false);
-  const [description, setDescription] = useState("");
-
-  const { addElements, addElement } = useElementsStore();
+  const [, setIsPlacingComponent] = useState(false);
 
   // Add state for CAD Assistant
   const [showCADAssistant, setShowCADAssistant] = useState(false);
-  const [showChatPanel, setShowChatPanel] = useState(false);
-
-  // State to manage subscriptions from plugin windows
-  const [crossWindowSubscriptions, setCrossWindowSubscriptions] = useState<CrossWindowSubscription[]>([]);
   const [activeRightPanel, setActiveRightPanel] = useState<
     "proprieties" | "trasform" | "ai" | "constraints" | "simulation" | "settings"
   >("proprieties");
 
-  const { setViewMode, toggleGrid, toggleAxis, activeTool } = useCADStore();
-
-
-
-  // Get state management functions from Zustand stores
-  const {
-    elements: getElementsState,
-    addElement: createElementState,
-    updateElement: updateElementState,
-    deleteElement: deleteElementState
-    // TODO: Potentially add getSelectedElements, etc. if needed by API
-  } = useElementsStore.getState(); // Get non-reactive state functions
-  // TODO: Identify and get the main application event subscription mechanism
-  const subscribeToAppEvents = (eventType: string, handler: (event: any) => void): (() => void) => {
-    console.warn(`[PluginManager Init] Placeholder: Subscribing to ${eventType}. Actual implementation needed.`);
-    // Replace with your actual event bus subscription logic (e.g., using mitt, EventEmitter, or Zustand middleware)
-    // const unsubscribe = myEventBus.on(eventType, handler);
-    // return unsubscribe;
-    return () => {
-      console.warn(`[PluginManager Init] Placeholder: Unsubscribing from ${eventType}. Actual implementation needed.`);
-    };
-  };
-
-  const [prompt, setPrompt] = useState("");
-  const { textToCAD, state } = useAI();
-  const [statuss, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
-
-  const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-
-    setStatus("processing");
-
-    try {
-      const result = await textToCAD(prompt);
-
-      if (result.success) {
-        setStatus("success");
-        // Usa result.data...
-      } else {
-        setStatus("error");
-      }
-    } catch (error) {
-      setStatus("error");
-    }
-  };
+  const { setViewMode, toggleGrid, toggleAxis } = useCADStore();
 
   const { loadCadDrawing } = useLocalLibrary(); // Move the hook call to the top level
   useEffect(() => {
@@ -286,83 +236,10 @@ export default function CADPage() {
     console.log("Selected tool:", tool);
     setShowUnifiedLibrary(false);
   };
-  const handleGenerateElements = async () => {
-    const result = await textToCAD(description);
-    if (result.success && result.data) {
-      addElements(result.data);
-    }
-  };
-  useEffect(() => {
-    // Controlla se c'è un parametro loadComponent nella query string
-    if (router.query.loadComponent) {
-      const componentId = String(router.query.loadComponent);
-      const storedComponentJSON = localStorage.getItem("componentToLoadInCAD");
-
-      console.log("Tentativo di caricamento componente ID:", componentId);
-      console.log("Dati in localStorage:", storedComponentJSON?.substring(0, 100) + "...");
-
-      if (storedComponentJSON) {
-        try {
-          const componentData = JSON.parse(storedComponentJSON);
-
-          // Verifica che l'ID corrisponda esattamente
-          if (componentData && componentData.id && componentData.id === componentId) {
-            console.log("Componente trovato, preparazione al caricamento");
-
-            // Crea un nuovo elemento CAD dal componente
-            const newElement = {
-              id: `component-${Date.now()}`, // ID univoco per il nuovo elemento CAD
-              type: "component",
-              x: 0,
-              y: 0,
-              z: 0,
-              name: componentData.name || "Componente",
-              componentId: componentData.id,
-              data: componentData.data,
-              layerId: layers.length > 0 ? layers[0].id : "default"
-            };
-
-            // Aggiungi l'elemento al canvas
-            addElement(newElement);
-            toast.success(`Componente ${componentData.name} caricato con successo`);
-
-            // Pulisci localStorage dopo il caricamento
-            localStorage.removeItem("componentToLoadInCAD");
-            localStorage.removeItem("componentToLoadInCAD_timestamp");
-
-            // Rimuovi i parametri query dall'URL
-            const { loadComponent, ts, ...otherParams } = router.query;
-            router.replace(
-              {
-                pathname: router.pathname,
-                query: otherParams
-              },
-              undefined,
-              { shallow: true }
-            );
-          } else {
-            console.error("ID componente non corrisponde:", {
-              idFromURL: componentId,
-              idFromStorage: componentData?.id
-            });
-            toast.error("ID componente non corrisponde");
-          }
-        } catch (error) {
-          console.error("Errore parsing dati componente:", error);
-          toast.error("Errore formato dati componente");
-        }
-      } else {
-        console.error("Nessun dato componente trovato in localStorage");
-        toast.error("Dati componente non trovati");
-      }
-    }
-  }, [router.query.loadComponent, layers, addElement, router]);
 
   const { plugins: clientPlugins } = usePluginClient(); // Use client context hook
   const [activePluginId, setActivePluginId] = useState<string | null>(null);
   const [sidebarPlugins, setSidebarPlugins] = useState<PluginRegistryEntry[]>([]); // Use correct type
-  const [expandedWidth, setExpandedWidth] = useState(false); // Stato per larghezza
-  const [isContentVisible, setIsContentVisible] = useState(false); // Stato per visibilità contenuto (come FloatingToolbar) - Changed default to false
 
   // Filter plugins that contribute to sidebar
   useEffect(() => {
@@ -396,6 +273,15 @@ export default function CADPage() {
 
   // Costruisci l'oggetto di contesto CAD aggiornato
   const cadContextData = useMemo(() => {
+    if (!showCADAssistant) {
+      return {
+        totalElementCount: elements.length,
+        selectedElementCount: selectedElementIds.length,
+        selectedElements: [],
+        activeLayer: null
+      };
+    }
+
     const selectedElementsDetails = selectedElementIds
       .map(id => elements.find(el => el.id === id))
       .filter(el => el !== undefined)
@@ -429,22 +315,11 @@ export default function CADPage() {
       selectedElements: selectedElementsDetails, // Array con dettagli elementi selezionati
       activeLayer: activeLayerDetails ? { id: activeLayerDetails.id, name: activeLayerDetails.name } : null // Dettagli layer attivo
     };
-  }, [elements, selectedElementIds, layers, activeLayer]);
+  }, [showCADAssistant, elements, selectedElementIds, layers, activeLayer]);
 
   // Placeholder for getting the mesh to simulate - replace with actual logic
 
-  if (status === "loading") {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loading />
-      </div>
-    );
-  }
-
-  if (status === "unauthenticated") {
-    router.push("/waitlist");
-    return null;
-  }
+ 
 
   return (
     <motion.div
@@ -506,11 +381,11 @@ export default function CADPage() {
             animate="visible"
             transition={{ duration: 0.8, delay: 0.6 }}
           >
-            <DrawingEnabledCADCanvas
+            <DynamicDrawingEnabledCADCanvas
               width="100%"
               height="100%"
               previewComponent={selectedLibraryComponent}
-              onComponentPlaced={(component, position) => {
+              onComponentPlaced={(component: string, position: { x: number; y: number; z: number }) => {
                 handleComponentPlacement(component, position);
                 setIsPlacingComponent(false);
               }}
@@ -543,11 +418,13 @@ export default function CADPage() {
             </motion.div>
 
             {/* CAD Assistant Bridge - Passa il contesto aggiornato */}
-            <CADAssistantBridge
-              isVisible={showCADAssistant}
-              onClose={() => setShowCADAssistant(false)}
-              initialContextData={cadContextData}
-            />
+            {showCADAssistant && (
+              <DynamicCADAssistantBridge
+                isVisible={true}
+                onClose={() => setShowCADAssistant(false)}
+                initialContextData={cadContextData}
+              />
+            )}
           </motion.div>
 
           {/* Right sidebar for properties */}
@@ -618,7 +495,7 @@ export default function CADPage() {
               animate="visible"
               transition={{ duration: 0.6, delay: 1 }}
             >
-              {activeRightPanel === "proprieties" && <PropertyPanel />}
+              {activeRightPanel === "proprieties" && <DynamicPropertyPanel />}
 
               {activeRightPanel === "settings" && (
                 <motion.div
@@ -687,9 +564,9 @@ export default function CADPage() {
                         </button>
                       </div>
                     </div>
-                    <OriginControls />
-                    <WorkpieceSetup />
-                    <SnapSettings />
+                    <DynamicOriginControls />
+                    <DynamicWorkpieceSetup />
+                    <DynamicSnapSettings />
                   </div>
                 </motion.div>
               )}
@@ -716,7 +593,9 @@ export default function CADPage() {
                     </div>
                     {/* Content Host (flex-1 to fill remaining space, overflow-auto for scroll) */}
                     <div className="flex-1 p-4 overflow-auto">
-                      {activePluginId && <PluginHostContainer pluginId={activePluginId} entryPoint="sidebar" />}
+                      {activePluginId && (
+                        <DynamicPluginHostContainer pluginId={activePluginId} entryPoint="sidebar" />
+                      )}
                       {sidebarPlugins.length === 0 && (
                         <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
                           No plugins with sidebar UI are enabled
@@ -764,19 +643,19 @@ export default function CADPage() {
 
       {/* Import/Export Dialog */}
       {showImportExportDialog && (
-        <ImportExportDialog mode={dialogMode} onClose={() => setShowImportExportDialog(false)} isOpen={true} />
+        <DynamicImportExportDialog mode={dialogMode} onClose={() => setShowImportExportDialog(false)} isOpen={true} />
       )}
       {/* Library View Modal */}
       {showLibraryView && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-auto">
-            <LocalCadLibraryView onClose={() => setShowLibraryView(false)} onSelectDrawing={handleSelectDrawing} />
+            <DynamicLocalCadLibraryView onClose={() => setShowLibraryView(false)} onSelectDrawing={handleSelectDrawing} />
           </div>
         </div>
       )}
 
       {/* Unified Library Modal */}
-      <UnifiedLibraryModal
+      <DynamicUnifiedLibraryModal
         isOpen={showUnifiedLibrary}
         onClose={() => setShowUnifiedLibrary(false)}
         onSelectComponent={handleComponentSelection}

@@ -27,7 +27,7 @@ export function withSubscription(requiredPlan: string = SUBSCRIPTION_PLANS.FREE)
 
         // Get user's subscription
         const subscription = await prisma.subscription.findUnique({
-          where: { userId }
+          where: { id: userId }
         });
 
         const now = new Date();

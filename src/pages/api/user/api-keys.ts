@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { PrismaClient } from "@prisma/client";
 import { randomBytes, createHash } from "crypto";
 
@@ -14,6 +14,7 @@ function generateApiKey() {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
+
   if (!userId) {
     return; // requireAuth already sent the response
   }

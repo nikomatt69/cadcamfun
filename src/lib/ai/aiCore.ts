@@ -1,5 +1,7 @@
 // src/lib/ai/aiCore.ts - Enhanced version with MCP Integration
-import Anthropic from "@anthropic-ai/sdk";
+// All model calls route through the single unified provider via the
+// `/api/ai/*` proxies (server-side LLMClient on the Vercel AI SDK). This module
+// no longer instantiates `@anthropic-ai/sdk` directly.
 import { AIServiceConfig, AIRequest, AIResponse, AIModelType } from "../../types/ai";
 import { aiCache } from "./aiCache";
 import { aiAnalytics } from "./aiAnalytics";
@@ -37,33 +39,18 @@ export async function validateAIResponse(response: unknown): Promise<ValidatedAI
 }
 
 export class AICore {
-  private client: Anthropic;
   private config: AIServiceConfig;
   private requestQueue: AIRequest[] = [];
   private processing = false;
-  private apiKeyValid = false;
+  // The API key lives server-side behind the proxies; the client always assumes
+  // it can issue requests and lets the server surface auth/key errors.
+  private apiKeyValid = true;
 
   constructor(config: AIServiceConfig) {
-    // SECURITY: Never use NEXT_PUBLIC_ for API keys!
-    const secureApiKey = typeof window === "undefined" ? process.env.ANTHROPIC_API_KEY : undefined;
-
     this.config = {
-      apiKey: secureApiKey,
       // Default values will be overridden by config
       ...config
     };
-
-    if (!this.config.apiKey) {
-      console.warn("⚠️ No Anthropic API key provided. AI features will be limited.");
-      this.apiKeyValid = false;
-    } else {
-      this.apiKeyValid = true;
-    }
-
-    this.client = new Anthropic({
-      apiKey: this.config.apiKey || "dummy-key",
-      dangerouslyAllowBrowser: this.config.allowBrowser || typeof window !== "undefined"
-    });
   }
 
   /**
@@ -117,45 +104,32 @@ export class AICore {
         };
       }
 
-      // Make API call with streaming support if onProgress callback is provided
-      let fullResponse = "";
-
-      if (onProgress) {
-        // Streaming response
-        const stream = await this.client.beta.messages.create({
+      // Route through the unified provider proxy (server-side LLMClient).
+      const proxyResponse = await fetch("/api/ai/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           model,
           max_tokens: maxTokens,
           temperature,
           system: systemPrompt,
-          thinking: {
-            type: "enabled",
-            budget_tokens: 1500
-          },
-          messages: [{ role: "user", content: prompt }],
-          stream: true
-        });
-        for await (const chunk of stream) {
-          if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-            const text = chunk.delta.text;
-            fullResponse += text;
-            onProgress(text);
-          }
-        }
-      } else {
-        // Non-streaming response
-        const response = await this.client.messages.create({
-          model,
-          max_tokens: maxTokens,
-          temperature,
-          thinking: {
-            type: "enabled",
-            budget_tokens: 1500
-          },
-          system: systemPrompt,
+          reasoning: true,
           messages: [{ role: "user", content: prompt }]
-        });
+        })
+      });
 
-        fullResponse = response.content[0]?.type === "text" ? response.content[0].text : "";
+      if (!proxyResponse.ok) {
+        const errorData = await proxyResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `AI proxy request failed with status ${proxyResponse.status}`);
+      }
+
+      // Anthropic-shaped response: { content: [{ type: "text", text }] }
+      const data = await proxyResponse.json();
+      const fullResponse: string = data?.content?.[0]?.text ?? "";
+
+      // The proxy is non-streaming; emit the full text once for progress callers.
+      if (onProgress && fullResponse) {
+        onProgress(fullResponse);
       }
 
       // Parse response if a parser is provided
@@ -251,42 +225,35 @@ export class AICore {
   }
 
   /**
-   * Validate API key by making a minimal request
+   * Validate connectivity to the unified provider proxy.
+   * The actual API key is held and validated server-side, so this performs a
+   * minimal round-trip and treats any 2xx as success.
    */
   async validateApiKey(): Promise<boolean> {
-    if (!this.config.apiKey) {
-      this.apiKeyValid = false;
-      return false;
-    }
-
     try {
-      await this.client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 10,
-        messages: [{ role: "user", content: "API key validation test" }]
+      const response = await fetch("/api/ai/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          max_tokens: 10,
+          messages: [{ role: "user", content: "ping" }]
+        })
       });
-
-      this.apiKeyValid = true;
-      return true;
+      this.apiKeyValid = response.ok;
+      return response.ok;
     } catch (error) {
-      console.error("API key validation failed:", error);
+      console.error("AI provider validation failed:", error);
       this.apiKeyValid = false;
       return false;
     }
   }
 
   /**
-   * Set a new API key
+   * Set a new API key (forwarded to config; transport stays on the proxy).
    */
   setApiKey(apiKey: string): void {
     this.config.apiKey = apiKey;
-    this.client = new Anthropic({
-      apiKey,
-      dangerouslyAllowBrowser: this.config.allowBrowser
-    });
-
-    // Validate the new key
-    this.validateApiKey();
+    this.apiKeyValid = true;
   }
 
   /**

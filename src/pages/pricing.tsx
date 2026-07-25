@@ -1,13 +1,12 @@
 import React from "react";
 import { motion, Transition, Variants } from "framer-motion";
 
-import { SubscriptionProvider, useSubscription } from "src/contexts/SubscriptionContext";
+import { useSubscription } from "src/contexts/SubscriptionContext";
 import PricingPlans from "src/components/subscription/PricingPlans";
 import Footer from "src/components/ui/Footer";
-import { useRouter } from "next/router";
 import DynamicLayout from "../components/layout/Layout";
 import MetaTags from "../components/layout/Metatags";
-import { Clock, Star } from "react-feather";
+import { Clock } from "react-feather";
 import { useSession } from "@/src/lib/auth-client";
 
 // Animation variants
@@ -59,7 +58,7 @@ function PricingPageContent() {
                   Simple, Transparent Pricing
                 </h1>
                 <p className="max-w-xl mx-auto text-xl text-gray-600 dark:text-gray-300">
-                  Choose the plan that's right for you and get started with CAD/CAM FUN today.
+                  Choose the plan that&apos;s right for you and get started with CAD/CAM FUN today.
                 </p>
 
                 {/* Trial Status Banner */}
@@ -72,7 +71,7 @@ function PricingPageContent() {
                   >
                     <Clock className="w-5 h-5 mr-2" />
                     <span className="font-semibold">
-                      You're on a {features?.name} trial - {trialDaysLeft} days remaining
+                      You&apos;re on a {features?.name} trial - {trialDaysLeft} days remaining
                     </span>
                   </motion.div>
                 )}
@@ -142,9 +141,9 @@ function PricingPageContent() {
                   <div>
                     <dt className="text-lg leading-6 font-medium text-gray-900 dark:text-white">How can I cancel my subscription?</dt>
                     <dd className="mt-2 text-base text-gray-600 dark:text-gray-300">
-                      You can cancel your subscription at any time from your account settings. If you cancel, you'll
+                      You can cancel your subscription at any time from your account settings. If you cancel, you&apos;ll
                       continue to have access to your paid features until the end of your current billing cycle, after
-                      which you'll be downgraded to the free plan.
+                      which you&apos;ll be downgraded to the free plan.
                     </dd>
                   </div>
                 </dl>
@@ -160,19 +159,20 @@ function PricingPageContent() {
 }
 
 export default function PricingPage() {
+  const { isPending } = useSession();
 
-  const router = useRouter();
-
-  if (status === "unauthenticated") {
-    router.push("/waitlist");
-    return null;
+  // Show loading while checking auth status
+  if (isPending) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   return (
-    <SubscriptionProvider>
-      <DynamicLayout>
-        <PricingPageContent />
-      </DynamicLayout>
-    </SubscriptionProvider>
+    <DynamicLayout>
+      <PricingPageContent />
+    </DynamicLayout>
   );
 }

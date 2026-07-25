@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import formidable from "formidable";
 import fs from "fs";
 import path from "path";
@@ -17,6 +17,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const userId = await requireAuth(req, res);
+
   if (!userId) {
     return; // requireAuth already sent the response
   }

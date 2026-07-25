@@ -8,6 +8,7 @@ import { Prisma } from "@prisma/client";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     // Only support POST method

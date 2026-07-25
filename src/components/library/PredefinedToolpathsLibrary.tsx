@@ -17,7 +17,7 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
   onSelectItem,
   isOpen,
   onClose,
-  projectId
+  projectId,
 }) => {
   const [items, setItems] = useState<any[]>([]);
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
@@ -26,7 +26,7 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
   const [filters, setFilters] = useState({
     type: "",
     operationType: "",
-    category: ""
+    category: "",
   });
 
   // Fetch library items
@@ -38,12 +38,15 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
         // Build query params
         const query = new URLSearchParams();
         if (filters.type) query.append("type", filters.type);
-        if (filters.operationType) query.append("operationType", filters.operationType);
+        if (filters.operationType)
+          query.append("operationType", filters.operationType);
         if (filters.category) query.append("category", filters.category);
         if (searchTerm) query.append("search", searchTerm);
         query.append("projectId", projectId);
 
-        const response = await fetch(`/api/${libraryType}/library?${query.toString()}`);
+        const response = await fetch(
+          `/api/${libraryType}/library?${query.toString()}`,
+        );
 
         if (!response.ok) {
           throw new Error(`Failed to fetch ${libraryType} library`);
@@ -75,7 +78,7 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
   // Handle filter changes
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   if (!isOpen) return null;
@@ -91,7 +94,8 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
       >
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Standard {libraryType === "toolpaths" ? "Toolpaths" : "Components"} Library
+            Standard {libraryType === "toolpaths" ? "Toolpaths" : "Components"}{" "}
+            Library
           </h2>
           <button
             onClick={onClose}
@@ -173,16 +177,22 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="text-center py-12">
-              <Filter size={48} className="mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No items found</h3>
+              <Filter
+                size={48}
+                className="mx-auto mb-4 text-gray-400 dark:text-gray-600"
+              />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No items found
+              </h3>
               <p className="text-gray-500 dark:text-gray-400">
-                Try adjusting your search or filters to find what you are looking for.
+                Try adjusting your search or filters to find what you are
+                looking for.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
-                {filteredItems.map(item => (
+                {filteredItems.map((item) => (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -194,7 +204,11 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
                   >
                     <div className="h-40 bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative">
                       {item.thumbnail ? (
-                        <img src={item.thumbnail} alt={item.name} className="h-full w-full object-contain" />
+                        <img
+                          src={item.thumbnail}
+                          alt={item.name}
+                          className="h-full w-full object-contain"
+                        />
                       ) : (
                         <div className="text-gray-400 dark:text-gray-600 text-6xl font-thin">
                           {libraryType === "toolpaths" ? "⚙️" : "📦"}
@@ -215,22 +229,28 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
                     </div>
 
                     <div className="p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 truncate">{item.name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 truncate">
+                        {item.name}
+                      </h3>
 
                       {item.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{item.description}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                          {item.description}
+                        </p>
                       )}
 
-                      {item.tags && item.tags.length > 0 && (
+                      {Array.isArray(item.tags) && item.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {item.tags.slice(0, 3).map((tag: string, index: number) => (
-                            <span
-                              key={index}
-                              className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                          {item.tags
+                            .slice(0, 3)
+                            .map((tag: string, index: number) => (
+                              <span
+                                key={index}
+                                className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                              >
+                                {tag}
+                              </span>
+                            ))}
                           {item.tags.length > 3 && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                               +{item.tags.length - 3}
@@ -240,10 +260,12 @@ const PredefinedToolpathsLibrary: React.FC<PredefinedLibraryProps> = ({
                       )}
 
                       <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{item.category || "Standard"}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {item.category || "Standard"}
+                        </span>
 
                         <button
-                          onClick={e => {
+                          onClick={(e) => {
                             e.stopPropagation();
                             onSelectItem(item);
                           }}

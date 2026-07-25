@@ -19,7 +19,7 @@ interface AuthRedirectState {
 
 const PUBLIC_ROUTES = [
   '/auth/signin',
-  '/auth/signup', 
+  '/auth/signup',
   '/auth/verify',
   '/auth/reset-password',
   '/legal/privacy',
@@ -29,7 +29,7 @@ const PUBLIC_ROUTES = [
 
 const PROTECTED_ROUTES = [
   '/cad',
-  '/cam', 
+  '/cam',
   '/projects',
   '/admin',
   '/settings',
@@ -43,7 +43,7 @@ const INTENDED_ROUTE_KEY = 'auth_intended_route';
 const createStorage = () => {
   // In-memory fallback per desktop o quando sessionStorage non disponibile
   let memoryStorage: { [key: string]: string } = {};
-  
+
   return {
     setItem: (key: string, value: string) => {
       try {
@@ -89,7 +89,7 @@ export function useAuthRedirect(options: RedirectOptions = {}): AuthRedirectStat
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [isRedirecting, setIsRedirecting] = useState(false);
-  
+
   const {
     requireAuth = false,
     redirectTo = '/auth/signin',
@@ -123,10 +123,10 @@ export function useAuthRedirect(options: RedirectOptions = {}): AuthRedirectStat
   // Smart redirect logic
   const handleRedirect = useCallback(async (destination: string) => {
     if (router.asPath === destination) return;
-    
+
     setIsRedirecting(true);
     onRedirect?.();
-    
+
     try {
       await router.push(destination);
     } catch (error) {
@@ -155,16 +155,16 @@ export function useAuthRedirect(options: RedirectOptions = {}): AuthRedirectStat
         handleRedirect(redirectTo);
         return;
       }
-      
+
       // Se è già in auth pages e non autenticato, ok
       if (isPublicRoute) return;
-      
+
       return;
     }
 
     // User autenticato
-    const userRoles = session.user.roles || [];
-    
+    const userRoles = (session.user as any).roles || [];
+
     // Check roles se specificati
     if (!hasRequiredRole(userRoles)) {
       handleRedirect('/');
@@ -183,13 +183,13 @@ export function useAuthRedirect(options: RedirectOptions = {}): AuthRedirectStat
   // Calculate access state
   const canAccess = (() => {
     if (isPending) return false;
-    
+
     if (requireAuth && !session?.user) return false;
-    
+
     if (session?.user && allowedRoles.length > 0) {
-      return hasRequiredRole(session.user.roles || []);
+      return hasRequiredRole((session.user as any).roles || []);
     }
-    
+
     return true;
   })();
 
@@ -204,10 +204,10 @@ export function useAuthRedirect(options: RedirectOptions = {}): AuthRedirectStat
 // Hook per redirect post-login ottimizzato (desktop compatible)
 export function usePostLoginRedirect() {
   const router = useRouter();
-  
+
   return useCallback(async () => {
     const intendedRoute = storage.getItem(INTENDED_ROUTE_KEY);
-    
+
     if (intendedRoute && !PUBLIC_ROUTES.includes(intendedRoute)) {
       storage.removeItem(INTENDED_ROUTE_KEY);
       await router.push(intendedRoute);
@@ -220,11 +220,11 @@ export function usePostLoginRedirect() {
 // Hook per controllo route access
 export function useRouteAccess(requiredRoles: string[] = []) {
   const { data: session, isPending } = useSession();
-  
+
   return {
-    hasAccess: !isPending && session?.user && 
-      (requiredRoles.length === 0 || 
-       requiredRoles.some(role => session.user.roles?.includes(role))),
+    hasAccess: !isPending && session?.user &&
+      (requiredRoles.length === 0 ||
+        requiredRoles.some(role => (session.user as any).roles?.includes(role))),
     isLoading: isPending,
     user: session?.user
   };

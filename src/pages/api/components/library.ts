@@ -5,7 +5,7 @@ import {
   sendSuccessResponse,
   handleApiError,
 } from "src/lib/api/helpers";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export async function handleComponentLibrary(
   req: NextApiRequest,
@@ -14,6 +14,7 @@ export async function handleComponentLibrary(
   try {
     // Ensure user is authenticated
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     const { id } = req.query;

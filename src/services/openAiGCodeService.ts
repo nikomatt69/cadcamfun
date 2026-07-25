@@ -2,11 +2,14 @@
 import axios from "axios";
 
 /**
- * Service for OpenAI API integration specifically for GCode operations
+ * Service for GCode AI operations.
+ *
+ * All requests go through the unified `/api/openai/completion` endpoint, which
+ * runs on the single provider (Vercel AI SDK / LLMClient). No OpenAI base URL or
+ * client-side key is used here.
  */
 class OpenAiGCodeService {
   private apiKey = process.env.OPENAI_API_KEY!;
-  private baseUrl: string = "https://api.openai.com/v1";
   private model: string = "gpt-4.1";
 
   /**

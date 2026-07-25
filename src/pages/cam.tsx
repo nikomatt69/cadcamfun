@@ -4,15 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { useRouter } from "next/router";
 import { toast } from "react-hot-toast";
-import GCodeViewer from "src/components/cam/GCodeViewer";
-import GCodeEditor from "src/components/cam/GCodeEditor";
 import { AIConfigurationService } from "src/services/ai/AIConfigurationService";
 import StatusBar from "src/components/cad/StatusBar";
-import MachineCycles from "src/components/cam/MachineCycles";
-import LocalCamLibraryView from "src/components/library/LocalCamLibraryView";
-import UnifiedLibraryModal from "../components/library/UnifiedLibraryModal";
-import { MaterialLibraryItem, ToolLibraryItem } from "@/src/hooks/useUnifiedLibrary";
-import ProductionCostsManager from "@/src/components/production-costs/ProductionCostsManager";
+import { ComponentLibraryItem, MaterialLibraryItem, ToolLibraryItem } from "@/src/hooks/useUnifiedLibrary";
 import {
   Save,
   Upload,
@@ -36,30 +30,67 @@ import {
 } from "react-feather";
 import { Brain, PanelRightIcon, PanelRightInactiveIcon } from "lucide-react";
 import EnhancedSidebarCam from "../components/cam/EnanchedSidebarCam";
-import Loading from "../components/ui/Loading";
 import MetaTags from "../components/layout/Metatags";
 import Link from "next/link";
-import GenericPostProcessor from "../components/cam/postprocessor/GenericPostProcessor";
 import dynamic from "next/dynamic";
-import FixedCyclesUIRenderer from "../components/cam/FixedCyclesUIRenderer";
-import OptimizedToolpathVisualizer from "../components/cam/OptimizedToolpathVisualizer";
 import { useCAMStore } from "@/src/store/camStore";
-import ToolpathAnalysisPanel from "../components/ai/CAMAssistant/ToolpathAnalysisPanel";
 
 // Tipi di post-processor supportati
 type PostProcessorType = "fanuc" | "heidenhain" | "siemens" | "haas" | "mazak" | "okuma" | "generic";
+
+const fullPanelSkeleton = <div className="w-full h-full bg-gray-100 dark:bg-gray-800 animate-pulse rounded-xl" />;
+
+const DynamicGCodeViewer = dynamic<any>(() => import("src/components/cam/GCodeViewer"), {
+  ssr: false,
+  loading: () => fullPanelSkeleton
+});
+
+const DynamicGCodeEditor = dynamic<any>(() => import("src/components/cam/GCodeEditor"), {
+  ssr: false,
+  loading: () => fullPanelSkeleton
+});
+
+const DynamicOptimizedToolpathVisualizer = dynamic<any>(() => import("src/components/cam/OptimizedToolpathVisualizer"), {
+  ssr: false,
+  loading: () => fullPanelSkeleton
+});
+
+const DynamicMachineCycles = dynamic<any>(() => import("src/components/cam/MachineCycles"), {
+  ssr: false,
+  loading: () => fullPanelSkeleton
+});
+
+const DynamicFixedCyclesUIRenderer = dynamic<any>(() => import("src/components/cam/FixedCyclesUIRenderer"), {
+  ssr: false
+});
+
+const DynamicGenericPostProcessor = dynamic<any>(
+  () => import("../components/cam/postprocessor/GenericPostProcessor"),
+  { ssr: false, loading: () => fullPanelSkeleton }
+);
+
+const DynamicLocalCamLibraryView = dynamic<any>(() => import("src/components/library/LocalCamLibraryView"), {
+  ssr: false,
+  loading: () => fullPanelSkeleton
+});
+
+const DynamicUnifiedLibraryModal = dynamic<any>(() => import("../components/library/UnifiedLibraryModal"), {
+  ssr: false
+});
+
+const DynamicProductionCostsManager = dynamic<any>(
+  () => import("@/src/components/production-costs/ProductionCostsManager"),
+  { ssr: false, loading: () => fullPanelSkeleton }
+);
+
 export const DynamicToolpathGenerator = dynamic(() => import("src/components/cam/ToolpathGenerator"), {
   ssr: false, // Heavy Three.js component
   loading: () => <div className="w-full h-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
 });
-export const DynamicToolpathVisualizer = dynamic(() => import("src/components/cam/ToolpathVisualizer2"), {
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
-});
 
 export const DynamicPostProcessors = {
-  Fanuc: dynamic(() => import("src/components/cam/postprocessor/FanucPostProcessor"), { ssr: true }),
-  Heidenhain: dynamic(() => import("src/components/cam/postprocessor/HeidenhainPostProcessor"), { ssr: true })
+  Fanuc: dynamic<any>(() => import("src/components/cam/postprocessor/FanucPostProcessor"), { ssr: false }),
+  Heidenhain: dynamic<any>(() => import("src/components/cam/postprocessor/HeidenhainPostProcessor"), { ssr: false })
 };
 
 // Animation variants
@@ -105,7 +136,7 @@ const tabVariants = {
 export default function CAMPage() {
 
   const router = useRouter();
-  const { toolpaths, syncWorkpieceFromCAD } = useCAMStore();
+  const syncWorkpieceFromCAD = useCAMStore(state => state.syncWorkpieceFromCAD);
 
   // Sincronizza il workpiece dal CAD quando si carica la pagina CAM
   useEffect(() => {
@@ -127,7 +158,6 @@ export default function CAMPage() {
     "generator"
   );
   const [selectedLibraryTool, setSelectedLibraryTool] = useState<string | null>(null);
-  const [selectedToolpathId, setSelectedToolpathId] = useState<string | null>(null);
   const [showChatPanel, setShowChatPanel] = useState(true);
 
   // AI Configuration Management
@@ -171,7 +201,7 @@ export default function CAMPage() {
   const [showUnifiedLibrary, setShowUnifiedLibrary] = useState(false);
   // Add state for production costs manager modal
   const [showCostsManager, setShowCostsManager] = useState(false);
-  const [cadElements, setCadElements] = useState<any[]>([]);
+  const cadElements = useMemo<any[]>((() => []), []);
   // Add useEffect to load toolpath from localStorage when URL contains loadToolpath parameter
   useEffect(() => {
     const loadToolpathFromStorage = async () => {
@@ -215,9 +245,6 @@ export default function CAMPage() {
             });
           }, 1500);
         }
-
-        // Set selected toolpath ID for cost panel
-        setSelectedToolpathId(toolpathData.id);
 
         toast.success(`Toolpath '${toolpathData.name}' loaded successfully`);
 
@@ -388,13 +415,6 @@ export default function CAMPage() {
     // usando useLocalLibrary hook o simili
   };
 
-  // Gestore per la selezione del toolpath per il pannello dei costi
-  const handleToolpathSelect = (toolpathId: string) => {
-    setSelectedToolpathId(toolpathId);
-    // Passa automaticamente alla tab di costi
-    setActiveRightPanel("analysis");
-  };
-
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const toggleDarkMode = () => {
@@ -408,19 +428,6 @@ export default function CAMPage() {
       localStorage.setItem("theme", "dark");
     }
   };
-
-  if (status === "loading") {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loading />
-      </div>
-    );
-  }
-
-  if (status === "unauthenticated") {
-    router.push("/waitlist");
-    return null;
-  }
 
   return (
     <motion.div
@@ -645,13 +652,13 @@ export default function CAMPage() {
           >
             {activeTab === "preview" && (
               <div className="h-full">
-                <GCodeViewer width="100%" height="100%" gcode={gcode} isSimulating={isSimulating} />
+                <DynamicGCodeViewer width="100%" height="100%" gcode={gcode} isSimulating={isSimulating} />
               </div>
             )}
 
             {activeTab === "editor" && (
               <div className="h-full">
-                <GCodeEditor
+                <DynamicGCodeEditor
                   height="100%"
                   value={gcode}
                   onChange={setGcode}
@@ -668,7 +675,7 @@ export default function CAMPage() {
 
             {activeTab === "visualizer" && (
               <div className="h-full rounded-xl">
-                <OptimizedToolpathVisualizer
+                <DynamicOptimizedToolpathVisualizer
                   width="100%"
                   height="100%"
                   gcode={gcode}
@@ -680,7 +687,7 @@ export default function CAMPage() {
                     // Handle simulation complete
                     setIsSimulating(false);
                   }}
-                  onSimulationProgress={progress => {
+                  onSimulationProgress={(progress: number) => {
                     // Update progress if needed
                     console.log(`Simulation progress: ${progress}%`);
                   }}
@@ -738,7 +745,7 @@ export default function CAMPage() {
                   )}
 
                   {["siemens", "haas", "mazak", "okuma", "generic"].includes(selectedPostProcessor) && (
-                    <GenericPostProcessor
+                    <DynamicGenericPostProcessor
                       initialGcode={gcode}
                       controllerType={selectedPostProcessor}
                       onProcessedGcode={handleProcessedGcode}
@@ -876,11 +883,11 @@ export default function CAMPage() {
 
               {activeRightPanel === "cycles" && (
                 <>
-                  <MachineCycles
+                  <DynamicMachineCycles
                     controllerType={selectedPostProcessor as "fanuc" | "heidenhain"}
                     onCycleCodeGenerated={handleCycleCodeGenerated}
                   />
-                  <FixedCyclesUIRenderer gCodeLine={gcode} />
+                  <DynamicFixedCyclesUIRenderer gCodeLine={gcode} />
                 </>
               )}
 
@@ -935,7 +942,7 @@ export default function CAMPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <LocalCamLibraryView
+              <DynamicLocalCamLibraryView
                 onSelectProject={handleLoadProjectFromLibrary}
                 onClose={() => setShowLibrary(false)}
                 showCloseButton={false}
@@ -946,12 +953,12 @@ export default function CAMPage() {
       )}
 
       {/* Unified Library Modal */}
-      <UnifiedLibraryModal
+      <DynamicUnifiedLibraryModal
         isOpen={showUnifiedLibrary}
         onClose={() => setShowUnifiedLibrary(false)}
         onSelectTool={handleToolSelection}
         onSelectMaterial={handleMaterialSelection}
-        onSelectComponent={component => {
+        onSelectComponent={(_component: ComponentLibraryItem) => {
           /* Placeholder if needed */
         }}
         defaultTab="tools"
@@ -971,7 +978,7 @@ export default function CAMPage() {
               </button>
             </div>
             <div className="flex-1 rounded-xl overflow-y-auto">
-              <ProductionCostsManager />
+              <DynamicProductionCostsManager />
             </div>
           </div>
         </div>

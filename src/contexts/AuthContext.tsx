@@ -1,381 +1,382 @@
 // src/contexts/AuthContext.tsx
-
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, ReactNode, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import {
   useSession,
   signIn,
+  signUp,
   signOut,
-  signInWithPasskey,
+  useTauriAuth,
   addPasskey,
-  forgetPassword,
-  resetPassword,
-  verifyEmail,
+  signInWithPasskey,
+
   sendMagicLink,
-  signInWithGitHub,
-  linkGitHubAccount,
-  signUp as authClientSignUp
+  verifyMagicLink,
+  enableTwoFactor,
+  disableTwoFactor,
+  verifyTotp,
+  sendTwoFactorOtp,
+  verifyTwoFactorOtp,
+  generateBackupCodes,
 } from "@/src/lib/auth-client";
-import { useAuthStore } from '@/src/store/authStore';
-import { usePostLoginRedirect } from '@/src/hooks/useAuthRedirect';
 
-type Role = "ADMIN" | "MANAGER" | "MEMBER" | "USER";
-
-interface User {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  roles?: Role[];
-  emailVerified?: boolean | null;
-}
-
+// Tipi estesi con plugin
 interface AuthContextType {
-  user: User | null;
+  // Session data direttamente da Better Auth
+  session: any;
+  user: any;
   isLoading: boolean;
   isAuthenticated: boolean;
-  authError: string | null;
-  showOnboarding: boolean;
-  hasRole: (role: Role | Role[]) => boolean;
-  signIn: (credentials: any) => Promise<any>;
-  signUp: (credentials: any) => Promise<any>;
-  signOut: () => Promise<any>;
-  signInWithPasskey: () => Promise<void>;
-  signInWithGitHub: (callbackURL?: string) => Promise<void>;
-  linkGitHubAccount: (callbackURL?: string) => Promise<{ success: boolean; message: string }>;
-  registerPasskey: () => Promise<{ success: boolean; message: string }>;
-  requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
-  resetPassword: (token: string, password: string) => Promise<{ success: boolean; message: string }>;
-  verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
-  sendMagicLink: (email: string) => Promise<{ success: boolean; message: string }>;
-  refreshSession: () => Promise<any>;
-  clearAuthError: () => void;
-  completeOnboarding: () => void;
+
+  // Metodi di autenticazione base
+  handleSignIn: (email: string, password: string) => Promise<void>;
+  handleSignUp: (name: string, email: string, password: string) => Promise<void>;
+  handleSignOut: () => Promise<void>;
+
+  // Social auth
+  signInWithGitHub: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+
+  // 🔐 Passkey functions
+  handleSignInWithPasskey: () => Promise<void>;
+
+  // 🔗 Magic Link functions
+  handleSendMagicLink: (email: string, callbackURL?: string) => Promise<any>;
+  handleVerifyMagicLink: (token: string) => Promise<any>;
+
+  // 🛡️ Two-Factor functions (aligned with page usage)
+  handleEnable2FA: () => Promise<any>;
+  handleDisable2FA: () => Promise<any>;
+  handleVerifyTOTP: (code: string) => Promise<any>;
+  handleSendOTP: () => Promise<any>;
+  handleVerifyOTP: (code: string) => Promise<any>;
+  handleGenerateBackupCodes: () => Promise<any>;
+  handleGet2FAStatus: () => Promise<any>;
+
+  // Password reset (aligned with page usage)
+  handleForgotPassword: (email: string, callbackURL?: string) => Promise<any>;
+  handleResetPassword: (token: string, newPassword: string) => Promise<any>;
+
+  // Email verification (aligned with page usage)
+  handleSendEmailVerification: (email: string, callbackURL?: string) => Promise<any>;
+  handleVerifyEmail: (token: string, callbackURL?: string) => Promise<any>;
+
+  // Passkey management (additional functions needed)
+  handleListPasskeys: () => Promise<any>;
+  handleDeletePasskey: (id: string) => Promise<any>;
+  handleAddPasskey: (name: string) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { data: session, isPending: isLoading } = useSession();
 
-  // Enhanced Better Auth hooks con cache
-  const { data: session, isPending, error, refresh, clear } = useSession();
+  // Inizializza Tauri auth se necessario
+  useTauriAuth();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
+  // ================================
+  // METODI AUTENTICAZIONE BASE
+  // ================================
 
-  // Auth store integration
-  const { syncSession, clearSession, recordLoginMethod, checkPasskeySupport } = useAuthStore();
+  const handleSignIn = useCallback(async (email: string, password: string) => {
+    await signIn.email({ email, password });
+    router.push('/');
+  }, [router]);
 
-  // Enhanced redirect hook
-  const redirectAfterLogin = usePostLoginRedirect();
+  const handleSignUp = useCallback(async (name: string, email: string, password: string) => {
+    await signUp.email({ name, email, password });
+    router.push('/');
+  }, [router]);
 
-  // Enhanced session sync con error handling
-  useEffect(() => {
-    // Clear auth errors when session changes
-    setAuthError(null);
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    router.push('/auth/signin');
+  }, [router]);
 
-    if (session?.user) {
-      const userData = {
-        id: session.user.id,
-        name: session.user.name,
-        email: session.user.email,
-        image: session.user.image,
-        emailVerified: session.user.emailVerified,
-        roles: (session.user.roles as unknown as Role[]) || ["USER" as unknown as Role]
-      };
-      setUser(userData);
+  const signInWithGitHub = useCallback(async () => {
+    await signIn.social({
+      provider: "github",
+      callbackURL: "/",
+    });
+  }, []);
 
-      // Sync with auth store
-      syncSession(session);
-    } else {
-      setUser(null);
-      clearSession();
+  const signInWithGoogle = useCallback(async () => {
+    await signIn.social({
+      provider: "google",
+      callbackURL: "/",
+    });
+  }, []);
+
+  // ================================
+  // 🔐 PASSKEY FUNCTIONS
+  // ================================
+
+  const handleAddPasskey = useCallback(async (name: string) => {
+    if (!addPasskey) throw new Error("Passkey not available");
+    return await addPasskey(name);
+  }, []);
+
+  const handleSignInWithPasskey = useCallback(async () => {
+    if (!signInWithPasskey) throw new Error("Passkey not available");
+    await signInWithPasskey();
+    router.push('/');
+  }, [router]);
+
+  const handleListPasskeys = useCallback(async () => {
+    const response = await fetch('/api/auth/list-passkeys', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to list passkeys');
     }
-  }, [session, syncSession, clearSession]);
 
-  // Handle session errors
-  useEffect(() => {
-    if (error) {
-      setAuthError(error);
-      console.warn('Session error:', error);
-    }
-  }, [error]);
+    return await response.json();
+  }, []);
 
-  // Check passkey support on mount
-  useEffect(() => {
-    checkPasskeySupport();
-  }, [checkPasskeySupport]);
+  const handleDeletePasskey = useCallback(async (id: string) => {
+    const response = await fetch('/api/auth/delete-passkey', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+      credentials: 'include'
+    });
 
-  const hasRole = (role: Role | Role[]): boolean => {
-    if (!user || !user.roles) return false;
-
-    if (Array.isArray(role)) {
-      return role.some(r => user.roles?.includes(r));
+    if (!response.ok) {
+      throw new Error('Failed to delete passkey');
     }
 
-    return user.roles.includes(role);
-  };
+    return await response.json();
+  }, []);
 
-  const handleSignIn = async (credentials: any) => {
-    try {
-      setAuthError(null);
+  // ================================
+  // 🔗 MAGIC LINK FUNCTIONS
+  // ================================
 
-      const result = await signIn({
-        email: credentials.email,
-        password: credentials.password,
-      });
+  const handleSendMagicLink = useCallback(async (email: string, callbackURL = "/") => {
+    if (!sendMagicLink) throw new Error("Magic link not available");
+    return await sendMagicLink(email, callbackURL);
+  }, []);
 
-      if (result.data && !result.error) {
-        recordLoginMethod('password');
+  const handleVerifyMagicLink = useCallback(async (token: string) => {
+    if (!verifyMagicLink) throw new Error("Magic link not available");
+    return await verifyMagicLink(token);
+  }, []);
 
-        // Refresh session per ottenere data aggiornati
-        await refresh();
+  // ================================
+  // 🛡️ TWO-FACTOR FUNCTIONS
+  // ================================
 
-        // Smart redirect alla intended route
-        await redirectAfterLogin();
-      } else {
-        setAuthError(result.data?.message || 'Login failed');
-      }
+  const handleEnable2FA = useCallback(async () => {
+    if (!enableTwoFactor) throw new Error("Two-factor not available");
+    const result = await enableTwoFactor();
+    return result;
+  }, []);
 
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login error';
-      setAuthError(errorMessage);
-      console.error("Sign in error:", error);
-      throw error;
+  const handleDisable2FA = useCallback(async () => {
+    if (!disableTwoFactor) throw new Error("Two-factor not available");
+    return await disableTwoFactor();
+  }, []);
+
+  const handleVerifyTOTP = useCallback(async (code: string) => {
+    if (!verifyTotp) throw new Error("Two-factor not available");
+    const result = await verifyTotp(code);
+    // After verification, the session is updated, and we can redirect.
+    router.push('/');
+    return result;
+  }, [router]);
+
+  const handleSendOTP = useCallback(async () => {
+    if (!sendTwoFactorOtp) throw new Error("Two-factor not available");
+    return await sendTwoFactorOtp();
+  }, []);
+
+  const handleVerifyOTP = useCallback(async (code: string) => {
+    if (!verifyTwoFactorOtp) throw new Error("Two-factor not available");
+    const result = await verifyTwoFactorOtp(code);
+    // After verification, the session is updated, and we can redirect.
+    router.push('/');
+    return result;
+  }, [router]);
+
+  const handleGenerateBackupCodes = useCallback(async () => {
+    if (!generateBackupCodes) throw new Error("Two-factor not available");
+    return await generateBackupCodes();
+  }, []);
+
+  const handleGet2FAStatus = useCallback(async () => {
+    if (!session?.user) return { enabled: false };
+    // Better Auth include 2FA status nella sessione quando attivo
+    return { enabled: !!(session as any).twoFactorVerified || false };
+  }, [session]);
+
+  // ================================
+  // PASSWORD RESET & EMAIL VERIFICATION
+  // ================================
+
+  // ================================
+  // PASSWORD RESET FUNCTIONS (production-ready)
+  // ================================
+
+  const handleForgotPassword = useCallback(async (email: string, callbackURL = "/auth/reset-password") => {
+    const response = await fetch('/api/auth/forget-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        redirectTo: `${window.location.origin}${callbackURL}`
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send password reset email');
     }
-  };
 
-  const signUp = async (credentials: any) => {
-    try {
-      setAuthError(null);
-      const result = await authClientSignUp({
-        provider: "credentials",
-        data: credentials,
-      });
-      if (result.error) throw new Error(result.error);
-      // After sign up, better-auth automatically signs the user in.
-      // The session change will be picked up by useSession, triggering a re-render.
-      return result;
-    } catch (err: any) {
-      setAuthError(err.message || "Sign up failed");
-      return { error: err.message };
+    return await response.json();
+  }, []);
+
+  const handleResetPassword = useCallback(async (token: string, newPassword: string) => {
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to reset password');
     }
-  };
 
-  const handleSignInWithPasskey = async () => {
-    try {
-      setAuthError(null);
-
-      const result = await signInWithPasskey();
-
-      if (result?.data && !result.error) {
-        recordLoginMethod('passkey');
-
-        // Refresh session per ottenere data aggiornati
-        await refresh();
-
-        // Smart redirect alla intended route
-        await redirectAfterLogin();
-      } else {
-        setAuthError(result?.data?.message || 'Passkey authentication failed');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Passkey authentication error';
-      setAuthError(errorMessage);
-      console.error("Passkey sign in error:", error);
-      throw error;
+    const result = await response.json();
+    if (result.session) {
+      router.push('/');
     }
-  };
 
-  const handleSignOut = async () => {
-    try {
-      setAuthError(null);
+    return result;
+  }, [router]);
 
-      // Call server logout first
-      await signOut();
+  // ================================
+  // EMAIL VERIFICATION FUNCTIONS (production-ready)
+  // ================================
 
-      // Clear local session
-      clear();
+  const handleSendEmailVerification = useCallback(async (email: string, callbackURL = "/auth/verify-email") => {
+    const response = await fetch('/api/auth/send-verification-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        callbackURL: `${window.location.origin}${callbackURL}`
+      })
+    });
 
-      // Log successful logout
-      console.log('Logout successful');
-
-      // Navigate to signin
-      router.push(`/auth/signin`);
-    } catch (error) {
-      console.error("Logout error:", error);
-
-      // Still clear local session and redirect even if server logout fails
-      clear();
-      router.push(`/auth/signin`);
-
-      throw error;
+    if (!response.ok) {
+      throw new Error('Failed to send verification email');
     }
-  };
 
-  const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const result = await forgetPassword(email);
+    return await response.json();
+  }, []);
 
-      if (result?.data && !result.error) {
-        return { success: true, message: "Password reset email sent" };
-      } else {
-        return { success: false, message: "Failed to send reset email" };
-      }
-    } catch (error) {
-      console.error("Password reset request error:", error);
-      return { success: false, message: "An unexpected error occurred" };
+  const handleVerifyEmail = useCallback(async (token: string, callbackURL = "/") => {
+    const response = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to verify email');
     }
-  };
 
-  const handleResetPassword = async (token: string, password: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const result = await resetPassword(token, password);
-
-      if (result?.data && !result.error) {
-        return { success: true, message: "Password updated successfully" };
-      } else {
-        return { success: false, message: "Failed to reset password" };
-      }
-    } catch (error) {
-      console.error("Password reset error:", error);
-      return { success: false, message: "An unexpected error occurred" };
+    const result = await response.json();
+    if (result.session) {
+      router.push(callbackURL);
     }
-  };
 
-  const registerPasskey = async (): Promise<{ success: boolean; message: string }> => {
-    try {
-      if (!user) {
-        return { success: false, message: "You must be logged in to register a passkey" };
-      }
+    return result;
+  }, [router]);
 
-      const result = await addPasskey();
+  // ================================
+  // CONTEXT VALUE
+  // ================================
 
-      if (result?.data && !result.error) {
-        return { success: true, message: "Passkey registered successfully!" };
-      } else {
-        return { success: false, message: "Failed to register passkey" };
-      }
-    } catch (error: any) {
-      console.error("Passkey registration error:", error);
-      return { success: false, message: error.message || "Failed to register passkey" };
-    }
-  };
+  const value: AuthContextType = useMemo(() => ({
+    session,
+    user: session?.user,
+    isLoading,
+    isAuthenticated: !!session?.user,
 
-  const handleVerifyEmail = async (token: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      const result = await verifyEmail(token);
+    // Base auth
+    handleSignIn,
+    handleSignUp,
+    handleSignOut,
+    signInWithGitHub,
+    signInWithGoogle,
 
-      if (result?.data && !result.error) {
-        return { success: true, message: "Email verified successfully" };
-      } else {
-        return { success: false, message: "Failed to verify email" };
-      }
-    } catch (error) {
-      console.error("Email verification error:", error);
-      return { success: false, message: "An unexpected error occurred" };
-    }
-  };
+    // Passkey
+    handleAddPasskey,
+    handleSignInWithPasskey,
+    handleListPasskeys,
+    handleDeletePasskey,
 
-  const handleSendMagicLink = async (email: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      setAuthError(null);
+    // Magic Link
+    handleSendMagicLink,
+    handleVerifyMagicLink,
 
-      const result = await sendMagicLink(email);
+    // Two-Factor (aligned with page usage)
+    handleEnable2FA,
+    handleDisable2FA,
+    handleVerifyTOTP,
+    handleSendOTP,
+    handleVerifyOTP,
+    handleGenerateBackupCodes,
+    handleGet2FAStatus,
 
-      if (result?.data && !result.error) {
-        return { success: true, message: "Magic link sent! Check your email." };
-      } else {
-        return { success: false, message: "Failed to send magic link" };
-      }
-    } catch (error) {
-      console.error("Magic link send error:", error);
-      return { success: false, message: "An unexpected error occurred" };
-    }
-  };
-
-  const handleSignInWithGitHub = async (callbackURL?: string) => {
-    try {
-      setAuthError(null);
-
-      const result = await signInWithGitHub(callbackURL);
-
-      if (result?.data && !result.error) {
-        recordLoginMethod('oauth');
-        // The redirect will be handled by the OAuth flow
-      } else {
-        setAuthError(result?.data?.message || 'GitHub authentication failed');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'GitHub authentication error';
-      setAuthError(errorMessage);
-      console.error("GitHub sign in error:", error);
-      throw error;
-    }
-  };
-
-  const handleLinkGitHubAccount = async (callbackURL?: string): Promise<{ success: boolean; message: string }> => {
-    try {
-      setAuthError(null);
-
-      if (!user) {
-        return { success: false, message: "You must be logged in to link a GitHub account" };
-      }
-
-      const result = await linkGitHubAccount(callbackURL);
-
-      if (result?.data && !result.error) {
-        return { success: true, message: "GitHub account linked successfully!" };
-      } else {
-        return { success: false, message: result?.data?.message || "Failed to link GitHub account" };
-      }
-    } catch (error) {
-      console.error("GitHub link account error:", error);
-      return { success: false, message: "An unexpected error occurred" };
-    }
-  };
-
-  // Clear auth error helper
-  const clearAuthError = () => {
-    setAuthError(null);
-  };
+    // Password & Email (aligned with page usage)
+    handleForgotPassword,
+    handleResetPassword,
+    handleSendEmailVerification,
+    handleVerifyEmail,
+  }), [
+    session,
+    isLoading,
+    handleSignIn,
+    handleSignUp,
+    handleSignOut,
+    signInWithGitHub,
+    signInWithGoogle,
+    handleAddPasskey,
+    handleSignInWithPasskey,
+    handleListPasskeys,
+    handleDeletePasskey,
+    handleSendMagicLink,
+    handleVerifyMagicLink,
+    handleEnable2FA,
+    handleDisable2FA,
+    handleVerifyTOTP,
+    handleSendOTP,
+    handleVerifyOTP,
+    handleGenerateBackupCodes,
+    handleGet2FAStatus,
+    handleForgotPassword,
+    handleResetPassword,
+    handleSendEmailVerification,
+    handleVerifyEmail,
+  ]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading: isPending,
-        isAuthenticated: !!user,
-        authError,
-        hasRole,
-        signIn: handleSignIn,
-        signUp: signUp,
-        signOut: handleSignOut,
-        signInWithPasskey: handleSignInWithPasskey,
-        signInWithGitHub: handleSignInWithGitHub,
-        linkGitHubAccount: handleLinkGitHubAccount,
-        registerPasskey,
-        requestPasswordReset,
-        resetPassword: handleResetPassword,
-        verifyEmail: handleVerifyEmail,
-        sendMagicLink: handleSendMagicLink,
-        refreshSession: refresh,
-        clearAuthError,
-        showOnboarding: false, // Add default value
-        completeOnboarding: () => { } // Add default function
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}

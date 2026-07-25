@@ -13,7 +13,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { prisma } from "@/src/lib/prisma";
 import {
   downloadStreamFromBucket,
@@ -22,7 +22,7 @@ import {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   // Set security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -56,7 +56,7 @@ export default async function handler(
     }
 
     // Check if item is free
-    if (item.price.toNumber() > 0) {
+    if (item.price > 0) {
       return res.status(400).json({ message: "This item requires payment" });
     }
 
@@ -155,7 +155,7 @@ export default async function handler(
           res.setHeader("Content-Type", contentType);
           res.setHeader(
             "Content-Disposition",
-            `attachment; filename="${fileName}"`
+            `attachment; filename="${fileName}"`,
           );
 
           if (item.fileSize) {
@@ -203,7 +203,7 @@ export default async function handler(
       res.setHeader("Content-Type", contentType);
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${fileName}"`
+        `attachment; filename="${fileName}"`,
       );
       res.setHeader("Content-Length", Buffer.byteLength(fallbackContent));
 
@@ -219,7 +219,7 @@ export default async function handler(
       res.setHeader("Content-Type", contentType);
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${fileName}"`
+        `attachment; filename="${fileName}"`,
       );
       res.setHeader("Content-Length", Buffer.byteLength(fallbackContent));
 

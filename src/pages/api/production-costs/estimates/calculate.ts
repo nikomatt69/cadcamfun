@@ -1,7 +1,7 @@
 // src/pages/api/production-costs/estimates/calculate.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { ProductionCostEstimate, CostSettings } from "@/src/types/costs";
 
 // Helper function to get the most appropriate cost settings for the user/organization

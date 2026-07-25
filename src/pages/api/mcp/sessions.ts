@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { requireAuth } from '@/src/lib/api/auth';
+import { NextApiRequest, NextApiResponse } from "next";
+import { requireAuth } from "src/lib/api/auth";
 
 interface McpSession {
   id: string;
@@ -13,6 +13,7 @@ interface McpSession {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
+
   if (!userId) {
     return; // requireAuth already sent the response
   }

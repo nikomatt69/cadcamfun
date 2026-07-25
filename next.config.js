@@ -6,32 +6,16 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Tauri desktop support
-  trailingSlash: true,
-  output: process.env.NEXT_EXPORT === 'true' ? 'export' : undefined,
+
   // Fix: Use absolute path for Tauri builds
-  assetPrefix: process.env.NEXT_EXPORT === 'true' ? '/' : '',
+
 
   // Export path mapping for static export - exclude problematic pages
-  ...(process.env.NEXT_EXPORT === 'true' && {
-    exportPathMap: async function (defaultPathMap, { dev, dir, outDir, distDir, buildId }) {
-      // Remove pages that use getServerSideProps
-      const {
-        '/opensearch.xml': _1,
-        '/sitemap.xml': _2,
-        '/admin/feature-flags': _3,
-        '/invitations/[token]': _4,
-        '/plugins/[id]': _5,
-        ...exportPathMap
-      } = defaultPathMap;
 
-      return exportPathMap;
-    }
-  }),
 
   // Configure images for static export
   images: {
-    unoptimized: process.env.NEXT_EXPORT === 'true',
+
     remotePatterns: [
       {
         protocol: 'https',

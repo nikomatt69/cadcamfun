@@ -1,12 +1,9 @@
 // This script optimizes images in the public directory
-// Run with: npx ts-node scripts/optimize-images.ts
+// Run with: bun run scripts/optimize-images.js
 
 import fs from "fs";
 import path from "path";
-import { promisify } from "util";
-import { exec } from "child_process";
-
-const execAsync = promisify(exec);
+import { execSync } from "child_process";
 
 // Configuration
 const PUBLIC_DIR = path.join(process.cwd(), "public");
@@ -15,31 +12,32 @@ const EXCLUDE_DIRS = ["node_modules", ".next", ".git", "fonts"];
 const MAX_WIDTH = 1920; // Maximum width for resizing images
 
 // Ensure required packages are installed
-async function ensurePackagesInstalled() {
+function ensurePackagesInstalled() {
   try {
     console.log("Checking if required packages are installed...");
 
-    // Check if sharp and svgo are installed
-    await execAsync("npm list sharp svgo --depth=0");
-    console.log("✅ Required packages are installed");
-  } catch (error) {
-    console.log("⚠️ Required packages not found. Installing...");
+    // Check if sharp is installed (check if it can be required)
     try {
-      await execAsync("npm install --save-dev sharp svgo");
-      console.log("✅ Packages installed successfully");
-    } catch (installError) {
-      console.error("❌ Failed to install packages:", installError);
+      require.resolve("sharp");
+      console.log("✅ Required packages are installed");
+    } catch {
+      console.log(
+        "⚠️ Required packages not found. Please run: bun add -d sharp svgo",
+      );
       process.exit(1);
     }
+  } catch (error) {
+    console.error("❌ Error checking packages:", error);
+    process.exit(1);
   }
 }
 
 // Main optimization function
 async function optimizeImages() {
-  await ensurePackagesInstalled();
+  ensurePackagesInstalled();
 
   console.log("Scanning for images in public directory...");
-  const imageFiles = await getImageFiles(PUBLIC_DIR);
+  const imageFiles = getImageFiles(PUBLIC_DIR);
 
   if (imageFiles.length === 0) {
     console.log("No images found in public directory.");
@@ -61,7 +59,7 @@ async function optimizeImages() {
     console.log(`Processing batch ${i + 1}/${batches.length}...`);
 
     await Promise.all(
-      batch.map(async filePath => {
+      batch.map(async (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
 
         if (ext === ".svg") {
@@ -69,7 +67,7 @@ async function optimizeImages() {
         } else {
           await optimizeRasterImage(filePath);
         }
-      })
+      }),
     );
   }
 
@@ -77,13 +75,13 @@ async function optimizeImages() {
 }
 
 // Run the script
-optimizeImages().catch(error => {
+optimizeImages().catch((error) => {
   console.error("❌ Error during image optimization:", error);
   process.exit(1);
 });
 
 // Get all image files recursively
-async function getImageFiles(dir, fileList = []) {
+function getImageFiles(dir, fileList = []) {
   const files = fs.readdirSync(dir);
 
   for (const file of files) {
@@ -91,7 +89,7 @@ async function getImageFiles(dir, fileList = []) {
     const stat = fs.statSync(filePath);
 
     if (stat.isDirectory() && !EXCLUDE_DIRS.includes(file)) {
-      fileList = await getImageFiles(filePath, fileList);
+      fileList = getImageFiles(filePath, fileList);
     } else {
       const ext = path.extname(file).toLowerCase();
       if (IMAGE_EXTENSIONS.includes(ext)) {
@@ -139,7 +137,7 @@ async function optimizeRasterImage(filePath) {
       fs.unlinkSync(filePath);
       fs.renameSync(tempPath, filePath);
       console.log(
-        `✅ Optimized ${path.basename(filePath)} - ${formatBytes(origSize)} → ${formatBytes(newSize)} (${Math.round((1 - newSize / origSize) * 100)}% reduction)`
+        `✅ Optimized ${path.basename(filePath)} - ${formatBytes(origSize)} → ${formatBytes(newSize)} (${Math.round((1 - newSize / origSize) * 100)}% reduction)`,
       );
     } else {
       fs.unlinkSync(tempPath);
@@ -157,7 +155,8 @@ async function optimizeSvg(filePath) {
     const backupPath = `${filePath}.backup`;
     fs.copyFileSync(filePath, backupPath);
 
-    const { stdout, stderr } = await execAsync(`npx svgo "${filePath}" -o "${filePath}"`);
+    // Use bunx to run svgo
+    execSync(`bunx svgo "${filePath}" -o "${filePath}"`, { stdio: "pipe" });
 
     // Get file sizes
     const origSize = fs.statSync(backupPath).size;
@@ -167,7 +166,7 @@ async function optimizeSvg(filePath) {
     fs.unlinkSync(backupPath);
 
     console.log(
-      `✅ Optimized ${path.basename(filePath)} - ${formatBytes(origSize)} → ${formatBytes(newSize)} (${Math.round((1 - newSize / origSize) * 100)}% reduction)`
+      `✅ Optimized ${path.basename(filePath)} - ${formatBytes(origSize)} → ${formatBytes(newSize)} (${Math.round((1 - newSize / origSize) * 100)}% reduction)`,
     );
   } catch (error) {
     console.error(`❌ Failed to optimize SVG ${filePath}:`, error);

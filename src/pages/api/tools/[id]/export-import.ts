@@ -3,7 +3,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 import { sendSuccessResponse, sendErrorResponse, handleApiError } from "src/lib/api/helpers";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { generateObjectPath, uploadToBucket, downloadFromBucket, listObjectsByType } from "src/lib/storageService";
 import JSZip from "jszip";
 
@@ -45,6 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Authentication check
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     // EXPORT - GET

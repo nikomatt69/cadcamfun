@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 // import { aiCore } from '@/src/lib/ai/aiCore'; // aiCore is used by webSearchService
 import { webSearchService, WebSearchOptions, CADContextForSearch } from "@/src/lib/ai/websearch/websearchService";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 interface WebSearchApiRequest extends NextApiRequest {
   body: {

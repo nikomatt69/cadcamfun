@@ -4,9 +4,10 @@ import stripe, {
   executeStripeOperation,
   logStripeEvent,
 } from "src/lib/stripe-server";
-import { requireAuth } from "src/lib/api/auth";
+
 import { SUBSCRIPTION_PLANS } from "@/src/lib/stripe";
 import { stripeService } from "src/lib/stripe/stripeService";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,21 +20,23 @@ export default async function handler(
   if (req.method === "GET") {
     try {
       const userSubscription = await prisma.subscription.findUnique({
-        where: { userId },
+        where: { id: userId },
       });
 
       // If no subscription record, create a Free plan and return it
       if (!userSubscription) {
         const newFreeSubscription = await prisma.subscription.upsert({
-          where: { userId },
+          where: { id: userId },
           update: {
             plan: SUBSCRIPTION_PLANS.FREE,
             status: "active",
+            user: { connect: { id: userId } },
           },
           create: {
-            userId,
+            id: userId,
             plan: SUBSCRIPTION_PLANS.FREE,
             status: "active",
+            user: { connect: { id: userId } },
           },
         });
 
@@ -57,7 +60,7 @@ export default async function handler(
 
           // Update local database with latest Stripe data
           await prisma.subscription.update({
-            where: { userId },
+            where: { id: userId },
             data: {
               status: stripeSubscription.status,
               stripePriceId: stripeSubscription.items.data[0]?.price.id,
@@ -94,7 +97,7 @@ export default async function handler(
           // If the subscription no longer exists in Stripe, update to FREE plan
           if ((stripeError as any)?.code === "resource_missing") {
             await prisma.subscription.update({
-              where: { userId },
+              where: { id: userId },
               data: {
                 plan: SUBSCRIPTION_PLANS.FREE,
                 status: "active",
@@ -131,7 +134,7 @@ export default async function handler(
         if (trialEnds <= now) {
           // Trial has expired, update to FREE
           await prisma.subscription.update({
-            where: { userId },
+            where: { id: userId },
             data: {
               plan: SUBSCRIPTION_PLANS.FREE,
               status: "active",
@@ -213,7 +216,7 @@ export default async function handler(
         automaticTax: true,
         billingAddressCollection: "auto",
         metadata: {
-          userId,
+          id: userId,
           planType: priceId,
         },
       });
@@ -246,7 +249,7 @@ async function startFreeTrial(
   try {
     // Check if user already has a subscription
     const existingSubscription = await prisma.subscription.findUnique({
-      where: { userId },
+      where: { id: userId },
     });
 
     if (existingSubscription && existingSubscription.status !== "expired") {
@@ -304,7 +307,7 @@ async function startFreeTrial(
 
     // 4. Update local database record
     await prisma.subscription.upsert({
-      where: { userId },
+      where: { id: userId },
       update: {
         plan: planPriceId,
         status: "trialing",
@@ -317,7 +320,7 @@ async function startFreeTrial(
         ),
       },
       create: {
-        userId,
+        id: userId,
         plan: planPriceId,
         status: "trialing",
         trialEndsAt: new Date(subscription.trial_end! * 1000),
@@ -327,6 +330,7 @@ async function startFreeTrial(
         stripeCurrentPeriodEnd: new Date(
           subscription.current_period_end * 1000
         ),
+        user: { connect: { id: userId } },
       },
     });
 

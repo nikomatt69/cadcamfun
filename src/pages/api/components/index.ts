@@ -51,8 +51,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (search) {
         query.where.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { description: { contains: search, mode: "insensitive" } }
+          { name: { contains: search } },
+          { description: { contains: search } }
         ];
       }
 

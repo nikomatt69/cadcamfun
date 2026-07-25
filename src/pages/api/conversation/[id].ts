@@ -2,7 +2,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 import { requireAuth } from "src/lib/api/auth";
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
   if (!userId) return;

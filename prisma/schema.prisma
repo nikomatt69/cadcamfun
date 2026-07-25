@@ -4,9 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -23,6 +22,11 @@ model User {
   title         String? // Job title
   publicProfile Boolean   @default(true) // Whether profile is public
   showEmail     Boolean   @default(false) // Whether to show email publicly
+  
+  // Better Auth fields
+  twoFactorEnabled Boolean   @default(false) // Two-factor authentication enabled
+  stripeCustomerId String?   // Better Auth Stripe plugin field
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -31,13 +35,15 @@ model User {
   projects                Project[]
   accounts                Account[]
   sessions                Session[] // Better Auth sessions
+  passkeys                Passkey[] // Better Auth passkeys
+  twoFactor               TwoFactor? // Better Auth two-factor
   materials               Material[] // Add ownership relationship
   tools                   Tool[] // Add ownership relationship
   machineConfigs          MachineConfig[]
   activityLogs            ActivityLog[]
   aiAnalysisLogs          AIAnalysisLog[]
   LibraryItem             LibraryItem[]
-  subscription            Subscription? // Relation to subscription
+  subscriptions           Subscription[] // Better Auth allows multiple subscriptions per user
   ConversationParticipant ConversationParticipant[]
   Message                 Message[]
   tokens                  Token[] // Magic link and other tokens
@@ -90,31 +96,41 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// Subscription model for Stripe integration
+// Better Auth Stripe Plugin Subscription Model
 model Subscription {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  plan        String    @default("FREE") // Will store LS Variant ID or 'free'
-  status      String    @default("inactive") // e.g., active, past_due, trialing, cancelled, expired
-  trialEndsAt DateTime? // Added specifically for trial end tracking
+  id                   String    @id @default(cuid())
+  plan                 String
+  referenceId          String    // Usually userId, but can be organizationId for team subscriptions
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String    @default("active") // active, canceled, incomplete, etc.
+  periodStart          DateTime?
+  periodEnd            DateTime?
+  cancelAtPeriodEnd    Boolean?  @default(false)
+  seats                Int?      // For team subscriptions
+  groupId              String?   // To group multiple subscriptions per reference
+  priceId              String?   // Stripe price ID
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  // Stripe fields (mantieni per compatibilità)
-  stripeCustomerId         String?
-  stripeSubscriptionId     String?
+  // Legacy compatibility fields (keeping for migration)
   stripePriceId            String?
   stripeCurrentPeriodStart DateTime?
   stripeCurrentPeriodEnd   DateTime?
+  lsCustomerId             String?
+  lsSubscriptionId         String?
+  lsVariantId              String?
+  lsCurrentPeriodEnd       DateTime?
+  trialEndsAt              DateTime?
 
-  // LemonSqueezy fields
-  lsCustomerId       String?
-  lsSubscriptionId   String?
-  lsVariantId        String?
-  lsCurrentPeriodEnd DateTime?
+  // Relationship to User (via referenceId)
+  user User @relation(fields: [referenceId], references: [id], onDelete: Cascade)
 
-  cancelAtPeriodEnd Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([referenceId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 // Auth models remain unchanged
@@ -437,7 +453,7 @@ model LibraryItem {
   type           String
   data           Json // Store the complex structure with elements
   properties     Json?
-  tags           String[]
+  tags           Json?
   thumbnail      String?
   isPublic       Boolean  @default(false)
   createdAt      DateTime @default(now())
@@ -480,7 +496,7 @@ model ConversationParticipant {
 
 model Message {
   id             String   @id @default(cuid())
-  content        String   @db.Text
+  content        String
   senderId       String
   conversationId String
   fileId         String? // Aggiungi questo campo
@@ -557,7 +573,7 @@ model ComponentVersion {
 model ComponentComment {
   id          String   @id @default(cuid())
   componentId String
-  content     String   @db.Text
+  content     String
   userId      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -586,7 +602,7 @@ model Token {
 // Model to store core plugin metadata
 model PluginRegistryEntry {
   id           String   @id // Plugin ID (e.g., com.example.myplugin)
-  manifestJson String   @db.Text // Store the full manifest as a JSON string
+  manifestJson String
   state        String // Store PluginState enum as string (e.g., "ENABLED", "DISABLED", "ERROR")
   enabled      Boolean
   version      String
@@ -602,7 +618,7 @@ model PluginRegistryEntry {
 // Model to store plugin-specific configuration
 model PluginConfiguration {
   pluginId   String @id // Foreign key referencing PluginRegistryEntry.id
-  configJson String @db.Text // Store the configuration object as a JSON string
+configJson String
 
   // Explicit relation back to PluginRegistryEntry
   plugin PluginRegistryEntry @relation(fields: [pluginId], references: [id], onDelete: Cascade) // Cascade delete config if plugin is removed
@@ -782,19 +798,19 @@ model MarketplaceItem {
   description      String?
   shortDescription String?
   type             MarketplaceItemType
-  price            Decimal               @db.Decimal(10, 2)
+  price            Float
   currencyCode     String                @default("USD")
   licenseType      LicenseType           @default(PERSONAL)
-  tags             String[]
+  tags             Json?
   category         String?
   subcategory      String?
   thumbnailUrl     String?
-  previewImages    String[]
+  previewImages    Json?
   downloadUrl      String?
   fileSize         Int?
   downloadCount    Int                   @default(0)
   viewCount        Int                   @default(0)
-  rating           Decimal?              @db.Decimal(3, 2)
+  rating           Float?
   reviewCount      Int                   @default(0)
   status           MarketplaceItemStatus @default(DRAFT)
   featured         Boolean               @default(false)
@@ -830,11 +846,11 @@ model MarketplaceSeller {
   storeUrl         String?  @unique
   avatar           String?
   banner           String?
-  rating           Decimal? @db.Decimal(3, 2)
+  rating           Float?
   reviewCount      Int      @default(0)
   totalSales       Int      @default(0)
-  totalRevenue     Decimal  @default(0) @db.Decimal(10, 2)
-  commissionRate   Decimal  @default(15.00) @db.Decimal(5, 2)
+  totalRevenue     Float  @default(0)
+  commissionRate   Float  @default(15.00)
   payoutEmail      String?
   taxInfo          Json     @default("{}")
   verified         Boolean  @default(false)
@@ -858,10 +874,10 @@ model MarketplaceOrder {
   sellerId          String
   itemId            String
   quantity          Int                    @default(1)
-  unitPrice         Decimal                @db.Decimal(10, 2)
-  totalPrice        Decimal                @db.Decimal(10, 2)
-  commissionAmount  Decimal                @db.Decimal(10, 2)
-  sellerAmount      Decimal                @db.Decimal(10, 2)
+  unitPrice         Float
+  totalPrice        Float
+  commissionAmount  Float
+  sellerAmount      Float
   currencyCode      String                 @default("USD")
   status            MarketplaceOrderStatus @default(PENDING)
   polarCheckoutId   String?                @unique
@@ -979,7 +995,7 @@ model MarketplaceWishlist {
 model MarketplacePayout {
   id            String    @id @default(cuid())
   sellerId      String
-  amount        Decimal   @db.Decimal(10, 2)
+  amount        Float
   currencyCode  String    @default("USD")
   status        String    @default("PENDING")
   payoutMethod  String
@@ -994,4 +1010,33 @@ model MarketplacePayout {
   seller MarketplaceSeller @relation(fields: [sellerId], references: [id])
 
   @@index([sellerId])
+}
+
+// Better Auth Passkey table
+model Passkey {
+  id           String  @id @default(cuid())
+  name         String?
+  publicKey    String
+  userId       String
+  credentialID String  @unique
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  aaguid       String?
+  createdAt    DateTime @default(now())
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("passkey")
+}
+
+// Better Auth Two-Factor table
+model TwoFactor {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  secret      String
+  backupCodes String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
 }

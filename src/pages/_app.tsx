@@ -8,7 +8,6 @@ import PageTransition from "../components/layout/PageTransition";
 import PWAInstallPrompt from "../components/ui/PWAInstallPrompt";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { AuthProvider } from "../contexts/AuthContext";
-import { AuthLoadingProvider } from "../contexts/AuthLoadingContext";
 import AuthWrapper from "../components/auth/AuthWrapper";
 import { LanguageProvider } from "../contexts/LanguageContext";
 import { camFont } from "src/lib/camFont";
@@ -29,10 +28,9 @@ import { ThemeProvider } from "../contexts/ThemeProvider";
 import { ConstraintProvider } from "../contexts/ConstraintContext";
 import { MCPProvider } from "../contexts/MCPContext";
 import InitialOnboarding from "../components/auth/InitialOnboarding";
-import { useAuth } from "../contexts/AuthContext";
 import { useState, useCallback, useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { authClient, initializeTauriAuth } from "../lib/auth-client";
+import { authClient } from "../lib/auth-client";
 import { initializeSqlClient } from '../lib/database/sqlClient';
 // Import the event handlers
 
@@ -42,7 +40,6 @@ let pluginSystemInitialized = false;
 export default function App({ Component, pageProps, router }: AppProps) {
   // Get the function to add elements from the Zustand store
   const addElements = useElementsStore(state => state.addElements);
-  const [sqlClientReady, setSqlClientReady] = useState(false);
 
   // Welcome onboarding state - shows BEFORE signin
 
@@ -136,8 +133,8 @@ export default function App({ Component, pageProps, router }: AppProps) {
   useEffect(() => {
     const initTauri = async () => {
       if (await isTauri()) {
-        console.log("[_app] Tauri environment detected. Initializing Tauri auth listener...");
-        initializeTauriAuth();
+        console.log("[_app] Tauri environment detected.");
+        // Tauri auth is now handled in AuthContext with useTauriAuth
       } else {
         console.log("[_app] Not in Tauri environment.");
       }
@@ -150,11 +147,9 @@ export default function App({ Component, pageProps, router }: AppProps) {
     const initSqlClient = async () => {
       try {
         await initializeSqlClient();
-        setSqlClientReady(true);
         console.log('✅ SQL Client initialized in app startup');
       } catch (error) {
         console.warn('⚠️ SQL Client initialization failed:', error);
-        setSqlClientReady(true); // Continue without SQL client
       }
     };
 
@@ -163,58 +158,58 @@ export default function App({ Component, pageProps, router }: AppProps) {
 
   return (
     <ErrorBoundary>
-      <AuthProvider >
-        <AuthLoadingProvider>
-          <AuthWrapper>
-            <LanguageProvider>
-              <MetaTags ogImage="/og-image.png" />
-              <main className={`${camFont.style.fontFamily} antialiased bg-white dark:bg-gray-900`}>
-                <div id="plugin-container-root" style={{ position: "relative", zIndex: 1000 }} />
-                <ThemeProvider>
-                  <SubscriptionProvider>
-                    <NotificationProvider>
-                      <ToastProvider>
-                        <AnimatePresence mode="wait">
-                          <PageTransition key={router.route}>
-                            <PageViewTracker />
-                            <AnalyticsProvider>
-                              <CursorProvider>
-                                <MCPProvider>
-                                  <ConstraintProvider>
-                                    <AIContextProvider addElementsToCanvas={addElements}>
-                                      {/* Add event handlers for CAD/CAM integration */}
-                                      <style jsx global>{`
+      <AuthProvider>
+        <AuthWrapper>
+          <LanguageProvider>
+            <MetaTags ogImage="/og-image.png" />
+            <main className={`${camFont.style.fontFamily} antialiased bg-white dark:bg-gray-900`}>
+              <div id="plugin-container-root" style={{ position: "relative", zIndex: 1000 }} />
+              <ThemeProvider>
+                <SubscriptionProvider>
+                  <NotificationProvider>
+                    <ToastProvider>
+                      <AnimatePresence mode="wait">
+                        <PageTransition key={router.route}>
+                          <PageViewTracker />
+                          <AnalyticsProvider>
+                            <CursorProvider>
+                              <MCPProvider>
+                                <ConstraintProvider>
+                                  <AIContextProvider addElementsToCanvas={addElements}>
+                                    {/* Add event handlers for CAD/CAM integration */}
+                                    <style jsx global>{`
                                       body {
                                         font-family: ${camFont.style.fontFamily};
                                       }
                                     `}</style>
-                                      <ViewportMeta />
-                                      <PluginClientProvider>
-                                        <Component {...pageProps} />
-                                      </PluginClientProvider>
-                                    </AIContextProvider>
-                                  </ConstraintProvider>
-                                </MCPProvider>
-                              </CursorProvider>
-                            </AnalyticsProvider>
-                            <PWAInstallPrompt />
-                          </PageTransition>
-                        </AnimatePresence>
-                      </ToastProvider>
-                    </NotificationProvider>
-                  </SubscriptionProvider>
-                </ThemeProvider>
-              </main>
-            </LanguageProvider>
-          </AuthWrapper>
-        </AuthLoadingProvider>
+                                    <ViewportMeta />
+                                    <PluginClientProvider>
+                                      <Component {...pageProps} />
+                                    </PluginClientProvider>
+                                  </AIContextProvider>
+                                </ConstraintProvider>
+                              </MCPProvider>
+                            </CursorProvider>
+                          </AnalyticsProvider>
+                          <PWAInstallPrompt />
+                        </PageTransition>
+                      </AnimatePresence>
+                    </ToastProvider>
+                  </NotificationProvider>
+                </SubscriptionProvider>
+              </ThemeProvider>
+            </main>
+          </LanguageProvider>
+        </AuthWrapper>
       </AuthProvider>
 
       {/* Initial Onboarding - appears before signin for new users */}
+
       <InitialOnboarding
         isVisible={showWelcome}
         onComplete={handleOnboardingComplete}
       />
-    </ErrorBoundary>
+
+    </ErrorBoundary >
   );
 }

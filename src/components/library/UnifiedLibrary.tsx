@@ -16,7 +16,7 @@ import {
   RefreshCw,
   ChevronDown,
   Zap,
-  Star
+  Star,
 } from "react-feather";
 import {
   useUnifiedLibrary,
@@ -26,38 +26,38 @@ import {
   ToolLibraryItem,
   LibrarySource,
   LibraryEntityType,
-  LibraryFilter
+  LibraryFilter,
 } from "@/src/hooks/useUnifiedLibrary";
 
 // Define tabs for the library sources with enhanced icons
-const LIBRARY_SOURCES: Array<{ 
-  id: LibrarySource; 
-  label: string; 
-  icon: React.ReactNode; 
+const LIBRARY_SOURCES: Array<{
+  id: LibrarySource;
+  label: string;
+  icon: React.ReactNode;
   color: string;
   bgColor: string;
 }> = [
-  { 
-    id: "api", 
-    label: "Main Library", 
+  {
+    id: "api",
+    label: "Main Library",
     icon: <Database size={16} />,
     color: "text-blue-600",
-    bgColor: "bg-blue-50 dark:bg-blue-900/20"
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
   },
-  { 
-    id: "local", 
-    label: "Local Library", 
+  {
+    id: "local",
+    label: "Local Library",
     icon: <HardDrive size={16} />,
     color: "text-purple-600",
-    bgColor: "bg-purple-50 dark:bg-purple-900/20"
+    bgColor: "bg-purple-50 dark:bg-purple-900/20",
   },
-  { 
-    id: "predefined", 
-    label: "Standard Library", 
+  {
+    id: "predefined",
+    label: "Standard Library",
     icon: <Book size={16} />,
     color: "text-green-600",
-    bgColor: "bg-green-50 dark:bg-green-900/20"
-  }
+    bgColor: "bg-green-50 dark:bg-green-900/20",
+  },
 ];
 
 interface UnifiedLibraryProps<T extends LibraryItem> {
@@ -75,7 +75,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
   onSaveItem,
   showCloseButton = false,
   onClose,
-  initialSource = "api"
+  initialSource = "api",
 }: UnifiedLibraryProps<T>) {
   // State for UI
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,17 +84,23 @@ export default function UnifiedLibrary<T extends LibraryItem>({
   const [filters, setFilters] = useState<LibraryFilter>({});
 
   // Get library data from the hook
-  const { items, isLoading, error, activeSource, setActiveSource, refreshLibrary, sourceStats } = useUnifiedLibrary<T>(
-    entityType,
-    initialSource
-  );
+  const {
+    items,
+    isLoading,
+    error,
+    activeSource,
+    setActiveSource,
+    refreshLibrary,
+    sourceStats,
+  } = useUnifiedLibrary<T>(entityType, initialSource);
 
   // Apply search filter
   const filteredItems = searchQuery
     ? items.filter(
-        item =>
+        (item) =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (item.name && item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+          (item.name &&
+            item.name.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : items;
 
@@ -118,9 +124,11 @@ export default function UnifiedLibrary<T extends LibraryItem>({
   };
 
   // Handle filter change
-  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleFilterChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   // Get icon for item based on entity type
@@ -129,9 +137,12 @@ export default function UnifiedLibrary<T extends LibraryItem>({
       const component = item as unknown as ComponentLibraryItem;
       const itemType = component.type || "";
 
-      if (itemType === "mechanical") return <Tool size={20} className="text-blue-500" />;
-      if (itemType === "electronic") return <Zap size={20} className="text-yellow-500" />;
-      if (itemType === "fixture") return <Grid size={20} className="text-purple-500" />;
+      if (itemType === "mechanical")
+        return <Tool size={20} className="text-blue-500" />;
+      if (itemType === "electronic")
+        return <Zap size={20} className="text-yellow-500" />;
+      if (itemType === "fixture")
+        return <Grid size={20} className="text-purple-500" />;
 
       return <Package size={20} className="text-gray-500" />;
     }
@@ -151,9 +162,12 @@ export default function UnifiedLibrary<T extends LibraryItem>({
       const tool = item as unknown as ToolLibraryItem;
       const toolType = tool.type || "";
 
-      if (toolType === "endmill") return <Tool size={20} className="text-blue-500" />;
-      if (toolType === "drillbit") return <Tool size={20} className="text-green-500" />;
-      if (toolType === "facemill") return <Tool size={20} className="text-orange-500" />;
+      if (toolType === "endmill")
+        return <Tool size={20} className="text-blue-500" />;
+      if (toolType === "drillbit")
+        return <Tool size={20} className="text-green-500" />;
+      if (toolType === "facemill")
+        return <Tool size={20} className="text-orange-500" />;
 
       return <Tool size={20} className="text-gray-500" />;
     }
@@ -167,9 +181,9 @@ export default function UnifiedLibrary<T extends LibraryItem>({
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
-      }
-    }
+        staggerChildren: 0.1,
+      },
+    },
   };
 
   const itemVariants = {
@@ -178,14 +192,14 @@ export default function UnifiedLibrary<T extends LibraryItem>({
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.3
-      }
-    }
+        duration: 0.3,
+      },
+    },
   };
 
   // Render library header
   const renderHeader = () => (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -193,24 +207,24 @@ export default function UnifiedLibrary<T extends LibraryItem>({
     >
       {/* Background decoration */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-purple-50/50 to-pink-50/50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20" />
-      
+
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <motion.div
-              animate={{ 
+              animate={{
                 rotate: [0, 360],
-                scale: [1, 1.1, 1]
+                scale: [1, 1.1, 1],
               }}
-              transition={{ 
+              transition={{
                 duration: 3,
                 repeat: Infinity,
-                repeatType: "reverse"
+                repeatType: "reverse",
               }}
-                             className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg"
-             >
-               <Star size={20} className="text-white" />
-             </motion.div>
+              className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg"
+            >
+              <Star size={20} className="text-white" />
+            </motion.div>
             <div>
               <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                 {entityType === "components"
@@ -238,8 +252,18 @@ export default function UnifiedLibrary<T extends LibraryItem>({
               onClick={onClose}
               className="p-3 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </motion.button>
           )}
@@ -247,7 +271,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
 
         <div className="flex flex-col space-y-4">
           {/* Search bar */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
@@ -272,15 +296,25 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                 onClick={() => setSearchQuery("")}
                 className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </motion.button>
             )}
           </motion.div>
 
           {/* Library source tabs */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -307,11 +341,11 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                
+
                 <div className="relative z-10 flex items-center space-x-2">
                   {source.icon}
                   <span>{source.label}</span>
-                  <motion.span 
+                  <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     className="text-xs bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm px-2 py-1 rounded-full font-medium shadow-sm"
@@ -324,7 +358,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
           </motion.div>
 
           {/* View controls and actions */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -336,8 +370,8 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={`p-3 transition-all duration-200 ${
-                    viewMode === "grid" 
-                      ? "bg-blue-500 text-white shadow-lg" 
+                    viewMode === "grid"
+                      ? "bg-blue-500 text-white shadow-lg"
                       : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}
                   onClick={() => setViewMode("grid")}
@@ -349,8 +383,8 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={`p-3 transition-all duration-200 ${
-                    viewMode === "list" 
-                      ? "bg-blue-500 text-white shadow-lg" 
+                    viewMode === "list"
+                      ? "bg-blue-500 text-white shadow-lg"
                       : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}
                   onClick={() => setViewMode("list")}
@@ -368,7 +402,10 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                 className="p-3 text-gray-500 hover:text-blue-500 dark:text-gray-400 dark:hover:text-blue-400 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80"
                 title="Refresh Library"
               >
-                <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
+                <RefreshCw
+                  size={18}
+                  className={isLoading ? "animate-spin" : ""}
+                />
               </motion.button>
             </div>
 
@@ -397,25 +434,25 @@ export default function UnifiedLibrary<T extends LibraryItem>({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center py-16 space-y-4"
         >
           <motion.div
-            animate={{ 
+            animate={{
               rotate: 360,
-              scale: [1, 1.2, 1]
+              scale: [1, 1.2, 1],
             }}
-            transition={{ 
+            transition={{
               duration: 2,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
             }}
-                         className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center"
-           >
-             <Star size={24} className="text-white" />
-           </motion.div>
+            className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center"
+          >
+            <Star size={24} className="text-white" />
+          </motion.div>
           <p className="text-gray-500 dark:text-gray-400 text-lg font-medium">
             Loading {entityType}...
           </p>
@@ -423,14 +460,14 @@ export default function UnifiedLibrary<T extends LibraryItem>({
             {[0, 1, 2].map((i) => (
               <motion.div
                 key={i}
-                animate={{ 
+                animate={{
                   scale: [1, 1.2, 1],
-                  opacity: [0.3, 1, 0.3]
+                  opacity: [0.3, 1, 0.3],
                 }}
-                transition={{ 
+                transition={{
                   duration: 1,
                   repeat: Infinity,
-                  delay: i * 0.2
+                  delay: i * 0.2,
                 }}
                 className="w-2 h-2 bg-blue-500 rounded-full"
               />
@@ -442,18 +479,30 @@ export default function UnifiedLibrary<T extends LibraryItem>({
 
     if (error) {
       return (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center justify-center py-16 space-y-4"
         >
           <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-8 h-8 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <div className="text-center">
-            <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Error loading {entityType}</h3>
+            <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
+              Error loading {entityType}
+            </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -470,20 +519,20 @@ export default function UnifiedLibrary<T extends LibraryItem>({
 
     if (filteredItems.length === 0) {
       return (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center justify-center py-16 space-y-6"
         >
           <motion.div
-            animate={{ 
+            animate={{
               y: [0, -10, 0],
-              rotate: [0, 5, -5, 0]
+              rotate: [0, 5, -5, 0],
             }}
-            transition={{ 
+            transition={{
               duration: 3,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
             }}
             className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center"
           >
@@ -494,8 +543,8 @@ export default function UnifiedLibrary<T extends LibraryItem>({
               No {entityType} found
             </h3>
             <p className="text-gray-500 dark:text-gray-500">
-              {searchQuery 
-                ? `No ${entityType} match your search "${searchQuery}"` 
+              {searchQuery
+                ? `No ${entityType} match your search "${searchQuery}"`
                 : `No ${entityType} available in this library`}
             </p>
           </div>
@@ -532,10 +581,10 @@ export default function UnifiedLibrary<T extends LibraryItem>({
         <motion.div
           key={`${item.id}-${index}`}
           variants={itemVariants}
-          whileHover={{ 
+          whileHover={{
             y: -8,
             scale: 1.02,
-            transition: { duration: 0.2 }
+            transition: { duration: 0.2 },
           }}
           className="group relative"
         >
@@ -560,7 +609,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                 <h3 className="font-semibold text-gray-900 dark:text-white text-lg truncate">
                   {item.name}
                 </h3>
-                
+
                 {item.description && (
                   <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                     {item.description}
@@ -568,7 +617,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                 )}
 
                 {/* Tags */}
-                {item.tags && item.tags.length > 0 && (
+                {Array.isArray(item.tags) && item.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {item.tags.slice(0, 3).map((tag, tagIndex) => (
                       <span
@@ -597,7 +646,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                 >
                   Select
                 </motion.button>
-                
+
                 {activeSource !== "local" && onSaveItem && (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -628,10 +677,8 @@ export default function UnifiedLibrary<T extends LibraryItem>({
           className="relative overflow-hidden rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-white/20 dark:border-gray-700/30 shadow-sm hover:shadow-md transition-all duration-200"
         >
           <div className="flex items-center p-4">
-            <div className="flex-shrink-0 mr-4">
-              {getItemIcon(item)}
-            </div>
-            
+            <div className="flex-shrink-0 mr-4">{getItemIcon(item)}</div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <div>
@@ -644,7 +691,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -654,7 +701,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                   >
                     Select
                   </motion.button>
-                  
+
                   {activeSource !== "local" && onSaveItem && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -681,8 +728,14 @@ export default function UnifiedLibrary<T extends LibraryItem>({
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-white/50 to-purple-50/30 dark:from-gray-900/50 dark:via-gray-800/50 dark:to-blue-900/30">
         {/* Animated background elements */}
         <div className="absolute top-20 left-20 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-80 h-80 bg-purple-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-        <div className="absolute top-1/2 left-1/3 w-48 h-48 bg-pink-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+        <div
+          className="absolute bottom-20 right-20 w-80 h-80 bg-purple-400/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        />
+        <div
+          className="absolute top-1/2 left-1/3 w-48 h-48 bg-pink-400/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "2s" }}
+        />
       </div>
 
       {/* Header */}
@@ -701,7 +754,9 @@ export default function UnifiedLibrary<T extends LibraryItem>({
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Category
+                  </label>
                   <select
                     name="category"
                     value={filters.category || ""}
@@ -714,9 +769,11 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                     <option value="fixture">Fixture</option>
                   </select>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Material</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Material
+                  </label>
                   <select
                     name="material"
                     value={filters.material || ""}
@@ -729,9 +786,11 @@ export default function UnifiedLibrary<T extends LibraryItem>({
                     <option value="plastic">Plastic</option>
                   </select>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Tags
+                  </label>
                   <input
                     type="text"
                     name="tags"
@@ -749,9 +808,7 @@ export default function UnifiedLibrary<T extends LibraryItem>({
 
       {/* Content */}
       <div className="flex-1 overflow-hidden relative z-10">
-        <div className="h-full overflow-y-auto">
-          {renderContent()}
-        </div>
+        <div className="h-full overflow-y-auto">{renderContent()}</div>
       </div>
     </div>
   );

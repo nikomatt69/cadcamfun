@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
 // Define supported languages
 export const SUPPORTED_LANGUAGES = {
@@ -17,6 +17,7 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const translationsCache = new Map<LanguageCode, Record<string, any>>();
 
 interface LanguageProviderProps {
   children: ReactNode;
@@ -24,17 +25,35 @@ interface LanguageProviderProps {
 }
 
 export function LanguageProvider({ children, defaultLanguage = "en" }: LanguageProviderProps) {
-  const [language, setLanguage] = useState<LanguageCode>(defaultLanguage);
+  const [language, setLanguage] = useState<LanguageCode>(() => {
+    if (typeof window === "undefined") return defaultLanguage;
+
+    const storedLanguage = window.localStorage.getItem("preferredLanguage") as LanguageCode | null;
+    return storedLanguage && storedLanguage in SUPPORTED_LANGUAGES ? storedLanguage : defaultLanguage;
+  });
   const [translations, setTranslations] = useState<Record<string, any>>({});
 
   useEffect(() => {
+    const cachedTranslations = translationsCache.get(language);
+    if (cachedTranslations) {
+      setTranslations(cachedTranslations);
+      return;
+    }
+
+    const controller = new AbortController();
+
     // Load translations for the current language
     const loadTranslations = async () => {
       try {
-        const response = await fetch(`/locales/${language}/common.json`);
+        const response = await fetch(`/locales/${language}/common.json`, {
+          signal: controller.signal
+        });
         const data = await response.json();
+        translationsCache.set(language, data);
         setTranslations(data);
       } catch (error) {
+        if (controller.signal.aborted) return;
+
         console.error(`Failed to load translations for ${language}:`, error);
         // Fallback to English if translation loading fails
         if (language !== "en") {
@@ -44,22 +63,31 @@ export function LanguageProvider({ children, defaultLanguage = "en" }: LanguageP
     };
 
     loadTranslations();
+
+    return () => {
+      controller.abort();
+    };
   }, [language]);
 
-  const handleSetLanguage = (newLanguage: LanguageCode) => {
+  const handleSetLanguage = useCallback((newLanguage: LanguageCode) => {
     setLanguage(newLanguage);
     // Store language preference in localStorage
-    localStorage.setItem("preferredLanguage", newLanguage);
-  };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("preferredLanguage", newLanguage);
+    }
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      language,
+      setLanguage: handleSetLanguage,
+      translations
+    }),
+    [handleSetLanguage, language, translations]
+  );
 
   return (
-    <LanguageContext.Provider
-      value={{
-        language,
-        setLanguage: handleSetLanguage,
-        translations
-      }}
-    >
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

@@ -4,7 +4,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 // Assuming UserMetricDataPoint can represent all possible chart data points now
 // We might need to adjust this interface if some metrics have different value types (e.g., usage vs count)
 import { UserMetricDataPoint } from "@/src/components/analytics/UserMetricsChart";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { ActivityItemType, ActivityAction } from "@/src/lib/activityTracking"; // Import activity types
 
 // Create a singleton instance of PrismaClient

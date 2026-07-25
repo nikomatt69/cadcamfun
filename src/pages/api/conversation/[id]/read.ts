@@ -1,6 +1,7 @@
 // src/pages/api/conversation/[id]/read.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
+
 import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

@@ -5,7 +5,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
 import { mcpClientManager } from "@/src/lib/mcp/client";
 import { getMCPClient } from "../../../lib/ai/mcp/mcpOfficialClient";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { stdioProcessManager } from "@/src/server/mcp/StdioProcessManager";
 import { filesystemServerManager } from "@/src/server/mcp/FilesystemServerAdapter";
 
@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Legacy path: require authentication and use database lookup
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     if (!serverId) {

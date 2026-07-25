@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Star,
   Download,
@@ -12,14 +12,14 @@ import {
   Zap,
   User,
   Calendar,
-  Tag
-} from 'react-feather';
-import { cn } from '@/src/lib/utils';
-import { MarketplaceItemWithSeller } from '@/src/types/marketplace';
-import { useMarketplaceStore } from '@/src/store/marketplaceStore';
-import toast from 'react-hot-toast';
-import { useRouter } from 'next/router';
-import { useSession } from '@/src/lib/auth-client';
+  Tag,
+} from "react-feather";
+import { cn } from "@/src/lib/utils";
+import { MarketplaceItemWithSeller } from "@/src/types/marketplace";
+import { useMarketplaceStore } from "@/src/store/marketplaceStore";
+import toast from "react-hot-toast";
+import { useRouter } from "next/router";
+import { useSession } from "@/src/lib/auth-client";
 
 interface ItemCardProps {
   item: MarketplaceItemWithSeller;
@@ -35,9 +35,13 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const averageRating = item.reviews && item.reviews.length > 0
-    ? item.reviews.reduce((sum: number, review: any) => sum + Number(review.rating), 0) / item.reviews.length
-    : 0;
+  const averageRating =
+    item.reviews && item.reviews.length > 0
+      ? item.reviews.reduce(
+          (sum: number, review: any) => sum + Number(review.rating),
+          0,
+        ) / item.reviews.length
+      : 0;
 
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -47,35 +51,38 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
       if (isInWishlist) {
         await removeFromWishlist(item.id);
         setIsInWishlist(false);
-        toast.success('Removed from wishlist');
+        toast.success("Removed from wishlist");
       } else {
         await addToWishlist(item.id);
         setIsInWishlist(true);
-        toast.success('Added to wishlist');
+        toast.success("Added to wishlist");
       }
     } catch (error) {
-      toast.error('Failed to update wishlist');
+      toast.error("Failed to update wishlist");
     }
   };
 
   const handlePurchase = async () => {
     if (!session) {
-      router.push('/auth/signin');
+      router.push("/auth/signin");
       return;
     }
 
-    if (item.price.toNumber() === 0) {
+    if (item.price === 0) {
       // Free item - handle direct download
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/marketplace/items/${item.id}/download`, {
-          method: 'POST',
-        });
+        const response = await fetch(
+          `/api/marketplace/items/${item.id}/download`,
+          {
+            method: "POST",
+          },
+        );
 
         if (response.ok) {
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
+          const a = document.createElement("a");
           a.href = url;
           a.download = item.title;
           document.body.appendChild(a);
@@ -84,11 +91,11 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
           document.body.removeChild(a);
         } else {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Download failed');
+          throw new Error(errorData.message || "Download failed");
         }
       } catch (error) {
-        console.error('Download error:', error);
-        setError(error instanceof Error ? error.message : 'Download failed');
+        console.error("Download error:", error);
+        setError(error instanceof Error ? error.message : "Download failed");
       } finally {
         setIsLoading(false);
       }
@@ -98,10 +105,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('/api/marketplace/checkout', {
-          method: 'POST',
+        const response = await fetch("/api/marketplace/checkout", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             itemId: item.id,
@@ -112,17 +119,20 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create checkout session');
+          throw new Error(
+            errorData.message || "Failed to create checkout session",
+          );
         }
 
         const { checkoutUrl } = await response.json();
 
         // Redirect to Polar checkout
         window.location.href = checkoutUrl;
-
       } catch (error) {
-        console.error('Checkout error:', error);
-        setError(error instanceof Error ? error.message : 'Failed to start checkout');
+        console.error("Checkout error:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to start checkout",
+        );
         setIsLoading(false);
       }
     }
@@ -142,11 +152,13 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
     >
       <Link href={`/marketplace/items/${item.id}`}>
         <div className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer border border-gray-200 dark:border-gray-700">
-
           {/* Holographic background effect */}
           <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 animate-pulse" />
-            <div className="absolute inset-0 bg-gradient-to-tl from-cyan-400 via-green-400 to-yellow-400 mix-blend-overlay animate-pulse" style={{ animationDelay: '0.5s' }} />
+            <div
+              className="absolute inset-0 bg-gradient-to-tl from-cyan-400 via-green-400 to-yellow-400 mix-blend-overlay animate-pulse"
+              style={{ animationDelay: "0.5s" }}
+            />
           </div>
 
           {/* Featured badge */}
@@ -176,16 +188,17 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
                 "transition-colors",
                 isInWishlist
                   ? "fill-red-500 text-red-500"
-                  : "text-gray-600 dark:text-gray-300 group-hover:text-red-500"
+                  : "text-gray-600 dark:text-gray-300 group-hover:text-red-500",
               )}
             />
           </motion.button>
 
           {/* Image */}
           <div className="relative h-48 overflow-hidden">
-            {item.previewImages && item.previewImages.length > 0 ? (
+            {Array.isArray(item.previewImages) &&
+            item.previewImages.length > 0 ? (
               <Image
-                src={item.previewImages[0]}
+                src={item.previewImages[0] as string}
                 alt={item.title}
                 fill
                 className="object-cover group-hover:scale-110 transition-transform duration-500"
@@ -211,7 +224,10 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
                     exit={{ scale: 0 }}
                     className="bg-white/90 dark:bg-gray-800/90 rounded-full p-3"
                   >
-                    <Eye size={20} className="text-gray-800 dark:text-gray-200" />
+                    <Eye
+                      size={20}
+                      className="text-gray-800 dark:text-gray-200"
+                    />
                   </motion.div>
                 </motion.div>
               )}
@@ -223,7 +239,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
             {/* Type badge */}
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                {item.type.replace('_', ' ')}
+                {item.type.replace("_", " ")}
               </span>
               {averageRating > 0 && (
                 <div className="flex items-center gap-1">
@@ -249,7 +265,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
             <div className="flex items-center gap-2">
               <User size={14} className="text-gray-400" />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {item.seller?.user?.name || 'Unknown Seller'}
+                {item.seller?.user?.name || "Unknown Seller"}
               </span>
             </div>
 
@@ -274,9 +290,14 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
             {/* Price and actions */}
             <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
               <div className="flex items-center gap-1">
-                <DollarSign size={16} className="text-green-600 dark:text-green-400" />
+                <DollarSign
+                  size={16}
+                  className="text-green-600 dark:text-green-400"
+                />
                 <span className="font-bold text-lg text-gray-900 dark:text-white">
-                  {Number(item.price) === 0 ? 'Free' : `$${Number(item.price).toFixed(2)}`}
+                  {Number(item.price) === 0
+                    ? "Free"
+                    : `$${Number(item.price).toFixed(2)}`}
                 </span>
               </div>
 
@@ -287,7 +308,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors"
               >
                 <ShoppingCart size={14} />
-                {isLoading ? 'Processing...' : 'Buy Now'}
+                {isLoading ? "Processing..." : "Buy Now"}
               </motion.button>
             </div>
           </div>
@@ -304,4 +325,4 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, className }) => {
       </Link>
     </motion.div>
   );
-}; 
+};

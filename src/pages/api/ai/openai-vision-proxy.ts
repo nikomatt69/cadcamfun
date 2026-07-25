@@ -1,11 +1,6 @@
 // src/pages/api/ai/openai-vision-proxy.ts - Endpoint API per Vision
 import type { NextApiRequest, NextApiResponse } from "next";
-import OpenAI from "openai";
-
-// Inizializza OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { LLMClient } from "@/src/lib/ai/provider";
 
 interface VisionProxyRequest {
   prompt: string;
@@ -90,21 +85,19 @@ export default async function handler(
       enhancedPrompt += `\nProvide specific insights for CAD modeling, manufacturing, and design optimization.`;
     }
 
-    // Chiamata all'API OpenAI Responses usando l'esempio esatto fornito
-    console.log(`🤖 [Vision Proxy] Calling OpenAI Responses API...`);
+    // Chiamata al provider unificato (Vercel AI SDK) con input multimodale
+    console.log(`🤖 [Vision Proxy] Calling unified provider (vision)...`);
 
-    const response = await openai.responses.create({
-      model: model,
-      input: [
+    const response = await LLMClient.generate({
+      model,
+      maxTokens,
+      temperature,
+      messages: [
         {
           role: "user",
           content: [
-            { type: "input_text", text: enhancedPrompt },
-            {
-              type: "input_image",
-              image_url: imageUrl,
-              detail: "high",
-            },
+            { type: "text", text: enhancedPrompt },
+            { type: "image", image: imageUrl },
           ],
         },
       ],
@@ -112,11 +105,11 @@ export default async function handler(
 
     const processingTime = Date.now() - startTime;
     console.log(
-      `✅ [Vision Proxy] OpenAI Responses API successful (${processingTime}ms)`
+      `✅ [Vision Proxy] Vision request successful (${processingTime}ms)`
     );
 
     // Estrai il risultato dalla risposta
-    const result = response.output_text;
+    const result = response.text;
 
     if (!result) {
       console.warn("⚠️ [Vision Proxy] Empty response from OpenAI");
@@ -148,34 +141,21 @@ export default async function handler(
       error
     );
 
-    // Gestisci errori specifici di OpenAI
-    if (error instanceof OpenAI.APIError) {
-      console.error(
-        `🚨 [Vision Proxy] OpenAI API Error: ${error.status} - ${error.message}`
-      );
-
-      if (error.status === 400) {
-        return res.status(400).json({
-          error:
-            "Invalid request to Vision API. Check image format and prompt.",
-          metadata: {
-            model: req.body.model || "gpt-4.1-mini",
-            processingTime,
-          },
-        });
-      }
-
-      if (error.status === 401) {
-        return res.status(500).json({
-          error: "Invalid API key configuration",
-        });
-      }
-
-      if (error.status === 429) {
-        return res.status(429).json({
-          error: "Rate limit exceeded. Please try again later.",
-        });
-      }
+    // Gestisci errori specifici del provider (status code propagato dall'AI SDK)
+    const status = (error as any)?.statusCode ?? (error as any)?.status;
+    if (status === 400) {
+      return res.status(400).json({
+        error: "Invalid request to Vision API. Check image format and prompt.",
+        metadata: { model: req.body.model || "gpt-4.1-mini", processingTime },
+      });
+    }
+    if (status === 401) {
+      return res.status(500).json({ error: "Invalid API key configuration" });
+    }
+    if (status === 429) {
+      return res.status(429).json({
+        error: "Rate limit exceeded. Please try again later.",
+      });
     }
 
     // Errore generico

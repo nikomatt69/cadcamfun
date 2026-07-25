@@ -4,7 +4,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
 import { mcpClientManager } from "@/src/lib/mcp/client";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { stdioProcessManager } from "@/src/server/mcp/StdioProcessManager";
 import { filesystemServerManager } from "@/src/server/mcp/FilesystemServerAdapter";
 

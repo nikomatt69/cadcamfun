@@ -72,10 +72,7 @@ export default function MCPResourceBrowser() {
     const client = mcpClientManager.getServer(selectedServerId);
     if (!client) return;
 
-    const response = await client.readResource({
-      uri,
-      accept: "application/json"
-    });
+    const response = await client.readResource({ uri });
 
     setResourceData(response.content);
   };

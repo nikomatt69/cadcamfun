@@ -15,7 +15,7 @@ export async function updateExpiredTrials() {
         },
       },
       select: {
-        userId: true, // Select only userId to update
+        id: true, // Select only userId to update
       },
     });
 
@@ -24,7 +24,7 @@ export async function updateExpiredTrials() {
       return { success: true, updatedCount: 0 };
     }
 
-    const userIdsToExpire = expiredTrials.map((sub) => sub.userId);
+    const userIdsToExpire = expiredTrials.map((sub) => sub.id);
     console.log(
       `Found ${expiredTrials.length} expired trials for users:`,
       userIdsToExpire
@@ -33,7 +33,7 @@ export async function updateExpiredTrials() {
     // Update the found subscriptions
     const updateResult = await prisma.subscription.updateMany({
       where: {
-        userId: {
+        id: {
           in: userIdsToExpire,
         },
         // Add extra condition to be safe

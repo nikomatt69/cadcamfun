@@ -91,7 +91,7 @@ for %%t in (%TARGETS%) do (
 
 REM Install Node.js dependencies
 echo %INFO% Installing Node.js dependencies...
-yarn install
+bun install
 if %errorlevel% neq 0 (
     echo %ERROR% Failed to install Node.js dependencies
     pause
@@ -100,7 +100,7 @@ if %errorlevel% neq 0 (
 
 REM Build frontend
 echo %INFO% Building frontend...
-yarn build:export
+bun run build:export
 if %errorlevel% neq 0 (
     echo %ERROR% Failed to build frontend
     pause

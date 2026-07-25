@@ -184,7 +184,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ onSidebarToggle }) => {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, handleSignOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { profileImage } = useUserProfileStore(); // Get image from global store
@@ -511,7 +511,7 @@ const Navbar: React.FC<NavbarProps> = ({ onSidebarToggle }) => {
                       variants={dropdownItemVariants}
                     >
                       <motion.button
-                        onClick={signOut}
+                        onClick={handleSignOut}
                         className="w-full text-left block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/20 flex items-center rounded-lg mx-2 transition-all duration-200"
                         role="menuitem"
                         whileHover={{ x: 4 }}

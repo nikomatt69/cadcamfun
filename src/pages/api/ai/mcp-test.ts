@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { getMCPClient } from "@/src/lib/ai/mcp/mcpOfficialClient";
 import { getMCPIntegratedService } from "@/src/lib/ai/mcp/mcpIntegratedService";
 

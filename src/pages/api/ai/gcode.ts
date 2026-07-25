@@ -2,7 +2,7 @@
 // Consolidates: analyze-gcode.ts + gcode-completion.ts + gcode-*.ts
 // Actions: analyze, optimize, complete, validate, generate
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { unifiedAIService } from "@/src/lib/ai/unifiedAIService";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

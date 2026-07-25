@@ -31,7 +31,7 @@ const wsLink =
     : null;
 
 // Auth link to add authorization headers
-const authLink = setContext(async (_, { headers }) => {
+const authLink = setContext(async (_: unknown, { headers }: { headers?: Record<string, string> }) => {
   // TODO: Implement Better Auth session retrieval for Apollo client
   // For now, we'll handle auth at the API level
   return {
@@ -46,7 +46,7 @@ const authLink = setContext(async (_, { headers }) => {
 const splitLink =
   typeof window !== "undefined" && wsLink
     ? split(
-        ({ query }) => {
+        ({ query }: { query: unknown }) => {
           const definition = getMainDefinition(query);
           return definition.kind === "OperationDefinition" && definition.operation === "subscription";
         },

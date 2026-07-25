@@ -7,17 +7,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { prisma } from "@/src/lib/prisma";
 
-// Import your AI provider integration
-import { OpenAI } from "openai";
+// AI provider integration — single unified provider (Vercel AI SDK)
 import { config as loadEnv } from "dotenv";
-import type { ChatCompletionMessageParam } from "openai/resources/chat";
-import { requireAuth } from "@/src/lib/api/auth";
+import { LLMClient } from "@/src/lib/ai/provider";
+import type { CoreMessage } from "ai";
+import { requireAuth } from "src/lib/api/auth";
 
 loadEnv();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
@@ -55,13 +51,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => mcpServerId
       });
-      // Instantiate the Client with the required name, version, and transport settings
+      // Instantiate the Client with the required name and version.
       const client = new Client({
         name: "MCP Client",
-        version: "1.0.0",
-        transport
+        version: "1.0.0"
       });
-      // Connect to the MCP server (providing an empty options object to match the expected signature)
+      // Connect to the MCP server using the configured transport.
       await client.connect(transport);
 
       try {
@@ -84,26 +79,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Prepare messages for the AI
-    const aiMessages: ChatCompletionMessageParam[] = [...messages];
+    const aiMessages: CoreMessage[] = [...messages];
 
     // Add MCP data to context if available
     if (mcpData) {
       aiMessages.push({
         role: "system",
-        content: `The following data was retrieved from an MCP server: ${
-          typeof mcpData === "object" ? JSON.stringify(mcpData) : mcpData
-        }`
+        content: `The following data was retrieved from an MCP server: ${typeof mcpData === "object" ? JSON.stringify(mcpData) : mcpData
+          }`
       });
     }
 
-    // Call AI provider
-    const completion = await openai.chat.completions.create({
+    // Call AI provider through the unified provider
+    const completion = await LLMClient.generate({
       model: "gpt-4.1",
       messages: aiMessages,
-      max_tokens: 1000
+      maxTokens: 1000
     });
 
-    const reply = completion.choices[0]?.message?.content || "No response generated";
+    const reply = completion.text || "No response generated";
 
     // Return the AI response
     return res.status(200).json({

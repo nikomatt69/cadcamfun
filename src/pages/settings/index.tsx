@@ -12,9 +12,6 @@ import { useLanguage, SUPPORTED_LANGUAGES } from "../../contexts/LanguageContext
 import { LanguageSelector } from "../../components/LanguageSelector";
 import { AISettingsPanel } from "@/src/components/ai/ai-new";
 import SubscriptionSettings from "@/src/components/subscription/SubscriptionSettings";
-import SubscriptionSettingsPage from "./subscription";
-import ProfileSettingsPage from "../profile/settings";
-import { SubscriptionProvider } from "@/src/contexts/SubscriptionContext";
 import PasskeySettings from "@/src/components/settings/PasskeySettings";
 import ProfileSettings from "@/src/components/settings/ProfileSettings";
 import SessionManagement from "@/src/components/settings/SessionManagement";
@@ -39,8 +36,8 @@ const buttonVariants: Variants = {
 };
 
 export default function Settings() {
-
   const router = useRouter();
+  const { data: session, isPending } = useSession();
   const [activeTab, setActiveTab] = useState("profile");
 
   // Deletion State
@@ -93,8 +90,8 @@ export default function Settings() {
     }
   };
 
-  // Se l'utente non è autenticato, viene reindirizzato alla pagina di login
-  if (status === "loading") {
+  // Show loading while checking auth status
+  if (isPending) {
     return (
       <DynamicLayout>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -106,8 +103,9 @@ export default function Settings() {
     );
   }
 
-  if (status === "unauthenticated") {
-    router.push("/auth/signup");
+  // Redirect if not authenticated
+  if (!session) {
+    router.push("/auth/signin?callbackUrl=/settings");
     return null;
   }
 
@@ -471,9 +469,7 @@ export default function Settings() {
                     <fieldset>
                       <legend className="text-base font-medium text-gray-900 dark:text-white">Billing</legend>
                       <div className="mt-4 space-y-4">
-                        <SubscriptionProvider>
-                          <SubscriptionSettings />
-                        </SubscriptionProvider>
+                        <SubscriptionSettings />
                       </div>
                     </fieldset>
                   </div>

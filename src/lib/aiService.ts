@@ -1,35 +1,36 @@
-import Anthropic from "@anthropic-ai/sdk";
-import dotenv from "dotenv";
+/**
+ * Thin AI helper that routes through the single unified provider.
+ *
+ * Previously this instantiated `@anthropic-ai/sdk` directly in the browser
+ * (`dangerouslyAllowBrowser`). It now POSTs to the unified `/api/ai/proxy`
+ * endpoint, which runs the request through `LLMClient` (Vercel AI SDK) on the
+ * server. No provider SDK is bundled or keyed on the client anymore.
+ */
 
-dotenv.config();
+const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
 class AIService {
-  private client: Anthropic;
-
-  constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-      dangerouslyAllowBrowser: true
-    });
-  }
-
   async generateResponse(prompt: string): Promise<string> {
     try {
-      const response = await this.client.beta.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 6000,
-        thinking: { type: "enabled", budget_tokens: Math.min(1600, 6000 / 2) },
-        messages: [{ role: "user", content: prompt }]
+      const response = await fetch("/api/ai/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          max_tokens: 6000,
+          reasoning: true,
+          messages: [{ role: "user", content: prompt }]
+        })
       });
-      for (const block of response.content) {
-        if (block.type === "thinking") {
-          console.log(`\nThinking summary: ${block.thinking}`);
-        } else if (block.type === "text") {
-          console.log(`\nResponse: ${block.text}`);
-        }
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || `AI proxy request failed (${response.status})`);
       }
 
-      return response.content[0]?.type?.toString();
+      // Anthropic-shaped response from the proxy: { content: [{ type, text }] }
+      const data = await response.json();
+      return data?.content?.[0]?.text ?? "";
     } catch (error) {
       console.error("AI Service Error:", error);
       throw error;

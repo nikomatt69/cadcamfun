@@ -97,11 +97,11 @@ done
 
 # Install dependencies
 print_status "Installing Node.js dependencies..."
-yarn install
+bun install
 
 # Build frontend
 print_status "Building frontend..."
-yarn build:export
+bun run build:export
 
 # Build for each target
 for target in "${TARGETS[@]}"; do

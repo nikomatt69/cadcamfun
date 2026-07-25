@@ -1,11 +1,12 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { userAnalyticsService } from "@/src/lib/ai/ai-new/userAnalytics";
 import { prisma } from "@/src/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const userId = await requireAuth(req, res);
+
     if (!userId) {
       return; // requireAuth already sent the response
     }
@@ -65,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             select: { email: true }
           });
           const isAdmin = user?.email === process.env.ADMIN_EMAIL;
-          
+
           if (!isAdmin) {
             return res.status(403).json({ error: "Admin access required" });
           }
@@ -96,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } catch (error) {
     console.error("Error in user-usage API:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error"
     });

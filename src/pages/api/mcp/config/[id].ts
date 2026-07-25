@@ -3,7 +3,7 @@
 // src/pages/api/mcp/config/[id].ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/src/lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { mcpClientManager } from "@/src/lib/mcp/client";
 import { MCPServerConfig, MCPSseConfig, MCPStdioServerConfig } from "@/src/lib/mcp/client";
 
@@ -117,29 +117,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (existingConfig.type === "stdio" &&
             ((existingConfig as MCPStdioServerConfig).command !== (updatedConfig as MCPStdioServerConfig).command ||
               JSON.stringify((existingConfig as MCPStdioServerConfig).args) !==
-                JSON.stringify((updatedConfig as MCPStdioServerConfig).args) ||
+              JSON.stringify((updatedConfig as MCPStdioServerConfig).args) ||
               (existingConfig as MCPStdioServerConfig).workingDirectory !==
-                (updatedConfig as MCPStdioServerConfig).workingDirectory))
+              (updatedConfig as MCPStdioServerConfig).workingDirectory))
         ) {
           // Convert DB model to MCPServerConfig
           const serverConfig: MCPServerConfig =
             updatedConfig.type === "sse"
               ? ({
-                  id: updatedConfig.id,
-                  name: updatedConfig.name,
-                  type: "sse",
-                  url: (updatedConfig as MCPSseConfig).url,
-                  enabled: updatedConfig.enabled
-                } as MCPSseConfig)
+                id: updatedConfig.id,
+                name: updatedConfig.name,
+                type: "sse",
+                url: (updatedConfig as MCPSseConfig).url,
+                enabled: updatedConfig.enabled
+              } as MCPSseConfig)
               : ({
-                  id: updatedConfig.id,
-                  name: updatedConfig.name,
-                  type: "stdio",
-                  command: (updatedConfig as MCPStdioServerConfig).command,
-                  args: ((updatedConfig as MCPStdioServerConfig).args as string[] | undefined) || [],
-                  workingDirectory: (updatedConfig as MCPStdioServerConfig).workingDirectory as string | undefined,
-                  enabled: updatedConfig.enabled
-                } as MCPStdioServerConfig);
+                id: updatedConfig.id,
+                name: updatedConfig.name,
+                type: "stdio",
+                command: (updatedConfig as MCPStdioServerConfig).command,
+                args: ((updatedConfig as MCPStdioServerConfig).args as string[] | undefined) || [],
+                workingDirectory: (updatedConfig as MCPStdioServerConfig).workingDirectory as string | undefined,
+                enabled: updatedConfig.enabled
+              } as MCPStdioServerConfig);
 
           // Disconnect existing server if connected
           if (mcpClientManager.getServer(id)) {

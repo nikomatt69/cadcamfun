@@ -1,21 +1,20 @@
 // src/pages/api/openai/completion.ts
 import { NextApiRequest, NextApiResponse } from "next";
-import axios from "axios";
+import { LLMClient } from "@/src/lib/ai/provider";
+import { toCoreMessages } from "@/src/lib/ai/provider/compat";
 
-// OpenAI API endpoint
-const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-
+/**
+ * OpenAI-compatible completion endpoint.
+ *
+ * Refactored onto the single unified provider (Vercel AI SDK) instead of a
+ * hand-rolled axios call to api.openai.com. Callers keep the same request shape
+ * ({ model, messages, temperature, max_tokens, response_format, isGcode }) and
+ * the same response contract ({ content }, { content, json }, or { gcode }).
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  // Get the API key from environment variable
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.error("OpenAI API key is missing");
-    return res.status(500).json({ error: "OpenAI API key is missing" });
   }
 
   try {
@@ -24,9 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       messages,
       temperature = 0.7,
       max_tokens = 1000,
-      presence_penalty = 0,
-      frequency_penalty = 0,
-      response_format
+      response_format,
     } = req.body;
 
     // Basic validation
@@ -34,31 +31,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Messages are required and must be an array" });
     }
 
-    // Make the request to OpenAI API
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model,
-        messages,
-        temperature,
-        max_tokens,
-        presence_penalty,
-        frequency_penalty,
-        ...(response_format && { response_format })
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        }
-      }
-    );
+    const wantsJson = response_format?.type === "json_object";
 
-    // Extract the completion text
-    const content = response.data.choices[0].message.content;
+    const result = await LLMClient.generate({
+      model,
+      messages: toCoreMessages(messages),
+      temperature,
+      maxTokens: max_tokens,
+    });
+
+    const content = result.text;
 
     // If response_format is json_object, parse the JSON
-    if (response_format?.type === "json_object") {
+    if (wantsJson) {
       try {
         const json = JSON.parse(content);
         return res.status(200).json({ content, json });
@@ -76,15 +61,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Return the completion
     return res.status(200).json({ content });
   } catch (error: any) {
-    console.error("Error communicating with OpenAI API:", error);
+    console.error("Error communicating with AI provider:", error);
 
-    // Handle OpenAI API errors
-    if (error.response) {
-      return res.status(error.response.status).json({
-        error: error.response.data.error?.message || "Error from OpenAI API"
-      });
-    }
-
-    return res.status(500).json({ error: "Failed to communicate with OpenAI API" });
+    // Propagate upstream status when the AI SDK surfaces one
+    const status = error?.statusCode ?? error?.status ?? 500;
+    return res.status(typeof status === "number" ? status : 500).json({
+      error: error instanceof Error ? error.message : "Failed to communicate with AI provider",
+    });
   }
 }

@@ -144,7 +144,7 @@ export const AIMessage: React.FC<AIMessageProps> = ({
   });
 
   const userInitial = session?.user?.name?.charAt(0) || "?";
-  const userImage = session?.user?.image;
+  const userImage = "https://ui-avatars.com/api/?name=" + userInitial;
 
   // Determine message bubble style based on role/error, default to assistant style for typing
   const messageBubbleClasses =

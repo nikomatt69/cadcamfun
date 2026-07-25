@@ -5,7 +5,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getMCPClient, MCPServerConfig } from "../../../lib/ai/mcp/mcpOfficialClient";
 import { prisma } from "@/src/lib/prisma";
 import { MCPSseConfig, MCPStdioServerConfig } from "@/src/lib/mcp/client";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 type ConfigFileFormat = {
   mcpServers: (MCPSseConfig | MCPStdioServerConfig)[];

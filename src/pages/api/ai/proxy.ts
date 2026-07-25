@@ -1,58 +1,42 @@
 // src/pages/api/ai/proxy.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireAuthFast } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
+import { LLMClient, DEFAULT_MODEL_ID } from "@/src/lib/ai/provider";
 
+/**
+ * Anthropic-compatible proxy used by UnifiedAIService.
+ *
+ * Refactored to route through the single unified provider (Vercel AI SDK)
+ * instead of hand-rolling a fetch to api.anthropic.com. The response is shaped
+ * like the Anthropic Messages API so the existing client parser keeps working.
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const userId = await requireAuthFast(req, res);
+  const userId = await requireAuth(req, res);
   if (!userId) return;
 
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
-  const secretKey = process.env.ANTHROPIC_API_KEY;
 
-  if (!secretKey) {
-    // Throw error only in development/build time, avoid crashing production server if env var is momentarily unavailable.
-    // Consider more robust error handling or logging here for production.
-    if (process.env.NODE_ENV !== "production") {
-      throw new Error("Anthropic API key is not defined. Please set ANTHROPIC_API_KEY in your environment variables.");
-    }
-    console.error("Anthropic API key is not defined.");
-  }
   try {
-    const { endpoint, model, messages, max_tokens, temperature, system } = req.body;
+    const { model, messages, max_tokens, temperature, system, reasoning } = req.body;
 
-    // Base URL for Anthropic API
-    const apiUrl = "https://api.anthropic.com/v1";
-    const finalEndpoint = `${apiUrl}/${endpoint || "messages"}`;
+    const modelID = model || DEFAULT_MODEL_ID;
 
-    const response = await fetch(finalEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": secretKey || "",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 7000,
-        temperature: 1,
-        system,
-        messages
-      })
+    const result = await LLMClient.generate({
+      model: modelID,
+      system,
+      messages,
+      maxTokens: max_tokens,
+      temperature,
+      reasoning,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || "Failed to call Anthropic API");
-    }
-
-    return res.status(200).json(data);
+    return res.status(200).json(LLMClient.toAnthropicMessageResponse(result, modelID));
   } catch (error) {
-    console.error("Error proxying to Anthropic API:", error);
+    console.error("Error in AI proxy:", error);
     return res.status(500).json({
-      message: error instanceof Error ? error.message : "Error calling Anthropic API"
+      message: error instanceof Error ? error.message : "Error calling AI provider",
     });
   }
 }
@@ -62,6 +46,6 @@ export const config = {
   api: {
     responseLimit: "16mb",
     // Extended timeout for complex CAD operations (max 2 minutes)
-    maxDuration: 120 // 120 seconds = 2 minutes
-  }
+    maxDuration: 120, // 120 seconds = 2 minutes
+  },
 };

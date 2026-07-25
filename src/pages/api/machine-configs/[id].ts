@@ -1,8 +1,9 @@
 // src/pages/api/machine-configs/[id].ts
-import { requireAuth, sendSuccessResponse, sendErrorResponse } from "@/src/lib/api/auth";
+import { sendSuccessResponse, sendErrorResponse } from "@/src/lib/api/auth";
 import { handleApiError } from "@/src/lib/api/auth";
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
+import { requireAuth } from "src/lib/api/auth";
 
 interface PermissionResult {
   hasAccess: boolean;
@@ -13,6 +14,7 @@ interface PermissionResult {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const userId = await requireAuth(req, res);
+
     if (!userId) return;
 
     const { id } = req.query;
@@ -143,9 +145,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           description: description !== undefined ? description : machineConfig.description,
           config: config
             ? {
-                ...(machineConfig.config && typeof machineConfig.config === "object" ? machineConfig.config : {}),
-                ...config
-              }
+              ...(machineConfig.config && typeof machineConfig.config === "object" ? machineConfig.config : {}),
+              ...config
+            }
             : machineConfig.config,
           type: type || machineConfig.type,
           isPublic: newIsPublic !== undefined ? newIsPublic : machineConfig.isPublic,

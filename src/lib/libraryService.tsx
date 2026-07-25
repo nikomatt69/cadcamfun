@@ -1,10 +1,10 @@
 // src/lib/libraryService.ts
 import { transformLibraryItemToCADElement } from "./libraryTransform";
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
-import { getEnvironment } from '@/src/hooks/useTauri';
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { getEnvironment } from "@/src/hooks/useTauri";
 
 const env = getEnvironment();
-const customFetch = env === 'desktop' ? tauriFetch : window.fetch;
+const customFetch = env === "desktop" ? tauriFetch : window.fetch;
 
 // Interface for library item
 export interface LibraryItem {
@@ -26,7 +26,10 @@ export class LibraryService {
   private userItems: Record<string, LibraryItem[]>;
 
   // Cache per le richieste API con timestamp
-  private apiCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private apiCache = new Map<
+    string,
+    { data: any; timestamp: number; ttl: number }
+  >();
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minuti
 
   // Tracking richieste in corso per evitare duplicati
@@ -37,14 +40,14 @@ export class LibraryService {
       component: [],
       tool: [],
       material: [],
-      machine: []
+      machine: [],
     };
 
     this.userItems = {
       component: [],
       tool: [],
       material: [],
-      machine: []
+      machine: [],
     };
   }
 
@@ -64,7 +67,7 @@ export class LibraryService {
 
     // Check cache first
     const cached = this.apiCache.get(cacheKey);
-    if (cached && (now - cached.timestamp) < cached.ttl) {
+    if (cached && now - cached.timestamp < cached.ttl) {
       console.log(`🎯 LibraryService cache HIT for ${url}`);
       return cached.data;
     }
@@ -83,7 +86,9 @@ export class LibraryService {
       try {
         const response = await customFetch(url, options);
         if (!response.ok) {
-          throw new Error(`Failed to fetch from ${url}: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch from ${url}: ${response.statusText}`,
+          );
         }
         const data = await response.json();
 
@@ -91,7 +96,7 @@ export class LibraryService {
         this.apiCache.set(cacheKey, {
           data,
           timestamp: now,
-          ttl: this.CACHE_TTL
+          ttl: this.CACHE_TTL,
         });
 
         return data;
@@ -118,7 +123,7 @@ export class LibraryService {
         this.cachedFetch("/api/library/predefined?category=component"),
         this.cachedFetch("/api/library/predefined?category=tool"),
         this.cachedFetch("/api/library/predefined?category=material"),
-        this.cachedFetch("/api/library/predefined?category=machine")
+        this.cachedFetch("/api/library/predefined?category=machine"),
       ]);
 
       this.predefinedItems.component = components;
@@ -180,7 +185,7 @@ export class LibraryService {
       this.loadUserComponents(),
       this.loadUserMaterials(),
       this.loadUserTools(),
-      this.loadUserMachineConfigs()
+      this.loadUserMachineConfigs(),
     ]);
   }
 
@@ -210,9 +215,9 @@ export class LibraryService {
       const newItem = await this.cachedFetch("/api/library", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(item)
+        body: JSON.stringify(item),
       });
 
       // Add to local cache
@@ -234,7 +239,12 @@ export class LibraryService {
 
   // Search across all library items
   public search(query: string): LibraryItem[] {
-    const allItems = [...this.getComponents(), ...this.getTools(), ...this.getMaterials(), ...this.getMachines()];
+    const allItems = [
+      ...this.getComponents(),
+      ...this.getTools(),
+      ...this.getMaterials(),
+      ...this.getMachines(),
+    ];
 
     if (!query.trim()) {
       return allItems;
@@ -243,10 +253,14 @@ export class LibraryService {
     const lowerQuery = query.toLowerCase();
 
     return allItems.filter(
-      item =>
+      (item) =>
         item.name.toLowerCase().includes(lowerQuery) ||
-        (item.description && item.description.toLowerCase().includes(lowerQuery)) ||
-        item.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
+        (item.description &&
+          item.description.toLowerCase().includes(lowerQuery)) ||
+        (Array.isArray(item.tags) &&
+          item.tags.some((tag) =>
+            (tag as string).toLowerCase().includes(lowerQuery),
+          )),
     );
   }
 }

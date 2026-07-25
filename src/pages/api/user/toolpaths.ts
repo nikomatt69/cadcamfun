@@ -1,4 +1,4 @@
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "src/lib/prisma";
 

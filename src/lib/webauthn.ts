@@ -64,12 +64,14 @@ export async function verifyPasskeyRegistration(
 
   if (verification.verified && verification.registrationInfo) {
     const { credentialID, credentialPublicKey, counter } = verification.registrationInfo;
+    const credentialPublicKeyBytes = new Uint8Array(credentialPublicKey.length);
+    credentialPublicKeyBytes.set(credentialPublicKey);
 
     await prisma.authenticator.create({
       data: {
         userId,
         credentialID: Buffer.from(credentialID).toString('base64'),
-        credentialPublicKey: credentialPublicKey,
+        credentialPublicKey: credentialPublicKeyBytes,
         counter,
         credentialDeviceType: 'unknown',
         credentialBackedUp: false,
@@ -143,4 +145,4 @@ export async function verifyPasskeyAuthentication(
     verified: verification.verified,
     user: authenticator.user
   };
-} 
+}

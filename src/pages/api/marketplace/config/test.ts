@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { POLAR_CONFIG, validatePolarConfig } from "@/src/lib/polar/config";
 import { Polar } from "@polar-sh/sdk";
 

@@ -2,7 +2,7 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getActivityStatistics } from "@/src/lib/activityTracking";
 import { prisma } from "@/src/lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check method first
@@ -11,10 +11,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  // Authenticate user - requireAuth should handle session validation
+  // Authenticate user using Better Auth
   const userId = await requireAuth(req, res);
+
   if (!userId) {
-    // requireAuth already sent a response (e.g., 401)
+    // getAuthenticatedUserId already sent a response (e.g., 401)
     return;
   }
 
@@ -65,78 +66,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       filters.action = Array.isArray(action) ? action : [action];
     }
 
-    // --- User Filtering Logic ---
-    let activityLogUserFilter: { userId?: string } = {}; // Filter for ActivityLog queries
-    let generalUserFilter: { userId?: string } = {}; // Filter for other user-specific queries if needed
-
-    if (!isAdmin) {
-      // Non-admin users see their own data
-      filters.userId = userId; // Used by getActivityStatistics
-      activityLogUserFilter.userId = userId; // Used for ActivityLog queries (activeUsers, recentActivity)
-      generalUserFilter.userId = userId; // If needed for other user-scoped data
-    } else if (userFilter) {
-      // Admin users can filter by a specific user
-      filters.userId = userFilter as string;
-      activityLogUserFilter.userId = userFilter as string;
-      generalUserFilter.userId = userFilter as string;
-    } else {
-      // Admin viewing all users - no userId filter applied to activityLogUserFilter
-      // filters.userId might still be needed if getActivityStatistics expects it for 'all users' scenario
-      // If getActivityStatistics doesn't need userId for admins viewing all, remove this else block for filters.userId
-      // filters.userId = undefined;
+    // Add user filter (admin only)
+    if (userFilter && isAdmin) {
+      filters.userId = Array.isArray(userFilter) ? userFilter : [userFilter];
+    } else if (!isAdmin) {
+      // Non-admin users can only see their own data
+      filters.userId = [userId];
     }
 
-    // --- Fetch Data ---
+    // Get analytics data
+    const analyticsData = await getActivityStatistics(filters);
 
-    // 1. Get activity statistics (pass adjusted filters)
-    const statistics = await getActivityStatistics(filters);
-
-    // 2. Get total user count (only relevant for admins, maybe conditional fetch?)
-    let userCount: number | null = null;
-    if (isAdmin) {
-      // Only fetch total count if user is admin
-      userCount = await prisma.user.count();
-    }
-
-    // 3. Get active users in the last 30 days (apply user filter)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const activeUsers = await prisma.activityLog.groupBy({
-      by: ["userId"],
-      where: {
-        timestamp: { gte: thirtyDaysAgo },
-        ...activityLogUserFilter // Apply user filter here
-      },
-      _count: { userId: true }, // Count occurrences of each userId
-      orderBy: {
-        _count: {
-          userId: "desc"
-        }
-      },
-      take: 10
-    });
-
-    // 4. Get recent activity (apply user filter)
-    const recentActivity = await prisma.activityLog.findMany({
-      where: activityLogUserFilter, // Apply user filter here
-      orderBy: { timestamp: "desc" },
-      take: 10,
-      include: {
-        user: { select: { id: true, name: true, email: true } }
-      }
-    });
-
-    // --- Return Response ---
+    // Return the data
     return res.status(200).json({
-      statistics,
-      userCount: userCount ?? undefined, // Return count only if fetched (admin)
-      activeUsers: activeUsers.map(u => ({ userId: u.userId, count: u._count.userId })), // Simplify structure
-      recentActivity,
-      isAdmin // Include isAdmin flag for frontend UI adjustments
+      success: true,
+      data: analyticsData,
+      isAdmin,
+      filters
     });
   } catch (error) {
-    console.error("Failed to get analytics data:", error);
-    return res.status(500).json({ message: "Failed to get analytics data" });
+    console.error("Analytics API error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
   }
 }

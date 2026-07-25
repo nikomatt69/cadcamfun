@@ -13,7 +13,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from "next";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 import { prisma } from "@/src/lib/prisma";
 import {
   downloadStreamFromBucket,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { useSession, useSignIn } from "@/src/lib/auth-client";
+import { useSession, signIn } from "@/src/lib/auth-client";
 
 import { prisma } from "src/lib/prisma";
 import { GetServerSideProps } from "next";
@@ -81,9 +81,9 @@ export default function InvitationPage({ invitation, error, expired }: Invitatio
 
     router.push({
       pathname: "/auth/signin",
-      query: { 
-        email: invitation.email, 
-        redirect: typeof window !== 'undefined' ? window.location.pathname : '/' 
+      query: {
+        email: invitation.email,
+        redirect: typeof window !== 'undefined' ? window.location.pathname : '/'
       }
     });
   };
@@ -94,9 +94,9 @@ export default function InvitationPage({ invitation, error, expired }: Invitatio
 
     router.push({
       pathname: "/auth/signup",
-      query: { 
-        email: invitation.email, 
-        redirect: typeof window !== 'undefined' ? window.location.pathname : '/' 
+      query: {
+        email: invitation.email,
+        redirect: typeof window !== 'undefined' ? window.location.pathname : '/'
       }
     });
   };

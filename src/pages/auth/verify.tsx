@@ -5,13 +5,13 @@ import { CheckCircleIcon, XCircleIcon } from "lucide-react";
 import MetaTags from "@/src/components/layout/Metatags";
 import Navbar from "@/src/components/layout/Navbar";
 import Footer from "@/src/components/ui/Footer";
-import { useTauri } from "@/src/hooks/useTauri";
+import { verifyEmail } from "@/src/lib/auth-client";
+
 export default function VerifyEmail() {
   const router = useRouter();
   const { token } = router.query;
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
-  const { httpFetch } = useTauri();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -20,37 +20,23 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     if (isClient && token && typeof token === "string") {
-      verifyEmail(token);
+      verifyEmailToken(token);
     }
   }, [isClient, token]);
 
-  const verifyEmail = async (emailToken: string) => {
+  const verifyEmailToken = async (emailToken: string) => {
     try {
-      const response = await httpFetch(`${process.env.NEXTAUTH_URL}/api/auth/verify-email`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ token: emailToken })
-      });
+      await verifyEmail(emailToken);
+      setStatus("success");
+      setMessage("Email verified successfully! You can now sign in to your account.");
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setStatus("success");
-        setMessage("Email verified successfully! You can now sign in to your account.");
-
-        // Redirect to signin after 3 seconds
-        setTimeout(() => {
-          router.push(`${process.env.NEXTAUTH_URL}/auth/signin`);
-        }, 3000);
-      } else {
-        setStatus("error");
-        setMessage(data.message || "Failed to verify email");
-      }
-    } catch (error) {
+      // Redirect to signin after 3 seconds
+      setTimeout(() => {
+        router.push("/auth/signin");
+      }, 3000);
+    } catch (error: any) {
       setStatus("error");
-      setMessage("An unexpected error occurred");
+      setMessage(error.message || "Failed to verify email");
       console.error("Verification error:", error);
     }
   };

@@ -736,9 +736,9 @@ const EnhancedSidebar: React.FC<EnhancedSidebarProps> = ({ isOpen, setIsOpen, is
           >
             <div className="flex items-center space-x-3 p-2 rounded-xl backdrop-blur-sm bg-white/40 dark:bg-gray-700/40 border border-white/30 dark:border-gray-600/30">
               <div className="flex-shrink-0">
-                {profileImage || session?.user?.image ? (
+                {profileImage || session?.user?.name ? (
                   <motion.img
-                    src={profileImage || session?.user?.image || ""}
+                    src={profileImage || "https://ui-avatars.com/api/?name=" + session?.user?.name.charAt(0) || ""}
                     alt="Profile"
                     className="h-10 w-10 rounded-full object-cover border-2 border-white/50 dark:border-gray-600/50"
                     whileHover={{ scale: 1.1, rotate: 5 }}

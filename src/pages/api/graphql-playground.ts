@@ -1,13 +1,14 @@
 // pages/api/graphql-playground.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import { renderPlaygroundPage, RenderPageOptions } from "graphql-playground-html";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 // Define CursorShape type if not directly exported (adjust based on actual library export)
 type CursorShape = "line" | "block" | "underline";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = await requireAuth(req, res);
+
   if (!userId) {
     // If requireAuth returns falsy, it means auth failed and it already sent a response.
     return;

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../lib/prisma";
-import { requireAuth } from "@/src/lib/api/auth";
+import { requireAuth } from "src/lib/api/auth";
 
 interface Activity {
   id: string;
@@ -23,7 +23,8 @@ export default async function handler(
   try {
     // Skip auth for now to fix the issues
     const userId = await requireAuth(req, res);
-  if (!userId) return
+
+    if (!userId) return
     const limit = parseInt(req.query.limit as string) || 10;
 
     // Get recent activities from different tables
@@ -41,10 +42,10 @@ export default async function handler(
           owner: { select: { name: true } }
         }
       }),
-      
+
       // Recent Drawings
       prisma.drawing.findMany({
-        where: { 
+        where: {
           project: { ownerId: userId }
         },
         orderBy: { updatedAt: 'desc' },
@@ -54,17 +55,17 @@ export default async function handler(
           name: true,
           createdAt: true,
           updatedAt: true,
-          project: { 
-            select: { 
+          project: {
+            select: {
               owner: { select: { name: true } }
             }
           }
         }
       }),
-      
+
       // Recent Components
       prisma.component.findMany({
-        where: { 
+        where: {
           project: { ownerId: userId }
         },
         orderBy: { updatedAt: 'desc' },
@@ -74,14 +75,14 @@ export default async function handler(
           name: true,
           createdAt: true,
           updatedAt: true,
-          project: { 
-            select: { 
+          project: {
+            select: {
               owner: { select: { name: true } }
             }
           }
         }
       }),
-      
+
       // Recent Toolpaths
       prisma.toolpath.findMany({
         where: { createdBy: userId },
@@ -108,7 +109,7 @@ export default async function handler(
         userId: userId,
         userName: project.owner.name || "Unknown User"
       })),
-      
+
       ...recentDrawings.map(drawing => ({
         id: `drawing-${drawing.id}`,
         type: "drawing" as const,
@@ -118,7 +119,7 @@ export default async function handler(
         userId: userId,
         userName: drawing.project.owner.name || "Unknown User"
       })),
-      
+
       ...recentComponents.map(component => ({
         id: `component-${component.id}`,
         type: "component" as const,
@@ -126,9 +127,9 @@ export default async function handler(
         itemName: component.name || `Component ${component.id}`,
         timestamp: component.updatedAt.toISOString(),
         userId: userId,
-        userName: component.project.owner.name || "Unknown User" 
+        userName: component.project.owner.name || "Unknown User"
       })),
-      
+
       ...recentToolpaths.map(toolpath => ({
         id: `toolpath-${toolpath.id}`,
         type: "tool" as const,

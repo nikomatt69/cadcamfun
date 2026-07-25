@@ -54,10 +54,10 @@ export default function ProfileSettingsPage() {
       if (savedImage) {
         setProfileImage(savedImage);
         setStoreProfileImage(savedImage);
-      } else if (session?.user?.image) {
+      } else if (session?.user?.name) {
         // Use user profile image if available
-        setProfileImage(session.user.image);
-        setStoreProfileImage(session.user.image);
+        setProfileImage("https://ui-avatars.com/api/?name=" + session.user.name.charAt(0));
+        setStoreProfileImage("https://ui-avatars.com/api/?name=" + session.user.name.charAt(0));
       }
     }
   }, [session, storeProfileImage, setStoreProfileImage]);
