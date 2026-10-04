@@ -76,6 +76,7 @@ export class ToolpathsApi extends HttpApiGroup.make("toolpaths").add(
     params: { projectId: Schema.String },
     payload: ToolpathInput,
     success: SavedToolpath,
+    error: ProjectNotFound.pipe(HttpApiSchema.status(404)),
   }),
   HttpApiEndpoint.get("get", "/toolpaths/:id", { params: id, success: SavedToolpath, error: NotFound }),
   HttpApiEndpoint.put("update", "/toolpaths/:id", {

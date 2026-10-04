@@ -1,10 +1,11 @@
-import { Config, Context, Effect, Layer, Redacted, Schema } from "effect"
+import { Config, Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import type { ModelRef } from "@cadcamfun/llm"
 import * as Anthropic from "@cadcamfun/llm/providers/anthropic"
 import * as Google from "@cadcamfun/llm/providers/google"
 import * as OpenAI from "@cadcamfun/llm/providers/openai"
 import * as OpenRouter from "@cadcamfun/llm/providers/openrouter"
 import * as XAI from "@cadcamfun/llm/providers/xai"
+import * as Nikcli from "./nikcli"
 
 export const AiProvider = Schema.Literals(["anthropic", "openai", "openrouter", "google", "xai"])
 export type AiProvider = typeof AiProvider.Type
@@ -39,21 +40,47 @@ export const modelFor = (provider: AiProvider, id: string, apiKey: string): Mode
 /** The language model the agent talks to. */
 export class AiModel extends Context.Service<AiModel, { readonly model: ModelRef }>()("@cadcamfun/ai/AiModel") {
   /**
-   * Resolve from environment: `CADCAMFUN_AI_PROVIDER` (default anthropic), `CADCAMFUN_AI_MODEL`
-   * and the provider's usual API key variable (e.g. `ANTHROPIC_API_KEY`).
+   * Resolve the model from the environment, falling back to a local nikcli install:
+   * - provider: `CADCAMFUN_AI_PROVIDER`, else nikcli's default model provider, else the first
+   *   provider with a key (env or nikcli `auth.json`), else anthropic;
+   * - model: `CADCAMFUN_AI_MODEL`, else nikcli's default model for that provider, else a default;
+   * - key: the provider's usual variable (e.g. `ANTHROPIC_API_KEY`), else nikcli's credential.
    */
   static readonly layerConfig = Layer.effect(
     AiModel,
     Effect.gen(function* () {
-      const provider = yield* Config.schema(AiProvider, "CADCAMFUN_AI_PROVIDER").pipe(
-        Config.withDefault("anthropic" as const),
-      )
-      const fallback = defaultModel[provider]
+      const nikcli = yield* Nikcli.load()
+      const envKey = (p: AiProvider) =>
+        Config.Redacted(keyEnv[p]).pipe(
+          Config.option,
+          Config.map(Option.map(Redacted.value)),
+          Config.map(Option.orElse(() => Option.fromUndefinedOr(nikcli.key(p)))),
+        )
+      const isProvider = Schema.is(AiProvider)
+      const nikcliProvider = nikcli.model && isProvider(nikcli.model.provider) ? nikcli.model.provider : undefined
+
+      const explicit = yield* Config.schema(AiProvider, "CADCAMFUN_AI_PROVIDER").pipe(Config.option)
+      let provider: AiProvider = Option.getOrUndefined(explicit) ?? nikcliProvider ?? "anthropic"
+      if (Option.isNone(explicit) && !nikcliProvider) {
+        for (const p of AiProvider.literals) {
+          if (Option.isSome(yield* envKey(p))) {
+            provider = p
+            break
+          }
+        }
+      }
+
+      const fallback = (nikcli.model?.provider === provider ? nikcli.model.id : undefined) ?? defaultModel[provider]
       const id = yield* fallback
         ? Config.String("CADCAMFUN_AI_MODEL").pipe(Config.withDefault(fallback))
         : Config.String("CADCAMFUN_AI_MODEL")
-      const apiKey = yield* Config.Redacted(keyEnv[provider])
-      return AiModel.of({ model: modelFor(provider, id, Redacted.value(apiKey)) })
+      const apiKey = yield* envKey(provider)
+      if (Option.isNone(apiKey)) {
+        return yield* Effect.die(
+          new Error(`No ${provider} credential: set ${keyEnv[provider]} or run \`nikcli auth login\``),
+        )
+      }
+      return AiModel.of({ model: modelFor(provider, id, apiKey.value) })
     }),
   )
 
