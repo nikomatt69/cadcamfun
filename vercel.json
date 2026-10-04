@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/update-expired-trials",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
