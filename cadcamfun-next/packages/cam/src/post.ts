@@ -34,7 +34,11 @@ type Fmt = (n: number) => string
 const paren = (text: string) => `(${text.replace(/[()]/g, "")})`
 const units = (p: Program) => (p.units === "mm" ? "G21" : "G20")
 const words = (a: Axes, fmt: Fmt) =>
-  [a.x !== undefined ? `X${fmt(a.x)}` : "", a.y !== undefined ? `Y${fmt(a.y)}` : "", a.z !== undefined ? `Z${fmt(a.z)}` : ""]
+  [
+    a.x !== undefined ? `X${fmt(a.x)}` : "",
+    a.y !== undefined ? `Y${fmt(a.y)}` : "",
+    a.z !== undefined ? `Z${fmt(a.z)}` : "",
+  ]
     .filter(Boolean)
     .join(" ")
 const coolantM = (t: Toolpath) => (t.coolant === "flood" ? ["M8"] : t.coolant === "mist" ? ["M7"] : [])
@@ -95,7 +99,9 @@ const dialects: Record<Controller, Dialect> = {
     },
   },
   heidenhain: {
-    header: (p) => [`BEGIN PGM ${p.name.replace(/\W+/g, "_").toUpperCase() || "PART"} ${p.units === "mm" ? "MM" : "INCH"}`],
+    header: (p) => [
+      `BEGIN PGM ${p.name.replace(/\W+/g, "_").toUpperCase() || "PART"} ${p.units === "mm" ? "MM" : "INCH"}`,
+    ],
     comment: (text) => `; ${text}`,
     toolChange: (t) => [`TOOL CALL ${t.toolNumber} Z S${Math.round(t.rpm)}`, "M3"],
     coolant: (t) => (t.coolant && t.coolant !== "none" ? ["M8"] : []),
@@ -116,7 +122,12 @@ const dialects: Record<Controller, Dialect> = {
         : []),
       `L X${fmt(c.x)} Y${fmt(c.y)} FMAX M99`,
     ],
-    footer: (p) => ["M5", "M9", "L Z+100 R0 FMAX M2", `END PGM ${p.name.replace(/\W+/g, "_").toUpperCase() || "PART"} ${p.units === "mm" ? "MM" : "INCH"}`],
+    footer: (p) => [
+      "M5",
+      "M9",
+      "L Z+100 R0 FMAX M2",
+      `END PGM ${p.name.replace(/\W+/g, "_").toUpperCase() || "PART"} ${p.units === "mm" ? "MM" : "INCH"}`,
+    ],
     lineNumbers: (lines) => lines.map((l, i) => `${i} ${l}`),
   },
   marlin: {

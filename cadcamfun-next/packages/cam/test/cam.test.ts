@@ -177,6 +177,13 @@ describe("post-processing and parsing", () => {
     const stats = Analyze.analyzeMoves(moves, 1000, { x: 10, y: 0, z: 0 })
     expect(stats.cutDistance).toBeCloseTo(2 * Math.PI * 10, 0)
   })
+
+  test("each move maps to its source line", () => {
+    const { moves, lines } = Gcode.parse("G21\n(comment)\nG0 X1 Y0 Z0\nG2 X-1 Y0 R1 F100\nM30")
+    expect(lines).toHaveLength(moves.length)
+    expect(lines[0]).toBe(2)
+    expect(new Set(lines.slice(1))).toEqual(new Set([3]))
+  })
 })
 
 describe("canned cycles and Heidenhain", () => {
@@ -184,7 +191,15 @@ describe("canned cycles and Heidenhain", () => {
   const program = run(
     generateProgram(doc, {
       ...setup(doc, [
-        { _tag: "Drill", id: "d", toolId: "dr-5", elementIds: doc.elements.map((e) => e.id), depth: 8, peck: 2, cycle: true },
+        {
+          _tag: "Drill",
+          id: "d",
+          toolId: "dr-5",
+          elementIds: doc.elements.map((e) => e.id),
+          depth: 8,
+          peck: 2,
+          cycle: true,
+        },
       ]),
       machineId: "vmc-fanuc",
     }),

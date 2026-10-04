@@ -97,6 +97,9 @@ function Layout() {
         <span class="text-xs text-zinc-500">
           {saved() === "saved" ? "Saved" : saved() === "saving" ? "Saving…" : "Unsaved changes"}
         </span>
+        <a href="/library" class="text-xs text-zinc-400 hover:text-[var(--accent)]">
+          Library
+        </a>
         <Show when={ed.notice()}>
           {(n) => (
             <span

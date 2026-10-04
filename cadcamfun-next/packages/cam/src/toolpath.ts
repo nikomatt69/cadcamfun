@@ -1,7 +1,12 @@
 import { Schema } from "effect"
 
 export const Rapid = Schema.TaggedStruct("Rapid", { x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })
-export const Feed = Schema.TaggedStruct("Feed", { x: Schema.Finite, y: Schema.Finite, z: Schema.Finite, f: Schema.Finite })
+export const Feed = Schema.TaggedStruct("Feed", {
+  x: Schema.Finite,
+  y: Schema.Finite,
+  z: Schema.Finite,
+  f: Schema.Finite,
+})
 /**
  * A canned drilling cycle at (x, y): rapid to `r`, feed to `z` (pecking by `peck` when > 0),
  * retract to `r`. Controllers with canned cycles get G81/G83; others get explicit moves.

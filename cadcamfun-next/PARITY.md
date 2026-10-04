@@ -6,9 +6,10 @@ Goal: everything the Next.js app does, rebuilt on Effect 4 + SolidJS. Ticked = d
 - [x] CAD core (schemas, commands, undo), CAM core (toolpaths, feeds, posts), AI agent, HttpApi server, SolidJS editor
 
 ## 1. CAM libraries and toolpaths
-- [ ] Tools, materials, machine configs: CRUD, clone, JSON import/export, DB-backed `CamLibrary`
-- [ ] Saved toolpaths per project with versions, restore, comments
-- [ ] G-code editor/viewer with simulation playback; Heidenhain post; fixed cycles (G81/G83)
+- [x] Tools, materials, machine configs: CRUD, clone, JSON import/export, DB-backed `CamLibrary`
+- [x] Saved toolpaths per project with versions, restore, comments
+- [x] G-code editor/viewer with simulation playback; Heidenhain post; fixed cycles (G81/G83)
+- [x] AI uses the local nikcli login (auth.json + default model) when installed
 
 ## 2. Accounts
 - [ ] Sign up / sign in (password + OAuth), sessions, profile, password change, settings

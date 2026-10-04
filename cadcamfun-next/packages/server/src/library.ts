@@ -104,7 +104,7 @@ export class Library extends Context.Service<
           )
 
         return {
-          list: sql<Row>`SELECT * FROM library_items WHERE kind = ${kind} ORDER BY builtin DESC, updated_at`.pipe(
+          list: sql<Row>`SELECT * FROM library_items WHERE kind = ${kind} ORDER BY builtin DESC, json_extract(data, '$.name')`.pipe(
             Effect.flatMap((rows) => Effect.forEach(rows, decode)),
             Effect.orDie,
           ),

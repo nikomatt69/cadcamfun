@@ -2,6 +2,8 @@ import { expandCycle, type Motion } from "./toolpath"
 
 export interface ParseResult {
   readonly moves: ReadonlyArray<Motion>
+  /** Zero-based source line of each move (same length as `moves`), for editor/simulator sync. */
+  readonly lines: ReadonlyArray<number>
   readonly units: "mm" | "inch"
   readonly warnings: ReadonlyArray<string>
 }
@@ -26,7 +28,8 @@ export const parse = (source: string, options: { readonly arcSegmentLength?: num
   let cycle: { r: number; z: number; q: number; initialZ: number } | undefined
   let returnToInitial = true
 
-  source.split(/\r?\n/).forEach((raw, index) => {
+  const lines: Array<number> = []
+  const step = (raw: string, index: number) => {
     const line = raw
       .replace(/\(.*?\)/g, "")
       .replace(/;.*$/, "")
@@ -121,6 +124,10 @@ export const parse = (source: string, options: { readonly arcSegmentLength?: num
       }
     }
     pos = target
+  }
+  source.split(/\r?\n/).forEach((raw, index) => {
+    step(raw, index)
+    while (lines.length < moves.length) lines.push(index)
   })
-  return { moves, units, warnings }
+  return { moves, lines, units, warnings }
 }
