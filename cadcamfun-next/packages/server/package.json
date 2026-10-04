@@ -1,0 +1,27 @@
+{
+  "name": "@cadcamfun/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/api.ts"
+  },
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cadcamfun/ai": "workspace:*",
+    "@cadcamfun/cam": "workspace:*",
+    "@cadcamfun/core": "workspace:*",
+    "@cadcamfun/llm": "workspace:*",
+    "@effect/platform-bun": "4.0.0",
+    "@effect/sql-sqlite-bun": "4.0.0",
+    "effect": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14"
+  }
+}

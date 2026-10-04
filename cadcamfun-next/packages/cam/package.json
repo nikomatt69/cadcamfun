@@ -1,0 +1,21 @@
+{
+  "name": "@cadcamfun/cam",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cadcamfun/core": "workspace:*",
+    "@countertype/clipper2-ts": "1.5.4-3.9a869ba",
+    "effect": "4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14"
+  }
+}
