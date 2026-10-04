@@ -2,6 +2,13 @@ import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
 import { Doc } from "@cadcamfun/core"
 import { Machines, Materials, Operations, Tools, Toolpaths } from "@cadcamfun/cam"
+import { MachinesApi, MaterialsApi, ToolsApi } from "./api-library"
+import { ToolpathsApi } from "./api-toolpaths"
+import { ProjectNotFound } from "./api-errors"
+
+export * from "./api-library"
+export * from "./api-toolpaths"
+export * from "./api-errors"
 
 export const ProjectSummary = Schema.Struct({
   id: Schema.String,
@@ -21,10 +28,6 @@ export const Project = Schema.Struct({
   updatedAt: Schema.String,
 })
 export type Project = typeof Project.Type
-
-export class ProjectNotFound extends Schema.TaggedError<ProjectNotFound>()("ProjectNotFound", {
-  id: Schema.String,
-}) {}
 
 export class CamFailed extends Schema.TaggedError<CamFailed>()("CamFailed", {
   message: Schema.String,
@@ -101,6 +104,10 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(SystemApi)
   .add(ProjectsApi)
   .add(CamApi)
+  .add(ToolsApi)
+  .add(MaterialsApi)
+  .add(MachinesApi)
+  .add(ToolpathsApi)
   .prefix("/api")
   .annotateMerge(OpenApi.annotations({ title: "CADCAMFUN API" })) {}
 

@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { createEffect, onCleanup, onMount } from "solid-js"
 import { Doc, Elements, Geometry } from "@cadcamfun/core"
+import { Toolpaths } from "@cadcamfun/cam"
 import { useEditor } from "../editor/store"
 
 /** 3D preview: stock, extruded closed profiles and toolpaths. Loaded lazily (three.js is large). */
@@ -110,7 +111,7 @@ export default function Viewport3D() {
         const rapids: Array<THREE.Vector3> = []
         for (const tp of output.program.toolpaths) {
           let prev: THREE.Vector3 | undefined
-          for (const m of tp.moves) {
+          for (const m of Toolpaths.expand(tp.moves)) {
             const v = new THREE.Vector3(m.x, m.y, m.z)
             if (prev) (m._tag === "Rapid" ? rapids : feeds).push(prev, v)
             prev = v

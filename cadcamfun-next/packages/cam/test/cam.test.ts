@@ -178,3 +178,41 @@ describe("post-processing and parsing", () => {
     expect(stats.cutDistance).toBeCloseTo(2 * Math.PI * 10, 0)
   })
 })
+
+describe("canned cycles and Heidenhain", () => {
+  const doc = docWith({ _tag: "Point", position: { x: 10, y: 10 } }, { _tag: "Point", position: { x: 30, y: 10 } })
+  const program = run(
+    generateProgram(doc, {
+      ...setup(doc, [
+        { _tag: "Drill", id: "d", toolId: "dr-5", elementIds: doc.elements.map((e) => e.id), depth: 8, peck: 2, cycle: true },
+      ]),
+      machineId: "vmc-fanuc",
+    }),
+  )
+
+  test("ISO controllers get G83 and the parser expands it identically", () => {
+    const fanuc = Post.post(program, { controller: "fanuc" })
+    expect(fanuc).toMatch(/G98 G83 X10 Y10 Z-8 R1 Q2 F\d+/)
+    expect(fanuc).toMatch(/N\d+ X30 Y10\n/)
+    expect(fanuc).toContain("G80")
+    const parsed = Gcode.parse(Post.post(program, { controller: "linuxcnc" }))
+    const a = Analyze.analyzeProgram(program, grbl)
+    const b = Analyze.analyzeMoves(parsed.moves, grbl.rapidFeed)
+    expect(b.cutDistance).toBeCloseTo(a.cutDistance, 3)
+  })
+
+  test("controllers without cycles get explicit pecks", () => {
+    const code = Post.post(program, { controller: "grbl" })
+    expect(code).not.toContain("G83")
+    expect(code.match(/Z-8/g)?.length).toBe(2)
+  })
+
+  test("Heidenhain conversational output", () => {
+    const tnc = Post.post(program, { controller: "heidenhain" })
+    expect(tnc).toMatch(/^0 BEGIN PGM TEST_PART MM/)
+    expect(tnc).toContain("CYCL DEF 200 DRILLING")
+    expect(tnc).toMatch(/TOOL CALL 5 Z S\d+/)
+    expect(tnc).toContain("L X+30 Y+10 FMAX M99")
+    expect(tnc.trim()).toMatch(/END PGM TEST_PART MM$/)
+  })
+})

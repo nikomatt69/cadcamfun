@@ -14,6 +14,11 @@ export const Material = Schema.Struct({
   chipLoad: Geometry.Positive,
   /** Max depth of cut as a fraction of tool diameter. */
   maxDepthRatio: Geometry.Positive,
+  description: Schema.optional(Schema.String),
+  /** g/cm³ */
+  density: Schema.optional(Geometry.Positive),
+  /** Brinell hardness. */
+  hardness: Schema.optional(Geometry.Positive),
 })
 export type Material = typeof Material.Type
 

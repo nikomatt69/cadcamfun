@@ -2,13 +2,15 @@ import { Effect, Layer } from "effect"
 import { HttpRouter, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder, HttpApiScalar } from "effect/http-api"
 import { SqlClient } from "effect/sql"
-import { CamLibrary } from "@cadcamfun/cam"
+import type { CamLibrary } from "@cadcamfun/cam"
 import type { CadAgent, Workspace } from "@cadcamfun/ai"
 import { Api } from "./api"
 import { ChatRoute } from "./chat"
 import { ApiHandlers } from "./handlers"
 import { MigratorLayer } from "./migrations"
+import { Library } from "./library"
 import { Projects } from "./projects"
+import { ToolpathStore } from "./toolpaths"
 
 /** Serve a built single-page app: files when they exist, `index.html` otherwise. */
 const StaticRoute = (dir: string) =>
@@ -39,8 +41,8 @@ export const makeApp = <E>(options: AppOptions<E>) => {
     options.staticDir ? StaticRoute(options.staticDir) : Layer.empty,
   )
   return routes.pipe(
-    Layer.provide(Projects.layer),
-    Layer.provide(CamLibrary.layer),
+    Layer.provide(Library.camLibrary),
+    Layer.provide(Layer.mergeAll(Projects.layer, Library.layer, ToolpathStore.layer)),
     Layer.provide(MigratorLayer),
     Layer.provide(Layer.orDie(options.sql)),
   )

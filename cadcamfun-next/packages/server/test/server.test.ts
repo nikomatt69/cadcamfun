@@ -102,4 +102,93 @@ describe("HTTP API", () => {
     const state = events.find((e) => e.type === "state")
     expect(state?.type === "state" && state.document.elements).toHaveLength(1)
   })
+
+  test("library CRUD, read-only presets, clone, import/export", async () => {
+    type Entry = { item: { id: string; name: string }; builtin: boolean }
+    const list = (await (await call("GET", "/api/library/tools")).json()) as Array<Entry>
+    expect(list.length).toBeGreaterThan(0)
+    const preset = list[0]!
+    expect(preset.builtin).toBe(true)
+    expect((await call("PUT", `/api/library/tools/${preset.item.id}`, preset.item)).status).toBe(403)
+    expect((await call("DELETE", `/api/library/tools/${preset.item.id}`)).status).toBe(403)
+
+    const clone = (await (await call("POST", `/api/library/tools/${preset.item.id}/clone`)).json()) as Entry
+    expect(clone.builtin).toBe(false)
+    expect(clone.item.id).not.toBe(preset.item.id)
+    expect(clone.item.name).toBe(`${preset.item.name} (copy)`)
+    const renamed = await call("PUT", `/api/library/tools/${clone.item.id}`, { ...clone.item, name: "Mine" })
+    expect(((await renamed.json()) as Entry).item.name).toBe("Mine")
+
+    const exported = (await (await call("GET", "/api/library/tools/export")).json()) as {
+      kind: string
+      items: Array<Entry["item"]>
+    }
+    expect(exported.kind).toBe("tools")
+    expect(exported.items).toHaveLength(list.length + 1)
+    const imported = await call("POST", "/api/library/tools/import", { items: [clone.item] })
+    expect(await imported.json()).toEqual({ imported: 1 })
+    expect((await (await call("GET", "/api/library/tools")).json()) as Array<Entry>).toHaveLength(list.length + 2)
+
+    expect((await call("DELETE", `/api/library/tools/${clone.item.id}`)).status).toBe(204)
+    expect((await call("GET", `/api/library/tools/${clone.item.id}`)).status).toBe(404)
+    expect((await call("POST", "/api/library/materials", { id: "x", name: "bad" })).status).toBe(400)
+  })
+
+  test("custom machine is used by CAM", async () => {
+    type Entry = { item: { id: string } }
+    const machines = (await (await call("GET", "/api/library/machines")).json()) as Array<Entry>
+    const custom = (await (await call("POST", `/api/library/machines/${machines[0]!.item.id}/clone`)).json()) as Entry
+    const created = (await (await call("POST", "/api/projects", { name: "M" })).json()) as Project
+    const document = {
+      ...created.document,
+      elements: [{ _tag: "Point", id: "p1", layerId: created.document.activeLayerId, position: { x: 10, y: 10 } }],
+    }
+    const setup = {
+      ...created.setup,
+      machineId: custom.item.id,
+      operations: [{ _tag: "Drill", id: "d", toolId: "dr-5", elementIds: ["p1"], depth: 5, peck: 0 }],
+    }
+    expect((await call("POST", "/api/cam/gcode", { document, setup })).status).toBe(200)
+  })
+
+  test("saved toolpaths: versions, restore, comments", async () => {
+    type Saved = { id: string; gcode: string; versions: number; name: string }
+    const project = (await (await call("POST", "/api/projects", { name: "TP" })).json()) as Project
+    const stats = { moves: 2, cutDistance: 10, rapidDistance: 5, estimatedSeconds: 3 }
+    const input = { name: "Contour", controller: "grbl", gcode: "G0 X0 Y0\nG1 X10 F500", stats }
+    expect((await call("POST", "/api/projects/missing/toolpaths", input)).status).toBe(404)
+    const saved = (await (await call("POST", `/api/projects/${project.id}/toolpaths`, input)).json()) as Saved
+    expect(saved.versions).toBe(0)
+
+    const edited = (await (
+      await call("PUT", `/api/toolpaths/${saved.id}`, { gcode: "G0 X0 Y0\nG1 X20 F500", message: "longer" })
+    ).json()) as Saved
+    expect(edited.versions).toBe(1)
+    expect(edited.gcode).toContain("X20")
+
+    const versions = (await (await call("GET", `/api/toolpaths/${saved.id}/versions`)).json()) as Array<{
+      id: string
+      gcode: string
+      message?: string
+    }>
+    expect(versions).toMatchObject([{ gcode: input.gcode, message: "longer" }])
+    const restored = (await (
+      await call("POST", `/api/toolpaths/${saved.id}/versions/${versions[0]!.id}/restore`)
+    ).json()) as Saved
+    expect(restored.gcode).toBe(input.gcode)
+    expect(restored.versions).toBe(2)
+
+    const list = (await (await call("GET", `/api/projects/${project.id}/toolpaths`)).json()) as Array<Saved>
+    expect(list).toMatchObject([{ id: saved.id, name: "Contour", versions: 2 }])
+    expect(list[0]).not.toHaveProperty("gcode")
+
+    const comment = (await (
+      await call("POST", `/api/toolpaths/${saved.id}/comments`, { content: "Check the feed" })
+    ).json()) as { id: string; author: string }
+    expect(comment.author).toBe("me")
+    expect(await (await call("GET", `/api/toolpaths/${saved.id}/comments`)).json()).toHaveLength(1)
+    expect((await call("DELETE", `/api/toolpaths/${saved.id}/comments/${comment.id}`)).status).toBe(204)
+    expect((await call("DELETE", `/api/toolpaths/${saved.id}`)).status).toBe(204)
+    expect((await call("GET", `/api/toolpaths/${saved.id}`)).status).toBe(404)
+  })
 })

@@ -21,6 +21,11 @@ export const Tool = Schema.Struct({
   angle: Schema.optional(Geometry.Positive),
   /** Tool-table slot used for tool changes. */
   number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  maxRpm: Schema.optional(Geometry.Positive),
+  coolant: Schema.optional(Schema.Literals(["none", "flood", "mist"])),
+  shankDiameter: Schema.optional(Geometry.Positive),
+  totalLength: Schema.optional(Geometry.Positive),
+  notes: Schema.optional(Schema.String),
 })
 export type Tool = typeof Tool.Type
 
