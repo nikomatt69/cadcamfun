@@ -1,0 +1,23 @@
+name: cadcamfun-next
+
+on:
+  push:
+    paths: ["cadcamfun-next/**", ".github/workflows/cadcamfun-next.yml"]
+  pull_request:
+    paths: ["cadcamfun-next/**", ".github/workflows/cadcamfun-next.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cadcamfun-next
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
