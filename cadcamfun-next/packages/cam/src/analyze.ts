@@ -1,5 +1,5 @@
 import type { Machine } from "./machine"
-import type { Move, Program } from "./toolpath"
+import { expand, type Move, type Program } from "./toolpath"
 
 export interface Stats {
   readonly moves: number
@@ -21,7 +21,7 @@ export const analyzeMoves = (moves: ReadonlyArray<Move>, rapidFeed: number, star
   let p = start
   const min = { x: Infinity, y: Infinity, z: Infinity }
   const max = { x: -Infinity, y: -Infinity, z: -Infinity }
-  for (const m of moves) {
+  for (const m of expand(moves)) {
     const d = Math.hypot(m.x - p.x, m.y - p.y, m.z - p.z)
     if (m._tag === "Rapid") {
       rapid += d
@@ -37,7 +37,7 @@ export const analyzeMoves = (moves: ReadonlyArray<Move>, rapidFeed: number, star
     p = m
   }
   return {
-    moves: moves.length,
+    moves: expand(moves).length,
     cutDistance: cut,
     rapidDistance: rapid,
     estimatedSeconds: seconds,
@@ -53,6 +53,6 @@ export const analyzeProgram = (program: Program, machine: Pick<Machine, "rapidFe
 
 /** Moves that would leave the machine's work envelope (machine zero at XY min, Z at stock top). */
 export const outOfBounds = (moves: ReadonlyArray<Move>, machine: Pick<Machine, "workArea">): ReadonlyArray<Move> =>
-  moves.filter(
+  expand(moves).filter(
     (m) => m.x < 0 || m.y < 0 || m.x > machine.workArea.x || m.y > machine.workArea.y || -m.z > machine.workArea.z,
   )

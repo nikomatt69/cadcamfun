@@ -2,10 +2,11 @@ import { useAtomSet, useAtomValue } from "@effect/atom-solid"
 import { Cause, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { For, Show, createSignal } from "solid-js"
+import { useNavigate } from "@solidjs/router"
 import { Doc } from "@cadcamfun/core"
 import type { Controller, Operation, OperationInput } from "@cadcamfun/cam"
-import type { Library } from "@cadcamfun/server"
-import { gcodeAtom, libraryAtom } from "../lib/atoms"
+import type { Library, ToolpathSummary } from "@cadcamfun/server"
+import { createToolpathAtom, gcodeAtom, libraryAtom, projectToolpathsAtom } from "../lib/atoms"
 import { download } from "../lib/download"
 import { useEditor } from "../editor/store"
 import { Button, Field, NumberInput, Section, Select } from "./ui"
@@ -32,11 +33,16 @@ export function CamPanel() {
 function CamPanelLoaded(props: { library: Library }) {
   const ed = useEditor()
   const generate = useAtomSet(() => gcodeAtom, { mode: "promiseExit" })
+  const createToolpath = useAtomSet(() => createToolpathAtom, { mode: "promiseExit" })
+  const saved = useAtomValue(() => projectToolpathsAtom(ed.project.id))
+  const navigate = useNavigate()
   const [busy, setBusy] = createSignal(false)
   const [controller, setController] = createSignal<Controller | "">("")
 
   const [kind, setKind] = createSignal<Kind>("Profile")
-  const [toolId, setToolId] = createSignal(props.library.tools[1]?.id ?? props.library.tools[0]!.id)
+  const [toolId, setToolId] = createSignal(
+    (props.library.tools.find((t) => t.kind === "flat-endmill") ?? props.library.tools[0]!).id,
+  )
   const [depth, setDepth] = createSignal(3)
   const [stepDown, setStepDown] = createSignal(0)
   const [side, setSide] = createSignal<"outside" | "inside" | "on">("outside")
@@ -81,6 +87,27 @@ function CamPanelLoaded(props: { library: Library }) {
       const err = Cause.squash(exit.cause) as { message?: string }
       ed.notify("error", err?.message ?? "G-code generation failed")
     }
+  }
+
+  const saveToolpath = async () => {
+    const out = ed.output()
+    if (!out) return
+    const name = prompt("Toolpath name", `${ed.doc().name || "Program"} · ${out.controller}`)?.trim()
+    if (!name) return
+    const exit = await createToolpath({
+      params: { projectId: ed.project.id },
+      payload: {
+        name,
+        controller: out.controller,
+        gcode: out.gcode,
+        program: out.program,
+        setup: ed.setup(),
+        stats: out.stats,
+      },
+      reactivityKeys: ["toolpaths"],
+    })
+    if (Exit.isSuccess(exit)) navigate(`/toolpaths/${exit.value.id}`)
+    else ed.notify("error", "Could not save the toolpath (save the project first)")
   }
 
   const autoStock = () => {
@@ -232,6 +259,7 @@ function CamPanelLoaded(props: { library: Library }) {
               { value: "grbl", label: "GRBL" },
               { value: "fanuc", label: "Fanuc" },
               { value: "linuxcnc", label: "LinuxCNC" },
+              { value: "heidenhain", label: "Heidenhain" },
               { value: "marlin", label: "Marlin" },
             ]}
             onChange={setController}
@@ -252,12 +280,17 @@ function CamPanelLoaded(props: { library: Library }) {
           <Section
             title={`G-code · ${out().controller}`}
             actions={
-              <button
-                class="text-xs text-[var(--accent)] hover:underline"
-                onClick={() => download(`${ed.doc().name.replace(/\W+/g, "_") || "program"}.nc`, out().gcode)}
-              >
-                Download
-              </button>
+              <span class="flex gap-3">
+                <button class="text-xs text-[var(--accent)] hover:underline" onClick={saveToolpath}>
+                  Save toolpath
+                </button>
+                <button
+                  class="text-xs text-[var(--accent)] hover:underline"
+                  onClick={() => download(`${ed.doc().name.replace(/\W+/g, "_") || "program"}.nc`, out().gcode)}
+                >
+                  Download
+                </button>
+              </span>
             }
           >
             <div class="grid grid-cols-2 gap-1 font-mono text-[11px] text-zinc-400">
@@ -269,6 +302,34 @@ function CamPanelLoaded(props: { library: Library }) {
             <pre class="max-h-64 overflow-auto rounded bg-black/50 p-2 font-mono text-[11px] leading-4 text-emerald-300">
               {out().gcode.split("\n").slice(0, 400).join("\n")}
             </pre>
+          </Section>
+        )}
+      </Show>
+
+      <Show
+        when={
+          AsyncResult.isSuccess(saved()) &&
+          (saved() as AsyncResult.Success<ReadonlyArray<ToolpathSummary>, unknown>).value
+        }
+      >
+        {(items) => (
+          <Section title={`Saved toolpaths (${items().length})`}>
+            <For
+              each={items()}
+              fallback={<p class="text-xs text-zinc-500">None yet: generate, then "Save toolpath".</p>}
+            >
+              {(t) => (
+                <a
+                  href={`/toolpaths/${t.id}`}
+                  class="flex items-center justify-between rounded bg-zinc-900 px-2 py-1 text-xs hover:bg-zinc-800"
+                >
+                  <span class="text-zinc-200">{t.name}</span>
+                  <span class="font-mono text-[11px] text-zinc-500">
+                    {t.controller} · v{t.versions + 1}
+                  </span>
+                </a>
+              )}
+            </For>
           </Section>
         )}
       </Show>

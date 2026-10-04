@@ -31,7 +31,12 @@ export default function Projects() {
         <h1 class="text-2xl font-bold tracking-tight text-zinc-100">
           CADCAM<span class="text-[var(--accent)]">FUN</span>
         </h1>
-        <span class="text-xs text-zinc-500">CAD · CAM · AI for CNC</span>
+        <nav class="flex items-baseline gap-4 text-xs">
+          <a href="/library" class="text-zinc-300 hover:text-[var(--accent)]">
+            Library
+          </a>
+          <span class="text-zinc-500">CAD · CAM · AI for CNC</span>
+        </nav>
       </header>
       <form class="mb-6 flex gap-2" onSubmit={submit}>
         <input

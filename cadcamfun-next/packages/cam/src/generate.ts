@@ -203,6 +203,12 @@ const drill = Effect.fnUntraced(function* (
       if (Geometry.distance(here, p) < Geometry.distance(here, remaining[idx]!)) idx = i
     })
     const p = remaining.splice(idx, 1)[0]!
+    if (op.cycle) {
+      if (!b.position) b.rapid(p.x, p.y, ctx.safeZ)
+      b.cycle({ x: p.x, y: p.y, z: -op.depth, r: retract, peck: op.peck, f: r.plunge })
+      here = p
+      continue
+    }
     b.rapid(p.x, p.y, ctx.safeZ).rapid(p.x, p.y, retract)
     if (op.peck > 0) {
       for (let d = op.peck; ; d += op.peck) {
@@ -295,6 +301,7 @@ export const generateOperation = Effect.fn("cam.generateOperation")(function* (c
     toolName: ctx.tool.name,
     toolDiameter: ctx.tool.diameter,
     rpm: r.rpm,
+    ...(ctx.tool.coolant && ctx.machine.coolant ? { coolant: ctx.tool.coolant } : {}),
     moves,
   }
   return toolpath

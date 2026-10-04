@@ -1,5 +1,6 @@
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { Commands, Doc, Elements, Geometry, Transform, type Element, type Vec2 } from "@cadcamfun/core"
+import { Toolpaths } from "@cadcamfun/cam"
 import { useEditor } from "../editor/store"
 
 interface View {
@@ -241,7 +242,7 @@ export function Canvas2D() {
     const result: Array<{ d: string; rapid: boolean }> = []
     for (const tp of out.program.toolpaths) {
       let prev: Vec2 | undefined
-      for (const m of tp.moves) {
+      for (const m of Toolpaths.expand(tp.moves)) {
         const s = toScreen(m)
         if (prev) result.push({ d: `M${prev.x},${prev.y}L${s.x},${s.y}`, rapid: m._tag === "Rapid" })
         prev = s

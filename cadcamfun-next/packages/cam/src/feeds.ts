@@ -21,7 +21,8 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
  */
 export const compute = (tool: Tool, material: Material, machine: Machine): Feeds => {
   const vc = material.cuttingSpeed * (tool.material === "hss" ? 0.4 : 1)
-  const rpm = Math.round(clamp((vc * 1000) / (Math.PI * tool.diameter), machine.minRpm, machine.maxRpm))
+  const maxRpm = Math.min(machine.maxRpm, tool.maxRpm ?? Infinity)
+  const rpm = Math.round(clamp((vc * 1000) / (Math.PI * tool.diameter), machine.minRpm, maxRpm))
   const chipLoad = material.chipLoad * (tool.diameter / 6)
   const feed = Math.round(clamp(rpm * tool.flutes * chipLoad, 10, machine.maxFeed))
   const plunge = Math.round(feed * (tool.kind === "drill" ? 0.5 : 0.3))

@@ -6,6 +6,8 @@ import "./styles.css"
 
 const Projects = lazy(() => import("./pages/Projects"))
 const Editor = lazy(() => import("./pages/Editor"))
+const Library = lazy(() => import("./pages/Library"))
+const ToolpathPage = lazy(() => import("./pages/Toolpath"))
 
 render(
   () => (
@@ -13,6 +15,8 @@ render(
       <Router>
         <Route path="/" component={Projects} />
         <Route path="/p/:id" component={Editor} />
+        <Route path="/library" component={Library} />
+        <Route path="/toolpaths/:id" component={ToolpathPage} />
       </Router>
     </RegistryProvider>
   ),

@@ -1,12 +1,17 @@
 import { Schema } from "effect"
 import { Geometry } from "@cadcamfun/core"
 
-export const Controller = Schema.Literals(["grbl", "fanuc", "linuxcnc", "marlin"])
+export const Controller = Schema.Literals(["grbl", "fanuc", "linuxcnc", "heidenhain", "marlin"])
 export type Controller = typeof Controller.Type
+
+export const MachineKind = Schema.Literals(["mill", "router", "lathe", "laser", "printer"])
+export type MachineKind = typeof MachineKind.Type
 
 export const Machine = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
+  kind: Schema.optional(MachineKind),
+  description: Schema.optional(Schema.String),
   controller: Controller,
   minRpm: Geometry.NonNegative,
   maxRpm: Geometry.Positive,
@@ -17,6 +22,8 @@ export const Machine = Schema.Struct({
   workArea: Geometry.Vec3,
   /** Automatic tool changer available (otherwise tool changes pause the program). */
   toolChanger: Schema.Boolean,
+  /** Coolant supported (emits M8/M9 when a tool requests it). */
+  coolant: Schema.optional(Schema.Boolean),
 })
 export type Machine = typeof Machine.Type
 

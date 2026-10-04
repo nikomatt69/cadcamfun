@@ -17,7 +17,7 @@ packages/server   Bun HTTP server: Effect HttpApi (OpenAPI), SQLite persistence,
 
 ```sh
 bun install
-cp .env.example .env        # add ANTHROPIC_API_KEY (or another provider) for the AI assistant
+cp .env.example .env        # optional: AI uses your nikcli login, or set a provider key here
 bun run dev                 # API on :8787, web on http://localhost:5173
 ```
 
@@ -66,7 +66,10 @@ islands; no tabs, ramps/helical entries or adaptive clearing yet.
 
 ## AI assistant
 
-Configure with `CADCAMFUN_AI_PROVIDER` (`anthropic` default, `openai`, `openrouter`, `google`,
+If nikcli is installed, the assistant reuses its login: API keys and unexpired OAuth tokens from
+nikcli's `auth.json` and the default `provider/model` from its global `nikcli.json` (same paths
+as nikcli: `NIKCLI_DATA_DIR`, `XDG_DATA_HOME/nikcli`, `~/.local/share/nikcli`). Environment
+variables override it. Configure with `CADCAMFUN_AI_PROVIDER` (`anthropic` default, `openai`, `openrouter`, `google`,
 `xai`), `CADCAMFUN_AI_MODEL` and the provider's API key variable. Tools: `get_document`,
 `add_shapes`, `transform_elements`, `delete_elements`, `list_library`, `get_cam_setup`,
 `configure_cam`, `add_operation`, `remove_operation`, `generate_gcode`.

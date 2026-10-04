@@ -29,7 +29,11 @@ const kinds = {
   /** Clear the area enclosed by closed elements with concentric offset passes. */
   Pocket: { stepOver: StepOver, direction: Direction },
   /** Drill at Point positions and at the centre of circles. `peck` 0 disables pecking. */
-  Drill: { peck: Geometry.NonNegative },
+  Drill: {
+    peck: Geometry.NonNegative,
+    /** Emit canned cycles (G81/G83, Heidenhain CYCL DEF 200) instead of explicit moves. */
+    cycle: Schema.optional(Schema.Boolean),
+  },
   /** Follow the element geometry exactly (no offset), e.g. for v-carving lines. */
   Engrave: {},
   /** Surface the bounding box of the selected elements (or the stock) with a zig-zag raster. */
