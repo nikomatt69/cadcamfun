@@ -87,3 +87,14 @@ CLAUDE.md
 .claude/* */
 target/*
 src-tauri/target/*
+# Legacy Next.js/Prisma codebase kept for reference only
+.reference/
+
+# Local dependency references and generated desktop build outputs
+.opencode/references/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/binaries/sidecar-*
+apps/desktop/src-tauri/resources/migrations/
+release/
+data/

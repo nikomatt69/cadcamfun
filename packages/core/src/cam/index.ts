@@ -1,0 +1,16 @@
+/**
+ * CAM core (WP2): the machine-neutral toolpath layer.
+ *
+ * Entities -> operations -> toolpath IR -> post-processor -> G-code text. An
+ * operation turns drawing geometry into IR moves; a post turns a program into
+ * dialect-specific text; nothing in between knows about G-code words.
+ */
+export * from "./ir.ts"
+export * from "./tool.ts"
+export * from "./params.ts"
+export * from "./path.ts"
+export * from "./arc-fit.ts"
+export * from "./geometry.ts"
+export * from "./operations/index.ts"
+export * from "./post/index.ts"
+export * as testing from "./testing/index.ts"

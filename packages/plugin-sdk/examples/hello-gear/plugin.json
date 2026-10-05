@@ -1,0 +1,14 @@
+{
+  "id": "com.example.hello-gear",
+  "name": "Hello Gear",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "entry": "index.js",
+  "capabilities": ["drawing:write", "toolpath:read", "storage", "ui:panel"],
+  "contributes": {
+    "commands": [{ "id": "hello-gear.add", "title": "Add a gear", "keybinding": "Mod+Shift+G" }],
+    "panels": [{ "id": "hello-gear.panel", "title": "Gear generator", "entry": "panel" }],
+    "postProcessors": [{ "id": "hello-gear.header", "title": "Hello Gear header", "entry": "post" }]
+  },
+  "dev": true
+}

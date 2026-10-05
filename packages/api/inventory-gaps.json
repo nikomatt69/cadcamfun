@@ -1,0 +1,1056 @@
+{
+  "total": 195,
+  "covered": 68,
+  "missing": [
+    {
+      "route": "/api",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/ai/analyze-gcode",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/anthropic-proxy",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/anthropic-stream",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/chat",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/containers",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/containers/:id",
+      "missingMethods": [
+        "DELETE",
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/containers/:id/files",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/files",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/files/:id",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/code-interpreter/files/upload",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/completion",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/continuous-agent",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "OPTIONS",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/feedback",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/gcode",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/mcp",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/mcp-test",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/openai-proxy",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/openai-vision-proxy",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/proxy",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/toolpath-analysis",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ai/websearch",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics/dashboard-data",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics/log-view",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/analytics/recent-activity",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics/user-history",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics/user-metrics",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/analytics/user-usage",
+      "missingMethods": [
+        "DELETE",
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/app-control/notify",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/auth/get-session",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/auth/signin-direct",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/auth/signup",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/auth/test-direct-create",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/auth/verify-magic-link",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/better-auth-stripe/billing-portal",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/better-auth-stripe/feature-access",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/better-auth-stripe/subscription",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/better-auth-stripe/sync",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/analysis",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/comments",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/comments/:commentId",
+      "missingMethods": [
+        "DELETE",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/details",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/relationships",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/storage",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/versions",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/versions/:versionId",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/:id/versions/restore",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/export-import",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/components/library",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/conversation/:id",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/conversation/:id",
+      "missingMethods": [
+        "GET",
+        "PATCH"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/conversation/:id/messages",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/conversation/:id/read",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/cron/update-expired-trials",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/desktop/auth/signin",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/desktop/projects",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/desktop/user/by-email",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/graphql-playground",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/health/stripe",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/invitations/:token/accept",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/checkout",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/checkout/route",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/config/test",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/items",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/items/:id",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/items/:id/download",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/orders/:id/download",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/orders/my-purchases",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/seller/dashboard",
+      "missingMethods": [
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/marketplace/webhooks/polar",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/marketplace/wishlist",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/mcp-agent",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp-protocol",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/mcp/config",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/config/:id",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/generate-assembly",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/resource",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/server-info",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/session",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/sessions",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/specialized-tools",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/stdio-cleanup",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/stdio-server-status",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/tool",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/utilities",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/mcp/websearch",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ml/evaluate",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ml/feedback",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/ml/train",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/og",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/og-image/*slug",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/openai/completion",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/organizations/:id/conversations",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/organizations/:id/invite",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/organizations/:id/members",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/organizations/:id/projects",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/projects/tracked/:id",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/push-subscription",
+      "missingMethods": [
+        "DELETE",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/route",
+      "missingMethods": [],
+      "existingMethods": [],
+      "unresolvedMethods": true
+    },
+    {
+      "route": "/api/subscription/info",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/subscriptions",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/subscriptions/portal",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/test-webauthn",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/:id/comments",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/:id/comments/:commentId",
+      "missingMethods": [
+        "DELETE",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/:id/versions",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/:id/versions/restore",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/export-import",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/toolpaths/library",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/:id",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/api-keys",
+      "missingMethods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/components",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/delete-account",
+      "missingMethods": [
+        "DELETE"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/organizations",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/password",
+      "missingMethods": [
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/profile",
+      "missingMethods": [
+        "GET",
+        "PUT"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/projects",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/stats",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/tokens",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/toolpaths",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/user/verify-change",
+      "missingMethods": [
+        "GET"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/webhooks/stripe",
+      "missingMethods": [
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    },
+    {
+      "route": "/api/websocket",
+      "missingMethods": [
+        "GET",
+        "POST"
+      ],
+      "existingMethods": [],
+      "unresolvedMethods": false
+    }
+  ]
+}

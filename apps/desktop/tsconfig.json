@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "jsx": "preserve", "jsxImportSource": "solid-js", "types": ["bun", "vite/client"] },
+  "include": ["src", "test", "scripts", "vite.config.ts", "src-tauri/stub"]
+}

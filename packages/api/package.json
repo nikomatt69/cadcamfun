@@ -1,0 +1,18 @@
+{
+  "name": "@cadcamfun/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "coverage": "bun scripts/api-coverage.ts"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112",
+    "@cadcamfun/core": "workspace:*",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {}
+}

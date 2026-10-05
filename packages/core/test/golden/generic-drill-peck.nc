@@ -1,0 +1,20 @@
+(PROGRAM: drill-peck)
+(UNITS: MM)
+(WORK OFFSET: G54)
+(material: aluminium 6061)
+(OP 1: Four holes | T3 [3] | S10000 | F300)
+G21 G90 G17 G94
+G54
+(OPERATION: Four holes)
+T3 M6
+M3 S10000
+(Drill: Four holes)
+G0 X10.000 Y10.000 Z10.000
+G83 G99 Z-9.000 R2.000 Q3.000 F300
+Y40.000
+X50.000
+Y10.000
+G80
+G0 Z10.000
+M5
+M30

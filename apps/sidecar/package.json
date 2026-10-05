@@ -1,0 +1,24 @@
+{
+  "name": "@cadcamfun/sidecar",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "bun src/main.ts"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112",
+    "@effect/platform-bun": "4.0.0-rc.112",
+    "@cadcamfun/db": "workspace:*",
+    "@cadcamfun/api": "workspace:*",
+    "@cadcamfun/core": "workspace:*",
+    "@cadcamfun/ai": "workspace:*",
+    "@cadcamfun/plugin-sdk": "workspace:*",
+    "drizzle-orm": "1.0.0-beta.22",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {}
+}

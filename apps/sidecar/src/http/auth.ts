@@ -1,0 +1,124 @@
+import {
+  Api, AuthBadRequest, AuthInternal, AuthNotFound, PasskeyNotImplemented
+} from "@cadcamfun/api"
+import { Effect } from "effect"
+import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+import { AppConfigService } from "../config.ts"
+import { AuthRepo } from "../repos/auth-repo.ts"
+import { AuthTokens } from "../services/auth-tokens.ts"
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const bad = (error: string, details: string) => new AuthBadRequest({ error, details })
+const notFound = (error: string, details: string) => new AuthNotFound({ error, details })
+const detailsOf = (e: unknown) => e instanceof Error ? e.message : "Errore interno del server"
+const internal = (log: string, error: string, details?: string) => (e: unknown) =>
+  Effect.logError(log, e).pipe(Effect.andThen(Effect.fail(new AuthInternal({ error, details: details ?? detailsOf(e) }))))
+
+const COOKIE = "auth-token=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+
+export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function*(handlers) {
+  const repo = yield* AuthRepo
+  const tokens = yield* AuthTokens
+  const config = yield* AppConfigService
+  const base = config.appUrl ?? "http://localhost:3001"
+  const debug = config.debugLinks === true
+
+  /** forgot-password and send-magic-link differ only in copy, token type and lifetime. */
+  const linkFlow = Effect.fn("auth.linkFlow")(function*(
+    input: { readonly email?: string | undefined; readonly callbackURL?: string | undefined },
+    flow: { type: string; ttl: number; callback: string; message: string }
+  ) {
+    const { email } = input
+    if (!email) return yield* bad("Email richiesta", "Inserisci un indirizzo email valido")
+    if (!EMAIL.test(email)) return yield* bad("Email non valida", "Inserisci un indirizzo email valido")
+    const user = yield* repo.findByEmail(email.trim().toLowerCase())
+    // Never reveal whether the address exists.
+    if (!user?.email) return { success: true as const, message: flow.message }
+    const jwt = tokens.sign({ userId: user.id, email: user.email, type: flow.type }, flow.ttl)
+    const url = `${base}${input.callbackURL ?? flow.callback}?token=${jwt}`
+    // No mail transport in the desktop app yet (legacy had the same TODO): the link is logged.
+    yield* Effect.logInfo(`${flow.type} link generated for ${user.email}`)
+    return { success: true as const, message: flow.message, ...(debug ? { link: url } : {}) }
+  })
+
+  return handlers
+    .handle("forgotPassword", ({ payload }) =>
+      linkFlow(payload, {
+        type: "password-reset", ttl: 30 * 60, callback: "/auth/reset-password",
+        message: "Se l'email esiste nel nostro sistema, riceverai un link per resettare la password."
+      }).pipe(
+        Effect.map(({ link, ...rest }) => ({ ...rest, ...(link ? { debugResetLink: link } : {}) })),
+        Effect.catchTag("DatabaseError", internal("Forgot password error", "Errore durante la richiesta di reset password"))))
+    .handle("sendMagicLink", ({ payload }) =>
+      linkFlow(payload, {
+        type: "magic-link", ttl: 15 * 60, callback: "/auth/verify-magic-link",
+        message: "Se l'email esiste nel nostro sistema, riceverai un link magico a breve."
+      }).pipe(
+        Effect.map(({ link, ...rest }) => ({ ...rest, ...(link ? { debugMagicLink: link } : {}) })),
+        Effect.catchTag("DatabaseError", internal("Send magic link error", "Errore durante l'invio del link magico"))))
+    .handle("resetPassword", ({ payload }) => Effect.gen(function*() {
+      const { token, newPassword, confirmPassword } = payload
+      if (!token) return yield* bad("Token richiesto", "Password reset token mancante")
+      if (!newPassword || !confirmPassword) return yield* bad("Password richieste", "Inserisci la nuova password e la conferma")
+      if (newPassword !== confirmPassword) {
+        return yield* bad("Password non corrispondenti", "La nuova password e la conferma devono essere identiche")
+      }
+      if (newPassword.length < 8) return yield* bad("Password troppo corta", "La password deve essere di almeno 8 caratteri")
+      const claims = yield* tokens.verify(token).pipe(Effect.mapError(() =>
+        bad("Token non valido o scaduto", "Il link di reset password è scaduto o non valido. Richiedi un nuovo link.")))
+      if (claims.type !== "password-reset") return yield* bad("Token non valido", "Questo non è un token di reset password valido")
+      const user = yield* repo.findById(claims.userId)
+      if (!user) return yield* notFound("Utente non trovato", "L'account associato a questo reset token non esiste più")
+      if (user.email !== claims.email) return yield* bad("Token non valido", "L'email associata al token non corrisponde")
+      const hash = yield* Effect.promise(() => Bun.password.hash(newPassword, { algorithm: "bcrypt", cost: 12 }))
+      yield* repo.setPassword(user.id, hash)
+      return {
+        success: true as const,
+        message: "Password resettata con successo! Ora puoi effettuare il login con la nuova password.",
+        user: { id: user.id, email: user.email ?? "", name: user.name }
+      }
+    }).pipe(Effect.catchTag("DatabaseError", internal("Reset password error", "Errore durante il reset della password"))))
+    .handle("sendVerificationEmail", ({ payload }) => Effect.gen(function*() {
+      const { email } = payload
+      if (!email) return yield* bad("Email mancante", "L'indirizzo email è richiesto")
+      const user = yield* repo.findByEmail(email)
+      if (!user?.email) return yield* notFound("Utente non trovato", "Nessun utente trovato con questo indirizzo email")
+      if (user.emailVerified) return yield* bad("Email già verificata", "Questo indirizzo email è già stato verificato")
+      const jwt = tokens.sign({ userId: user.id, email: user.email, type: "email-verification" }, 24 * 60 * 60)
+      const link = `${base}${payload.callbackURL ?? "/auth/verify-email"}?token=${jwt}`
+      yield* Effect.logInfo(`email verification link generated for ${user.email}`)
+      return { success: true as const, message: "Verification email sent successfully", debug: { link } }
+    }).pipe(Effect.catchTag("DatabaseError", internal(
+      "Send verification email failed", "Errore interno del server",
+      "Si è verificato un errore durante l'invio dell'email di verifica"))))
+    .handle("verifyEmail", ({ payload }) => Effect.gen(function*() {
+      if (!payload.token) return yield* bad("Token mancante", "Il token di verifica è richiesto")
+      const claims = yield* tokens.verify(payload.token).pipe(Effect.mapError((kind) => kind === "expired"
+        ? bad("Link scaduto", "Il link di verifica è scaduto. Richiedi un nuovo link.")
+        : bad("Token non valido", "Il link di verifica non è valido o è stato manomesso.")))
+      if (claims.type !== "email-verification") return yield* bad("Token non valido", "Il token non è per la verifica email")
+      const user = yield* repo.markVerified(claims.userId)
+      if (!user) return yield* notFound("Utente non trovato", "L'utente associato al token di verifica non esiste")
+      return {
+        success: true as const,
+        message: "Email verified successfully",
+        user: { id: user.id, email: user.email ?? "", name: user.name, emailVerified: (user.emailVerified ?? new Date()).toISOString() }
+      }
+    }).pipe(Effect.catchTag("DatabaseError", internal(
+      "Email verification failed", "Errore interno del server",
+      "Si è verificato un errore durante la verifica dell'email"))))
+    .handle("signout", () => Effect.succeed(HttpApiSchema.withHeaders({
+      body: { success: true as const, message: "Logout effettuato con successo!" },
+      headers: { "set-cookie": [COOKIE] }
+    })))
+    .handle("registerPasskey", () => Effect.fail(new PasskeyNotImplemented({
+      error: "Passkey registration not yet implemented",
+      details: "Passkey authentication sarà disponibile in futuro",
+      todoImplementation: {
+        webauthn: "Utilizzare @simplewebauthn/server",
+        challengeGeneration: "Generare challenge sicuro",
+        credentialStorage: "Salvare public key nel database",
+        userVerification: "Implementare user verification"
+      }
+    })))
+}))

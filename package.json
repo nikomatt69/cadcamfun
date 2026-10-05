@@ -1,0 +1,28 @@
+{
+  "name": "cadcamfun",
+  "private": true,
+  "version": "6.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck && bunx tsc -p tsconfig.json",
+    "test": "bun test packages apps scripts",
+    "build": "bun scripts/build.ts",
+    "build:sidecar": "bun scripts/build.ts --only=compile,resources",
+    "build:desktop": "bun run --filter @cadcamfun/desktop build",
+    "desktop:dev": "bun run build:sidecar && bun run --filter @cadcamfun/desktop tauri dev",
+    "db:generate": "bun run --filter @cadcamfun/db generate",
+    "db:migrate": "bun run --filter @cadcamfun/db migrate"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "@effect/platform-node-shared": "4.0.0-rc.112",
+    "@effect/platform-node": "4.0.0-rc.112"
+  }
+}

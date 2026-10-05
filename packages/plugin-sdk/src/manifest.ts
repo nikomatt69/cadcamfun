@@ -1,0 +1,120 @@
+/**
+ * The plugin manifest (`plugin.json`) and its validation (spec 09-plugins.md §1).
+ *
+ * The Schema is the contract: the host refuses to install anything that does not
+ * decode, and every field the host relies on (id, entry, apiVersion, capabilities)
+ * is validated here rather than trusted from disk.
+ *
+ * Capabilities are *not* cross-checked here: `drawing:write` already implies
+ * `drawing:read` (see `capability.ts`), so requiring both in the manifest would
+ * only make authors repeat themselves.
+ */
+import { Effect, Schema } from "effect"
+import { CapabilitySchema, type Capability } from "./capability.ts"
+
+/** Reverse-DNS identifier, e.g. `com.example.gear-generator`. */
+export const PluginIdSchema = Schema.String.check(
+  Schema.isMinLength(3),
+  Schema.isMaxLength(128),
+  Schema.isPattern(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/)
+)
+export type PluginId = typeof PluginIdSchema.Type
+
+/** `major.minor.patch` with an optional pre-release suffix. */
+export const SemverSchema = Schema.String.check(
+  Schema.isPattern(/^\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/)
+)
+
+/** Plugin API major version this SDK implements. */
+export const SUPPORTED_API_VERSION = "1"
+
+export const CommandContributionSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  /** Keyboard shortcut in the app's notation, e.g. `Mod+Shift+G`. */
+  keybinding: Schema.optional(Schema.String)
+})
+export type CommandContribution = typeof CommandContributionSchema.Type
+
+export const PanelContributionSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  /** Name of a function the plugin exposes for the panel's declarative tree. */
+  entry: Schema.String
+})
+export type PanelContribution = typeof PanelContributionSchema.Type
+
+export const PostProcessorContributionSchema = Schema.Struct({
+  /** Post id the plugin registers into WP2's registry at runtime. */
+  id: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  /** Name of the exported `(program, options) => string` function. */
+  entry: Schema.String
+})
+export type PostProcessorContribution = typeof PostProcessorContributionSchema.Type
+
+export const OperationContributionSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  /** Name of the exported `{ schema, generate }` record. */
+  entry: Schema.String
+})
+export type OperationContribution = typeof OperationContributionSchema.Type
+
+export const ContributionsSchema = Schema.Struct({
+  commands: Schema.optional(Schema.Array(CommandContributionSchema)),
+  panels: Schema.optional(Schema.Array(PanelContributionSchema)),
+  postProcessors: Schema.optional(Schema.Array(PostProcessorContributionSchema)),
+  operations: Schema.optional(Schema.Array(OperationContributionSchema))
+})
+export type Contributions = typeof ContributionsSchema.Type
+
+export const PluginManifestSchema = Schema.Struct({
+  id: PluginIdSchema,
+  name: Schema.String.check(Schema.isMinLength(1)),
+  version: SemverSchema,
+  /** Plugin API major the plugin targets; only `1` exists today. */
+  apiVersion: Schema.Literal(SUPPORTED_API_VERSION),
+  /** ES module entry, relative to the plugin folder. */
+  entry: Schema.String.check(Schema.isMinLength(1)),
+  capabilities: Schema.Array(CapabilitySchema),
+  contributes: Schema.optional(ContributionsSchema),
+  /** Ed25519 signature over the archive hash; required for packaged installs. */
+  signature: Schema.optional(Schema.String),
+  /** Local development plugin: skips signature checks, shows a badge in the UI. */
+  dev: Schema.optional(Schema.Boolean)
+})
+export type PluginManifest = typeof PluginManifestSchema.Type
+
+export const decodeManifest = Schema.decodeUnknownEffect(PluginManifestSchema)
+export const encodeManifest = Schema.encodeEffect(PluginManifestSchema)
+export const isManifest = Schema.is(PluginManifestSchema)
+
+/**
+ * Parses and validates a `plugin.json` payload. Returns the typed manifest or a
+ * `SchemaError` with the readable issues, which is what the install endpoint
+ * shows the user. A JSON syntax error is turned into the same error channel, so
+ * callers only have to handle one failure type.
+ */
+export const parseManifest = (json: string) =>
+  Effect.flatMap(
+    Effect.try({
+      try: () => JSON.parse(json) as unknown,
+      catch: (cause) => cause
+    }),
+    (value) => Schema.decodeUnknownEffect(PluginManifestSchema)(value)
+  )
+
+/** Capabilities a manifest asks for, as a sorted array (for display and diffing). */
+export const requestedCapabilities = (manifest: PluginManifest): ReadonlyArray<Capability> =>
+  [...manifest.capabilities].sort()
+
+/** A manifest with a stable fingerprint: `{id}@{version}`. */
+export const manifestKey = (manifest: PluginManifest): string => `${manifest.id}@${manifest.version}`
+
+/** Whether a manifest may be installed without a signature (spec 09 §4). */
+export const isDevPlugin = (manifest: PluginManifest): boolean => manifest.dev === true
+
+/** Whether the manifest carries the signature a packaged install requires. */
+export const isSigned = (manifest: PluginManifest): boolean =>
+  typeof manifest.signature === "string" && manifest.signature.length > 0

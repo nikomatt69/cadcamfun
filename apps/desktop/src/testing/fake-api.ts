@@ -1,0 +1,138 @@
+import { Effect, Layer } from "effect"
+import { ApiClient as Service, clientLayer } from "../app/client.ts"
+import type { Client } from "../state/client.ts"
+
+export type ApiClient = Client
+type Row = Record<string, unknown> & { id: string; name: string }
+export interface FakeApiSeed {
+  readonly projects?: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  readonly materials?: ReadonlyArray<Row>
+  readonly tools?: ReadonlyArray<Row>
+  readonly machineConfigs?: ReadonlyArray<Row>
+  readonly toolpaths?: ReadonlyArray<Row>
+}
+export interface FakeApiOptions { readonly seed?: FakeApiSeed; readonly now?: () => string }
+export interface FakeStore {
+  projects: Row[]
+  drawings: Row[]
+  materials: Row[]
+  tools: Row[]
+  machineConfigs: Row[]
+  toolpaths: Row[]
+}
+export class FakeApiError extends Error {
+  readonly _tag = "FakeApiError"
+  constructor(readonly details: { readonly endpoint: string; readonly message: string }) { super(details.message) }
+}
+export type FakeApi = Client & {
+  readonly store: FakeStore
+  failNext(endpoint: string, error?: FakeApiError): void
+  createdIds(): ReadonlyArray<string>
+}
+
+// Use the real generated client over an in-memory HTTP transport: payloads and
+// responses undergo the same schema decoding as the sidecar, without casts.
+/**
+ * Decodes a request body into a value: strings are JSON, bytes are decoded as UTF-8,
+ * and a stream (what `fetch` hands a `Request` body) is drained. Anything else is
+ * treated as an empty payload, matching what an endpoint with no fields would send.
+ */
+const decodeBody = async (body: unknown): Promise<unknown> => {
+  try {
+    if (typeof body === "string") return body === "" ? {} : JSON.parse(body)
+    if (body instanceof Uint8Array) return body.length === 0 ? {} : JSON.parse(new TextDecoder().decode(body))
+    if (ArrayBuffer.isView(body) || body instanceof ArrayBuffer) {
+      const bytes = body instanceof ArrayBuffer ? new Uint8Array(body) : new Uint8Array(body.buffer, body.byteOffset, body.byteLength)
+      return bytes.length === 0 ? {} : JSON.parse(new TextDecoder().decode(bytes))
+    }
+    if (body instanceof ReadableStream) {
+      const text = await new Response(body).text()
+      return text === "" ? {} : JSON.parse(text)
+    }
+    if (typeof body === "object" && body !== null) return body
+  } catch {
+    return {}
+  }
+  return {}
+}
+
+export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
+  const now = options.now ?? (() => new Date().toISOString())
+  const common = () => ({ createdAt: now(), updatedAt: now(), ownerId: "user-local", organizationId: null, isPublic: false })
+  const store: FakeStore = {
+    projects: (options.seed?.projects ?? []).map((p) => ({ ...common(), description: null, ...p })),
+    drawings: [],
+    materials: [...(options.seed?.materials ?? [{ ...common(), id: "aluminium", name: "Aluminium 6061", description: null, properties: { density: 2700, costPerUnit: 4.2 } }])],
+    tools: [...(options.seed?.tools ?? [{ ...common(), id: "endmill", name: "6 mm end mill", type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: 3, maxRPM: 18000, coolantType: null, cuttingLength: null, totalLength: null, shankDiameter: null, notes: null }])],
+    machineConfigs: [...(options.seed?.machineConfigs ?? [{ ...common(), id: "grbl", name: "3018 CNC", type: "mill", description: null, config: { workVolume: { x: 300, y: 180, z: 60 }, maxSpindleSpeed: 18000, maxFeedRate: 2000, controller: "grbl" } }])],
+    toolpaths: [...(options.seed?.toolpaths ?? [])]
+  }
+  const failures = new Map<string, string>()
+  const ids: string[] = []
+  let sequence = 0
+  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } })
+  const handle: (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => Promise<Response> = async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input))
+    const parts = url.pathname.split("/").filter(Boolean)
+    const group = parts[1] ?? "health"
+    const method = init?.method ?? "GET"
+    const failure = failures.get(group)
+    if (failure !== undefined) { failures.delete(group); return json({ message: failure }, 500) }
+    // Both health paths answer the same body: the legacy `/api/health` and the
+    // authenticated `/health` the native boot contract uses.
+    if (url.pathname === "/health" || url.pathname === "/api/health") return json({ status: "ok", timestamp: now() })
+    // The generated client encodes JSON payloads as bytes, not as a string, so the body
+    // has to be decoded from whichever representation the transport was handed.
+    const body: unknown = await decodeBody(init?.body)
+    const payload = typeof body === "object" && body !== null ? body : {}
+    const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null ? Object.fromEntries(Object.entries(value)) : {}
+    const data = record(payload)
+    const collection = group === "machine-configs" ? store.machineConfigs : group === "projects" ? store.projects : group === "drawings" ? store.drawings : group === "materials" ? store.materials : group === "tools" ? store.tools : group === "toolpaths" ? store.toolpaths : undefined
+    if (collection === undefined) return json({ message: "Not implemented in browser preview" }, 501)
+    const envelope = (value: unknown, status = 200) => group === "machine-configs" ? json({ success: true, data: value }, status) : json(value, status)
+    const relations = (row: Row) => group === "projects" ? { ...row, owner: { id: "user-local", name: "Local profile", email: null }, organization: null, _count: { drawings: store.drawings.filter((d) => d["projectId"] === row.id).length, components: 0 } } : row
+    const id = parts[2]
+    if (group === "projects" && parts[3] === "drawings") {
+      if (!store.projects.some((p) => p.id === id)) return json({ message: "Project not found" }, 404)
+      if (method === "GET") return json(store.drawings.filter((d) => d["projectId"] === id))
+      const row: Row = { id: `drawing-${++sequence}`, name: "Drawing", description: null, data: null, thumbnail: null, createdAt: now(), updatedAt: now(), ...data, projectId: id }
+      store.drawings.push(row); ids.push(row.id)
+      return json(row, 201)
+    }
+    if (method === "GET" && !id) {
+      const rows = collection.filter((row) => !url.searchParams.get("projectId") || row["projectId"] === url.searchParams.get("projectId"))
+      return envelope(group === "machine-configs" ? { configs: rows, total: rows.length } : rows.map(relations))
+    }
+    if (method === "POST" && !id) {
+      if (typeof data["name"] !== "string" || !data["name"].trim()) return json({ message: "Name is required" }, 400)
+      const defaults = group === "tools" ? { type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: null, maxRPM: null, coolantType: null, cuttingLength: null, totalLength: null, shankDiameter: null, notes: null } : group === "toolpaths" ? { data: null, type: null, operationType: null, gcode: null, thumbnail: null, createdBy: "user-local", drawingId: null, materialId: null, toolId: null, machineConfigId: null } : { properties: {} }
+      const row: Row = { ...common(), ...defaults, description: null, ...data, id: `${group}-${++sequence}`, name: data["name"] }
+      collection.push(row); ids.push(row.id)
+      // Machine configs answer through the legacy envelope helpers, which default to
+      // 200 even on create; the other collections declare 201 in the contract.
+      return envelope(row, group === "machine-configs" ? 200 : 201)
+    }
+    const index = collection.findIndex((r) => r.id === id)
+    const row = collection[index]
+    if (row === undefined) return json({ message: "Not found" }, 404)
+    if (method === "DELETE") {
+      collection.splice(index, 1)
+      if (group === "projects") { store.drawings = store.drawings.filter((d) => d["projectId"] !== id); store.toolpaths = store.toolpaths.filter((d) => d["projectId"] !== id) }
+      return envelope({ message: "Deleted" })
+    }
+    if (method === "PUT") {
+      const updated = { ...row, ...data, id: row.id, name: typeof data["name"] === "string" ? data["name"] : row.name, updatedAt: now() }
+      collection[index] = updated
+      return envelope(group === "toolpaths" ? { ...updated, message: "Updated" } : relations(updated))
+    }
+    if (group === "drawings") return json({ ...row, project: { id: row["projectId"], name: "Project", ownerId: "user-local", organization: null } })
+    if (group === "tools" || group === "materials") return json({ ...row, owner: null, organization: null })
+    return envelope(relations(row))
+  }
+  const transport = Object.assign(handle, { preconnect: globalThis.fetch.preconnect })
+  const layer = clientLayer({ baseUrl: "http://preview.local", token: "preview" }, transport)
+  const client = Effect.runSync(Effect.service(Service).pipe(Effect.provide(layer)))
+  return Object.assign(client, { store, createdIds: () => [...ids], failNext: (endpoint: string, error?: FakeApiError) => { failures.set(endpoint === "machineConfigs" ? "machine-configs" : endpoint, error?.message ?? "Request failed") } })
+}
+
+export const fakeApiLayer = (options?: FakeApiOptions) => Layer.succeed(Service, createFakeApi(options))

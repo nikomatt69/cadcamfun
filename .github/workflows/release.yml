@@ -1,0 +1,217 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v-prefixed version tag to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.4.2"
+
+jobs:
+  trusted:
+    if: >-
+      github.event.repository.fork == false &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag, 'v')))
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.ref.outputs.tag }}
+      version: ${{ steps.ref.outputs.version }}
+      sha: ${{ steps.ref.outputs.sha }}
+      pub_date: ${{ steps.ref.outputs.pub_date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Validate release tag and application version
+        id: ref
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: bun --no-env-file scripts/release-ref.ts
+
+  build:
+    needs: trusted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,rpm,appimage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.trusted.outputs.sha }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: cargo-${{ matrix.target }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux bundler dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 libssl-dev build-essential rpm
+      - name: Import Windows signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) { throw 'Windows signing certificate and password are required' }
+          $path = Join-Path $env:RUNNER_TEMP 'release-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password
+            if (-not $cert.HasPrivateKey) { throw 'Certificate has no private key' }
+            "TAURI_WINDOWS_CERTIFICATE_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+          } finally { Remove-Item $path -ErrorAction SilentlyContinue }
+      - name: Build, sign and index release assets
+        env:
+          CADCAM_RELEASE: "1"
+          RELEASE_TAG: ${{ needs.trusted.outputs.tag }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bun --no-env-file scripts/build.ts --target=${{ matrix.target }} --bundles=${{ matrix.bundles }} --out-dir=release
+      - name: Build architecture-specific updater manifest
+        env:
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
+          RELEASE_DATE: ${{ needs.trusted.outputs.pub_date }}
+          RELEASE_TARGET: ${{ matrix.target }}
+        shell: bash
+        run: bun --no-env-file scripts/updater-manifest.ts --collect-dir=release --arch="$RELEASE_TARGET" --version="$RELEASE_VERSION" --release-url="$RELEASE_URL" --pub-date="$RELEASE_DATE" --out=manifest/latest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifest-${{ matrix.target }}
+          path: manifest/latest.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.target }}
+          path: release/
+          if-no-files-found: error
+      - name: Remove Windows signing certificate
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ($env:TAURI_WINDOWS_CERTIFICATE_THUMBPRINT) { Remove-Item "Cert:\CurrentUser\My\$env:TAURI_WINDOWS_CERTIFICATE_THUMBPRINT" -ErrorAction SilentlyContinue }
+
+  manifest:
+    needs: [trusted, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.trusted.outputs.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: manifest-*
+          path: manifests
+      - name: Validate and merge all four updater platforms
+        env:
+          RELEASE_VERSION: ${{ needs.trusted.outputs.version }}
+        run: bun --no-env-file scripts/updater-manifest.ts --merge=manifests --out=latest.json --version="$RELEASE_VERSION" --expected-platforms=darwin-aarch64,darwin-x86_64,windows-x86_64,linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latest-json
+          path: latest.json
+          if-no-files-found: error
+
+  draft-release:
+    needs: [trusted, build, manifest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.trusted.outputs.sha }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: installers
+      - uses: actions/download-artifact@v4
+        with:
+          name: latest-json
+          path: manifest
+      - name: Verify checksums and manifest asset links; stage release
+        env:
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/download/${{ needs.trusted.outputs.tag }}
+        run: bun --no-env-file scripts/stage-release.ts --installers=installers --manifest=manifest/latest.json --out=dist --release-url="$RELEASE_URL"
+      - name: Refuse to modify an already published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.trusted.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > existing-release.json; then
+            bun --no-env-file -e 'const release = await Bun.file("existing-release.json").json(); if (release.isDraft !== true) throw new Error("Release is already published")'
+          else
+            gh api "repos/$GITHUB_REPOSITORY/releases?per_page=1" > /dev/null
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.trusted.outputs.tag }}
+          target_commitish: ${{ needs.trusted.outputs.sha }}
+          name: CADCAM FUN ${{ needs.trusted.outputs.tag }}
+          draft: true
+          prerelease: ${{ contains(needs.trusted.outputs.version, '-') }}
+          body_path: dist/RELEASE_NOTES.md
+          files: dist/*
+          fail_on_unmatched_files: true

@@ -1,0 +1,163 @@
+/**
+ * Ambient declaration for the part of `@nikcli-ai/sdk-next@1.428.0` this
+ * package uses. The upstream package ships `index.js` only (spec 08, 6.1).
+ * Everything the app touches is imported through `./host.ts`, so a future API
+ * change is confined to this folder.
+ */
+declare module "@nikcli-ai/sdk-next" {
+  import type { Effect } from "effect"
+
+  /** Context handed to `Tool.define(...).execute`. */
+  export interface ToolExecuteContext {
+    readonly sessionID: string
+    readonly messageID: string
+    readonly agent: string
+    readonly callID?: string
+    readonly abort: AbortSignal
+  }
+
+  export interface ToolExecuteResult {
+    readonly title: string
+    readonly output: string
+    readonly metadata: Record<string, unknown>
+  }
+
+  export interface ToolDefinition {
+    readonly description: string
+    /** A zod 4 object schema. */
+    readonly parameters: unknown
+    readonly execute: (args: never, ctx: ToolExecuteContext) => Promise<ToolExecuteResult>
+  }
+
+  /** Opaque value accepted by `NikCli.tools.register`. */
+  export interface ToolInfo {
+    readonly id: string
+  }
+
+  export const Tool: {
+    define(id: string, init: () => Promise<ToolDefinition>): ToolInfo
+  }
+
+  export class ClientError extends Error {
+    readonly reason: string
+  }
+
+  /** Subset of the host's SSE bus event. */
+  export interface HostEvent {
+    readonly type: string
+    readonly properties: Record<string, unknown>
+  }
+
+  export interface HostSession {
+    readonly id: string
+    readonly title: string
+    readonly directory: string
+  }
+
+  export interface HostMessageInfo {
+    readonly id: string
+    readonly role: string
+    readonly error?: { readonly name?: string; readonly data?: { readonly message?: string } }
+    readonly tokens?: { readonly input: number; readonly output: number }
+    readonly finish?: string
+  }
+
+  export interface HostPart {
+    readonly id: string
+    readonly type: string
+    readonly text?: string
+    readonly tool?: string
+    readonly callID?: string
+    readonly state?: {
+      readonly status: string
+      readonly input?: unknown
+      readonly output?: string
+      readonly error?: string
+    }
+  }
+
+  export interface HostPromptResult {
+    readonly info?: HostMessageInfo
+    readonly parts?: ReadonlyArray<HostPart>
+    /** Present instead of `info` when the host rejected the prompt. */
+    readonly name?: string
+    readonly data?: { readonly message?: string }
+  }
+
+  export interface RequestOptions {
+    readonly signal?: AbortSignal
+    readonly headers?: HeadersInit
+  }
+
+  export interface HostClient {
+    readonly session: {
+      create(input?: { title?: string }, options?: RequestOptions): Promise<HostSession>
+      list(input?: { limit?: number }, options?: RequestOptions): Promise<ReadonlyArray<HostSession>>
+      get(input: { sessionID: string }, options?: RequestOptions): Promise<HostSession>
+      remove(input: { sessionID: string }, options?: RequestOptions): Promise<boolean>
+      abort(input: { sessionID: string }, options?: RequestOptions): Promise<boolean>
+      messages(
+        input: { sessionID: string; limit?: number },
+        options?: RequestOptions
+      ): Promise<ReadonlyArray<{ info: HostMessageInfo; parts: ReadonlyArray<HostPart> }>>
+    }
+    readonly "session-prompt": {
+      prompt(
+        input: {
+          sessionID: string
+          agent?: string
+          model?: { providerID: string; modelID: string }
+          system?: string
+          tools?: Record<string, boolean>
+          parts: ReadonlyArray<{ type: "text"; text: string }>
+        },
+        options?: RequestOptions
+      ): Promise<HostPromptResult>
+    }
+    readonly events: {
+      subscribe(options?: RequestOptions): AsyncIterable<HostEvent>
+    }
+    readonly provider: {
+      list(options?: RequestOptions): Promise<{
+        all: ReadonlyArray<{ id: string; models: Record<string, unknown> }>
+        connected: ReadonlyArray<string>
+      }>
+      api(input: { providerID: string; key: string }, options?: RequestOptions): Promise<unknown>
+      removeAuth(input: { providerID: string }, options?: RequestOptions): Promise<unknown>
+    }
+    readonly permission: {
+      list(options?: RequestOptions): Promise<ReadonlyArray<Record<string, unknown>>>
+      reply(
+        input: { requestID: string; reply: "once" | "always" | "reject"; message?: string },
+        options?: RequestOptions
+      ): Promise<boolean>
+    }
+    readonly config: {
+      get(options?: RequestOptions): Promise<Record<string, unknown>>
+    }
+    readonly "config-management": {
+      reload(options?: RequestOptions): Promise<unknown>
+    }
+    readonly "top-level": {
+      agent(options?: RequestOptions): Promise<ReadonlyArray<Record<string, unknown>>>
+      dispose(options?: RequestOptions): Promise<unknown>
+    }
+    readonly experimental: {
+      toolIDs(options?: RequestOptions): Promise<ReadonlyArray<string>>
+      tools(
+        input: { provider: string; model: string },
+        options?: RequestOptions
+      ): Promise<ReadonlyArray<{ id: string; description: string; parameters: unknown }>>
+    }
+  }
+
+  export interface NikCliHostInstance extends HostClient {
+    readonly tools: {
+      register(...tools: ToolInfo[]): Effect.Effect<void, Error>
+    }
+  }
+
+  export namespace NikCli {
+    function create(options?: { directory?: string }): Effect.Effect<NikCliHostInstance>
+  }
+}

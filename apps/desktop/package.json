@@ -1,0 +1,44 @@
+{
+  "name": "@cadcamfun/desktop",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "vite",
+    "build": "vite build",
+    "stub-sidecar": "bun scripts/build-stub-sidecar.ts",
+    "tauri": "tauri",
+    "tauri:dev": "bun scripts/build-stub-sidecar.ts --if-missing && tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112",
+    "three": "^0.180.0",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@cadcamfun/api": "workspace:*",
+    "@cadcamfun/core": "workspace:*",
+    "solid-js": "^1.9.0",
+    "@solidjs/router": "^0.15.0",
+    "lucide-solid": "^0.509.0",
+    "@kobalte/core": "^0.13.0",
+    "solid-motionone": "^1.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "tailwindcss": "^3.4.17",
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/three": "^0.180.0",
+    "happy-dom": "^18.0.0",
+    "vite-plugin-solid": "^2.0.0",
+    "@solidjs/testing-library": "^0.8.10",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20",
+    "tailwind-scrollbar": "^3.1.0"
+  }
+}

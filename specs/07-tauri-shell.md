@@ -1,0 +1,79 @@
+# WP5 — Tauri shell (`apps/desktop/src-tauri`)
+
+Status: **M1 done, most of M2 done; lifecycle hardening implemented and unit-tested** (see section 7; the real-binary graceful-shutdown test stays ignored until it can run in CI). Owner dir: `apps/desktop/src-tauri`. Updater wiring is shared with WP10 (WP10 edits only `tauri.conf.json` updater section and `src/updater.rs`).
+
+Tauri v2, Rust 1.96 (installed). Use the Bun-installed CLI: `bunx tauri …` from `apps/desktop` (`@tauri-apps/cli`, `@tauri-apps/api`). No `cargo install tauri-cli`.
+
+## 1. Responsibilities (keep the Rust small)
+
+1. **Sidecar lifecycle** — spawn the Bun-compiled sidecar (`tauri-plugin-shell`, `externalBin: ["binaries/sidecar"]`), generate a 32-byte random token, pass `CADCAMFUN_TOKEN`, `CADCAMFUN_DATA_DIR` (Tauri `app_data_dir`), `CADCAMFUN_MIGRATIONS_DIR` (bundled resource). Parse the `{"event":"ready","port":N}` stdout line (timeout 15 s). Restart once on crash unless shutting down, then surface an error event to the webview. On exit send `{"event":"shutdown"}\n` on stdin, wait up to 2 seconds before kill fallback, and wait for process reaping before exit; stdin EOF remains the parent-death fallback.
+2. **Commands exposed to the webview** (`#[tauri::command]`): `get_sidecar_endpoint() -> { baseUrl, token }`, `get_logs_dir()`, `open_path(path)`, `secret_get/secret_set/secret_delete(key)`, `pick_file(filters)`, `save_file(defaultName, contents)`.
+3. **Secure storage** — OS keychain via the `keyring` crate (macOS Keychain, Windows Credential Manager, Secret Service on Linux) for AI API keys and (later) tokens; service name `com.cadcamfun.app`. Never store secrets in the SQLite DB or in plain files.
+4. **Native menus** (File: New, Open, Save, Export G-code, Quit; Edit: Undo/Redo/Cut/Copy/Paste/Select all; View: zoom, view presets, toggle panels, devtools in debug; Window; Help) emitting `menu` events to the webview with stable ids (`file.new`, `view.zoom_in`, …); the UI maps ids to commands.
+5. **System tray** — Show/Hide, Recent projects, Quit; app keeps the sidecar alive while hidden.
+6. **File associations & deep links** — register `.cadcam` (project export) and `.nc`/`.gcode`; handle open-file events by forwarding the path to the webview. Single-instance plugin so a second launch focuses the existing window.
+7. **Updater** (WP10) — `tauri-plugin-updater` with signature verification; check every 4 hours and at launch; critical updates flagged in the manifest force the prompt.
+
+## 2. Security configuration
+
+- `tauri.conf.json` CSP: `default-src 'self'; connect-src 'self' http://127.0.0.1:* ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:`. **No** `unsafe-eval`, no remote hosts in v6.0 (the old CSP allowed `cadcamfun.xyz` and `unsafe-eval`; do not carry that over).
+- Capabilities (Tauri v2 permissions) granted to the main window only: `core:default`, `shell:allow-spawn` scoped to the sidecar, `dialog:default`, `fs:allow-read/write` scoped to `$APPDATA/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, plus the custom commands above. No wildcard `fs` scope on `$HOME/**` (the old config used it).
+- The token never touches disk or logs; log redaction for any line containing `Bearer`.
+
+## 3. Project layout
+
+```
+apps/desktop/src-tauri/
+  Cargo.toml  build.rs  tauri.conf.json  capabilities/main.json  icons/  binaries/ (gitignored, filled by sidecar build)
+  src/main.rs  lib.rs  sidecar.rs  commands.rs  secrets.rs  menu.rs  tray.rs  updater.rs
+```
+
+Icons: generate from `public/icon.png` (`bunx tauri icon public/icon.png`). Bundle identifier `com.cadcamfun.app`, product name `CADCAM FUN`.
+
+## 4. Milestones
+
+- **M1 (skeleton, can start immediately in wave 1)**: window loads the Vite dev URL; `get_sidecar_endpoint` returns a **stub** endpoint from a tiny Bun script that implements `/health`; sidecar spawn/ready-line/kill logic complete with Rust unit tests for the stdout parser.
+- **M2**: real sidecar binary integrated (after WP4), menus, tray, secrets, file associations.
+- **M3**: updater, signing/notarisation config (WP10).
+
+## 5. Acceptance criteria
+
+- `bunx tauri dev` opens the app on macOS; the UI shows sidecar status "ready"; closing the window leaves **no** orphan sidecar process (check with `pgrep`).
+- `cargo clippy -- -D warnings` and `cargo test` pass in `src-tauri`.
+- `bunx tauri build` produces a `.app`/`.dmg` on macOS containing the sidecar binary and migrations resource.
+- Secrets round-trip through the keychain on macOS; the commands return typed errors, never panic.
+
+## 6. Change log
+
+- v4 focused lifecycle: shell now sends exactly `{"event":"shutdown"}\n` on stdin and gives the child up to 2 seconds to exit before force-kill. It waits for the plugin's process wait/reap notification before allowing exit or restart; shutdown suppresses restart. Raw-byte newline decoding is stateful, bounded to 16 KiB per incomplete line, and survives the ready-to-monitor handoff; errors and logs are redacted before publication. Real-binary graceful shutdown is not verified by this work (the integration test remains ignored).
+- v3 (superseded by v4): the interrupted implementation used `{"command":"shutdown"}\n` and a 5-second grace period, with plugin process wait/reap coordination and stdin EOF as the parent-death fallback.
+- v1: initial spec.
+- v2: M1 implemented and verified on macOS with a stub sidecar; menu, tray, secrets, dialogs, single-instance and open-file forwarding implemented (M2 minus real sidecar and bundling). Placeholder UI is SolidJS (`solid-js` + `vite-plugin-solid`). Added section 7 (status, deviations, open items).
+
+## 7. Status
+
+Focused lifecycle checks: `cargo fmt --check`, `cargo test` (60 passed, 2 ignored: OS keychain and real-binary parent contract), and `cargo clippy --all-targets -- -D warnings` passed on macOS. Native UI, packaged builds and the real-binary graceful drain were not run in this pass.
+
+### Done and verified (macOS, `bunx tauri dev` with the stub sidecar)
+
+- `src-tauri/`: `Cargo.toml`, `build.rs`, `tauri.conf.json` (strict CSP, no `unsafe-eval`, `devCsp` only adds localhost and `unsafe-inline` scripts for Vite), `capabilities/main.json` (scoped fs, scoped `shell:allow-spawn`, one permission per custom command), icons generated from `public/icon.png`.
+- `sidecar.rs`: spawn through `tauri-plugin-shell`, 32-byte hex token per launch, env `CADCAMFUN_TOKEN/DATA_DIR/MIGRATIONS_DIR`, bounded raw-byte ready-line decoder, 15 s ready timeout, restart once unless shutting down, graceful stdin shutdown with a 2-second kill fallback and process-reap coordination. Logs, process errors and failure status messages redact credential markers or the token. State changes are emitted as the `sidecar-status` event (`{state: starting|ready|restarting|failed, ...}`); `get_sidecar_endpoint` waits for ready. The decoder/lifecycle changes are covered by Rust unit tests, not a new native UI smoke test.
+- `commands.rs`, `secrets.rs`, `menu.rs`, `tray.rs`, `lib.rs`: all commands from section 1, plus `set_recent_projects(projects)` (rebuilds the tray "Recent projects" submenu; items emit `menu` with id `tray.recent.<projectId>`). Menu ids: `file.new|open|save|export_gcode`, `view.zoom_in|zoom_out|zoom_fit|preset_top|preset_front|preset_right|preset_iso|toggle_left_panel|toggle_right_panel|toggle_console`, `help.documentation|open_logs`. `open-file` event carries paths of `.cadcam/.nc/.gcode` from launch args (single-instance) and macOS open-file events.
+- Stub: `src-tauri/stub/stub-sidecar.ts`, built by `bun apps/desktop/scripts/build-stub-sidecar.ts [--if-missing]` into `src-tauri/binaries/sidecar-<triple>`; hooks `STUB_NO_READY=1`, `STUB_CRASH_AFTER_MS=n`. `tauri:dev` builds it only if no binary exists, so the real sidecar is never overwritten.
+- Verified: window shows "Sidecar: ready ... stub:true"; killing the sidecar once restarts it (new port, UI refreshes via event), a second kill yields `failed`; cmd+Q leaves no sidecar; `kill -9` of the shell leaves no sidecar (stdin EOF); keychain round trip passes (`cargo test -- --ignored`).
+
+### Deviations
+
+- Closing the window quits the app (acceptance criterion: no orphan). The tray Show/Hide hides the window but the sidecar stays alive; "hide on close" is a possible M2 setting.
+- Shutdown requests a graceful drain over stdin (`{"event":"shutdown"}\n`); `CommandChild::kill` remains the fallback after 2 seconds. The WP4 sidecar now honours that command, stdin EOF and `SIGTERM`/`SIGINT`, cancelling its stdin reader so the process can exit and running the database checkpoint/close finalizers; this is verified by `apps/sidecar/test/process.test.ts` (three real-process modes, WAL drained, data persisted across restart). Driving the drain through the Rust shell with the compiled binary is still covered only by the ignored real-binary test.
+- Custom commands are opt-in per capability (`AppManifest::commands` in `build.rs`); new commands need an `allow-<name>` entry in `capabilities/main.json`.
+- `shell:allow-spawn` is granted to the webview per section 2 although only Rust spawns the sidecar; it can be removed without code changes if the UI never needs it.
+- `open_path` only opens existing files under `$APPDATA`, the log dir, `$DOCUMENT`, `$DOWNLOAD`, `$DESKTOP`, and refuses executable types.
+- `keyring` is pinned to 3.6 (4.x split into per-platform crates); Tauri crates are the 2.x line (3.0 alpha exists on crates.io).
+- `build.rs` needs `binaries/sidecar-<triple>` to exist even for `cargo clippy/test`: run `bun apps/desktop/scripts/build-stub-sidecar.ts` first.
+- WP10's `updater.rs` and plugin registration are present. Updater, configuration and resources were not changed or integration-verified during this focused lifecycle work.
+
+### Left for M2/M3
+
+- Real sidecar binary, `bunx tauri build` (.app/.dmg) containing sidecar and migrations (resource mapping `packages/db/drizzle/` to `migrations/` is configured but unbuilt), file-association behaviour on a packaged build, tray/menu interaction (built, not clicked headlessly), Windows/Linux keychain backends untested.
+- M3: packaged updater verification and signing/notarisation remain outside this lifecycle verification.
