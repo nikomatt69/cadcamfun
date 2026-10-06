@@ -16,9 +16,13 @@ export class StorageService extends Context.Service<StorageService, {
   upload(key: string, data: string | Uint8Array | object): Effect.Effect<string, StorageError>
   /** Parsed JSON when the object is JSON, otherwise the raw bytes; `null` when absent. */
   download(key: string): Effect.Effect<unknown | null, StorageError>
+  /** Raw bytes of an object (never JSON-parsed), `null` when absent. */
+  downloadBytes(key: string): Effect.Effect<Uint8Array | null, StorageError>
   delete(key: string): Effect.Effect<void, StorageError>
   /** Local stand-in for a pre-signed URL: a `file://` URL (no expiry). */
   signedUrl(key: string): Effect.Effect<string, StorageError>
+  /** Removes every object whose key starts with `prefix` (a folder). */
+  deletePrefix(prefix: string): Effect.Effect<void, StorageError>
   listByPrefix(prefix: string): Effect.Effect<string[], StorageError>
 }>()("cadcamfun/StorageService") {
   static readonly layer = Layer.effect(
@@ -48,8 +52,13 @@ export class StorageService extends Context.Service<StorageService, {
           if (!key.endsWith(".json")) return new Uint8Array(buf)
           try { return JSON.parse(buf.toString("utf8")) } catch { return new Uint8Array(buf) }
         }),
+        downloadBytes: (key) => run("downloadBytes", async () => {
+          const buf = await readFile(pathOf(key)).catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? null : Promise.reject(e)))
+          return buf === null ? null : new Uint8Array(buf)
+        }),
         delete: (key) => run("delete", () => rm(pathOf(key), { force: true })),
         signedUrl: (key) => run("signedUrl", async () => `file://${pathOf(key)}`),
+        deletePrefix: (prefix) => run("deletePrefix", () => rm(pathOf(prefix), { recursive: true, force: true })),
         listByPrefix: (prefix) => run("list", async () => {
           const dir = pathOf(prefix.includes("/") ? prefix.slice(0, prefix.lastIndexOf("/")) : "")
           const names = await readdir(dir, { recursive: true }).catch(() => [] as string[])

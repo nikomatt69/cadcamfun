@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/materials/[id].tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/materials/[id].tsx" />
-}
+import { MaterialDetailScreen } from "../../screens/library-detail-screen.tsx"
+export default function Page() { return <MaterialDetailScreen /> }

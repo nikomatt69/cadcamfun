@@ -7,7 +7,7 @@
  * the status bar can all read the same source of truth.
  */
 import { createSignal, type Accessor, type Setter } from "solid-js"
-import type { Drawing } from "@cadcamfun/core"
+import type { Drawing, Solid } from "@cadcamfun/core"
 import { createHistory, type History } from "./history.ts"
 import type { Command } from "./commands.ts"
 
@@ -25,7 +25,11 @@ export const EDITOR_TOOLS = [
   "move",
   "rotate",
   "scale",
-  "mirror"
+  "mirror",
+  "offset",
+  "trim",
+  "fillet",
+  "chamfer"
 ] as const
 export type EditorTool = (typeof EDITOR_TOOLS)[number]
 
@@ -47,12 +51,27 @@ export interface EditorState {
   /** Entities the current selection touches; the viewport renders this. */
   readonly selection: Accessor<ReadonlyArray<string>>
   setSelection(ids: ReadonlyArray<string>): void
+  /** 3D solids in the scene; managed in parallel to the 2D drawing history. */
+  readonly solids: Accessor<ReadonlyArray<Solid>>
+  /** Solid ids selected in the 3D viewport. */
+  readonly solidSelection: Accessor<ReadonlyArray<number>>
+  setSolidSelection(indices: ReadonlyArray<number>): void
+  /** Adds a new solid; the caller decides whether to commit the source profile too. */
+  addSolid(solid: Solid): number
+  /** Removes a solid by its index in `solids()`. */
+  removeSolid(index: number): void
+  /** Replaces the whole solids list (paste, import). */
+  setSolids(solids: ReadonlyArray<Solid>): void
+  /** Clears selection. */
+  clearSolidSelection(): void
 }
 
 export const createEditorState = (initial: Drawing): EditorState => {
   const [history, setHistory] = createSignal<History>(createHistory(initial))
   const [tool, setTool] = createSignal<EditorTool>("select")
   const [selection, setSelection] = createSignal<ReadonlyArray<string>>([])
+  const [solids, setSolids] = createSignal<ReadonlyArray<Solid>>([])
+  const [solidSelection, setSolidSelection] = createSignal<ReadonlyArray<number>>([])
   const commit = (next: History): Drawing => {
     setHistory(next)
     return next.state.present
@@ -73,6 +92,20 @@ export const createEditorState = (initial: Drawing): EditorState => {
     load: (drawing) => {
       setHistory(createHistory(drawing))
       setSelection([])
-    }
+    },
+    solids,
+    solidSelection,
+    setSolidSelection: (indices) => setSolidSelection([...indices]),
+    addSolid: (solid) => {
+      const next = [...solids(), solid]
+      setSolids(next)
+      return next.length - 1
+    },
+    removeSolid: (index) => {
+      setSolids(solids().filter((_, i) => i !== index))
+      setSolidSelection(solidSelection().filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)))
+    },
+    setSolids,
+    clearSolidSelection: () => setSolidSelection([])
   }
 }

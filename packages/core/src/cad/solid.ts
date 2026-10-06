@@ -34,6 +34,24 @@ export const SphereSolidSchema = Schema.TaggedStruct("Sphere", {
   radius: Schema.Finite.check(Schema.isGreaterThan(0)),
   rings: Schema.Int.check(Schema.isBetween({ minimum: 2, maximum: 256 }))
 })
+export const ConeSolidSchema = Schema.TaggedStruct("Cone", {
+  origin: Vec3Point,
+  baseRadius: Schema.Finite.check(Schema.isGreaterThan(0)),
+  topRadius: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+  height: Schema.Finite.check(Schema.isGreaterThan(0)),
+  segments: Schema.Int.check(Schema.isBetween({ minimum: 3, maximum: 512 })),
+  axis: Schema.Literals(["z", "x", "y"]).pipe(Schema.optionalKey)
+})
+export const TorusSolidSchema = Schema.TaggedStruct("Torus", {
+  center: Vec3Point,
+  majorRadius: Schema.Finite.check(Schema.isGreaterThan(0)),
+  minorRadius: Schema.Finite.check(Schema.isGreaterThan(0)),
+  /** Rotation of the torus tube around the Z axis, in radians. */
+  rotation: Schema.Finite.pipe(Schema.optionalKey),
+  majorSegments: Schema.Int.check(Schema.isBetween({ minimum: 3, maximum: 512 })),
+  minorSegments: Schema.Int.check(Schema.isBetween({ minimum: 3, maximum: 256 })),
+  axis: Schema.Literals(["z", "x", "y"]).pipe(Schema.optionalKey)
+})
 export const ExtrudeSolidSchema = Schema.TaggedStruct("Extrude", {
   /** Closed profile in the XY plane; first point is not repeated. */
   profile: Schema.Array(Point2).check(Schema.isMinLength(3)),
@@ -50,6 +68,8 @@ export const RevolveSolidSchema = Schema.TaggedStruct("Revolve", {
 export type BoxSolid = typeof BoxSolidSchema.Type
 export type CylinderSolid = typeof CylinderSolidSchema.Type
 export type SphereSolid = typeof SphereSolidSchema.Type
+export type ConeSolid = typeof ConeSolidSchema.Type
+export type TorusSolid = typeof TorusSolidSchema.Type
 export type ExtrudeSolid = typeof ExtrudeSolidSchema.Type
 export type RevolveSolid = typeof RevolveSolidSchema.Type
 
@@ -57,6 +77,8 @@ export const SolidSchema: Schema.Codec<Solid> = Schema.Union([
   BoxSolidSchema,
   CylinderSolidSchema,
   SphereSolidSchema,
+  ConeSolidSchema,
+  TorusSolidSchema,
   ExtrudeSolidSchema,
   RevolveSolidSchema
 ])
@@ -65,6 +87,8 @@ export type Solid =
   | BoxSolid
   | CylinderSolid
   | SphereSolid
+  | ConeSolid
+  | TorusSolid
   | ExtrudeSolid
   | RevolveSolid
 
@@ -119,6 +143,41 @@ export const solidBounds = (solid: Solid): SolidBounds => {
         maxY: solid.center.y + solid.radius,
         maxZ: solid.center.z + solid.radius
       }
+    case "Cone": {
+      const axis = solid.axis ?? "z"
+      const r = Math.max(solid.baseRadius, solid.topRadius)
+      const rx = axis === "x" ? 0 : r
+      const ry = axis === "y" ? 0 : r
+      const rz = axis === "z" ? 0 : r
+      return {
+        minX: solid.origin.x - rx,
+        minY: solid.origin.y - ry,
+        minZ: solid.origin.z - rz,
+        maxX: solid.origin.x + rx + (axis === "x" ? solid.height : 0),
+        maxY: solid.origin.y + ry + (axis === "y" ? solid.height : 0),
+        maxZ: solid.origin.z + rz + (axis === "z" ? solid.height : 0)
+      }
+    }
+    case "Torus": {
+      const axis = solid.axis ?? "z"
+      const r = solid.majorRadius + solid.minorRadius
+      const rot = solid.rotation ?? 0
+      const cosR = Math.cos(rot)
+      const sinR = Math.sin(rot)
+      // Project the torus tube radius onto each axis for a tight bound.
+      const rx = axis === "x" ? 0 : Math.abs(cosR) * solid.minorRadius + Math.abs(sinR) * r
+      const ry = axis === "y" ? 0 : Math.abs(sinR) * solid.minorRadius + Math.abs(cosR) * r
+      const rz = axis === "z" ? 0 : solid.minorRadius
+      const big = axis === "x" ? solid.majorRadius : axis === "y" ? solid.majorRadius : solid.majorRadius
+      return {
+        minX: solid.center.x - (axis === "x" ? solid.minorRadius : big) - rx,
+        minY: solid.center.y - (axis === "y" ? solid.minorRadius : big) - ry,
+        minZ: solid.center.z - (axis === "z" ? solid.minorRadius : big) - rz,
+        maxX: solid.center.x + (axis === "x" ? solid.minorRadius : big) + rx,
+        maxY: solid.center.y + (axis === "y" ? solid.minorRadius : big) + ry,
+        maxZ: solid.center.z + (axis === "z" ? solid.minorRadius : big) + rz
+      }
+    }
     case "Extrude": {
       const origin = solid.origin ?? { x: 0, y: 0, z: 0 }
       const xs = solid.profile.map((p) => p.x + origin.x)
@@ -477,6 +536,10 @@ export const meshOf = (solid: Solid, tolerance = 0.1): Mesh => {
       return cylinderMesh(solid)
     case "Sphere":
       return sphereMesh(solid)
+    case "Cone":
+      return coneMesh(solid)
+    case "Torus":
+      return torusMesh(solid)
     case "Extrude":
       return extrudeMesh(solid)
     case "Revolve":
@@ -532,3 +595,114 @@ export const stockBox = (
   origin: { x: number; y: number; z: number },
   size: { x: number; y: number; z: number }
 ): BoxSolid => ({ _tag: "Box", origin, size })
+
+/**
+ * Truncated cone / cylinder with two radii (base and top). When `topRadius`
+ * equals `baseRadius`, this is a regular cylinder. The base is at `origin` and
+ * the top is at `origin + height * axis`.
+ */
+const coneMesh = (solid: ConeSolid): Mesh => {
+  const b = new MeshBuilder()
+  const n = solid.segments
+  const axis = solid.axis ?? "z"
+  const o = solid.origin
+  const h = solid.height
+  const r0 = solid.baseRadius
+  const r1 = solid.topRadius
+  // Rotate the radius direction by `theta` and offset by height along `axis`.
+  const at = (i: number, top: 0 | 1): { x: number; y: number; z: number } => {
+    const a = (i / n) * TAU
+    const r = top === 0 ? r0 : r1
+    const dx = r * Math.cos(a)
+    const dy = r * Math.sin(a)
+    const dz = top * h
+    if (axis === "x") return { x: o.x + dz, y: o.y + dy, z: o.z + dx }
+    if (axis === "y") return { x: o.x + dx, y: o.y + dz, z: o.z + dy }
+    return { x: o.x + dx, y: o.y + dy, z: o.z + dz }
+  }
+  const ring = (top: 0 | 1): number[] => {
+    const out: number[] = []
+    for (let i = 0; i < n; i++) {
+      const p = at(i, top)
+      out.push(b.vertex(p.x, p.y, p.z))
+    }
+    return out
+  }
+  const bottom = ring(0)
+  const top = ring(1)
+  // Side band: each quad is (bottom i, bottom j, top j, top i) where j = i + 1.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    if (axis === "x") {
+      // Looking from +X: swap winding so the normal points away from the axis.
+      b.triangle(bottom[i]!, top[j]!, bottom[j]!)
+      b.triangle(bottom[i]!, top[i]!, top[j]!)
+    } else if (axis === "y") {
+      b.triangle(bottom[j]!, top[j]!, bottom[i]!)
+      b.triangle(bottom[i]!, top[j]!, top[i]!)
+    } else {
+      b.triangle(bottom[i]!, bottom[j]!, top[j]!)
+      b.triangle(bottom[i]!, top[j]!, top[i]!)
+    }
+  }
+  // Caps: only when the matching radius is > 0 (a tip would have no surface).
+  if (r0 > 0) b.polygon3(bottom.map((idx) => vertexFromIndex(b, idx)).reverse())
+  if (r1 > 0) b.polygon3(top.map((idx) => vertexFromIndex(b, idx)))
+  return b.build()
+}
+
+/**
+ * Torus mesh. The major circle lies in the plane perpendicular to `axis`
+ * (default Z) at `center`, with tube radius `minorRadius` swept around a
+ * circle of radius `majorRadius`. `rotation` rotates the tube cross-section
+ * within that plane.
+ */
+const torusMesh = (solid: TorusSolid): Mesh => {
+  const b = new MeshBuilder()
+  const c = solid.center
+  const R = solid.majorRadius
+  const r = solid.minorRadius
+  const maj = solid.majorSegments
+  const min = solid.minorSegments
+  const axis = solid.axis ?? "z"
+  const tube = solid.rotation ?? 0
+  const cosTube = Math.cos(tube)
+  const sinTube = Math.sin(tube)
+  // Build a (maj+1) × (min+1) grid of tube centres + tube offsets.
+  const indexAt = (i: number, j: number): number => {
+    const phi = (i / maj) * TAU
+    const theta = (j / min) * TAU
+    // Local frame on the major circle.
+    const lx = R * Math.cos(phi)
+    const ly = R * Math.sin(phi)
+    // Tube cross-section, rotated by `tube` so the user can spin the hole.
+    const ox = r * Math.cos(theta)
+    const oy = r * Math.sin(theta)
+    const ux = ox * cosTube - oy * sinTube
+    const uy = ox * sinTube + oy * cosTube
+    const uz = 0
+    const px = lx + ux
+    const py = ly + uy
+    const pz = uz
+    if (axis === "x") return b.vertex(c.x + pz, c.y + py, c.z + px)
+    if (axis === "y") return b.vertex(c.x + px, c.y + pz, c.z + py)
+    return b.vertex(c.x + px, c.y + py, c.z + pz)
+  }
+  for (let i = 0; i < maj; i++) {
+    for (let j = 0; j < min; j++) {
+      const a = indexAt(i, j)
+      const bIdx = indexAt(i, j + 1)
+      const cIdx = indexAt(i + 1, j)
+      const d = indexAt(i + 1, j + 1)
+      b.triangle(a, bIdx, d)
+      b.triangle(a, d, cIdx)
+    }
+  }
+  return b.build()
+}
+
+const vertexFromIndex = (b: MeshBuilder, index: number): { x: number; y: number; z: number } => ({
+  x: b.positions[index * 3]!,
+  y: b.positions[index * 3 + 1]!,
+  z: b.positions[index * 3 + 2]!
+})

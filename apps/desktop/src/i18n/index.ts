@@ -6,7 +6,23 @@
  * runtime `[missing]`. Values may carry `{placeholder}` slots that `t` fills.
  */
 import { createContext, createMemo, createSignal, useContext, type Accessor, type JSX } from "solid-js"
-import table from "./en.json" with { type: "json" }
+import base from "./en.json" with { type: "json" }
+// One table per vertical so ports of different areas never edit the same file concurrently.
+import shell from "./en.shell.json" with { type: "json" }
+import library from "./en.library.json" with { type: "json" }
+import org from "./en.org.json" with { type: "json" }
+import cad from "./en.cad.json" with { type: "json" }
+import cam from "./en.cam.json" with { type: "json" }
+import ai from "./en.ai.json" with { type: "json" }
+import plugins from "./en.plugins.json" with { type: "json" }
+import legacy from "./en.legacy.json" with { type: "json" }
+import settings from "./en.settings.json" with { type: "json" }
+import viewport from "./en.viewport.json" with { type: "json" }
+import system from "./en.system.json" with { type: "json" }
+import pricing from "./en.pricing.json" with { type: "json" }
+import detail from "./en.detail.json" with { type: "json" }
+
+const table = { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail }
 
 /** The shipped locale, and the only one in v6.0. */
 export type Locale = "en"

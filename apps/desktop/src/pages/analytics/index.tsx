@@ -1,6 +1,1 @@
-// Port of legacy `src/pages/analytics/index.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/analytics/index.tsx" />
-}
+export { AnalyticsScreen as default } from "../../screens/analytics.tsx"

@@ -1,6 +1,1 @@
-// Port of legacy `src/pages/plugins/[id].tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/plugins/[id].tsx" />
-}
+export { PluginDetailScreen as default } from "../../screens/plugins.tsx"

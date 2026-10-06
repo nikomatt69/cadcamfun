@@ -8,12 +8,18 @@ import { arcTool, polylineTool } from "./chained.ts"
 import type { ToolFactory, ToolId } from "./tool.ts"
 import { emptyContext, type ToolContext } from "./tool.ts"
 import { gestureTool } from "./annotation-transform.ts"
+import { offsetTool } from "./offset.ts"
+import { trimTool } from "./trim.ts"
+import { filletTool } from "./fillet-chamfer.ts"
 
 export * from "./tool.ts"
 export { selectTool, selectionOf, selectionBand, CLICK_SLOP } from "./select.ts"
 export type { SelectState } from "./select.ts"
 export { twoPointTool, MIN_GESTURE } from "./two-point.ts"
 export { polylineTool, arcTool, committed } from "./chained.ts"
+export { offsetTool } from "./offset.ts"
+export { trimTool } from "./trim.ts"
+export { filletTool } from "./fillet-chamfer.ts"
 
 /**
  * Only implemented machines appear here; callers can disable unavailable tools.
@@ -31,7 +37,10 @@ export const TOOL_FACTORIES: Readonly<Partial<Record<ToolId, ToolFactory>>> = {
   move: gestureTool("move", () => emptyContext),
   rotate: gestureTool("rotate", () => emptyContext),
   scale: gestureTool("scale", () => emptyContext),
-  mirror: gestureTool("mirror", () => emptyContext)
+  mirror: gestureTool("mirror", () => emptyContext),
+  offset: offsetTool(() => emptyContext),
+  trim: trimTool(() => emptyContext),
+  fillet: filletTool(() => emptyContext)
 }
 
 /** Tool ids that currently have a working machine. */
@@ -46,5 +55,9 @@ export const startTool = (
 ): ReturnType<ToolFactory> | undefined => {
   if (id === "select" && lookup !== undefined) return selectTool(lookup)()
   if (id === "text" || id === "dimension" || id === "move" || id === "rotate" || id === "scale" || id === "mirror") return gestureTool(id, context, text)()
+  if (id === "offset") return offsetTool(context)()
+  if (id === "trim") return trimTool(context)()
+  if (id === "fillet") return filletTool(context)()
+  if (id === "chamfer") return filletTool(context)()
   return TOOL_FACTORIES[id]?.()
 }

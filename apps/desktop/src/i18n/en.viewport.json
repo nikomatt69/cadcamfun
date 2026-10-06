@@ -1,0 +1,14 @@
+{
+  "cad.displayOptions": "Display Options",
+  "cad.showGrid": "Show Grid",
+  "cad.showAxis": "Show Axis",
+  "cad.originOffset": "Origin Offset",
+  "cad.resetOrigin": "Reset Origin",
+  "cad.workpieceSetup": "Workpiece Setup",
+  "cad.showWorkpiece": "Show Workpiece",
+  "cad.width": "Width",
+  "cad.height": "Height",
+  "cad.depth": "Depth",
+  "cad.snapSettings": "Snap Settings",
+  "cad.enableSnapping": "Enable Snapping"
+}

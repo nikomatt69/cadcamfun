@@ -9,6 +9,14 @@ import type { BootState } from "../state/client.ts"
 import { Shell } from "./Shell.tsx"
 import { watchSystemTheme } from "../state/settings.ts"
 import { routes } from "./routes.tsx"
+import { AiProvider } from "../ai/context.tsx"
+
+/** The provider, router and shell for a booted app state; `App` renders it once the sidecar answers. */
+export function AppRoutes(props: { readonly state: AppState }) {
+  return <AppProvider state={props.state}><AiProvider><Router root={(p) => <Shell>{p.children}</Shell>}>
+    {routes.map((r) => <Route path={r.path} component={r.component} />)}
+  </Router></AiProvider></AppProvider>
+}
 
 export default function App() {
   const [state, setState] = createSignal<AppState>()
@@ -44,9 +52,7 @@ export default function App() {
   onCleanup(() => { disposed = true; attempt++; state()?.dispose(); theme.dispose() })
   return (
     <Show when={state()} fallback={<BootScreen state={boot()} elapsedSeconds={0} onRetry={() => { resetEndpoint(); void start() }} />}>
-      {(app) => <AppProvider state={app()}><Router root={(props) => <Shell>{props.children}</Shell>}>
-        {routes.map((r) => <Route path={r.path} component={r.component} />)}
-      </Router></AppProvider>}
+      {(app) => <AppRoutes state={app()} />}
     </Show>
   )
 }

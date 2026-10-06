@@ -1,0 +1,354 @@
+import { For, Match, Show, Switch, type JSX } from "solid-js"
+import { Cpu, Play } from "lucide-solid"
+import { cam } from "@cadcamfun/core"
+import { useElementsStore } from "../../../cad/store/elementsStore.ts"
+import { dimensionRows, elementSummary, type CadElement } from "../../lib/job.ts"
+import { useJob } from "../../lib/useJob.ts"
+import { useGeneratorStore, type GeometryType } from "../../store/generatorStore.ts"
+import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPreview.tsx"
+import { PrinterPreview } from "./PrinterPreview.tsx"
+import { PrinterSettings } from "./PrinterSettings.tsx"
+import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+
+const BTN_BLUE = "px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+const BTN_GREEN = "px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+
+/** "Machining Depth (mm)" box of the selected-element panels. */
+function DepthBox(): JSX.Element {
+  const gen = useGeneratorStore()
+  return (
+    <div class="mt-3 p-2 bg-blue-50 rounded-md">
+      <label class="block text-sm font-medium text-blue-700 mb-1">Machining Depth (mm)</label>
+      <NumberField min="0.1" step="0.1" class="w-full p-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
+    </div>
+  )
+}
+
+/** "Use XY Dimensions" / "Use 3D Depth" buttons. */
+function UseButtons(props: { readonly element: CadElement }): JSX.Element {
+  const gen = useGeneratorStore()
+  const e = () => props.element
+  const threeD = () => ["cube", "sphere", "cylinder", "cone"].includes(String(e()["type"]))
+  return (
+    <div class="mt-3 flex justify-between">
+      <button
+        type="button"
+        class={BTN_BLUE}
+        onClick={() => {
+          const el = e()
+          if (el["type"] === "rectangle") gen.setRectangle(el["width"], el["height"])
+          else if (el["type"] === "circle") gen.setCircleRadius(el["radius"])
+          else if (el["type"] === "polygon" && el["sides"] && el["radius"]) gen.setPolygon(el["sides"], el["radius"])
+          gen.flash("Dimensions applied from CAD")
+        }}
+      >
+        Use XY Dimensions
+      </button>
+      <Show when={threeD()}>
+        <button
+          type="button"
+          class={BTN_GREEN}
+          onClick={() => {
+            const el = e()
+            if (el["type"] === "cube") gen.updateSettings("depth", el["depth"])
+            else if (el["type"] === "sphere") gen.updateSettings("depth", el["radius"] * 2)
+            else gen.updateSettings("depth", el["height"])
+            gen.flash("Depth updated from 3D geometry")
+          }}
+        >
+          Use 3D Depth
+        </button>
+      </Show>
+    </div>
+  )
+}
+
+/** The printer's "Element Selection": geometry source, selected element summary and the list of elements. */
+function PrinterElementSelection(): JSX.Element {
+  const gen = useGeneratorStore()
+  const job = useJob()
+  const store = useElementsStore()
+  return (
+    <div class="p-4 bg-white rounded-md shadow-sm border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-700 mb-3">Element Selection</h3>
+      <div class="space-y-3">
+        <div>
+          <label class={LABEL}>Geometry Source</label>
+          <select class={INPUT} value={gen.geometryType} onChange={(event) => gen.setGeometryType(event.currentTarget.value as GeometryType, job.element())}>
+            <option value="selected">From Selected Element</option>
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="polygon">Polygon</option>
+            <option value="cube">Cube</option>
+            <option value="sphere">Sphere</option>
+            <option value="cylinder">Cylinder</option>
+            <option value="cone">Cone</option>
+          </select>
+        </div>
+
+        <Show when={gen.geometryType === "selected"}>
+          <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
+            <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">No element selected. Select an element in the CAD Editor.</p>}>
+              {(element) => (
+                <div>
+                  <p class="text-sm text-green-700 font-medium mb-1">Selected Element: {String(element()["type"])} (ID: {String(element()["id"]).substring(0, 6)}...)</p>
+                  <div class="mt-2 text-xs text-green-600"><span>{elementSummary(element())}</span></div>
+                  <DepthBox />
+                  <UseButtons element={element()} />
+                </div>
+              )}
+            </Show>
+          </div>
+          <Show when={job.elements().length > 0}>
+            <div class="mt-2">
+              <h4 class="text-xs font-medium text-gray-600 mb-1">Available Elements:</h4>
+              <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-md">
+                <ul class="divide-y divide-gray-200">
+                  <For each={job.elements()}>
+                    {(element) => (
+                      <li
+                        class={`px-2 py-1 text-xs hover:bg-blue-50 cursor-pointer ${job.element()?.["id"] === element["id"] ? "bg-blue-100" : ""}`}
+                        onClick={() => {
+                          store.selectElement(String(element["id"]))
+                          gen.setGeometryType("selected", element)
+                        }}
+                      >
+                        {String(element["type"])}: {String(element["name"] || String(element["id"]).substring(0, 8))}
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </div>
+          </Show>
+        </Show>
+      </div>
+    </div>
+  )
+}
+
+/** The mill's "Selected Element" panel with its dimension rows. */
+function MillElementPanel(): JSX.Element {
+  const gen = useGeneratorStore()
+  const job = useJob()
+  return (
+    <div class={`p-3 ${job.element() ? "bg-green-50" : "bg-yellow-50"} rounded-md`}>
+      <Show when={job.element()} fallback={<p class="text-sm text-yellow-700">No element selected. Select an element in the CAD Editor.</p>}>
+        {(element) => {
+          const rows = () => dimensionRows(element(), gen.settings.depth)
+          return (
+            <div>
+              <p class="text-sm text-green-700 font-medium mb-2">
+                Selected Element: {String(element()["type"])} (ID: {String(element()["id"]).substring(0, 6)}...)
+                <Show when={job.selection().length > 1}> and {job.selection().length - 1} more</Show>
+              </p>
+              <div class="mt-2 border-t border-green-200 pt-2">
+                <p class="text-sm font-medium text-gray-700 mb-1">Element Dimensions:</p>
+                <Show when={rows().length > 0} fallback={<div class="text-sm text-gray-600">Details available for this element in the CAD Editor.</div>}>
+                  <div class="grid grid-cols-2 gap-2 text-sm">
+                    <For each={rows().slice(0, -1)}>
+                      {([label, value]) => (
+                        <div class="flex justify-between"><span class="text-gray-600">{label}</span><span class="font-medium">{value}</span></div>
+                      )}
+                    </For>
+                    <div class="flex justify-between col-span-2 mt-2 border-t border-green-200 pt-2">
+                      <span class="text-gray-600 font-medium">Machining Depth:</span>
+                      <span class="font-medium text-blue-600">{gen.settings.depth} mm</span>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+              <DepthBox />
+              <UseButtons element={element()} />
+            </div>
+          )
+        }}
+      </Show>
+    </div>
+  )
+}
+
+function ThicknessField(props: { readonly class?: string }): JSX.Element {
+  const gen = useGeneratorStore()
+  return (
+    <div class={props.class}>
+      <label class={LABEL}>Thickness (mm)(Z)</label>
+      <NumberField min="0.1" step="0.1" value={gen.settings.depth} onValue={(value) => gen.updateSettings("depth", value)} />
+    </div>
+  )
+}
+
+const SAMPLE = [
+  "; Esempio di G-code", "G0 Z5 ; Posizione sicura", "G0 X0 Y0 ; Vai all'origine", "G1 Z-1 F100 ; Scendi a profondità 1mm",
+  "G1 X10 Y0 F200 ; Muovi a X=10mm", "G1 X10 Y10 F200 ; Muovi a Y=10mm", "G1 X0 Y10 F200 ; Muovi a X=0mm", "G1 X0 Y0 F200 ; Torna all'origine",
+  "G0 Z5 ; Torna a posizione sicura", ""
+].join("\n")
+
+/** "Operation": which operation, and what it works on (own geometry, a selected element, or a custom path). */
+export function OperationSection(): JSX.Element {
+  const gen = useGeneratorStore()
+  const job = useJob()
+  const info = () => cam.generator.getOperationDescription(gen.settings.operationType)
+  const operation = (event: Event & { currentTarget: HTMLSelectElement }): void =>
+    gen.updateSettings("operationType", event.currentTarget.value as typeof gen.settings.operationType)
+  return (
+    <Section id="operation" delay={0.25} tone="purple" icon={Play} title="Operation" testId="operation-section">
+      <div>
+        <label class={LABEL}>Operation Type</label>
+        <Switch>
+          <Match when={gen.settings.machineType === "mill"}>
+            <select class={INPUT} value={gen.settings.operationType} onChange={operation}>
+              <option value="contour">Contouring</option>
+              <option value="pocket">Pocket Clearing</option>
+              <option value="drill">Drilling</option>
+              <option value="engrave">Engraving</option>
+              <option value="profile">3D Profile</option>
+              <option value="threading">Threading</option>
+              <option value="3d_surface">3D Surface</option>
+            </select>
+          </Match>
+          <Match when={gen.settings.machineType === "lathe"}>
+            <select class={INPUT} value={gen.settings.operationType} onChange={operation}>
+              <option value="turning">Turning</option>
+              <option value="facing">Facing</option>
+              <option value="boring">Boring</option>
+              <option value="threading">Threading</option>
+              <option value="grooving">Grooving</option>
+              <option value="parting">Parting</option>
+              <option value="knurling">Knurling</option>
+            </select>
+          </Match>
+          <Match when={gen.settings.machineType === "3dprinter"}>
+            <div class="flex flex-col gap-4">
+              <div class="space-y-4">
+                <PrinterElementSelection />
+                <div class="bg-white rounded-md shadow-sm border border-gray-200">
+                  <PrinterPreview element={job.element()} settings={gen.settings} printer={gen.printer} />
+                </div>
+              </div>
+              <div class="bg-white p-4 rounded-md shadow-sm border border-gray-200">
+                <PrinterSettings element={job.element()} />
+              </div>
+            </div>
+          </Match>
+        </Switch>
+      </div>
+
+      <div class="p-4 bg-blue-50 rounded-md">
+        <p class="text-blue-700 text-sm">{info().description}</p>
+      </div>
+
+      <Show when={gen.settings.machineType === "mill"}>
+        <div>
+          <label class={LABEL}>Geometry Type</label>
+          <select class={INPUT} value={gen.geometryType} onChange={(event) => gen.setGeometryType(event.currentTarget.value as GeometryType, job.element())}>
+            <option value="rectangle">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="polygon">Polygon</option>
+            <option value="selected">From Selected Element</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <Show when={gen.geometryType === "selected"}>
+          <MillElementPanel />
+        </Show>
+
+        <Show when={gen.geometryType === "rectangle"}>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class={LABEL}>Width (mm)(X)</label>
+              <NumberField min="1" value={gen.rectangleWidth} onValue={(value) => gen.setRectangle(value, undefined)} />
+            </div>
+            <div>
+              <label class={LABEL}>Height (mm)(Y)</label>
+              <NumberField min="1" value={gen.rectangleHeight} onValue={(value) => gen.setRectangle(undefined, value)} />
+            </div>
+            <ThicknessField class="col-span-2" />
+          </div>
+          <RectanglePreview width={gen.rectangleWidth} height={gen.rectangleHeight} depth={gen.settings.depth} />
+        </Show>
+
+        <Show when={gen.geometryType === "circle"}>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class={LABEL}>Radius (mm)</label>
+              <NumberField min="1" value={gen.circleRadius} onValue={(value) => gen.setCircleRadius(value)} />
+            </div>
+            <ThicknessField />
+          </div>
+          <CirclePreview radius={gen.circleRadius} depth={gen.settings.depth} />
+        </Show>
+
+        <Show when={gen.geometryType === "polygon"}>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class={LABEL}>Number of Sides</label>
+              <NumberField min="3" max="20" int accept={(value) => value >= 3} value={gen.polygonSides} onValue={(value) => gen.setPolygon(value, undefined)} />
+            </div>
+            <div>
+              <label class={LABEL}>Radius (mm)</label>
+              <NumberField min="1" value={gen.polygonRadius} onValue={(value) => gen.setPolygon(undefined, value)} />
+            </div>
+            <ThicknessField class="col-span-2" />
+          </div>
+          <PolygonPreview sides={gen.polygonSides} radius={gen.polygonRadius} depth={gen.settings.depth} />
+        </Show>
+
+        <Show when={gen.geometryType === "custom"}>
+          <div>
+            <label class={LABEL}>G-code Custom</label>
+            <div class="relative">
+              <textarea
+                class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm h-32"
+                value={gen.customPath}
+                onInput={(event) => gen.setCustomPath(event.currentTarget.value)}
+                placeholder="Inserisci G-code personalizzato qui..."
+              />
+              <Show when={gen.settings.useAI && !gen.isAIProcessing}>
+                <button
+                  type="button"
+                  class="absolute top-2 right-2 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                  title="Genera G-code con AI"
+                  onClick={() => {
+                    const s = gen.settings
+                    gen.setAIProcessing(true)
+                    setTimeout(() => {
+                      gen.setCustomPath(
+                        "; G-code generato automaticamente da AI\n" +
+                        "G0 Z10 ; Posizione sicura\n" +
+                        "G0 X0 Y0 ; Posizione iniziale\n" +
+                        `G1 Z-${s.depth / 2} F${s.plungerate} ; Prima profondità\n` +
+                        `G1 X10 Y10 F${s.feedrate} ; Movimento lineare\n` +
+                        `G2 X20 Y0 I0 J-10 F${s.feedrate} ; Arco in senso orario\n` +
+                        `G1 X0 Y0 F${s.feedrate} ; Ritorno all'origine\n` +
+                        "G0 Z10 ; Posizione sicura\n"
+                      )
+                      gen.setAIProcessing(false)
+                    }, 2000)
+                  }}
+                >
+                  <Cpu size={16} />
+                </button>
+              </Show>
+              <Show when={gen.isAIProcessing}>
+                <div class="absolute top-2 right-2 p-1">
+                  <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              </Show>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-4">
+              <div class="flex justify-start">
+                <button type="button" class="text-xs text-blue-600 hover:text-blue-800" onClick={() => gen.setCustomPath(SAMPLE)}>Insert example</button>
+              </div>
+              <ThicknessField />
+            </div>
+          </div>
+        </Show>
+      </Show>
+    </Section>
+  )
+}

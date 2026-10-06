@@ -1,0 +1,117 @@
+import { describe, expect, test } from "bun:test"
+import { simulateReadableStream } from "ai"
+import { MockLanguageModelV4 } from "ai/test"
+import { Effect, Layer, Redacted, Stream } from "effect"
+import { AiConfig } from "../src/ai-config.ts"
+import { AiCredentials } from "../src/credentials.ts"
+import { DirectModel, type LanguageModelFactory } from "../src/direct-model.ts"
+import { analyzeGcode } from "../src/gcode-analysis.ts"
+import { render, systemPrompt } from "../src/prompts/system.ts"
+import { AiService } from "../src/service.ts"
+import { buildTools, TOOL_IDS, type ToolHandlersShape } from "../src/tools/catalogue.ts"
+
+const usage = {
+  inputTokens: { total: 4, noCache: 4, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 6, text: 6, reasoning: undefined }
+}
+const streamModel = (parts: string[]) =>
+  new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          { type: "stream-start", warnings: [] },
+          { type: "text-start", id: "t" },
+          ...parts.map((delta) => ({ type: "text-delta" as const, id: "t", delta })),
+          { type: "text-end", id: "t" },
+          { type: "finish", finishReason: { unified: "stop", raw: undefined }, usage }
+        ]
+      })
+    })
+  })
+
+const layer = (factory: LanguageModelFactory) => {
+  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }))
+  return AiService.layer.pipe(Layer.provideMerge(DirectModel.layerWith(factory).pipe(Layer.provideMerge(base))))
+}
+
+describe("AiService without the embedded host", () => {
+  test("models lists the catalogue and marks configured providers", async () => {
+    const program = Effect.gen(function* () {
+      const credentials = yield* AiCredentials
+      const ai = yield* AiService
+      const before = yield* ai.models
+      yield* credentials.set("anthropic", Redacted.make("sk-test-1234"))
+      const after = yield* ai.models
+      return { before, after }
+    })
+    const { before, after } = await Effect.runPromise(program.pipe(Effect.provide(layer(() => streamModel(["x"])))))
+    expect(before.every((m) => !m.configured)).toBe(true)
+    expect(after.filter((m) => m.configured).every((m) => m.provider === "anthropic")).toBe(true)
+    expect(after.some((m) => m.configured)).toBe(true)
+  })
+
+  test("chat streams deltas then done with usage", async () => {
+    const program = Effect.gen(function* () {
+      yield* (yield* AiCredentials).set("anthropic", Redacted.make("sk-test-1234"))
+      const events = yield* (yield* AiService).chat({ message: "hi", context: "Drawing: 3 lines" }).pipe(Stream.runCollect)
+      return events
+    })
+    const events = await Effect.runPromise(program.pipe(Effect.provide(layer(() => streamModel(["Hel", "lo"])))))
+    expect(events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text)).toEqual(["Hel", "lo"])
+    const done = events.at(-1)
+    expect(done).toMatchObject({ type: "done", text: "Hello", usage: { inputTokens: 4, outputTokens: 6 } })
+  })
+
+  test("chat without any key fails with a config error", async () => {
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () { return yield* (yield* AiService).chat({ message: "hi" }).pipe(Stream.runCollect) }).pipe(Effect.provide(layer(() => streamModel([]))))
+    )
+    expect(exit._tag).toBe("Failure")
+  })
+})
+
+describe("gcode analysis", () => {
+  test("flags cutting without spindle or feed, rapids below zero, and out-of-travel moves", () => {
+    const report = analyzeGcode(["G21", "G90", "G1 X10 Y10", "G0 Z-2", "M3 S5000", "G1 X500 F300", "M30"].join("\n"), {
+      workVolume: { x: 100, y: 100, z: 50 }, maxSpindleSpeed: 4000
+    })
+    const codes = report.issues.map((i) => i.code)
+    expect(codes).toContain("CUT_WITHOUT_SPINDLE")
+    expect(codes).toContain("CUT_WITHOUT_FEED")
+    expect(codes).toContain("RAPID_BELOW_ZERO")
+    expect(codes).toContain("SPINDLE_OVER_LIMIT")
+    expect(codes).toContain("OUT_OF_TRAVEL")
+    expect(report.stats.cutMoves).toBe(2)
+  })
+
+  test("a clean program has no issues", () => {
+    const report = analyzeGcode(["G21", "G90", "M3 S1000", "G0 X0 Y0", "G1 Z-1 F100", "G1 X10", "G0 Z5", "M30"].join("\n"))
+    expect(report.issues).toEqual([])
+    expect(report.stats.bounds?.max.x).toBe(10)
+  })
+})
+
+describe("prompts and tools", () => {
+  test("the renderer fills variables and drops missing ones", () => {
+    expect(render("a {{x}} b {{y}}", { x: "1" })).toBe("a 1 b ")
+    expect(systemPrompt("hello")).toContain("Current context:\nhello")
+    expect(systemPrompt()).not.toContain("{{")
+  })
+
+  test("every catalogued tool exists and delete demands confirmation", async () => {
+    const calls: string[] = []
+    const handlers = new Proxy({} as ToolHandlersShape, {
+      get: (_t, name: string) => async () => { calls.push(name); return { ok: true } }
+    })
+    const tools = buildTools(handlers, "p1")
+    expect(tools.map((t) => t.id).sort()).toEqual([...TOOL_IDS].sort())
+    const del = tools.find((t) => t.id === "cad_delete_entities")!
+    const ctx = { sessionId: "s", projectId: "p1", signal: new AbortController().signal }
+    expect(JSON.parse(await del.execute({ ids: ["a"], confirm: false }, ctx))).toMatchObject({ ok: false })
+    expect(calls).toEqual([])
+    await del.execute({ ids: ["a"], confirm: true }, ctx)
+    expect(calls).toEqual(["deleteEntities"])
+    const add = tools.find((t) => t.id === "cad_add_entities")!
+    await expect(add.execute({ entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: -1 }] }, ctx)).rejects.toBeDefined()
+  })
+})

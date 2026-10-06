@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/invitations/[token].tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/invitations/[token].tsx" />
-}
+import { InvitationScreen } from "../../screens/invitation-screen.tsx"
+export default function Page() { return <InvitationScreen /> }

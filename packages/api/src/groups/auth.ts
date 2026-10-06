@@ -4,6 +4,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/ht
 const errorFields = { error: Schema.String, details: Schema.String }
 export class AuthBadRequest extends Schema.TaggedError<AuthBadRequest>()("AuthBadRequest", errorFields, { httpApiStatus: 400 }) {}
 export class AuthNotFound extends Schema.TaggedError<AuthNotFound>()("AuthNotFound", errorFields, { httpApiStatus: 404 }) {}
+export class AuthUnauthorized extends Schema.TaggedError<AuthUnauthorized>()("AuthUnauthorized", errorFields, { httpApiStatus: 401 }) {}
 export class AuthInternal extends Schema.TaggedError<AuthInternal>()("AuthInternal", errorFields, { httpApiStatus: 500 }) {}
 export class PasskeyNotImplemented extends Schema.TaggedError<PasskeyNotImplemented>()("PasskeyNotImplemented", {
   ...errorFields,
@@ -29,6 +30,34 @@ export const PasswordResetResponse = Schema.Struct({ ...AuthMessage.fields, user
 export const VerifyEmailResponse = Schema.Struct({
   ...AuthMessage.fields, user: Schema.Struct({ ...AuthUserReference.fields, emailVerified: Schema.String })
 })
+export const FullUser = Schema.Struct({
+  id: Schema.String, email: Schema.NullOr(Schema.String), name: Schema.NullOr(Schema.String),
+  emailVerified: Schema.NullOr(Schema.String), createdAt: Schema.String
+})
+export const SignInBody = Schema.Struct({ email: Schema.optional(Schema.String), password: Schema.optional(Schema.String) })
+export const SignUpBody = Schema.Struct({
+  email: Schema.optional(Schema.String), password: Schema.optional(Schema.String),
+  confirmPassword: Schema.optional(Schema.String), name: Schema.optional(Schema.String)
+})
+export const SignInResponse = HttpApiSchema.WithHeaders(
+  Schema.Struct({ ...AuthMessage.fields, user: FullUser, token: Schema.String }), { "set-cookie": Schema.Array(Schema.String) })
+export const SignUpResponse = Schema.Struct({ ...AuthMessage.fields, user: FullUser })
+export const SessionResponse = Schema.Struct({
+  session: Schema.Struct({
+    user: Schema.Struct({
+      id: Schema.String, email: Schema.NullOr(Schema.String), name: Schema.NullOr(Schema.String),
+      emailVerified: Schema.NullOr(Schema.String), createdAt: Schema.String, updatedAt: Schema.String
+    }),
+    expires: Schema.String, sessionToken: Schema.optional(Schema.String)
+  })
+})
+export const TestCreateBody = Schema.Struct({ email: Schema.optional(Schema.String), password: Schema.optional(Schema.String), name: Schema.optional(Schema.String) })
+export const TestCreateResponse = Schema.Struct({ success: Schema.Literal(true), message: Schema.String, user: FullUser })
+export class TestCreateBadRequest extends Schema.TaggedError<TestCreateBadRequest>()("TestCreateBadRequest", { error: Schema.String }, { httpApiStatus: 400 }) {}
+export class TestCreateFailure extends Schema.TaggedError<TestCreateFailure>()("TestCreateFailure", { error: Schema.String, message: Schema.String }, { httpApiStatus: 500 }) {}
+export const MagicVerifyResponse = HttpApiSchema.WithHeaders(
+  Schema.Struct({ ...AuthMessage.fields, user: Schema.Struct({ id: Schema.String, email: Schema.NullOr(Schema.String), name: Schema.NullOr(Schema.String) }) }),
+  { "set-cookie": Schema.Array(Schema.String) })
 export const SignoutResponse = HttpApiSchema.WithHeaders(AuthMessage, { "set-cookie": Schema.Array(Schema.String) })
 
 export class AuthGroup extends HttpApiGroup.make("auth")
@@ -49,6 +78,19 @@ export class AuthGroup extends HttpApiGroup.make("auth")
       payload: AuthTokenRequest, success: VerifyEmailResponse, error: [AuthBadRequest, AuthNotFound, AuthInternal]
     }),
     HttpApiEndpoint.post("signout", "/api/auth/signout", { success: SignoutResponse }),
+    HttpApiEndpoint.get("getSession", "/api/auth/get-session", { success: SessionResponse, error: [AuthUnauthorized, AuthInternal] }),
+    HttpApiEndpoint.post("signinDirect", "/api/auth/signin-direct", {
+      payload: SignInBody, success: SignInResponse, error: [AuthBadRequest, AuthUnauthorized, AuthNotFound, AuthInternal]
+    }),
+    HttpApiEndpoint.post("signup", "/api/auth/signup", {
+      payload: SignUpBody, success: SignUpResponse.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [AuthBadRequest, AuthInternal]
+    }),
+    HttpApiEndpoint.post("testDirectCreate", "/api/auth/test-direct-create", {
+      payload: TestCreateBody, success: TestCreateResponse.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [TestCreateBadRequest, TestCreateFailure]
+    }),
+    HttpApiEndpoint.post("verifyMagicLink", "/api/auth/verify-magic-link", {
+      payload: AuthTokenRequest, success: MagicVerifyResponse, error: [AuthBadRequest, AuthNotFound, AuthInternal]
+    }),
     // The legacy handler always returns 501; do not advertise a fabricated success response.
     HttpApiEndpoint.post("registerPasskey", "/api/auth/passkey-register", {
       success: Schema.Never, error: [PasskeyNotImplemented, AuthInternal]

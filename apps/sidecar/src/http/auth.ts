@@ -1,5 +1,5 @@
 import {
-  Api, AuthBadRequest, AuthInternal, AuthNotFound, PasskeyNotImplemented
+  Api, AuthBadRequest, AuthInternal, AuthNotFound, AuthUnauthorized, CurrentUser, PasskeyNotImplemented, TestCreateBadRequest, TestCreateFailure
 } from "@cadcamfun/api"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
@@ -14,6 +14,10 @@ const detailsOf = (e: unknown) => e instanceof Error ? e.message : "Errore inter
 const internal = (log: string, error: string, details?: string) => (e: unknown) =>
   Effect.logError(log, e).pipe(Effect.andThen(Effect.fail(new AuthInternal({ error, details: details ?? detailsOf(e) }))))
 
+const iso = (d: Date | null) => (d ? d.toISOString() : null)
+const fullUser = (u: { id: string; email: string | null; name: string | null; emailVerified: Date | null; createdAt: Date }) => ({
+  id: u.id, email: u.email, name: u.name, emailVerified: iso(u.emailVerified), createdAt: u.createdAt.toISOString()
+})
 const COOKIE = "auth-token=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 
 export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function*(handlers) {
@@ -107,6 +111,65 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
     }).pipe(Effect.catchTag("DatabaseError", internal(
       "Email verification failed", "Errore interno del server",
       "Si è verificato un errore durante la verifica dell'email"))))
+    .handle("getSession", () => Effect.gen(function*() {
+      // The desktop app has one local identity, so the session is always the local profile (the legacy JWT cookie is not needed).
+      const me = yield* CurrentUser
+      const row = yield* repo.profile(me.id)
+      if (!row) return yield* new AuthUnauthorized({ error: "No active session", details: "No active session" })
+      return { session: { user: {
+        id: row.id, email: row.email, name: row.name, emailVerified: iso(row.emailVerified), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString()
+      }, expires: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() } }
+    }).pipe(Effect.catchTag("DatabaseError", internal("Get session error", "Errore durante il controllo della sessione"))))
+    .handle("signinDirect", ({ payload }) => Effect.gen(function*() {
+      const { email, password } = payload
+      if (!email || !password) return yield* bad("Email e password sono richiesti", "Inserisci sia email che password per accedere")
+      const user = yield* repo.findForSignin(email.trim())
+      if (!user) return yield* notFound("Utente non trovato", "Nessun account registrato con questa email")
+      if (!user.password) return yield* bad("Password non impostata", "Questo account non ha una password. Usa un metodo di login alternativo.")
+      if (!(yield* Effect.promise(() => Bun.password.verify(password, user.password!).catch(() => false)))) {
+        return yield* new AuthUnauthorized({ error: "Credenziali non valide", details: "Email o password non corretti" })
+      }
+      const token = tokens.sign({ userId: user.id, email: user.email ?? "", type: "session" }, 7 * 24 * 3600)
+      return HttpApiSchema.withHeaders({
+        body: { success: true as const, message: "Login effettuato con successo!", user: fullUser(user), token },
+        headers: { "set-cookie": [`auth-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}`] }
+      })
+    }).pipe(Effect.catchTag("DatabaseError", internal("Direct signin error", "Errore durante il login"))))
+    .handle("signup", ({ payload }) => Effect.gen(function*() {
+      const { email, password, confirmPassword, name } = payload
+      if (!email || !password || !confirmPassword || !name) return yield* bad("Tutti i campi sono richiesti", "Email, nome, password e conferma password sono obbligatori")
+      if (!EMAIL.test(email)) return yield* bad("Email non valida", "Inserisci un indirizzo email valido")
+      if (name.trim().length < 2) return yield* bad("Nome troppo corto", "Il nome deve essere di almeno 2 caratteri")
+      if (password.length < 8) return yield* bad("Password troppo corta", "La password deve essere di almeno 8 caratteri")
+      if (password !== confirmPassword) return yield* bad("Le password non corrispondono", "La password e la conferma devono essere identiche")
+      const passwordHash = yield* Effect.promise(() => Bun.password.hash(password, { algorithm: "bcrypt", cost: 12 }))
+      const user = yield* repo.createUser({ email: email.trim(), name: name.trim(), passwordHash })
+      if (!user) return yield* bad("Email già in uso", "Questo indirizzo email è già registrato")
+      return { success: true as const, message: "Account creato con successo! Ora puoi effettuare il login.", user: fullUser(user) }
+    }).pipe(Effect.catchTag("DatabaseError", internal("Signup error", "Errore durante la registrazione"))))
+    .handle("testDirectCreate", ({ payload }) => Effect.gen(function*() {
+      const { email, password, name } = payload
+      if (!email || !password || !name) return yield* new TestCreateBadRequest({ error: "Missing required fields" })
+      const passwordHash = yield* Effect.promise(() => Bun.password.hash(password, { algorithm: "bcrypt", cost: 12 }))
+      const user = yield* repo.createUser({ email: email.trim(), name: name.trim(), passwordHash })
+      if (!user) return yield* new TestCreateFailure({ error: "Direct creation failed", message: "Unique constraint failed on the fields: (`email`)" })
+      return { success: true as const, message: "User created successfully with Prisma", user: fullUser(user) }
+    }).pipe(Effect.catchTag("DatabaseError", (e) => Effect.fail(new TestCreateFailure({ error: "Direct creation failed", message: String(e) })))))
+    .handle("verifyMagicLink", ({ payload }) => Effect.gen(function*() {
+      if (!payload.token) return yield* bad("Token mancante", "Il token di verifica è richiesto")
+      const claims = yield* tokens.verify(payload.token).pipe(Effect.mapError((kind) => kind === "expired"
+        ? bad("Link scaduto", "Il magic link è scaduto. Richiedi un nuovo link.")
+        : bad("Token non valido", "Il magic link non è valido o è stato manomesso.")))
+      if (claims.type !== "magic-link") return yield* bad("Token non valido", "Il token non è un magic link valido")
+      const user = yield* repo.findById(claims.userId)
+      if (!user) return yield* notFound("Utente non trovato", "L'utente associato al magic link non esiste")
+      const authToken = tokens.sign({ userId: user.id, email: user.email ?? "", type: "session" }, 7 * 24 * 3600)
+      return HttpApiSchema.withHeaders({
+        body: { success: true as const, message: "Magic link verified successfully", user: { id: user.id, email: user.email, name: user.name } },
+        headers: { "set-cookie": [`auth-token=${authToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 3600}`] }
+      })
+    }).pipe(Effect.catchTag("DatabaseError", internal("Magic link verification failed", "Errore interno del server",
+      "Si è verificato un errore durante la verifica del magic link"))))
     .handle("signout", () => Effect.succeed(HttpApiSchema.withHeaders({
       body: { success: true as const, message: "Logout effettuato con successo!" },
       headers: { "set-cookie": [COOKIE] }

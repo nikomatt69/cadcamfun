@@ -7,7 +7,10 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-solid"
+import FolderOpen from "lucide-solid/icons/folder-open"
+import Pencil from "lucide-solid/icons/pencil"
+import Plus from "lucide-solid/icons/plus"
+import Trash2 from "lucide-solid/icons/trash-2"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { invalidatePrefix } from "../state/query-cache.ts"

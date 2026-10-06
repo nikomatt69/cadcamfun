@@ -8,17 +8,22 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "bun run --filter '*' typecheck && bunx tsc -p tsconfig.json",
+    "typecheck": "turbo run typecheck && tsgo -p tsconfig.json --noEmit",
     "test": "bun test packages apps scripts",
     "build": "bun scripts/build.ts",
     "build:sidecar": "bun scripts/build.ts --only=compile,resources",
     "build:desktop": "bun run --filter @cadcamfun/desktop build",
     "desktop:dev": "bun run build:sidecar && bun run --filter @cadcamfun/desktop tauri dev",
     "db:generate": "bun run --filter @cadcamfun/db generate",
-    "db:migrate": "bun run --filter @cadcamfun/db migrate"
+    "db:migrate": "bun run --filter @cadcamfun/db migrate",
+    "tsgo": "tsgo",
+    "tsc": "tsc",
+    "turbo": "turbo"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "turbo": "^2.11.7",
     "typescript": "^5.9.0"
   },
   "overrides": {

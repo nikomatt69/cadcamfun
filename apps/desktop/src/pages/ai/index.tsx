@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/ai/index.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/ai/index.tsx" />
-}
+/** Re-export of the nikcli-powered assistant page so the legacy route table keeps matching. */
+export { AssistantPage as default } from "../../ai/AssistantPage.tsx"

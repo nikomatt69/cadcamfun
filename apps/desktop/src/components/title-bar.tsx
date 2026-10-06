@@ -8,7 +8,8 @@
  * contract, so the fallback can never invent an id the shell does not know.
  */
 import { createSignal, For, Show, type JSX } from "solid-js"
-import { ChevronDown, Search } from "lucide-solid"
+import ChevronDown from "lucide-solid/icons/chevron-down"
+import Search from "lucide-solid/icons/search"
 import { t, type Key } from "../i18n/index.ts"
 import { isTauri } from "../app/sidecar.ts"
 
@@ -99,7 +100,7 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
 
   return (
     <header
-      class="flex h-11 shrink-0 items-center gap-1 border-b border-gray-200 bg-white pl-20 pr-2 dark:border-gray-700 dark:bg-gray-800"
+      class="reference-native-titlebar flex h-11 shrink-0 items-center gap-1 border-b border-gray-200 bg-white pl-20 pr-2 dark:border-gray-700 dark:bg-gray-800"
       data-tauri-drag-region
     >
       <Show when={withMenus()} fallback={
@@ -158,9 +159,9 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
         </nav>
       </Show>
 
-      <span class="ml-2 text-sm font-semibold" data-tauri-drag-region>
+      <Show when={withMenus()}><span class="ml-2 text-sm font-semibold" data-tauri-drag-region>
         {t("app.name")}
-      </span>
+      </span></Show>
 
       <button
         type="button"

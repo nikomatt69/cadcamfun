@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/500.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/500.tsx" />
-}
+import { ServerErrorScreen } from "../screens/error-screens.tsx"
+export default function Page() { return <ServerErrorScreen /> }

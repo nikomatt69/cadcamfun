@@ -1,3 +1,4 @@
+/// <reference path="./sdk-next.d.ts" />
 import { Effect, Queue, Stream } from "effect"
 import type { HostPromptResult } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"

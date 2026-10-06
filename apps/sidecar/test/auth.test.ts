@@ -114,3 +114,56 @@ describe("/api/auth/signout and passkey-register", () => {
     expect((await app.call("/api/auth/signout", { method: "POST", auth: false })).status).toBe(401)
   })
 })
+
+describe("signup, signin-direct, get-session, magic link verification", () => {
+  test("signup validates with the legacy messages and creates an account once", async () => {
+    expect((await post("/api/auth/signup")).body).toMatchObject({ error: "Tutti i campi sono richiesti" })
+    const ok = { email: "ada@example.com", name: "Ada", password: "longpassword", confirmPassword: "longpassword" }
+    expect((await post("/api/auth/signup", { ...ok, email: "nope" })).body).toMatchObject({ error: "Email non valida" })
+    expect((await post("/api/auth/signup", { ...ok, name: "A" })).body).toMatchObject({ error: "Nome troppo corto" })
+    expect((await post("/api/auth/signup", { ...ok, password: "short", confirmPassword: "short" })).body).toMatchObject({ error: "Password troppo corta" })
+    expect((await post("/api/auth/signup", { ...ok, confirmPassword: "different1" })).body).toMatchObject({ error: "Le password non corrispondono" })
+    const created = await post("/api/auth/signup", ok)
+    expect(created.status).toBe(201)
+    expect(created.body.user).toMatchObject({ email: "ada@example.com", name: "Ada", emailVerified: null })
+    const dup = await post("/api/auth/signup", ok)
+    expect(dup.status).toBe(400)
+    expect(dup.body.error).toBe("Email già in uso")
+  })
+
+  test("signin-direct checks credentials and sets the session cookie", async () => {
+    expect((await post("/api/auth/signin-direct")).body).toMatchObject({ error: "Email e password sono richiesti" })
+    expect((await post("/api/auth/signin-direct", { email: "ghost@example.com", password: "x" })).status).toBe(404)
+    const wrong = await post("/api/auth/signin-direct", { email: "ada@example.com", password: "wrongpass1" })
+    expect(wrong.status).toBe(401)
+    expect(wrong.body.error).toBe("Credenziali non valide")
+    const ok = await post("/api/auth/signin-direct", { email: "ada@example.com", password: "longpassword" })
+    expect(ok.status).toBe(200)
+    expect(ok.body).toMatchObject({ success: true, message: "Login effettuato con successo!", user: { email: "ada@example.com" } })
+    expect(ok.headers.get("set-cookie")).toContain(`auth-token=${ok.body.token}`)
+  })
+
+  test("get-session answers with the local profile", async () => {
+    const r = await app.call("/api/auth/get-session")
+    expect(r.status).toBe(200)
+    expect(r.body.session.user.email).toBe("local@cadcamfun.local")
+  })
+
+  test("test-direct-create validates and conflicts", async () => {
+    expect((await post("/api/auth/test-direct-create", { email: "x@y.co" })).body.error).toBe("Missing required fields")
+    const ok = await post("/api/auth/test-direct-create", { email: "t@y.co", password: "pw", name: "T" })
+    expect(ok.status).toBe(201)
+    expect((await post("/api/auth/test-direct-create", { email: "t@y.co", password: "pw", name: "T" })).status).toBe(500)
+  })
+
+  test("a magic link signs in once verified", async () => {
+    const link = await post("/api/auth/send-magic-link", { email: "local@cadcamfun.local" })
+    const token = new URL(link.body.debugMagicLink).searchParams.get("token")!
+    expect((await post("/api/auth/verify-magic-link")).body).toMatchObject({ error: "Token mancante" })
+    expect((await post("/api/auth/verify-magic-link", { token: "garbage" })).body).toMatchObject({ error: "Token non valido" })
+    const ok = await post("/api/auth/verify-magic-link", { token })
+    expect(ok.status).toBe(200)
+    expect(ok.body.message).toBe("Magic link verified successfully")
+    expect(ok.headers.get("set-cookie")).toContain("auth-token=")
+  })
+})

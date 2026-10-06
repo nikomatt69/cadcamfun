@@ -9,7 +9,11 @@
  */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { createEffect } from "solid-js"
-import { LoaderCircle, Send, Sparkles, Trash2, X } from "lucide-solid"
+import LoaderCircle from "lucide-solid/icons/loader-circle"
+import Send from "lucide-solid/icons/send"
+import Sparkles from "lucide-solid/icons/sparkles"
+import Trash2 from "lucide-solid/icons/trash-2"
+import X from "lucide-solid/icons/x"
 import { t } from "../i18n/index.ts"
 
 export interface AiMessage {

@@ -1,5 +1,5 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun"
-import { Cause, Effect, Layer, Logger, Runtime } from "effect"
+import { Cause, Effect, Layer, Logger, Runtime, Schedule } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
@@ -10,6 +10,13 @@ const Ready = Layer.effectDiscard(Effect.gen(function*() {
   const server = yield* HttpServer.HttpServer
   const address = server.address
   if (address._tag !== "TcpAddress") return yield* Effect.die("sidecar must listen on TCP")
+  // The socket listens while the API layers (the AI host takes a moment) may still be building;
+  // announce readiness only once the public health route answers, so the shell never sees a 404.
+  const probe = Effect.tryPromise(async () => {
+    const res = await fetch(`http://127.0.0.1:${address.port}/api/health`)
+    if (!res.ok) throw new Error(`health ${res.status}`)
+  })
+  yield* probe.pipe(Effect.retry({ schedule: Schedule.spaced("50 millis"), times: 400 }), Effect.orDie)
   console.log(JSON.stringify({ event: "ready", port: address.port }))
 }))
 

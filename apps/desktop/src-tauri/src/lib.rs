@@ -97,17 +97,6 @@ pub fn run() {
         .menu(menu::build)
         .on_menu_event(|app, event| menu::handle_event(app, event.id().as_ref()))
         .setup(setup)
-        .on_page_load(|webview, payload| {
-            if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                let url = payload.url().to_string();
-                let label = webview.label().to_owned();
-                log::info!("page loaded in '{label}': {url}");
-                // Diagnostic: report whether the frontend actually booted.
-                let _ = webview.eval(
-                    "setTimeout(() => console.log('BOOTDIAG root=' + (document.getElementById('root')?.childElementCount ?? 'missing') + ' body=' + document.body.innerText.slice(0, 120)), 4000)",
-                );
-            }
-        })
         .invoke_handler(tauri::generate_handler![
             commands::get_sidecar_endpoint,
             commands::get_logs_dir,

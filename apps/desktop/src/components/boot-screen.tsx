@@ -3,7 +3,9 @@
  * "View logs" (spec 06-desktop-ui.md §1).
  */
 import { Show, type JSX } from "solid-js"
-import { LoaderCircle, Terminal, Triangle } from "lucide-solid"
+import LoaderCircle from "lucide-solid/icons/loader-circle"
+import Terminal from "lucide-solid/icons/terminal"
+import Triangle from "lucide-solid/icons/triangle"
 import { t } from "../i18n/index.ts"
 import type { BootState } from "../state/client.ts"
 

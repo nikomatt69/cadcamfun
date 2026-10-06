@@ -57,3 +57,9 @@ Goal: every legacy route in `specs/api-inventory.md` exists in the sidecar with 
 - `/api/materials`, `/api/materials/:id`, `/api/materials/:id/storage`, `/api/materials/export-import`
 - `/api/tools`, `/api/tools/:id`, `/api/tools/:id/storage`, `/api/tools/export-import`, `/api/tools/:id/export-import`
 - Deviations: list `search` narrows the visible set (legacy replaced the visibility filter, leaking others' rows); material create/import organisation membership is checked for the current user (legacy matched any member); error bodies carry an extra `_tag` field.
+
+### Integration batch (analytics, waitlist, auth, files, plugins)
+
+- Done: `GET /api/analytics/system-metrics`, `POST /api/analytics/track`, `POST /api/waitlist`, `POST /api/auth/{forgot-password,reset-password,send-magic-link,send-verification-email,verify-email,signout,passkey-register}`, `POST /api/upload`, `GET /api/download`, all 14 `/api/plugins/*` routes.
+- Deviations: waitlist is kept in `<dataDir>/waitlist.json`; upload returns a `file://` URL from `StorageService` instead of a 4everland pre-signed URL (and needs an existing conversation participant row); download serves `<dataDir>/downloads/cadcamfun-app.zip`; plugin deviations are listed in `09-plugins.md`; error bodies carry an extra `_tag`.
+- Not yet: `GET /api/auth/get-session`, `signin-direct`, `signup`, `test-direct-create`, `verify-magic-link`, the remaining `analytics/*` routes, and every family without a contract (see `bun run --filter @cadcamfun/api coverage --missing`).

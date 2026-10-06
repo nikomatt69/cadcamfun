@@ -1,0 +1,11 @@
+{
+  "plugins.title": "Installed Plugins",
+  "plugins.install": "Install Plugin",
+  "plugins.empty": "No plugins installed yet.",
+  "plugins.info": "Plugin Info",
+  "plugins.uploadFile": "Upload File",
+  "plugins.dropPackage": "Drop your plugin package here",
+  "plugins.browsePackage": "or click to browse files (.zip or .vsix)",
+  "plugins.invalidPackage": "Invalid file type. Please upload a plugin package (.zip or .vsix)",
+  "plugins.packageTooLarge": "File too large. Maximum size is 10MB"
+}

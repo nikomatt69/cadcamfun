@@ -48,13 +48,13 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 | WP0 | Database | `packages/db` | `02-database.md` | — | **done** (schema generated from Prisma, migration, `Database` layer, tests) |
 | WP1 | CAD geometry core | `packages/core/src/cad` | `03-core-cad.md` | — | **done** (288 core tests incl. WP2) |
 | WP2 | CAM + G-code core | `packages/core/src/cam` | `04-core-cam.md` | WP1 (types only) | **done** (3 posts, goldens, regression tests for all legacy bugs) |
-| WP3 | Shared API contract | `packages/api` | `05-api-sidecar.md` | WP1, WP2 schemas | **in progress** — 30/195 legacy routes covered (`bun run --filter @cadcamfun/api coverage`) |
-| WP4 | Sidecar server | `apps/sidecar` | `05-api-sidecar.md` | WP0, WP3 | **in progress** — sidecar wiring + 30 routes, 49 HTTP tests |
+| WP3 | Shared API contract | `packages/api` | `05-api-sidecar.md` | WP1, WP2 schemas | **in progress** — 67/195 legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`) |
+| WP4 | Sidecar server | `apps/sidecar` | `05-api-sidecar.md` | WP0, WP3 | **in progress** — every contract group is now served (plugins, auth, analytics, waitlist, files added); families without a contract are still missing, see `11-api-parity-brief.md` |
 | WP5 | Tauri shell | `apps/desktop/src-tauri` | `07-tauri-shell.md` | WP4 (binary contract only) | **M1 done** (clippy + 32 Rust tests; verified with stub sidecar) |
-| WP6 | UI shell + project screens | `apps/desktop/src/app`, `…/screens` | `06-desktop-ui.md` | WP3 | **in progress** — Solid + Tailwind v3 foundation, 65 page stubs, router (see `apps/desktop/src/app`) |
+| WP6 | UI shell + project screens | `apps/desktop/src/app`, `…/screens` | `06-desktop-ui.md` | WP3 | **in progress** — Solid + Tailwind v3 foundation, core screens plus plugins, costs, organizations, waitlist, auth and analytics screens; the rest of the 65 pages are still stubs |
 | WP7 | 3D/2D viewport | `apps/desktop/src/viewport` | `06-desktop-ui.md` | WP1 | **in progress** — separate session owns `src/viewport`, `src/state` |
 | WP8 | AI layer (nikcli + AI SDK v7) | `packages/ai` | `08-ai.md` | — | **done** |
-| WP9 | Plugin system | `packages/plugin-sdk`, `apps/sidecar/src/plugins` | `09-plugins.md` | WP3, WP4 | **done** (SDK + host; HTTP group pending) |
+| WP9 | Plugin system | `packages/plugin-sdk`, `apps/sidecar/src/plugins` | `09-plugins.md` | WP3, WP4 | **done** (SDK + host; legacy `/api/plugins/*` HTTP group served, SDK host not exposed over HTTP yet) |
 | WP10 | Updates, sync, packaging, CI | `.github/workflows`, `scripts/`, `apps/desktop/src-tauri` (updater only) | `10-release-sync.md` | WP5 | **done** (pipeline + CI + updater; release secrets unset) |
 
 ### Parallelisation map

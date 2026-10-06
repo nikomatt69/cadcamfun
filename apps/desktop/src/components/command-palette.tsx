@@ -7,7 +7,8 @@
  */
 import { createEffect, createSignal, For, Show, type JSX } from "solid-js"
 import { createUniqueId } from "solid-js"
-import { Search, X } from "lucide-solid"
+import Search from "lucide-solid/icons/search"
+import X from "lucide-solid/icons/x"
 import { t } from "../i18n/index.ts"
 import { filterCommands } from "../app/shortcuts.ts"
 

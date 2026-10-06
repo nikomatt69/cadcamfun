@@ -1,3 +1,4 @@
+import type { LanguageModelFactory } from "@cadcamfun/ai"
 import { Config, Context, Effect, Layer, Redacted } from "effect"
 
 export interface AppConfig {
@@ -9,6 +10,16 @@ export interface AppConfig {
   readonly appUrl?: string
   /** Echo reset/magic links in the response, as the legacy handlers did in development. */
   readonly debugLinks?: boolean
+  /** `nikcli` (default) runs chat through the embedded host; `direct` uses the AI SDK only. */
+  /** Stripe webhook signing secret (legacy `STRIPE_WEBHOOK_SECRET`); without it webhooks are refused. */
+  readonly stripeWebhookSecret?: string
+  /** Shared secret for `/api/cron/*` (legacy `CRON_SECRET`); without it the cron route is open to the local app. */
+  readonly cronSecret?: string
+  /** E-mail of the administrator (legacy `ADMIN_EMAIL`); the local profile is the admin of its own installation by default. */
+  readonly adminEmail?: string
+  readonly aiHost?: "nikcli" | "direct"
+  /** Test hook: replaces the vendor SDK model construction (never set in production). */
+  readonly aiModelFactory?: LanguageModelFactory
 }
 
 /** Single place that reads the environment (see specs/05 §1). */
@@ -21,7 +32,15 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const migrationsDir = yield* Config.option(Config.string("CADCAMFUN_MIGRATIONS_DIR"))
       const appUrl = yield* Config.option(Config.string("CADCAMFUN_APP_URL"))
       const debugLinks = yield* Config.withDefault(Config.boolean("CADCAMFUN_DEBUG_LINKS"), false)
+      const aiHost = yield* Config.withDefault(Config.literals(["nikcli", "direct"], "CADCAMFUN_AI_HOST"), "nikcli" as const)
+      const stripeWebhookSecret = yield* Config.option(Config.string("STRIPE_WEBHOOK_SECRET"))
+      const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
+      const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
       return AppConfigService.of({
+        ...(adminEmail._tag === "Some" ? { adminEmail: adminEmail.value } : {}),
+        ...(stripeWebhookSecret._tag === "Some" ? { stripeWebhookSecret: stripeWebhookSecret.value } : {}),
+        ...(cronSecret._tag === "Some" ? { cronSecret: cronSecret.value } : {}),
+        aiHost,
         ...(appUrl._tag === "Some" ? { appUrl: appUrl.value } : {}),
         debugLinks,
         token,

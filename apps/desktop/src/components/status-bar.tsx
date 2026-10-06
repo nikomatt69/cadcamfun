@@ -6,16 +6,14 @@
  * on — without booting a client.
  */
 import { For, Show, type JSX } from "solid-js"
-import {
-  Cpu,
-  FolderOpen,
-  Library,
-  Plug,
-  Ruler,
-  Settings as SettingsIcon,
-  Sparkles,
-  Wallet
-} from "lucide-solid"
+import Cpu from "lucide-solid/icons/cpu"
+import FolderOpen from "lucide-solid/icons/folder-open"
+import Library from "lucide-solid/icons/library"
+import Plug from "lucide-solid/icons/plug"
+import Ruler from "lucide-solid/icons/ruler"
+import SettingsIcon from "lucide-solid/icons/settings"
+import Sparkles from "lucide-solid/icons/sparkles"
+import Wallet from "lucide-solid/icons/wallet"
 import { t, type Key } from "../i18n/index.ts"
 import { formatLength, type DisplayUnits } from "../viewport/units.ts"
 import { ACTIVITIES, type ActivityId } from "../app/layout.ts"
@@ -102,7 +100,7 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
   }
   return (
     <footer
-      class="flex h-7 shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+      class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
       aria-label={t("status.units")}
     >
       <span>
@@ -111,7 +109,7 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
       </span>
       <span>
         <span class="sr-only">{t("status.snap")}: </span>
-        {t("status.snap")}: {props.snapEnabled ? "on" : t("status.snapOff")}
+        {t("status.snap")}: {props.snapEnabled ? t("shell.snapOn") : t("status.snapOff")}
       </span>
       <Show when={props.toolLabel !== undefined}>
         <span>

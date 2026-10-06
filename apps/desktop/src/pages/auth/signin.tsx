@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/auth/signin.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/auth/signin.tsx" />
-}
+import { LegacyAuth } from "../../screens/legacy-account.tsx"
+export default function Page() { return <LegacyAuth mode="signin" /> }

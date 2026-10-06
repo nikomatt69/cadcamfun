@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/organizations/[id]/chat/[conversationId].tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/organizations/[id]/chat/[conversationId].tsx" />
-}
+import { LegacyChat } from "../../../../screens/legacy-chat.tsx"
+export default function Page() { return <LegacyChat mode="conversation" /> }

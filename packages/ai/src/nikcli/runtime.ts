@@ -1,3 +1,4 @@
+/// <reference path="./sdk-next.d.ts" />
 import { Effect, Scope } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { writeFile } from "node:fs/promises"

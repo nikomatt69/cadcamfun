@@ -1,6 +1,6 @@
-// Port of legacy `src/pages/marketplace/items/[id].tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../../app/PageStub.tsx"
-
+import { useParams } from "@solidjs/router"
+import { MarketplaceScreen } from "../../../screens/marketplace.tsx"
 export default function Page() {
-  return <PageStub legacy="pages/marketplace/items/[id].tsx" />
+  const params = useParams<{ id: string }>()
+  return <MarketplaceScreen view="item" id={params.id} />
 }

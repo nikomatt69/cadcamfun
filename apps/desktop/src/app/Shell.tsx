@@ -6,13 +6,17 @@
  * `children` slot. That keeps routing in `app/App.tsx` and this file free of the router,
  * so the whole layout can be rendered in a component test without a router.
  */
-import { Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { useNavigate } from "@solidjs/router"
+import { Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { t, type Key } from "../i18n/index.ts"
-import { ActivityBar, StatusBar } from "../components/status-bar.tsx"
+import { StatusBar } from "../components/status-bar.tsx"
+import { ReferenceNavbar, ReferenceSidebar } from "../components/reference-navigation.tsx"
+import { ReferenceBreadcrumbs, ReferenceFooter, referenceLayout } from "../components/reference-page.tsx"
+import ChevronUp from "lucide-solid/icons/chevron-up"
+import "../styles/reference-shell.css"
 import { TitleBar } from "../components/title-bar.tsx"
 import { CommandPalette, type PaletteCommand } from "../components/command-palette.tsx"
-import { AiPanel, type AiMessage } from "../components/ai-panel.tsx"
+import { AssistantPanel } from "../ai/AssistantPanel.tsx"
 import { useApp } from "../state/context.ts"
 import { activeActivity, routeOf, type ActivityId } from "./layout.ts"
 import { findShortcut, shortcuts } from "./shortcuts.ts"
@@ -29,7 +33,22 @@ const groupKey = (group: "navigation" | "edit" | "view" | "ai"): Key =>
 export function Shell(props: ShellProps): JSX.Element {
   const app = useApp()
   const navigate = useNavigate()
-  const [messages, setMessages] = createSignal<ReadonlyArray<AiMessage>>([])
+  const location = useLocation()
+  const layout = () => referenceLayout(location.pathname)
+  const [sidebarOpen, setSidebarOpen] = createSignal(true)
+  const [mobile, setMobile] = createSignal(false)
+  const [showScrollTop, setShowScrollTop] = createSignal(false)
+  let main: HTMLElement | undefined
+  const resize = () => {
+    const next = window.innerWidth < 768
+    if (next !== mobile()) { setMobile(next); setSidebarOpen(!next) }
+  }
+  createEffect(() => {
+    const activity = activeActivity(location.pathname)
+    app.setActivity(activity)
+    setShowScrollTop(false)
+    main?.scrollTo?.({ top: 0 })
+  })
 
   const go = (route: string): void => {
     navigate(route)
@@ -94,7 +113,7 @@ export function Shell(props: ShellProps): JSX.Element {
   const onMenu = (id: string): void => {
     switch (id) {
       case "file.new":
-        go("/")
+        go("/projects/create")
         return
       case "edit.undo":
         app.editor.undo()
@@ -105,6 +124,9 @@ export function Shell(props: ShellProps): JSX.Element {
       case "view.toggle_right_panel":
       case "view.toggle_console":
         app.setPanelOpen(!app.panelOpen())
+        return
+      case "view.toggle_left_panel":
+        setSidebarOpen(!sidebarOpen())
         return
       default:
         return
@@ -141,25 +163,14 @@ export function Shell(props: ShellProps): JSX.Element {
   }
 
   onMount(() => {
+    resize()
+    window.addEventListener("resize", resize)
     window.addEventListener("keydown", onKeyDown)
   })
   onCleanup(() => {
+    window.removeEventListener("resize", resize)
     window.removeEventListener("keydown", onKeyDown)
   })
-
-  /**
-   * WP8 has not landed, so the panel streams a canned reply. The signature is the one an
-   * SSE endpoint will have, so replacing this function is the only change needed then.
-   */
-  const streamReply = async function* (prompt: string, signal: AbortSignal): AsyncIterable<string> {
-    const reply = `I can see the project with ${app.drawing().entities.length} entities. Ask me about toolpaths.`
-    for (const word of reply.split(" ")) {
-      if (signal.aborted) return
-      await Promise.resolve()
-      yield `${word} `
-    }
-    void prompt
-  }
 
   const settings = (): ReturnType<typeof app.settings.settings> => app.settings.settings()
   const toolLabel = (): string | undefined => {
@@ -168,26 +179,29 @@ export function Shell(props: ShellProps): JSX.Element {
   }
 
   return (
-    <div class="flex h-screen w-screen flex-col overflow-hidden bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <div class="reference-shell">
       <TitleBar onMenu={onMenu} onOpenPalette={() => app.setPaletteOpen(true)} />
+      <Show when={layout() !== "workspace"}>
+        <ReferenceNavbar sidebarOpen={sidebarOpen()} onToggleSidebar={() => setSidebarOpen(!sidebarOpen())} />
+      </Show>
 
-      <div class="flex min-h-0 flex-1">
-        <ActivityBar active={app.activity()} onSelect={selectActivity} />
+      <div class="reference-shell-body" classList={{ "is-workspace": layout() === "workspace", "is-standalone": layout() === "standalone" }}>
+        <Show when={layout() === "page"}>
+          <ReferenceSidebar open={sidebarOpen()} mobile={mobile()} onOpenChange={setSidebarOpen} />
+        </Show>
 
-        <main class="flex min-w-0 flex-1 flex-col" id="main-content">
-          <div class="min-h-0 flex-1 overflow-y-auto">
-            {props.children}
-          </div>
-        </main>
+        <div class="reference-page-column">
+          <Show when={layout() === "page"}><ReferenceBreadcrumbs pathname={location.pathname} /></Show>
+          <main ref={main} class="reference-page-scroll" id="main-content" onScroll={(event) => setShowScrollTop(event.currentTarget.scrollTop > 300)}>
+            <div class={layout() === "workspace" ? "reference-workspace-container" : layout() === "standalone" ? "reference-standalone-container" : "reference-page-container"}>
+              {props.children}
+            </div>
+            <Show when={layout() === "page"}><ReferenceFooter /></Show>
+          </main>
+          <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={() => main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}><ChevronUp size={20} /></button></Show>
+        </div>
 
-        <AiPanel
-          open={app.panelOpen()}
-          messages={messages()}
-          streaming={false}
-          onSend={streamReply}
-          onClose={() => app.setPanelOpen(false)}
-          onClear={() => setMessages([])}
-        />
+        <AssistantPanel open={app.panelOpen()} onClose={() => app.setPanelOpen(false)} />
       </div>
 
       <StatusBar

@@ -6,6 +6,7 @@ import { MachineConfigsGroup, MachineConfigsStorageGroup } from "./groups/machin
 import { DrawingsGroup } from "./groups/drawings.ts"
 import { ComponentsGroup } from "./groups/components.ts"
 import { ProjectToolpathsGroup, ToolpathsGroup } from "./groups/toolpaths.ts"
+import { ToolpathGeneratorGroup } from "./groups/toolpath-generator.ts"
 import { LibraryGroup } from "./groups/library.ts"
 import { ProjectsGroup } from "./projects.ts"
 import { HealthGroup, SystemGroup } from "./system.ts"
@@ -17,6 +18,12 @@ import { NotificationsGroup } from "./groups/notifications.ts"
 import { AuthGroup } from "./groups/auth.ts"
 import { WaitlistGroup } from "./groups/waitlist.ts"
 import { AnalyticsGroup } from "./groups/analytics.ts"
+import { UserGroup } from "./groups/user.ts"
+import { AiGroup } from "./groups/ai.ts"
+import { McpGroup } from "./groups/mcp.ts"
+import { BillingGroup } from "./groups/billing.ts"
+import { MiscGroup } from "./groups/misc.ts"
+import { KvGroup } from "./groups/kv.ts"
 
 export * from "./errors.ts"
 export * from "./auth.ts"
@@ -30,11 +37,18 @@ export * from "./groups/notifications.ts"
 export * from "./groups/auth.ts"
 export * from "./groups/waitlist.ts"
 export * from "./groups/analytics.ts"
+export * from "./groups/user.ts"
+export * from "./groups/ai.ts"
+export * from "./groups/mcp.ts"
+export * from "./groups/billing.ts"
+export * from "./groups/misc.ts"
+export * from "./groups/kv.ts"
 export * from "./groups/materials.ts"
 export * from "./groups/tools.ts"
 export * from "./groups/drawings.ts"
 export * from "./groups/components.ts"
 export * from "./groups/toolpaths.ts"
+export * from "./groups/toolpath-generator.ts"
 export * from "./groups/library.ts"
 export * from "./component-data.ts"
 export * from "./groups/machine-configs.ts"
@@ -47,6 +61,12 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(AuthGroup.middleware(Authorization))
   .add(WaitlistGroup.middleware(Authorization))
   .add(AnalyticsGroup.middleware(Authorization))
+  .add(UserGroup.middleware(Authorization))
+  .add(AiGroup.middleware(Authorization))
+  .add(McpGroup.middleware(Authorization))
+  .add(BillingGroup.middleware(Authorization))
+  .add(MiscGroup.middleware(Authorization))
+  .add(KvGroup.middleware(Authorization))
   .add(ProductionCostsGroup.middleware(Authorization))
   .add(PluginsGroup.middleware(Authorization))
   .add(FilesGroup.middleware(Authorization))
@@ -62,6 +82,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(DrawingsGroup.middleware(Authorization))
   .add(ComponentsGroup.middleware(Authorization))
   .add(ToolpathsGroup.middleware(Authorization))
+  .add(ToolpathGeneratorGroup.middleware(Authorization))
   .add(LibraryGroup.middleware(Authorization))
   .add(ProjectToolpathsGroup.middleware(Authorization))
   .annotateMerge(OpenApi.annotations({ title: "CADCAMFUN sidecar API" }))

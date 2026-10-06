@@ -5,7 +5,8 @@
  * there is a single place where `role="alert"` and `aria-busy` are decided.
  */
 import { Show, type JSX } from "solid-js"
-import { LoaderCircle, Triangle } from "lucide-solid"
+import LoaderCircle from "lucide-solid/icons/loader-circle"
+import Triangle from "lucide-solid/icons/triangle"
 import { t } from "../i18n/index.ts"
 
 export interface ScreenHeaderProps {

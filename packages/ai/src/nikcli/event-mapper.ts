@@ -1,3 +1,4 @@
+/// <reference path="./sdk-next.d.ts" />
 import type { HostEvent } from "@nikcli-ai/sdk-next"
 import type { AiEvent } from "../events.ts"
 

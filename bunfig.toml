@@ -1,0 +1,3 @@
+[test]
+# Solid `.tsx` transform for the desktop UI tests (apps/desktop/test/helpers/solid-plugin.ts).
+preload = ["./apps/desktop/test/helpers/solid-plugin.ts"]

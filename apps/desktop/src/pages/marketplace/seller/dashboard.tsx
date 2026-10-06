@@ -1,6 +1,2 @@
-// Port of legacy `src/pages/marketplace/seller/dashboard.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/marketplace/seller/dashboard.tsx" />
-}
+import { MarketplaceScreen } from "../../../screens/marketplace.tsx"
+export default function Page() { return <MarketplaceScreen view="seller" /> }

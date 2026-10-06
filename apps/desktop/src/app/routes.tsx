@@ -22,6 +22,7 @@ export const routes: AppRoute[] = [
   { path: "/auth/verify", component: lazy(() => import("../pages/auth/verify.tsx")) },
   { path: "/cad", component: lazy(() => import("../pages/cad.tsx")) },
   { path: "/cam", component: lazy(() => import("../pages/cam.tsx")) },
+  { path: "/costs", component: lazy(() => import("../pages/costs.tsx")) },
   { path: "/components/:id", component: lazy(() => import("../pages/components/_id_.tsx")) },
   { path: "/components", component: lazy(() => import("../pages/components/index.tsx")) },
   { path: "/drawings/:id", component: lazy(() => import("../pages/drawings/_id_.tsx")) },

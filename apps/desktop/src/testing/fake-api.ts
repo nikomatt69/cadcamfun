@@ -1,4 +1,5 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schema } from "effect"
+import { cam } from "@cadcamfun/core"
 import { ApiClient as Service, clientLayer } from "../app/client.ts"
 import type { Client } from "../state/client.ts"
 
@@ -56,6 +57,34 @@ const decodeBody = async (body: unknown): Promise<unknown> => {
   return {}
 }
 
+/**
+ * The generator routes are pure functions of the request, so the browser preview runs the very same
+ * `cam.generator` code the sidecar does and answers with the contract Schemas' encoding.
+ */
+const generatorRoute = (kind: string, body: unknown): { readonly status: number; readonly body: unknown } => {
+  const g = cam.generator
+  try {
+    switch (kind) {
+      case "generate": {
+        const outcome = g.generateToolpath(Schema.decodeUnknownSync(g.GenerateRequestSchema)(body))
+        if (outcome.error !== undefined) return { status: 400, body: { message: outcome.error } }
+        return { status: 200, body: Schema.encodeSync(g.GenerateResponseSchema)(outcome.response) }
+      }
+      case "suggest": {
+        const request = Schema.decodeUnknownSync(g.SuggestRequestSchema)(body)
+        return { status: 200, body: Schema.encodeSync(g.SuggestResponseSchema)(g.suggestFor(request.settings, request.geometry as cam.generator.GeometryInput)) }
+      }
+      default: {
+        const request = Schema.decodeUnknownSync(g.ParseRequestSchema)(body)
+        const analysis = g.analyseGcode(request.gcode, request.name)
+        return { status: 200, body: Schema.encodeSync(g.ParseResponseSchema)({ warnings: analysis.warnings, stats: analysis.stats, program: analysis.program }) }
+      }
+    }
+  } catch (cause) {
+    return { status: 400, body: { message: cause instanceof Error ? cause.message : String(cause) } }
+  }
+}
+
 export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
   const now = options.now ?? (() => new Date().toISOString())
   const common = () => ({ createdAt: now(), updatedAt: now(), ownerId: "user-local", organizationId: null, isPublic: false })
@@ -87,6 +116,10 @@ export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
     const payload = typeof body === "object" && body !== null ? body : {}
     const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null ? Object.fromEntries(Object.entries(value)) : {}
     const data = record(payload)
+    if (group === "toolpaths" && method === "POST" && ["generate", "suggest", "parse"].includes(parts[2] ?? "")) {
+      const answer = generatorRoute(parts[2] ?? "", body)
+      return json(answer.body, answer.status)
+    }
     const collection = group === "machine-configs" ? store.machineConfigs : group === "projects" ? store.projects : group === "drawings" ? store.drawings : group === "materials" ? store.materials : group === "tools" ? store.tools : group === "toolpaths" ? store.toolpaths : undefined
     if (collection === undefined) return json({ message: "Not implemented in browser preview" }, 501)
     const envelope = (value: unknown, status = 200) => group === "machine-configs" ? json({ success: true, data: value }, status) : json(value, status)

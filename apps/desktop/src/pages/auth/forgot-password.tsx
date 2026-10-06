@@ -1,6 +1,1 @@
-// Port of legacy `src/pages/auth/forgot-password.tsx` (see .reference). TODO: replace this stub with the real page.
-import PageStub from "../../app/PageStub.tsx"
-
-export default function Page() {
-  return <PageStub legacy="pages/auth/forgot-password.tsx" />
-}
+export { ForgotPasswordScreen as default } from "../../screens/auth.tsx"
