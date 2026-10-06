@@ -45,7 +45,7 @@ interface ApiTokenRow {
   readonly id: string
   readonly name: string
   readonly prefix: string
-  readonly permissions: string[]
+  readonly permissions: readonly string[]
   readonly createdAt: string
   readonly lastUsed?: string
   readonly expiresAt?: string
@@ -105,7 +105,7 @@ export function SessionManagement(): JSX.Element {
 
   const authSessions: readonly AuthSessionRow[] = []
   const mcpSessions: readonly McpSessionRow[] = []
-  const apiTokens = (): readonly ApiTokenRow[] => tokens.data?.tokens ?? []
+  const apiTokens = (): readonly ApiTokenRow[] => tokens.data()?.tokens ?? []
   const deviceInfo = detectDeviceInfo()
   const lastLoginMethod: string | undefined = undefined
 

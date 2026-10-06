@@ -10,14 +10,15 @@ import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { ErrorState, ScreenHeader, Toast } from "./screen-parts.tsx"
 
-/** Auth failures carry `{ error, details }`; show both. */
-const describe = (cause: unknown): string => {
+/** Auth failures carry `{ error, details }`; show both, else `fallback`. */
+export const describe = (cause: unknown, fallback: string = String(cause)): string => {
   if (typeof cause === "object" && cause !== null) {
     const e = cause as { error?: unknown; details?: unknown; message?: unknown }
     if (typeof e.error === "string") return typeof e.details === "string" ? `${e.error}: ${e.details}` : e.error
-    if (typeof e.message === "string") return e.message
+    if (typeof e.message === "string" && e.message.length > 0) return e.message
   }
-  return String(cause)
+  if (cause instanceof Error && cause.message.length > 0) return cause.message
+  return fallback
 }
 
 function useAction() {
@@ -107,6 +108,78 @@ export function VerifyEmailScreen(): JSX.Element {
       <A class="btn btn-outline" href="/">{t("activity.projects")}</A>
     </div>
   </section>
+}
+
+/**
+ * `/auth/magic-link/verify` — port of `.reference/src/pages/auth/magic-link/verify.tsx`.
+ *
+ * One `?token=` drives `POST /api/auth/verify-magic-link`, then the legacy four states
+ * (loading / success with a 2 s redirect to the dashboard / expired / error).
+ */
+export function MagicLinkVerifyScreen(): JSX.Element {
+  const app = useApp()
+  const navigate = useNavigate()
+  const [search] = useSearchParams<{ token?: string }>()
+  const [status, setStatus] = createSignal<"loading" | "success" | "error" | "expired">("loading")
+  const [message, setMessage] = createSignal("")
+  let alive = true
+  onCleanup(() => { alive = false })
+  onMount(() => {
+    const token = search.token
+    if (!token) { setStatus("error"); setMessage(t("magicverify.noToken")); return }
+    void (async () => {
+      try {
+        await app.runtime.run(app.client.auth.verifyMagicLink({ payload: { token } }))
+        setStatus("success")
+        setMessage(t("magicverify.successBody"))
+        setTimeout(() => { if (alive) navigate("/") }, 2000)
+      } catch (cause) {
+        const detail = describe(cause, t("magicverify.failedMessage"))
+        if (detail.toLowerCase().includes("expired")) { setStatus("expired"); setMessage(t("magicverify.expiredMessage")) }
+        else if (typeof cause === "object" && cause !== null && "error" in cause) { setStatus("error"); setMessage(detail) }
+        else { setStatus("error"); setMessage(t("magicverify.invalidMessage")) }
+      }
+    })()
+  })
+  return (
+    <section class="flex min-h-[70vh] items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4 py-12 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 sm:px-6 lg:px-8">
+      <div class="w-full max-w-md rounded-2xl border border-gray-200/50 bg-white/80 p-8 text-center shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/80">
+        <Show when={status() === "loading"}>
+          <div class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.verifying")}</h2>
+          <p class="text-gray-600 dark:text-gray-400">{t("magicverify.wait")}</p>
+        </Show>
+        <Show when={status() === "success"}>
+          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+            <CircleCheck class="h-6 w-6 text-green-600 dark:text-green-400" />
+          </div>
+          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.successTitle")}</h2>
+          <p class="mb-4 text-gray-600 dark:text-gray-400">{message()}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{t("magicverify.redirecting")}</p>
+        </Show>
+        <Show when={status() === "expired"}>
+          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+            <CircleX class="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.expiredTitle")}</h2>
+          <p class="mb-6 text-gray-600 dark:text-gray-400">{t("magicverify.expiredBody")}</p>
+          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700" href="/auth/signin">
+            {t("magicverify.getNew")}
+          </A>
+        </Show>
+        <Show when={status() === "error"}>
+          <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <CircleX class="h-6 w-6 text-red-600 dark:text-red-400" />
+          </div>
+          <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.errorTitle")}</h2>
+          <p class="mb-6 text-gray-600 dark:text-gray-400">{message()}</p>
+          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700" href="/auth/signin">
+            {t("magicverify.tryAgain")}
+          </A>
+        </Show>
+      </div>
+    </section>
+  )
 }
 
 /**

@@ -21,6 +21,7 @@ import RefreshCw from "lucide-solid/icons/refresh-cw"
 import Brain from "lucide-solid/icons/brain"
 import Wrench from "lucide-solid/icons/wrench"
 import ChevronDown from "lucide-solid/icons/chevron-down"
+import KeyRound from "lucide-solid/icons/key-round"
 import ChevronUp from "lucide-solid/icons/chevron-up"
 import ChevronRight from "lucide-solid/icons/chevron-right"
 import Copy from "lucide-solid/icons/copy"
@@ -29,6 +30,7 @@ import { t } from "../i18n/index.ts"
 import { useAiStore } from "./context.tsx"
 import { useApp } from "../state/context.ts"
 import { ProviderBadge } from "./ProviderBadge.tsx"
+import { ProviderSettings } from "./ProviderSettings.tsx"
 import { TOOL_IDS } from "./tools.ts"
 import type { AiEvent as StreamEvent, AiMessage } from "./types.ts"
 
@@ -313,6 +315,7 @@ interface ModelToolbarProps {
 function ModelToolbar(props: ModelToolbarProps): JSX.Element {
   const ai = useAiStore()
   const [open, setOpen] = createSignal(false)
+  const [showProviders, setShowProviders] = createSignal(false)
   const currentLabel = (): string => {
     const m = ai.model()
     if (m === undefined) return t("ai.model.label")
@@ -334,6 +337,23 @@ function ModelToolbar(props: ModelToolbarProps): JSX.Element {
         </button>
         <Show when={open()}>
           <ModelMenu onSelect={() => setOpen(false)} />
+        </Show>
+      </div>
+      <div class="relative">
+        <button
+          type="button"
+          class="rounded p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          aria-label={t("ai.providers.title")}
+          aria-expanded={showProviders()}
+          data-testid="ai-providers-toggle"
+          onClick={() => setShowProviders(!showProviders())}
+        >
+          <KeyRound size={14} aria-hidden="true" />
+        </button>
+        <Show when={showProviders()}>
+          <div class="absolute bottom-full mb-1 left-0 w-80 max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg z-10 p-3">
+            <ProviderSettings />
+          </div>
         </Show>
       </div>
       <label class="ml-2 inline-flex items-center gap-1 cursor-pointer text-gray-600 dark:text-gray-400">

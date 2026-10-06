@@ -102,12 +102,18 @@ export interface StreamHandle {
 /** The full Effect: POST + SSE parsing + per-line decoding, exposed for tests. */
 export const streamChatEffect = (
   client: Client,
-  input: StreamInput
+  input: StreamInput,
+  signal?: AbortSignal
 ): Stream.Stream<AiEvent, AiStreamError> =>
   Stream.callback<AiEvent, AiStreamError>((queue) =>
     Effect.gen(function* () {
       const controller = new AbortController()
-      yield* Effect.addFinalizer(() => Effect.sync(() => controller.abort()))
+      const abort = () => controller.abort()
+      signal?.addEventListener("abort", abort, { once: true })
+      yield* Effect.addFinalizer(() => Effect.sync(() => {
+        signal?.removeEventListener("abort", abort)
+        controller.abort()
+      }))
       const offer = (event: AiEvent) => void Queue.offerUnsafe(queue, event)
 
       const pump = (async () => {
@@ -177,7 +183,7 @@ export const streamChat = (
   input: StreamInput
 ): StreamHandle => {
   const controller = new AbortController()
-  const program = streamChatEffect(deps.client, input).pipe(
+  const program = streamChatEffect(deps.client, input, controller.signal).pipe(
     Stream.runForEach((event) => Effect.sync(() => deps.onEvent(event)))
   )
   const run = deps.runtime.run(program.pipe(Effect.ensuring(Effect.sync(() => deps.onDone()))))

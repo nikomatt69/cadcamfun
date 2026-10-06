@@ -74,8 +74,11 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
     execute: async () => json(await handlers.describeDrawing(projectId)) },
   {
     id: "cam_create_operation", description: "Add a CAM operation (profile, pocket, drill...) with its parameters.",
-    parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()) }),
-    execute: async (input) => json(await handlers.createOperation(projectId, input as { type: string; params: unknown }))
+    parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()).optional() }),
+    execute: async (input) => {
+      const operation = input as { type: string; params?: unknown }
+      return json(await handlers.createOperation(projectId, { type: operation.type, params: operation.params ?? {} }))
+    }
   },
   {
     id: "cam_generate_gcode", description: "Run the CAM pipeline and return statistics plus the first lines of G-code.",

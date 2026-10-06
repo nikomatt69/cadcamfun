@@ -1,81 +1,17 @@
-/**
- * `.reference/src/components/ai/ai-new/AISettingsPanel.tsx` — the AI tab of `/settings`.
- *
- * v6 has no `AIContextProvider` (the AI runtime lives behind the sidecar's `ai`
- * routes), so the panel owns its state as signals persisted to the legacy
- * `localStorage.aiSettings` key with the legacy defaults and save flow. The MCP test
- * posts the legacy `{ type: "schema" }` probe to the configured endpoint through the
- * sidecar base URL.
- */
-import { For, Show, createSignal, onMount, type JSX } from "solid-js"
+/** AI settings reuse the shell AI provider; non-secret preferences live in sidecar KV. */
+import { Show, createSignal, onMount, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import {
   AlertTriangle, Clock, Cpu, Database, DollarSign, RefreshCw, Save, Server, Shield, Sliders, Zap
 } from "lucide-solid"
 import { t } from "../../i18n/index.ts"
+import { useApp } from "../../state/context.ts"
+import { useAiStore } from "../../ai/context.tsx"
+import { ProviderSettings } from "../../ai/ProviderSettings.tsx"
+import { DEFAULT_TEMPERATURE, defaultAiSettings, loadAiSettings, saveAiSettings, type AiSettings, type McpStrategy } from "./ai-settings.ts"
 import { getEndpoint } from "../../app/sidecar.ts"
 
-type AiModel = string
-type McpStrategy = "aggressive" | "balanced" | "conservative"
 type TestStatus = "idle" | "testing" | "success" | "error"
-
-interface AiSettings {
-  autoSuggest: boolean
-  cacheEnabled: boolean
-  analyticsEnabled: boolean
-  maxTokens: number
-  suggestThreshold: number
-  customPrompts: Record<string, string>
-  autoModelSelection: boolean
-  costOptimization: boolean
-  mcpEnabled: boolean
-  mcpStrategy: McpStrategy
-  mcpCacheLifetime: number
-  mcpEndpoint?: string
-  mcpApiKey?: string
-  multiProviderEnabled?: boolean
-  preferredProvider?: string
-}
-
-/** `.reference/src/lib/ai/ai-new/aiConfigManager.ts` — the models this panel offers. */
-const AI_MODELS = {
-  CLAUDE_SONNET: "claude-3-7-sonnet-20250219",
-  CLAUDE_OPUS: "claude-opus-4-20250514",
-  CLAUDE_HAIKU: "claude-3-haiku-20240229",
-  CLAUDE_SONNET_4: "claude-sonnet-4-20250514"
-} as const
-
-const MODEL_COSTS: Readonly<Record<string, { readonly input: number; readonly output: number }>> = {
-  [AI_MODELS.CLAUDE_OPUS]: { input: 15.0, output: 75.0 },
-  [AI_MODELS.CLAUDE_SONNET]: { input: 3.0, output: 15.0 },
-  [AI_MODELS.CLAUDE_HAIKU]: { input: 0.25, output: 1.25 },
-  [AI_MODELS.CLAUDE_SONNET_4]: { input: 3.0, output: 15.0 }
-}
-
-/** `.reference/src/components/ai/ai-new/AIContextProvider.tsx` `initialState`. */
-const DEFAULT_SETTINGS: AiSettings = {
-  autoSuggest: true,
-  cacheEnabled: true,
-  analyticsEnabled: true,
-  maxTokens: 6000,
-  mcpEnabled: true,
-  mcpStrategy: "balanced",
-  mcpCacheLifetime: 3600,
-  suggestThreshold: 0.7,
-  customPrompts: {},
-  autoModelSelection: true,
-  costOptimization: true,
-  multiProviderEnabled: true,
-  preferredProvider: "claude"
-}
-
-const DEFAULT_MODEL: AiModel = AI_MODELS.CLAUDE_SONNET_4
-const DEFAULT_TEMPERATURE = 0.7
-
-const calculateCost = (model: AiModel): string => {
-  const costs = MODEL_COSTS[model] ?? MODEL_COSTS[AI_MODELS.CLAUDE_SONNET]!
-  return (((costs.input + costs.output) / 2) / 1000).toFixed(3)
-}
 
 interface McpTestResult {
   readonly success: boolean
@@ -122,7 +58,7 @@ const Chevron = (props: { readonly open: boolean }): JSX.Element => (
     viewBox="0 0 24 24"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path strokeLinecap="round" strokeLinejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
   </svg>
 )
 
@@ -156,9 +92,13 @@ const ToggleRow = (props: ToggleRowProps): JSX.Element => (
 )
 
 export function AISettingsPanel(): JSX.Element {
-  const [model, setModel] = createSignal<AiModel>(DEFAULT_MODEL)
+  const app = useApp()
+  const ai = useAiStore()
+  const [mcpApiKey, setMcpApiKey] = createSignal("")
+  const [isLoading, setIsLoading] = createSignal(true)
+  const [settingsError, setSettingsError] = createSignal<string>()
   const [temperature, setTemperature] = createSignal(DEFAULT_TEMPERATURE)
-  const [settings, setSettings] = createSignal<AiSettings>({ ...DEFAULT_SETTINGS })
+  const [settings, setSettings] = createSignal<AiSettings>(defaultAiSettings())
   const [showAdvanced, setShowAdvanced] = createSignal(false)
   const [showMCPSettings, setShowMCPSettings] = createSignal(false)
   const [isSaving, setIsSaving] = createSignal(false)
@@ -168,63 +108,39 @@ export function AISettingsPanel(): JSX.Element {
   const performance = { averageResponseTime: 0, successRate: 100, lastSync: Date.now() }
 
   onMount(() => {
-    try {
-      const saved = window.localStorage.getItem("aiSettings")
-      if (saved !== null) {
-        const parsed = JSON.parse(saved) as { model?: AiModel; temperature?: number; settings?: Partial<AiSettings> }
-        if (parsed.model !== undefined) setModel(parsed.model)
-        if (parsed.temperature !== undefined) setTemperature(parsed.temperature)
-        if (parsed.settings !== undefined) setSettings((current) => ({ ...current, ...parsed.settings }))
-      }
-    } catch {
-      /* unreadable payload — the defaults stand, like the legacy console.error path */
-    }
+    void app.runtime.run(loadAiSettings(app.client)).then((saved) => {
+      setTemperature(saved.temperature)
+      setSettings(saved.settings)
+    }).catch(() => setSettingsError(t("ai.providers.failed")))
+      .finally(() => setIsLoading(false))
   })
 
-  const updateSettings = (patch: Partial<AiSettings>): void => setSettings((current) => ({ ...current, ...patch }))
-
-  const handleClearCache = (): void => {
-    try {
-      window.localStorage.removeItem("ai_cache")
-    } catch {
-      /* storage unavailable */
-    }
-    setSaveSuccess(true)
-    setTimeout(() => setSaveSuccess(false), 3000)
+  const updateSettings = (patch: Partial<AiSettings>): void => {
+    setSaveSuccess(false)
+    setSettings((current) => ({ ...current, ...patch }))
   }
 
-  const handleSaveSettings = (): void => {
+  const handleSaveSettings = async (): Promise<void> => {
+    if (isLoading() || isSaving()) return
     setIsSaving(true)
-    setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          "aiSettings",
-          JSON.stringify({ model: model(), temperature: temperature(), settings: settings() })
-        )
-        setSaveSuccess(true)
-      } catch {
-        /* storage unavailable — the legacy path logged the failure */
-      } finally {
-        setIsSaving(false)
-        setTimeout(() => setSaveSuccess(false), 3000)
-      }
-    }, 500)
+    setSaveSuccess(false)
+    setSettingsError(undefined)
+    try {
+      await app.runtime.run(saveAiSettings(app.client, { temperature: temperature(), settings: settings() }))
+      setSaveSuccess(true)
+    } catch {
+      setSettingsError(t("ai.providers.failed"))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const runMcpTest = async (): Promise<void> => {
     setMcpTestStatus("testing")
     setMcpTestResult("")
-    const result = await testConnection(settings().mcpEndpoint || "/api/mcp-protocol", settings().mcpApiKey)
+    const result = await testConnection(settings().mcpEndpoint || "/api/mcp-protocol", mcpApiKey())
     setMcpTestStatus(result.success ? "success" : "error")
     setMcpTestResult(result.message)
-  }
-
-  const calculateMCPSavings = (): string | number => {
-    if (!settings().mcpEnabled) return 0
-    const strategyEfficiency: Record<McpStrategy, number> = { aggressive: 0.5, balanced: 0.35, conservative: 0.2 }
-    const efficiency = strategyEfficiency[settings().mcpStrategy]
-    const modelCost = parseFloat(calculateCost(model()))
-    return (modelCost * efficiency).toFixed(3)
   }
 
   return (
@@ -237,8 +153,8 @@ export function AISettingsPanel(): JSX.Element {
 
         <div class="flex space-x-2">
           <Motion.button
-            onClick={handleSaveSettings}
-            disabled={isSaving()}
+            onClick={() => void handleSaveSettings()}
+            disabled={isSaving() || isLoading()}
             hover={{ scale: 1.02 }}
             press={{ scale: 0.98 }}
             transition={{ duration: 0.2 }}
@@ -259,38 +175,15 @@ export function AISettingsPanel(): JSX.Element {
         </div>
       </Show>
 
-      <div class="space-y-4">
-        <div>
-          <label htmlFor="ai-model" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {t("settings.ai.model")}
-          </label>
-          <select
-            id="ai-model"
-            value={model()}
-            onChange={(event) => setModel(event.currentTarget.value)}
-            class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
-          >
-            <option value={AI_MODELS.CLAUDE_HAIKU}>
-              {`Claude Haiku (Fast, $${calculateCost(AI_MODELS.CLAUDE_HAIKU)}$/1K token)`}
-            </option>
-            <option value={AI_MODELS.CLAUDE_SONNET}>
-              {`Claude 3.7 Sonnet (Balanced, $${calculateCost(AI_MODELS.CLAUDE_SONNET)}$/1K token)`}
-            </option>
-            <option value={AI_MODELS.CLAUDE_OPUS}>
-              {`Claude 4 Opus (Powerful, $${calculateCost(AI_MODELS.CLAUDE_OPUS)}$/1K token)`}
-            </option>
-            <option value={AI_MODELS.CLAUDE_SONNET_4}>
-              {`Claude 4 Sonnet (Advanced, $${calculateCost(AI_MODELS.CLAUDE_SONNET_4)}$/1K token)`}
-            </option>
-          </select>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Select the AI model most suitable for your needs. More powerful models offer better results but at higher
-            costs.
-          </p>
-        </div>
+      <Show when={settingsError()}>
+        <p role="alert" class="text-sm text-red-600 dark:text-red-400">{settingsError()}</p>
+      </Show>
+
+      <fieldset disabled={isLoading() || isSaving()} class="space-y-4 min-w-0">
+        <ProviderSettings />
 
         <div>
-          <label htmlFor="ai-temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="ai-temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             {t("settings.ai.temperature", { value: temperature().toFixed(1) })}
           </label>
           <input
@@ -300,7 +193,10 @@ export function AISettingsPanel(): JSX.Element {
             max="1"
             step="0.1"
             value={temperature()}
-            onInput={(event) => setTemperature(Number.parseFloat(event.currentTarget.value))}
+            onInput={(event) => {
+              setSaveSuccess(false)
+              setTemperature(Number.parseFloat(event.currentTarget.value))
+            }}
             class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
           />
           <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -355,7 +251,7 @@ export function AISettingsPanel(): JSX.Element {
               <Show when={showMCPSettings()}>
                 <div class="mt-3 space-y-3 pl-2 border-l-2 border-blue-200 dark:border-blue-800">
                   <div>
-                    <label htmlFor="mcp-endpoint" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-endpoint" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t("settings.ai.mcpEndpoint")}
                     </label>
                     <input
@@ -372,21 +268,22 @@ export function AISettingsPanel(): JSX.Element {
                   </div>
 
                   <div>
-                    <label htmlFor="mcp-api-key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-api-key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t("settings.ai.mcpApiKey")}
                     </label>
                     <input
                       type="password"
                       id="mcp-api-key"
                       placeholder="Enter your MCP API key"
-                      value={settings().mcpApiKey ?? ""}
-                      onInput={(event) => updateSettings({ mcpApiKey: event.currentTarget.value })}
+                      value={mcpApiKey()}
+                      autocomplete="off"
+                      onInput={(event) => setMcpApiKey(event.currentTarget.value)}
                       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100 text-sm"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="mcp-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t("settings.ai.mcpStrategy")}
                     </label>
                     <select
@@ -405,7 +302,7 @@ export function AISettingsPanel(): JSX.Element {
                   </div>
 
                   <div>
-                    <label htmlFor="mcp-cache-lifetime" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label for="mcp-cache-lifetime" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {t("settings.ai.mcpCache", { hours: (settings().mcpCacheLifetime || 86400000) / (1000 * 60 * 60) })}
                     </label>
                     <input
@@ -508,7 +405,7 @@ export function AISettingsPanel(): JSX.Element {
         <Show when={showAdvanced()}>
           <div class="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
             <div>
-              <label htmlFor="ai-max-tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="ai-max-tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {t("settings.ai.maxTokens", { value: settings().maxTokens })}
               </label>
               <input
@@ -529,7 +426,7 @@ export function AISettingsPanel(): JSX.Element {
             </div>
 
             <div>
-              <label htmlFor="ai-suggestion-threshold" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="ai-suggestion-threshold" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {t("settings.ai.suggestThreshold", { value: settings().suggestThreshold })}
               </label>
               <input
@@ -552,8 +449,8 @@ export function AISettingsPanel(): JSX.Element {
             <div class="flex justify-between">
               <button
                 type="button"
-                onClick={handleClearCache}
-                class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                disabled
+                class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Database size={14} class="mr-1" />
                 {t("settings.ai.clearCache")}
@@ -561,7 +458,7 @@ export function AISettingsPanel(): JSX.Element {
 
               <button
                 type="button"
-                onClick={() => undefined}
+                onClick={() => ai.clear()}
                 class="flex items-center text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
               >
                 <RefreshCw size={14} class="mr-1" />
@@ -570,7 +467,7 @@ export function AISettingsPanel(): JSX.Element {
             </div>
           </div>
         </Show>
-      </div>
+      </fieldset>
 
       {/* Performance summary */}
       <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mt-4">
@@ -603,7 +500,7 @@ export function AISettingsPanel(): JSX.Element {
               <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">{t("settings.ai.savings")}</p>
                 <p class="text-sm font-medium text-green-600 dark:text-green-400">
-                  ${calculateMCPSavings()}/1K token
+                  --
                 </p>
               </div>
               <div>
@@ -624,7 +521,7 @@ export function AISettingsPanel(): JSX.Element {
           <div class="flex items-center justify-between">
             <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <DollarSign size={12} class="mr-1" />
-              {t("settings.ai.costPerK", { cost: calculateCost(model()) })}
+              {t("settings.ai.costPerK", { cost: "--" })}
             </div>
             <div class="flex items-center text-xs text-gray-500 dark:text-gray-400">
               <Clock size={12} class="mr-1" />

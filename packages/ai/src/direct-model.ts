@@ -8,8 +8,8 @@ import { AiConfig } from "./ai-config.ts"
 import { AiCredentials, type StoredCredential } from "./credentials.ts"
 import { AiAborted, AiConfigError, AiProviderError, type AiError } from "./errors.ts"
 import {
+  BUILTIN_PROVIDER_IDS,
   DEFAULT_MINIMAX_BASE_URL,
-  PROVIDER_IDS,
   resolveModel,
   type ModelSelector,
   type ProviderId,
@@ -91,7 +91,8 @@ export class DirectModel extends Context.Service<
 
         const prepare = Effect.fn("DirectModel.prepare")(function* (selector: ModelSelector | undefined) {
           const status = yield* credentials.status
-          const configured = new Set(PROVIDER_IDS.filter((id) => status[id] === "configured"))
+          // Only the providers `defaultModelFactory` can build a client for; the rest are host-only.
+          const configured = new Set<ProviderId>(BUILTIN_PROVIDER_IDS.filter((id) => status[id] === "configured"))
           const resolved = resolveModel(selector, { configured, forceGateway: config.forceGateway })
           if (resolved instanceof AiConfigError) return yield* resolved
           const credential = yield* credentials.get(resolved.provider)

@@ -434,6 +434,15 @@ export const text3dToolpath = (e: CadElement, s: ToolpathSettings): string => {
   return gcode
 }
 
+/** Legacy notes for the sweep-like members a composite cannot machine yet. */
+const notImplementedMember = (sub: CadElement): string => {
+  switch (sub.type) {
+    case "tube": return `; Tube element: ${sub.path?.length || 0} path points, radius=${sub.radius}\n; Toolpath generation for tube is not yet implemented\n`
+    case "lathe": return `; Lathe element: ${sub.points?.length || 0} points, segments=${sub.segments}\n; Toolpath generation for lathe is not yet implemented\n`
+    default: return `; Grid element: size=${sub.size}, divisions=${sub.divisions}, plane=${sub.plane}\n; Toolpath generation for grid is not yet implemented\n`
+  }
+}
+
 export const compositeFromElement = (e: CadElement, s: ToolpathSettings, g: GeometryInput): string => {
   if (!Array.isArray(e.elements) || e.elements.length === 0) return "; No sub-elements found in composite element\n"
   let gcode = "; Composite element with sub-elements\n"
@@ -447,13 +456,9 @@ export const compositeFromElement = (e: CadElement, s: ToolpathSettings, g: Geom
         gcode += Array.isArray(sub.elements) && sub.elements.length > 0 ? compositeFromElement(sub, s, g) : "; Empty group, no toolpath generated\n"
         break
       case "tube":
-        gcode += `; Tube element: ${sub.path?.length || 0} path points, radius=${sub.radius}\n; Toolpath generation for tube is not yet implemented\n`
-        break
       case "lathe":
-        gcode += `; Lathe element: ${sub.points?.length || 0} points, segments=${sub.segments}\n; Toolpath generation for lathe is not yet implemented\n`
-        break
       case "grid":
-        gcode += `; Grid element: size=${sub.size}, divisions=${sub.divisions}, plane=${sub.plane}\n; Toolpath generation for grid is not yet implemented\n`
+        gcode += notImplementedMember(sub)
         break
       case "component":
         gcode += `; Component with ${sub.elements?.length || 0} elements\n`
@@ -462,6 +467,55 @@ export const compositeFromElement = (e: CadElement, s: ToolpathSettings, g: Geom
       default:
         gcode += elementToolpath(sub, s, g)
     }
+  }
+  return gcode
+}
+
+/**
+ * Contour for any element type without its own generator (legacy `generateDefaultToolpath` ->
+ * `generateGenericToolpath`): a circle for round things, otherwise the rectangle of its width x height (or the
+ * size / diameter it carries), down to its own depth. The legacy wrapper also repeated a program header,
+ * compensation and finishing pass around this; the mill program writes those once for the whole selection.
+ */
+export const genericToolpath = (e: CadElement, s: ToolpathSettings): string => {
+  // Legacy `extractGenericGeometry`.
+  let width = e.width !== undefined ? e.width : e.size !== undefined ? e.size : 0
+  let height = e.height !== undefined ? e.height : width
+  let depth = e.depth !== undefined ? e.depth : e.thickness !== undefined ? e.thickness : 0
+  const radius: number = e.radius !== undefined ? e.radius : e.diameter !== undefined ? e.diameter / 2 : 0
+  if (radius > 0) { width = radius * 2; height = radius * 2 }
+  if (width === 0 && height === 0 && depth === 0 && radius === 0) { width = 10; height = 10; depth = 10 }
+  const type = String(e.type)
+  const cx = e.x || 0
+  const cy = e.y || 0
+  const cz = e.z || 0
+  // Legacy `getElementDepth`: the element's own depth, 5 mm for flat things.
+  const machining = Math.min(s.depth, depth > 0 ? depth : 5)
+  const levels = cutLevels(machining, s.stepdown)
+
+  if (radius > 0 && (type === "circle" || type.includes("sphere"))) {
+    const effective = s.offset === "inside" ? Math.max(0, radius - s.toolDiameter / 2) : s.offset === "outside" ? radius + s.toolDiameter / 2 : radius
+    if (effective <= 0) return `; Cannot generate toolpath: radius (${radius}mm) too small for tool diameter (${s.toolDiameter}mm) with inside offset\n`
+    let gcode = `; Generic circular contour: ${type} at (${cx}, ${cy}, ${cz}), radius ${radius}mm\n`
+    for (const level of levels) {
+      const z = cz + level
+      gcode += `\n; Z Level: ${z.toFixed(3)}\n` + circleSlice({ ...e, x: cx, y: cy }, s, effective, z, "Move above start position")
+    }
+    return gcode
+  }
+
+  if (!width || !height) return "; Error: Invalid bounding box dimensions\n"
+  const d = offsetDistance(s)
+  const w = width + d * 2
+  const h = height + d * 2
+  if (w <= 0 || h <= 0) return `; Cannot generate toolpath: dimensions (${width}x${height}mm) too small for tool diameter (${s.toolDiameter}mm) with inside offset\n`
+  let gcode = `; Generic rectangular contour: ${type} at (${cx}, ${cy}, ${cz}), size ${width}x${height}mm\n`
+  const x0 = cx - w / 2
+  const y0 = cy - h / 2
+  for (const level of levels) {
+    const z = cz + level
+    gcode += `\n; Z Level: ${z.toFixed(3)}\n` + above(x0, y0, z, "Move above start position") + plunge(z, s)
+    gcode += pointMoves(rectangleCorners(x0, y0, w, h, s), s.feedrate, "Corner")
   }
   return gcode
 }
@@ -490,6 +544,9 @@ export const elementToolpath = (e: CadElement, s: ToolpathSettings, g: GeometryI
     case "arc": return arcToolpath(e, s)
     case "ellipse": return ellipseToolpath(e, s)
     case "text3d": return text3dToolpath(e, s)
-    default: return `; Unsupported element type '${e.type}' - no toolpath generated\n`
+    default:
+      // Members of a container keep the legacy "not yet implemented" note; anything else gets the generic contour.
+      if (e["inContainer"] === true && (e.type === "tube" || e.type === "lathe" || e.type === "grid")) return notImplementedMember(e)
+      return genericToolpath(e, s)
   }
 }

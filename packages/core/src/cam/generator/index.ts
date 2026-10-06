@@ -6,6 +6,21 @@
  *
  * The sidecar's `toolpathGenerator` HTTP group and the UI both go through `generateToolpath`;
  * nothing here reads a store, a file or the clock.
+ *
+ * Where the output deliberately differs from the legacy panel (each is a legacy bug, covered by a test):
+ *  - Z levels run from `-stepdown` to exactly `-depth` (legacy: first pass at Z0, last pass one step short);
+ *  - an inside tool offset shrinks rectangles / slices (legacy: grew them), and sphere / hemisphere slices apply
+ *    the offset it computed but never used; a rapid at depth is preceded by a retract;
+ *  - a circular pocket steps out in rings (legacy: arcs that ended at the centre); G2/G3 labels match the code;
+ *  - a cube is `width` (X) x `height` (Y) x `depth` (Z), as the CAD scene draws it (legacy mixed the two);
+ *  - arc fitting uses the circumcentre and only fits circular runs; the compensation approach point is found;
+ *  - lathe threading counts passes as `round(depth / 0.1)` (legacy float accumulation dropped the last one);
+ *  - composite 3D prints shrink their shells and clip the infill to the outline (legacy grew the shells and
+ *    drew the bounding box without travelling to line starts);
+ *  - a `component` is sliced as one unified geometry (`unified-geometry.ts`, the legacy `unifiedGeometryCalculator`; its
+ *    boolean step was a no-op there too, so overlapping members keep their own contours); pocket / drill / engrave and
+ *    the other containers are machined member by member, and a group is machined (legacy: "Invalid component element");
+ *  - unknown element types get the generic contour without the nested program header the legacy wrapper added.
  */
 import { convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 import { detectFixedCycles } from "./cycles.ts"
@@ -32,6 +47,25 @@ export { elementToolpath } from "./element-paths.ts"
 export { generate3DPrinterGCodeForElement, generateCompositeElement3D, calculateExtrusion, printStartGCode, printEndGCode, type PrinterSettings } from "./printer.ts"
 export { convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 export * from "./cycles.ts"
+export {
+  calculate3DComponentDetails,
+  calculateComponentDimensions,
+  calculateElementZLevelIntersection,
+  calculateMeshZIntersection,
+  calculateZLevelIntersection,
+  calculateZLevels,
+  combineElementDimensions,
+  convertToolpathToGcode,
+  generateOptimizedToolpath,
+  isUnifiedSolid,
+  splitUnifiedMembers,
+  toComponent3D,
+  unifiedGcode,
+  type Component3D,
+  type ElementIntersection,
+  type ToolpathSegment,
+  type ZLevelIntersection
+} from "./unified-geometry.ts"
 
 export const printerSettingsOf = (settings: ToolpathSettings, extras: PrinterExtras): PrinterSettings => ({
   layerHeight: settings.layerHeight,

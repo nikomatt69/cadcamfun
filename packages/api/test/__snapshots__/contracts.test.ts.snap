@@ -2967,6 +2967,103 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/ai/permission/reply": {
+      "post": {
+        "operationId": "ai.permissionReply",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "decision": {
+                    "enum": [
+                      "once",
+                      "always",
+                      "reject",
+                    ],
+                    "type": "string",
+                  },
+                  "requestId": {
+                    "type": "string",
+                  },
+                  "sessionId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "sessionId",
+                  "requestId",
+                  "decision",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "message",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/proxy": {
       "post": {
         "operationId": "ai.proxy",
@@ -35972,9 +36069,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "string",
                       },
                       "printOrientation": {
+                        "enum": [
+                          "original",
+                          "auto-optimal",
+                        ],
                         "type": "string",
                       },
                       "printResolution": {
+                        "enum": [
+                          "standard",
+                          "high",
+                          "low",
+                        ],
                         "type": "string",
                       },
                       "shellCount": {
@@ -35982,6 +36088,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "integer",
                       },
                       "supportType": {
+                        "enum": [
+                          "none",
+                          "minimal",
+                          "full",
+                        ],
                         "type": "string",
                       },
                     },

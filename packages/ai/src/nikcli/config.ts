@@ -5,6 +5,12 @@ import { DEFAULT_MINIMAX_BASE_URL, allModels, type ProviderId } from "../models.
  * pushed separately through `provider.api`. The host's built-in model
  * catalogue is unavailable with `NIKCLI_DISABLE_MODELS_FETCH`, so every provider
  * the app uses is declared here from the single `models.ts` catalogue.
+ *
+ * `enabled_providers` is deliberately NOT set: nikcli turns it into a
+ * deny-everything-then-allow-list policy, which would hide every models.dev
+ * provider we do not declare here. Leaving it out lets the user pick any
+ * provider and model the host knows (`provider.list()`), while the entries
+ * below only override base URL / protocol for the ones we care about.
  */
 export const CADCAM_AGENT = "cadcam"
 
@@ -71,7 +77,6 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     autoupdate: false,
     snapshot: false,
     username: "cadcam",
-    enabled_providers: input.providers.map((p) => p.id),
     provider,
     default_agent: CADCAM_AGENT,
     agent: {

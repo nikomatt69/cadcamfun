@@ -42,6 +42,7 @@ export const StreamChatBody = Schema.Struct({
   context: opt(Schema.String), model: opt(AiModelSelector)
 })
 export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String) })
+export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]) })
 
 export const CompletionBody = Schema.Struct({
   prompt: opt(Schema.String), systemPrompt: opt(Schema.String), model: opt(Schema.String), temperature: opt(Schema.Number)
@@ -96,6 +97,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]
     }),
     HttpApiEndpoint.post("chatAbort", "/api/ai/chat/abort", { payload: AbortBody, success: message, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("permissionReply", "/api/ai/permission/reply", { payload: PermissionReplyBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("completion", "/api/ai/completion", { payload: CompletionBody, success: CompletionReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("analyzeGcode", "/api/ai/analyze-gcode", { payload: AnalyzeGcodeBody, success: GcodeReport, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("gcode", "/api/ai/gcode", { payload: GcodeActionBody, success: GcodeActionReply, error: [GcodeActionError, GcodeActionFailure] }),

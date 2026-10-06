@@ -34,9 +34,9 @@ export function CADAssistantBridge(props: Props): JSX.Element {
     const drawing = app.drawing()
     setBridgeData({
       totalElementCount: drawing.entities.length,
-      selectedElementCount: 0,
-      selectedElements: [],
-      activeLayer: drawing.layers[0] ? { id: drawing.layers[0].id, name: drawing.layers[0].name } : null
+      selectedElementCount: drawing.entities.filter((entity) => app.editor.selection().includes(entity.id)).length,
+      selectedElements: drawing.entities.filter((entity) => app.editor.selection().includes(entity.id)).map((entity) => ({ ...entity })),
+      activeLayer: null
     })
   })
 

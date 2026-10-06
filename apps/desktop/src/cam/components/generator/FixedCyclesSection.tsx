@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { RotateCw } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
+import { panelCycles, type PanelCycle } from "../../lib/cyclePanel.ts"
 import { useJob } from "../../lib/useJob.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
 import { Section } from "./ui.tsx"
@@ -67,11 +68,39 @@ export function FixedCycleEditor(props: { readonly line: string; readonly onAppl
   )
 }
 
+/** "Detected Fixed Cycles (n)": one card per cycle with its position and depth (legacy `FixedCycleInfoPanel`). */
+function FixedCycleInfoPanel(props: { readonly cycles: ReadonlyArray<PanelCycle>; readonly onSelect: (index: number) => void }): JSX.Element {
+  return (
+    <div class="fixed-cycles-info-panel">
+      <h3>Detected Fixed Cycles ({props.cycles.length})</h3>
+      <div class="cycles-list">
+        <For each={props.cycles}>
+          {(cycle, index) => (
+            <div class="cycle-item" onClick={() => props.onSelect(index())}>
+              <div class="cycle-position">X: {cycle.x?.toFixed(2)}, Y: {cycle.y?.toFixed(2)}</div>
+              <div class="cycle-depth">Z: {cycle.z?.toFixed(2)} (R: {cycle.r?.toFixed(2)})</div>
+              <Show when={cycle.q}>{(q) => <div class="cycle-increment">Inc: {q().toFixed(2)}mm</div>}</Show>
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  )
+}
+
 /** "Fixed Cycles": cycles found in the program, the editor for the picked one, create / remove. */
 export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) => void }): JSX.Element {
   const gen = useGeneratorStore()
   const job = useJob()
   const [generated, setGenerated] = createSignal("")
+  const cycles = createMemo(() => panelCycles(gen.currentGCode))
+
+  // Legacy `handleCycleSelect`: rebuilds a G81 line from the picked cycle and opens it in the editor.
+  const selectCycle = (index: number): void => {
+    const cycle = cycles()[index]
+    if (!cycle) return
+    setGenerated(`G81 X${cycle.x?.toFixed(3) || "0"} Y${cycle.y?.toFixed(3) || "0"} Z${cycle.z?.toFixed(3) || "0"} R${cycle.r?.toFixed(3) || "0"} F${cycle.f || "100"}`)
+  }
 
   // Replaces the cycle lines of the current program by `cycle` and hands the program back (legacy `handleFixedCycleGCode`).
   const apply = (cycle: string): void => {
@@ -101,6 +130,9 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
             <button onClick={fromSelection} disabled={job.selection().length === 0}>Generate Fixed Cycle from Selected Elements</button>
           </div>
         </div>
+        <Show when={cycles().length > 0}>
+          <FixedCycleInfoPanel cycles={cycles()} onSelect={selectCycle} />
+        </Show>
         <Show when={generated()}>
           <FixedCycleEditor line={generated()} onApply={props.onGCode} class="cycle-editor" />
         </Show>

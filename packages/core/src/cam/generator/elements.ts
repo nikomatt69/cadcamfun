@@ -50,7 +50,9 @@ export const childrenOf = (parent: CadElement): CadElement[] => {
   const dx = num(parent["x"])
   const dy = num(parent["y"])
   const dz = num(parent["z"])
-  return list.filter((c): c is CadElement => typeof c === "object" && c !== null).map(child => shiftElement(child, dx, dy, dz))
+  return list
+    .filter((c): c is CadElement => typeof c === "object" && c !== null)
+    .map(child => ({ ...shiftElement(child, dx, dy, dz), inContainer: true }))
 }
 
 /** Every non-container descendant, parents' offsets applied. */

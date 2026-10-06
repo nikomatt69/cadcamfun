@@ -1,29 +1,31 @@
 /**
- * Left sidebar for the CAM workspace (spec 06-desktop-ui.md §3).
+ * Left sidebar for the CAM workspace (legacy `EnanchedSidebarCam`).
  *
- * Three tabs mirror the data-flow stages:
- *  - **workpiece** — stock and origin.
- *  - **generator** — pick the operation (profile, pocket, ...) and its params.
- *  - **operations** — the saved toolpaths, one per row.
+ * Three tabs, as in the reference:
+ *  - **explorer** — the CAD elements: select what the generator machines, link the raw piece.
+ *  - **settings** — view mode, grid / axis and snap settings.
+ *  - **machine** — origin, workpiece (stock + material) and the saved toolpaths.
  *
- * The sidebar is collapsible; collapsed it shows only icon buttons. The bottom
- * row has the collapse toggle, matching the CAD editor.
+ * The Generator itself lives in the right-hand panel, not here. The sidebar is collapsible; collapsed it shows
+ * only icon buttons. The bottom row has the collapse toggle, matching the CAD editor.
  */
 import { For, Show, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
-import { ChevronLeft, ChevronRight, Layers, ListChecks, Wrench } from "lucide-solid"
-import { t } from "../../i18n/index.ts"
+import { Box, ChevronLeft, ChevronRight, Eye, EyeOff, Grid, List, Settings, Wrench } from "lucide-solid"
+import { useCADStore } from "../../cad/store/cadStore.ts"
+import OriginControls from "../../cad/components/OriginControls.tsx"
 import { useCamStore } from "../store/camStore.ts"
 import WorkpieceSetup from "./WorkpieceSetup.tsx"
-import GeneratorPanel from "./GeneratorPanel.tsx"
+import CamElementExplorer from "./explorer/CamElementExplorer.tsx"
+import ViewSettings from "./explorer/ViewSettings.tsx"
 import OperationsList from "./OperationsList.tsx"
 
-export type SidebarTab = "workpiece" | "generator" | "operations"
+export type SidebarTab = "explorer" | "settings" | "machine"
 
 const TABS: ReadonlyArray<{ readonly id: SidebarTab; readonly label: string; readonly title: string; readonly icon: (size: number) => JSX.Element }> = [
-  { id: "workpiece", label: t("cam.workpiece"), title: t("cam.workpiece"), icon: (size) => <Layers size={size} /> },
-  { id: "generator", label: t("cam.generator"), title: t("cam.generator"), icon: (size) => <Wrench size={size} /> },
-  { id: "operations", label: "Operations", title: "Saved toolpaths", icon: (size) => <ListChecks size={size} /> }
+  { id: "explorer", label: "Explorer", title: "CAD elements", icon: (size) => <List size={size} /> },
+  { id: "settings", label: "Settings", title: "View settings", icon: (size) => <Settings size={size} /> },
+  { id: "machine", label: "Machine", title: "Machine, workpiece and toolpaths", icon: (size) => <Wrench size={size} /> }
 ]
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
@@ -38,16 +40,19 @@ export interface CamSidebarProps {
   readonly onSelectTab: (tab: SidebarTab) => void
   readonly isOpen: boolean
   readonly setIsOpen: (open: boolean) => void
-  /** Toolpaths list, used by the operations tab. */
+  /** Toolpaths list, shown under the machine tab. */
   readonly toolpaths: ReadonlyArray<{ readonly id: string; readonly name: string; readonly toolId: string; readonly moves: number }>
-  /** Selected toolpath id, used by the operations tab. */
+  /** Selected toolpath id, shown under the machine tab. */
   readonly selectedId: string | undefined
   readonly onSelectToolpath: (id: string | undefined) => void
   readonly onDeleteToolpath: (id: string) => void
+  /** Receives program text generated from the explorer / multi-toolpath panel, so the page's editor shows it. */
+  readonly onGCodeGenerated?: (gcode: string) => void
 }
 
 export default function CamSidebar(props: CamSidebarProps): JSX.Element {
   const cam = useCamStore()
+  const cad = useCADStore()
 
   return (
     <Motion.div
@@ -97,26 +102,61 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
       </Motion.div>
 
       <Motion.div class="flex-1 flex-col rounded-xl overflow-y-auto" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
-        <Show when={props.isOpen}>
+        <Show
+          when={props.isOpen}
+          fallback={
+            <div class="py-4 px-2 flex flex-col items-center rounded-xl bg-white/30 dark:bg-gray-800/50 backdrop-blur-sm">
+              <Show when={props.activeTab === "explorer"}>
+                <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
+                  <List size={20} class="mx-auto mb-2" />
+                  Open sidebar
+                  <br />
+                  to view elements
+                </div>
+              </Show>
+              <Show when={props.activeTab === "settings"}>
+                <div class="space-y-4 p-1">
+                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle Grid" onClick={() => cad.toggleGrid()}>
+                    <Grid size={20} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                  </button>
+                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle Axis" onClick={() => cad.toggleAxis()}>
+                    <Show when={cad.axisVisible} fallback={<EyeOff size={20} class="text-gray-600 dark:text-gray-400" />}><Eye size={20} class="text-blue-600 dark:text-blue-400" /></Show>
+                  </button>
+                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle View Mode" onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}>
+                    <Box size={20} class={cad.viewMode === "3d" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
+                  </button>
+                </div>
+              </Show>
+            </div>
+          }
+        >
           <div class="p-1 rounded-xl overflow-y-auto space-y-6 flex flex-col items-center">
-            <Show when={props.activeTab === "workpiece"}>
-              <WorkpieceSetup
-                workpiece={cam.workpiece}
-                material={cam.material}
-                onChangeWorkpiece={(next) => cam.setWorkpiece(next)}
-                onChangeMaterial={(next) => cam.setMaterial(next)}
-              />
+            <Show when={props.activeTab === "explorer"}>
+              <Motion.div class="w-full" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+                <CamElementExplorer {...(props.onGCodeGenerated ? { onGCodeGenerated: props.onGCodeGenerated } : {})} />
+              </Motion.div>
             </Show>
-            <Show when={props.activeTab === "generator"}>
-              <GeneratorPanel />
+            <Show when={props.activeTab === "machine"}>
+              <Motion.div class="w-full space-y-6" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+                <OriginControls />
+                <WorkpieceSetup
+                  workpiece={cam.workpiece}
+                  material={cam.material}
+                  onChangeWorkpiece={(next) => cam.setWorkpiece(next)}
+                  onChangeMaterial={(next) => cam.setMaterial(next)}
+                />
+                <OperationsList
+                  toolpaths={props.toolpaths}
+                  selectedId={props.selectedId}
+                  onSelect={props.onSelectToolpath}
+                  onDelete={props.onDeleteToolpath}
+                />
+              </Motion.div>
             </Show>
-            <Show when={props.activeTab === "operations"}>
-              <OperationsList
-                toolpaths={props.toolpaths}
-                selectedId={props.selectedId}
-                onSelect={props.onSelectToolpath}
-                onDelete={props.onDeleteToolpath}
-              />
+            <Show when={props.activeTab === "settings"}>
+              <Motion.div class="w-full" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
+                <ViewSettings />
+              </Motion.div>
             </Show>
           </div>
         </Show>

@@ -1,143 +1,212 @@
 /**
- * The `/cam` editor (spec 06-desktop-ui.md §3).
+ * The `/cam` editor, laid out like the legacy `pages/cam.tsx`.
  *
- * Composes the toolbar, the left sidebar (workpiece / generator / operations),
- * the central panel (the four tabs: preview, editor, toolpath, post) and the
- * right-hand preview/properties panel. Side effects (API calls, persistence)
- * run in `useApp().runtime`; the page never calls `fetch` directly.
+ * Top toolbar with the four workspace tabs; the left sidebar (explorer / settings / machine); the central panel
+ * (preview, G-code editor, toolpath, post-processor); and the right sidebar with the "Generator" and "Cycles" tabs.
+ * The generator turns the CAD selection into G-code (sidecar `toolpathGenerator` group); the page keeps that text,
+ * mirrors it into the CAM store and asks the sidecar to parse it into the program the 3D views play back, so
+ * generated, imported and hand-edited code all share one pipeline.
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { A } from "@solidjs/router"
+import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
+import { useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Schema } from "effect"
-import { ChevronLeft, ChevronRight } from "lucide-solid"
-import { cam } from "@cadcamfun/core"
+import { Box, ChevronLeft, ChevronRight, Wrench } from "lucide-solid"
 import { Toaster, toast } from "../components/ui/toast.tsx"
 import { useApp } from "../state/context.ts"
+import StatusBar from "../cad/components/StatusBar.tsx"
+import { buildPlayback } from "../viewport/view3d/playback.ts"
+import { makeToolpathGenerator } from "./api/generator.ts"
 import { useCamStore } from "./store/camStore.ts"
+import { useGeneratorStore, type LibraryTool } from "./store/generatorStore.ts"
 import CamToolbar from "./components/CamToolbar.tsx"
 import CamSidebar, { type SidebarTab } from "./components/CamSidebar.tsx"
-import GeneratorPanel from "./components/GeneratorPanel.tsx"
+import ToolpathGenerator from "./components/ToolpathGenerator.tsx"
 import ToolpathVisualizer from "./components/ToolpathVisualizer.tsx"
 import GCodeEditor from "./components/GCodeEditor.tsx"
-import PostProcessorPanel from "./components/PostProcessorPanel.tsx"
-import { buildPlayback } from "../viewport/view3d/playback.ts"
-import { t } from "../i18n/index.ts"
+import MachineCycles from "./components/MachineCycles.tsx"
+import PostProcessorTab, { type PostProcessorType } from "./components/PostProcessorTab.tsx"
+import { CostsModal, ToolLibraryModal } from "./components/CamModals.tsx"
+import { FixedCycleEditor } from "./components/generator/FixedCyclesSection.tsx"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
+const PARSE_DELAY_MS = 400
 
-/** A single toolpath summary shown in the sidebar list. */
-interface OperationRow {
-  readonly id: string
-  readonly name: string
-  readonly toolId: string
-  readonly moves: number
-}
+const RIGHT_TAB_ON = "text-[#007ACC] bg-blue-50/80 dark:bg-blue-900/30 border-b-2 border-[#007ACC] shadow-md"
+const RIGHT_TAB_OFF = "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/40 dark:hover:bg-gray-700/40"
+
+/** Maps the seven legacy controller names onto the three the CAM store knows. */
+const storeController = (post: PostProcessorType): "gcode" | "grbl" | "fanuc" => (post === "fanuc" ? "fanuc" : "gcode")
 
 export default function CamPage(): JSX.Element {
   const app = useApp()
   const camStore = useCamStore()
-  const [sidebarTab, setSidebarTab] = createSignal<SidebarTab>("workpiece")
-  const [gcode, setGcode] = createSignal<string>("")
-  const [error, setError] = createSignal<string | undefined>(undefined)
+  const gen = useGeneratorStore()
+  const generator = makeToolpathGenerator(app.client)
+  const [search, setSearch] = useSearchParams()
 
-  const duration = createMemo(() => buildPlayback(camStore.program).duration)
-  const lines = createMemo(() =>
-    gcode().split(/\r?\n/).filter((line) => line.trim().length > 0).length
-  )
+  const [gcode, setGcodeSignal] = createSignal<string>(camStore.gcode)
+  const [processedGcode, setProcessedGcode] = createSignal("")
+  const [selectedPostProcessor, setSelectedPostProcessor] = createSignal<PostProcessorType>("fanuc")
+  const [sidebarTab, setSidebarTab] = createSignal<SidebarTab>("machine")
+  const [showLibrary, setShowLibrary] = createSignal(false)
+  const [showCosts, setShowCosts] = createSignal(false)
 
-  const operationsAsRows = createMemo<ReadonlyArray<OperationRow>>(() =>
-    camStore.program.toolpaths.map((tp) => ({
-      id: tp.id,
-      name: tp.name,
-      toolId: tp.toolId,
-      moves: tp.moves.length
-    }))
-  )
-
-  const generate = (): void => {
-    if (camStore.program.toolpaths.length === 0) {
-      setError(t("cam.noGeometry"))
-      toast.error(t("cam.noGeometry"))
-      return
-    }
-    const post = cam.posts[camStore.controller === "gcode" ? "generic" : camStore.controller]
-    if (post === undefined) {
-      setError(t("cam.postUnavailable"))
-      toast.error(t("cam.postUnavailable"))
-      return
-    }
-    const code = post.emit(camStore.program)
-    setGcode(code)
-    setError(undefined)
-    camStore.setActiveTab("post")
-    toast.success(t("cam.saved"))
+  const setGcode = (next: string): void => {
+    setGcodeSignal(next)
+    camStore.setGcode(next)
   }
 
-  const downloadGCode = (): void => {
-    const code = gcode()
-    if (code.length === 0) {
-      toast.error("Nothing to download yet")
-      return
+  // The raw piece follows the CAD (legacy `syncWorkpieceFromCAD` on mount).
+  onMount(() => camStore.syncWorkpieceFromCAD())
+
+  // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.
+  createEffect(on(gcode, (text) => {
+    if (text.trim().length === 0) return
+    const timer = setTimeout(() => {
+      void app.runtime.run(generator.parse(text)).then(
+        (parsed) => camStore.setProgram(parsed.program as never),
+        () => undefined
+      )
+    }, PARSE_DELAY_MS)
+    onCleanup(() => clearTimeout(timer))
+  }, { defer: true }))
+
+  const duration = createMemo(() => buildPlayback(camStore.program).duration)
+  // Leaving the page stops the simulation clock.
+  onCleanup(() => camStore.setPlaying(false))
+
+  // The simulation stops by itself at the end of the program.
+  createEffect(() => {
+    if (camStore.playing && duration() > 0 && camStore.playbackTime >= duration()) camStore.setPlaying(false)
+  })
+
+  const rows = createMemo(() => camStore.program.toolpaths.map((tp) => ({ id: tp.id, name: tp.name, toolId: tp.toolId, moves: tp.moves.length })))
+
+  const loadFromStorage = (key: string): { readonly id?: string; readonly name?: string; readonly gcode?: string } | undefined => {
+    try {
+      const stored = localStorage.getItem(key)
+      return stored ? JSON.parse(stored) : undefined
+    } catch { return undefined }
+  }
+  const clearParam = (name: "loadToolpath" | "loadTool", storageKey: string): void => {
+    try { localStorage.removeItem(storageKey) } catch { /* storage blocked */ }
+    // `replace`: the consumed hand-off must not become a history entry the Back button returns to.
+    setSearch({ [name]: undefined }, { replace: true, state: {} })
+  }
+
+  // `?loadToolpath=<id>`: the toolpaths page leaves the program in localStorage (legacy hand-off).
+  createEffect(() => {
+    const id = search.loadToolpath
+    if (typeof id !== "string") return
+    const data = loadFromStorage("toolpathToLoadInCAM")
+    if (!data) { toast.error("Toolpath data not found"); clearParam("loadToolpath", "toolpathToLoadInCAM"); return }
+    if (!data.id || data.id !== id) { toast.error("Invalid toolpath data"); return }
+    if (data.gcode) {
+      setGcode(data.gcode)
+      camStore.setActiveTab("editor")
+      setTimeout(() => toast.success('Switch to the "Toolpath" tab to view the toolpath visualization'), 1500)
     }
+    toast.success(`Toolpath '${data.name}' loaded successfully`)
+    clearParam("loadToolpath", "toolpathToLoadInCAM")
+  })
+
+  // `?loadTool=<id>`: the tools page leaves the tool in localStorage; it becomes the generator's tool.
+  createEffect(() => {
+    const id = search.loadTool
+    if (typeof id !== "string") return
+    const data = loadFromStorage("toolToLoadInCAM")
+    if (!data) { toast.error("Tool data not found"); clearParam("loadTool", "toolToLoadInCAM"); return }
+    if (!data.id || data.id !== id) { toast.error("Invalid tool data"); return }
+    gen.selectLibraryTool(data as LibraryTool)
+    camStore.setRightTab("generator")
+    toast.success(`Tool '${data.name}' loaded successfully`)
+    clearParam("loadTool", "toolToLoadInCAM")
+  })
+
+  const importGCode = (file: File): void => {
+    void file.text().then(
+      (text) => setGcode(text),
+      () => toast.error("Failed to read the file")
+    )
+  }
+
+  const saveGCode = (): void => {
+    const code = camStore.activeTab === "post" && processedGcode() ? processedGcode() : gcode()
+    if (!code) return
+    const extension = selectedPostProcessor() === "heidenhain" ? ".h" : ".nc"
     const url = URL.createObjectURL(new Blob([code], { type: "text/plain" }))
     const link = document.createElement("a")
     link.href = url
-    link.download = "toolpath.nc"
+    link.download = `toolpath-${new Date().toISOString().slice(0, 10)}${extension}`
+    document.body.appendChild(link)
     link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    toast.success("G-code downloaded")
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
-  const importGCode = (file: File | undefined): void => {
-    if (!file) return
-    void file.text().then((text) => {
-      setGcode(text)
-      camStore.setActiveTab("editor")
-      toast(t("cam.importHint"))
-    })
-  }
-
-  const processGCode = (): void => {
-    try {
-      const post = cam.posts[camStore.controller === "gcode" ? "generic" : camStore.controller]
-      if (post === undefined) {
-        setError(t("cam.postUnavailable"))
-        toast.error(t("cam.postUnavailable"))
-        return
-      }
-      const emitted = post.emit(camStore.program)
-      setGcode(emitted)
-      setError(undefined)
-      toast.success(t("cam.process"))
-    } catch (cause) {
-      setError(String(cause))
-      toast.error(String(cause))
+  const toggleSimulation = (): void => {
+    const next = !camStore.playing
+    if (next && camStore.program.toolpaths.length === 0) {
+      toast.error("Nothing to simulate yet: generate or import G-code first")
+      return
     }
+    camStore.setPlaying(next)
+    if (next && (camStore.activeTab === "editor" || camStore.activeTab === "post")) camStore.setActiveTab("toolpath")
+  }
+
+  // "Process G-Code": re-parse the edited text so the views and the statistics match it.
+  const processGCode = (): void => {
+    void app.runtime.run(generator.parse(gcode())).then(
+      (parsed) => {
+        camStore.setProgram(parsed.program as never)
+        for (const warning of parsed.warnings) toast(warning)
+        toast.success(`${parsed.program.toolpaths.length} toolpath(s) parsed`)
+      },
+      (cause) => toast.error(cause instanceof Error ? cause.message : String(cause))
+    )
+  }
+
+  // Cycles are appended while editing, otherwise they replace the program (legacy `handleCycleCodeGenerated`).
+  const onCycleCode = (code: string): void => {
+    setGcode(camStore.activeTab === "editor" && gcode() ? `${gcode()}\n\n${code}` : code)
+    camStore.setActiveTab("editor")
   }
 
   const selectToolpath = (id: string | undefined): void => {
     camStore.setSelectedOperationId(id)
-    const found = camStore.program.toolpaths.find((tp) => tp.id === id)
-    if (found === undefined) return
-    const post = cam.posts[camStore.controller === "gcode" ? "generic" : camStore.controller]
-    setGcode(post?.emit({ ...camStore.program, toolpaths: [found] }) ?? "")
-    camStore.setActiveTab("toolpath")
+    if (id !== undefined) camStore.setActiveTab("toolpath")
   }
-
   const deleteToolpath = (id: string): void => {
-    const nextProgram: cam.Program = {
-      ...camStore.program,
-      toolpaths: camStore.program.toolpaths.filter((tp) => tp.id !== id)
-    }
-    camStore.setProgram(nextProgram)
+    camStore.setProgram({ ...camStore.program, toolpaths: camStore.program.toolpaths.filter((tp) => tp.id !== id) })
     if (camStore.selectedOperationId === id) camStore.setSelectedOperationId(undefined)
   }
 
-  const projectName = (): string => {
-    const recent = app.recents()[0]
-    return recent?.name ?? "Untitled project"
+  // The AI copilot is the docked assistant panel: the toggle opens/closes it and gates the generator's AI suggestions.
+  const toggleAi = (): void => {
+    const next = !app.panelOpen()
+    app.setPanelOpen(next)
+    gen.updateSettings("useAI", next)
   }
+
+  const cycleController = (): "fanuc" | "heidenhain" => (selectedPostProcessor() === "heidenhain" ? "heidenhain" : "fanuc")
+
+  const rightTabButton = (id: "generator" | "cycles", label: string, icon: (size: number) => JSX.Element): JSX.Element => (
+    <Show
+      when={camStore.rightOpen}
+      fallback={
+        <button class={`w-full py-5 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} onClick={() => camStore.setRightTab(id)} title={label}>
+          {icon(20)}
+        </button>
+      }
+    >
+      <button class={`flex-1 py-4 px-3 text-sm font-medium glass-hover-light rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} onClick={() => camStore.setRightTab(id)}>
+        <div class="flex items-center justify-center">
+          <span class="mr-2">{icon(16)}</span>
+          {label}
+        </div>
+      </button>
+    </Show>
+  )
 
   return (
     <Motion.div
@@ -152,164 +221,132 @@ export default function CamPage(): JSX.Element {
         transition={{ duration: 0.8, delay: 0.2 }}
       >
         <CamToolbar
-          totalLines={lines()}
-          estimatedSeconds={duration()}
-          onImportGCode={() => {
-            const input = document.createElement("input")
-            input.type = "file"
-            input.accept = ".nc,.gcode,.cnc,.txt"
-            input.onchange = () => importGCode(input.files?.[0] ?? undefined)
-            input.click()
-          }}
-          onSaveGCode={downloadGCode}
+          canSave={(camStore.activeTab === "post" ? processedGcode() : gcode()).length > 0}
+          isSimulating={camStore.playing}
+          aiEnhanced={app.panelOpen()}
+          showChat={app.panelOpen()}
+          onSave={saveGCode}
+          onImport={importGCode}
+          onToggleSimulation={toggleSimulation}
+          onOpenLibrary={() => setShowLibrary(true)}
+          onOpenCosts={() => setShowCosts(true)}
+          onToggleAi={toggleAi}
+          onToggleChat={() => app.setPanelOpen(!app.panelOpen())}
         />
 
         <Motion.div
-          class="flex flex-1 p-2 backdrop-blur-sm bg-gradient-to-br from-white/50 to-blue-50/30 dark:from-gray-800/50 dark:to-gray-900/30 border-b border-white/30 dark:border-gray-600/30 overflow-hidden w-full rounded-lg shadow-lg"
+          class="flex flex-1 backdrop-blur-sm bg-gradient-to-br from-white/50 to-blue-50/30 dark:from-gray-800/50 dark:to-gray-900/30 p-1 overflow-hidden w-full rounded-lg m-0.5 shadow-lg border-0 border-white/30 dark:border-gray-600/30"
           {...rise}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.6, delay: 1 }}
         >
           <CamSidebar
             activeTab={sidebarTab()}
             onSelectTab={setSidebarTab}
             isOpen={camStore.sidebarOpen}
             setIsOpen={camStore.toggleSidebar}
-            toolpaths={operationsAsRows()}
+            toolpaths={rows()}
             selectedId={camStore.selectedOperationId}
             onSelectToolpath={selectToolpath}
             onDeleteToolpath={deleteToolpath}
+            onGCodeGenerated={setGcode}
           />
 
           <Motion.div
-            class="flex-1 flex rounded-2xl bg-gradient-to-br from-white/90 to-blue-50/50 dark:from-gray-800/90 dark:to-gray-900/50 relative shadow-xl border border-white/30 mr-2 dark:border-gray-600/30 backdrop-blur-md overflow-hidden"
+            class="flex-1 relative rounded-2xl bg-gradient-to-br from-white/90 to-blue-50/50 dark:from-gray-800/90 dark:to-gray-900/50 shadow-xl border border-white/30 dark:border-gray-600/30 mx-2 backdrop-blur-md"
             {...rise}
-            transition={{ duration: 0.8, delay: 0.6 }}
+            transition={{ duration: 0.8, delay: 1.2 }}
           >
-            <div class="flex-1 flex flex-col min-w-0">
-              <Show when={error()}>
-                <div class="alert alert-danger" role="alert">
-                  <span>{error()}</span>
-                  <button class="btn btn-outline ml-auto" onClick={() => setError(undefined)}>Dismiss</button>
-                </div>
-              </Show>
-
-              <Show when={camStore.activeTab === "preview"}>
-                <ToolpathVisualizer
-                  program={camStore.program}
-                  workpiece={camStore.workpiece}
-                  playing={camStore.playing}
-                  playbackTime={camStore.playbackTime}
-                  playbackRate={1}
-                  onPlaybackTimeChange={camStore.setPlaybackTime}
-                />
-              </Show>
-              <Show when={camStore.activeTab === "editor"}>
+            <Show when={camStore.activeTab === "preview"}>
+              <div class="h-full">
+                <ToolpathVisualizer program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+              </div>
+            </Show>
+            <Show when={camStore.activeTab === "editor"}>
+              <div class="h-full">
                 <GCodeEditor value={gcode()} onChange={setGcode} onProcess={processGCode} />
-              </Show>
-              <Show when={camStore.activeTab === "toolpath"}>
-                <ToolpathVisualizer
-                  program={camStore.program}
-                  workpiece={camStore.workpiece}
-                  playing={camStore.playing}
-                  playbackTime={camStore.playbackTime}
-                  playbackRate={1}
-                  onPlaybackTimeChange={camStore.setPlaybackTime}
-                />
-              </Show>
-              <Show when={camStore.activeTab === "post"}>
-                <PostProcessorPanel
-                  controller={camStore.controller}
-                  program={camStore.program}
-                  onChangeController={camStore.setController}
-                  onSave={(next) => setGcode(next)}
-                />
-              </Show>
-            </div>
-
-            <Motion.div
-              class="absolute bottom-4 right-4 z-40 flex items-center gap-2"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 1 }}
-            >
-              <button
-                class="btn btn-outline"
-                disabled={camStore.program.toolpaths.length === 0}
-                onClick={() => {
-                  camStore.setPlaying(!camStore.playing)
-                  camStore.setActiveTab("toolpath")
-                }}
-              >
-                {camStore.playing ? "Pause" : "Play simulation"}
-              </button>
-              <A class="btn btn-outline" href={`/cad${app.recents()[0]?.id ? `?projectId=${encodeURIComponent(app.recents()[0]!.id)}` : ""}`}>
-                Edit in CAD
-              </A>
-            </Motion.div>
+              </div>
+            </Show>
+            <Show when={camStore.activeTab === "toolpath"}>
+              <div class="h-full rounded-xl">
+                <ToolpathVisualizer program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+              </div>
+            </Show>
+            <Show when={camStore.activeTab === "post"}>
+              <PostProcessorTab
+                gcode={gcode()}
+                program={camStore.program}
+                controller={selectedPostProcessor()}
+                onControllerChange={(next) => { setSelectedPostProcessor(next); camStore.setController(storeController(next)) }}
+                onProcessedGcode={setProcessedGcode}
+              />
+            </Show>
           </Motion.div>
 
           <Motion.div
-            class={`${camStore.rightOpen ? "w-80" : "w-0"} flex-shrink-0 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white border border-white/30 dark:border-gray-600/30 rounded-2xl shadow-xl transition-all duration-300 ease-in-out overflow-y-auto`}
+            class={`${camStore.rightOpen ? "w-80" : "w-20"} flex-shrink-0 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white border border-white/30 dark:border-gray-600/30 ml-0.5 rounded-2xl shadow-xl transition-all duration-300 ease-in-out h-full flex flex-col`}
             animate={{ x: camStore.rightOpen ? 0 : 300, opacity: camStore.rightOpen ? 1 : 0.7 }}
             transition={{ duration: 0.5 }}
           >
-            <Motion.div
-              class="w-full border-b border-white/30 dark:border-gray-600/30 p-2 rounded-t-2xl bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-gray-700/50 dark:to-gray-800/50 backdrop-blur-sm"
-              {...rise}
-              transition={{ duration: 0.6, delay: 0.8 }}
-            >
-              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 text-center">Generator</h3>
-            </Motion.div>
-
-            <Motion.div class="p-2 space-y-6 flex flex-col items-center" {...rise} transition={{ duration: 0.6, delay: 1 }}>
-              <GeneratorPanel onGenerate={generate} />
-
-              <div class="w-full">
-                <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Project</h4>
-                <div class="rounded-xl border border-white/30 dark:border-gray-600/30 bg-white/60 dark:bg-gray-800/60 p-3">
-                  <div class="text-sm font-medium">{projectName()}</div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Material: <span class="font-semibold">{camStore.material || "not set"}</span>
-                  </div>
-                </div>
+            <div class="w-full border-b rounded-t-2xl border-white/30 dark:border-gray-600/30 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 flex justify-center shadow-md">
+              <div class={camStore.rightOpen ? "flex justify-center w-full text-center" : "flex flex-col w-full"}>
+                {rightTabButton("generator", "Generator", (size) => <Wrench size={size} />)}
+                {rightTabButton("cycles", "Cycles", (size) => <Box size={size} />)}
               </div>
-            </Motion.div>
+            </div>
+
+            <Show when={camStore.rightOpen}>
+              <div class=" space-y-6 flex-1 rounded-xl overflow-y-auto">
+                <Show when={camStore.rightTab !== "cycles"}>
+                  <ToolpathGenerator onGCodeGenerated={setGcode} />
+                </Show>
+                <Show when={camStore.rightTab === "cycles"}>
+                  <MachineCycles controllerType={cycleController()} onCycleCodeGenerated={onCycleCode} />
+                  <Show when={gcode().trim().length > 0}>
+                    <CycleLines gcode={gcode()} />
+                  </Show>
+                </Show>
+              </div>
+            </Show>
           </Motion.div>
 
           <Motion.button
-            class="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white p-3 rounded-l-2xl shadow-xl border border-white/30 dark:border-gray-600/30 hover:bg-white/95 dark:hover:bg-gray-700/95 transition-all duration-200"
+            class="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 glass-interactive backdrop-blur-md bg-white/90 dark:bg-gray-800/90 p-3 rounded-l-2xl shadow-xl border border-white/30 dark:border-gray-600/30 hover:bg-white/95 dark:hover:bg-gray-700/95 transition-all duration-200"
             onClick={() => camStore.toggleRight()}
             hover={{ scale: 1.05, x: -2 }}
             press={{ scale: 0.95 }}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 1.2 }}
+            transition={{ duration: 0.5, delay: 1.4 }}
             aria-label="Toggle generator sidebar"
           >
-            <Show
-              when={camStore.rightOpen}
-              fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}
-            >
-              <ChevronRight size={20} class="text-gray-600 dark:text-gray-300" />
-            </Show>
+            <Motion.div animate={{ rotate: camStore.rightOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
+              <Show when={camStore.rightOpen} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}>
+                <ChevronRight size={20} class="text-gray-600 dark:text-gray-300" />
+              </Show>
+            </Motion.div>
           </Motion.button>
         </Motion.div>
 
-        <Motion.div
-          class="flex items-center justify-between px-4 py-2 text-xs text-gray-600 dark:text-gray-400 backdrop-blur-md bg-white/70 dark:bg-gray-900/70 border-t border-white/30 dark:border-gray-600/30"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 1.4 }}
-        >
-          <span role="status">{camStore.program.toolpaths.length === 0
-              ? "no program loaded"
-              : `${camStore.program.toolpaths.length} toolpath(s)`}
-          </span>
-          <span>{t("cam.duration", { seconds: duration().toFixed(1) })}</span>
+        <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.6 }}>
+          <StatusBar />
         </Motion.div>
       </Motion.div>
 
+      <ToolLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)} />
+      <CostsModal isOpen={showCosts()} onClose={() => setShowCosts(false)} />
       <Toaster />
     </Motion.div>
+  )
+}
+
+/** The fixed-cycle lines of the current program, each editable in place (legacy `FixedCyclesUIRenderer`). */
+function CycleLines(props: { readonly gcode: string }): JSX.Element {
+  const lines = createMemo(() => props.gcode.split(/\r?\n/).filter((line) => /^\s*G(7[4-9]|8[1-9])\b/i.test(line)))
+  return (
+    <Show when={lines().length > 0}>
+      <div class="p-3 space-y-2" data-testid="cycle-lines">
+        {lines().map((line) => <FixedCycleEditor line={line.trim()} />)}
+      </div>
+    </Show>
   )
 }

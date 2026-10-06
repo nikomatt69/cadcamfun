@@ -4890,6 +4890,9 @@ class SchemaError extends (/* @__PURE__ */ TaggedError2("SchemaError")) {
     return `SchemaError(${this.message})`;
   }
 }
+function isSchemaError(u) {
+  return hasProperty(u, SchemaErrorTypeId) && u[SchemaErrorTypeId] === SchemaErrorTypeId;
+}
 var is2 = is;
 function decodeUnknownEffect2(schema, options) {
   const parser = decodeUnknownEffect(schema, options);
@@ -4903,8 +4906,38 @@ function fromIssueEffect(self) {
   }
   return catchCause2(self, (cause) => failCauseSync2(() => map5(cause, (issue) => new SchemaError(issue))));
 }
+function getSchemaErrorOrThrow(cause, message) {
+  let schemaError;
+  for (const reason of cause.reasons) {
+    if (!isFailReason2(reason) || !isSchemaError(reason.error)) {
+      throw new globalThis.Error(message, {
+        cause
+      });
+    }
+    schemaError ??= reason.error;
+  }
+  if (schemaError === undefined) {
+    throw new globalThis.Error(message, {
+      cause
+    });
+  }
+  return schemaError;
+}
+function runSchemaErrorSync(self) {
+  const exit = runSyncExit2(self);
+  if (isSuccess3(exit)) {
+    return exit.value;
+  }
+  throw getSchemaErrorOrThrow(exit.cause, "Sync adapter can only throw schema errors");
+}
 function fromIssueExit(exit) {
   return isSuccess3(exit) ? exit : failCause2(map5(exit.cause, (issue) => new SchemaError(issue)));
+}
+function decodeUnknownSync(schema, options) {
+  const parser = decodeUnknownEffect2(schema, options);
+  return (input, options) => {
+    return runSchemaErrorSync(parser(input, options));
+  };
 }
 function encodeUnknownEffect2(schema, options) {
   const parser = encodeUnknownEffect(schema, options);
@@ -5155,6 +5188,25 @@ function makeIsLessThan(options) {
     });
   };
 }
+function makeIsLessThanOrEqualTo(options) {
+  const lte = isLessThanOrEqualTo(options.order);
+  const formatter = options.formatter ?? format;
+  return (maximum, annotations) => {
+    return makeFilter2((input) => lte(input, maximum), {
+      expected: `a value less than or equal to ${formatter(maximum)}`,
+      arbitrary: {
+        constraint: {
+          ordered: {
+            order: options.order,
+            maximum
+          }
+        }
+      },
+      ...options.annotate?.(maximum),
+      ...annotations
+    });
+  };
+}
 function makeIsBetween(deriveOptions) {
   const greaterThanOrEqualTo = isGreaterThanOrEqualTo(deriveOptions.order);
   const greaterThan = isGreaterThan(deriveOptions.order);
@@ -5240,6 +5292,23 @@ var isLessThan2 = /* @__PURE__ */ makeIsLessThan({
     }),
     toCode: () => ({
       runtime: `Schema.isLessThan(${format(exclusiveMaximum)})`
+    })
+  })
+});
+var isLessThanOrEqualTo2 = /* @__PURE__ */ makeIsLessThanOrEqualTo({
+  order: Number2,
+  annotate: (maximum) => ({
+    representation: {
+      id: "effect/schema/isLessThanOrEqualTo",
+      payload: {
+        maximum: encodeNumberPayload(maximum)
+      }
+    },
+    toJsonSchema: () => ({
+      maximum
+    }),
+    toCode: () => ({
+      runtime: `Schema.isLessThanOrEqualTo(${format(maximum)})`
     })
   })
 });
@@ -5951,6 +6020,23 @@ var SphereSolidSchema = TaggedStruct("Sphere", {
   radius: Finite.check(isGreaterThan2(0)),
   rings: Int.check(isBetween({ minimum: 2, maximum: 256 }))
 });
+var ConeSolidSchema = TaggedStruct("Cone", {
+  origin: Vec3Point,
+  baseRadius: Finite.check(isGreaterThan2(0)),
+  topRadius: Finite.check(isGreaterThanOrEqualTo2(0)),
+  height: Finite.check(isGreaterThan2(0)),
+  segments: Int.check(isBetween({ minimum: 3, maximum: 512 })),
+  axis: Literals(["z", "x", "y"]).pipe(optionalKey2)
+});
+var TorusSolidSchema = TaggedStruct("Torus", {
+  center: Vec3Point,
+  majorRadius: Finite.check(isGreaterThan2(0)),
+  minorRadius: Finite.check(isGreaterThan2(0)),
+  rotation: Finite.pipe(optionalKey2),
+  majorSegments: Int.check(isBetween({ minimum: 3, maximum: 512 })),
+  minorSegments: Int.check(isBetween({ minimum: 3, maximum: 256 })),
+  axis: Literals(["z", "x", "y"]).pipe(optionalKey2)
+});
 var ExtrudeSolidSchema = TaggedStruct("Extrude", {
   profile: ArraySchema(Point2).check(isMinLength(3)),
   height: Finite,
@@ -5965,6 +6051,8 @@ var SolidSchema = Union2([
   BoxSolidSchema,
   CylinderSolidSchema,
   SphereSolidSchema,
+  ConeSolidSchema,
+  TorusSolidSchema,
   ExtrudeSolidSchema,
   RevolveSolidSchema
 ]);
@@ -6138,6 +6226,238 @@ class EngraveParams extends Class3("cam/EngraveParams")(Struct({
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
+// packages/core/src/cam/generator/cycles.ts
+var FixedCycleType = {
+  DRILLING: "drilling",
+  DRILLING_DWELL: "drilling_dwell",
+  PECK_DRILLING: "peck_drilling",
+  RIGHT_TAPPING: "right_tapping",
+  BORING: "boring",
+  BORING_DWELL: "boring_dwell",
+  BACK_BORING: "back_boring",
+  LEFT_TAPPING: "left_tapping",
+  BORING_WITH_RETRACT: "boring_retract",
+  CUSTOM: "custom"
+};
+var WORDS = {
+  G81: FixedCycleType.DRILLING,
+  G82: FixedCycleType.DRILLING_DWELL,
+  G83: FixedCycleType.PECK_DRILLING,
+  G84: FixedCycleType.RIGHT_TAPPING,
+  G85: FixedCycleType.BORING,
+  G86: FixedCycleType.BORING_DWELL,
+  G87: FixedCycleType.BACK_BORING,
+  G88: FixedCycleType.CUSTOM,
+  G74: FixedCycleType.LEFT_TAPPING,
+  G89: FixedCycleType.BORING_WITH_RETRACT
+};
+var CODE_OF = {
+  [FixedCycleType.DRILLING]: "G81",
+  [FixedCycleType.DRILLING_DWELL]: "G82",
+  [FixedCycleType.PECK_DRILLING]: "G83",
+  [FixedCycleType.RIGHT_TAPPING]: "G84",
+  [FixedCycleType.BORING]: "G85",
+  [FixedCycleType.BORING_DWELL]: "G86",
+  [FixedCycleType.BACK_BORING]: "G87",
+  [FixedCycleType.LEFT_TAPPING]: "G74",
+  [FixedCycleType.BORING_WITH_RETRACT]: "G89",
+  [FixedCycleType.CUSTOM]: "G81"
+};
+
+// packages/core/src/cam/generator/unified-geometry.ts
+var SOLID_TYPES = new Set([
+  "cube",
+  "sphere",
+  "hemisphere",
+  "cylinder",
+  "cone",
+  "capsule",
+  "pyramid",
+  "prism",
+  "ellipsoid",
+  "rectangle",
+  "circle",
+  "polygon",
+  "ellipse",
+  "triangle",
+  "mesh",
+  "custom",
+  "imported"
+]);
+
+// packages/core/src/cam/generator/schema.ts
+var Num2 = Finite;
+var PositiveInt = Int.check(isGreaterThan2(0));
+var Percent = Finite.check(isGreaterThan2(0), isLessThanOrEqualTo2(100));
+var MachineTypeSchema = Literals(["mill", "lathe", "3dprinter"]);
+var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface"]);
+var LatheOperationSchema = Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]);
+var PrinterOperationSchema = Literals(["standard", "vase", "support", "infill", "raft", "brim"]);
+var OperationTypeSchema = Union2([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema]);
+var MaterialTypeSchema = Literals(["aluminum", "steel", "wood", "plastic", "brass", "titanium", "composite", "other"]);
+var ToolTypeSchema = Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"]);
+var LatheToolTypeSchema = Literals(["turning", "facing", "threading", "grooving", "boring", "parting"]);
+var PrinterNozzleSchema = Literals(["brass", "hardened", "ruby", "standard"]);
+var AllToolTypeSchema = Union2([ToolTypeSchema, LatheToolTypeSchema, PrinterNozzleSchema]);
+var OriginTypeSchema = Literals(["workpiece-center", "workpiece-corner", "workpiece-corner2", "machine-zero", "custom"]);
+var GeometryTypeSchema = Literals([
+  "rectangle",
+  "circle",
+  "polygon",
+  "custom",
+  "selected",
+  "cube",
+  "sphere",
+  "cylinder",
+  "cone",
+  "extrude",
+  "line",
+  "pyramid",
+  "hemisphere",
+  "ellipsoid",
+  "capsule",
+  "triangle",
+  "ellipse",
+  "prism"
+]);
+var ToolpathSettingsSchema = Struct({
+  machineType: withDefault2(MachineTypeSchema, "mill"),
+  operationType: withDefault2(OperationTypeSchema, "contour"),
+  material: withDefault2(MaterialTypeSchema, "aluminum"),
+  toolType: withDefault2(AllToolTypeSchema, "endmill"),
+  toolDiameter: withDefault2(Positive3, 6),
+  flutes: withDefault2(PositiveInt, 2),
+  depth: withDefault2(Positive3, 5),
+  stepdown: withDefault2(Positive3, 1),
+  stepover: withDefault2(Percent, 40),
+  feedrate: withDefault2(Positive3, 800),
+  plungerate: withDefault2(Positive3, 300),
+  rpm: withDefault2(Positive3, 1e4),
+  tolerance: withDefault2(NonNegative3, 0.01),
+  offset: withDefault2(Literals(["inside", "outside", "center"]), "outside"),
+  direction: withDefault2(Literals(["climb", "conventional"]), "climb"),
+  coolant: withDefault2(Boolean2, true),
+  finishingPass: withDefault2(Boolean2, false),
+  finishingAllowance: withDefault2(NonNegative3, 0.2),
+  finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
+  useAI: withDefault2(Boolean2, false),
+  aiDifficulty: withDefault2(Literals(["simple", "moderate", "complex"]), "moderate"),
+  aiOptimize: withDefault2(Literals(["speed", "quality", "balance"]), "balance"),
+  optimizePath: withDefault2(Boolean2, false),
+  useArcFitting: withDefault2(Boolean2, false),
+  useHighSpeedMode: withDefault2(Boolean2, false),
+  useExactStop: withDefault2(Boolean2, false),
+  useToolCompensation: withDefault2(Boolean2, false),
+  useAdaptiveFeeds: withDefault2(Boolean2, false),
+  useRestMachining: withDefault2(Boolean2, false),
+  toolNumber: withDefault2(PositiveInt, 1),
+  nozzleDiameter: withDefault2(Positive3, 0.4),
+  filamentDiameter: withDefault2(Positive3, 1.75),
+  layerHeight: withDefault2(Positive3, 0.2),
+  extrusionWidth: withDefault2(Positive3, 0.4),
+  printSpeed: withDefault2(Positive3, 60),
+  printTemperature: withDefault2(Positive3, 200),
+  bedTemperature: withDefault2(NonNegative3, 60),
+  stockDiameter: withDefault2(Positive3, 50),
+  stockLength: withDefault2(Positive3, 100),
+  spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
+  turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
+  applyToolCompensation: withDefault2(Boolean2, true),
+  originType: withDefault2(OriginTypeSchema, "workpiece-center"),
+  originX: withDefault2(Num2, 0),
+  originY: withDefault2(Num2, 0),
+  originZ: withDefault2(Num2, 0)
+});
+var DEFAULT_SETTINGS = decodeUnknownSync(ToolpathSettingsSchema)({});
+var StockSchema2 = Struct({
+  width: Positive3,
+  height: Positive3,
+  depth: Positive3,
+  radius: withDefault2(NonNegative3, 0),
+  x: withDefault2(Num2, 0),
+  y: withDefault2(Num2, 0),
+  topZ: withDefault2(Num2, 0),
+  allowance: withDefault2(NonNegative3, 1),
+  material: optionalKey2(String4),
+  elementId: optionalKey2(String4)
+});
+var CadElementSchema = Record(String4, Unknown2);
+var GeometrySchema = Struct({
+  geometryType: withDefault2(GeometryTypeSchema, "rectangle"),
+  rectangleWidth: withDefault2(Positive3, 100),
+  rectangleHeight: withDefault2(Positive3, 50),
+  circleRadius: withDefault2(Positive3, 25),
+  polygonSides: withDefault2(Int.check(isGreaterThanOrEqualTo2(3)), 6),
+  polygonRadius: withDefault2(Positive3, 30),
+  customPath: withDefault2(String4, ""),
+  selectedElements: withDefault2(ArraySchema(CadElementSchema), []),
+  stock: optionalKey2(StockSchema2)
+});
+var DEFAULT_GEOMETRY = decodeUnknownSync(GeometrySchema)({});
+var PrinterExtrasSchema = Struct({
+  infillDensity: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 100 })), 20),
+  infillPattern: withDefault2(Literals(["grid", "lines", "triangles", "honeycomb"]), "grid"),
+  supportType: withDefault2(Literals(["none", "minimal", "full"]), "minimal"),
+  shellCount: withDefault2(PositiveInt, 2),
+  printResolution: withDefault2(Literals(["standard", "high", "low"]), "standard"),
+  printOrientation: withDefault2(Literals(["original", "auto-optimal"]), "original")
+});
+var DEFAULT_PRINTER_EXTRAS = decodeUnknownSync(PrinterExtrasSchema)({});
+var GenerateRequestSchema = Struct({
+  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
+  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY),
+  printer: withDefault2(PrinterExtrasSchema, DEFAULT_PRINTER_EXTRAS),
+  stamp: optionalKey2(String4)
+});
+var GcodeStatsSchema = Struct({
+  lines: Int,
+  cutLength: Finite,
+  rapidLength: Finite,
+  minZ: Finite,
+  maxZ: Finite,
+  estimatedSeconds: Finite,
+  bounds: Struct({
+    min: Struct({ x: Finite, y: Finite, z: Finite }),
+    max: Struct({ x: Finite, y: Finite, z: Finite })
+  })
+});
+var GenerateResponseSchema = Struct({
+  gcode: String4,
+  cycles: ArraySchema(Struct({ gcode: String4 })),
+  warnings: ArraySchema(String4),
+  stats: GcodeStatsSchema,
+  program: ProgramSchema
+});
+var ParseRequestSchema = Struct({
+  gcode: String4,
+  name: withDefault2(String4, "Program")
+});
+var ParseResponseSchema = Struct({
+  warnings: ArraySchema(String4),
+  stats: GcodeStatsSchema,
+  program: ProgramSchema
+});
+var SuggestRequestSchema = Struct({
+  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
+  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY)
+});
+var SuggestResponseSchema = Struct({
+  parameters: optionalKey2(Struct({
+    depth: Finite,
+    stepdown: Finite,
+    operationType: OperationTypeSchema
+  })),
+  suggestions: ArraySchema(String4),
+  feedback: String4,
+  statistics: Struct({
+    cuttingSpeed: Finite,
+    chipLoad: Finite,
+    materialRemovalRate: Finite,
+    effectiveStepover: Finite
+  }),
+  operation: Struct({ title: String4, description: String4 }),
+  warnings: ArraySchema(String4)
+});
 // packages/plugin-sdk/examples/hello-gear/index.ts
 var gearEntity = (id) => ({
   ...baseEntity(id),

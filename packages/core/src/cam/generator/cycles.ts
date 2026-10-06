@@ -56,6 +56,7 @@ const WORDS: Readonly<Record<string, FixedCycleType>> = {
   G85: FixedCycleType.BORING,
   G86: FixedCycleType.BORING_DWELL,
   G87: FixedCycleType.BACK_BORING,
+  G88: FixedCycleType.CUSTOM,
   G74: FixedCycleType.LEFT_TAPPING,
   G89: FixedCycleType.BORING_WITH_RETRACT
 }

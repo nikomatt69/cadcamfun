@@ -89,6 +89,31 @@ declare module "@nikcli-ai/sdk-next" {
     readonly headers?: HeadersInit
   }
 
+  /** A model as the host catalogue describes it. */
+  export interface HostModel {
+    readonly id?: string
+    readonly name?: string
+    readonly providerID?: string
+    readonly capabilities?: {
+      readonly toolcall?: boolean
+      readonly attachment?: boolean
+      readonly reasoning?: boolean
+      readonly input?: { readonly text?: boolean; readonly image?: boolean }
+    }
+    readonly limit?: { readonly context?: number; readonly output?: number }
+    readonly cost?: { readonly input?: number; readonly output?: number }
+    readonly status?: string
+  }
+
+  /** A provider as the host catalogue describes it (models.dev ∪ `nikcli.json`). */
+  export interface HostProvider {
+    readonly id: string
+    readonly name?: string
+    readonly source?: string
+    readonly env?: ReadonlyArray<string>
+    readonly models: Readonly<Record<string, HostModel>>
+  }
+
   export interface HostClient {
     readonly session: {
       create(input?: { title?: string }, options?: RequestOptions): Promise<HostSession>
@@ -118,10 +143,13 @@ declare module "@nikcli-ai/sdk-next" {
       subscribe(options?: RequestOptions): AsyncIterable<HostEvent>
     }
     readonly provider: {
+      /** Every provider the host knows, with its models (models.dev ∪ config). */
       list(options?: RequestOptions): Promise<{
-        all: ReadonlyArray<{ id: string; models: Record<string, unknown> }>
+        all: ReadonlyArray<HostProvider>
         connected: ReadonlyArray<string>
       }>
+      /** Which authentication methods each provider accepts. */
+      auth(options?: RequestOptions): Promise<Readonly<Record<string, ReadonlyArray<{ type: string; label?: string }>>>>
       api(input: { providerID: string; key: string }, options?: RequestOptions): Promise<unknown>
       removeAuth(input: { providerID: string }, options?: RequestOptions): Promise<unknown>
     }

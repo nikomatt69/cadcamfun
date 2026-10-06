@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option, Redacted, Scope } from "effect"
 import { AiConfigError } from "./errors.ts"
-import { PROVIDER_IDS, type ProviderId } from "./models.ts"
+import { BUILTIN_PROVIDER_IDS, isProviderId, type ProviderId } from "./models.ts"
 
 export interface StoredCredential {
   readonly key: Redacted.Redacted<string>
@@ -55,7 +55,7 @@ export class AiCredentials extends Context.Service<
     return AiCredentials.of({
       set: (provider, key, opts) =>
         Effect.gen(function* () {
-          if (!PROVIDER_IDS.includes(provider)) {
+          if (!isProviderId(provider)) {
             return yield* new AiConfigError({ message: `Unknown provider "${String(provider)}".` })
           }
           if (Redacted.value(key).trim().length === 0) {

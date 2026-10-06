@@ -24,8 +24,48 @@ const MAX_HOST_RETRIES = 2
 export const createHostSession = (host: ProjectHost, title: string): Effect.Effect<string, AiConfigError> =>
   Effect.tryPromise({
     try: async () => (await host.client.session.create({ title })).id,
-    catch: (cause) => new AiConfigError({ message: `Failed to create a session: ${cause instanceof Error ? cause.message : String(cause)}` })
+    catch: (cause) => new AiConfigError({ message: `Failed to create a session: ${describeHostFailure(cause)}` })
   })
+
+/**
+ * Is this session still known to the host? The UI owns the session id it shows,
+ * and it can point at a session the host dropped (app restart, cleared state,
+ * another project). Checking before prompting turns a bare `UnexpectedStatus`
+ * into a transparent recovery.
+ */
+export const sessionExists = (host: ProjectHost, sessionId: string): Effect.Effect<boolean> =>
+  Effect.tryPromise({
+    try: async () => {
+      await host.client.session.get({ sessionID: sessionId })
+      return true
+    },
+    catch: () => false
+  }).pipe(Effect.orElseSucceed(() => false))
+
+/**
+ * The generated client throws `ClientError(reason, { cause })` and drops the
+ * response body, so `UnexpectedStatus` is all a caller sees. Map the known
+ * statuses to something a user can act on; anything else keeps its own message.
+ */
+export const describeHostFailure = (cause: unknown): string => {
+  if (cause === null || typeof cause !== "object") return String(cause)
+  const reason = (cause as { reason?: unknown }).reason
+  const status = (cause as { cause?: { status?: unknown } }).cause?.status
+  if (typeof reason !== "string") return cause instanceof Error ? cause.message : String(cause)
+  if (reason !== "UnexpectedStatus") return cause instanceof Error ? cause.message : reason
+  switch (status) {
+    case 400:
+      return "nikcli rejected the request (400). The session or message was malformed."
+    case 404:
+      return "The AI session no longer exists (404). Start a new conversation."
+    case 409:
+      return "The AI session is busy (409). Wait for the current answer to finish, or stop it."
+    case 429:
+      return "The AI session is rate limited (429). Try again in a moment."
+    default:
+      return `The AI host answered with HTTP ${typeof status === "number" ? status : "?"}.`
+  }
+}
 
 export const abortHostSession = (host: ProjectHost, sessionId: string): Effect.Effect<void> =>
   Effect.promise(() => host.client.session.abort({ sessionID: sessionId }).then(() => undefined, () => undefined))
@@ -126,7 +166,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             type: "error",
             sessionId,
             code: "provider",
-            message: cause instanceof Error ? cause.message : String(cause)
+            message: describeHostFailure(cause)
           })
           return
         }

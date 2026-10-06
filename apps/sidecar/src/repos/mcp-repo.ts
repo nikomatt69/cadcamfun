@@ -68,9 +68,11 @@ export class McpRepo extends Context.Service<McpRepo, {
         const rows = await db.delete(T).where(eq(T.id, id)).returning({ id: T.id })
         return rows.length > 0
       }),
-      replaceAll: (userId, entries) => query("mcp.replaceAll", (db) => db.transaction(async (tx) => {
-        await tx.delete(T).where(eq(T.userId, userId))
-        for (const entry of entries) await tx.insert(T).values({ ...entry, userId })
+      // The sync driver rejects an async callback, so the whole swap runs inside one
+      // synchronous transaction: drop the profile's rows, insert the imported ones.
+      replaceAll: (userId, entries) => query("mcp.replaceAll", (db) => db.transaction((tx) => {
+        tx.delete(T).where(eq(T.userId, userId)).run()
+        for (const entry of entries) tx.insert(T).values({ ...entry, userId }).run()
         return entries.length
       }))
     })

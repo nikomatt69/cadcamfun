@@ -1,0 +1,2039 @@
+{
+ "simple-drilling": {
+  "name": "Simple Drilling",
+  "parameters": [
+   {
+    "name": "drillDiameter",
+    "label": "Drill Diameter",
+    "type": "number",
+    "defaultValue": 8,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the drill bit to use"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total drilling depth"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for drilling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 1000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "retractHeight",
+    "label": "Retract Height",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Return height of the drill after drilling"
+   },
+   {
+    "name": "dwellTime",
+    "label": "Dwell Time",
+    "type": "number",
+    "defaultValue": 0,
+    "min": 0,
+    "max": 100,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at the bottom (0 for no dwell)"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "drillDiameter": 8.1,
+   "depth": 20.1,
+   "feedrate": 101,
+   "spindleSpeed": 1100,
+   "retractHeight": 5.1,
+   "dwellTime": 0.1
+  },
+  "fanuc": {
+   "defaults": "(SIMPLE DRILLING CYCLE)\n(DIAMETER: 8mm, DEPTH: 20mm)\nG90 G54\nG00 X0 Y0\nG43 Z5 H1\nS1000 M3\nG00 X0 Y0\nG99 G81 R5 Z-20 F100 P0\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z5\nM5",
+   "varied": "(SIMPLE DRILLING CYCLE)\n(DIAMETER: 8.1mm, DEPTH: 20.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z5.1 H1\nS1100 M3\nG00 X0 Y0\nG99 G81 R5.1 Z-20.1 F101 P100\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z5.1\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; SIMPLE DRILLING CYCLE\n; DIAMETER: 8mm, DEPTH: 20mm\nTOOL CALL 1 Z S1000\nL Z+5 R0 FMAX\nCYCL DEF 200 DRILLING\n  Q200=5  ; SAFETY DISTANCE\n  Q201=-20         ; DEPTH\n  Q206=100       ; FEEDRATE FOR PLUNGING\n  Q202=20          ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q211=0      ; DWELL TIME AT BOTTOM\nL X+0 Y+0 R0 FMAX M99\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+5 FMAX\nM5",
+   "varied": "; SIMPLE DRILLING CYCLE\n; DIAMETER: 8.1mm, DEPTH: 20.1mm\nTOOL CALL 1 Z S1100\nL Z+5.1 R0 FMAX\nCYCL DEF 200 DRILLING\n  Q200=5.1  ; SAFETY DISTANCE\n  Q201=-20.1         ; DEPTH\n  Q206=101       ; FEEDRATE FOR PLUNGING\n  Q202=20.1          ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q211=0.1      ; DWELL TIME AT BOTTOM\nL X+0 Y+0 R0 FMAX M99\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+5.1 FMAX\nM5"
+  }
+ },
+ "rectangular-pocket": {
+  "name": "Rectangular Pocket",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "pocketWidth",
+    "label": "Pocket Width",
+    "type": "number",
+    "defaultValue": 50,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the pocket along the X-axis"
+   },
+   {
+    "name": "pocketLength",
+    "label": "Pocket Length",
+    "type": "number",
+    "defaultValue": 80,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Length of the pocket along the Y-axis"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the pocket"
+   },
+   {
+    "name": "stepdown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of cut for each increment"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 800,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 300,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "cornerRadius",
+    "label": "Corner Radius",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Radius of the pocket corners (0 for sharp corners)"
+   },
+   {
+    "name": "finishAllowance",
+    "label": "Finish Allowance",
+    "type": "number",
+    "defaultValue": 0.2,
+    "min": 0,
+    "max": 10,
+    "step": 0.05,
+    "unit": "mm",
+    "description": "Stock left for finishing"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 10.1,
+   "pocketWidth": 50.1,
+   "pocketLength": 80.1,
+   "depth": 15.1,
+   "stepdown": 5.1,
+   "feedrate": 801,
+   "plungeFeedrate": 301,
+   "spindleSpeed": 3100,
+   "cornerRadius": 5.1,
+   "finishAllowance": 0.25
+  },
+  "fanuc": {
+   "defaults": "(RECTANGULAR POCKET CYCLE)\n(DIMENSIONS: 50x80mm, DEPTH: 15mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\nG00 X-19.8 Y-34.8\n\n(PASS 1 - DEPTH: 5mm)\nG01 Z-5 F300\nG01 X19.8 F800\nG01 Y34.8\nG01 X-19.8\nG01 Y-34.8\n(PASS 2 - DEPTH: 10mm)\nG01 Z-10 F300\nG01 X19.8 F800\nG01 Y34.8\nG01 X-19.8\nG01 Y-34.8\n(PASS 3 - DEPTH: 15mm)\nG01 Z-15 F300\nG01 X19.8 F800\nG01 Y34.8\nG01 X-19.8\nG01 Y-34.8\nG00 Z50\nM9\nM5",
+   "varied": "(RECTANGULAR POCKET CYCLE)\n(DIMENSIONS: 50.1x80.1mm, DEPTH: 15.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\nG00 X-19.75 Y-34.75\n\n(PASS 1 - DEPTH: 5.1mm)\nG01 Z-5.1 F301\nG01 X19.75 F801\nG01 Y34.75\nG01 X-19.75\nG01 Y-34.75\n(PASS 2 - DEPTH: 10.2mm)\nG01 Z-10.2 F301\nG01 X19.75 F801\nG01 Y34.75\nG01 X-19.75\nG01 Y-34.75\n(PASS 3 - DEPTH: 15.1mm)\nG01 Z-15.1 F301\nG01 X19.75 F801\nG01 Y34.75\nG01 X-19.75\nG01 Y-34.75\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; RECTANGULAR POCKET CYCLE\n; DIMENSIONS: 50x80mm, DEPTH: 15mm\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\nCYCL DEF 251 RECTANGULAR POCKET\n  Q215=0                        ; MACHINING TYPE\n  Q218=50    ; LENGTH SIDE 1\n  Q219=80   ; LENGTH SIDE 2\n  Q220=5   ; CORNER RADIUS\n  Q368=0.2; SIDE ALLOWANCE\n  Q224=0                        ; ROTATION\n  Q201=-15         ; DEPTH\n  Q367=0                        ; POCKET POSITION\n  Q202=5       ; PLUNGING DEPTH\n  Q207=800       ; MILLING FEEDRATE\n  Q206=300 ; PLUNGING FEEDRATE\n  Q385=800       ; FINISHING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q351=+1                       ; MILLING MODE\n  Q370=1                        ; PATH OVERLAP\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; RECTANGULAR POCKET CYCLE\n; DIMENSIONS: 50.1x80.1mm, DEPTH: 15.1mm\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\nCYCL DEF 251 RECTANGULAR POCKET\n  Q215=0                        ; MACHINING TYPE\n  Q218=50.1    ; LENGTH SIDE 1\n  Q219=80.1   ; LENGTH SIDE 2\n  Q220=5.1   ; CORNER RADIUS\n  Q368=0.25; SIDE ALLOWANCE\n  Q224=0                        ; ROTATION\n  Q201=-15.1         ; DEPTH\n  Q367=0                        ; POCKET POSITION\n  Q202=5.1       ; PLUNGING DEPTH\n  Q207=801       ; MILLING FEEDRATE\n  Q206=301 ; PLUNGING FEEDRATE\n  Q385=801       ; FINISHING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q351=+1                       ; MILLING MODE\n  Q370=1                        ; PATH OVERLAP\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "contour-milling": {
+  "name": "Contour Milling",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "contourType",
+    "label": "Contour Type",
+    "type": "select",
+    "defaultValue": "external",
+    "options": [
+     {
+      "value": "external",
+      "label": "External (right)"
+     },
+     {
+      "value": "internal",
+      "label": "Internal (left)"
+     }
+    ],
+    "description": "Contour type: external or internal"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the contour"
+   },
+   {
+    "name": "stepdown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of cut for each increment"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 800,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 300,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "approachDistance",
+    "label": "Approach Distance",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Distance to approach the contour"
+   },
+   {
+    "name": "useToolCompensation",
+    "label": "Use Tool Compensation",
+    "type": "checkbox",
+    "defaultValue": true,
+    "description": "Activate tool radius compensation"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 10.1,
+   "contourType": "internal",
+   "depth": 10.1,
+   "stepdown": 5.1,
+   "feedrate": 801,
+   "plungeFeedrate": 301,
+   "spindleSpeed": 3100,
+   "approachDistance": 5.1,
+   "useToolCompensation": false
+  },
+  "fanuc": {
+   "defaults": "(CONTOUR MILLING CYCLE EXTERNAL)\n(DEPTH: 10mm, PASSES: 2)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\n\n(PASS 1 - DEPTH: 5mm)\nG00 X-5 Y0\nG00 Z5\nG01 Z-5 F300\nG42 D1\nG01 X0 Y0 F800\nG01 X50\nG01 Y50\nG01 X0\nG01 Y0\nG40\nG00 Z5\n(PASS 2 - DEPTH: 10mm)\nG00 X-5 Y0\nG00 Z5\nG01 Z-10 F300\nG42 D1\nG01 X0 Y0 F800\nG01 X50\nG01 Y50\nG01 X0\nG01 Y0\nG40\nG00 Z5\nG00 Z50\nM9\nM5",
+   "varied": "(CONTOUR MILLING CYCLE INTERNAL)\n(DEPTH: 10.1mm, PASSES: 2)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\n\n(PASS 1 - DEPTH: 5.1mm)\nG00 X-5.1 Y0\nG00 Z5\nG01 Z-5.1 F301\n\nG01 X0 Y0 F801\nG01 X50\nG01 Y50\nG01 X0\nG01 Y0\n\nG00 Z5\n(PASS 2 - DEPTH: 10.1mm)\nG00 X-5.1 Y0\nG00 Z5\nG01 Z-10.1 F301\n\nG01 X0 Y0 F801\nG01 X50\nG01 Y50\nG01 X0\nG01 Y0\n\nG00 Z5\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CONTOUR MILLING CYCLE EXTERNAL\n; DEPTH: 10mm, PASSES: 2\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\n\n; PASS 1 - DEPTH: 5mm\nL X-5 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-5 F300\nL RR R5\nL X+0 Y+0 F800\nL X+50\nL Y+50\nL X+0\nL Y+0\nL R0\nL Z+5 FMAX\n; PASS 2 - DEPTH: 10mm\nL X-5 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-10 F300\nL RR R5\nL X+0 Y+0 F800\nL X+50\nL Y+50\nL X+0\nL Y+0\nL R0\nL Z+5 FMAX\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CONTOUR MILLING CYCLE INTERNAL\n; DEPTH: 10.1mm, PASSES: 2\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\n\n; PASS 1 - DEPTH: 5.1mm\nL X-5.1 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-5.1 F301\n\nL X+0 Y+0 F801\nL X+50\nL Y+50\nL X+0\nL Y+0\n\nL Z+5 FMAX\n; PASS 2 - DEPTH: 10.1mm\nL X-5.1 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-10.1 F301\n\nL X+0 Y+0 F801\nL X+50\nL Y+50\nL X+0\nL Y+0\n\nL Z+5 FMAX\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "tapping-cycle": {
+  "name": "Tapping",
+  "parameters": [
+   {
+    "name": "threadSize",
+    "label": "Thread Size",
+    "type": "select",
+    "defaultValue": "M8",
+    "options": [
+     {
+      "value": "M3",
+      "label": "M3 (pitch 0.5mm)"
+     },
+     {
+      "value": "M4",
+      "label": "M4 (pitch 0.7mm)"
+     },
+     {
+      "value": "M5",
+      "label": "M5 (pitch 0.8mm)"
+     },
+     {
+      "value": "M6",
+      "label": "M6 (pitch 1.0mm)"
+     },
+     {
+      "value": "M8",
+      "label": "M8 (pitch 1.25mm)"
+     },
+     {
+      "value": "M10",
+      "label": "M10 (pitch 1.5mm)"
+     },
+     {
+      "value": "M12",
+      "label": "M12 (pitch 1.75mm)"
+     }
+    ],
+    "description": "Size of the metric thread"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the thread"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 500,
+    "min": 1,
+    "max": 10000,
+    "step": 10,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "rigidTapping",
+    "label": "Rigid Tapping",
+    "type": "checkbox",
+    "defaultValue": true,
+    "description": "Use rigid tapping mode (synchronized)"
+   },
+   {
+    "name": "chamferDepth",
+    "label": "Chamfer Depth",
+    "type": "number",
+    "defaultValue": 1,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of the chamfer at the thread entrance"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "threadSize": "M12",
+   "depth": 20.1,
+   "spindleSpeed": 510,
+   "rigidTapping": false,
+   "chamferDepth": 1.1
+  },
+  "fanuc": {
+   "defaults": "(TAPPING CYCLE M8)\n(DEPTH: 20mm, PITCH: 1.25mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nM29 S500 (RIGID TAPPING)\nG00 X0 Y0\nG00 Z5\nG84 R5 Z-20 F625 \nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM5",
+   "varied": "(TAPPING CYCLE M12)\n(DEPTH: 20.1mm, PITCH: 1.75mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS510 M3\nG00 X0 Y0\nG00 Z5\nG84 R5 Z-20.1 F892.5 P100\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; TAPPING CYCLE M8\n; DEPTH: 20mm, PITCH: 1.25mm\nTOOL CALL 1 Z S500\nL Z+50 R0 FMAX\nCYCL DEF 207 RIGID TAPPING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-20         ; THREAD DEPTH\n  Q239=1.25                 ; THREAD PITCH\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; TAPPING CYCLE M12\n; DEPTH: 20.1mm, PITCH: 1.75mm\nTOOL CALL 1 Z S510\nL Z+50 R0 FMAX\nCYCL DEF 207 RIGID TAPPING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-20.1         ; THREAD DEPTH\n  Q239=1.75                 ; THREAD PITCH\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "deep-drilling": {
+  "name": "Deep Drilling",
+  "parameters": [
+   {
+    "name": "drillDiameter",
+    "label": "Drill Diameter",
+    "type": "number",
+    "defaultValue": 8,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the drill bit to use"
+   },
+   {
+    "name": "depth",
+    "label": "Total Depth",
+    "type": "number",
+    "defaultValue": 80,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the hole"
+   },
+   {
+    "name": "peckDepth",
+    "label": "Peck Depth",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of each peck"
+   },
+   {
+    "name": "retractDistance",
+    "label": "Retract Distance",
+    "type": "number",
+    "defaultValue": 3,
+    "min": 0.1,
+    "max": 50,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Retract distance for chip evacuation"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 120,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for drilling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 1200,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "dwellAtBottom",
+    "label": "Dwell at Bottom",
+    "type": "number",
+    "defaultValue": 0.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at the bottom of each peck"
+   },
+   {
+    "name": "useChipBreaking",
+    "label": "Use Chip Breaking",
+    "type": "checkbox",
+    "defaultValue": true,
+    "description": "Activate chip breaking during drilling"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "drillDiameter": 8.1,
+   "depth": 80.1,
+   "peckDepth": 15.1,
+   "retractDistance": 3.1,
+   "feedrate": 121,
+   "spindleSpeed": 1300,
+   "dwellAtBottom": 0.6,
+   "useChipBreaking": false
+  },
+  "fanuc": {
+   "defaults": "(DEEP DRILLING CYCLE)\n(DIAMETER: 8mm, DEPTH: 80mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1200 M3\nM8\nG00 X0 Y0\nG83 R5 Z-80 Q15 F120 K0 P500\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5",
+   "varied": "(DEEP DRILLING CYCLE)\n(DIAMETER: 8.1mm, DEPTH: 80.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1300 M3\nM8\nG00 X0 Y0\nG73 R3.1 Z-80.1 Q15.1 F121 K0 P600\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; DEEP DRILLING CYCLE\n; DIAMETER: 8mm, DEPTH: 80mm\nTOOL CALL 1 Z S1200\nL Z+50 R0 FMAX\nCYCL DEF 203 UNIVERSAL DRILLING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-80         ; DEPTH\n  Q206=120       ; FEEDRATE FOR PLUNGING\n  Q202=15      ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q212=3; RETRACTION AMOUNT\n  Q213=3                        ; NO. OF CHIP BREAKS\n  Q205=1                        ; MIN. PLUNGING DEPTH\n  Q211=0.5  ; DWELL TIME AT BOTTOM\n  Q208=500                      ; FEEDRATE FOR RETRACT\n  Q256=3; RETRACT CHIP BREAK\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; DEEP DRILLING CYCLE\n; DIAMETER: 8.1mm, DEPTH: 80.1mm\nTOOL CALL 1 Z S1300\nL Z+50 R0 FMAX\nCYCL DEF 200 DRILLING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-80.1         ; DEPTH\n  Q206=121       ; FEEDRATE FOR PLUNGING\n  Q202=15.1      ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q211=0.6  ; DWELL TIME AT BOTTOM\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "slot-milling": {
+  "name": "Slot Milling",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 8,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "slotLength",
+    "label": "Slot Length",
+    "type": "number",
+    "defaultValue": 50,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Length of the slot"
+   },
+   {
+    "name": "slotWidth",
+    "label": "Slot Width",
+    "type": "number",
+    "defaultValue": 12,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the slot"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the slot"
+   },
+   {
+    "name": "stepdown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 3,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of cut for each increment"
+   },
+   {
+    "name": "stepover",
+    "label": "Stepover",
+    "type": "number",
+    "defaultValue": 4,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Lateral stepover between passes"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 600,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 300,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3500,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "angle",
+    "label": "Angle",
+    "type": "number",
+    "defaultValue": 0,
+    "min": -360,
+    "max": 360,
+    "step": 1,
+    "unit": "degrees",
+    "description": "Angle of the slot relative to the X-axis"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 8.1,
+   "slotLength": 50.1,
+   "slotWidth": 12.1,
+   "depth": 10.1,
+   "stepdown": 3.1,
+   "stepover": 4.1,
+   "feedrate": 601,
+   "plungeFeedrate": 301,
+   "spindleSpeed": 3600,
+   "angle": 1
+  },
+  "fanuc": {
+   "defaults": "(SLOT MILLING CYCLE)\n(DIMENSIONS: 50x12mm, DEPTH: 10mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3500 M3\nM8\n(Z PASS 1 - DEPTH: 3mm)\nG00 X-23.000 Y0.000\nG00 Z5\nG01 Z-3.000 F300\nG01 X27.000 Y0.000 F600\nG00 Z5\nG00 X-27.000 Y0.000\nG01 Z-3.000 F300\nG01 X23.000 Y0.000 F600\nG00 Z5\n(Z PASS 2 - DEPTH: 6mm)\nG00 X-23.000 Y0.000\nG01 Z-6.000 F300\nG01 X27.000 Y0.000 F600\nG00 Z5\nG00 X-27.000 Y0.000\nG01 Z-6.000 F300\nG01 X23.000 Y0.000 F600\nG00 Z5\n(Z PASS 3 - DEPTH: 9mm)\nG00 X-23.000 Y0.000\nG01 Z-9.000 F300\nG01 X27.000 Y0.000 F600\nG00 Z5\nG00 X-27.000 Y0.000\nG01 Z-9.000 F300\nG01 X23.000 Y0.000 F600\nG00 Z5\n(Z PASS 4 - DEPTH: 10mm)\nG00 X-23.000 Y0.000\nG01 Z-10.000 F300\nG01 X27.000 Y0.000 F600\nG00 Z5\nG00 X-27.000 Y0.000\nG01 Z-10.000 F300\nG01 X23.000 Y0.000 F600\nG00 Z5\nG00 Z50\nM9\nM5",
+   "varied": "(SLOT MILLING CYCLE)\n(DIMENSIONS: 50.1x12.1mm, DEPTH: 10.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3600 M3\nM8\n(Z PASS 1 - DEPTH: 3.1mm)\nG00 X-23.046 Y-0.402\nG00 Z5\nG01 Z-3.100 F301\nG01 X27.046 Y0.472 F601\nG00 Z5\nG00 X-27.146 Y-0.474\nG01 Z-3.100 F301\nG01 X22.947 Y0.401 F601\nG00 Z5\n(Z PASS 2 - DEPTH: 6.2mm)\nG00 X-23.046 Y-0.402\nG01 Z-6.200 F301\nG01 X27.046 Y0.472 F601\nG00 Z5\nG00 X-27.146 Y-0.474\nG01 Z-6.200 F301\nG01 X22.947 Y0.401 F601\nG00 Z5\n(Z PASS 3 - DEPTH: 9.3mm)\nG00 X-23.046 Y-0.402\nG01 Z-9.300 F301\nG01 X27.046 Y0.472 F601\nG00 Z5\nG00 X-27.146 Y-0.474\nG01 Z-9.300 F301\nG01 X22.947 Y0.401 F601\nG00 Z5\n(Z PASS 4 - DEPTH: 10.1mm)\nG00 X-23.046 Y-0.402\nG01 Z-10.100 F301\nG01 X27.046 Y0.472 F601\nG00 Z5\nG00 X-27.146 Y-0.474\nG01 Z-10.100 F301\nG01 X22.947 Y0.401 F601\nG00 Z5\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; SLOT MILLING CYCLE\n; DIMENSIONS: 50x12mm, DEPTH: 10mm\nTOOL CALL 1 Z S3500\nL Z+50 R0 FMAX\nCYCL DEF 253 SLOT MILLING\n  Q215=0                        ; MACHINING TYPE\n  Q218=50     ; SLOT LENGTH\n  Q219=12      ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q374=0          ; ANGLE OF ROTATION\n  Q367=0                        ; SLOT POSITION\n  Q207=600       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-10         ; DEPTH\n  Q202=3       ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=300 ; PLUNGING FEEDRATE\n  Q338=4       ; FINISHING INCREMENT\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; SLOT MILLING CYCLE\n; DIMENSIONS: 50.1x12.1mm, DEPTH: 10.1mm\nTOOL CALL 1 Z S3600\nL Z+50 R0 FMAX\nCYCL DEF 253 SLOT MILLING\n  Q215=0                        ; MACHINING TYPE\n  Q218=50.1     ; SLOT LENGTH\n  Q219=12.1      ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q374=1          ; ANGLE OF ROTATION\n  Q367=0                        ; SLOT POSITION\n  Q207=601       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-10.1         ; DEPTH\n  Q202=3.1       ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=301 ; PLUNGING FEEDRATE\n  Q338=4.1       ; FINISHING INCREMENT\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "boring-cycle": {
+  "name": "Boring",
+  "parameters": [
+   {
+    "name": "initialDiameter",
+    "label": "Initial Diameter",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the pre-drilled hole"
+   },
+   {
+    "name": "finalDiameter",
+    "label": "Final Diameter",
+    "type": "number",
+    "defaultValue": 22,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Final diameter after boring"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 30,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the boring operation"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 80,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for boring"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 800,
+    "min": 1,
+    "max": 24000,
+    "step": 10,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "dwellTime",
+    "label": "Dwell Time",
+    "type": "number",
+    "defaultValue": 0.5,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at the bottom for finishing"
+   },
+   {
+    "name": "retractFeedrate",
+    "label": "Retract Feedrate",
+    "type": "number",
+    "defaultValue": 150,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for retraction"
+   },
+   {
+    "name": "orientation",
+    "label": "Spindle Orientation",
+    "type": "number",
+    "defaultValue": 0,
+    "min": 0,
+    "max": 360,
+    "step": 1,
+    "unit": "degrees",
+    "description": "Spindle orientation angle upon exit"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "initialDiameter": 20.1,
+   "finalDiameter": 22.1,
+   "depth": 30.1,
+   "feedrate": 81,
+   "spindleSpeed": 810,
+   "dwellTime": 0.6,
+   "retractFeedrate": 151,
+   "orientation": 1
+  },
+  "fanuc": {
+   "defaults": "(BORING CYCLE)\n(DIAMETER: 20mm -> 22mm, DEPTH: 30mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS800 M3\nM8\nG00 X0 Y0\nG00 Z5\nG76 R5 Z-30 Q0 P500 F80 K150\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5",
+   "varied": "(BORING CYCLE)\n(DIAMETER: 20.1mm -> 22.1mm, DEPTH: 30.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS810 M3\nM8\nG00 X0 Y0\nG00 Z5\nG76 R5 Z-30.1 Q1 P600 F81 K151\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; BORING CYCLE\n; DIAMETER: 20mm -> 22mm, DEPTH: 30mm\nTOOL CALL 1 Z S800\nL Z+50 R0 FMAX\nCYCL DEF 202 BORING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-30         ; DEPTH\n  Q206=80       ; FEEDRATE FOR PLUNGING\n  Q211=0.5      ; DWELL TIME AT BOTTOM\n  Q208=150; FEEDRATE FOR RETRACT\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q214=1                        ; RETRACTION DIRECTION\n  Q336=0    ; SPINDLE ANGLE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; BORING CYCLE\n; DIAMETER: 20.1mm -> 22.1mm, DEPTH: 30.1mm\nTOOL CALL 1 Z S810\nL Z+50 R0 FMAX\nCYCL DEF 202 BORING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-30.1         ; DEPTH\n  Q206=81       ; FEEDRATE FOR PLUNGING\n  Q211=0.6      ; DWELL TIME AT BOTTOM\n  Q208=151; FEEDRATE FOR RETRACT\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q214=1                        ; RETRACTION DIRECTION\n  Q336=1    ; SPINDLE ANGLE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "back-boring": {
+  "name": "Back Boring",
+  "parameters": [
+   {
+    "name": "holeDiameter",
+    "label": "Hole Diameter",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the through hole"
+   },
+   {
+    "name": "counterboreDiameter",
+    "label": "Counterbore Diameter",
+    "type": "number",
+    "defaultValue": 28,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the bottom counterbore"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of the counterbore (from the bottom surface)"
+   },
+   {
+    "name": "thickness",
+    "label": "Part Thickness",
+    "type": "number",
+    "defaultValue": 30,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total thickness of the part"
+   },
+   {
+    "name": "safetyDistance",
+    "label": "Safety Distance",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Safety distance inside the hole"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for boring"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 600,
+    "min": 1,
+    "max": 24000,
+    "step": 10,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "dwellTime",
+    "label": "Dwell Time",
+    "type": "number",
+    "defaultValue": 0.2,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at depth"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "holeDiameter": 20.1,
+   "counterboreDiameter": 28.1,
+   "depth": 10.1,
+   "thickness": 30.1,
+   "safetyDistance": 5.1,
+   "feedrate": 101,
+   "spindleSpeed": 610,
+   "dwellTime": 0.30000000000000004
+  },
+  "fanuc": {
+   "defaults": "(BACK BORING CYCLE)\n(COUNTERBORE DIAMETER: 28mm, DEPTH: 10mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS600 M3\nM8\nG00 X0 Y0\nG00 Z5\n(POSITION TOOL INSIDE HOLE)\nG00 Z-25\n(SPINDLE ORIENTATION)\nM19\nG31 Z-40 F50\nG01 Z-40 F100\nG04 P200\nG01 Z-25 F100\nG00 Z5\nX10 Y10\n(REPEAT CYCLE)\nG00 Z-25\nM19\nG31 Z-40 F50\nG01 Z-40 F100\nG04 P200\nG01 Z-25 F100\nG00 Z5\nG00 Z50\nM9\nM5",
+   "varied": "(BACK BORING CYCLE)\n(COUNTERBORE DIAMETER: 28.1mm, DEPTH: 10.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS610 M3\nM8\nG00 X0 Y0\nG00 Z5\n(POSITION TOOL INSIDE HOLE)\nG00 Z-25\n(SPINDLE ORIENTATION)\nM19\nG31 Z-40.2 F50\nG01 Z-40.2 F101\nG04 P300.00000000000006\nG01 Z-25 F101\nG00 Z5\nX10 Y10\n(REPEAT CYCLE)\nG00 Z-25\nM19\nG31 Z-40.2 F50\nG01 Z-40.2 F101\nG04 P300.00000000000006\nG01 Z-25 F101\nG00 Z5\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; BACK BORING CYCLE\n; COUNTERBORE DIAMETER: 28mm, DEPTH: 10mm\nTOOL CALL 1 Z S600\nL Z+50 R0 FMAX\nCYCL DEF 204 BACK BORING\n  Q200=2                        ; SAFETY DISTANCE\n  Q249=10          ; BACK BORE DEPTH\n  Q250=30      ; MATERIAL THICKNESS\n  Q251=2                        ; ECCENTRICITY\n  Q252=0                        ; CUTTING EDGE HEIGHT\n  Q253=500                      ; FEEDRATE FOR APPROACH\n  Q254=100       ; FEEDRATE FOR MACHINING\n  Q255=0.2      ; DWELL TIME\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; BACK BORING CYCLE\n; COUNTERBORE DIAMETER: 28.1mm, DEPTH: 10.1mm\nTOOL CALL 1 Z S610\nL Z+50 R0 FMAX\nCYCL DEF 204 BACK BORING\n  Q200=2                        ; SAFETY DISTANCE\n  Q249=10.1          ; BACK BORE DEPTH\n  Q250=30.1      ; MATERIAL THICKNESS\n  Q251=2                        ; ECCENTRICITY\n  Q252=0                        ; CUTTING EDGE HEIGHT\n  Q253=500                      ; FEEDRATE FOR APPROACH\n  Q254=101       ; FEEDRATE FOR MACHINING\n  Q255=0.30000000000000004      ; DWELL TIME\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "thread-milling": {
+  "name": "Thread Milling",
+  "parameters": [
+   {
+    "name": "threadDiameter",
+    "label": "Thread Diameter",
+    "type": "number",
+    "defaultValue": 16,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Nominal diameter of the thread"
+   },
+   {
+    "name": "threadPitch",
+    "label": "Thread Pitch",
+    "type": "number",
+    "defaultValue": 2,
+    "min": 0.1,
+    "max": 10,
+    "step": 0.05,
+    "unit": "mm",
+    "description": "Pitch of the thread"
+   },
+   {
+    "name": "threadDepth",
+    "label": "Thread Depth (Radial)",
+    "type": "number",
+    "defaultValue": 1.6,
+    "min": 0.1,
+    "max": 10,
+    "step": 0.05,
+    "unit": "mm",
+    "description": "Depth of the thread (radial)"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the thread"
+   },
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 8,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the thread milling cutter"
+   },
+   {
+    "name": "threadType",
+    "label": "Thread Type",
+    "type": "select",
+    "defaultValue": "internal",
+    "options": [
+     {
+      "value": "internal",
+      "label": "Internal"
+     },
+     {
+      "value": "external",
+      "label": "External"
+     }
+    ],
+    "description": "Thread type: internal or external"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 400,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "threadTurns",
+    "label": "Number of Turns",
+    "type": "number",
+    "defaultValue": 1,
+    "min": 1,
+    "max": 10,
+    "step": 0.25,
+    "unit": "turns",
+    "description": "Number of complete thread turns"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "threadDiameter": 16.1,
+   "threadPitch": 2.05,
+   "threadDepth": 1.6500000000000001,
+   "depth": 20.1,
+   "toolDiameter": 8.1,
+   "threadType": "external",
+   "feedrate": 401,
+   "spindleSpeed": 3100,
+   "threadTurns": 1.25
+  },
+  "fanuc": {
+   "defaults": "(THREAD MILLING CYCLE INTERNAL)\n(DIAMETER: 16mm, PITCH: 2mm, DEPTH: 20mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\nG00 X0 Y0\nG00 Z5\n(POSITION AT CENTER)\nG00 X-2.4000000000000004\n(APPROACH TO WORKING DEPTH)\nG01 Z0 F400\n(HELICAL MOVEMENT)\nG17\nG02 X2.4000000000000004 Y0 I2.4000000000000004 J0 Z-20 F400\n(COMPLETE THREAD CYCLE)\nG02 X2.4000000000000004 Y0 I-2.4000000000000004 J0 F400\n(RETURN TO CENTER)\nG01 X0\nG00 Z50\nM9\nM5",
+   "varied": "(THREAD MILLING CYCLE EXTERNAL)\n(DIAMETER: 16.1mm, PITCH: 2.05mm, DEPTH: 20.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\nG00 X0 Y0\nG00 Z5\n(POSITION AT CENTER)\nG00 X13.75\n(APPROACH TO WORKING DEPTH)\nG01 Z0 F401\n(HELICAL MOVEMENT)\nG17\nG03 X-13.75 Y0 I-13.75 J0 Z-20.1 F401\n(COMPLETE THREAD CYCLE)\nG03 X-13.75 Y0 I13.75 J0 F401\n(RETURN TO CENTER)\nG01 X0\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; THREAD MILLING CYCLE INTERNAL\n; DIAMETER: 16mm, PITCH: 2mm, DEPTH: 20mm\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\nCYCL DEF 262 THREAD MILLING\n  Q335=16 ; NOMINAL DIAMETER\n  Q239=2    ; THREAD PITCH\n  Q201=-20         ; THREAD DEPTH\n  Q355=1    ; THREADS PER PASS\n  Q253=750                      ; FEEDRATE FOR APPROACH\n  Q351=+1                       ; MILLING MODE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q207=400       ; MILLING FEEDRATE\nCYCL DEF 264 THREAD MILLING FROM SOLID\n  Q335=16 ; NOMINAL DIAMETER\n  Q239=2    ; THREAD PITCH\n  Q201=-20         ; THREAD DEPTH\n  Q222=12.8 ; PRE-DRILLED DIAMETER\n  Q355=1    ; THREADS PER PASS\n  Q253=750                      ; FEEDRATE FOR APPROACH\n  Q351=+1                       ; MILLING MODE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q207=400       ; MILLING FEEDRATE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; THREAD MILLING CYCLE EXTERNAL\n; DIAMETER: 16.1mm, PITCH: 2.05mm, DEPTH: 20.1mm\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\nCYCL DEF 262 THREAD MILLING\n  Q335=16.1 ; NOMINAL DIAMETER\n  Q239=2.05    ; THREAD PITCH\n  Q201=-20.1         ; THREAD DEPTH\n  Q355=1.25    ; THREADS PER PASS\n  Q253=750                      ; FEEDRATE FOR APPROACH\n  Q351=+1                       ; MILLING MODE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q207=401       ; MILLING FEEDRATE\nCYCL DEF 264 THREAD MILLING FROM SOLID\n  Q335=16.1 ; NOMINAL DIAMETER\n  Q239=2.05    ; THREAD PITCH\n  Q201=-20.1         ; THREAD DEPTH\n  Q222=19.400000000000002 ; PRE-DRILLED DIAMETER\n  Q355=1.25    ; THREADS PER PASS\n  Q253=750                      ; FEEDRATE FOR APPROACH\n  Q351=+1                       ; MILLING MODE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q207=401       ; MILLING FEEDRATE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "circular-pocket": {
+  "name": "Circular Pocket",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "pocketDiameter",
+    "label": "Pocket Diameter",
+    "type": "number",
+    "defaultValue": 80,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Final diameter of the pocket"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the pocket"
+   },
+   {
+    "name": "stepdown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of cut for each increment"
+   },
+   {
+    "name": "stepover",
+    "label": "Radial Stepover",
+    "type": "number",
+    "defaultValue": 4,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Radial stepover between passes"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 800,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 300,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "finishAllowance",
+    "label": "Finish Allowance",
+    "type": "number",
+    "defaultValue": 0.2,
+    "min": 0,
+    "max": 10,
+    "step": 0.05,
+    "unit": "mm",
+    "description": "Stock left for finishing"
+   },
+   {
+    "name": "helicalEntrance",
+    "label": "Helical Entrance",
+    "type": "checkbox",
+    "defaultValue": true,
+    "description": "Use helical entrance instead of vertical"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 10.1,
+   "pocketDiameter": 80.1,
+   "depth": 15.1,
+   "stepdown": 5.1,
+   "stepover": 4.1,
+   "feedrate": 801,
+   "plungeFeedrate": 301,
+   "spindleSpeed": 3100,
+   "finishAllowance": 0.25,
+   "helicalEntrance": false
+  },
+  "fanuc": {
+   "defaults": "(CIRCULAR POCKET CYCLE)\n(DIAMETER: 80mm, DEPTH: 15mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\nG00 X0 Y0\nG00 Z5\n(HELICAL ENTRANCE)\nG17\nG03 X0 Y0 I2.5 J0 Z-5 F300\n\n(PASS 1 - DEPTH: 5mm)\nG03 X0 Y0 I0 J0 R4 F800\nG03 X0 Y0 I0 J0 R8 F800\nG03 X0 Y0 I0 J0 R12 F800\nG03 X0 Y0 I0 J0 R16 F800\nG03 X0 Y0 I0 J0 R20 F800\nG03 X0 Y0 I0 J0 R24 F800\nG03 X0 Y0 I0 J0 R28 F800\nG03 X0 Y0 I0 J0 R32 F800\nG03 X0 Y0 I0 J0 R34.8 F800\n(PASS 2 - DEPTH: 10mm)\nG01 Z-10 F300\nG03 X0 Y0 I0 J0 R4 F800\nG03 X0 Y0 I0 J0 R8 F800\nG03 X0 Y0 I0 J0 R12 F800\nG03 X0 Y0 I0 J0 R16 F800\nG03 X0 Y0 I0 J0 R20 F800\nG03 X0 Y0 I0 J0 R24 F800\nG03 X0 Y0 I0 J0 R28 F800\nG03 X0 Y0 I0 J0 R32 F800\nG03 X0 Y0 I0 J0 R34.8 F800\n(PASS 3 - DEPTH: 15mm)\nG01 Z-15 F300\nG03 X0 Y0 I0 J0 R4 F800\nG03 X0 Y0 I0 J0 R8 F800\nG03 X0 Y0 I0 J0 R12 F800\nG03 X0 Y0 I0 J0 R16 F800\nG03 X0 Y0 I0 J0 R20 F800\nG03 X0 Y0 I0 J0 R24 F800\nG03 X0 Y0 I0 J0 R28 F800\nG03 X0 Y0 I0 J0 R32 F800\nG03 X0 Y0 I0 J0 R34.8 F800\n\n\n(SIDE FINISHING)\nG03 X0 Y0 I0 J0 R35 F800\n // Note: R is non-standard\nG00 Z50\nM9\nM5",
+   "varied": "(CIRCULAR POCKET CYCLE)\n(DIAMETER: 80.1mm, DEPTH: 15.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\nG00 X0 Y0\nG00 Z5\n(VERTICAL ENTRANCE)\nG01 Z-5.1 F301\n\n(PASS 1 - DEPTH: 5.1mm)\nG03 X0 Y0 I0 J0 R4.1 F801\nG03 X0 Y0 I0 J0 R8.2 F801\nG03 X0 Y0 I0 J0 R12.299999999999999 F801\nG03 X0 Y0 I0 J0 R16.4 F801\nG03 X0 Y0 I0 J0 R20.5 F801\nG03 X0 Y0 I0 J0 R24.599999999999998 F801\nG03 X0 Y0 I0 J0 R28.699999999999996 F801\nG03 X0 Y0 I0 J0 R32.8 F801\nG03 X0 Y0 I0 J0 R34.75 F801\n(PASS 2 - DEPTH: 10.2mm)\nG01 Z-10.2 F301\nG03 X0 Y0 I0 J0 R4.1 F801\nG03 X0 Y0 I0 J0 R8.2 F801\nG03 X0 Y0 I0 J0 R12.299999999999999 F801\nG03 X0 Y0 I0 J0 R16.4 F801\nG03 X0 Y0 I0 J0 R20.5 F801\nG03 X0 Y0 I0 J0 R24.599999999999998 F801\nG03 X0 Y0 I0 J0 R28.699999999999996 F801\nG03 X0 Y0 I0 J0 R32.8 F801\nG03 X0 Y0 I0 J0 R34.75 F801\n(PASS 3 - DEPTH: 15.1mm)\nG01 Z-15.1 F301\nG03 X0 Y0 I0 J0 R4.1 F801\nG03 X0 Y0 I0 J0 R8.2 F801\nG03 X0 Y0 I0 J0 R12.299999999999999 F801\nG03 X0 Y0 I0 J0 R16.4 F801\nG03 X0 Y0 I0 J0 R20.5 F801\nG03 X0 Y0 I0 J0 R24.599999999999998 F801\nG03 X0 Y0 I0 J0 R28.699999999999996 F801\nG03 X0 Y0 I0 J0 R32.8 F801\nG03 X0 Y0 I0 J0 R34.75 F801\n\n\n(SIDE FINISHING)\nG03 X0 Y0 I0 J0 R35 F801\n // Note: R is non-standard\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CIRCULAR POCKET CYCLE\n; DIAMETER: 80mm, DEPTH: 15mm\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\nCYCL DEF 252 CIRCULAR POCKET\n  Q215=0                        ; MACHINING TYPE\n  Q223=80 ; POCKET DIAMETER\n  Q368=0.2; SIDE ALLOWANCE\n  Q207=800       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-15         ; DEPTH\n  Q202=5       ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=300 ; PLUNGING FEEDRATE\n  Q338=4       ; FINISHING STEP\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q370=1                        ; PATH OVERLAP\n  Q366=1 ; PLUNGING STRATEGY\n  Q385=800       ; FINISHING FEEDRATE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CIRCULAR POCKET CYCLE\n; DIAMETER: 80.1mm, DEPTH: 15.1mm\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\nCYCL DEF 252 CIRCULAR POCKET\n  Q215=0                        ; MACHINING TYPE\n  Q223=80.1 ; POCKET DIAMETER\n  Q368=0.25; SIDE ALLOWANCE\n  Q207=801       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-15.1         ; DEPTH\n  Q202=5.1       ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=301 ; PLUNGING FEEDRATE\n  Q338=4.1       ; FINISHING STEP\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q370=1                        ; PATH OVERLAP\n  Q366=0 ; PLUNGING STRATEGY\n  Q385=801       ; FINISHING FEEDRATE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "circular-island": {
+  "name": "Circular Island",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "islandDiameter",
+    "label": "Island Diameter",
+    "type": "number",
+    "defaultValue": 50,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Final diameter of the island"
+   },
+   {
+    "name": "stockDiameter",
+    "label": "Stock Diameter",
+    "type": "number",
+    "defaultValue": 60,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the raw material"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the machining operation"
+   },
+   {
+    "name": "stepdown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of cut for each increment"
+   },
+   {
+    "name": "stepover",
+    "label": "Radial Stepover",
+    "type": "number",
+    "defaultValue": 4,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Radial stepover between passes"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 800,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 300,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "finishAllowance",
+    "label": "Finish Allowance",
+    "type": "number",
+    "defaultValue": 0.2,
+    "min": 0,
+    "max": 10,
+    "step": 0.05,
+    "unit": "mm",
+    "description": "Stock left for finishing"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 10.1,
+   "islandDiameter": 50.1,
+   "stockDiameter": 60.1,
+   "depth": 15.1,
+   "stepdown": 5.1,
+   "stepover": 4.1,
+   "feedrate": 801,
+   "plungeFeedrate": 301,
+   "spindleSpeed": 3100,
+   "finishAllowance": 0.25
+  },
+  "fanuc": {
+   "defaults": "(CIRCULAR ISLAND CYCLE)\n(ISLAND DIAMETER: 50mm, DEPTH: 15mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\nG00 X35 Y0\nG00 Z5\n\n(PASS 1 - DEPTH: 5mm)\nG01 Z-5 F300\nG03 X35 Y0 I-35 J0 F800\nG01 X31 F800\nG03 X31 Y0 I-31 J0 F800\nG01 X30.2 F800\nG03 X30.2 Y0 I-30.2 J0 F800\n(PASS 2 - DEPTH: 10mm)\nG01 Z-10 F300\nG03 X35 Y0 I-35 J0 F800\nG01 X31 F800\nG03 X31 Y0 I-31 J0 F800\nG01 X30.2 F800\nG03 X30.2 Y0 I-30.2 J0 F800\n(PASS 3 - DEPTH: 15mm)\nG01 Z-15 F300\nG03 X35 Y0 I-35 J0 F800\nG01 X31 F800\nG03 X31 Y0 I-31 J0 F800\nG01 X30.2 F800\nG03 X30.2 Y0 I-30.2 J0 F800\n\n\n(SIDE FINISHING)\nG01 X30 F800\nG03 X30 Y0 I-30 J0 F800\n // Note: I/J relative to start point\nG00 Z50\nM9\nM5",
+   "varied": "(CIRCULAR ISLAND CYCLE)\n(ISLAND DIAMETER: 50.1mm, DEPTH: 15.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\nG00 X35.1 Y0\nG00 Z5\n\n(PASS 1 - DEPTH: 5.1mm)\nG01 Z-5.1 F301\nG03 X35.1 Y0 I-35.1 J0 F801\nG01 X31 F801\nG03 X31 Y0 I-31 J0 F801\nG01 X30.35 F801\nG03 X30.35 Y0 I-30.35 J0 F801\n(PASS 2 - DEPTH: 10.2mm)\nG01 Z-10.2 F301\nG03 X35.1 Y0 I-35.1 J0 F801\nG01 X31 F801\nG03 X31 Y0 I-31 J0 F801\nG01 X30.35 F801\nG03 X30.35 Y0 I-30.35 J0 F801\n(PASS 3 - DEPTH: 15.1mm)\nG01 Z-15.1 F301\nG03 X35.1 Y0 I-35.1 J0 F801\nG01 X31 F801\nG03 X31 Y0 I-31 J0 F801\nG01 X30.35 F801\nG03 X30.35 Y0 I-30.35 J0 F801\n\n\n(SIDE FINISHING)\nG01 X30.1 F801\nG03 X30.1 Y0 I-30.1 J0 F801\n // Note: I/J relative to start point\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CIRCULAR ISLAND CYCLE\n; ISLAND DIAMETER: 50mm, DEPTH: 15mm\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\nCYCL DEF 257 CIRCULAR ISLAND\n  Q223=50 ; FINISHED PART DIAMETER\n  Q222=60  ; RAW PART DIAMETER\n  Q368=0.2; SIDE ALLOWANCE\n  Q207=800       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-15         ; DEPTH\n  Q202=5       ; PLUNGING DEPTH\n  Q206=300 ; PLUNGING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q370=1                        ; PATH OVERLAP\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CIRCULAR ISLAND CYCLE\n; ISLAND DIAMETER: 50.1mm, DEPTH: 15.1mm\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\nCYCL DEF 257 CIRCULAR ISLAND\n  Q223=50.1 ; FINISHED PART DIAMETER\n  Q222=60.1  ; RAW PART DIAMETER\n  Q368=0.25; SIDE ALLOWANCE\n  Q207=801       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-15.1         ; DEPTH\n  Q202=5.1       ; PLUNGING DEPTH\n  Q206=301 ; PLUNGING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q370=1                        ; PATH OVERLAP\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "chip-breaking-drill": {
+  "name": "Chip Breaking Drilling",
+  "parameters": [
+   {
+    "name": "drillDiameter",
+    "label": "Drill Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the drill bit to use"
+   },
+   {
+    "name": "depth",
+    "label": "Total Depth",
+    "type": "number",
+    "defaultValue": 50,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the hole"
+   },
+   {
+    "name": "incrementDepth",
+    "label": "Increment Depth",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of each increment"
+   },
+   {
+    "name": "chipBreakDistance",
+    "label": "Chip Break Distance",
+    "type": "number",
+    "defaultValue": 1,
+    "min": 0.1,
+    "max": 10,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Retract distance for chip breaking"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 150,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for drilling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 1500,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "returnType",
+    "label": "Return Type",
+    "type": "select",
+    "defaultValue": "rapid",
+    "options": [
+     {
+      "value": "rapid",
+      "label": "Rapid"
+     },
+     {
+      "value": "feed",
+      "label": "Feedrate"
+     }
+    ],
+    "description": "Type of retraction movement"
+   },
+   {
+    "name": "chipBreakCount",
+    "label": "Breaks per Step",
+    "type": "number",
+    "defaultValue": 3,
+    "min": 1,
+    "max": 20,
+    "step": 1,
+    "unit": "breaks",
+    "description": "Number of chip breaks per increment"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "drillDiameter": 10.1,
+   "depth": 50.1,
+   "incrementDepth": 5.1,
+   "chipBreakDistance": 1.1,
+   "feedrate": 151,
+   "spindleSpeed": 1600,
+   "returnType": "feed",
+   "chipBreakCount": 4
+  },
+  "fanuc": {
+   "defaults": "(CHIP BREAKING DRILLING CYCLE)\n(DIAMETER: 10mm, DEPTH: 50mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1500 M3\nM8\nG00 X0 Y0\nG00 Z5\nG73 R1 Z-50 Q5 F150 K3\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5",
+   "varied": "(CHIP BREAKING DRILLING CYCLE)\n(DIAMETER: 10.1mm, DEPTH: 50.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1600 M3\nM8\nG00 X0 Y0\nG00 Z5\nG73 R1.1 Z-50.1 Q5.1 F151 K4\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CHIP BREAKING DRILLING CYCLE\n; DIAMETER: 10mm, DEPTH: 50mm\nTOOL CALL 1 Z S1500\nL Z+50 R0 FMAX\nCYCL DEF 203 UNIVERSAL DRILLING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-50         ; DEPTH\n  Q206=150       ; FEEDRATE FOR PLUNGING\n  Q202=5 ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q212=0                        ; RETRACTION AMOUNT\n  Q213=3 ; NO. OF CHIP BREAKS\n  Q205=1                        ; MIN. PLUNGING DEPTH\n  Q211=0                        ; DWELL TIME AT BOTTOM\n  Q208=99999 ; FEEDRATE FOR RETRACT\n  Q256=1 ; RETRACT CHIP BREAK\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CHIP BREAKING DRILLING CYCLE\n; DIAMETER: 10.1mm, DEPTH: 50.1mm\nTOOL CALL 1 Z S1600\nL Z+50 R0 FMAX\nCYCL DEF 203 UNIVERSAL DRILLING\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-50.1         ; DEPTH\n  Q206=151       ; FEEDRATE FOR PLUNGING\n  Q202=5.1 ; PLUNGING DEPTH\n  Q210=0                        ; DWELL TIME AT TOP\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q212=0                        ; RETRACTION AMOUNT\n  Q213=4 ; NO. OF CHIP BREAKS\n  Q205=1                        ; MIN. PLUNGING DEPTH\n  Q211=0                        ; DWELL TIME AT BOTTOM\n  Q208=151 ; FEEDRATE FOR RETRACT\n  Q256=1.1 ; RETRACT CHIP BREAK\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "t-slot-milling": {
+  "name": "T-Slot Milling",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Tool Diameter",
+    "type": "number",
+    "defaultValue": 12,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the T-slot cutter"
+   },
+   {
+    "name": "slotWidth",
+    "label": "Slot Width",
+    "type": "number",
+    "defaultValue": 16,
+    "min": 1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the upper part of the slot"
+   },
+   {
+    "name": "tSlotWidth",
+    "label": "T-Slot Width",
+    "type": "number",
+    "defaultValue": 22,
+    "min": 1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the lower T-shaped part"
+   },
+   {
+    "name": "slotDepth",
+    "label": "Slot Depth",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of the main slot"
+   },
+   {
+    "name": "tSlotDepth",
+    "label": "T-Slot Depth",
+    "type": "number",
+    "defaultValue": 6,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Additional depth of the T-shaped part"
+   },
+   {
+    "name": "slotLength",
+    "label": "Slot Length",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total length of the slot"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 400,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 200,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging in Z"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 2500,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 12.1,
+   "slotWidth": 16.1,
+   "tSlotWidth": 22.1,
+   "slotDepth": 10.1,
+   "tSlotDepth": 6.1,
+   "slotLength": 100.1,
+   "feedrate": 401,
+   "plungeFeedrate": 201,
+   "spindleSpeed": 2600
+  },
+  "fanuc": {
+   "defaults": "(T-SLOT MILLING CYCLE)\n(DIMENSIONS: 100x16/22mm, DEPTH: 10+6mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2500 M3\nM8\n\n(FIRST STAGE - MAIN SLOT WITH STANDARD END MILL)\n(CHANGE TOOL TO CYLINDRICAL END MILL OF APPROPRIATE DIAMETER)\nT2 M6\nG43 Z50 H2\nS2500 M3\n\nG00 X-50 Y0\nG00 Z5\nG01 Z-10 F200\nG01 X50 F400\nG00 Z50\n\n(SECOND STAGE - T-SLOT WIDENING WITH T-SLOT CUTTER)\n(CHANGE TOOL TO T-SLOT CUTTER)\nT3 M6\nG43 Z50 H3\nS2500 M3\n\nG00 X-50 Y0\nG00 Z-12\nG01 Z-16 F200\nG01 X50 F400\nG00 Z50\nM9\nM5",
+   "varied": "(T-SLOT MILLING CYCLE)\n(DIMENSIONS: 100.1x16.1/22.1mm, DEPTH: 10.1+6.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2600 M3\nM8\n\n(FIRST STAGE - MAIN SLOT WITH STANDARD END MILL)\n(CHANGE TOOL TO CYLINDRICAL END MILL OF APPROPRIATE DIAMETER)\nT2 M6\nG43 Z50 H2\nS2600 M3\n\nG00 X-50.05 Y0\nG00 Z5\nG01 Z-10.1 F201\nG01 X50.05 F401\nG00 Z50\n\n(SECOND STAGE - T-SLOT WIDENING WITH T-SLOT CUTTER)\n(CHANGE TOOL TO T-SLOT CUTTER)\nT3 M6\nG43 Z50 H3\nS2600 M3\n\nG00 X-50.05 Y0\nG00 Z-12.1\nG01 Z-16.2 F201\nG01 X50.05 F401\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; T-SLOT MILLING CYCLE\n; DIMENSIONS: 100x16/22mm, DEPTH: 10+6mm\nTOOL CALL 1 Z S2500 ; CYLINDRICAL END MILL\n\nL Z+50 R0 FMAX\n; FIRST STAGE - MAIN SLOT\nCYCL DEF 253 SLOT MILLING\n  Q215=0                        ; MACHINING TYPE\n  Q218=100     ; SLOT LENGTH\n  Q219=16      ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q374=0                        ; ANGLE OF ROTATION\n  Q367=0                        ; SLOT POSITION\n  Q207=400       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-10     ; DEPTH\n  Q202=10      ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=200 ; PLUNGING FEEDRATE\n  Q338=0                        ; FINISHING INCREMENT\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\n\n; SECOND STAGE - T-SLOT WIDENING\nTOOL CALL 2 Z S2500 ; T-SLOT CUTTER\nL Z+50 R0 FMAX\nL X-50 Y+0 R0 FMAX\nL Z-12 R0 FMAX\nL Z-16 F200\nL X+50 F400\nL Z+50 R0 FMAX\nM5",
+   "varied": "; T-SLOT MILLING CYCLE\n; DIMENSIONS: 100.1x16.1/22.1mm, DEPTH: 10.1+6.1mm\nTOOL CALL 1 Z S2600 ; CYLINDRICAL END MILL\n\nL Z+50 R0 FMAX\n; FIRST STAGE - MAIN SLOT\nCYCL DEF 253 SLOT MILLING\n  Q215=0                        ; MACHINING TYPE\n  Q218=100.1     ; SLOT LENGTH\n  Q219=16.1      ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q374=0                        ; ANGLE OF ROTATION\n  Q367=0                        ; SLOT POSITION\n  Q207=401       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-10.1     ; DEPTH\n  Q202=10.1      ; PLUNGING DEPTH\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q206=201 ; PLUNGING FEEDRATE\n  Q338=0                        ; FINISHING INCREMENT\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\n\n; SECOND STAGE - T-SLOT WIDENING\nTOOL CALL 2 Z S2600 ; T-SLOT CUTTER\nL Z+50 R0 FMAX\nL X-50.05 Y+0 R0 FMAX\nL Z-12.1 R0 FMAX\nL Z-16.2 F201\nL X+50.05 F401\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "center-drilling": {
+  "name": "Center Drilling",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Drill Diameter",
+    "type": "number",
+    "defaultValue": 6,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the center drill"
+   },
+   {
+    "name": "coneAngle",
+    "label": "Cone Angle",
+    "type": "number",
+    "defaultValue": 90,
+    "min": 60,
+    "max": 120,
+    "step": 1,
+    "unit": "degrees",
+    "description": "Angle of the drill point (typically 90° or 60°)"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 3,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Centering depth"
+   },
+   {
+    "name": "chamferDiameter",
+    "label": "Chamfer Diameter",
+    "type": "number",
+    "defaultValue": 10,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Top diameter of the chamfer"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 150,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for centering"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 2000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "dwellTime",
+    "label": "Dwell Time",
+    "type": "number",
+    "defaultValue": 0,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at the bottom (0 for no dwell)"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 6.1,
+   "coneAngle": 91,
+   "depth": 3.1,
+   "chamferDiameter": 10.1,
+   "feedrate": 151,
+   "spindleSpeed": 2100,
+   "dwellTime": 0.1
+  },
+  "fanuc": {
+   "defaults": "(CENTER DRILLING CYCLE)\n(CHAMFER DIAMETER: 10mm, DEPTH: 3.00mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2000 M3\nM8\nG00 X0 Y0\nG00 Z5\nG81 R5 Z-3.00 F150 P0\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5",
+   "varied": "(CENTER DRILLING CYCLE)\n(CHAMFER DIAMETER: 10.1mm, DEPTH: 3.10mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2100 M3\nM8\nG00 X0 Y0\nG00 Z5\nG81 R5 Z-3.10 F151 P100\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CENTER DRILLING CYCLE\n; CHAMFER DIAMETER: 10mm, DEPTH: 3.00mm\nTOOL CALL 1 Z S2000\nL Z+50 R0 FMAX\nCYCL DEF 240 CENTERING\n  Q200=2                        ; SAFETY DISTANCE\n  Q343=0                        ; SELECT DIAM./DEPTH\n  Q201=-3.00; DEPTH\n  Q344=-10; DIAMETER\n  Q206=150       ; FEEDRATE FOR PLUNGING\n  Q211=0      ; DWELL TIME AT BOTTOM\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CENTER DRILLING CYCLE\n; CHAMFER DIAMETER: 10.1mm, DEPTH: 3.10mm\nTOOL CALL 1 Z S2100\nL Z+50 R0 FMAX\nCYCL DEF 240 CENTERING\n  Q200=2                        ; SAFETY DISTANCE\n  Q343=0                        ; SELECT DIAM./DEPTH\n  Q201=-3.10; DEPTH\n  Q344=-10.1; DIAMETER\n  Q206=151       ; FEEDRATE FOR PLUNGING\n  Q211=0.1      ; DWELL TIME AT BOTTOM\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "chamfering-cycle": {
+  "name": "Chamfering",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Cutter Diameter",
+    "type": "number",
+    "defaultValue": 12,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the chamfering cutter"
+   },
+   {
+    "name": "chamferWidth",
+    "label": "Chamfer Width",
+    "type": "number",
+    "defaultValue": 2,
+    "min": 0.1,
+    "max": 50,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the chamfer"
+   },
+   {
+    "name": "chamferAngle",
+    "label": "Chamfer Angle",
+    "type": "number",
+    "defaultValue": 45,
+    "min": 30,
+    "max": 60,
+    "step": 1,
+    "unit": "degrees",
+    "description": "Angle of the chamfer (typically 45°)"
+   },
+   {
+    "name": "contourLength",
+    "label": "Contour Length",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Length of the contour to be chamfered"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 400,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for milling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 3000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "contourType",
+    "label": "Contour Type",
+    "type": "select",
+    "defaultValue": "external",
+    "options": [
+     {
+      "value": "external",
+      "label": "External"
+     },
+     {
+      "value": "internal",
+      "label": "Internal"
+     }
+    ],
+    "description": "Contour type: external or internal"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 12.1,
+   "chamferWidth": 2.1,
+   "chamferAngle": 46,
+   "contourLength": 100.1,
+   "feedrate": 401,
+   "spindleSpeed": 3100,
+   "contourType": "internal"
+  },
+  "fanuc": {
+   "defaults": "(CHAMFER MILLING CYCLE)\n(WIDTH: 2mm, ANGLE: 45°)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3000 M3\nM8\nG00 X-10 Y0\nG00 Z5\nG01 Z-2.00 F100\nG42 D1\nG01 X0 Y0 F400\nG01 X100\nG01 Y100\nG01 X0\nG01 Y0\nG40\nG00 Z50\nM9\nM5",
+   "varied": "(CHAMFER MILLING CYCLE)\n(WIDTH: 2.1mm, ANGLE: 46°)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS3100 M3\nM8\nG00 X-10 Y0\nG00 Z5\nG01 Z-2.03 F100\nG41 D1\nG01 X0 Y0 F401\nG01 X100.1\nG01 Y100.1\nG01 X0\nG01 Y0\nG40\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; CHAMFER MILLING CYCLE\n; WIDTH: 2mm, ANGLE: 45°\nTOOL CALL 1 Z S3000\nL Z+50 R0 FMAX\n; CHAMFER CYCLE DEFINITION\nCYCL DEF 275 MILL TROUGH SLOT PROF\n  Q215=2                        ; MACHINING TYPE\n  Q219=2   ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q436=2.00 ; INCREMENT PER REVOLUTION\n  Q207=400       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-2.00 ; DEPTH\n  Q202=2.00 ; PLUNGING DEPTH\n  Q206=400       ; PLUNGING FEEDRATE\n  Q338=0                        ; FINISHING STEP\n  Q385=400       ; FINISHING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q439=0                        ; FEED REFERENCE\n; CONTOUR PATH\nL X-10 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-2.00 F100\nL RR R6\nL X+0 Y+0 F400\nL X+100\nL Y+100\nL X+0\nL Y+0\nL R0\nL Z+50 R0 FMAX\nM5",
+   "varied": "; CHAMFER MILLING CYCLE\n; WIDTH: 2.1mm, ANGLE: 46°\nTOOL CALL 1 Z S3100\nL Z+50 R0 FMAX\n; CHAMFER CYCLE DEFINITION\nCYCL DEF 275 MILL TROUGH SLOT PROF\n  Q215=2                        ; MACHINING TYPE\n  Q219=2.1   ; SLOT WIDTH\n  Q368=0                        ; SIDE ALLOWANCE\n  Q436=2.03 ; INCREMENT PER REVOLUTION\n  Q207=401       ; MILLING FEEDRATE\n  Q351=+1                       ; MILLING MODE\n  Q201=-2.03 ; DEPTH\n  Q202=2.03 ; PLUNGING DEPTH\n  Q206=401       ; PLUNGING FEEDRATE\n  Q338=0                        ; FINISHING STEP\n  Q385=401       ; FINISHING FEEDRATE\n  Q200=2                        ; SAFETY DISTANCE\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  Q366=0                        ; PLUNGING STRATEGY\n  Q369=0                        ; DEPTH ALLOWANCE\n  Q439=0                        ; FEED REFERENCE\n; CONTOUR PATH\nL X-10 Y+0 R0 FMAX\nL Z+5 R0 FMAX\nL Z-2.03 F100\nL RL R6.05\nL X+0 Y+0 F401\nL X+100.1\nL Y+100.1\nL X+0\nL Y+0\nL R0\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "peck-drilling": {
+  "name": "Peck Drilling",
+  "parameters": [
+   {
+    "name": "drillDiameter",
+    "label": "Drill Diameter",
+    "type": "number",
+    "defaultValue": 12,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the drill bit to use"
+   },
+   {
+    "name": "depth",
+    "label": "Total Depth",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the hole"
+   },
+   {
+    "name": "peckDepth",
+    "label": "Peck Depth",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of each peck before retracting"
+   },
+   {
+    "name": "retractHeight",
+    "label": "Retract Height",
+    "type": "number",
+    "defaultValue": 5,
+    "min": 1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Retract height after each peck"
+   },
+   {
+    "name": "feedrate",
+    "label": "Feedrate",
+    "type": "number",
+    "defaultValue": 120,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for drilling"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 1000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   },
+   {
+    "name": "dwellTime",
+    "label": "Dwell Time",
+    "type": "number",
+    "defaultValue": 0.2,
+    "min": 0,
+    "max": 10,
+    "step": 0.1,
+    "unit": "sec",
+    "description": "Dwell time at the bottom of each peck"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "drillDiameter": 12.1,
+   "depth": 100.1,
+   "peckDepth": 15.1,
+   "retractHeight": 5.1,
+   "feedrate": 121,
+   "spindleSpeed": 1100,
+   "dwellTime": 0.30000000000000004
+  },
+  "fanuc": {
+   "defaults": "(PECK DRILLING CYCLE - FULL RETRACT)\n(DIAMETER: 12mm, DEPTH: 100mm, PECK: 15mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1000 M3\nM8\nG00 X0 Y0\nG00 Z5\nG83 R5 Z-100 Q15 F120 P200\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5",
+   "varied": "(PECK DRILLING CYCLE - FULL RETRACT)\n(DIAMETER: 12.1mm, DEPTH: 100.1mm, PECK: 15.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS1100 M3\nM8\nG00 X0 Y0\nG00 Z5.1\nG83 R5.1 Z-100.1 Q15.1 F121 P300.00000000000006\nX10 Y10\nX20 Y10\nX30 Y10\nG80\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; PECK DRILLING CYCLE - FULL RETRACT\n; DIAMETER: 12mm, DEPTH: 100mm, PECK: 15mm\nTOOL CALL 1 Z S1000\nL Z+50 R0 FMAX\nCYCL DEF 201 BORING\n  Q200=5  ; SAFETY DISTANCE\n  Q201=-100         ; DEPTH\n  Q206=120       ; FEEDRATE FOR PLUNGING\n  Q211=0.2      ; DWELL TIME AT BOTTOM\n  Q208=500                      ; FEEDRATE FOR RETRACT\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  // Note: Heidenhain CYCL DEF 205 is typically used for pecking\n  // Using 201 here might not perform full retract pecking as intended\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5",
+   "varied": "; PECK DRILLING CYCLE - FULL RETRACT\n; DIAMETER: 12.1mm, DEPTH: 100.1mm, PECK: 15.1mm\nTOOL CALL 1 Z S1100\nL Z+50 R0 FMAX\nCYCL DEF 201 BORING\n  Q200=5.1  ; SAFETY DISTANCE\n  Q201=-100.1         ; DEPTH\n  Q206=121       ; FEEDRATE FOR PLUNGING\n  Q211=0.30000000000000004      ; DWELL TIME AT BOTTOM\n  Q208=500                      ; FEEDRATE FOR RETRACT\n  Q203=+0                       ; SURFACE COORDINATE\n  Q204=50                       ; 2ND SAFETY DISTANCE\n  // Note: Heidenhain CYCL DEF 205 is typically used for pecking\n  // Using 201 here might not perform full retract pecking as intended\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL X+10 Y+10 R0 FMAX M99\nL X+20 Y+10 R0 FMAX M99\nL X+30 Y+10 R0 FMAX M99\nL Z+50 R0 FMAX\nM5"
+  }
+ },
+ "plunge-milling": {
+  "name": "Plunge Milling",
+  "parameters": [
+   {
+    "name": "toolDiameter",
+    "label": "Cutter Diameter",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Diameter of the milling cutter to use"
+   },
+   {
+    "name": "pocketWidth",
+    "label": "Area Width",
+    "type": "number",
+    "defaultValue": 100,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Width of the area to be roughed"
+   },
+   {
+    "name": "pocketLength",
+    "label": "Area Length",
+    "type": "number",
+    "defaultValue": 150,
+    "min": 1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Length of the area to be roughed"
+   },
+   {
+    "name": "depth",
+    "label": "Depth",
+    "type": "number",
+    "defaultValue": 20,
+    "min": 0.1,
+    "max": 1000,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Total depth of the operation"
+   },
+   {
+    "name": "stepDown",
+    "label": "Z Increment",
+    "type": "number",
+    "defaultValue": 4,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Depth of each plunge"
+   },
+   {
+    "name": "stepOver",
+    "label": "Lateral Step",
+    "type": "number",
+    "defaultValue": 15,
+    "min": 0.1,
+    "max": 100,
+    "step": 0.1,
+    "unit": "mm",
+    "description": "Distance between plunges"
+   },
+   {
+    "name": "plungeFeedrate",
+    "label": "Plunge Feedrate",
+    "type": "number",
+    "defaultValue": 250,
+    "min": 1,
+    "max": 5000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for plunging"
+   },
+   {
+    "name": "traverseFeedrate",
+    "label": "Traverse Feedrate",
+    "type": "number",
+    "defaultValue": 1000,
+    "min": 1,
+    "max": 10000,
+    "step": 1,
+    "unit": "mm/min",
+    "description": "Feed rate for traversing between plunges"
+   },
+   {
+    "name": "spindleSpeed",
+    "label": "Spindle Speed",
+    "type": "number",
+    "defaultValue": 2000,
+    "min": 1,
+    "max": 24000,
+    "step": 100,
+    "unit": "RPM",
+    "description": "Spindle rotation speed"
+   }
+  ],
+  "controllerTypes": [
+   "fanuc",
+   "heidenhain"
+  ],
+  "variedValues": {
+   "toolDiameter": 20.1,
+   "pocketWidth": 100.1,
+   "pocketLength": 150.1,
+   "depth": 20.1,
+   "stepDown": 4.1,
+   "stepOver": 15.1,
+   "plungeFeedrate": 251,
+   "traverseFeedrate": 1001,
+   "spindleSpeed": 2100
+  },
+  "fanuc": {
+   "defaults": "(PLUNGE MILLING CYCLE)\n(AREA: 100x150mm, DEPTH: 20mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2000 M3\nM8\n(Z LEVEL 1 - DEPTH: 4mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-65.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-50.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-35.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-20.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-5.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y10.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y25.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y40.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X5.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X20.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\nG00 X35.000 Y55.000\nG00 Z5\nG01 Z-4.000 F250\nG01 Z5 F1000\n(Z LEVEL 2 - DEPTH: 8mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-65.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-50.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-35.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-20.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-5.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y10.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y25.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y40.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X5.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X20.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\nG00 X35.000 Y55.000\nG00 Z5\nG01 Z-8.000 F250\nG01 Z5 F1000\n(Z LEVEL 3 - DEPTH: 12mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-65.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-50.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-35.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-20.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-5.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y10.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y25.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y40.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X5.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X20.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\nG00 X35.000 Y55.000\nG00 Z5\nG01 Z-12.000 F250\nG01 Z5 F1000\n(Z LEVEL 4 - DEPTH: 16mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-65.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-50.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-35.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-20.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-5.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y10.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y25.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y40.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X5.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X20.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\nG00 X35.000 Y55.000\nG00 Z5\nG01 Z-16.000 F250\nG01 Z5 F1000\n(Z LEVEL 5 - DEPTH: 20mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-65.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-50.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-35.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-20.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y-5.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y10.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y25.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y40.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-40.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-25.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X-10.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X5.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X20.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 X35.000 Y55.000\nG00 Z5\nG01 Z-20.000 F250\nG01 Z5 F1000\nG00 Z50\nM9\nM5",
+   "varied": "(PLUNGE MILLING CYCLE)\n(AREA: 100.1x150.1mm, DEPTH: 20.1mm)\nG90 G54\nG00 X0 Y0\nG43 Z50 H1\nS2100 M3\nM8\n(Z LEVEL 1 - DEPTH: 4.1mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-65.000\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-49.900\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-34.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-19.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-4.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y10.500\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y25.600\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y40.700\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X5.300 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X20.400 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\nG00 X35.500 Y55.800\nG00 Z5\nG01 Z-4.100 F251\nG01 Z5 F1001\n(Z LEVEL 2 - DEPTH: 8.2mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y-65.000\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y-49.900\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y-34.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y-19.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y-4.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y10.500\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y25.600\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y40.700\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-40.000 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-24.900 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X-9.800 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X5.300 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X20.400 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\nG00 X35.500 Y55.800\nG00 Z5\nG01 Z-8.200 F251\nG01 Z5 F1001\n(Z LEVEL 3 - DEPTH: 12.299999999999999mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y-65.000\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y-49.900\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y-34.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y-19.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y-4.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y10.500\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y25.600\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y40.700\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-40.000 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-24.900 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X-9.800 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X5.300 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X20.400 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\nG00 X35.500 Y55.800\nG00 Z5\nG01 Z-12.300 F251\nG01 Z5 F1001\n(Z LEVEL 4 - DEPTH: 16.4mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y-65.000\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y-49.900\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y-34.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y-19.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y-4.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y10.500\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y25.600\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y40.700\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-40.000 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-24.900 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X-9.800 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X5.300 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X20.400 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\nG00 X35.500 Y55.800\nG00 Z5\nG01 Z-16.400 F251\nG01 Z5 F1001\n(Z LEVEL 5 - DEPTH: 20.1mm)\nG00 X-40.000 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-65.000\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-49.900\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-34.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-19.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y-4.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y10.500\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y25.600\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y40.700\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-40.000 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-24.900 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X-9.800 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X5.300 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X20.400 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 X35.500 Y55.800\nG00 Z5\nG01 Z-20.100 F251\nG01 Z5 F1001\nG00 Z50\nM9\nM5"
+  },
+  "heidenhain": {
+   "defaults": "; PLUNGE MILLING CYCLE\n; AREA: 100x150mm, DEPTH: 20mm\nTOOL CALL 1 Z S2000\nL Z+50 R0 FMAX\nCYCL DEF 241 DEEP HOLE DRILLING WITH CANNULAS // Using an approximation\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-20         ; DEPTH\n  Q227=0                        ; STARTING POINT X\n  Q228=0                        ; STARTING POINT Y\n  Q229=100    ; END POINT X\n  Q230=150   ; END POINT Y\n  Q231=6 ; NUMBER OF COLUMNS\n  Q232=9 ; NUMBER OF ROWS\n  Q233=0                        ; SURFACE HEIGHT\n  Q240=5 ; NUMBER OF APPROACHES\n  Q351=1                        ; MILLING TYPE\n  Q253=1000 ; PRE-POSITIONING FEED\n  Q206=250 ; PLUNGING FEEDRATE // Q206 is plunge feed\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5",
+   "varied": "; PLUNGE MILLING CYCLE\n; AREA: 100.1x150.1mm, DEPTH: 20.1mm\nTOOL CALL 1 Z S2100\nL Z+50 R0 FMAX\nCYCL DEF 241 DEEP HOLE DRILLING WITH CANNULAS // Using an approximation\n  Q200=2                        ; SAFETY DISTANCE\n  Q201=-20.1         ; DEPTH\n  Q227=0                        ; STARTING POINT X\n  Q228=0                        ; STARTING POINT Y\n  Q229=100.1    ; END POINT X\n  Q230=150.1   ; END POINT Y\n  Q231=6 ; NUMBER OF COLUMNS\n  Q232=9 ; NUMBER OF ROWS\n  Q233=0                        ; SURFACE HEIGHT\n  Q240=5 ; NUMBER OF APPROACHES\n  Q351=1                        ; MILLING TYPE\n  Q253=1001 ; PRE-POSITIONING FEED\n  Q206=251 ; PLUNGING FEEDRATE // Q206 is plunge feed\nL X+0 Y+0 R0 FMAX M3\nCYCL CALL\nL Z+50 R0 FMAX\nM5"
+  }
+ }
+}

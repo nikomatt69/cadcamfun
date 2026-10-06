@@ -47,5 +47,6 @@ test("ViewportControls mounts over a multi-element template", async () => {
   const options = root.querySelectorAll("option").length
   dispose()
   expect(text).toContain("Fit to view")
-  expect(options).toBe(9)
+  // 9 view presets + 4 render modes
+  expect(options).toBe(13)
 })

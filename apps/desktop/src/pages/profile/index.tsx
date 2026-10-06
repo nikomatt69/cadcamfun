@@ -1,1 +1,1 @@
-export { LegacyProfile as default } from "../../screens/legacy-account.tsx"
+export { ProfileScreen as default } from "../../screens/profile.tsx"

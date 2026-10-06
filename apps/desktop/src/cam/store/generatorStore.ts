@@ -82,6 +82,21 @@ interface GeneratorState {
 
 const SETTINGS_KEY = "toolpath-config"
 
+/**
+ * The legacy component's `useEffect`s: choosing a material loads its feed / plunge / rpm preset and changing the machine
+ * picks a valid operation. React ran them after every render where the dependency changed (and once on mount); here
+ * they run wherever the settings change, so loading a config or a library material behaves the same as the select.
+ */
+export const withSettingsEffects = (before: ToolpathSettings, after: ToolpathSettings): ToolpathSettings => {
+  let next = after
+  if (next.material !== before.material) next = g.withMaterialDefaults(next)
+  if (next.machineType !== before.machineType) next = g.withMachineDefaults(next)
+  return next
+}
+
+/** The panel's first state: React applied the material preset on mount (aluminum: 800 / 300 / 12000). */
+const initialSettings = (): ToolpathSettings => g.withMaterialDefaults(g.DEFAULT_SETTINGS)
+
 let successTimer: ReturnType<typeof setTimeout> | undefined
 let errorTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -90,7 +105,7 @@ const initial = (): Pick<GeneratorState,
   "printer" | "selectedLibraryTool" | "showFullscreen" | "isGenerating" | "isAIProcessing" | "error" | "success" | "aiSuggestions" | "currentGCode" |
   "detectedCycles" | "selectedCycle" | "depthSetManually"
 > => ({
-  settings: g.DEFAULT_SETTINGS,
+  settings: initialSettings(),
   expanded: { ...g.DEFAULT_EXPANDED },
   geometryType: "rectangle",
   rectangleWidth: 100,
@@ -120,16 +135,13 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
 
   updateSettings: (key, value) => {
     const before = get().settings
-    let next: ToolpathSettings = { ...before, [key]: value }
-    // Effects the legacy component ran on `settings.material` / `settings.machineType` changes.
-    if (key === "material") next = g.withMaterialDefaults(next)
-    if (key === "machineType") next = g.withMachineDefaults(next)
+    const next = withSettingsEffects(before, { ...before, [key]: value })
     set({ settings: next, ...(key === "depth" ? { depthSetManually: true } : {}) })
   },
 
-  patchSettings: patch => set(state => ({ settings: { ...state.settings, ...patch } })),
+  patchSettings: patch => set(state => ({ settings: withSettingsEffects(state.settings, { ...state.settings, ...patch }) })),
 
-  replaceSettings: settings => set({ settings }),
+  replaceSettings: settings => set(state => ({ settings: withSettingsEffects(state.settings, settings) })),
 
   setGeometryType: (type, selected) => {
     set({ geometryType: type })

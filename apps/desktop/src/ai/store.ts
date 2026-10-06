@@ -8,11 +8,12 @@
  *
  * Status: spec 06-desktop-ui.md §1 + spec 08-ai.md §3; nikcli is the base (WP8).
  */
-import { batch, createMemo, createRoot, createSignal, onCleanup, type Accessor, type Setter } from "solid-js"
+import { batch, createEffect, createMemo, createRoot, createSignal, onCleanup, type Accessor, type Setter } from "solid-js"
 import { useApp } from "../state/context.ts"
 import { streamChat, type StreamHandle } from "./stream.ts"
 import { buildSuggestions, type Suggestion } from "./suggestions.ts"
 import { loadPersisted, savePersisted } from "./persisted.ts"
+import { appProjectId, persistDrawingContext } from "./drawing-context.ts"
 import type { AiEvent, AiMessage, AiPermission, AiSession, AiToolCalls, ChatModel } from "./types.ts"
 
 export interface AiStats {
@@ -88,6 +89,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const [permissions, setPermissions] = createSignal<ReadonlyArray<AiPermission>>([])
   const [stats, setStats] = createSignal<AiStats>(emptyStats())
   const [dismissedSuggestions, setDismissedSuggestions] = createSignal<ReadonlyArray<string>>([])
+  const [projectContextRevision, setProjectContextRevision] = createSignal(0)
 
   const model: Accessor<ChatModel | undefined> = modelSig
   const setModel = (next: ChatModel | undefined | ((prev: ChatModel | undefined) => ChatModel | undefined)): void => {
@@ -109,6 +111,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   }
 
   let handle: StreamHandle | undefined
+  let activeAssistantId: string | undefined
 
   const upsertSession = (id: string, title: string, startedAt: string): void => {
     const next = [{ id, title, startedAt, updatedAt: startedAt, exchanges: 0 }, ...sessionsSig().filter((s) => s.id !== id)].slice(0, MAX_SESSIONS)
@@ -128,14 +131,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     setMessages((current) => current.map((m) => m.id === id ? patch(m) : m))
   }
 
-  const projectId = (): string | undefined => {
-    const drawing = app.drawing()
-    return drawing ? drawing.id : undefined
-  }
+  const projectId = (): string | undefined => appProjectId(app)
 
   const applyEvent = (event: AiEvent): void => {
+    const idForEvent = activeAssistantId ?? `${event.sessionId}:assistant`
     if (event.type === "delta") {
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       const exists = messages().some((m) => m.id === id)
       if (!exists) {
         appendMessage({ id, role: "assistant", text: event.text, createdAt: new Date().toISOString(), events: [], status: "streaming" })
@@ -145,14 +146,14 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       return
     }
     if (event.type === "tool_call") {
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       setToolCalls((current) => ({ ...current, [event.callId]: { tool: event.tool, input: event.input, status: "running", sessionId: event.sessionId } }))
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       setStats((s) => ({ ...s, toolCalls: s.toolCalls + 1 }))
       return
     }
     if (event.type === "tool_result") {
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       setToolCalls((current) => {
         const existing = current[event.callId]
         if (existing === undefined) return current
@@ -164,12 +165,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     if (event.type === "permission_request") {
       const permission: AiPermission = { requestId: event.requestId, permission: event.permission, patterns: event.patterns, sessionId: event.sessionId }
       setPermissions((current) => [...current, permission])
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       return
     }
     if (event.type === "done") {
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage }))
       setStats((s) => ({
         ...s,
@@ -181,7 +182,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       return
     }
     if (event.type === "error") {
-      const id = `${event.sessionId}:assistant`
+      const id = idForEvent
       if (messages().some((m) => m.id === id)) {
         patchMessage(id, (prev) => ({ ...prev, status: "error", error: event.message }))
       } else {
@@ -190,6 +191,19 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setError(event.message)
     }
   }
+
+  createEffect(() => {
+    app.drawing()
+    app.editor.selection()
+    app.tool()
+    projectContextRevision()
+    const project = projectId()
+    if (!project) return
+    const timer = setTimeout(() => {
+      void persistDrawingContext(app).catch(() => undefined)
+    }, 250)
+    onCleanup(() => clearTimeout(timer))
+  })
 
   const finishStream = (next: "idle" | "error"): void => {
     setStatus(next)
@@ -207,17 +221,33 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
     const userId = nextMessageId()
     appendMessage({ id: userId, role: "user", text, createdAt: at, events: [], status: "done" })
-    const assistantId = `${sid}:assistant`
+    const assistantId = nextMessageId()
+    activeAssistantId = assistantId
     appendMessage({ id: assistantId, role: "assistant", text: "", createdAt: at, events: [], status: "streaming" })
     batch(() => {
       setStatus("connecting")
       setError(undefined)
     })
-    const ctx = includeContext() ? (() => {
-      const d = app.drawing()
-      const lines = d.entities.length
-      return `Active drawing: ${d.name} (id ${d.id}, ${lines} entities). Active tool: ${app.tool()}.`
-    })() : ""
+    const activeProjectId = projectId()
+    if (includeContext()) {
+      if (!activeProjectId) {
+        const message = "Open a project before sending a request to nikcli"
+        patchMessage(assistantId, (previous) => ({ ...previous, status: "error", error: message }))
+        setError(message)
+        setStatus("error")
+        return
+      }
+      try {
+        await persistDrawingContext(app)
+        setProjectContextRevision((revision) => revision + 1)
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Unable to save drawing context"
+        patchMessage(assistantId, (previous) => ({ ...previous, status: "error", error: message }))
+        setError(message)
+        setStatus("error")
+        return
+      }
+    }
     const m = modelSig()
     handle = streamChat({
       client: app.client,
@@ -227,13 +257,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
         setError(message)
         setStatus("error")
       },
-      onDone: () => finishStream("idle")
+      onDone: () => finishStream(status() === "error" ? "error" : "idle")
     }, {
       message: text,
       sessionId: sid,
-      ...(projectId() ? { projectId: projectId()! } : {}),
+      ...(activeProjectId ? { projectId: activeProjectId } : {}),
       ...(m ? { model: m } : {}),
-      ...(ctx ? { context: ctx } : {})
     })
     setStatus("streaming")
   }
@@ -270,8 +299,13 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     })
   }
 
-  const replyPermission: AiStore["replyPermission"] = async (requestId, _decision) => {
-    setPermissions((current) => current.filter((p) => p.requestId !== requestId))
+  const replyPermission: AiStore["replyPermission"] = async (requestId, decision) => {
+    const permission = permissions().find((item) => item.requestId === requestId)
+    if (!permission) return
+    await app.runtime.run(app.client.ai.permissionReply({
+      payload: { sessionId: permission.sessionId, requestId, decision }
+    }))
+    setPermissions((current) => current.filter((item) => item.requestId !== requestId))
   }
 
   const suggestions = createMemo<ReadonlyArray<Suggestion>>(() => {
@@ -281,9 +315,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     void app.tool()
     const built = buildSuggestions({
       entityCount: drawing.entities.length,
-      selectedCount: 0,
+      selectedCount: app.editor.selection().length,
       activeTool: app.tool(),
-      layers: 1
+      layers: drawing.layers.length
     })
     return built.filter((s: Suggestion) => !dismissedSuggestions().includes(s.id))
   })

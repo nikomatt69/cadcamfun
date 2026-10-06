@@ -1,2 +1,2 @@
-import { LegacyAuth } from "../../screens/legacy-account.tsx"
-export default function Page() { return <LegacyAuth mode="signin" /> }
+import { SignInScreen } from "../../screens/signin.tsx"
+export default function Page() { return <SignInScreen /> }

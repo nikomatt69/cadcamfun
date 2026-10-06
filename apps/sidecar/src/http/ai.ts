@@ -1,4 +1,4 @@
-import { AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, PROVIDER_IDS, type ProviderId } from "@cadcamfun/ai"
+import { AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, replyHostPermission, PROVIDER_IDS, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -96,6 +96,16 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
       yield* ai.abort(payload.sessionId)
       return { message: "Aborted" }
+    }))
+    .handle("permissionReply", ({ payload }) => Effect.gen(function*() {
+      if (!Option.isSome(host)) return yield* new BadRequest({ message: "Permission prompts are only available through nikcli" })
+      const projectHost = yield* host.value.runtime.host("default").pipe(
+        Effect.mapError((error) => new InternalError({ message: error instanceof Error ? error.message : "Unable to reach nikcli host" }))
+      )
+      yield* replyHostPermission(projectHost, payload.requestId, payload.decision).pipe(
+        Effect.mapError((error) => new InternalError({ message: error.message }))
+      )
+      return { message: "Permission reply sent" }
     }))
     .handle("completion", ({ payload }) => Effect.gen(function*() {
       if (!payload.prompt) return yield* new BadRequest({ message: "Prompt is required" })

@@ -36,23 +36,39 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
   let toolbar: HTMLDivElement | undefined
   let grab: Position = { x: 0, y: 0 }
 
+  /**
+   * The window floats *inside* the surface it belongs to (the canvas), not over the
+   * whole viewport: the shell's title bar, status bar and docked AI panel would
+   * otherwise cover it, and an ancestor's `transform`/`backdrop-filter` would silently
+   * rebase `position: fixed` anyway. `offsetParent` is that positioned ancestor.
+   */
+  const host = (): HTMLElement | undefined =>
+    (toolbar?.offsetParent as HTMLElement | null | undefined) ?? toolbar?.parentElement ?? undefined
+
   const isLayerLocked = createMemo(() => {
     if (!layers.activeLayer) return true
     return layers.layers.find((layer) => layer.id === layers.activeLayer)?.locked ?? false
   })
   const noSelection = () => !elements.selectedElement
 
+  /** Clamps to the host's box; before layout (or headless) the point is kept as given. */
   const constrain = (point: Position): Position => {
     const rect = toolbar?.getBoundingClientRect()
+    const box = host()?.getBoundingClientRect()
     const width = rect?.width ?? 300
     const height = rect?.height ?? 100
+    if (!box || box.width === 0 || box.height === 0) return point
     return {
-      x: Math.min(Math.max(0, point.x), windowSize().width - width),
-      y: Math.min(Math.max(0, point.y), windowSize().height - height)
+      x: Math.min(Math.max(0, point.x), Math.max(0, box.width - width)),
+      y: Math.min(Math.max(0, point.y), Math.max(0, box.height - height))
     }
   }
 
-  const move = (event: MouseEvent) => { if (dragging()) setPosition(constrain({ x: event.clientX - grab.x, y: event.clientY - grab.y })) }
+  const move = (event: MouseEvent) => {
+    if (!dragging()) return
+    const box = host()?.getBoundingClientRect()
+    setPosition(constrain({ x: event.clientX - grab.x - (box?.left ?? 0), y: event.clientY - grab.y - (box?.top ?? 0) }))
+  }
   const stop = () => setDragging(false)
   const start = (event: MouseEvent) => {
     if ((event.target as HTMLElement).closest("button")) return
@@ -102,7 +118,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
   return (
     <Motion.div
       ref={toolbar}
-      style={{ position: "fixed", left: `${position().x}px`, top: `${position().y}px`, "touch-action": "none", "z-index": 1000 }}
+      style={{ position: "absolute", left: `${position().x}px`, top: `${position().y}px`, "touch-action": "none", "z-index": 1000 }}
       initial={{ opacity: 0, scale: 0.8, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.3 }}
       class="bg-white max-h-[80vh] dark:bg-gray-800 rounded-xl shadow-lg backdrop-blur-lg bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700"
     >

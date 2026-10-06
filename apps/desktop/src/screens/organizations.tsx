@@ -1,102 +1,934 @@
-/** Organizations screens: list, create form and the member overview. */
+/**
+ * Organizations screens — `/organizations`, `/organizations/create`, `/organizations/:id`.
+ *
+ * Ports of `.reference/src/pages/organizations/{index,create,[id]}.tsx`: the gradient
+ * page with the create modal, the plain create form, and the tabbed detail page
+ * (Overview / Chat / Members / Projects / Settings) with the invite modal.
+ *
+ * Three legacy calls have no v6 counterpart, so they keep their legacy *outcome*
+ * instead of inventing data:
+ *  - `GET …/organizations/:id/members` — the detail reply already carries `members`;
+ *  - `GET …/organizations/:id/projects` — the Projects tab always renders the legacy
+ *    empty state ("No projects");
+ *  - `POST …/organizations/:id/invite` and the Danger-Zone delete button — no request
+ *    is made, exactly like the legacy buttons that never registered a handler.
+ *
+ * `organizations.get` answers `OrganizationDetails`: flat members (`name`, `email`,
+ * `image`, `role`, `joinedAt`) plus `projectCount` and the caller's `userRole`, which is
+ * what the legacy page used to derive from the members list.
+ */
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
 import { Effect } from "effect"
+import { Motion, Presence } from "solid-motionone"
+import { ArrowLeft, Building, Mail, Plus, User, UserPlus, Users } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
-import { EmptyState, ErrorState, LoadingState, ScreenHeader } from "./screen-parts.tsx"
+import { ErrorState, LoadingState } from "./screen-parts.tsx"
+import { OrganizationCard } from "../components/organizations/organization-card.tsx"
 
-const describe = (cause: unknown): string =>
-  typeof cause === "object" && cause !== null && typeof (cause as { message?: unknown }).message === "string"
-    ? (cause as { message: string }).message : String(cause)
+/** framer's page easing, verbatim from the legacy `pageVariants`. */
+const EASE: [number, number, number, number] = [0.25, 0.1, 0.25, 1]
+/** The spring (stiffness 300 / 400, damping 25 / 10) approximated with a tween. */
+const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+const HOVER_SHADOW = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
 
-export function OrganizationsScreen(): JSX.Element {
-  const orgs = useRead((c) => c.organizations.list())
-  return <section>
-    <ScreenHeader title={t("orgs.title")} subtitle={t("orgs.subtitle")}
-      actions={<A class="btn btn-primary" href="/organizations/create">{t("orgs.create")}</A>} />
-    <div class="grid gap-3 p-5 md:grid-cols-2">
-      <Show when={orgs.error()}><ErrorState label={t("orgs.error")} detail={describe(orgs.error())} /></Show>
-      <Show when={orgs.loading() && !orgs.data()}><LoadingState label={t("common.loading")} /></Show>
-      <Show when={orgs.data()?.length === 0}><EmptyState label={t("orgs.empty")} /></Show>
-      <For each={orgs.data() ?? []}>{(org) =>
-        <article class="card p-4">
-          <h2 class="font-semibold"><A href={`/organizations/${encodeURIComponent(org.id)}`}>{org.name}</A></h2>
-          <p class="text-sm text-gray-600 dark:text-gray-300">{org.description ?? ""}</p>
-          <p class="mt-1 text-xs">{t("orgs.members")}: {org.userCount} · {t("orgs.projects")}: {org.projectCount} · {org.role}</p>
-        </article>}</For>
-    </div>
-  </section>
+/** Legacy shows `error.message || "An error occurred while creating the organization"`. */
+const messageOr = (cause: unknown, fallback: string): string => {
+  if (typeof cause === "object" && cause !== null) {
+    const message = (cause as { message?: unknown }).message
+    if (typeof message === "string" && message.length > 0) return message
+  }
+  return fallback
 }
 
+const formatDate = (dateString: string): string => {
+  const parsed = Date.parse(dateString)
+  return Number.isNaN(parsed) ? "" : new Date(parsed).toLocaleDateString()
+}
+
+const roleBadge = (role: "ADMIN" | "MANAGER" | "MEMBER"): string =>
+  role === "ADMIN" ? "bg-red-100 text-red-800" : role === "MANAGER" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
+
+type DetailTab = "overview" | "chat" | "members" | "projects" | "settings"
+type Role = "ADMIN" | "MANAGER" | "MEMBER"
+
+const TAB_BASE = "whitespace-nowrap rounded-md px-3 py-2 font-medium text-sm"
+const TAB_ACTIVE = "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+const TAB_IDLE = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+
+const GRADIENT_PAGE =
+  "min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
+const LEGACY_CARD = "bg-[#F8FBFF] shadow-md rounded-lg dark:bg-gray-800"
+const LEGACY_INPUT =
+  "block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+
+/** `/organizations` — the list page with its create modal. */
+export function OrganizationsScreen(): JSX.Element {
+  const app = useApp()
+  const navigate = useNavigate()
+  const orgs = useRead((c) => c.organizations.list())
+  const [showModal, setShowModal] = createSignal(false)
+  const [name, setName] = createSignal("")
+  const [description, setDescription] = createSignal("")
+  const [isSubmitting, setIsSubmitting] = createSignal(false)
+  const [error, setError] = createSignal<string>()
+
+  const submit = async (event: Event): Promise<void> => {
+    event.preventDefault()
+    if (isSubmitting()) return
+    setIsSubmitting(true)
+    setError(undefined)
+    try {
+      const created = await app.runtime.run(app.client.organizations.create({
+        payload: { name: name().trim(), description: description() }
+      }))
+      setShowModal(false)
+      setName("")
+      setDescription("")
+      navigate(`/organizations/${encodeURIComponent(created.id)}`)
+    } catch (cause) {
+      setError(messageOr(cause, t("org.modal.createFailed")))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const createButton = "inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+  return (
+    <Motion.section
+      class={`min-h-screen p-4 md:p-6 lg:p-8 ${GRADIENT_PAGE}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, easing: EASE }}
+    >
+      <div class="mx-auto max-w-7xl">
+        {/* Header Section */}
+        <Motion.div
+          class="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, easing: EASE }}
+        >
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
+                {t("org.title")}
+              </h1>
+              <p class="mt-2 text-gray-600 dark:text-gray-400">{t("org.subtitle")}</p>
+            </div>
+            <Motion.button
+              type="button"
+              onClick={() => setShowModal(true)}
+              hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
+              press={{ scale: 0.95 }}
+              class={createButton}
+            >
+              <Plus size={20} class="mr-2" />
+              {t("org.new")}
+            </Motion.button>
+          </div>
+        </Motion.div>
+
+        {/* Organizations Content */}
+        <Show
+          when={orgs.data() !== undefined || !orgs.loading()}
+          fallback={<LoadingState label={t("common.loading")} />}
+        >
+          <Show when={orgs.error() === undefined} fallback={<ErrorState label={t("common.error")} detail={orgs.error()} />}>
+            <Show
+              when={(orgs.data() ?? []).length > 0}
+              fallback={
+                /* Empty State */
+                <Motion.div
+                  class="rounded-2xl border border-gray-200/50 bg-white/70 p-12 text-center shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/70"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, delay: 0.2, easing: CARD_EASE }}
+                >
+                  <Motion.div
+                    class="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20"
+                    hover={{ scale: 1.1, rotate: 5, transition: { duration: 0.3, easing: CARD_EASE } }}
+                  >
+                    <Building size={48} class="text-blue-500 dark:text-blue-400" />
+                  </Motion.div>
+                  <h3 class="mb-3 text-xl font-semibold text-gray-900 dark:text-white">{t("org.empty.title")}</h3>
+                  <p class="mx-auto mb-8 max-w-md text-gray-600 dark:text-gray-400">{t("org.empty.body")}</p>
+                  <Motion.button
+                    type="button"
+                    onClick={() => setShowModal(true)}
+                    hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
+                    press={{ scale: 0.95 }}
+                    class={createButton}
+                  >
+                    <Plus size={20} class="mr-2" />
+                    {t("org.empty.cta")}
+                  </Motion.button>
+                </Motion.div>
+              }
+            >
+              {/* Organizations Grid */}
+              <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <For each={orgs.data() ?? []}>
+                  {(org, index) => (
+                    <OrganizationCard
+                      org={org}
+                      index={index()}
+                      memberCount={org.userCount}
+                      projectCount={org.projectCount}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </Show>
+      </div>
+
+      {/* Create Organization Modal */}
+      <Presence>
+        <Show when={showModal()}>
+          <div class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+              {/* Background overlay */}
+              <Motion.div
+                class="fixed inset-0 bg-gray-500/75 backdrop-blur-sm transition-opacity dark:bg-gray-900/75"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, easing: EASE }}
+                onClick={() => setShowModal(false)}
+              />
+
+              {/* Modal panel */}
+              <Motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-organization-title"
+                class="inline-block w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/50 bg-white/90 px-4 pb-4 pt-5 text-left align-bottom shadow-2xl backdrop-blur-xl sm:my-8 sm:align-middle sm:p-6 dark:border-gray-700/50 dark:bg-gray-800/90"
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2, easing: EASE } }}
+                transition={{ duration: 0.3, easing: CARD_EASE }}
+              >
+                <div>
+                  <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
+                    <Building class="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div class="mt-3 text-center sm:mt-5">
+                    <h3 id="create-organization-title" class="text-lg font-semibold leading-6 text-gray-900 dark:text-white">
+                      {t("org.modal.title")}
+                    </h3>
+                    <div class="mt-2">
+                      <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.modal.body")}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* The legacy modal shows the list hook's `error`; a failed create lands here too. */}
+                <Show when={error() ?? orgs.error()}>
+                  <Motion.div
+                    class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2, easing: EASE }}
+                  >
+                    <div class="text-sm text-red-700 dark:text-red-300">{error()}</div>
+                  </Motion.div>
+                </Show>
+
+                <form onSubmit={(event) => void submit(event)} class="mt-6 space-y-4">
+                  <div>
+                    <label for="name" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t("org.modal.nameLabel")}
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      required
+                      value={name()}
+                      onInput={(event) => setName(event.currentTarget.value)}
+                      placeholder={t("org.modal.namePlaceholder")}
+                      class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label for="description" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {t("org.modal.descriptionLabel")}
+                    </label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows={3}
+                      value={description()}
+                      onInput={(event) => setDescription(event.currentTarget.value)}
+                      placeholder={t("org.modal.descriptionPlaceholder")}
+                      class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div class="mt-6 flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      disabled={isSubmitting()}
+                      onClick={() => setShowModal(false)}
+                      class="rounded-xl border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    >
+                      {t("org.modal.cancel")}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting()}
+                      class="inline-flex items-center rounded-xl border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Show
+                        when={!isSubmitting()}
+                        fallback={
+                          <>
+                            <span class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                            {t("org.modal.creating")}
+                          </>
+                        }
+                      >
+                        <Building size={16} class="mr-2" />
+                        {t("org.modal.submit")}
+                      </Show>
+                    </button>
+                  </div>
+                </form>
+              </Motion.div>
+            </div>
+          </div>
+        </Show>
+      </Presence>
+    </Motion.section>
+  )
+}
+
+/** `/organizations/create` — the standalone create form. */
 export function CreateOrganizationScreen(): JSX.Element {
   const app = useApp()
   const navigate = useNavigate()
   const [name, setName] = createSignal("")
   const [description, setDescription] = createSignal("")
   const [error, setError] = createSignal<string>()
-  const [pending, setPending] = createSignal(false)
-  const submit = async (event: Event) => {
-    event.preventDefault(); if (pending()) return
-    setPending(true); setError(undefined)
+  const [isSubmitting, setIsSubmitting] = createSignal(false)
+
+  const submit = async (event: Event): Promise<void> => {
+    event.preventDefault()
+    if (isSubmitting()) return
+    setIsSubmitting(true)
+    setError(undefined)
     try {
       const created = await app.runtime.run(app.client.organizations.create({
-        payload: { name: name().trim(), description: description().trim() === "" ? null : description().trim() }
+        payload: { name: name().trim(), description: description() }
       }))
       navigate(`/organizations/${encodeURIComponent(created.id)}`)
-    } catch (cause) { setError(describe(cause)) } finally { setPending(false) }
+    } catch (cause) {
+      setError(messageOr(cause, t("org.create.failed")))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
-  return <section>
-    <ScreenHeader title={t("orgs.create")} />
-    <form class="card m-5 grid max-w-xl gap-3 p-4" onSubmit={(e) => void submit(e)}>
-      <label class="form-label">{t("orgs.name")}<input class="form-input" required value={name()} onInput={(e) => setName(e.currentTarget.value)} /></label>
-      <label class="form-label">{t("orgs.description")}<textarea class="form-textarea" value={description()} onInput={(e) => setDescription(e.currentTarget.value)} /></label>
-      <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
-      <div class="flex gap-2">
-        <button class="btn btn-primary" disabled={pending() || !name().trim()}>{t("orgs.create")}</button>
-        <A class="btn btn-outline" href="/organizations">{t("common.cancel")}</A>
+
+  return (
+    <section class="p-6">
+      <div class="mb-6 flex items-center">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          class="mr-4 text-gray-500 hover:text-gray-700"
+          aria-label={t("common.back")}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{t("org.modal.title")}</h1>
       </div>
-    </form>
-  </section>
+
+      <div class="mx-auto max-w-3xl">
+        <div class="overflow-hidden rounded-lg bg-[#F8FBFF] shadow-md dark:bg-gray-800 dark:text-white">
+          <div class="p-6">
+            <div class="mb-6 flex items-center">
+              <div class="mr-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                <Users class="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 class="text-lg font-medium text-gray-900 dark:text-white">{t("org.create.details")}</h2>
+                <p class="text-sm text-gray-500">{t("org.create.lead")}</p>
+              </div>
+            </div>
+
+            <Show when={error()}>
+              <div class="mb-4 rounded border border-red-400 bg-red-50 px-4 py-3 text-red-700" role="alert">
+                <span class="block sm:inline">{error()}</span>
+              </div>
+            </Show>
+
+            <form onSubmit={(event) => void submit(event)}>
+              <div class="space-y-6">
+                <div>
+                  <label for="name" class="block text-sm font-medium text-gray-700">
+                    {t("org.modal.nameLabel")}
+                  </label>
+                  <div class="mt-1">
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      required
+                      value={name()}
+                      onInput={(event) => setName(event.currentTarget.value)}
+                      placeholder={t("org.modal.namePlaceholder")}
+                      class={LEGACY_INPUT}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label for="description" class="block text-sm font-medium text-gray-700">
+                    {t("org.modal.descriptionLabel")}
+                  </label>
+                  <div class="mt-1">
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows={3}
+                      value={description()}
+                      onInput={(event) => setDescription(event.currentTarget.value)}
+                      placeholder={t("org.modal.descriptionPlaceholder")}
+                      class={LEGACY_INPUT}
+                    />
+                  </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-6">
+                  <div class="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => navigate(-1)}
+                      class="rounded-md border border-gray-300 bg-[#F8FBFF] px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-white"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting()}
+                      class="ml-3 inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                    >
+                      {isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
 
+/** `/organizations/:id` — header card, five tabs and the invite modal. */
 export function OrganizationDetailScreen(): JSX.Element {
-  const app = useApp()
   const params = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const org = useRead((c) => c.organizations.get({ params: { id: params.id } }))
-  const [confirming, setConfirming] = createSignal(false)
-  const [error, setError] = createSignal<string>()
-  const remove = async () => {
-    try {
-      await app.runtime.run(Effect.asVoid(app.client.organizations.remove({ params: { id: params.id } })))
-      navigate("/organizations")
-    } catch (cause) { setError(describe(cause)) }
+  const detail = useRead((c) => c.organizations.get({ params: { id: params.id } }))
+  const [activeTab, setActiveTab] = createSignal<DetailTab>("overview")
+  const [showInviteModal, setShowInviteModal] = createSignal(false)
+  const [inviteEmail, setInviteEmail] = createSignal("")
+  const [inviteRole, setInviteRole] = createSignal<Role>("MEMBER")
+
+  /** Legacy `handleInviteMember`; no invite endpoint exists, so nothing is sent. */
+  const submitInvite = (event: Event): void => {
+    event.preventDefault()
   }
-  return <section>
-    <ScreenHeader title={org.data()?.name ?? t("orgs.title")} subtitle={org.data()?.description ?? undefined}
-      actions={<A class="btn btn-outline" href="/organizations">{t("orgs.title")}</A>} />
-    <div class="grid gap-4 p-5">
-      <Show when={org.error()}><ErrorState label={t("orgs.error")} detail={describe(org.error())} /></Show>
-      <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
-      <Show when={org.data()}>{(o) => <>
-        <p class="text-sm">{t("orgs.role")}: {o().userRole} · {t("orgs.projects")}: {o().projectCount}</p>
-        <h2 class="font-semibold">{t("orgs.members")}</h2>
-        <ul class="grid gap-2 text-sm">
-          <For each={o().members}>{(m) => <li class="card flex justify-between p-3"><span>{m.name ?? m.email ?? m.id}</span><span>{m.role}</span></li>}</For>
-        </ul>
-        <Show when={o().userRole === "ADMIN"}>
-          <div><button class="btn btn-danger" onClick={() => setConfirming(true)}>{t("common.delete")}</button></div>
-        </Show>
-        <Show when={confirming()}>
-          <div role="alertdialog" aria-label={t("orgs.confirmDelete")} class="card p-4">
-            <p>{t("orgs.confirmDelete")}</p>
-            <button class="btn btn-danger" onClick={() => void remove()}>{t("common.delete")}</button>
-            <button class="btn btn-outline" onClick={() => setConfirming(false)}>{t("common.cancel")}</button>
-          </div>
-        </Show>
-      </>}</Show>
+
+  const notFound = (
+    <div class="p-6 text-center">
+      <h1 class="mb-4 text-2xl font-bold text-gray-900 dark:text-white">{t("org.notFound.title")}</h1>
+      <p class="mb-6 text-gray-600 dark:text-gray-400">{t("org.notFound.body")}</p>
+      <button
+        type="button"
+        onClick={() => navigate("/profile")}
+        class="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        {t("org.notFound.back")}
+      </button>
     </div>
-  </section>
+  )
+
+  return (
+    <Show
+      when={detail.data() !== undefined || !detail.loading()}
+      fallback={<LoadingState label={t("common.loading")} />}
+    >
+      <Show when={detail.data()} fallback={notFound}>
+        {(org) => {
+          const userRole = () => org().userRole
+          const canManageMembers = () => userRole() === "ADMIN" || userRole() === "MANAGER"
+          const canManageSettings = () => userRole() === "ADMIN"
+          const newProjectHref = () => `/projects/create?organizationId=${encodeURIComponent(params.id)}`
+
+          return (
+            <Motion.div
+              class={`min-h-screen p-4 md:p-6 lg:p-8 ${GRADIENT_PAGE}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, easing: EASE }}
+            >
+              <div class="mx-auto max-w-7xl">
+                {/* Header Section */}
+                <Motion.div
+                  class="mb-8 rounded-2xl border border-gray-200/50 bg-white/70 p-6 shadow-lg backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/70"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, easing: EASE }}
+                >
+                  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div class="flex items-center">
+                      <div class="mr-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg">
+                        <Users class="h-8 w-8 text-white" />
+                      </div>
+                      <div>
+                        <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
+                          {org().name}
+                        </h1>
+                        <Show when={(org().description ?? "").length > 0}>
+                          <p class="mt-2 text-gray-600 dark:text-gray-400">{org().description}</p>
+                        </Show>
+                        <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <span>{t("org.detail.created", { date: formatDate(org().createdAt) })}</span>
+                          <span>•</span>
+                          <span>{t("org.detail.memberCount", { count: org().members.length })}</span>
+                          <span>•</span>
+                          <span>{t("org.detail.projectCount", { count: org().projectCount })}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                      <Motion.button
+                        type="button"
+                        onClick={() => navigate(newProjectHref())}
+                        hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
+                        press={{ scale: 0.95 }}
+                        class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2.5 text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <Plus size={18} class="mr-2" />
+                        {t("org.detail.newProject")}
+                      </Motion.button>
+                      <Show when={canManageMembers()}>
+                        <Motion.button
+                          type="button"
+                          onClick={() => setShowInviteModal(true)}
+                          hover={{ scale: 1.05, y: -2, transition: { duration: 0.2, easing: CARD_EASE } }}
+                          press={{ scale: 0.95 }}
+                          class="inline-flex items-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-2.5 text-white shadow-lg shadow-green-500/25 transition-all hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                          <UserPlus size={18} class="mr-2" />
+                          {t("org.detail.inviteMember")}
+                        </Motion.button>
+                      </Show>
+                    </div>
+                  </div>
+                </Motion.div>
+              </div>
+
+              {/* Tabs */}
+              <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
+                <nav class="-mb-px flex space-x-4">
+                  <button
+                    type="button"
+                    class={`${TAB_BASE} ${activeTab() === "overview" ? TAB_ACTIVE : TAB_IDLE}`}
+                    onClick={() => setActiveTab("overview")}
+                  >
+                    {t("org.tab.overview")}
+                  </button>
+                  <button
+                    type="button"
+                    class={`${TAB_BASE} ${activeTab() === "chat" ? TAB_ACTIVE : TAB_IDLE}`}
+                    onClick={() => navigate(`/organizations/${encodeURIComponent(params.id)}/chat`)}
+                  >
+                    {t("org.tab.chat")}
+                  </button>
+                  <button
+                    type="button"
+                    class={`${TAB_BASE} ${activeTab() === "members" ? TAB_ACTIVE : TAB_IDLE}`}
+                    onClick={() => setActiveTab("members")}
+                  >
+                    {t("org.tab.members")}
+                  </button>
+                  <button
+                    type="button"
+                    class={`${TAB_BASE} ${activeTab() === "projects" ? TAB_ACTIVE : TAB_IDLE}`}
+                    onClick={() => setActiveTab("projects")}
+                  >
+                    {t("org.tab.projects")}
+                  </button>
+                  <Show when={canManageSettings()}>
+                    <button
+                      type="button"
+                      class={`${TAB_BASE} ${activeTab() === "settings" ? TAB_ACTIVE : TAB_IDLE}`}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      {t("org.tab.settings")}
+                    </button>
+                  </Show>
+                </nav>
+              </div>
+
+              {/* Tab content */}
+              <div class={LEGACY_CARD}>
+                <Show when={activeTab() === "overview"}>
+                  <div class="p-6">
+                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      <div>
+                        <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.overview.about")}</h2>
+                        <p class="text-gray-600 dark:text-gray-400">
+                          <Show
+                            when={(org().description ?? "").length > 0}
+                            fallback={t("org.overview.noDescription")}
+                          >
+                            {org().description}
+                          </Show>
+                        </p>
+
+                        <h3 class="mb-2 mt-6 text-md font-medium text-gray-900 dark:text-blue-400">{t("org.overview.details")}</h3>
+                        <div class="rounded-md bg-gray-50 p-4 dark:bg-gray-900">
+                          <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.created")}</span>
+                              <span class="dark:text-gray-300">{formatDate(org().createdAt)}</span>
+                            </div>
+                            <div>
+                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.updated")}</span>
+                              <span class="dark:text-gray-300">{formatDate(org().updatedAt)}</span>
+                            </div>
+                            <div>
+                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.members")}</span>
+                              <span class="dark:text-gray-300">{org().members.length}</span>
+                            </div>
+                            <div>
+                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.projects")}</span>
+                              <span class="dark:text-gray-300">{org().projectCount}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.overview.activity")}</h2>
+                        <div class="divide-y rounded-md border dark:divide-gray-700 dark:border-gray-700">
+                          <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+                            {t("org.overview.noActivity")}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === "members"}>
+                  <div>
+                    <div class="flex items-center justify-between border-gray-200 p-6 dark:border-gray-700">
+                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.members.title")}</h2>
+                      <Show when={canManageMembers()}>
+                        <button
+                          type="button"
+                          onClick={() => setShowInviteModal(true)}
+                          class="flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <UserPlus size={16} class="mr-1" />
+                          {t("org.members.invite")}
+                        </button>
+                      </Show>
+                    </div>
+                    <div class="p-6">
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                {t("org.members.member")}
+                              </th>
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                {t("org.members.role")}
+                              </th>
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                {t("org.members.joined")}
+                              </th>
+                              <Show when={canManageMembers()}>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                  {t("org.members.actions")}
+                                </th>
+                              </Show>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-gray-200 bg-[#F8FBFF] dark:divide-gray-700 dark:bg-gray-800">
+                            <For each={org().members}>
+                              {(member) => (
+                                <tr>
+                                  <td class="whitespace-nowrap px-6 py-4">
+                                    <div class="flex items-center">
+                                      <div class="h-10 w-10 flex-shrink-0">
+                                        <Show
+                                          when={member.image !== null && member.image.length > 0}
+                                          fallback={
+                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-600">
+                                              <User class="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                                            </div>
+                                          }
+                                        >
+                                          <img
+                                            class="h-10 w-10 rounded-full"
+                                            src={member.image ?? ""}
+                                            alt={member.name ?? t("org.members.avatarAlt")}
+                                          />
+                                        </Show>
+                                      </div>
+                                      <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-blue-400">
+                                          {member.name ?? t("org.members.unnamed")}
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">{member.email}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td class="whitespace-nowrap px-6 py-4">
+                                    <span class={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 dark:text-gray-900 ${roleBadge(member.role)}`}>
+                                      {member.role}
+                                    </span>
+                                  </td>
+                                  <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    {formatDate(member.joinedAt)}
+                                  </td>
+                                  <Show when={canManageMembers()}>
+                                    <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                      {/* Legacy renders these two buttons without handlers; v6 has no member endpoints either. */}
+                                      <button type="button" class="mr-3 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                                        {t("org.members.edit")}
+                                      </button>
+                                      <button type="button" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                        {t("org.members.remove")}
+                                      </button>
+                                    </td>
+                                  </Show>
+                                </tr>
+                              )}
+                            </For>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === "projects"}>
+                  <div>
+                    <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.projects.title")}</h2>
+                      <button
+                        type="button"
+                        onClick={() => navigate(newProjectHref())}
+                        class="flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <Plus size={16} class="mr-1" />
+                        {t("org.detail.newProject")}
+                      </button>
+                    </div>
+                    <div class="p-6">
+                      {/* No organization-projects endpoint: the legacy empty state, always. */}
+                      <div class="py-12 text-center">
+                        <svg
+                          class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="1.5"
+                            d="M9 12h6m-6 4h6m-6-8h6M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-4m-7 9.5V4.7c0-1 .573-1.902 1.465-2.332A2.066 2.066 0 0111.535 2c.365 0 .72.13 1 .366.28.236.47.56.535.92L14 8"
+                          />
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-blue-400">{t("org.projects.empty")}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.projects.emptyBody")}</p>
+                        <div class="mt-6">
+                          <button
+                            type="button"
+                            onClick={() => navigate(newProjectHref())}
+                            class="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          >
+                            {t("org.projects.create")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={activeTab() === "settings" && canManageSettings()}>
+                  <div>
+                    <div class="border-b border-gray-200 p-6 dark:border-gray-700">
+                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.settings.title")}</h2>
+                      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.settings.body")}</p>
+                    </div>
+                    <div class="p-6">
+                      {/* Legacy submits this form to nothing (no handler): it is inert here too. */}
+                      <form class="space-y-6" onSubmit={(event) => event.preventDefault()}>
+                        <div>
+                          <label for="orgName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {t("org.settings.name")}
+                          </label>
+                          <input type="text" name="orgName" id="orgName" class={`mt-1 ${LEGACY_INPUT}`} value={org().name} readonly />
+                        </div>
+
+                        <div>
+                          <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {t("org.settings.description")}
+                          </label>
+                          <textarea
+                            id="description"
+                            name="description"
+                            rows={3}
+                            class={`mt-1 ${LEGACY_INPUT}`}
+                            value={org().description ?? ""}
+                            readonly
+                          />
+                        </div>
+
+                        <div>
+                          <button
+                            type="submit"
+                            class="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          >
+                            {t("org.settings.save")}
+                          </button>
+                        </div>
+                      </form>
+
+                      <div class="mt-10 border-t border-gray-200 pt-10 dark:border-gray-700">
+                        <h3 class="text-lg font-medium text-red-700 dark:text-red-500">{t("org.settings.danger")}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.settings.dangerBody")}</p>
+                        <div class="mt-3">
+                          {/* Inert: legacy never wired a handler to this button. */}
+                          <button
+                            type="button"
+                            class="inline-flex justify-center rounded-md border border-red-300 bg-[#F8FBFF] px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-800/30"
+                          >
+                            {t("org.settings.delete")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+
+              {/* Invite Member Modal */}
+              <Presence>
+                <Show when={showInviteModal()}>
+                  <div class="fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="invite-member-title">
+                    <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+                      <div
+                        class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                        aria-hidden="true"
+                        onClick={() => setShowInviteModal(false)}
+                      />
+
+                      <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">
+                        &#8203;
+                      </span>
+
+                      <Motion.div
+                        class="inline-block w-full max-w-lg overflow-hidden rounded-lg bg-[#F8FBFF] text-left shadow-xl align-bottom sm:my-8 sm:align-middle dark:bg-gray-800"
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2, easing: EASE } }}
+                        transition={{ duration: 0.3, easing: CARD_EASE }}
+                      >
+                        <form onSubmit={submitInvite}>
+                          <div class="bg-[#F8FBFF] px-4 pb-4 pt-5 sm:p-6 sm:pb-4 dark:bg-gray-800">
+                            <div class="sm:flex sm:items-start">
+                              <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10 dark:bg-gray-700">
+                                <Mail class="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div class="mt-3 w-full text-center sm:ml-4 sm:mt-0 sm:text-left">
+                                <h3 id="invite-member-title" class="text-lg font-medium leading-6 text-gray-900 dark:text-blue-400">
+                                  {t("org.invite.title")}
+                                </h3>
+                                <div class="mt-2">
+                                  <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.invite.body")}</p>
+                                </div>
+
+                                <div class="mt-4">
+                                  <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {t("org.invite.email")}
+                                  </label>
+                                  <input
+                                    type="email"
+                                    name="email"
+                                    id="email"
+                                    required
+                                    placeholder={t("org.invite.emailPlaceholder")}
+                                    value={inviteEmail()}
+                                    onInput={(event) => setInviteEmail(event.currentTarget.value)}
+                                    class={`mt-1 ${LEGACY_INPUT}`}
+                                  />
+                                </div>
+
+                                <div class="mt-4">
+                                  <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {t("org.invite.role")}
+                                  </label>
+                                  <select
+                                    id="role"
+                                    name="role"
+                                    value={inviteRole()}
+                                    onChange={(event) => setInviteRole(event.currentTarget.value as Role)}
+                                    class={`mt-1 block w-full appearance-none rounded-md py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white ${LEGACY_INPUT}`}
+                                  >
+                                    <option value="MEMBER">{t("org.invite.roleMember")}</option>
+                                    <option value="MANAGER">{t("org.invite.roleManager")}</option>
+                                    <Show when={userRole() === "ADMIN"}>
+                                      <option value="ADMIN">{t("org.invite.roleAdmin")}</option>
+                                    </Show>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-gray-900">
+                            <button
+                              type="submit"
+                              class="w-full inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                              {t("org.invite.send")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowInviteModal(false)}
+                              class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-[#F8FBFF] px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                            >
+                              {t("org.modal.cancel")}
+                            </button>
+                          </div>
+                        </form>
+                      </Motion.div>
+                    </div>
+                  </div>
+                </Show>
+              </Presence>
+            </Motion.div>
+          )
+        }}
+      </Show>
+    </Show>
+  )
 }

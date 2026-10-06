@@ -1,7 +1,7 @@
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useNavigate, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Grid3x3, Puzzle, Settings, Wrench } from "lucide-solid"
+import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Puzzle, Settings, Wrench } from "lucide-solid"
 import { Toaster, toast } from "../components/ui/toast.tsx"
 import { useApp } from "../state/context.ts"
 import { useCADStore } from "./store/cadStore.ts"
@@ -13,6 +13,7 @@ import FloatingToolbar from "./components/FloatingToolbar.tsx"
 import EnhancedToolbar from "./components/EnhancedToolbar.tsx"
 import EnhancedSidebarCad, { type SidebarTab } from "./components/EnanchedSidebarCad.tsx"
 import CADCanvas, { type CADCanvasApi } from "./components/CADCanvas.tsx"
+import DimensionsOverlay from "./components/DimensionsOverlay.tsx"
 import PropertyPanel from "./components/PropertyPanel.tsx"
 import ImportExportDialog from "./components/ImportExportDialog.tsx"
 import OriginControls from "./components/OriginControls.tsx"
@@ -56,6 +57,13 @@ export default function CadPage(): JSX.Element {
   const [canvas, setCanvas] = createSignal<CADCanvasApi>()
   const [pluginId, setPluginId] = createSignal<string | null>(null)
   const [sidebarPlugins, setSidebarPlugins] = createSignal<ReadonlyArray<{ id: string; title: string; description: string }>>([])
+
+  // The legacy page set its document title through `MetaTags`.
+  onMount(() => {
+    const previous = document.title
+    document.title = "CAD Editor"
+    onCleanup(() => { document.title = previous })
+  })
 
   // `?loadComponent=<id>`: a component handed over from the component pages through local storage.
   createEffect(() => {
@@ -116,7 +124,7 @@ export default function CadPage(): JSX.Element {
 
   return (
     <Motion.div
-      class="h-screen w-screen flex bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex-col overflow-hidden"
+      class="h-full w-full flex bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex-col overflow-hidden"
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
     >
       <Motion.div class="flex flex-col backdrop-blur-md bg-white/80 dark:bg-gray-900/80 h-full w-full border border-white/20 dark:border-gray-700/30 shadow-xl" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
@@ -136,10 +144,9 @@ export default function CadPage(): JSX.Element {
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
               onReady={setCanvas} onSave={openExport}
             />
+            <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
-              <Motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-                <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} />
-              </Motion.div>
+              <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} />
             </Show>
             <Motion.div class="absolute bottom-4 rounded-lg right-16 z-40" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1 }}>
               <CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} class="shadow-lg" />
@@ -186,7 +193,7 @@ export default function CadPage(): JSX.Element {
                       <label class="text-sm font-medium text-gray-700 mb-1 block">Display Options</label>
                       <div class="space-y-2">
                         <button onClick={() => cad.toggleGrid()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
-                          <span class="flex items-center"><Grid3x3 size={16} class="mr-2" />Show Grid</span>
+                          <span class="flex items-center"><LayoutGrid size={16} class="mr-2" />Show Grid</span>
                           <span class={toggleTrack(cad.gridVisible)}><span class={toggleThumb(cad.gridVisible)} /></span>
                         </button>
                         <button onClick={() => cad.toggleAxis()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
@@ -225,7 +232,9 @@ export default function CadPage(): JSX.Element {
             onClick={() => setRightOpen(!rightOpen())} hover={{ scale: 1.05, x: -2 }} press={{ scale: 0.95 }}
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 1.2 }} aria-label="Toggle properties sidebar"
           >
-            <Show when={rightOpen()} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}><ChevronRight size={20} class="text-gray-600 dark:text-gray-300" /></Show>
+            <Motion.div animate={{ rotate: rightOpen() ? 0 : 180 }} transition={{ duration: 0.3 }}>
+              <Show when={rightOpen()} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}><ChevronRight size={20} class="text-gray-600 dark:text-gray-300" /></Show>
+            </Motion.div>
           </Motion.button>
         </Motion.div>
 

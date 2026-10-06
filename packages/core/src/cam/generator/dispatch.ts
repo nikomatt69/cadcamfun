@@ -13,7 +13,14 @@ import { drillPoints, drillPointsOf, drillWarning, elementOperation, type DrillP
 import { circleToolpath, polygonToolpath, rectangleToolpath } from "./basic.ts"
 import { applyOriginOffset, f3 } from "./common.ts"
 import { flattenElements, isContainer, orderForMachining, outsideStock, shiftElement, topOf } from "./elements.ts"
-import type { GeometryInput, Stock, ToolpathSettings } from "./schema.ts"
+import type { CadElement, GeometryInput, Stock, ToolpathSettings } from "./schema.ts"
+import { splitUnifiedMembers, unifiedGcode } from "./unified-geometry.ts"
+
+/** Operations that follow the element's outline: a `component` runs them as one unified geometry (legacy `generateComponentToolpath`). */
+const UNIFIED_OPERATIONS: ReadonlyArray<string> = ["contour", "profile", "3d_surface"]
+
+const isUnifiedComponent = (e: CadElement, s: ToolpathSettings): boolean =>
+  e["type"] === "component" && Array.isArray(e["elements"]) && e["elements"].length > 0 && UNIFIED_OPERATIONS.includes(s.operationType)
 
 export const stockComment = (stock: Stock | undefined, allowance = true): string =>
   stock
@@ -50,8 +57,11 @@ export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string
   const picked = g.selectedElements
   if (picked.length === 0) return "; No element selected for toolpath generation\n"
 
-  // Containers are machined through their members; the legacy comment block is kept for them.
-  const flat = flattenElements(picked)
+  // Containers are machined through their members; the legacy comment block is kept for them. A `component` is
+  // sliced as one unified geometry; the members it cannot slice (line, text, ...) are machined on their own.
+  const components = picked.filter(p => isUnifiedComponent(p, s0)).map(p => splitUnifiedMembers(flattenElements([p])))
+  const others = picked.filter(p => !isUnifiedComponent(p, s0))
+  const flat = [...components.flatMap(c => [...c.solids, ...c.rest]), ...flattenElements(others)]
   const containers = picked.filter(isContainer)
   const stock = g.stock
   const { dx, dy } = originShift(s0, g)
@@ -67,11 +77,24 @@ export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string
   out += stockComment(stock)
   if (stock) out += `; Machining starts at the stock top (Z${f3(stock.topZ)}); elements aligned by ${f3(dz)}mm\n`
 
-  const ordered = orderForMachining(flat)
+  const place = (element: CadElement): CadElement => shiftElement(shiftElement(element, 0, 0, dz), dx, dy, 0)
+  components.forEach((component, index) => {
+    if (component.solids.length === 0) return
+    const placed = component.solids.map(place)
+    if (component.solids.some(element => outsideStock(element, stock))) out += "; Warning: element leaves the stock rectangle\n"
+    const below = stock ? Math.max(0, stock.topZ - Math.max(...placed.map(topOf))) : 0
+    const limited = withinStock(s0, stock, stock ? stock.depth - below : undefined)
+    if (limited.warning) out += `; Warning: ${limited.warning}\n`
+    if (stock && stock.depth - below <= 0) return
+    out += `\n; Component ${index + 1}/${components.length}: ${component.solids.length} member(s) as one unified geometry\n`
+    out += unifiedGcode(placed, limited.settings)
+  })
+
+  const ordered = orderForMachining([...components.flatMap(c => c.rest), ...flattenElements(others)])
   const holes: DrillPoint[] = []
   ordered.forEach((element, index) => {
     const aligned = shiftElement(element, 0, 0, dz)
-    const placed = shiftElement(aligned, dx, dy, 0)
+    const placed = place(element)
     const label = `${String(element["type"])}${element["id"] ? ` (${String(element["id"])})` : ""}`
     if (ordered.length > 1) out += `\n; Element ${index + 1}/${ordered.length}: ${label}\n`
     if (outsideStock(element, stock)) out += "; Warning: element leaves the stock rectangle\n"

@@ -145,11 +145,11 @@ export function ProfileSettings(): JSX.Element {
   let fileInput: HTMLInputElement | undefined
   let seeded = false
 
-  const userStats = (): UserStats => stats.data ?? EMPTY_STATS
-  const userId = (): string => (profile.data?.email ?? "").trim() || "anonymous-user"
+  const userStats = (): UserStats => stats.data() ?? EMPTY_STATS
+  const userId = (): string => (profile.data()?.email ?? "").trim() || "anonymous-user"
 
   createEffect(() => {
-    const data = profile.data
+    const data = profile.data()
     if (data === undefined || seeded) return
     seeded = true
     setProfileData({
@@ -183,18 +183,17 @@ export function ProfileSettings(): JSX.Element {
     try {
       setIsUploading(true)
       const data = profileData()
-      await app.runtime.run(app.client.user.updateProfile({
-        payload: {
-          name: data.name,
-          bio: data.bio,
-          location: data.location,
-          website: data.website,
-          company: data.company,
-          title: data.title,
-          publicProfile: String(data.publicProfile),
-          showEmail: String(data.showEmail)
-        }
-      }))
+      // `UserProfileUpdate` is `HttpApiSchema.asMultipart()` — the payload is a FormData.
+      const payload = new FormData()
+      payload.set("name", data.name)
+      payload.set("bio", data.bio)
+      payload.set("location", data.location)
+      payload.set("website", data.website)
+      payload.set("company", data.company)
+      payload.set("title", data.title)
+      payload.set("publicProfile", String(data.publicProfile))
+      payload.set("showEmail", String(data.showEmail))
+      await app.runtime.run(app.client.user.updateProfile({ payload }))
       toast.success(t("settings.profile.updated"))
       setIsEditing(false)
       await profile.refetch()
@@ -456,7 +455,7 @@ export function ProfileSettings(): JSX.Element {
                     {t("settings.profile.badgeActive")}
                   </span>
                 </Show>
-                <Show when={profile.data !== undefined}>
+                <Show when={profile.data() !== undefined}>
                   <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
                     <ShieldCheck class="h-3 w-3 mr-1" />
                     {t("settings.profile.badgeVerified")}

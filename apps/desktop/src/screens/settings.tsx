@@ -143,7 +143,7 @@ export function SettingsScreen(): JSX.Element {
           <div class="max-w-xl">
             <div class="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div class="sm:col-span-4">
-                <label htmlFor="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t("settings.locale")}
                 </label>
                 <div class="mt-1">
@@ -219,7 +219,7 @@ export function SettingsScreen(): JSX.Element {
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label htmlFor="comments" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="comments" class="font-medium text-gray-700 dark:text-gray-300">
                       {t("settings.notif.comments")}
                     </label>
                     <p class="text-gray-500 dark:text-gray-400">
@@ -238,7 +238,7 @@ export function SettingsScreen(): JSX.Element {
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label htmlFor="mentions" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="mentions" class="font-medium text-gray-700 dark:text-gray-300">
                       {t("settings.notif.mentions")}
                     </label>
                     <p class="text-gray-500 dark:text-gray-400">Get notified when someone mentions you.</p>
@@ -264,7 +264,7 @@ export function SettingsScreen(): JSX.Element {
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label htmlFor="push-everything" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-everything" class="font-medium text-gray-700 dark:text-gray-300">
                       {t("settings.notif.pushAll")}
                     </label>
                     <p class="text-gray-500 dark:text-gray-400">Receive all push notifications.</p>
@@ -280,7 +280,7 @@ export function SettingsScreen(): JSX.Element {
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label htmlFor="push-email" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-email" class="font-medium text-gray-700 dark:text-gray-300">
                       {t("settings.notif.pushEmail")}
                     </label>
                     <p class="text-gray-500 dark:text-gray-400">Only receive notifications via email.</p>
@@ -296,7 +296,7 @@ export function SettingsScreen(): JSX.Element {
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label htmlFor="push-nothing" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-nothing" class="font-medium text-gray-700 dark:text-gray-300">
                       {t("settings.notif.pushNone")}
                     </label>
                     <p class="text-gray-500 dark:text-gray-400">Do not receive push notifications.</p>

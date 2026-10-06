@@ -69,3 +69,18 @@ If your page needs data owned by another vertical, call its endpoint through the
 `test/helpers/solid-plugin.ts` (loaded by the root `bunfig.toml`) compiles `.tsx` with Babel and points Solid at its DOM build; `test/helpers/dom.ts` installs happy-dom; `test/helpers/live-app.ts` boots the whole app over the real in-process sidecar. Known happy-dom gaps: a `<tr>` as the root of a Solid template is dropped by its parser (render rows inside a `<tbody>` that is part of the same template or use divs), and WebGL does not exist (components must catch renderer creation failures, see `View3D`). Browser behaviour is the reference; do not bend a screen out of shape to satisfy the test DOM beyond that.
 
 ## Progress log (agents append below)
+
+### CAD/assistant vertical (agent: assistant-panel + CAD toolbar)
+
+**Done**
+- Docked AI panel (spec 06 §1) is now reachable from both workspace screens: `cad/CadPage.tsx` derives `showAssistant` from `app.panelOpen()` and its canvas button toggles the shell panel; `ai/CADAssistantBridge.tsx` renders its hidden context node under `<Show when={isVisible}>` instead of the old `return <Show when={false}>` (the reason the panel never showed); `ai/AssistantPanel.tsx` gained an optional `onClose` + close button wired from `app/Shell.tsx`; `screens/cam.tsx` gained the legacy "Toggle AI Copilot" toolbar button (`Zap`/`Brain`, `aria-label="Toggle AI Copilot"`) with new keys `ai.copilot.toggle|enable|disable` in `i18n/locales/en.ai.json`. Tests: `test/assistant-panel.test.ts`.
+- **Floating "CAD Tools" window** (`cad/components/FloatingToolbar.tsx`) moved from `position: fixed` in viewport coordinates to `position: absolute` inside its host surface, clamped to the host's box (drag deltas are relative to `offsetParent`, and the clamp keeps the point as-is until layout exists). Inside the shell a `fixed` window sat under the title/status bar or behind the docked AI panel, and an ancestor's `transform`/`backdrop-filter` rebased `fixed` anyway, so it could fall outside the visible canvas. `cad/CadPage.tsx` lost the extra `Motion.div` wrapper around it (its own entrance animation remains) so the containing block is the canvas panel.
+- `cad/CadPage.tsx` root changed from `h-screen w-screen` to `h-full w-full`: the page is a child of `.reference-workspace-container`, and `100vw/100vh` overflowed it (horizontal scroll → content clipped on the left when the AI panel is open; the CAD status bar pushed under the shell status bar). Test: `test/cad-floating-toolbar.test.ts` (2 tests: absolute positioning inside the `relative rounded-2xl` canvas host, no `.h-screen.w-screen` box, wrench button hides/restores the window).
+
+**Deviations**
+- The reference renders `FloatingToolbar` with `initialPosition={{x:100,y:100}}` on `position: fixed` over a full-screen page; the port keeps the same default offset but resolves it against the canvas host, because v6 renders the page inside a shell with chrome around it. Behaviour (draggable, collapsible, modes, buttons) is unchanged.
+- The reference's CAD page is `100vw/100vh`; the port fits the shell container instead. Layout inside the page is unchanged.
+
+**Not done (this pass)**
+- Toolpath generator / CAM page parity with `.reference` and the AI-context payload (CAD + G-code + virtual toolpath) are tracked separately; nothing in this pass touched `packages/core` or `ai/store.ts`.
+

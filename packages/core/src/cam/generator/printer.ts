@@ -2,92 +2,16 @@
  * 3D printer G-code (port of the legacy `lib/toolpath/3dprinterToolpaths.ts` element generators).
  *
  * Start/end blocks, extrusion maths and the cube / cylinder / sphere / cone / torus / text
- * layer generators keep the legacy shape. Composites print each child in turn between one
- * start and one end block.
+ * generators keep the legacy shape: shells only, with the legacy `TODO` notes where infill and supports
+ * would go. Composites (and a lone line) are sliced layer by layer in `printer-composite.ts`, which does
+ * add rectilinear infill.
  */
 import type { CadElement } from "./schema.ts"
+import { calculateExtrusion, polygonLayer, printEndGCode, printStartGCode, type P3, type PrinterSettings } from "./printer-base.ts"
+import { generateCompositeElement3D } from "./printer-composite.ts"
 
-export interface PrinterSettings {
-  layerHeight: number
-  printSpeed: number
-  travelSpeed?: number
-  printTemperature: number
-  bedTemperature: number
-  extrusionWidth: number
-  filamentDiameter: number
-  retractionDistance?: number
-  retractionSpeed?: number
-  infillDensity: number
-  infillPattern: string
-  shellCount: number
-  supportType: string
-  supportOverhangAngle?: number
-  supportDensity?: number
-  raftLayers?: number
-  brimWidth?: number
-  material?: string
-  nozzleDiameter?: number
-}
-
-interface P3 { x: number; y: number; z: number }
-
-const f3 = (n: number): string => n.toFixed(3)
-
-export const printStartGCode = (s: PrinterSettings): string =>
-  "; Print Start G-code\n" +
-  "M82 ; Set extruder to absolute mode\n" +
-  "G21 ; Set units to millimeters\n" +
-  "G90 ; Use absolute coordinates\n" +
-  `M104 S${s.printTemperature} ; Set extruder temperature (no wait)\n` +
-  `M140 S${s.bedTemperature} ; Set bed temperature (no wait)\n` +
-  "G28 ; Home all axes\n" +
-  `M109 S${s.printTemperature} ; Wait for extruder temperature\n` +
-  `M190 S${s.bedTemperature} ; Wait for bed temperature\n` +
-  "G1 Z5 F5000 ; Move Z up\n" +
-  "G1 X0 Y0 Z0.2 F3000 ; Move to prime position\n" +
-  "G92 E0 ; Reset extruder position\n" +
-  "G1 E5 F1800 ; Prime the extruder\n" +
-  "G92 E0 ; Reset extruder position again\n" +
-  "G1 Z0.3 F3000 ; Lift slightly before starting print\n\n"
-
-export const printEndGCode = (s: PrinterSettings): string =>
-  "\n; Print End G-code\n" +
-  `G1 E-${s.retractionDistance || 2} F${(s.retractionSpeed || 60) * 60} ; Retract filament\n` +
-  "G91 ; Relative positioning\n" +
-  "G1 Z5 F3000 ; Move Z up relative\n" +
-  "G90 ; Absolute positioning\n" +
-  "G1 X0 Y200 F3000 ; Present print (move Y forward)\n" +
-  "M104 S0 ; Turn off extruder temperature\n" +
-  "M140 S0 ; Turn off bed temperature\n" +
-  "M84 ; Disable motors\n"
-
-/** Filament length (mm) for `length` mm of bead. */
-export const calculateExtrusion = (length: number, layerHeight: number, extrusionWidth: number, filamentDiameter: number): number => {
-  if (length <= 0 || layerHeight <= 0 || extrusionWidth <= 0 || filamentDiameter <= 0) return 0
-  const filamentArea = Math.PI * (filamentDiameter / 2) ** 2
-  return ((extrusionWidth * layerHeight) / filamentArea) * length
-}
-
-const moveTo = (p: P3, speed: number, e: number, amount: number): { gcode: string; e: number } => {
-  const next = e + amount
-  let gcode = `G1 X${f3(p.x)} Y${f3(p.y)} Z${f3(p.z)}`
-  if (amount > 0) gcode += ` E${next.toFixed(5)}`
-  return { gcode: `${gcode} F${speed * 60}\n`, e: next }
-}
-
-const polygonLayer = (points: ReadonlyArray<P3>, s: PrinterSettings, e0: number): { gcode: string; e: number } => {
-  if (points.length < 2) return { gcode: "", e: e0 }
-  let e = e0
-  let gcode = moveTo(points[0]!, s.travelSpeed || 150, e, 0).gcode
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1]!
-    const b = points[i]!
-    const move = moveTo(b, s.printSpeed, e, calculateExtrusion(Math.hypot(b.x - a.x, b.y - a.y), s.layerHeight, s.extrusionWidth, s.filamentDiameter))
-    gcode += move.gcode
-    e = move.e
-  }
-  return { gcode, e }
-}
+export { calculateExtrusion, printEndGCode, printStartGCode, generateCompositeElement3D }
+export type { PrinterSettings }
 
 const ring = (cx: number, cy: number, z: number, radius: number, segments: number): P3[] => {
   const points: P3[] = []
@@ -135,6 +59,8 @@ const cube3D = (el: CadElement, s: PrinterSettings): string => {
       gcode += out.gcode
       e = out.e
     }
+    gcode += `; TODO: Add infill for layer ${layer + 1}\n`
+    gcode += `; TODO: Check and add support for layer ${layer + 1}\n`
   }
   return gcode
 }
@@ -150,6 +76,8 @@ const cylinder3D = (el: CadElement, s: PrinterSettings): string => {
     const out = roundShells(el, z, el.radius, s, e)
     gcode += out.gcode
     e = out.e
+    gcode += `; TODO: Add infill for layer ${layer + 1}\n`
+    gcode += `; TODO: Check and add support for layer ${layer + 1}\n`
   }
   return gcode
 }
@@ -169,6 +97,8 @@ const sphere3D = (el: CadElement, s: PrinterSettings): string => {
     const out = roundShells(el, z, slice, s, e)
     gcode += out.gcode
     e = out.e
+    gcode += `; TODO: Add infill for layer ${layer + 1}\n`
+    gcode += `; TODO: Check and add support for layer ${layer + 1}\n`
   }
   return gcode
 }
@@ -186,6 +116,8 @@ const cone3D = (el: CadElement, s: PrinterSettings): string => {
     const out = roundShells(el, z, slice, s, e)
     gcode += out.gcode
     e = out.e
+    gcode += `; TODO: Add infill for layer ${layer + 1}\n`
+    gcode += `; TODO: Check and add support for layer ${layer + 1}\n`
   }
   return gcode
 }
@@ -219,6 +151,8 @@ const torus3D = (el: CadElement, s: PrinterSettings): string => {
         e = i.e
       }
     }
+    gcode += `; TODO: Add torus infill (ring shape) for layer ${layer + 1}\n`
+    gcode += `; TODO: Check and add support for layer ${layer + 1}\n`
   }
   return gcode
 }
@@ -233,45 +167,34 @@ const text3D = (el: CadElement, s: PrinterSettings): string => {
   return gcode + cube3D({ ...el, type: "cube", width, height: width, depth: thickness }, s)
 }
 
-/** Body of a printable element (no start/end blocks) and the highest Z it reaches. */
-const elementBody = (el: CadElement, s: PrinterSettings): { body: string; lastZ: number } => {
+/** Body of a printable element (no start/end blocks). */
+const elementBody = (el: CadElement, s: PrinterSettings): string => {
   switch (el.type) {
-    case "cube": return { body: cube3D(el, s), lastZ: el.z + el.depth / 2 }
-    case "cylinder": return { body: cylinder3D(el, s), lastZ: el.z + el.height / 2 }
-    case "sphere": return { body: sphere3D(el, s), lastZ: el.z + el.radius }
-    case "cone": return { body: cone3D(el, s), lastZ: el.z + el.height / 2 }
-    case "torus": return { body: torus3D(el, s), lastZ: el.z + (el.tubeRadius || 10) }
+    case "cube": return cube3D(el, s)
+    case "cylinder": return cylinder3D(el, s)
+    case "sphere": return sphere3D(el, s)
+    case "cone": return cone3D(el, s)
+    case "torus": return torus3D(el, s)
     case "text":
-    case "text3d": return { body: text3D(el, s), lastZ: el.z + (el.depth || 5) }
+    case "text3d": return text3D(el, s)
     default: {
       const width = el.width || el.radius * 2 || 10
       const height = el.height || el.radius * 2 || 10
       const depth = el.depth || el.radius * 2 || 10
       const note = `; WARNING: Unsupported element type '${el.type}' for direct 3D printing.\n; Approximating with bounding box.\n`
-      return { body: note + cube3D({ type: "cube", x: el.x, y: el.y, z: el.z, width, height, depth }, s), lastZ: el.z + depth / 2 }
+      return note + cube3D({ type: "cube", x: el.x, y: el.y, z: el.z, width, height, depth }, s)
     }
   }
-}
-
-export const generateCompositeElement3D = (el: CadElement, s: PrinterSettings): string => {
-  const children: CadElement[] = Array.isArray(el.elements) ? el.elements : []
-  if (children.length === 0) return "; Error: composite element has no sub-elements\n"
-  let body = `; 3D Print Composite: ${children.length} sub-elements\n`
-  let lastZ = 0
-  for (const child of children) {
-    if (!child) continue
-    if (child.type === "composite" || child.type === "group" || child.type === "component") {
-      body += generateCompositeElement3D(child, s)
-      continue
-    }
-    const part = elementBody(child, s)
-    body += part.body
-    lastZ = Math.max(lastZ, part.lastZ)
-  }
-  return printStartGCode(s) + body + printEndGCode(s)
 }
 
 export const generate3DPrinterGCodeForElement = (el: CadElement, s: PrinterSettings): string => {
   if (el.type === "composite" || el.type === "component" || el.type === "group") return generateCompositeElement3D(el, s)
-  return printStartGCode(s) + elementBody(el, s).body + printEndGCode(s)
+  if (el.type === "line") {
+    // A lone line has no area to print: like the legacy code it becomes a one-layer composite (the layer is as
+    // thick as the stroke), and the result says so.
+    const layerHeight = el.strokeWidth || s.extrusionWidth
+    const wrapper = { id: "line-wrapper", type: "composite", elements: [el], z: el.z, height: layerHeight }
+    return generateCompositeElement3D(wrapper, { ...s, layerHeight }) + "; Warning: a line element has no printable area - nothing was extruded\n"
+  }
+  return printStartGCode(s) + elementBody(el, s) + printEndGCode(s)
 }

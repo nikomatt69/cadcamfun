@@ -1,1 +1,1 @@
-export { CamScreen as default } from "../screens/cam.tsx"
+export { default } from "../cam/CamPage.tsx"

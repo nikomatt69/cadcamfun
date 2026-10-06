@@ -1,0 +1,131 @@
+import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
+import { createStore } from "solid-js/store"
+import { useRead } from "../../app/queries.ts"
+import type { ProductionCostsStore } from "./costsStore.ts"
+
+const availableCurrencies = [
+  { code: "EUR", symbol: "€", name: "Euro" },
+  { code: "USD", symbol: "$", name: "Dollaro USA" },
+  { code: "GBP", symbol: "£", name: "Sterlina britannica" }
+]
+
+interface MaterialCostFormProps {
+  readonly store: ProductionCostsStore
+  readonly costToEditId?: string | null
+  readonly onSubmissionDone?: () => void
+}
+
+type MaterialRow = { id: string; name: string }
+
+/** Add / edit the cost of a material (legacy `MaterialCostForm`). */
+export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Element {
+  const costs = props.store
+  const blank = () => ({ materialId: "", costPerUnit: 0, wasteFactor: 10, minimumCharge: 0, currencyCode: costs.state.settings.defaultCurrencyCode || "EUR" })
+  const [isEditing, setIsEditing] = createSignal(false)
+  const [formData, setFormData] = createStore(blank())
+
+  const materials = useRead((client) => client.materials.list({ query: {} }))
+  const allMaterials = (): MaterialRow[] => (materials.data() ?? []) as unknown as MaterialRow[]
+  const availableMaterialsForNewCost = createMemo(() => allMaterials().filter((material) => !costs.state.materialCosts.some((cost) => cost.materialId === material.id)))
+  const isLoadingMaterials = (): boolean => materials.loading()
+  const materialError = (): string | null => {
+    const error = materials.error()
+    return error ? `Errore caricamento materiali: ${error}` : null
+  }
+
+  const resetForm = (): void => {
+    setFormData(blank())
+    setIsEditing(false)
+    props.onSubmissionDone?.()
+  }
+
+  createEffect(on([() => props.costToEditId, () => costs.state.materialCosts], () => {
+    if (props.costToEditId) {
+      const costToEdit = costs.state.materialCosts.find((cost) => cost.id === props.costToEditId)
+      if (costToEdit) {
+        setFormData({ materialId: costToEdit.materialId, costPerUnit: costToEdit.costPerUnit, wasteFactor: costToEdit.wasteFactor, minimumCharge: costToEdit.minimumCharge, currencyCode: costToEdit.currencyCode })
+        setIsEditing(true)
+      } else resetForm()
+    } else {
+      if (isEditing()) resetForm()
+      setIsEditing(false)
+    }
+  }))
+
+  const handleChange = (event: Event & { currentTarget: HTMLInputElement | HTMLSelectElement }): void => {
+    const { name, value } = event.currentTarget
+    if (["costPerUnit", "wasteFactor", "minimumCharge"].includes(name)) setFormData(name as "costPerUnit", parseFloat(value) || 0)
+    else setFormData(name as "materialId" | "currencyCode", value)
+  }
+
+  const handleSubmit = async (event: Event): Promise<void> => {
+    event.preventDefault()
+    if (costs.state.isLoading) return
+    let success = false
+    if (isEditing() && props.costToEditId) success = await costs.updateMaterialCost(props.costToEditId, { ...formData })
+    else success = !!(await costs.addMaterialCost({ ...formData }))
+    if (success) resetForm()
+  }
+
+  return (
+    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow-md">
+      <h3 class="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-200">{isEditing() ? "Modify Material Cost" : "Add New Material Cost"}</h3>
+
+      <form onSubmit={(event) => void handleSubmit(event)} class="space-y-4">
+        <div>
+          <label for="materialId" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Material</label>
+          <select id="materialId" name="materialId" value={formData.materialId} onChange={handleChange} class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required disabled={isEditing() || isLoadingMaterials() || !!materialError()}>
+            <Show when={!isLoadingMaterials()} fallback={<option value="">Loading materials...</option>}>
+              <Show when={!materialError()} fallback={<option value="">{materialError()}</option>}>
+                <option value="">Select a material</option>
+                <Show
+                  when={isEditing() && formData.materialId}
+                  fallback={<For each={availableMaterialsForNewCost()}>{(material) => <option value={material.id}>{material.name}</option>}</For>}
+                >
+                  <For each={allMaterials().filter((material) => material.id === formData.materialId)}>{(material) => <option value={material.id} selected>{material.name}</option>}</For>
+                </Show>
+                <Show when={isEditing() && formData.materialId && !allMaterials().find((material) => material.id === formData.materialId)}>
+                  <option value={formData.materialId} disabled>{`Material (ID: ${formData.materialId}) - Loaded`}</option>
+                </Show>
+              </Show>
+            </Show>
+          </select>
+        </div>
+
+        <div>
+          <label for="costPerUnit" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Cost per Unit ({formData.currencyCode} / unit)</label>
+          <div class="flex items-center">
+            <input id="costPerUnit" type="number" name="costPerUnit" value={formData.costPerUnit} onInput={handleChange} min="0" step="0.01" class="w-full border-gray-300 rounded-l-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+            <select name="currencyCode" value={formData.currencyCode} onChange={handleChange} class="h-full border-gray-300 rounded-r-md shadow-sm p-2 border-l-0 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              <For each={availableCurrencies}>{(currency) => <option value={currency.code}>{currency.symbol} ({currency.code})</option>}</For>
+            </select>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Es. costo per cm³ o per kg. Ensure the unit is consistent. (e.g. cost per cm³ or per kg)</p>
+        </div>
+
+        <div>
+          <label for="wasteFactor" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Waste Factor (%)</label>
+          <input id="wasteFactor" type="number" name="wasteFactor" value={formData.wasteFactor} onInput={handleChange} min="0" max="100" step="1" class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+          <p class="text-xs text-gray-500 mt-1">Percentage of extra material to consider for waste and scrap (e.g. 10 for 10%).</p>
+        </div>
+
+        <div>
+          <label for="minimumCharge" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Minimum Charge ({formData.currencyCode})</label>
+          <input id="minimumCharge" type="number" name="minimumCharge" value={formData.minimumCharge} onInput={handleChange} min="0" step="0.01" class="w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+          <p class="text-xs text-gray-500 mt-1">Optional minimum charge for this material.</p>
+        </div>
+
+        <div class="flex items-center justify-end space-x-3 pt-2">
+          <Show when={isEditing() || formData.materialId}>
+            <button type="button" onClick={() => { resetForm(); if (props.onSubmissionDone && isEditing()) props.onSubmissionDone() }} class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              Cancel{isEditing() ? "" : "/Clear"}
+            </button>
+          </Show>
+          <button type="submit" disabled={costs.state.isLoading || isLoadingMaterials() || !formData.materialId} class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 dark:bg-indigo-700 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300">
+            {costs.state.isLoading ? "Saving..." : isEditing() ? "Save Changes" : "Add Cost"}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}

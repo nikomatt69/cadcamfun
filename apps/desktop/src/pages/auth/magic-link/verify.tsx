@@ -1,2 +1,2 @@
-import { LegacyAuth } from "../../../screens/legacy-account.tsx"
-export default function Page() { return <LegacyAuth mode="magic-link" /> }
+import { MagicLinkVerifyScreen } from "../../../screens/auth.tsx"
+export default function Page() { return <MagicLinkVerifyScreen /> }

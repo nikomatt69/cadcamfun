@@ -1,2 +1,2 @@
-import { LegacyAuth } from "../../screens/legacy-account.tsx"
-export default function Page() { return <LegacyAuth mode="two-factor" /> }
+import { TwoFactorScreen } from "../../screens/two-factor.tsx"
+export default function Page() { return <TwoFactorScreen /> }

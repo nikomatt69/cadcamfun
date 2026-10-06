@@ -12,7 +12,7 @@
 import { createContext, createResource, useContext, type Accessor, type JSX } from "solid-js"
 import { createAiStore, type AiStore } from "./store.ts"
 import { makeCatalog, type AiCatalogService } from "./models.ts"
-import type { AiStatus, ModelInfo } from "./types.ts"
+import type { AiStatus, ModelInfo, ProviderId } from "./types.ts"
 import { useApp, type AppState } from "../state/context.ts"
 
 interface AiContextValue {
@@ -21,6 +21,8 @@ interface AiContextValue {
   readonly aiStatus: Accessor<AiStatus | undefined>
   readonly models: Accessor<ReadonlyArray<ModelInfo>>
   readonly refresh: () => void
+  readonly saveCredentials: (provider: ProviderId, key: string, baseUrl?: string) => Promise<void>
+  readonly removeCredentials: (provider: ProviderId) => Promise<void>
 }
 
 const Ctx = createContext<AiContextValue>()
@@ -43,13 +45,24 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
     void modelsActions.refetch()
   }
 
+  const saveCredentials = async (provider: ProviderId, key: string, baseUrl?: string): Promise<void> => {
+    await app.runtime.run(catalog.setCredentials({ provider, key, ...(baseUrl ? { baseUrl } : {}) }))
+    refresh()
+  }
+  const removeCredentials = async (provider: ProviderId): Promise<void> => {
+    await app.runtime.run(catalog.clearCredentials(provider))
+    refresh()
+  }
+
   return Ctx.Provider({
     value: {
       store,
       app,
       aiStatus: () => statusResource() as AiStatus | undefined,
       models: () => (modelsResource() as ReadonlyArray<ModelInfo> | undefined) ?? [],
-      refresh
+      refresh,
+      saveCredentials,
+      removeCredentials
     },
     get children() { return props.children }
   })

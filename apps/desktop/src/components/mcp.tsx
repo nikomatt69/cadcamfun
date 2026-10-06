@@ -9,7 +9,7 @@
  */
 import { Show, createEffect, createSignal, type JSX } from "solid-js"
 import { Effect } from "effect"
-import type { McpServerEntry, McpServerInput } from "@cadcamfun/api"
+import type { McpServerEntry, McpServerPatch } from "@cadcamfun/api"
 import { t } from "../i18n/index.ts"
 
 /** A server row as the legacy cards and form read it (the DB row plus form-only fields). */
@@ -100,7 +100,7 @@ export function McpLoading(): JSX.Element {
 
 export interface McpServerFormProps {
   readonly initialValues?: Partial<McpServerCard>
-  readonly onSubmit: (values: McpServerInput) => Promise<void>
+  readonly onSubmit: (values: McpServerPatch) => Promise<void>
   readonly onCancel?: () => void
   readonly isSubmitting?: boolean
 }
@@ -157,7 +157,7 @@ export function McpServerForm(props: McpServerFormProps): JSX.Element {
     }
 
     const current = type()
-    const values: McpServerInput = {
+    const values: McpServerPatch = {
       name: name(),
       type: current,
       enabled: enabled(),

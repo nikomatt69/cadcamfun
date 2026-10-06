@@ -1,5 +1,5 @@
 import { Show, type JSX } from "solid-js"
-import { SlidersHorizontal } from "lucide-solid"
+import { SlidersVertical } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
@@ -16,7 +16,7 @@ export function CuttingSection(): JSX.Element {
   const stats = () => cam.generator.calculateCuttingStatistics(s())
   const effectiveStepover = () => (s().stepover / 100) * s().toolDiameter
   return (
-    <Section id="cutting" delay={0.4} tone="orange" icon={SlidersHorizontal} title="Cutting Parameters" testId="cutting-section">
+    <Section id="cutting" delay={0.4} tone="orange" icon={SlidersVertical} title="Cutting Parameters" testId="cutting-section">
       <div>
         <label class={LABEL}>Pass Depth (mm)</label>
         <NumberField min="0.1" step="0.1" value={s().stepdown} onValue={(value) => gen.updateSettings("stepdown", value)} />

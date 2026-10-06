@@ -2,12 +2,13 @@ import {
   AiConfig, AiCredentials, AiHost, AiService, DirectModel, defaultModelFactory, ToolHandlers, buildTools, defaultProviderSpecs,
   makeNikCliRuntime, systemPrompt, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
-import { baseEntity, emptyDrawing, type Drawing } from "@cadcamfun/core"
+import { baseEntity, cam, emptyDrawing, type Drawing } from "@cadcamfun/core"
 import { Effect, Layer, Redacted } from "effect"
 import { AppConfigService } from "../config.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
+import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
 import { LocalProfile } from "./local-profile.ts"
 
@@ -37,19 +38,19 @@ const toolHandlers = Effect.gen(function*() {
   const drawings = yield* DrawingRepo
   const materials = yield* MaterialRepo
   const tools = yield* ToolRepo
+  const toolpaths = yield* ToolpathRepo
   const { user } = yield* LocalProfile
   const kv = yield* KvStore
 
-  const load = async (projectId: string): Promise<{ id: string; drawing: Drawing }> => {
+  const load = async (projectId: string): Promise<{ id: string; projectId: string; drawing: Drawing }> => {
     const rows = await Effect.runPromise(drawings.listByProject(projectId))
     const row = rows[0]
     if (!row) {
-      const created = await Effect.runPromise(drawings.create(projectId, { name: "Drawing", data: emptyDrawing(crypto.randomUUID(), "Drawing") }))
-      return { id: created.id, drawing: emptyDrawing(created.id, "Drawing") }
+      throw new Error(`No drawing found for nikcli project ${projectId}`)
     }
     const data = (row as { data?: unknown }).data
     const drawing = data && typeof data === "object" && "entities" in data ? (data as Drawing) : emptyDrawing(row.id, row.name)
-    return { id: row.id, drawing }
+    return { id: row.id, projectId: (row as { projectId: string }).projectId, drawing }
   }
   const save = async (id: string, drawing: Drawing) => {
     await Effect.runPromise(drawings.update(id, { data: { ...drawing, version: drawing.version + 1 } }))
@@ -87,8 +88,40 @@ const toolHandlers = Effect.gen(function*() {
       return { name: drawing.name, units: drawing.units, layers: drawing.layers.map((l) => ({ id: l.id, name: l.name })), counts,
         entities: drawing.entities.slice(0, 200).map((e) => ({ id: e.id, type: e._tag, layerId: e.layerId })) }
     },
-    createOperation: async () => ({ ok: false, error: "Operations are created from the CAM workspace in this version." }),
-    generateGcode: async () => ({ gcode: "", stats: { note: "Use the CAM workspace to generate G-code." } }),
+    createOperation: async (drawingId, operation) => {
+      const { id, projectId, drawing } = await load(drawingId)
+      const params = operation.params !== null && typeof operation.params === "object" ? operation.params : {}
+      const settings = cam.generator.decodeSettings({ ...params, operationType: operation.type })
+      const geometry = {
+        geometryType: "selected" as const,
+        selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag }))
+      }
+      const request = { settings, geometry }
+      const row = await Effect.runPromise(toolpaths.create(user.id, {
+        name: `${operation.type} operation`, description: "Created by the nikcli CAD/CAM agent",
+        data: { request }, projectId, drawingId: id, type: settings.machineType, operationType: settings.operationType
+      }))
+      return { ok: true, operationId: row.id, name: row.name, drawing: drawing.name }
+    },
+    generateGcode: async (drawingId, operationId) => {
+      const { id, projectId, drawing } = await load(drawingId)
+      if (!operationId) return { gcode: "", stats: { error: "operationId is required" } }
+      const found = await Effect.runPromise(toolpaths.find(user.id, operationId))
+      if (!found || found.row.drawingId !== id || found.project.id !== projectId) {
+        return { gcode: "", stats: { error: "Operation not found in the active drawing" } }
+      }
+      const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
+      if (!stored?.request) return { gcode: "", stats: { error: "Operation has no generation settings" } }
+      const savedGeometry = stored.request.geometry !== null && typeof stored.request.geometry === "object" ? stored.request.geometry : {}
+      const request = {
+        ...stored.request,
+        geometry: { ...savedGeometry, selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag })) }
+      }
+      const { response, error } = cam.generator.generateToolpath(request as never)
+      if (error) return { gcode: "", stats: { error } }
+      await Effect.runPromise(toolpaths.update(operationId, { data: { request, response }, gcode: response.gcode }))
+      return { gcode: response.gcode, stats: response.stats }
+    },
     remember: async (key, value) => { await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
     lookupMaterial: async (query) => (await Effect.runPromise(materials.list(user.id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name })),

@@ -246,8 +246,8 @@ describe("selected elements", () => {
     expect(text).toContain("; Line: from (0, 0) to (1, 1)")
   })
 
-  test("unknown types are reported", () => {
-    expect(withElement({ type: "wormhole" })).toContain("Unsupported element type 'wormhole'")
+  test("unknown types get the legacy generic contour (see generator-parity.test.ts)", () => {
+    expect(withElement({ type: "wormhole" })).toContain("; Generic rectangular contour: wormhole at (0, 0, 0), size 10x10mm")
   })
 })
 
@@ -325,7 +325,8 @@ describe("3D printer program", () => {
     const { gcode } = printer({ type: "composite", elements: [{ type: "cube", x: 0, y: 0, z: 1, width: 4, height: 4, depth: 1 }, { type: "cylinder", x: 10, y: 0, z: 1, radius: 2, height: 1 }] })
     expect(gcode.match(/; Print Start G-code/g)).toHaveLength(1)
     expect(gcode.match(/; Print End G-code/g)).toHaveLength(1)
-    expect(gcode).toContain("; 3D Print Composite: 2 sub-elements")
+    expect(gcode).toContain("; Start Composite Element: composite")
+    expect(gcode).toContain("; End Composite Element: composite")
   })
 })
 

@@ -97,6 +97,7 @@ export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
     toolpaths: [...(options.seed?.toolpaths ?? [])]
   }
   const failures = new Map<string, string>()
+  const kv = new Map<string, { key: string; value: unknown; updatedAt: string }>()
   const ids: string[] = []
   let sequence = 0
   const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } })
@@ -116,6 +117,32 @@ export function createFakeApi(options: FakeApiOptions = {}): FakeApi {
     const payload = typeof body === "object" && body !== null ? body : {}
     const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null ? Object.fromEntries(Object.entries(value)) : {}
     const data = record(payload)
+    if (group === "kv") {
+      const key = parts[2] === undefined ? undefined : decodeURIComponent(parts[2])
+      if (method === "GET" && key === undefined) {
+        const prefix = url.searchParams.get("prefix")
+        return json({ entries: [...kv.values()].filter((entry) => !prefix || entry.key.startsWith(prefix)).sort((a, b) => a.key.localeCompare(b.key)) })
+      }
+      if (key !== undefined) {
+        if (method === "PUT") {
+          if (!/^[A-Za-z0-9_.:-]{1,200}$/.test(key)) return json({ _tag: "BadRequest", message: "Invalid key" }, 400)
+          const entry = { key, value: data["value"], updatedAt: now() }
+          kv.set(key, entry)
+          return json(entry)
+        }
+        if (method === "DELETE") return kv.delete(key) ? json({ message: "Deleted" }) : json({ _tag: "NotFound", message: "Key not found" }, 404)
+        if (method === "GET") {
+          const entry = kv.get(key)
+          return entry === undefined ? json({ _tag: "NotFound", message: "Key not found" }, 404) : json(entry)
+        }
+      }
+    }
+    if (group === "ai" && parts[2] === "permission" && parts[3] === "reply" && method === "POST") {
+      return json({ message: "Permission reply sent" })
+    }
+    if (group === "ai" && parts[2] === "chat" && parts[3] === "abort" && method === "POST") {
+      return json({ message: "Aborted" })
+    }
     if (group === "toolpaths" && method === "POST" && ["generate", "suggest", "parse"].includes(parts[2] ?? "")) {
       const answer = generatorRoute(parts[2] ?? "", body)
       return json(answer.body, answer.status)
