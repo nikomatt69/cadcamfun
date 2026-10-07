@@ -145,9 +145,24 @@ const DEFAULT_LAYERS: Drawing["layers"] = [
   { id: "layer-0", name: "0", visible: true, locked: false, color: "#1e88e5" }
 ]
 
+const hasLegacyShape = (input: Record<string, unknown>): boolean => {
+  if (!Array.isArray(input.entities) || input.entities.length === 0) return false
+  const legacyTypes = input.entities.every((entity: unknown) =>
+    isRecord(entity) && !("_tag" in entity) && typeof entity.type === "string" &&
+    entity.type === entity.type.toLowerCase()
+  )
+  // Early tagged exports omitted both document fields and entity base fields.
+  const sparseTaggedExport = ["name", "units", "layers", "version"].every((key) => !(key in input)) &&
+    input.entities.every((entity: unknown) =>
+      isRecord(entity) && typeof entity._tag === "string" &&
+      ["layerId", "visible", "locked"].every((key) => !(key in entity))
+    )
+  return legacyTypes || sparseTaggedExport
+}
+
 /**
- * Normalises any stored drawing JSON into a valid `Drawing`. Unmigratable
- * entities are dropped so one bad element never makes the document unreadable.
+ * Validates current drawings without reconstruction. Older drawings are
+ * normalised, dropping only legacy entities that cannot be migrated.
  */
 export const migrateDrawing = (input: unknown): Effect.Effect<Drawing, DrawingMigrationError> =>
   Effect.suspend(() => {
@@ -161,6 +176,16 @@ export const migrateDrawing = (input: unknown): Effect.Effect<Drawing, DrawingMi
           reason: `drawing schema version ${schemaVersion} is newer than the supported version ${CURRENT_SCHEMA_VERSION}`,
           schemaVersion
         })
+      )
+    }
+    if (schemaVersion === CURRENT_SCHEMA_VERSION && !hasLegacyShape(input)) {
+      return decodeDrawing(input).pipe(
+        Effect.mapError((cause) =>
+          new DrawingMigrationError({
+            reason: `drawing failed validation: ${String(cause)}`,
+            schemaVersion
+          })
+        )
       )
     }
     const rawEntities = Array.isArray(input.entities) ? input.entities : []
@@ -189,5 +214,6 @@ export const migrateDrawing = (input: unknown): Effect.Effect<Drawing, DrawingMi
 /** How many entities `migrateDrawing` had to drop, for the import report. */
 export const droppedEntities = (input: unknown): number => {
   if (!isRecord(input) || !Array.isArray(input.entities)) return 0
+  if (input.schemaVersion === CURRENT_SCHEMA_VERSION && !hasLegacyShape(input)) return 0
   return input.entities.length - input.entities.map(migrateEntity).filter((e) => e !== undefined).length
 }

@@ -1,6 +1,6 @@
 # WP2 — CAM and G-code core (`packages/core/src/cam`)
 
-Status: **done** (IR, five operations, `generic`/`fanuc`/`grbl` posts with modal emission, reference interpreter, goldens and a regression test per legacy bug; `linuxcnc` and `haas` are reserved ids, not implemented). Owner dir: `packages/core/src/cam`. Depends on WP1 types (`Vec2`, `Vec3`, `Entity`, `tessellate`, `offsetPolyline`) — import them from `../cad/index.ts`; until WP1 lands, code against the interfaces in `03-core-cad.md`.
+Status: **done; targeted cycle/arc safety hardening verified** (IR, five operations, `generic`/`fanuc`/`grbl` posts with modal emission, reference interpreter, goldens and a regression test per legacy bug; `linuxcnc` and `haas` are reserved ids, not implemented). Owner dir: `packages/core/src/cam`. Depends on WP1 types (`Vec2`, `Vec3`, `Entity`, `tessellate`, `offsetPolyline`) — import them from `../cad/index.ts`; until WP1 lands, code against the interfaces in `03-core-cad.md`.
 
 Pure and I/O-free, same rules as WP1.
 
@@ -121,6 +121,14 @@ Material removal simulation and collision checking (a later WP; the IR is design
 
 ### 8.3 Tests
 
+Safety hardening contract:
+- `expandCycle` and post emission reject invalid cycles with `RangeError`: coordinates/retract/feed/peck/dwell must be finite, feed positive, increments/dwell non-negative, and hole bottom strictly below the retract plane. Peck/chip-break expansion is bounded to 100,000 pecks and rejects increments that cannot make numeric progress. A zero peck retains the existing single-peck fallback.
+- Cycle expansion raises Z to at least the R plane before lateral positioning when starting below R. Canned emission performs the same protective lift. Every `Cycle` emits an executable block even at an identical hole; previously emitted cycle dwell `P` is explicitly reset to zero when requested (`G82` always initializes `P`).
+- Post emission rejects arcs with unknown starts, non-finite geometry/feed, non-positive radius/feed, or start/end radius mismatch greater than 1e-6 mm with `RangeError`, rather than substituting a straight cut. Non-full arcs whose XY endpoints collapse at output precision are linearized rather than emitted as unintended full circles.
+- These checks are not stock, fixture, tool-envelope or machine-coordinate collision certification; `validate` still requires a supplied machine profile and is not automatically run by the post.
+
+Audit limitations remaining for commercial machine release: `validate` assumes structurally valid program/machine input and does not fail closed on every non-finite field; posts lack comprehensive output-precision/options validation and controller-specific rounded-arc certification. Tool changes and initial positioning need machine-specific safe retract/parking procedures, homing/work-offset verification and tool-length validation. The R-plane lift prevents the identified below-R lateral traverse but does not prove R clears stock or fixtures. Text-level advanced post-processing is a separate surface not certified by this hardening. Material-removal/fixture collision simulation and real-controller acceptance remain required.
+
 `packages/core/test/cam/`: `ir`, `profile`, `pocket`, `drill-face-engrave`, `post`, `golden`, `regressions` (one block per legacy bug, numbered as in section 5), `path-and-interpreter`. Goldens: `packages/core/test/golden/{generic,fanuc,grbl}-{profile-outside,profile-inside,pocket-island,drill-peck,face}.nc`. Regenerate with `UPDATE_GOLDEN=1 bun test packages/core` and review the diff (Bun 1.4 does not expose `--update-snapshots` to the test process, so the spec's flag is replaced by this variable).
 
 ### 8.4 Changes made to WP1 for this work
@@ -129,5 +137,9 @@ Material removal simulation and collision checking (a later WP; the IR is design
 
 ## 9. Change log
 
+- Manufacturing setup contract: `setup.ts` defines rigid right-handed work frames, revisioned stock/fixtures/tool assemblies and pure world/work point conversions. `validateSetup` reports finite geometry, orthonormal frame, unique tool/fixture identifiers and clearance-envelope errors. All geometry uses mm; the frame maps work coordinates to world coordinates. This is setup validation, not collision certification. Public functions are exported through the CAM barrel.
+
 - v1: initial spec incl. legacy bug list.
 - v2: WP2 implemented; status set to done. Added the as-built section: IR `Cycle` extension, operations, posts (`generic`, `fanuc`, `grbl`), reference interpreter, goldens (`UPDATE_GOLDEN=1` instead of `--update-snapshots`), regression tests per legacy bug, and the deviations listed above (`linuxcnc`/`haas` not implemented, `useCannedCycles` defaults to true, `emit` takes partial options).
+- v3: Safety audit: document fail-closed arc/cycle emission, bounded peck expansion, R-plane positioning, repeated-hole execution and modal dwell reset before implementation. Regression tests stay inside the WP2-owned source directory.
+- v3 verification: `bun test packages/core` passed (573 tests, 0 failures, 275451 assertions); `bunx tsc -p packages/core/tsconfig.json --noEmit` exited 0. Existing test assertions and all golden files remain unchanged; `src/cam/safety.test.ts` adds 11 targeted safety tests. No cross-WP edits.

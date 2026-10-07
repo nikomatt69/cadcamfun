@@ -50,6 +50,28 @@ describe("AiService without the embedded host", () => {
     expect(after.some((m) => m.configured)).toBe(true)
   })
 
+  test("providers lists the built-ins with their tier defaults and key state", async () => {
+    const program = Effect.gen(function* () {
+      const credentials = yield* AiCredentials
+      const ai = yield* AiService
+      const before = yield* ai.providers
+      yield* credentials.set("minimax", Redacted.make("mm-key"))
+      const after = yield* ai.providers
+      return { before, after }
+    })
+    const { before, after } = await Effect.runPromise(program.pipe(Effect.provide(layer(() => streamModel(["x"])))))
+    // Without the host the catalogue is the built-ins — never an empty list, because an
+    // empty catalogue is what the settings screen used to show when the host had none.
+    expect(before.length).toBeGreaterThanOrEqual(4)
+    expect(before.every((p) => p.models.length > 0)).toBe(true)
+    expect(before.every((p) => !p.configured)).toBe(true)
+    const minimax = after.find((p) => p.id === "minimax")
+    expect(minimax?.configured).toBe(true)
+    expect(minimax?.models.map((m) => m.id)).toContain("MiniMax-M2")
+    // The catalogue says "configured" without the status call ever being made.
+    expect(after.find((p) => p.id === "anthropic")?.configured).toBe(false)
+  })
+
   test("chat streams deltas then done with usage", async () => {
     const program = Effect.gen(function* () {
       yield* (yield* AiCredentials).set("anthropic", Redacted.make("sk-test-1234"))

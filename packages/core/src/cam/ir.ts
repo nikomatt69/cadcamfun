@@ -17,6 +17,7 @@ import { angleInArc, normalizeAngle } from "../cad/arc-math.ts"
 import { Vec2Schema, Vec3Schema } from "../cad/entities.ts"
 import { TAU, type Vec2, type Vec3 } from "../cad/vec.ts"
 import type { Tool } from "./tool.ts"
+import { assertCycleSafe } from "./cycle-safety.ts"
 
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const NonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
@@ -164,6 +165,8 @@ export const moveLength = (move: Move, from: Vec3): number => {
  * `toolpathLength` and for the posts that cannot emit canned cycles.
  */
 export const expandCycle = (cycle: CycleMove, from: Vec3): ReadonlyArray<Move> => {
+  assertCycleSafe(cycle)
+  if (![from.x, from.y, from.z].every(Number.isFinite)) throw new RangeError("Invalid drilling cycle start")
   const out: Move[] = []
   const { x, y } = cycle.to
   const r = cycle.retractHeight
@@ -174,8 +177,10 @@ export const expandCycle = (cycle: CycleMove, from: Vec3): ReadonlyArray<Move> =
   const feed = (z: number): void => {
     out.push({ _tag: "Linear", to: { x, y, z }, feed: cycle.feed })
   }
-  if (Math.abs(from.x - x) > 1e-9 || Math.abs(from.y - y) > 1e-9) rapid(from.z)
-  if (Math.abs(from.z - r) > 1e-9) rapid(r)
+  const positioningZ = Math.max(from.z, r)
+  if (from.z < r) out.push({ _tag: "Rapid", to: { ...from, z: r } })
+  if (Math.abs(from.x - x) > 1e-9 || Math.abs(from.y - y) > 1e-9) rapid(positioningZ)
+  if (positioningZ !== r) rapid(r)
   const dwell = (): void => {
     if (cycle.dwellSeconds > 0) out.push({ _tag: "Dwell", seconds: cycle.dwellSeconds })
   }
@@ -421,6 +426,7 @@ export interface MachineProfile {
 }
 
 export type ValidationIssue =
+  | { readonly _tag: "InvalidInput"; readonly message: string; readonly path: string; readonly toolpathId?: string; readonly moveIndex?: number }
   | { readonly _tag: "TravelLimit"; readonly message: string; readonly point: Vec3; readonly toolpathId: string }
   | { readonly _tag: "FeedLimit"; readonly message: string; readonly feed: number; readonly toolpathId: string }
   | { readonly _tag: "MissingTool"; readonly message: string; readonly toolId: string; readonly toolpathId: string }
@@ -428,14 +434,47 @@ export type ValidationIssue =
 
 const fmt = (n: number): string => n.toFixed(3)
 
+const MachineProfileSchema = Schema.Struct({
+  id: Schema.String.check(Schema.isMinLength(1)),
+  travel: Schema.Struct({
+    minX: Schema.Finite, maxX: Schema.Finite,
+    minY: Schema.Finite, maxY: Schema.Finite,
+    minZ: Schema.Finite, maxZ: Schema.Finite
+  }),
+  maxFeed: Schema.optionalKey(Positive),
+  maxSpindleRpm: Schema.optionalKey(NonNegative),
+  tools: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)) })))
+})
+
+const validateProgramInput = Schema.decodeUnknownSync(ProgramSchema, { errors: "all" })
+const validateMachineInput = Schema.decodeUnknownSync(MachineProfileSchema, { errors: "all" })
+
 /**
- * Checks travel limits (including arc extrema), feed limits, spindle limits and
- * tool references. Returns every issue found (empty array = valid); the caller
- * decides whether a non-empty result is fatal.
+ * Fails closed on schema-invalid input, inverted travel, unsafe arcs and cycles.
+ * Schema failures stop geometric checks; otherwise all limit and semantic issues
+ * are collected. Cycle travel is checked analytically, never by peck expansion.
+ * An empty array means valid for these checks, not collision certification.
  */
 export const validate = (program: Program, machine: MachineProfile): ReadonlyArray<ValidationIssue> => {
   const issues: ValidationIssue[] = []
+  try {
+    validateProgramInput(program)
+  } catch (error) {
+    issues.push({ _tag: "InvalidInput", path: "program", message: `Invalid program: ${error instanceof Error ? error.message : String(error)}` })
+  }
+  try {
+    validateMachineInput(machine)
+  } catch (error) {
+    issues.push({ _tag: "InvalidInput", path: "machine", message: `Invalid machine profile: ${error instanceof Error ? error.message : String(error)}` })
+  }
+  if (issues.length > 0) return issues
   const t = machine.travel
+  for (const axis of ["X", "Y", "Z"] as const) {
+    if (t[`min${axis}`] > t[`max${axis}`]) {
+      issues.push({ _tag: "InvalidInput", path: `machine.travel.${axis}`, message: `Machine travel min${axis} must not exceed max${axis}` })
+    }
+  }
+  if (issues.length > 0) return issues
   for (const toolpath of program.toolpaths) {
     if (machine.tools !== undefined && !machine.tools.some((tool) => tool.id === toolpath.toolId)) {
       issues.push({
@@ -457,6 +496,10 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
       x < t.minX - 1e-9 || x > t.maxX + 1e-9 || y < t.minY - 1e-9 || y > t.maxY + 1e-9 || z < t.minZ - 1e-9 || z > t.maxZ + 1e-9
     const reported = new Set<string>()
     const check = (point: Vec3): void => {
+      if (![point.x, point.y, point.z].every(Number.isFinite)) {
+        issues.push({ _tag: "InvalidInput", path: `toolpath.${toolpath.id}.geometry`, toolpathId: toolpath.id, message: `Toolpath "${toolpath.name}" produces non-finite travel geometry` })
+        return
+      }
       if (!outside(point.x, point.y, point.z)) return
       const key = `${fmt(point.x)}/${fmt(point.y)}/${fmt(point.z)}`
       if (reported.has(key)) return
@@ -479,11 +522,40 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
         })
       }
     }
-    let from = toolpathStart(toolpath)
-    for (const move of expandMoves(toolpath.moves, from)) {
+    let from: Vec3 | undefined
+    for (const [moveIndex, move] of toolpath.moves.entries()) {
+      const invalid = (message: string): void => {
+        issues.push({ _tag: "InvalidInput", path: `toolpath.${toolpath.id}.moves[${moveIndex}]`, toolpathId: toolpath.id, moveIndex, message: `Toolpath "${toolpath.name}" move ${moveIndex}: ${message}` })
+      }
       const to = moveTarget(move)
       if (to === undefined) continue
-      if (move._tag === "Arc") for (const p of arcExtrema(move, from)) check(p)
+      if (move._tag === "Cycle") {
+        try {
+          assertCycleSafe(move)
+        } catch (error) {
+          invalid(error instanceof Error ? error.message : String(error))
+        }
+        // Every expanded peck lies between bottom and R. The only higher travel
+        // is the protective lift and lateral positioning at max(start Z, R).
+        const start = from ?? to
+        const positioningZ = Math.max(start.z, move.retractHeight)
+        check({ ...start, z: positioningZ })
+        check({ x: move.to.x, y: move.to.y, z: positioningZ })
+        check(move.to)
+      }
+      if (move._tag === "Arc") {
+        if (from === undefined) {
+          invalid("Arc requires a known start position from a preceding positioning move")
+        } else {
+          const radius = Math.hypot(from.x - move.center.x, from.y - move.center.y)
+          const endRadius = Math.hypot(to.x - move.center.x, to.y - move.center.y)
+          if (!Number.isFinite(radius) || !Number.isFinite(endRadius) || radius <= 0 || Math.abs(radius - endRadius) > 1e-6) {
+            invalid("Arc requires finite positive radius and matching endpoint radii within 1e-6 mm")
+          } else {
+            for (const p of arcExtrema(move, from)) check(p)
+          }
+        }
+      }
       check(to)
       from = to
     }

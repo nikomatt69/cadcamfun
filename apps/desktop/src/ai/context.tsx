@@ -12,7 +12,7 @@
 import { createContext, createResource, useContext, type Accessor, type JSX } from "solid-js"
 import { createAiStore, type AiStore } from "./store.ts"
 import { makeCatalog, type AiCatalogService } from "./models.ts"
-import type { AiStatus, ModelInfo, ProviderId } from "./types.ts"
+import type { AiStatus, ModelInfo, ProviderId, ProviderInfo } from "./types.ts"
 import { useApp, type AppState } from "../state/context.ts"
 
 interface AiContextValue {
@@ -20,6 +20,9 @@ interface AiContextValue {
   readonly app: AppState
   readonly aiStatus: Accessor<AiStatus | undefined>
   readonly models: Accessor<ReadonlyArray<ModelInfo>>
+  /** The provider catalogue the settings browser reads; empty until it loads. */
+  readonly providers: Accessor<ReadonlyArray<ProviderInfo>>
+  readonly providersPending: Accessor<boolean>
   readonly refresh: () => void
   readonly saveCredentials: (provider: ProviderId, key: string, baseUrl?: string) => Promise<void>
   readonly removeCredentials: (provider: ProviderId) => Promise<void>
@@ -40,9 +43,15 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
     () => app.runtime,
     (runtime) => runtime.run(catalog.models).catch(() => [] as ReadonlyArray<ModelInfo>)
   )
+  const [providersResource, providersActions] = createResource(
+    () => app.runtime,
+    (runtime) => runtime.run(catalog.providers).catch(() => [] as ReadonlyArray<ProviderInfo>)
+  )
   const refresh = (): void => {
     void statusActions.refetch()
     void modelsActions.refetch()
+    // The catalogue carries the key state, so the rows only flip to "Configured" when it is re-read.
+    void providersActions.refetch()
   }
 
   const saveCredentials = async (provider: ProviderId, key: string, baseUrl?: string): Promise<void> => {
@@ -60,6 +69,8 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
       app,
       aiStatus: () => statusResource() as AiStatus | undefined,
       models: () => (modelsResource() as ReadonlyArray<ModelInfo> | undefined) ?? [],
+      providers: () => (providersResource() as ReadonlyArray<ProviderInfo> | undefined) ?? [],
+      providersPending: () => providersResource.state === "pending",
       refresh,
       saveCredentials,
       removeCredentials

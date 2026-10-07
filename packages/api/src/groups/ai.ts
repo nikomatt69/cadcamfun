@@ -4,7 +4,11 @@ import { BadRequest, InternalError, NotFound } from "../errors.ts"
 
 const opt = Schema.optional
 const nullable = Schema.NullOr(Schema.String)
-export const AiProviderId = Schema.Literals(["anthropic", "openai", "minimax", "gateway"])
+/**
+ * Any provider the embedded host knows (models.dev merged with `nikcli.json`):
+ * not a closed union, because the user picks the provider in the settings.
+ */
+export const AiProviderId = Schema.String
 export const AiTier = Schema.Literals(["fast", "balanced", "best"])
 export const AiModelSelector = Schema.Struct({ provider: opt(AiProviderId), model: opt(Schema.String), tier: opt(AiTier) })
 
@@ -28,8 +32,34 @@ export const AiStatus = Schema.Struct({
   host: Schema.Literals(["nikcli", "direct"])
 })
 export const AiModelEntry = Schema.Struct({
-  id: Schema.String, provider: AiProviderId, tier: AiTier, contextWindow: Schema.Number,
+  id: Schema.String, provider: AiProviderId, tier: opt(AiTier), contextWindow: Schema.Number,
   tools: Schema.Boolean, vision: Schema.Boolean, configured: Schema.Boolean
+})
+
+/** One model of a catalogue provider, as the embedded host reports it. */
+export const AiHostModel = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  provider: Schema.String,
+  contextWindow: Schema.Number,
+  maxOutput: Schema.Number,
+  tools: Schema.Boolean,
+  vision: Schema.Boolean,
+  /** USD per million tokens. */
+  cost: Schema.Struct({ input: Schema.Number, output: Schema.Number })
+})
+/** One provider of `GET /api/ai/providers`: what nikcli knows plus our key state. */
+export const AiProviderEntry = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  /** Where the host got it: `models.dev`, `config`, … */
+  source: Schema.String,
+  /** How it can be authenticated (`api`, `oauth`). */
+  auth: Schema.Array(Schema.String),
+  configured: Schema.Boolean,
+  /** Present when the user overrode the base URL (OpenAI-compatible endpoints). */
+  baseUrl: opt(Schema.String),
+  models: Schema.Array(AiHostModel)
 })
 
 export const ChatMessage = Schema.Struct({ role: Schema.String, content: Schema.Unknown })
@@ -92,6 +122,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.delete("clearCredentials", "/api/ai/credentials/:provider", { params: providerParam, success: AiStatus, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("status", "/api/ai/status", { success: AiStatus, error: InternalError }),
     HttpApiEndpoint.get("models", "/api/ai/models", { success: Schema.Array(AiModelEntry), error: InternalError }),
+    HttpApiEndpoint.get("providers", "/api/ai/providers", { success: Schema.Array(AiProviderEntry), error: InternalError }),
     HttpApiEndpoint.post("chat", "/api/ai/chat", { payload: LegacyChatBody, success: LegacyChatReply, error: [AiBadRequest, AiNotFound, AiFailure] }),
     HttpApiEndpoint.post("chatStream", "/api/ai/chat/stream", {
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]

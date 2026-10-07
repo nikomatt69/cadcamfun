@@ -10,8 +10,9 @@
 import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Box, ChevronLeft, ChevronRight, Wrench } from "lucide-solid"
+import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-solid"
 import { Toaster, toast } from "../components/ui/toast.tsx"
+import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import StatusBar from "../cad/components/StatusBar.tsx"
 import { buildPlayback } from "../viewport/view3d/playback.ts"
@@ -21,6 +22,7 @@ import { useGeneratorStore, type LibraryTool } from "./store/generatorStore.ts"
 import CamToolbar from "./components/CamToolbar.tsx"
 import CamSidebar, { type SidebarTab } from "./components/CamSidebar.tsx"
 import ToolpathGenerator from "./components/ToolpathGenerator.tsx"
+import VerifyPanel from "./components/VerifyPanel.tsx"
 import ToolpathVisualizer from "./components/ToolpathVisualizer.tsx"
 import GCodeEditor from "./components/GCodeEditor.tsx"
 import MachineCycles from "./components/MachineCycles.tsx"
@@ -190,7 +192,7 @@ export default function CamPage(): JSX.Element {
 
   const cycleController = (): "fanuc" | "heidenhain" => (selectedPostProcessor() === "heidenhain" ? "heidenhain" : "fanuc")
 
-  const rightTabButton = (id: "generator" | "cycles", label: string, icon: (size: number) => JSX.Element): JSX.Element => (
+  const rightTabButton = (id: "generator" | "cycles" | "verify", label: string, icon: (size: number) => JSX.Element): JSX.Element => (
     <Show
       when={camStore.rightOpen}
       fallback={
@@ -291,13 +293,17 @@ export default function CamPage(): JSX.Element {
               <div class={camStore.rightOpen ? "flex justify-center w-full text-center" : "flex flex-col w-full"}>
                 {rightTabButton("generator", "Generator", (size) => <Wrench size={size} />)}
                 {rightTabButton("cycles", "Cycles", (size) => <Box size={size} />)}
+                {rightTabButton("verify", t("cam.verify"), (size) => <ShieldCheck size={size} />)}
               </div>
             </div>
 
             <Show when={camStore.rightOpen}>
               <div class=" space-y-6 flex-1 rounded-xl overflow-y-auto">
-                <Show when={camStore.rightTab !== "cycles"}>
+                <Show when={camStore.rightTab === "generator" || camStore.rightTab === "control"}>
                   <ToolpathGenerator onGCodeGenerated={setGcode} />
+                </Show>
+                <Show when={camStore.rightTab === "verify"}>
+                  <VerifyPanel />
                 </Show>
                 <Show when={camStore.rightTab === "cycles"}>
                   <MachineCycles controllerType={cycleController()} onCycleCodeGenerated={onCycleCode} />

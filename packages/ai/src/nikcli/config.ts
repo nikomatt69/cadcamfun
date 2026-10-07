@@ -1,4 +1,4 @@
-import { DEFAULT_MINIMAX_BASE_URL, allModels, type ProviderId } from "../models.ts"
+import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 
 /**
  * Builds the host's global `nikcli.json`. It contains no secrets: keys are
@@ -24,15 +24,16 @@ export interface HostProviderSpec {
   readonly models: ReadonlyArray<{ readonly id: string; readonly name: string; readonly context: number; readonly output: number }>
 }
 
-const PROTOCOLS: Readonly<Record<ProviderId, { name: string; protocol: HostProtocol; baseURL: string }>> = {
+const PROTOCOLS: Readonly<Record<BuiltinProviderId, { name: string; protocol: HostProtocol; baseURL: string }>> = {
   anthropic: { name: "Anthropic", protocol: "anthropic", baseURL: "https://api.anthropic.com/v1" },
   openai: { name: "OpenAI", protocol: "openai-responses", baseURL: "https://api.openai.com/v1" },
   minimax: { name: "MiniMax", protocol: "openai-compatible", baseURL: DEFAULT_MINIMAX_BASE_URL },
   gateway: { name: "AI Gateway", protocol: "openai-compatible", baseURL: "https://ai-gateway.vercel.sh/v1" }
 }
 
-export const defaultProviderSpecs = (baseUrls: Partial<Record<ProviderId, string>> = {}): ReadonlyArray<HostProviderSpec> =>
-  (Object.keys(PROTOCOLS) as ProviderId[]).map((id) => {
+/** One entry per built-in provider; every other provider comes from models.dev through the host. */
+export const defaultProviderSpecs = (baseUrls: Partial<Record<BuiltinProviderId, string>> = {}): ReadonlyArray<HostProviderSpec> =>
+  BUILTIN_PROVIDER_IDS.map((id) => {
     const p = PROTOCOLS[id]
     return {
       id,

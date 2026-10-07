@@ -8,6 +8,7 @@ import { TAU, type Vec2 } from "./vec.ts"
 import { arcSegmentCount } from "./arc-math.ts"
 import { signedArea } from "./shapes.ts"
 import { dropClosingDuplicate } from "./tessellate.ts"
+import { triangulateRing } from "./triangulate.ts"
 
 const Vec3Point = Schema.Struct({
   x: Schema.Finite,
@@ -161,21 +162,16 @@ export const solidBounds = (solid: Solid): SolidBounds => {
     case "Torus": {
       const axis = solid.axis ?? "z"
       const r = solid.majorRadius + solid.minorRadius
-      const rot = solid.rotation ?? 0
-      const cosR = Math.cos(rot)
-      const sinR = Math.sin(rot)
-      // Project the torus tube radius onto each axis for a tight bound.
-      const rx = axis === "x" ? 0 : Math.abs(cosR) * solid.minorRadius + Math.abs(sinR) * r
-      const ry = axis === "y" ? 0 : Math.abs(sinR) * solid.minorRadius + Math.abs(cosR) * r
-      const rz = axis === "z" ? 0 : solid.minorRadius
-      const big = axis === "x" ? solid.majorRadius : axis === "y" ? solid.majorRadius : solid.majorRadius
+      const rx = axis === "x" ? solid.minorRadius : r
+      const ry = axis === "y" ? solid.minorRadius : r
+      const rz = axis === "z" ? solid.minorRadius : r
       return {
-        minX: solid.center.x - (axis === "x" ? solid.minorRadius : big) - rx,
-        minY: solid.center.y - (axis === "y" ? solid.minorRadius : big) - ry,
-        minZ: solid.center.z - (axis === "z" ? solid.minorRadius : big) - rz,
-        maxX: solid.center.x + (axis === "x" ? solid.minorRadius : big) + rx,
-        maxY: solid.center.y + (axis === "y" ? solid.minorRadius : big) + ry,
-        maxZ: solid.center.z + (axis === "z" ? solid.minorRadius : big) + rz
+        minX: solid.center.x - rx,
+        minY: solid.center.y - ry,
+        minZ: solid.center.z - rz,
+        maxX: solid.center.x + rx,
+        maxY: solid.center.y + ry,
+        maxZ: solid.center.z + rz
       }
     }
     case "Extrude": {
@@ -185,10 +181,10 @@ export const solidBounds = (solid: Solid): SolidBounds => {
       return {
         minX: Math.min(...xs),
         minY: Math.min(...ys),
-        minZ: origin.z,
+        minZ: origin.z + Math.min(0, solid.height),
         maxX: Math.max(...xs),
         maxY: Math.max(...ys),
-        maxZ: origin.z + solid.height
+        maxZ: origin.z + Math.max(0, solid.height)
       }
     }
     case "Revolve": {
@@ -196,12 +192,18 @@ export const solidBounds = (solid: Solid): SolidBounds => {
       const zs = solid.profile.map((p) => p.y)
       const maxR = Math.max(...xs.map(Math.abs))
       const sweep = Math.abs(solid.angle) >= TAU - 1e-9
+      const angles = [0, solid.angle]
+      const low = Math.min(0, solid.angle)
+      const high = Math.max(0, solid.angle)
+      for (let i = Math.ceil(low / (Math.PI / 2)); i <= Math.floor(high / (Math.PI / 2)) && !sweep; i++) angles.push(i * Math.PI / 2)
+      const projectedX = xs.flatMap((r) => angles.map((a) => r * Math.cos(a)))
+      const projectedY = xs.flatMap((r) => angles.map((a) => r * Math.sin(a)))
       return {
-        minX: sweep ? -maxR : Math.min(...xs),
-        minY: sweep ? -maxR : Math.min(...xs),
+        minX: sweep ? -maxR : Math.min(...projectedX),
+        minY: sweep ? -maxR : Math.min(...projectedY),
         minZ: Math.min(...zs),
-        maxX: sweep ? maxR : Math.max(...xs),
-        maxY: sweep ? maxR : Math.max(...xs),
+        maxX: sweep ? maxR : Math.max(...projectedX),
+        maxY: sweep ? maxR : Math.max(...projectedY),
         maxZ: Math.max(...zs)
       }
     }
@@ -227,28 +229,13 @@ class MeshBuilder {
     this.indices.push(a, b, c)
   }
 
-  /**
-   * Adds a planar polygon as a triangle fan about its own centroid. The fan is
-   * emitted so the triangle normals follow the polygon's own winding, which keeps
-   * `meshVolume` consistent for callers that pass reversed rings.
-   */
+  /** Preserves concave outlines and the polygon's winding. */
   polygon(points: ReadonlyArray<Vec2>, to3: (p: Vec2) => { x: number; y: number; z: number }): void {
-    if (points.length < 3) return
-    let cx = 0
-    let cy = 0
-    for (const p of points) {
-      cx += p.x
-      cy += p.y
-    }
-    const center = to3({ x: cx / points.length, y: cy / points.length })
-    const ci = this.vertex(center.x, center.y, center.z)
     const ring = points.map((p) => {
       const v = to3(p)
       return this.vertex(v.x, v.y, v.z)
     })
-    for (let i = 0; i < ring.length; i++) {
-      this.triangle(ci, ring[i]!, ring[(i + 1) % ring.length]!)
-    }
+    for (const [a, b, c] of triangulateRing(points)) this.triangle(ring[a]!, ring[b]!, ring[c]!)
   }
 
   /** Adds an already-3D planar polygon as a fan about its centroid. */
@@ -266,35 +253,6 @@ class MeshBuilder {
     const ring = points.map((p) => this.vertex(p.x, p.y, p.z))
     for (let i = 0; i < ring.length; i++) {
       this.triangle(ci, ring[i]!, ring[(i + 1) % ring.length]!)
-    }
-  }
-
-  /**
-   * Emits a triangle fan over a cap in the plane of a sweep end. `endSign` is
-   * `-1` for the start of the sweep and `+1` for its end; `sweepSign` is the
-   * direction of the sweep itself. The normal of the emitted fan points along the
-   * sweep axis, so both caps of a partial sweep close the solid correctly.
-   */
-  triangleSweepCap(
-    face: ReadonlyArray<{ x: number; y: number; z: number }>,
-    endSign: number,
-    sweepSign: number
-  ): void {
-    const first = face[0]
-    if (first === undefined) return
-    for (let i = 1; i + 1 < face.length; i++) {
-      const c = face[i]!
-      const d = face[i + 1]!
-      const ux = c.x - first.x
-      const uy = c.y - first.y
-      const uz = c.z - first.z
-      const vx = d.x - first.x
-      const vy = d.y - first.y
-      const vz = d.z - first.z
-      // Dot of the triangle normal with the sweep axis; it must match
-      // `endSign * sweepSign` so the cap faces outwards.
-      const axisDot = (uy * vz - uz * vy) * endSign * sweepSign
-      this.emitWound(first, c, d, axisDot < 0)
     }
   }
 
@@ -367,13 +325,14 @@ const cylinderMesh = (solid: CylinderSolid): Mesh => {
   const b = new MeshBuilder()
   const n = solid.segments
   const o = solid.origin
+  const atLocal = (x: number, y: number, z: number) => axisPoint(x, y, z, solid.axis ?? "z", o)
   const at = (i: number, z: number): { x: number; y: number; z: number } => {
     const a = (i / n) * TAU
-    return { x: o.x + solid.radius * Math.cos(a), y: o.y + solid.radius * Math.sin(a), z: o.z + z }
+    return atLocal(solid.radius * Math.cos(a), solid.radius * Math.sin(a), z)
   }
   // Caps as fans about the disc centres.
-  const bottomCenter = b.vertex(o.x, o.y, o.z)
-  const topCenter = b.vertex(o.x, o.y, o.z + solid.height)
+  const bottomCenter = b.vertex(...vecOf(atLocal(0, 0, 0)))
+  const topCenter = b.vertex(...vecOf(atLocal(0, 0, solid.height)))
   const bottom = Array.from({ length: n }, (_, i) => b.vertex(...vecOf(at(i, 0))))
   const top = Array.from({ length: n }, (_, i) => b.vertex(...vecOf(at(i, solid.height))))
   for (let i = 0; i < n; i++) {
@@ -387,6 +346,13 @@ const cylinderMesh = (solid: CylinderSolid): Mesh => {
 }
 
 const vecOf = (v: { x: number; y: number; z: number }): [number, number, number] => [v.x, v.y, v.z]
+
+// Cyclic permutations preserve handedness, so every axis shares the same winding.
+const axisPoint = (x: number, y: number, z: number, axis: "x" | "y" | "z", origin: { x: number; y: number; z: number }) => {
+  if (axis === "x") return { x: origin.x + z, y: origin.y + x, z: origin.z + y }
+  if (axis === "y") return { x: origin.x + y, y: origin.y + z, z: origin.z + x }
+  return { x: origin.x + x, y: origin.y + y, z: origin.z + z }
+}
 
 /**
  * UV sphere mesh. Rows run from the north pole (`phi = 0`, `+Z`) down to the
@@ -424,10 +390,6 @@ const sphereMesh = (solid: SphereSolid): Mesh => {
 }
 
 /**
- * Extruded closed profile. The side wall is emitted counter-clockwise relative to
- * the profile's own winding, so an outward-wound profile yields outward normals.
- */
-/**
  * Extruded closed profile. Caps are emitted to face outward (down at `z = 0`, up
  * at `z = height`) and the side wall is oriented from the profile's own winding,
  * so both windings of the input produce a closed solid with outward normals.
@@ -438,16 +400,17 @@ const extrudeMesh = (solid: ExtrudeSolid): Mesh => {
   const ring = dropClosingDuplicate(solid.profile)
   const at = (p: Vec2, z: number): { x: number; y: number; z: number } => ({ x: p.x + o.x, y: p.y + o.y, z: z + o.z })
   const ccw = signedArea(ring) >= 0
+  const upward = solid.height >= 0
   // Bottom cap faces −Z, so its ring is reversed when the profile is CCW.
-  const bottomRing = ccw ? [...ring].reverse() : ring
-  const topRing = ccw ? ring : [...ring].reverse()
+  const bottomRing = ccw === upward ? [...ring].reverse() : ring
+  const topRing = ccw === upward ? ring : [...ring].reverse()
   b.polygon(bottomRing, (p) => at(p, 0))
   b.polygon(topRing, (p) => at(p, solid.height))
   const bottom = ring.map((p) => b.vertex(...vecOf(at(p, 0))))
   const top = ring.map((p) => b.vertex(...vecOf(at(p, solid.height))))
   for (let i = 0; i < ring.length; i++) {
     const j = (i + 1) % ring.length
-    if (ccw) {
+    if (ccw === upward) {
       b.triangle(bottom[i]!, bottom[j]!, top[j]!)
       b.triangle(bottom[i]!, top[j]!, top[i]!)
     } else {
@@ -458,17 +421,6 @@ const extrudeMesh = (solid: ExtrudeSolid): Mesh => {
   return b.build()
 }
 
-/**
- * Revolved profile. The profile lives in the XZ plane (`x` = radius, `y` = Z) and
- * is revolved about the Z axis. The result is a closed solid: the band between
- * consecutive profile rows, plus fan caps at each end of the sweep.
- */
-/**
- * Revolved cross-section. `profile` is a **closed** ring in the XZ plane (`x` =
- * radius from the revolve axis, `y` = Z), revolved through `angle` radians about
- * the Z axis. A partial sweep is closed with two flat caps at the sweep ends; a
- * full sweep needs none.
- */
 /**
  * Revolved cross-section. `profile` is a **closed** ring in the XZ plane (`x` =
  * radius from the revolve axis, `y` = Z), revolved through `angle` radians about
@@ -511,13 +463,14 @@ const revolveMesh = (solid: RevolveSolid): Mesh => {
       b.emitWound(a, d, c, flip)
     }
   }
-  // Sweep-end caps: a fan over the profile ring in the end plane. The cap at
+  // Sweep-end caps: triangulate the profile ring in the end plane. The cap at
   // `col = 0` faces backwards along the sweep and the one at `col = steps`
   // forwards, so the two ends share a winding and differ only in direction.
   if (!fullCircle) {
+    const triangles = triangulateRing(ring)
     for (const col of [0, steps]) {
-      const face = ring.map((_, row) => at(row, col))
-      b.triangleSweepCap(face, col === 0 ? -1 : 1, sweep)
+      const reverse = (signedArea(ring) < 0) !== ((col === 0 ? -1 : 1) * sweep < 0)
+      for (const [a, c, d] of triangles) b.emitWound(at(a, col), at(c, col), at(d, col), reverse)
     }
   }
   return b.build()
@@ -528,22 +481,42 @@ const revolveMesh = (solid: RevolveSolid): Mesh => {
  * surfaces and is ignored by the planar primitives.
  */
 export const meshOf = (solid: Solid, tolerance = 0.1): Mesh => {
-  void tolerance
+  if (!Number.isFinite(tolerance) || tolerance <= 0) throw new RangeError("Mesh tolerance must be positive and finite")
+  const segments = (radius: number, sweep: number, minimum: number, budget = tolerance): number => {
+    const step = 4 * Math.asin(Math.sqrt(Math.min(1, budget / radius) / 2))
+    const count = Math.max(minimum, Math.ceil(Math.abs(sweep) / step))
+    if (!Number.isFinite(count) || count > 65536) throw new RangeError("Mesh tolerance exceeds subdivision budget")
+    return count
+  }
+  const checkGrid = (rows: number, columns: number): void => {
+    if (rows * columns > 1_000_000) throw new RangeError("Mesh tolerance exceeds vertex budget")
+  }
   switch (solid._tag) {
     case "Box":
       return boxMesh(solid)
     case "Cylinder":
-      return cylinderMesh(solid)
-    case "Sphere":
-      return sphereMesh(solid)
+      return cylinderMesh({ ...solid, segments: segments(solid.radius, TAU, solid.segments) })
+    case "Sphere": {
+      const rings = segments(solid.radius, Math.PI, solid.rings, tolerance / 2)
+      checkGrid(rings + 1, rings * 2)
+      return sphereMesh({ ...solid, rings })
+    }
     case "Cone":
-      return coneMesh(solid)
-    case "Torus":
-      return torusMesh(solid)
+      return coneMesh({ ...solid, segments: segments(Math.max(solid.baseRadius, solid.topRadius), TAU, solid.segments) })
+    case "Torus": {
+      const majorSegments = segments(solid.majorRadius + solid.minorRadius, TAU, solid.majorSegments, tolerance / 2)
+      const minorSegments = segments(solid.minorRadius, TAU, solid.minorSegments, tolerance / 2)
+      checkGrid(majorSegments * 4, minorSegments)
+      return torusMesh({ ...solid, majorSegments, minorSegments })
+    }
     case "Extrude":
       return extrudeMesh(solid)
-    case "Revolve":
-      return revolveMesh(solid)
+    case "Revolve": {
+      const radius = Math.max(...solid.profile.map((p) => Math.abs(p.x)))
+      const count = segments(radius, Math.abs(solid.angle), solid.segments ?? 16)
+      checkGrid(solid.profile.length * 6, count)
+      return revolveMesh({ ...solid, segments: count })
+    }
   }
 }
 
@@ -613,12 +586,7 @@ const coneMesh = (solid: ConeSolid): Mesh => {
   const at = (i: number, top: 0 | 1): { x: number; y: number; z: number } => {
     const a = (i / n) * TAU
     const r = top === 0 ? r0 : r1
-    const dx = r * Math.cos(a)
-    const dy = r * Math.sin(a)
-    const dz = top * h
-    if (axis === "x") return { x: o.x + dz, y: o.y + dy, z: o.z + dx }
-    if (axis === "y") return { x: o.x + dx, y: o.y + dz, z: o.z + dy }
-    return { x: o.x + dx, y: o.y + dy, z: o.z + dz }
+    return axisPoint(r * Math.cos(a), r * Math.sin(a), top * h, axis, o)
   }
   const ring = (top: 0 | 1): number[] => {
     const out: number[] = []
@@ -633,17 +601,8 @@ const coneMesh = (solid: ConeSolid): Mesh => {
   // Side band: each quad is (bottom i, bottom j, top j, top i) where j = i + 1.
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n
-    if (axis === "x") {
-      // Looking from +X: swap winding so the normal points away from the axis.
-      b.triangle(bottom[i]!, top[j]!, bottom[j]!)
-      b.triangle(bottom[i]!, top[i]!, top[j]!)
-    } else if (axis === "y") {
-      b.triangle(bottom[j]!, top[j]!, bottom[i]!)
-      b.triangle(bottom[i]!, top[j]!, top[i]!)
-    } else {
-      b.triangle(bottom[i]!, bottom[j]!, top[j]!)
-      b.triangle(bottom[i]!, top[j]!, top[i]!)
-    }
+    b.triangle(bottom[i]!, bottom[j]!, top[j]!)
+    b.triangle(bottom[i]!, top[j]!, top[i]!)
   }
   // Caps: only when the matching radius is > 0 (a tip would have no surface).
   if (r0 > 0) b.polygon3(bottom.map((idx) => vertexFromIndex(b, idx)).reverse())
@@ -666,27 +625,12 @@ const torusMesh = (solid: TorusSolid): Mesh => {
   const min = solid.minorSegments
   const axis = solid.axis ?? "z"
   const tube = solid.rotation ?? 0
-  const cosTube = Math.cos(tube)
-  const sinTube = Math.sin(tube)
   // Build a (maj+1) × (min+1) grid of tube centres + tube offsets.
   const indexAt = (i: number, j: number): number => {
     const phi = (i / maj) * TAU
-    const theta = (j / min) * TAU
-    // Local frame on the major circle.
-    const lx = R * Math.cos(phi)
-    const ly = R * Math.sin(phi)
-    // Tube cross-section, rotated by `tube` so the user can spin the hole.
-    const ox = r * Math.cos(theta)
-    const oy = r * Math.sin(theta)
-    const ux = ox * cosTube - oy * sinTube
-    const uy = ox * sinTube + oy * cosTube
-    const uz = 0
-    const px = lx + ux
-    const py = ly + uy
-    const pz = uz
-    if (axis === "x") return b.vertex(c.x + pz, c.y + py, c.z + px)
-    if (axis === "y") return b.vertex(c.x + px, c.y + pz, c.z + py)
-    return b.vertex(c.x + px, c.y + py, c.z + pz)
+    const theta = (j / min) * TAU + tube
+    const radial = R + r * Math.cos(theta)
+    return b.vertex(...vecOf(axisPoint(radial * Math.cos(phi), radial * Math.sin(phi), r * Math.sin(theta), axis, c)))
   }
   for (let i = 0; i < maj; i++) {
     for (let j = 0; j < min; j++) {
@@ -694,8 +638,8 @@ const torusMesh = (solid: TorusSolid): Mesh => {
       const bIdx = indexAt(i, j + 1)
       const cIdx = indexAt(i + 1, j)
       const d = indexAt(i + 1, j + 1)
-      b.triangle(a, bIdx, d)
-      b.triangle(a, d, cIdx)
+      b.triangle(a, d, bIdx)
+      b.triangle(a, cIdx, d)
     }
   }
   return b.build()

@@ -74,9 +74,15 @@ export class AiCredentials extends Context.Service<
           store.delete(provider)
           yield* broadcast({ _tag: "clear", provider }).pipe(Effect.ignore)
         }),
-      status: Effect.sync(
-        () => Object.fromEntries(PROVIDER_IDS.map((id) => [id, store.has(id) ? "configured" : "missing"])) as Record<ProviderId, CredentialStatus>
-      ),
+      status: Effect.sync(() => {
+        // Builtins plus every provider the user saved a key for: a models.dev
+        // provider has to stay visible in the settings once configured.
+        const ids = new Set<string>([...BUILTIN_PROVIDER_IDS, ...store.keys()])
+        return Object.fromEntries([...ids].map((id) => [id, store.has(id) ? "configured" : "missing"])) as Record<
+          ProviderId,
+          CredentialStatus
+        >
+      }),
       get: (provider) => Effect.sync(() => Option.fromNullishOr(store.get(provider))),
       attach: (sink) =>
         Effect.gen(function* () {

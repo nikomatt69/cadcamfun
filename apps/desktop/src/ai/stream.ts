@@ -11,7 +11,7 @@
  */
 import { Effect, Queue, Schema, Stream } from "effect"
 import type { Client, AppRuntime } from "../state/client.ts"
-import type { AiEvent } from "./types.ts"
+import type { AiEvent, ProviderId, Tier } from "./types.ts"
 
 export class AiStreamError extends Schema.TaggedError<AiStreamError>()("AiStreamError", {
   message: Schema.String
@@ -92,7 +92,7 @@ export interface StreamInput {
   readonly sessionId: string
   readonly projectId?: string
   readonly context?: string
-  readonly model?: { readonly provider: "anthropic" | "openai" | "minimax" | "gateway"; readonly model: string; readonly tier?: "fast" | "balanced" | "best" }
+  readonly model?: { readonly provider: ProviderId; readonly model: string; readonly tier?: Tier }
 }
 
 export interface StreamHandle {

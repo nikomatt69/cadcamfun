@@ -8,6 +8,7 @@ import { AiConfigError, AiProviderError } from "../errors.ts"
 import { buildHostConfig, type HostProviderSpec } from "./config.ts"
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
+import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolSpec {
@@ -29,6 +30,8 @@ export interface NikCliRuntimeOptions {
   /** Builds the tool set for one project (closing over its project id). */
   readonly toolsFor: (projectId: string) => ReadonlyArray<HostToolSpec>
   readonly isolation?: IsolationOptions
+  /** Whether the one-shot models.dev seed may touch the network. Default: never (tests stay offline). */
+  readonly catalogue?: { readonly network?: boolean }
   /** Receives the host's own log lines. Default: warnings and errors only, dropped otherwise. */
   readonly hostLogs?: HostLogSink
 }
@@ -41,6 +44,11 @@ export interface ProjectHost {
 
 export interface NikCliRuntime {
   readonly paths: IsolatedPaths
+  /**
+   * Resolves when the models.dev catalogue seed finished. Every catalogue read
+   * awaits it; boot never does (the download must not delay the first frame).
+   */
+  readonly catalogueReady: Promise<CatalogueSeed>
   /** Get or lazily create the host bound to the project's scratch directory. */
   host(projectId: string): Effect.Effect<ProjectHost, AiConfigError>
   /** Push a key into the host (`provider.api.set`). */
@@ -58,7 +66,24 @@ let sdkPromise: Promise<Sdk> | undefined
 /**
  * The host freezes its paths and flags at module load, so the isolation env is
  * applied first and the module is imported dynamically, once per process.
+ *
+ * The import itself has to run with a clean `Error.prepareStackTrace`: once a JS
+ * rewriter is installed there (Bun swaps its own in while loading source-mapped
+ * modules — which anything running in our process can trigger), it stops
+ * accepting the plain objects axios brands as errors while following redirects,
+ * and the whole host fails to load with `First argument must be an Error object`.
  */
+const importSdk = async (): Promise<Sdk> => {
+  const previous = Error.prepareStackTrace
+  // lib.dom types the hook as non-optional; the runtime accepts `undefined` (its native default).
+  Error.prepareStackTrace = undefined as unknown as typeof Error.prepareStackTrace
+  try {
+    return await import("@nikcli-ai/sdk-next")
+  } finally {
+    Error.prepareStackTrace = previous
+  }
+}
+
 const loadSdk = (paths: IsolatedPaths, isolation: IsolationOptions | undefined): Promise<Sdk> => {
   if (initialisedRoot !== undefined && initialisedRoot !== paths.root) {
     return Promise.reject(
@@ -67,7 +92,7 @@ const loadSdk = (paths: IsolatedPaths, isolation: IsolationOptions | undefined):
   }
   initialisedRoot = paths.root
   applyIsolation(paths, isolation)
-  sdkPromise ??= import("@nikcli-ai/sdk-next")
+  sdkPromise ??= importSdk()
   return sdkPromise
 }
 
@@ -93,6 +118,12 @@ export const makeNikCliRuntime = (
       try: () => loadSdk(paths, options.isolation),
       catch: toConfigError("Failed to load the embedded nikcli host")
     })
+
+    // Started here, never awaited at boot: writing `<cache>/models.json` once is what
+    // gives `provider.list()` the whole models.dev catalogue instead of the four
+    // providers declared in nikcli.json. It cannot reject (`seedModelsCache` answers
+    // "unavailable"), so nothing surfaces as an unhandled rejection.
+    const catalogueReady = seedModelsCache(paths, options.catalogue)
 
     let providers = options.providers
     const hosts = new Map<string, Promise<ProjectHost>>()
@@ -131,6 +162,7 @@ export const makeNikCliRuntime = (
 
     const runtime: NikCliRuntime = {
       paths,
+      catalogueReady,
       host: (projectId) =>
         Effect.tryPromise({
           try: () => {

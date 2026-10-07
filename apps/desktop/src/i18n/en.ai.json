@@ -54,6 +54,16 @@
   "ai.model.provider.minimax": "MiniMax",
   "ai.model.provider.gateway": "Gateway",
 
+  "ai.model.current": "Current model",
+  "ai.catalogue.providerCount": "{count} providers",
+  "ai.catalogue.modelCount": "{count} models",
+  "ai.catalogue.search": "Search a provider or a model…",
+  "ai.catalogue.modelsLabel": "Models",
+  "ai.catalogue.noMatches": "No provider or model matches your search.",
+  "ai.catalogue.noProviderModels": "This provider publishes no model in the catalogue.",
+  "ai.catalogue.loading": "Loading the provider catalogue…",
+  "ai.catalogue.unavailable": "The provider catalogue is unavailable. The AI host may not have started yet.",
+
   "ai.thinking.title": "Thinking",
   "ai.thinking.expand": "Show details",
   "ai.thinking.collapse": "Hide details",

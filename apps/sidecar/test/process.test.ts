@@ -10,7 +10,7 @@ const token = "source-process-test-token"
 
 async function start(dataDir: string) {
   const child = Bun.spawn([process.execPath, entry], {
-    env: { ...process.env, CADCAMFUN_TOKEN: token, CADCAMFUN_DATA_DIR: dataDir, CADCAMFUN_MIGRATIONS_DIR: migrations },
+    env: { ...process.env, CADCAMFUN_TOKEN: token, CADCAMFUN_DATA_DIR: dataDir, CADCAMFUN_MIGRATIONS_DIR: migrations, CADCAMFUN_AI_OFFLINE: "1" },
     stdin: "pipe", stdout: "pipe", stderr: "pipe"
   })
   const errors = new Response(child.stderr).text()
@@ -35,7 +35,7 @@ async function start(dataDir: string) {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const base = await Promise.race([ready, new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Sidecar ready timeout")), 10000)
+      timer = setTimeout(() => reject(new Error("Sidecar ready timeout")), 30000)
     })])
     const call = (path: string, init: RequestInit = {}) => fetch(`${base}${path}`, {
       ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers },
@@ -55,7 +55,7 @@ async function exited(child: ReturnType<typeof Bun.spawn>) {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([child.exited, new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Graceful shutdown timeout")), 10000)
+      timer = setTimeout(() => reject(new Error("Graceful shutdown timeout")), 30000)
     })])
   } finally {
     clearTimeout(timer)

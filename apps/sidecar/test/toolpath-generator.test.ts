@@ -99,3 +99,37 @@ describe("existing toolpath routes are unaffected", () => {
     expect(res.body.message).toBe("Toolpath not found or access denied")
   })
 })
+
+describe("POST /api/toolpaths/verify", () => {
+  const stock = { minX: -20, maxX: 20, minY: -20, maxY: 20, minZ: -10, maxZ: 0 }
+  const tool = { kind: "endmill", diameter: 4 }
+
+  test("requires the bearer token", async () => {
+    expect((await post("/api/toolpaths/verify", {}, false)).status).toBe(401)
+  })
+
+  test("a safe slot reports removal and no errors", async () => {
+    const res = await post("/api/toolpaths/verify", { gcode: "G0 X-10 Y0 Z5\nG1 Z-3 F200\nG1 X10 F400\nG0 Z5", stock, tool, resolution: 0.5 })
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.stats.removedVolume).toBeGreaterThan(200)
+    expect(res.body.preview.heights.length).toBe(res.body.preview.nx * res.body.preview.ny)
+  })
+
+  test("a rapid into the stock comes back as an error issue with its line", async () => {
+    const res = await post("/api/toolpaths/verify", { gcode: "G0 X0 Y0 Z5\nG0 Z-2", stock, tool })
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(false)
+    expect(res.body.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "RapidInMaterial", severity: "error", line: 2 })]))
+  })
+
+  test("an invalid body is rejected", async () => {
+    expect((await post("/api/toolpaths/verify", { gcode: "G0 X0", stock, tool: { diameter: -1 } })).status).toBe(400)
+  })
+
+  test("gcode and program together are reported as invalid input, not simulated", async () => {
+    const res = await post("/api/toolpaths/verify", { gcode: "G0 X0", program: { name: "p", units: "mm", workOffset: "G54", toolpaths: [] }, stock, tool })
+    expect(res.body.ok).toBe(false)
+    expect(res.body.issues[0].code).toBe("InvalidInput")
+  })
+})

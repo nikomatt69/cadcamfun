@@ -56,6 +56,21 @@ const toolHandlers = Effect.gen(function*() {
     await Effect.runPromise(drawings.update(id, { data: { ...drawing, version: drawing.version + 1 } }))
   }
 
+  /** A stored operation of the active drawing with its request rebuilt over the drawing's current entities. */
+  const operation = async (drawingId: string, operationId: string | undefined): Promise<{ id: string; request: Record<string, unknown> } | { error: string }> => {
+    const { id, projectId, drawing } = await load(drawingId)
+    if (!operationId) return { error: "operationId is required" }
+    const found = await Effect.runPromise(toolpaths.find(user.id, operationId))
+    if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { error: "Operation not found in the active drawing" }
+    const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
+    if (!stored?.request) return { error: "Operation has no generation settings" }
+    const savedGeometry = stored.request.geometry !== null && typeof stored.request.geometry === "object" ? stored.request.geometry : {}
+    return {
+      id: operationId,
+      request: { ...stored.request, geometry: { ...savedGeometry, selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag })) } }
+    }
+  }
+
   const handlers: ToolHandlersShape = {
     addEntities: async (projectId, entities) => {
       const { id, drawing } = await load(projectId)
@@ -103,24 +118,71 @@ const toolHandlers = Effect.gen(function*() {
       }))
       return { ok: true, operationId: row.id, name: row.name, drawing: drawing.name }
     },
-    generateGcode: async (drawingId, operationId) => {
-      const { id, projectId, drawing } = await load(drawingId)
-      if (!operationId) return { gcode: "", stats: { error: "operationId is required" } }
+    listOperations: async (drawingId) => {
+      const { id } = await load(drawingId)
+      const rows = await Effect.runPromise(toolpaths.listForDrawing(id))
+      return rows.map((row) => {
+        const settings = (row.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {}
+        return {
+          id: row.id, name: row.name, type: row.type, operationType: row.operationType, generated: Boolean(row.gcode),
+          tool: { type: settings["toolType"], diameter: settings["toolDiameter"] }, depth: settings["depth"], stepdown: settings["stepdown"], feedrate: settings["feedrate"]
+        }
+      })
+    },
+    updateOperation: async (drawingId, operationId, params) => {
+      const { id, projectId } = await load(drawingId)
       const found = await Effect.runPromise(toolpaths.find(user.id, operationId))
-      if (!found || found.row.drawingId !== id || found.project.id !== projectId) {
-        return { gcode: "", stats: { error: "Operation not found in the active drawing" } }
-      }
-      const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
-      if (!stored?.request) return { gcode: "", stats: { error: "Operation has no generation settings" } }
-      const savedGeometry = stored.request.geometry !== null && typeof stored.request.geometry === "object" ? stored.request.geometry : {}
-      const request = {
-        ...stored.request,
-        geometry: { ...savedGeometry, selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag })) }
-      }
-      const { response, error } = cam.generator.generateToolpath(request as never)
+      if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
+      const stored = found.row.data as { request?: { settings?: Record<string, unknown>; geometry?: unknown; printer?: unknown } } | null
+      if (!stored?.request) return { ok: false, error: "Operation has no generation settings" }
+      const settings = cam.generator.decodeSettings({ ...(stored.request.settings ?? {}), ...params })
+      const request = { ...stored.request, settings }
+      // The stored G-code no longer matches the settings: drop it so nothing exports a stale program.
+      await Effect.runPromise(toolpaths.update(operationId, { data: { request }, gcode: null, operationType: settings.operationType }))
+      return { ok: true, operationId, settings: { operationType: settings.operationType, toolDiameter: settings.toolDiameter, depth: settings.depth, stepdown: settings.stepdown, feedrate: settings.feedrate }, note: "Generate G-code again, then verify it." }
+    },
+    suggestParameters: async (drawingId, params) => {
+      const { drawing } = await load(drawingId)
+      const settings = cam.generator.decodeSettings(params)
+      const geometry = cam.generator.GeometrySchema.make({
+        geometryType: "selected",
+        selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag }))
+      } as never)
+      return cam.generator.suggestFor(settings, geometry as never)
+    },
+    generateGcode: async (drawingId, operationId) => {
+      const found = await operation(drawingId, operationId)
+      if ("error" in found) return { gcode: "", stats: { error: found.error } }
+      const { response, error } = cam.generator.generateToolpath(found.request as never)
       if (error) return { gcode: "", stats: { error } }
-      await Effect.runPromise(toolpaths.update(operationId, { data: { request, response }, gcode: response.gcode }))
+      await Effect.runPromise(toolpaths.update(found.id, { data: { request: found.request, response }, gcode: response.gcode }))
       return { gcode: response.gcode, stats: response.stats }
+    },
+    verifyOperation: async (drawingId, operationId, options) => {
+      const found = await operation(drawingId, operationId)
+      if ("error" in found) return { ok: false, error: found.error }
+      const { response, error } = cam.generator.generateToolpath(found.request as never)
+      if (error) return { ok: false, error }
+      const built = cam.verify.verifyRequestFor(found.request as never, response.gcode, {
+        ...(options.tool !== undefined ? { tool: options.tool } : {}),
+        ...(options.stock !== undefined ? { stock: options.stock } : {}),
+        ...(options.fixtures !== undefined ? { fixtures: options.fixtures } : {}),
+        ...(options.targetSolids !== undefined ? { target: { solids: options.targetSolids } } : {}),
+        ...(options.resolution !== undefined ? { resolution: options.resolution } : {}),
+        ...(options.tolerance !== undefined ? { tolerance: options.tolerance } : {})
+      })
+      if (!built.ok) return { ok: false, error: built.error }
+      const report = cam.verify.verifyToolpath(built.request)
+      // The height field is for the UI; the model gets the verdict, the numbers and where it went wrong.
+      return {
+        ok: report.ok, issues: report.issues.slice(0, 20), stats: report.stats,
+        stock: built.request.stock, tool: built.request.tool,
+        modelled: {
+          holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined,
+          fixtures: built.request.fixtures.length, target: built.request.target !== undefined
+        },
+        note: "A passing report covers only what is modelled; it is not a machine certification."
+      }
     },
     remember: async (key, value) => { await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
@@ -141,6 +203,10 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     dataDir: config.dataDir,
     providers: defaultProviderSpecs(),
     systemPrompt: systemPrompt(),
+    // One request to models.dev, only while `<cache>/models.json` is missing: that file is
+    // what turns "the four providers we declare" into the whole catalogue. Offline tests
+    // set the flag and the seed answers "skipped" without touching the network.
+    catalogue: { network: process.env.CADCAMFUN_AI_OFFLINE !== "1" },
     toolsFor: (projectId) => buildTools(handlers, projectId)
   })
   yield* credentials.attach({

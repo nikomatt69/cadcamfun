@@ -427,14 +427,15 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
                   class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40"
                   disabled={!model.configured}
                   onClick={() => {
-                    ai.setModel({ provider: model.provider, model: model.id, tier: model.tier })
+                    ai.setModel({ provider: model.provider, model: model.id, ...(model.tier === undefined ? {} : { tier: model.tier }) })
                     props.onSelect()
                   }}
                 >
                   <span class="flex-1">
                     <div class="text-xs font-medium text-gray-900 dark:text-gray-100">{model.id}</div>
                     <div class="text-[10px] text-gray-500">
-                      {t(`ai.model.provider.${model.provider}` as never)} · {t(`ai.model.tier.${model.tier}` as never)}
+                      {ai.providers().find((p) => p.id === model.provider)?.name ?? t(`ai.model.provider.${model.provider}` as never)}
+                      <Show when={model.tier !== undefined}> · {t(`ai.model.tier.${model.tier}` as never)}</Show>
                     </div>
                   </span>
                   <Show when={!model.configured}>

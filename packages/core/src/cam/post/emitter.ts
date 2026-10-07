@@ -23,6 +23,7 @@ import {
   moveTarget
 } from "../ir.ts"
 import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from "./types.ts"
+import { assertCycleSafe } from "../cycle-safety.ts"
 
 const MM_PER_INCH = 25.4
 
@@ -194,14 +195,18 @@ class Writer {
     this.endCycle()
     const from = this.ir
     if (from === undefined) {
-      // No known start: a leading arc cannot be expressed; fall back to a straight move.
-      this.linear(move.to, move.feed)
-      return
+      throw new RangeError("Arc requires a known start position")
     }
     const sweep = arcSweepBetween(from, move.to, move.center, move.clockwise)
     const radius = Math.hypot(from.x - move.center.x, from.y - move.center.y)
+    const endRadius = Math.hypot(move.to.x - move.center.x, move.to.y - move.center.y)
+    if (![from.x, from.y, from.z, move.to.x, move.to.y, move.to.z, move.center.x, move.center.y, move.feed, radius, endRadius].every(Number.isFinite) ||
+      radius <= 0 || move.feed <= 0 || Math.abs(radius - endRadius) > 1e-6) {
+      throw new RangeError("Arc requires finite geometry, positive radius/feed and matching endpoint radii")
+    }
     const full = isFullCircle(move, from)
-    if (this.arcMode === "linearize") {
+    const collapsed = !full && Number(this.num(move.to.x)) === this.px && Number(this.num(move.to.y)) === this.py
+    if (this.arcMode === "linearize" || collapsed) {
       const n = arcSegmentCount(radius, sweep, this.options.tolerance, full ? 8 : 1)
       const a0 = Math.atan2(from.y - move.center.y, from.x - move.center.x)
       const dir = move.clockwise ? -1 : 1
@@ -257,11 +262,13 @@ class Writer {
   }
 
   cycleMove(move: CycleMove): void {
+    assertCycleSafe(move)
     const from = this.ir ?? { x: move.to.x, y: move.to.y, z: move.retractHeight }
     if (!this.options.useCannedCycles || !this.dialect.canned) {
       for (const m of expandCycle(move, from)) this.move(m)
       return
     }
+    if (from.z < move.retractHeight) this.rapid({ ...from, z: move.retractHeight })
     const code = CYCLE_CODE[move.cycle]
     if (this.cycle?.code !== code) {
       this.cycle = { code }
@@ -294,7 +301,7 @@ class Writer {
         state.q = q
       }
     }
-    if (move.cycle !== "drill" && move.dwellSeconds > 0) {
+    if (move.cycle !== "drill" && (move.cycle === "dwell" || move.dwellSeconds > 0 || state.p !== undefined)) {
       const p =
         this.dialect.dwell === "milliseconds"
           ? String(Math.round(move.dwellSeconds * 1000))
@@ -306,6 +313,8 @@ class Writer {
     }
     const f = this.feedWord(move.feed)
     if (f !== undefined) words.push(f)
+    // A bare modal repeat can be empty (same hole/feed/depth), losing a requested cycle.
+    if (words.length === 0) words.push(code)
     this.block(...words)
     this.motion = code
     // The control rapids over the hole and returns to the R plane (G99).

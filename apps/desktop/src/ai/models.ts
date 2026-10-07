@@ -7,7 +7,7 @@
  */
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import type { Client } from "../state/client.ts"
-import type { AiStatus, ModelInfo, ProviderId, Tier } from "./types.ts"
+import type { AiStatus, ModelInfo, ProviderId, ProviderInfo, Tier } from "./types.ts"
 
 export class AiConfigError extends Schema.TaggedError<AiConfigError>()("AiConfigError", {
   message: Schema.String
@@ -26,6 +26,8 @@ export interface CredentialsInput {
 export interface AiCatalog {
   readonly status: Effect.Effect<AiStatus, AiConfigError, never>
   readonly models: Effect.Effect<ReadonlyArray<ModelInfo>, AiConfigError, never>
+  /** The whole provider catalogue: what the settings browser lists (spec 08-ai.md §2). */
+  readonly providers: Effect.Effect<ReadonlyArray<ProviderInfo>, AiConfigError, never>
   readonly setCredentials: (input: CredentialsInput) => Effect.Effect<AiStatus, AiConfigError, never>
   readonly clearCredentials: (provider: ProviderId) => Effect.Effect<AiStatus, AiConfigError, never>
   readonly feedback: (input: { readonly messageId: string; readonly rating: "up" | "down"; readonly comment?: string }) => Effect.Effect<void, AiConfigError, never>
@@ -50,11 +52,25 @@ const fetchModels = Effect.fn("AiCatalog.models")(function* (client: Client) {
   return raw.map((m) => ({
     id: m.id,
     provider: m.provider,
-    tier: m.tier,
+    // Only the built-in fallback tiers carry one; models.dev entries do not.
+    ...(m.tier === undefined ? {} : { tier: m.tier }),
     contextWindow: m.contextWindow,
     tools: m.tools,
     vision: m.vision,
     configured: m.configured
+  }))
+})
+
+const fetchProviders = Effect.fn("AiCatalog.providers")(function* (client: Client) {
+  const raw = yield* client.ai.providers().pipe(Effect.mapError(invalid))
+  return raw.map((p): ProviderInfo => ({
+    id: p.id,
+    name: p.name,
+    source: p.source,
+    auth: p.auth,
+    configured: p.configured,
+    ...(p.baseUrl === undefined ? {} : { baseUrl: p.baseUrl }),
+    models: p.models
   }))
 })
 
@@ -82,6 +98,7 @@ const feedback = Effect.fn("AiCatalog.feedback")(function* (client: Client, inpu
 export const makeCatalog = (client: Client): AiCatalog => ({
   status: fetchStatus(client),
   models: fetchModels(client),
+  providers: fetchProviders(client),
   setCredentials: (input) => setCredentials(client, input),
   clearCredentials: (provider) => clearCredentials(client, provider),
   feedback: (input) => feedback(client, input)

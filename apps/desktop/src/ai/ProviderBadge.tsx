@@ -20,6 +20,9 @@ export function ProviderBadge(): JSX.Element {
     if (!s) return []
     return Object.entries(s.providers).filter(([, v]) => v === "configured").map(([k]) => k)
   }
+  /** First few configured providers; the rest collapse into a `+N` count. */
+  const shown = (): ReadonlyArray<string> => providers().slice(0, 3)
+  const extra = (): number => Math.max(0, providers().length - 3)
   return (
     <div class="flex items-center gap-1" data-testid="ai-provider-badge">
       <Show when={host() === "nikcli"} fallback={
@@ -35,7 +38,9 @@ export function ProviderBadge(): JSX.Element {
       </Show>
       <Show when={providers().length > 0}>
         <span class="text-[10px] text-gray-500" data-testid="ai-providers">
-          {providers().join(" · ")}
+          {/* A catalogue provider set can be huge: the pill summarises instead of listing. */}
+          {shown().join(" · ")}
+          <Show when={extra() > 0}> · +{extra()}</Show>
         </span>
       </Show>
     </div>

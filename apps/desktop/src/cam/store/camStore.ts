@@ -23,7 +23,7 @@ export type ControllerType = "gcode" | "grbl" | "fanuc"
 
 export type ActiveTab = "preview" | "editor" | "toolpath" | "post"
 export type SidebarTab = "workpiece" | "generator" | "operations"
-export type RightTab = "generator" | "cycles" | "control"
+export type RightTab = "generator" | "cycles" | "verify" | "control"
 
 export interface Workpiece {
   readonly x: number

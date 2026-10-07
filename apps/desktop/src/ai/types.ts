@@ -6,8 +6,13 @@
  * the host bus into the public stream events. Everything is plain JSON-safe.
  */
 
-export type ProviderId = "anthropic" | "openai" | "minimax" | "gateway"
 export type Tier = "fast" | "balanced" | "best"
+/**
+ * Any provider the embedded host knows: the models.dev catalogue merged with
+ * `nikcli.json` (spec 08-ai.md §2). Deliberately not a closed union — the
+ * settings browser offers every provider nikcli can talk to.
+ */
+export type ProviderId = string
 
 export interface ChatModel {
   readonly provider: ProviderId
@@ -18,11 +23,39 @@ export interface ChatModel {
 export interface ModelInfo {
   readonly id: string
   readonly provider: ProviderId
-  readonly tier: Tier
+  /** Absent for models.dev entries: only our built-in fallback tiers carry one. */
+  readonly tier?: Tier
   readonly contextWindow: number
   readonly tools: boolean
   readonly vision: boolean
   readonly configured: boolean
+}
+
+/** One model of a catalogue provider, exactly as `GET /api/ai/providers` returns it. */
+export interface HostModel {
+  readonly id: string
+  readonly name: string
+  readonly provider: string
+  readonly contextWindow: number
+  readonly maxOutput: number
+  readonly tools: boolean
+  readonly vision: boolean
+  /** USD per million tokens. */
+  readonly cost: { readonly input: number; readonly output: number }
+}
+
+/** One provider of `GET /api/ai/providers`: the host's catalogue plus our key state. */
+export interface ProviderInfo {
+  readonly id: string
+  readonly name: string
+  /** Where the host got it: `models.dev`, `config`, … */
+  readonly source: string
+  /** How it can be authenticated (`api`, `oauth`). */
+  readonly auth: ReadonlyArray<string>
+  readonly configured: boolean
+  /** Present when the base URL was overridden (OpenAI-compatible endpoints). */
+  readonly baseUrl?: string
+  readonly models: ReadonlyArray<HostModel>
 }
 
 export interface AiUsage {

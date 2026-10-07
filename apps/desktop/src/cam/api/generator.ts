@@ -15,6 +15,8 @@ export type SuggestRequest = Parameters<Client["toolpathGenerator"]["suggest"]>[
 export type GenerateResponse = typeof cam.generator.GenerateResponseSchema.Type
 export type SuggestResponse = typeof cam.generator.SuggestResponseSchema.Type
 export type ParseResponse = typeof cam.generator.ParseResponseSchema.Type
+export type VerifyRequest = typeof cam.verify.VerifyRequestSchema.Type
+export type VerifyResponse = typeof cam.verify.VerifyResponseSchema.Type
 
 export class ToolpathGeneratorError extends Schema.TaggedError<ToolpathGeneratorError>()("ToolpathGeneratorError", {
   message: Schema.String
@@ -34,12 +36,15 @@ export interface ToolpathGeneratorService {
   readonly suggest: (request: SuggestRequest) => Effect.Effect<SuggestResponse, ToolpathGeneratorError>
   /** Statistics and IR of arbitrary G-code text (pasted, imported or edited). */
   readonly parse: (gcode: string, name?: string) => Effect.Effect<ParseResponse, ToolpathGeneratorError>
+  /** Replays G-code against the stock: removal, collisions, gouges. */
+  readonly verify: (request: VerifyRequest) => Effect.Effect<VerifyResponse, ToolpathGeneratorError>
 }
 
 export const makeToolpathGenerator = (client: Client): ToolpathGeneratorService => ({
   generate: (payload) => client.toolpathGenerator.generate({ payload }).pipe(Effect.mapError(failure)),
   suggest: (payload) => client.toolpathGenerator.suggest({ payload }).pipe(Effect.mapError(failure)),
-  parse: (gcode, name) => client.toolpathGenerator.parse({ payload: { gcode, name: name ?? "Program" } }).pipe(Effect.mapError(failure))
+  parse: (gcode, name) => client.toolpathGenerator.parse({ payload: { gcode, name: name ?? "Program" } }).pipe(Effect.mapError(failure)),
+  verify: (payload) => client.toolpathGenerator.verify({ payload }).pipe(Effect.mapError(failure))
 })
 
 export class ToolpathGenerator extends Context.Service<ToolpathGenerator, ToolpathGeneratorService>()("cadcamfun/ToolpathGenerator") {

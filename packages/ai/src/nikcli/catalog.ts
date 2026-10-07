@@ -61,15 +61,20 @@ export const hostCatalog = (
   projectId = "default"
 ): Effect.Effect<ReadonlyArray<HostProviderInfo>, AiConfigError> =>
   Effect.gen(function* () {
+    // Read the seed first: the runtime starts it at boot without waiting, and
+    // `provider.list()` only sees models.dev once `<cache>/models.json` exists.
+    yield* Effect.promise(() => runtime.catalogueReady)
     const host = yield* runtime.host(projectId)
     const list = yield* Effect.tryPromise({
       try: async () => (await host.client.provider.list()).all as ReadonlyArray<HostProvider>,
       catch: toCatalogError
     })
+    // Authentication methods are decoration (the UI shows how to sign in): a host
+    // that cannot list them must not fail the whole catalogue read.
     const authByProvider = yield* Effect.tryPromise({
       try: async () => await host.client.provider.auth(),
-      catch: () => ({}) as Readonly<Record<string, ReadonlyArray<{ type: string }>>>
-    })
+      catch: toCatalogError
+    }).pipe(Effect.orElseSucceed(() => ({}) as Readonly<Record<string, ReadonlyArray<{ type: string }>>>))
 
     return list.map((provider) => ({
       id: provider.id,

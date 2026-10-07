@@ -50,6 +50,15 @@ export const defaultModelFactory: LanguageModelFactory = (resolved, credential) 
       })(resolved.modelId)
     case "gateway":
       return createGateway({ apiKey, ...(credential.baseUrl ? { baseURL: credential.baseUrl } : {}) })(resolved.modelId)
+    default: {
+      // Any other provider the host knows (models.dev): the one-shot path can only
+      // reach it through its OpenAI-compatible endpoint, so a base URL is required.
+      const providerId = resolved.provider
+      if (credential.baseUrl === undefined) {
+        throw new Error(`No base URL configured for "${providerId}". Add one in the AI settings, or pick a built-in provider.`)
+      }
+      return createOpenAICompatible({ name: providerId, apiKey, baseURL: credential.baseUrl })(resolved.modelId)
+    }
   }
 }
 

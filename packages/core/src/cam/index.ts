@@ -7,6 +7,7 @@
  */
 export * from "./ir.ts"
 export * from "./tool.ts"
+export * from "./setup.ts"
 export * from "./params.ts"
 export * from "./path.ts"
 export * from "./arc-fit.ts"
@@ -17,3 +18,4 @@ export * as testing from "./testing/index.ts"
 export * as generator from "./generator/index.ts"
 export * as cycles from "./cycles/index.ts"
 export * as viewer from "./viewer/index.ts"
+export * as verify from "./verify/index.ts"
