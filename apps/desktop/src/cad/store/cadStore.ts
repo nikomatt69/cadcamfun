@@ -1,5 +1,6 @@
 // src/store/cadStore.ts
 import { create } from "../../state/zustand.ts";
+import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
 
 type ViewMode = "2d" | "3d";
@@ -79,11 +80,16 @@ interface CADState {
   // State and action for dimension visibility
   showDimensions: boolean;
   toggleDimensions: () => void;
+  /** Drawing tolerance, mm: how closely curves are drawn (see `state/document-settings.ts`). */
+  tolerance: number;
+  setTolerance: (tolerance: number) => void;
   setWorkpieceFromElement: (elementId: string) => void;
 }
 
 export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
+  tolerance: DEFAULT_TOLERANCE,
+  setTolerance: (tolerance) => set({ tolerance }),
   activeTool: "select",
   gridVisible: true,
   axisVisible: true,

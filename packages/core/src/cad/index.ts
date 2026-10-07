@@ -51,3 +51,4 @@ const perTagSchemas = {
 } as const
 
 export const entitySchemaOf = (tag: EntityTag): (typeof perTagSchemas)[EntityTag] => perTagSchemas[tag]
+export * from "./tolerance.ts"

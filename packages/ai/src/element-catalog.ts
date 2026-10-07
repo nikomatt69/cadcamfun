@@ -5,8 +5,10 @@
  * lofts, sweeps, booleans, curves, mechanical parts and architecture, not only 2D sketches.
  *
  * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
- * No dependencies: the tool schema, the sidecar handler and the tests all read this one table.
+ * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
+import { MAX_CURVE_SEGMENTS, chordError, segmentsFor } from "@cadcamfun/core"
+
 type Fields = Readonly<Record<string, unknown>>
 
 interface Spec {
@@ -93,24 +95,9 @@ const COMMON = ["name", "color", "wireframe", "layer", "layerId", "rotation", "s
 
 /** How finely the editor draws round shapes; `tolerance` sets them from the allowed deviation instead. */
 const TESSELLATION = ["segments", "radialSegments", "tubularSegments", "capSegments"] as const
-const MIN_SEGMENTS = 8
 /** A round section never needs more than this to stay a mesh the editor can draw (sphere meshes grow with its square). */
-const MAX_SEGMENTS = 2048
 const MAX_SPHERE_SEGMENTS = 512
-
-/**
- * Segments of a circle of `radius` so that the chord deviates from the true circle by at most `tolerance` (both mm):
- * sagitta = r (1 - cos(pi / n)) <= tolerance. At least 8; `cap` limits very fine requests.
- */
-export const segmentsFor = (radius: number, tolerance: number, cap = MAX_SEGMENTS): number => {
-  if (!(radius > 0) || !(tolerance > 0)) return MIN_SEGMENTS
-  if (tolerance >= radius) return MIN_SEGMENTS
-  const n = Math.ceil(Math.PI / Math.acos(1 - tolerance / radius))
-  return Math.min(cap, Math.max(MIN_SEGMENTS, n))
-}
-
-/** The largest deviation of a chord-approximated circle, for reporting what a capped mesh really achieves. */
-export const chordError = (radius: number, segments: number): number => radius * (1 - Math.cos(Math.PI / segments))
+export { chordError, segmentsFor }
 
 const num = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0)
 const maxX = (profile: unknown): number => (Array.isArray(profile) ? Math.max(0, ...profile.map((p) => num((p as { x?: unknown }).x))) : 0)
@@ -125,15 +112,15 @@ const tessellate = (element: Record<string, unknown>, tolerance: number): string
     return err > tolerance * (1 + 1e-9) ? { n, warning: `${type}: ${n} segments is the finest mesh the editor draws; the deviation is ${err.toFixed(4)} mm, not ${tolerance} mm` } : { n }
   }
   switch (type) {
-    case "circle": case "cylinder": case "cone": case "hemisphere": { const g = grid(r, MAX_SEGMENTS); element["segments"] = g.n; return g.warning }
+    case "circle": case "cylinder": case "cone": case "hemisphere": { const g = grid(r, MAX_CURVE_SEGMENTS); element["segments"] = g.n; return g.warning }
     case "sphere": { const g = grid(r, MAX_SPHERE_SEGMENTS); element["segments"] = g.n; return g.warning }
-    case "ellipse": case "ellipsoid": { const g = grid(Math.max(num(element["radiusX"]), num(element["radiusY"]), num(element["radiusZ"])), MAX_SEGMENTS); element["segments"] = g.n; return g.warning }
-    case "revolution": { const g = grid(maxX(element["profile"]), MAX_SEGMENTS); element["segments"] = g.n; return g.warning }
-    case "capsule": { const g = grid(r, MAX_SEGMENTS); element["radialSegments"] = g.n; element["capSegments"] = Math.max(8, Math.ceil(g.n / 4)); return g.warning }
+    case "ellipse": case "ellipsoid": { const g = grid(Math.max(num(element["radiusX"]), num(element["radiusY"]), num(element["radiusZ"])), MAX_CURVE_SEGMENTS); element["segments"] = g.n; return g.warning }
+    case "revolution": { const g = grid(maxX(element["profile"]), MAX_CURVE_SEGMENTS); element["segments"] = g.n; return g.warning }
+    case "capsule": { const g = grid(r, MAX_CURVE_SEGMENTS); element["radialSegments"] = g.n; element["capSegments"] = Math.max(8, Math.ceil(g.n / 4)); return g.warning }
     case "torus": {
       const tube = num(element["tubeRadius"])
-      const major = grid(r + tube, MAX_SEGMENTS)
-      const minor = grid(tube, MAX_SEGMENTS)
+      const major = grid(r + tube, MAX_CURVE_SEGMENTS)
+      const minor = grid(tube, MAX_CURVE_SEGMENTS)
       element["tubularSegments"] = major.n
       element["radialSegments"] = minor.n
       return major.warning ?? minor.warning
@@ -177,7 +164,7 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
   for (const key of TESSELLATION) {
     const given = input[key]
     if (given === undefined) continue
-    if (typeof given !== "number" || !Number.isInteger(given) || given < 3 || given > MAX_SEGMENTS) return { ok: false, error: `${type}.${key} must be an integer from 3 to ${MAX_SEGMENTS}` }
+    if (typeof given !== "number" || !Number.isInteger(given) || given < 3 || given > MAX_CURVE_SEGMENTS) return { ok: false, error: `${type}.${key} must be an integer from 3 to ${MAX_CURVE_SEGMENTS}` }
     element[key] = given
   }
   let warning: string | undefined
@@ -206,3 +193,17 @@ export const elementCatalogueLines = (): string => ELEMENT_TYPES.map((type) => `
 
 /** The catalogue as one line, for places with no room for a list. */
 export const elementCatalogueText = (): string => ELEMENT_TYPES.map((type) => `${type} (${ELEMENT_SPECS[type].doc})`).join("; ")
+
+/** Element types drawn as meshes of chords, the ones a tolerance applies to. */
+const ROUND_TYPES = new Set(["circle", "cylinder", "cone", "hemisphere", "sphere", "ellipse", "ellipsoid", "revolution", "capsule", "torus"])
+
+/**
+ * Gives a round element the drawing's tolerance when it has neither its own `tolerance` nor `segments`.
+ * Used by the sidecar, which knows the drawing's settings; the tool itself only sees the model's input.
+ */
+export const withDefaultTolerance = (element: Record<string, unknown>, tolerance: number): { readonly element: Record<string, unknown>; readonly warning?: string } => {
+  if (!ROUND_TYPES.has(String(element["type"])) || element["tolerance"] !== undefined || element["segments"] !== undefined || !(tolerance > 0)) return { element }
+  const next = { ...element, tolerance }
+  const warning = tessellate(next, tolerance)
+  return warning === undefined ? { element: next } : { element: next, warning }
+}

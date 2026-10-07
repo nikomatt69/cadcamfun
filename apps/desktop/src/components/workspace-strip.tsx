@@ -8,6 +8,7 @@
 import { Show, type JSX } from "solid-js"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { UNIT_TABLE, formatLength } from "../viewport/units.ts"
 import { sidecarKey } from "./status-bar.tsx"
 
 const HIDE = { md: "hidden md:flex", lg: "hidden lg:flex", xl: "hidden xl:flex", "2xl": "hidden 2xl:flex" } as const
@@ -90,7 +91,8 @@ export function ShellSegs(): JSX.Element {
   const ready = (): boolean => app.sidecar() === "ready"
   return (
     <>
-      <Seg label="Units" value={settings().units} tone="amber" testId="status-units" />
+      <Seg label="Units" value={UNIT_TABLE[settings().units].label} tone="amber" testId="status-units" />
+      <Seg label="Tol" value={formatLength(settings().tolerance, settings().units, settings().decimals)} tone="cyan" title="Drawing tolerance" testId="status-tolerance" />
       <Seg label={t("status.snap")} value={settings().snapEnabled ? t("shell.snapOn") : t("status.snapOff")} tone={settings().snapEnabled ? "green" : "muted"} hideBelow="md" testId="status-snap" />
       <Seg label={t("status.sidecar")} value={t(sidecarKey(app.sidecar()))} tone={ready() ? "green" : "red"} testId="status-sidecar" />
     </>

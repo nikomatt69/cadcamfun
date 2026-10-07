@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { segmentsFor } from "@cadcamfun/core"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
 
@@ -86,6 +87,25 @@ describe("cad tools provision what is missing", () => {
     expect(stored.map((e) => e.id)).toEqual(expect.arrayContaining(car.ids))
   })
 
+  test("round elements take the drawing's tolerance unless they bring their own", async () => {
+    const drawings = (await app.call(`/api/projects/${projectId}/drawings`)).body as Array<{ id: string; data: Record<string, unknown> }>
+    const drawing = drawings[0]!
+    await app.call(`/api/drawings/${drawing.id}`, { method: "PUT", json: { data: { ...drawing.data, settings: { units: "um", tolerance: 0.001, decimals: 3 } } } })
+    const out = await handlers.addElements(projectId, [
+      { type: "cylinder", radius: 25, height: 40 },
+      { type: "cylinder", radius: 25, height: 40, tolerance: 0.05 },
+      { type: "cylinder", radius: 25, height: 40, segments: 48 },
+      { type: "cube", width: 5, height: 5, depth: 5 }
+    ]) as { elements: Array<Record<string, unknown>> }
+    expect(out.elements[0]).toMatchObject({ tolerance: 0.001, segments: segmentsFor(25, 0.001) })
+    expect(out.elements[1]).toMatchObject({ tolerance: 0.05 })
+    expect(out.elements[2]).toMatchObject({ segments: 48 })
+    expect(out.elements[2]).not.toHaveProperty("tolerance")
+    expect(out.elements[3]).not.toHaveProperty("tolerance")
+    const described = await handlers.describeDrawing(projectId) as { settings: { tolerance: number } }
+    expect(described.settings.tolerance).toBe(0.001)
+  })
+
   test("cad_add_elements adds nothing when any element is invalid, and says why", async () => {
     const before = ((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length
     const out = await run("cad_add_elements", { elements: [{ type: "sphere", radius: 5 }, { type: "revolution" }, { type: "cube", width: -3 }] }) as { ok: boolean; problems: string[] }
@@ -94,6 +114,13 @@ describe("cad tools provision what is missing", () => {
     expect(((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length).toBe(before)
     const bad = await handlers.addElements(projectId, [{ type: "boolean-union", operands: [0, 7] }]) as { ok: boolean }
     expect(bad.ok).toBe(false)
+  })
+
+  test("nothing in the drawing is missing the coordinates the generator needs", async () => {
+    const stored = (await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as Array<Record<string, unknown>>
+    const solids = stored.filter((e) => ["cube", "sphere", "cylinder", "cone", "torus", "circle"].includes(String(e["type"])))
+    expect(solids.length).toBeGreaterThan(0)
+    for (const e of solids) for (const k of ["x", "y", "z"]) expect(typeof e[k], `${e["type"]}.${k}`).toBe("number")
   })
 
   test("a cam operation needs something to machine", async () => {

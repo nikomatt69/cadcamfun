@@ -4,7 +4,6 @@
  * behaves the same; the rules live in `cad/lib/browser.ts`, the data in the CAD stores.
  */
 import { createSignal } from "solid-js"
-import { useCADStore } from "../../store/cadStore.ts"
 import { useElementsStore } from "../../store/elementsStore.ts"
 import { useLayerStore } from "../../store/layerStore.ts"
 import { useSelectionStore } from "../../store/selectorStore.ts"
@@ -131,11 +130,4 @@ export const createBrowser = (): Browser => {
     hasHidden: () => elements.elements.some((element) => element.visible === false) || layers.layers.some((layer) => !layer.visible),
     selectedGroups: () => selected().filter((id) => find(id)?.type === "group")
   }
-}
-
-/** Short summary of the document for the browser's top rows. */
-export const documentSummary = (): { readonly units: string; readonly workpiece: string } => {
-  const cad = useCADStore()
-  const w = cad.workpiece
-  return { units: "mm", workpiece: `${w.width} × ${w.height} × ${w.depth} mm` }
 }

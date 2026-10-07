@@ -1,8 +1,16 @@
+import { segmentsFor } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import * as THREE from "three";
 
+/** The editor never draws a curve with more chords than this by default (an element can ask for more with `segments`). */
+const DISPLAY_SEGMENT_CAP = 256;
+
 export const createThreeObject = (element: any): THREE.Object3D | null => {
-    const { originOffset } = useCADStore.getState();
+    const { originOffset, tolerance: documentTolerance } = useCADStore.getState();
+    // Round shapes: the element's own `segments`, else enough for its tolerance (its own, else the drawing's), never coarser than 32.
+    const seg = (radius: number): number =>
+      typeof element.segments === "number" ? element.segments
+        : Math.max(32, segmentsFor(Number(radius) || 0, typeof element.tolerance === "number" ? element.tolerance : documentTolerance, DISPLAY_SEGMENT_CAP));
     // Check if element is on a visible layer
 
     switch (element.type) {
@@ -21,7 +29,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         return cube;
 
       case "sphere":
-        const sphereGeometry = new THREE.SphereGeometry(element.radius, element.segments || 32, element.segments || 32);
+        const sphereGeometry = new THREE.SphereGeometry(element.radius, seg(element.radius), seg(element.radius));
 
         const sphereMaterial = new THREE.MeshStandardMaterial({
           color: element.color || 0x1e88e5,
@@ -38,7 +46,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           element.radius,
           element.radius,
           element.height,
-          element.segments || 32
+          seg(element.radius)
         );
 
         const cylinderMaterial = new THREE.MeshStandardMaterial({
@@ -58,7 +66,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         return cylinder;
 
       case "cone":
-        const coneGeometry = new THREE.ConeGeometry(element.radius, element.height, element.segments || 32);
+        const coneGeometry = new THREE.ConeGeometry(element.radius, element.height, seg(element.radius));
 
         const coneMaterial = new THREE.MeshStandardMaterial({
           color: element.color || 0x9c27b0,
@@ -75,8 +83,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         const torusGeometry = new THREE.TorusGeometry(
           element.radius,
           element.tubeRadius || element.radius / 4,
-          element.radialSegments || 16,
-          element.tubularSegments || 100
+          element.radialSegments || Math.max(16, seg(element.tubeRadius || element.radius / 4)),
+          element.tubularSegments || Math.max(100, seg(element.radius + (element.tubeRadius || element.radius / 4)))
         );
 
         const torusMaterial = new THREE.MeshStandardMaterial({
@@ -160,8 +168,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
       case "hemisphere":
         const hemisphereGeometry = new THREE.SphereGeometry(
           element.radius,
-          element.segments || 32,
-          element.segments || 32,
+          seg(element.radius),
+          seg(element.radius),
           0,
           Math.PI * 2,
           0,
@@ -191,8 +199,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         // Create sphere and scale it to make an ellipsoid
         const ellipsoidGeometry = new THREE.SphereGeometry(
           1, // We'll scale it
-          element.segments || 32,
-          element.segments || 32
+          seg(Math.max(element.radiusX || 0, element.radiusY || 0, element.radiusZ || 0)),
+          seg(Math.max(element.radiusX || 0, element.radiusY || 0, element.radiusZ || 0))
         );
 
         const ellipsoidMaterial = new THREE.MeshStandardMaterial({
@@ -756,7 +764,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
 
       // ======= 2D ELEMENTS =======
       case "circle":
-        const circleGeometry = new THREE.CircleGeometry(element.radius, element.segments || 32);
+        const circleGeometry = new THREE.CircleGeometry(element.radius, seg(element.radius));
 
         const circleMaterial = new THREE.MeshBasicMaterial({
           color: element.color || 0x000000,
@@ -1077,7 +1085,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         // LatheGeometry revolves a shape around an axis
         const revolutionGeometry = new THREE.LatheGeometry(
           revolutionPoints,
-          element.segments || 32,
+          typeof element.segments === "number" ? element.segments : seg(Math.max(0, ...element.profile.map((point: any) => Math.abs(point.x)))),
           element.phiStart || 0,
           element.angle || Math.PI * 2
         );

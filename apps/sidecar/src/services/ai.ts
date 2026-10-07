@@ -11,6 +11,7 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
+import { withDefaultTolerance } from "@cadcamfun/ai"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
 
@@ -72,7 +73,9 @@ const toolHandlers = Effect.gen(function*() {
     },
     addElements: async (projectId, raw) => {
       const loaded = await load(projectId)
-      const created: Element[] = raw.map((fields) => ({ ...fields, id: crypto.randomUUID(), layerId: typeof fields["layer"] === "string" ? fields["layer"] : typeof fields["layerId"] === "string" ? fields["layerId"] : "default" }) as Element)
+      const settings = loaded.data["settings"] as { tolerance?: unknown } | undefined
+      const drawingTolerance = typeof settings?.tolerance === "number" ? settings.tolerance : 0
+      const created: Element[] = raw.map((input) => withDefaultTolerance(input, drawingTolerance).element).map((fields) => ({ ...fields, id: crypto.randomUUID(), layerId: typeof fields["layer"] === "string" ? fields["layer"] : typeof fields["layerId"] === "string" ? fields["layerId"] : "default" }) as Element)
       // Booleans refer to their operands by id; inside one batch a number is the index of an earlier element.
       for (const element of created) {
         const operands = element["operands"]
@@ -109,7 +112,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     describeDrawing: async (projectId) => {
       const loaded = await load(projectId)
-      return { ...describeElements(loaded.elements), ...where(loaded) }
+      return { ...describeElements(loaded.elements), settings: loaded.data["settings"] ?? null, ...where(loaded) }
     },
     createOperation: async (drawingId, operation) => {
       const { id, projectId, elements, data } = await load(drawingId)

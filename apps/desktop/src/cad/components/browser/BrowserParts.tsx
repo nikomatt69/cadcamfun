@@ -3,7 +3,7 @@
  * the per-row controls, the rename-in-place name and the Document / Origin block. They render what
  * `createBrowser()` exposes and own no rules of their own.
  */
-import { For, Show, createMemo, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
   ChevronDown, ChevronRight, Copy, Crosshair, Eye, EyeOff, FolderPlus, Grid3x3, Layers, Lock, Maximize, Ruler, Scan, Sparkles, Trash2, Unlock, Ungroup, Plus
 } from "lucide-solid"
@@ -13,7 +13,11 @@ import { useLayerStore } from "../../store/layerStore.ts"
 import { useSelectionStore } from "../../store/selectorStore.ts"
 import { partition, type BrowserItem, type GroupMode } from "../../lib/browser.ts"
 import { selectionPrompt, useAskAi } from "../../../ai/ask.ts"
-import { documentSummary, type Browser } from "./browserState.ts"
+import { TOLERANCE_PRESETS, isTolerance } from "@cadcamfun/core"
+import { setDisplayUnits, setDocumentTolerance } from "../../../state/document-settings.ts"
+import { useApp } from "../../../state/context.ts"
+import { DISPLAY_UNITS, UNIT_TABLE, formatLength, fromDisplay, isDisplayUnits, toDisplay } from "../../../viewport/units.ts"
+import type { Browser } from "./browserState.ts"
 
 const ICON = "p-1.5 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
 const MINI = "p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -183,10 +187,22 @@ export function BrowserSections<T extends BrowserItem>(props: SectionsProps<T>):
 
 const TOGGLE_ROW = "flex items-center w-full px-2 py-1.5 text-xs text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 text-gray-700 dark:text-gray-300"
 
-/** Fusion's "Document Settings" and "Origin" folders: units, the workpiece, and the axes, grid and dimensions toggles. */
+const SELECT = "text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 max-w-[9rem]"
+
+/**
+ * Fusion's "Document Settings" and "Origin" folders: the unit the drawing is shown in, the drawing tolerance, the workpiece, and
+ * the axes, grid and dimensions toggles. Unit and tolerance apply to the editor, the CAM generator, the verification and the assistant
+ * (`state/document-settings.ts`); the tolerance is typed in the selected unit and kept in millimetres.
+ */
 export function OriginBlock(): JSX.Element {
+  const app = useApp()
   const cad = useCADStore()
-  const summary = documentSummary
+  const settings = () => app.settings.settings()
+  const [custom, setCustom] = createSignal(false)
+  const [problem, setProblem] = createSignal<string | undefined>()
+  const presets = createMemo(() => (TOLERANCE_PRESETS.includes(settings().tolerance) ? TOLERANCE_PRESETS : [...TOLERANCE_PRESETS, settings().tolerance].sort((a, b) => b - a)))
+  const decimals = () => settings().decimals
+  const length = (mm: number): string => formatLength(mm, settings().units, decimals())
   const row = (label: string, on: boolean, toggle: () => void, icon: JSX.Element, testId: string): JSX.Element => (
     <button type="button" class={TOGGLE_ROW} onClick={toggle} aria-pressed={on} data-testid={testId}>
       <span class="mr-2 text-gray-500">{icon}</span>
@@ -194,12 +210,47 @@ export function OriginBlock(): JSX.Element {
       <Show when={on} fallback={<EyeOff size={12} class="text-gray-400" />}><Eye size={12} /></Show>
     </button>
   )
+  const onTolerance = (value: string): void => {
+    if (value === "custom") { setCustom(true); return }
+    setCustom(false)
+    setProblem(undefined)
+    setDocumentTolerance(app, Number(value))
+  }
+  const onCustom = (typed: number): void => {
+    const mm = fromDisplay(typed, settings().units)
+    if (!isTolerance(mm)) { setProblem(`${length(0.0001)} to ${length(10)}`); return }
+    setProblem(undefined)
+    setDocumentTolerance(app, mm)
+  }
   return (
     <details class="border-b border-gray-200 dark:border-gray-700" data-testid="browser-origin" open>
       <summary class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300 cursor-pointer select-none">Document &amp; Origin</summary>
       <div class="pb-1">
-        <div class={TOGGLE_ROW}><span class="mr-2 text-gray-500"><Ruler size={14} /></span><span class="flex-1">Units</span><span class="font-mono">{summary().units}</span></div>
-        <div class={TOGGLE_ROW}><span class="mr-2 text-gray-500"><Maximize size={14} /></span><span class="flex-1">Workpiece</span><span class="font-mono">{summary().workpiece}</span></div>
+        <label class={TOGGLE_ROW}>
+          <span class="mr-2 text-gray-500"><Ruler size={14} /></span><span class="flex-1">Units</span>
+          <select class={SELECT} aria-label="Units" value={settings().units} onChange={(event) => { const units = event.currentTarget.value; if (isDisplayUnits(units)) setDisplayUnits(app, units) }}>
+            <For each={DISPLAY_UNITS}>{(unit) => <option value={unit}>{UNIT_TABLE[unit].label}</option>}</For>
+          </select>
+        </label>
+        <label class={TOGGLE_ROW}>
+          <span class="mr-2 text-gray-500"><Crosshair size={14} /></span><span class="flex-1">Tolerance</span>
+          <select class={SELECT} aria-label="Tolerance" value={custom() ? "custom" : String(settings().tolerance)} onChange={(event) => onTolerance(event.currentTarget.value)}>
+            <For each={presets()}>{(preset) => <option value={String(preset)}>{length(preset)}</option>}</For>
+            <option value="custom">Custom…</option>
+          </select>
+        </label>
+        <Show when={custom()}>
+          <div class="px-2 pb-1">
+            <input
+              type="number" step="any" aria-label="Custom tolerance" data-testid="browser-custom-tolerance"
+              class={`${SELECT} w-full`} placeholder={`Tolerance in ${UNIT_TABLE[settings().units].label}`}
+              value={toDisplay(settings().tolerance, settings().units)}
+              onChange={(event) => onCustom(event.currentTarget.valueAsNumber)}
+            />
+            <Show when={problem()}><p class="text-[11px] text-red-600" role="alert">Allowed: {problem()}</p></Show>
+          </div>
+        </Show>
+        <div class={TOGGLE_ROW}><span class="mr-2 text-gray-500"><Maximize size={14} /></span><span class="flex-1">Workpiece</span><span class="font-mono">{length(cad.workpiece.width)} × {length(cad.workpiece.height)} × {length(cad.workpiece.depth)}</span></div>
         {row("Axes", cad.axisVisible, () => cad.toggleAxis(), <Layers size={14} />, "browser-toggle-axes")}
         {row("Grid", cad.gridVisible, () => cad.toggleGrid(), <Grid3x3 size={14} />, "browser-toggle-grid")}
         {row("Dimensions", cad.showDimensions, () => cad.toggleDimensions(), <Ruler size={14} />, "browser-toggle-dimensions")}

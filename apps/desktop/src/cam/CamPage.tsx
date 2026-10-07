@@ -14,6 +14,7 @@ import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-soli
 import { Toaster, toast } from "../components/ui/toast.tsx"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { syncDocumentSettings } from "../state/document-settings.ts"
 import CamStatusBar from "./components/CamStatusBar.tsx"
 import { buildPlayback } from "../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "./api/generator.ts"
@@ -62,7 +63,7 @@ export default function CamPage(): JSX.Element {
   createEffect(on(() => camStore.gcode, (next) => { if (next !== gcode()) setGcodeSignal(next) }, { defer: true }))
 
   // The raw piece follows the CAD (legacy `syncWorkpieceFromCAD` on mount).
-  onMount(() => camStore.syncWorkpieceFromCAD())
+  onMount(() => { syncDocumentSettings(app); camStore.syncWorkpieceFromCAD() })
 
   // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.
   createEffect(on(gcode, (text) => {

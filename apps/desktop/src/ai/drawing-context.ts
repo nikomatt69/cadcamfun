@@ -15,6 +15,8 @@ import { useElementsStore } from "../cad/store/elementsStore.ts"
 import { useLayerStore } from "../cad/store/layerStore.ts"
 import { useSelectionStore } from "../cad/store/selectorStore.ts"
 import { useCamStore } from "../cam/store/camStore.ts"
+import { documentSettings } from "../state/document-settings.ts"
+import { toJsonSafe } from "../state/json-safe.ts"
 import { forgetPushed, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../cam/store/verifyStore.ts"
@@ -62,8 +64,11 @@ export function currentDrawingContext(app: AppState) {
     projectId: document.projectId,
     drawingId: document.drawingId,
     name: document.name,
+    // Every number in a tool call is millimetres, whatever the user reads on screen.
     units: "mm",
     displayUnits: app.settings.settings().units,
+    tolerance: app.settings.settings().tolerance,
+    decimals: app.settings.settings().decimals,
     viewMode: cad.viewMode,
     totalElementCount: elements.length,
     selectedElementCount: selectedIds.size,
@@ -122,12 +127,13 @@ export async function ensureDocument(app: AppState): Promise<{ projectId: string
 
 /** Writes the live elements into the stored drawing, which also makes it the newest one the tools will pick. */
 export async function pushLiveDrawing(app: AppState, drawingId: string): Promise<void> {
-  const { elements, selectedElement } = useElementsStore.getState()
+  const { selectedElement } = useElementsStore.getState()
+  const elements = toJsonSafe(useElementsStore.getState().elements) as ReadonlyArray<Record<string, unknown>>
   await run(app)(app.client.drawings.update({
     params: { id: drawingId },
-    payload: { data: { elements, selectedElement: selectedElement?.id ?? null, version: "1.0" } }
+    payload: { data: { elements, selectedElement: selectedElement?.id ?? null, settings: documentSettings(app), version: "1.0" } }
   }))
-  rememberPushed(elements as unknown as ReadonlyArray<Record<string, unknown>>)
+  rememberPushed(elements)
 }
 
 /**

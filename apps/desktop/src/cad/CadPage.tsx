@@ -25,6 +25,8 @@ import LibraryBrowser, { type LibraryComponent } from "./components/LibraryBrows
 import { CADAssistantButton } from "./components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../ai/CADAssistantBridge.tsx"
 import { FIT_VIEW_EVENT } from "../ai/editor-sync.ts"
+import { toJsonSafe } from "../state/json-safe.ts"
+import { documentSettings, restoreDocumentSettings, syncDocumentSettings } from "../state/document-settings.ts"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 type RightPanel = "proprieties" | "settings" | "constraints"
@@ -62,6 +64,8 @@ export default function CadPage(): JSX.Element {
   const [pluginId, setPluginId] = createSignal<string | null>(null)
   const [sidebarPlugins, setSidebarPlugins] = createSignal<ReadonlyArray<{ id: string; title: string; description: string }>>([])
 
+  onMount(() => syncDocumentSettings(app))
+
   // A stored drawing: `/cad?drawingId=<id>` (from the project page) or `/drawings/<id>`. It replaces what is on the canvas.
   const [drawingId, setDrawingId] = createSignal<string | null>(null)
   const [drawingName, setDrawingName] = createSignal<string | null>(null)
@@ -73,7 +77,8 @@ export default function CadPage(): JSX.Element {
     if (id === undefined || id === loadedFor) return
     loadedFor = id
     void app.runtime.run(app.client.drawings.get({ params: { id } })).then((row) => {
-      const stored = row.data as { elements?: unknown } | null
+      const stored = row.data as { elements?: unknown; settings?: unknown } | null
+      restoreDocumentSettings(app, stored?.settings)
       const fallbackLayer = layers.activeLayer
       const known = new Set(layers.layers.map((layer) => layer.id))
       const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>
@@ -93,7 +98,7 @@ export default function CadPage(): JSX.Element {
     const id = drawingId()
     if (id === null) { openExport(); return }
     const { elements: current, selectedElement } = useElementsStore.getState()
-    void app.runtime.run(app.client.drawings.update({ params: { id }, payload: { data: { elements: current, selectedElement: selectedElement?.id ?? null, version: "1.0" } } })).then(
+    void app.runtime.run(app.client.drawings.update({ params: { id }, payload: { data: { elements: toJsonSafe(current), selectedElement: selectedElement?.id ?? null, settings: documentSettings(app), version: "1.0" } } })).then(
       () => toast.success(`Saved "${drawingName() ?? "drawing"}"`),
       () => toast.error("The drawing could not be saved")
     )

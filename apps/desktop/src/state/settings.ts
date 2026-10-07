@@ -8,7 +8,8 @@
  */
 import { createEffect, createSignal, type Accessor } from "solid-js"
 import { DEFAULT_LOCALE, type Locale } from "../i18n/index.ts"
-import type { DisplayUnits } from "../viewport/units.ts"
+import { DEFAULT_TOLERANCE, isTolerance } from "@cadcamfun/core"
+import { isDisplayUnits, type DisplayUnits } from "../viewport/units.ts"
 
 export const THEMES = ["light", "dark", "system"] as const
 export type Theme = (typeof THEMES)[number]
@@ -26,6 +27,8 @@ export interface Settings {
   readonly postProcessor: PostProcessor
   /** Shown in the status bar; the editor itself always works in millimetres. */
   readonly snapEnabled: boolean
+  /** Drawing tolerance in millimetres: how closely curves are drawn and the default of the toolpath and its verification. */
+  readonly tolerance: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,7 +37,8 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: DEFAULT_LOCALE,
   decimals: 3,
   postProcessor: "grbl",
-  snapEnabled: true
+  snapEnabled: true,
+  tolerance: DEFAULT_TOLERANCE
 }
 
 const STORAGE_KEY = "cadcamfun.settings"
@@ -47,7 +51,7 @@ export const decodeSettings = (raw: unknown): Settings => {
   if (typeof raw !== "object" || raw === null) return DEFAULT_SETTINGS
   const record = raw as Record<string, unknown>
   return {
-    units: isOneOf(["mm", "inch"], record["units"]) ? record["units"] : DEFAULT_SETTINGS.units,
+    units: isDisplayUnits(record["units"]) ? record["units"] : DEFAULT_SETTINGS.units,
     theme: isOneOf(THEMES, record["theme"]) ? record["theme"] : DEFAULT_SETTINGS.theme,
     locale: isOneOf([DEFAULT_LOCALE], record["locale"]) ? record["locale"] : DEFAULT_SETTINGS.locale,
     decimals:
@@ -59,7 +63,8 @@ export const decodeSettings = (raw: unknown): Settings => {
       ? record["postProcessor"]
       : DEFAULT_SETTINGS.postProcessor,
     snapEnabled:
-      typeof record["snapEnabled"] === "boolean" ? record["snapEnabled"] : DEFAULT_SETTINGS.snapEnabled
+      typeof record["snapEnabled"] === "boolean" ? record["snapEnabled"] : DEFAULT_SETTINGS.snapEnabled,
+    tolerance: isTolerance(record["tolerance"]) ? record["tolerance"] : DEFAULT_SETTINGS.tolerance
   }
 }
 

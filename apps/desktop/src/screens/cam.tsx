@@ -8,6 +8,7 @@ import { SchemaForm } from "../components/schema-form.tsx"
 import { defaultsOf } from "../components/schema-form.ts"
 import { View3D } from "../viewport/index.ts"
 import { buildPlayback } from "../viewport/view3d/playback.ts"
+import { programUnitsOf } from "../viewport/units.ts"
 import { t, type Key } from "../i18n/index.ts"
 import { CadButton } from "./cad-controls.tsx"
 import {
@@ -147,7 +148,7 @@ export function CamScreen() {
               )
       if (!path.moves.some((move) => move._tag === "Linear" || move._tag === "Arc"))
         throw new Error(t("cam.noGeometry"))
-      const next = cam.makeProgram(params.name, [path], { units: app.settings.settings().units })
+      const next = cam.makeProgram(params.name, [path], { units: programUnitsOf(app.settings.settings().units) })
       const controller = postId()
       const post =
         controller === "gcode"

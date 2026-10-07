@@ -8,6 +8,7 @@
  * testable without the stores or the sidecar.
  */
 import { cam } from "@cadcamfun/core"
+import { toJsonSafeRecord } from "../../state/json-safe.ts"
 import { EXPLORER_MATERIALS, EXPLORER_TOOLS } from "./explorer.ts"
 import type { CadElement, Stock } from "./job.ts"
 
@@ -86,6 +87,6 @@ export const requestForElement = (input: {
   readonly printer?: cam.generator.PrinterExtras
 }): cam.generator.GenerateRequest => ({
   settings: input.settings,
-  geometry: { ...cam.generator.DEFAULT_GEOMETRY, geometryType: "selected", selectedElements: [input.element], stock: input.stock } as never,
+  geometry: { ...cam.generator.DEFAULT_GEOMETRY, geometryType: "selected", selectedElements: [toJsonSafeRecord(input.element)], stock: toJsonSafeRecord(input.stock) } as never,
   printer: input.printer ?? cam.generator.DEFAULT_PRINTER_EXTRAS
 })

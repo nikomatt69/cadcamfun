@@ -1,3 +1,4 @@
+import { toJsonSafe } from "../../state/json-safe.ts"
 import { useDocumentStore } from "../store/documentStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import type { AppState } from "../../state/context.ts"
@@ -21,7 +22,7 @@ export async function saveCADAsProject(app: Pick<AppState, "client" | "runtime">
     payload: {
       name: `${options.name} Drawing`,
       description: `Main drawing for project ${options.name}`,
-      data: { elements, selectedElement: selectedElement ? selectedElement.id : null, version: "1.0" }
+      data: { elements: toJsonSafe(elements), selectedElement: selectedElement ? selectedElement.id : null, version: "1.0" }
     }
   }))
   useDocumentStore.getState().setDocument({ projectId: project.id, drawingId: drawing.id, name: drawing.name })

@@ -352,6 +352,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const all = elements.elements
     const known = layers.layers
     cad.originOffset
+    cad.tolerance
     for (const stale of cadObjects()) {
       scene.remove(stale)
       stale.traverse((object) => {

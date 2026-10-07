@@ -105,10 +105,20 @@ export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string
     if (stock && stock.depth - below <= 0) return
     if (s0.operationType === "drill") {
       out += drillWarning(placed, limited.settings)
-      holes.push(...drillPointsOf(placed, limited.settings.depth))
+      try {
+        holes.push(...drillPointsOf(placed, limited.settings.depth))
+      } catch (cause) {
+        out += `; Warning: ${label} skipped: ${cause instanceof Error ? cause.message : String(cause)}\n`
+      }
       return
     }
-    out += elementOperation(placed, limited.settings, g)
+    // One element the generator cannot machine (missing coordinates, an unknown shape) must never stop the whole job:
+    // it is skipped, and the program says so.
+    try {
+      out += elementOperation(placed, limited.settings, g)
+    } catch (cause) {
+      out += `; Warning: ${label} skipped: ${cause instanceof Error ? cause.message : String(cause)}\n`
+    }
   })
   // Holes of every selected element are drilled as one nearest-first sequence.
   if (holes.length > 0) out += drillPoints(holes, s0, `${flat.length} element(s)`)

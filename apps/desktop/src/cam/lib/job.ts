@@ -7,6 +7,7 @@
  * without a DOM and without the stores' reactivity.
  */
 import { cam } from "@cadcamfun/core"
+import { toJsonSafeRecord } from "../../state/json-safe.ts"
 
 const g = cam.generator
 
@@ -100,8 +101,9 @@ export const geometryOf = (form: GeometryForm, sources: JobSources): cam.generat
   polygonSides: form.polygonSides,
   polygonRadius: form.polygonRadius,
   customPath: form.customPath,
-  selectedElements: selectedElements(sources),
-  stock: stockOf(sources)
+  // Elements may hold what JSON cannot (undefined, NaN, typed arrays, cycles): send the plain-JSON form.
+  selectedElements: selectedElements(sources).map((element) => toJsonSafeRecord(element)),
+  stock: toJsonSafeRecord(stockOf(sources))
 })
 
 /** Short label of an element for lists ("cube: Base" / "circle: 4f3a2b1c"). */

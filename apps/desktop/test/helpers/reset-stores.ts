@@ -14,6 +14,7 @@ export const resetStores = (): void => {
   useDocumentStore.getState().clear()
   forgetPushed()
   useCamStore.getState().reset()
+  useCADStore.setState({ tolerance: 0.01 })
   const cad = useCADStore.getState()
   if (cad.showDimensions) cad.toggleDimensions()
 }
