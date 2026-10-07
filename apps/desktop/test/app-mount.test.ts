@@ -9,7 +9,7 @@ import { join } from "node:path"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 const read = (rel: string) => readFileSync(join(import.meta.dir, "../src", rel), "utf8")

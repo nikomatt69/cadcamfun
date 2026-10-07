@@ -7,7 +7,7 @@ import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 const settle = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms))

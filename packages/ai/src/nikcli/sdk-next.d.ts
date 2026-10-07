@@ -50,6 +50,7 @@ declare module "@nikcli-ai/sdk-next" {
 
   export interface HostSession {
     readonly id: string
+    readonly parentID?: string
     readonly title: string
     readonly directory: string
   }
@@ -60,6 +61,8 @@ declare module "@nikcli-ai/sdk-next" {
     readonly error?: { readonly name?: string; readonly data?: { readonly message?: string } }
     readonly tokens?: { readonly input: number; readonly output: number }
     readonly finish?: string
+    readonly summary?: boolean
+    readonly agent?: string
   }
 
   export interface HostPart {
@@ -116,11 +119,12 @@ declare module "@nikcli-ai/sdk-next" {
 
   export interface HostClient {
     readonly session: {
-      create(input?: { title?: string }, options?: RequestOptions): Promise<HostSession>
+      create(input?: { title?: string; parentID?: string }, options?: RequestOptions): Promise<HostSession>
       list(input?: { limit?: number }, options?: RequestOptions): Promise<ReadonlyArray<HostSession>>
       get(input: { sessionID: string }, options?: RequestOptions): Promise<HostSession>
       remove(input: { sessionID: string }, options?: RequestOptions): Promise<boolean>
       abort(input: { sessionID: string }, options?: RequestOptions): Promise<boolean>
+      summarize(input: { sessionID: string; providerID: string; modelID: string; auto?: boolean }, options?: RequestOptions): Promise<boolean>
       messages(
         input: { sessionID: string; limit?: number },
         options?: RequestOptions
@@ -130,14 +134,28 @@ declare module "@nikcli-ai/sdk-next" {
       prompt(
         input: {
           sessionID: string
+          delivery?: "steer" | "queue"
           agent?: string
           model?: { providerID: string; modelID: string }
           system?: string
           tools?: Record<string, boolean>
-          parts: ReadonlyArray<{ type: "text"; text: string }>
+          parts: ReadonlyArray<
+            | { type: "text"; text: string; synthetic?: boolean }
+            | { type: "file"; mime: string; filename?: string; url: string }
+          >
         },
         options?: RequestOptions
       ): Promise<HostPromptResult>
+      /** Pinned bundle: generated client /prompt_async; admission uses the native pending queue. The body is empty (204), the generated client returns the wrapper. */
+      promptAsync(
+        input: {
+          sessionID: string
+          delivery?: "steer" | "queue"
+          agent?: string
+          parts: ReadonlyArray<{ type: "text"; text: string; synthetic?: boolean }>
+        },
+        options?: RequestOptions
+      ): Promise<unknown>
     }
     readonly events: {
       subscribe(options?: RequestOptions): AsyncIterable<HostEvent>

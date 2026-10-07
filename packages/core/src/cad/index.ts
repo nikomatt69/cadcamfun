@@ -52,3 +52,6 @@ const perTagSchemas = {
 
 export const entitySchemaOf = (tag: EntityTag): (typeof perTagSchemas)[EntityTag] => perTagSchemas[tag]
 export * from "./tolerance.ts"
+export * from "./design.ts"
+export * from "./import-drawing.ts"
+export * from "./import-step.ts"

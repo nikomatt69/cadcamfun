@@ -26,7 +26,7 @@ export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
   try { result = JSON.parse(output) } catch { return [] }
   if (result === null || typeof result !== "object" || result.ok !== true) return []
   const elements = Array.isArray(result.elements) ? result.elements.filter(isElement) : []
-  if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements")) return elements.length > 0 ? [{ kind: "add", elements }] : []
+  if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements") || tool.endsWith("cad_import_drawing")) return elements.length > 0 ? [{ kind: "add", elements }] : []
   if (tool.endsWith("cad_modify_entities")) return elements.length > 0 ? [{ kind: "update", elements }] : []
   if (tool.endsWith("cad_delete_entities")) {
     const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : []

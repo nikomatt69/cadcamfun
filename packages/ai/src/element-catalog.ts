@@ -161,6 +161,12 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     element[key] = given
   }
   for (const key of COMMON) if (input[key] !== undefined) element[key] = input[key]
+  if (input["rotation"] !== undefined) {
+    const r = input["rotation"] as Record<string, unknown> | null
+    if (typeof r !== "object" || r === null || Array.isArray(r) || !["x", "y", "z"].some((k) => k in r) || !Object.values(r).every((v) => typeof v === "number" && Number.isFinite(v))) {
+      return { ok: false, error: `${type}.rotation must be {x, y, z} in degrees` }
+    }
+  }
   for (const key of TESSELLATION) {
     const given = input[key]
     if (given === undefined) continue
@@ -207,3 +213,6 @@ export const withDefaultTolerance = (element: Record<string, unknown>, tolerance
   const warning = tessellate(next, tolerance)
   return warning === undefined ? { element: next } : { element: next, warning }
 }
+
+/** Most elements one `cad_add_elements` call may carry: a call is written by the model token by token, and a huge one is cut off by its output limit. */
+export const MAX_ELEMENTS_PER_CALL = 40

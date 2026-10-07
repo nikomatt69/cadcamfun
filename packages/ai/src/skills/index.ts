@@ -4,9 +4,12 @@
  * there whenever the host config is written. The text is what an experienced CAM programmer would tell a
  * new colleague, tied to the tools this app really has; it makes no promise the tools do not keep.
  */
-import { mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { ELEMENT_SPECS } from "../element-catalog.ts"
+
+/** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
+export const USER_MARKER = ".user-skill"
 
 export interface CadCamSkill {
   readonly name: string
@@ -25,7 +28,7 @@ Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or a
 - \`cylinder\`, \`cone\`, \`capsule\` stand along Z; \`revolution\` turns its profile about \`axis\` (default Y): profile \`x\` is the radius, \`y\` the height along the axis.
 - \`rectangle\`, \`circle\`, \`polygon\` are flat on the XY plane at height \`z\`.
 - Put related parts on one layer (\`layer: "car"\`); the layer is created if needed.
-- One call can hold up to 200 elements and is all-or-nothing: if one element is invalid nothing is added and every problem is listed, so fix them all and send the call again.
+- One call holds at most 40 elements (a long call is cut off by the model's output limit): build big things in steps, each a few calls, in the order a person would build it. Each element in a call is judged on its own: the valid ones are added, the invalid ones are listed under \`skipped\` with their index; resend only those, corrected.
 
 ## Recipes
 - **Block with a hole**: \`cube\` + \`cylinder\` (taller than the block), then \`boolean-subtract\` with \`operands: [0, 1]\` (indexes of the two elements in the same call).
@@ -33,11 +36,16 @@ Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or a
 - **Plate with a pattern of holes**: one \`cube\` plate, the holes as \`cylinder\`s, one \`boolean-subtract\` with the plate first.
 - **Bracket / L profile**: \`extrusion\` with \`profile\` points (>= 3, closed automatically) and \`depth\`.
 - **Pipe along a path**: \`sweep\` with \`path\` points and a round \`radius\`.
-- **Vehicle**: body as a \`cube\` or an \`extrusion\` of the side profile, cabin as a smaller \`cube\`, wheels as four \`cylinder\`s turned to the axle (use \`rotation\`), lights and details as small solids. Say what is simplified.
+- **Vehicle**: body as a \`cube\` or an \`extrusion\` of the side profile, cabin as a smaller \`cube\`, wheels as four \`cylinder\`s turned to the axle (\`rotation\` in DEGREES: a cylinder stands along Z, so a wheel on a Y axle needs rotation {x: 90}), lights and details as small solids. Say what is simplified.
+- **From a DXF or SVG drawing**: \`cad_import_drawing\` with the file text and a \`depth\` (a drawing has no height - ask). Closed outlines become solids standing on Z0, circles and inner loops become holes. If it reports open outlines, say so and offer a larger \`gap\`; never close them by guessing. To work from an image or a dimensioned drawing you can only look at, read the numbers yourself and build with \`cad_add_elements\`.
 - **Standard parts**: \`gear\`, \`spring\`, \`bolt\`, \`screw\`, \`nut\`, \`washer\` take their size and defaults from the catalogue.
 
+## Design space
+- Right-handed, Z up, XY the ground plane. Solids are placed by their CENTRE. A cube's width is its X extent, height its Y extent, depth its Z extent; cylinders, cones and tori stand along Z.
+- \`rotation\` is in DEGREES, arc and revolution angles in RADIANS.
+
 ## After modelling
-Describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use \`cad_modify_entities\` with the ids you were given; to remove, \`cad_delete_entities\` with \`confirm: true\` only when the user asked.`
+Run \`cad_check_design\`: it finds sizes that are not positive, rotation typed in radians, booleans with missing operands, duplicates, parts that float, and parts outside the stock. Fix what it reports, then describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use \`cad_modify_entities\` with the ids you were given; to remove, \`cad_delete_entities\` with \`confirm: true\` only when the user asked.`
 
 const WORKFLOW = `# From model to verified G-code
 
@@ -158,6 +166,45 @@ The same drawing becomes a different program on each machine. Program as if the 
 - \`cam_analyze_gcode\` with \`machineType\` catches what is illogical for the axes: Y on a lathe, X through the axis, a cut away from the chuck, a spindle that never started, cold extrusion, a build that goes down.
 - \`cam_verify_toolpath\` simulates mills only.`
 
+const DRAWINGS = `# From drawings and images to 3D
+
+Three kinds of input, three routes. Pick by what the user attached (the message lists "Attached files").
+
+## DXF, SVG or STEP file
+- \`cad_import_drawing\` with \`attachment\` (the file name) and \`depth\` (mm). It chains lines and arcs into closed profiles, extrudes each outer profile from Z0 along +Z, makes circles and inner loops holes, and reports outlines it could not close. Ask for the thickness if the user gave none; it is the only thing a flat drawing cannot say.
+- STEP (\`attachment\` is enough, the part brings its height): reads prismatic parts from the flat face looking down; its warnings say what it did not read (steps, pockets with a floor, slopes, curved faces). Report them, and if the part was modelled lying on another plane retry with \`up: "y"\` or \`"x"\`. It is not a full STEP kernel: do not promise free-form surfaces.\n- DXF is read in its own units (\`$INSUNITS\`) and lands in mm; SVG needs \`scale\` (mm per SVG unit) when it is not 1: a 96 dpi export in px is 0.2646.
+- Open outlines: report how many, offer a larger \`gap\` (mm) and say where the break probably is. Never close a profile by guessing.
+- Several parts in one file become several solids; give each a clear \`name\` and, if the user wants them stacked or moved, use \`cad_modify_entities\`.
+- Afterwards run \`cad_check_design\`, then continue to CAM.
+
+## Image of a drawing or a photo
+- Look first, then list what you read: every dimension with its unit, the view it belongs to, tolerances and notes. Say what is unreadable or missing instead of filling it in.
+- Build from the numbers with \`cad_add_elements\`: the base solid from the overall size, features one by one (holes as cylinders and one boolean-subtract, pockets, fillets as spheres/tori or a revolution profile, chamfers as extrusion profiles). A hole with a tolerance gets the middle of the limits.
+- Three-view drawings: front gives X and Z, top gives X and Y, side gives Y and Z. Check that the same size read from two views agrees; if not, ask which is right.
+- A photo has no scale: ask for one known dimension, then derive the rest and label them as estimates.
+- After building, compare against the numbers you read: \`cad_describe_drawing\` gives the bounds; report any difference.
+
+## Sketch by hand
+Treat it like a photo: ask for the scale, build the outline as an \`extrusion\` profile, then add features.`
+
+const PLUGINS = `# Programming extensions (plugins)
+
+When the user wants the app to do something new (a parametric generator, a custom post-processor, a command), write a plugin. A plugin is a folder with \`plugin.json\` and an ES module entry. It cannot be installed by a tool: give the user the files and tell them to add the folder in Plugins.
+
+## plugin.json
+- \`id\` reverse-DNS (\`com.company.name\`), \`name\`, \`version\` semver, \`apiVersion: "1"\`, \`entry\` (e.g. \`index.js\`).
+- \`capabilities\`, only what the code uses: \`drawing:read\`, \`drawing:write\` (implies read), \`toolpath:read\`, \`storage\`, \`ui:panel\`.
+- \`contributes\`: \`commands\` [{id, title, keybinding?}], \`panels\` [{id, title, entry}], \`postProcessors\` [{id, title, entry}: exported \`(program, options) => string\`], \`operations\` [{id, title, entry}: exported \`{ schema, generate }\`].
+
+## Module
+\`export default definePlugin({ manifest, activate(ctx) { ... return () => cleanup } })\`. Inside \`activate\` get each surface with \`requireCapability(ctx, "drawing:write", "drawing")\` (it throws a clear error when the manifest did not ask for it). Register commands and panels with \`ui.registerCommand\` / \`ui.registerPanel\`; keep state in \`storage\`; undo everything in the returned cleanup.
+
+## Rules
+- Units are mm and radians, like the tools. Pure functions for geometry so they can be tested.
+- Ask for the least capability; no network, no files outside the plugin's own storage.
+- Give a short test: the SDK has a test host, so show how to activate the plugin with it and assert what it registered.
+- If the need is a one-off model or operation, do it with the tools instead; a plugin is for something the user will repeat.`
+
 export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cad-3d-modeling", description: `Model 3D and 2D geometry in the open editor (${Object.keys(ELEMENT_SPECS).length} element types): conventions, recipes for common parts, how to build complex objects.`, category: "cad", tags: ["cad", "3d", "modeling"], body: MODELING },
   { name: "cam-operation-workflow", description: "The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.", category: "cam", tags: ["cam", "workflow", "gcode"], body: WORKFLOW },
@@ -166,6 +213,8 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "drilling-and-holes", description: "Drilling operations: cycles, peck rules, through-hole depth, large holes.", category: "cam", tags: ["cam", "drilling"], body: DRILLING },
   { name: "precision-and-tolerances", description: "Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.", category: "cam", tags: ["precision", "tolerance", "iso286"], body: PRECISION },
   { name: "machines-and-axes", description: "Mill, lathe and 3D printer: what turns, the sense of every axis, zeros and work offsets, touch probes and tool setters, and how to check a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: MACHINES },
+  { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: DRAWINGS },
+  { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: PLUGINS },
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: SETUP }
 ]
 
@@ -177,14 +226,28 @@ export const skillMarkdown = (skill: CadCamSkill): string =>
  * Writes the skills under `<configDir>/skills/`. Folders of ours are replaced, so an edit in this file reaches the host
  * on the next start; anything else in that folder is left alone.
  */
-export const installSkills = async (configDir: string): Promise<ReadonlyArray<string>> => {
+export const installSkills = async (configDir: string, userSkills: ReadonlyArray<{ name: string; description: string; body: string }> = []): Promise<ReadonlyArray<string>> => {
   const root = join(configDir, "skills")
   await mkdir(root, { recursive: true })
+  // Skills the user loaded earlier carry a marker; the ones no longer in the store are removed with it.
+  for (const entry of await readdir(root).catch(() => [] as string[])) {
+    if (await Bun.file(join(root, entry, USER_MARKER)).exists()) await rm(join(root, entry), { recursive: true, force: true })
+  }
   for (const skill of CADCAM_SKILLS) {
     const dir = join(root, skill.name)
     await rm(dir, { recursive: true, force: true })
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, "SKILL.md"), skillMarkdown(skill))
   }
-  return CADCAM_SKILLS.map((skill) => skill.name)
+  const loaded: string[] = []
+  for (const skill of userSkills) {
+    if (CADCAM_SKILLS.some((builtIn) => builtIn.name === skill.name)) continue
+    const dir = join(root, skill.name)
+    await rm(dir, { recursive: true, force: true })
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, "SKILL.md"), skillMarkdown({ ...skill, category: "user", tags: ["user"] }))
+    await writeFile(join(dir, USER_MARKER), "installed from the user's skills\n")
+    loaded.push(skill.name)
+  }
+  return [...CADCAM_SKILLS.map((skill) => skill.name), ...loaded]
 }

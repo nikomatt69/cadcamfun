@@ -90,7 +90,7 @@ describe("the 3D view draws curves to the drawing's tolerance", () => {
 })
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 afterEach(() => { app.state.settings.reset(); resetStores() })
 

@@ -23,34 +23,52 @@ export function AssistantPanel(props: Props): JSX.Element {
   return (
     <Show when={props.open}>
       <aside
-        class="flex w-96 shrink-0 flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
+        class="assistant-dock"
+        style={{
+          display: "flex",
+          "flex-direction": "column",
+          flex: "0 1 520px",
+          width: "100%",
+          "max-width": "min(520px, 100vw)",
+          "min-width": "0",
+          "min-height": "0",
+          overflow: "hidden",
+          animation: "none",
+          transition: "none"
+        }}
         aria-label={translate("ai.title")}
         data-testid="ai-panel"
       >
-        <div class="flex items-center justify-end gap-1 px-3 pt-2">
-          <A
-            href="/ai"
-            class="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-600"
-            aria-label={translate("ai.open")}
-          >
-            <Maximize2 size={10} aria-hidden="true" />
-            {translate("ai.open")}
-          </A>
-          <Show when={props.onClose}>
-            <button
-              type="button"
-              class="inline-flex items-center rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700"
-              aria-label={translate("ai.close")}
-              title={translate("ai.close")}
-              onClick={() => props.onClose?.()}
-            >
-              <X size={12} aria-hidden="true" />
-            </button>
-          </Show>
-        </div>
-        <div class="flex-1 min-h-0 p-2">
-          <EnhancedAssistant className="h-full" />
-        </div>
+        <EnhancedAssistant
+          className="assistant-dock-content !animate-none"
+          {...{
+            headerActions: (
+              <>
+                <A
+                  href="/ai"
+                  class="assistant-header-action"
+                  aria-label={translate("ai.open")}
+                  title={translate("ai.open")}
+                  style={{ animation: "none", transition: "none" }}
+                >
+                  <Maximize2 size={16} aria-hidden="true" />
+                </A>
+                <Show when={props.onClose}>
+                  <button
+                    type="button"
+                    class="assistant-header-action"
+                    aria-label={translate("ai.close")}
+                    title={translate("ai.close")}
+                    style={{ animation: "none", transition: "none" }}
+                    onClick={() => props.onClose?.()}
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                </Show>
+              </>
+            )
+          }}
+        />
       </aside>
     </Show>
   )

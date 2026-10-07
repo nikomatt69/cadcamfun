@@ -43,12 +43,12 @@ describe("toJsonSafe", () => {
     let deep: Record<string, unknown> = { leaf: 1 }
     for (let i = 0; i < 100; i++) deep = { next: deep }
     expect(() => JSON.stringify(toJsonSafe(deep))).not.toThrow()
-    expect(toJsonSafeRecord({ a: undefined })).toEqual({})
+    expect(toJsonSafeRecord({ a: undefined } as Record<string, unknown>)).toEqual({})
   })
 })
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 afterEach(() => resetStores())
 

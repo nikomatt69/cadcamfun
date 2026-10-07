@@ -34,7 +34,9 @@ const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(
 
 
 function BunServer() {
-  return BunHttpServer.layer({ port: 0, hostname: "127.0.0.1" })
+  // No idle timeout: Bun closes a connection that is silent for 10 s, and a model writing a long tool call is silent that long.
+  // The server only listens on the loopback interface, so nothing outside can hold connections open.
+  return BunHttpServer.layer({ port: 0, hostname: "127.0.0.1", idleTimeout: 0 })
 }
 
 /**

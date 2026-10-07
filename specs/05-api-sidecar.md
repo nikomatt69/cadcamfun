@@ -39,7 +39,7 @@ One `HttpApi` named `Api` composed of groups. All payloads are Schemas; all erro
 | `library` | CRUD + import/export JSON | `LibraryItem` |
 | `costs` | `POST /costs/estimate`, CRUD for cost settings and estimates | `CostSettings`, `ProductionCostEstimate`, `ToolWearCost`, `MaterialCost`, `OperationCost` |
 | `files` | `POST /files/import` (DXF/STL/G-code), `POST /files/export` | `FileUpload` (metadata only; blobs on disk in `<dataDir>/files/`) |
-| `ai` | `PUT /ai/credentials` (in-memory), `GET /ai/status`, `GET /ai/models`, `POST /ai/chat` (SSE stream), `POST /ai/analyze-gcode`, `POST /ai/generate-toolpath` | `AIAnalysisLog` |
+| `ai` | `PUT /ai/credentials` (in-memory), `GET /ai/status`, `GET /ai/models`, `POST /ai/chat` (SSE stream; optional `attachments`), `POST /ai/sessions/remove`, `POST /ai/sessions/state`, `GET/PUT /ai/skills`, `DELETE /ai/skills/:name` (user-loadable skills), `POST /ai/analyze-gcode`, `POST /ai/generate-toolpath` | `AIAnalysisLog` |
 | `plugins` | list/install/enable/disable/uninstall, per-plugin config | `PluginRegistryEntry`, `PluginConfiguration` |
 | `settings` | `GET/PUT /settings` (units, theme, locale, post defaults) | JSON in a local settings table or file — decide in WP4, document here |
 

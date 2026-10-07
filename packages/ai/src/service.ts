@@ -16,7 +16,8 @@ import {
   type ProviderId
 } from "./models.ts"
 import { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
-import { abortHostSession, createHostSession, hostChatStream, sessionExists } from "./nikcli/chat.ts"
+import { prepareAttachments, type Attachment } from "./attachments.ts"
+import { abortHostSession, createHostSession, hostChatStream, readHostSessionState, sessionExists, type HostSessionState } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
 import { systemPrompt } from "./prompts/system.ts"
@@ -43,6 +44,7 @@ export interface ChatInput {
   readonly sessionId?: string
   readonly projectId?: string
   readonly message: string
+  readonly attachments?: ReadonlyArray<Attachment>
   /** Free-text project context appended to the system prompt. */
   readonly context?: string
   readonly model?: ModelSelector
@@ -77,6 +79,8 @@ export class AiService extends Context.Service<AiService, {
   readonly summarizeDesignSuggestions: (input: { elements: string; currentOperation?: string; currentTool?: string; model?: ModelSelector }) => Effect.Effect<DesignSuggestionsSummary, AiError>
   readonly analyzeGcode: (input: { gcode: string; machine?: MachineProfile }) => Effect.Effect<GcodeReport>
   readonly abort: (sessionId: string) => Effect.Effect<void>
+  /** Where a conversation stands, for a client that lost its connection mid-turn (`busy: false` when there is no host session). */
+  readonly sessionState: (sessionId: string, projectId?: string) => Effect.Effect<HostSessionState, AiError>
 }>()("cadcamfun/AiService") {
   static readonly layer: Layer.Layer<AiService, never, AiCredentials | AiConfig | DirectModel> = Layer.effect(
     AiService,
@@ -229,12 +233,14 @@ export class AiService extends Context.Service<AiService, {
             const resolved = resolveModel(input.model, { configured: ok, forceGateway: config.forceGateway })
             if (resolved instanceof AiConfigError) return yield* resolved
             const system = systemPrompt(input.context)
+            const attached = prepareAttachments(input.projectId ?? "default", input.attachments)
+            const message = input.message + attached.note
 
             if (Option.isSome(host)) {
               const projectHost = yield* host.value.runtime.host(input.projectId ?? "default")
               const target = yield* ensureSession(projectHost, input.sessionId)
               return hostChatStream({
-                host: target.host, sessionId: target.sessionId, message: input.message, system,
+                host: target.host, sessionId: target.sessionId, message, files: attached.parts, system,
                 model: { providerID: resolved.provider, modelID: resolved.modelId }
               }).pipe(Stream.mapError((e): AiError => e))
             }
@@ -242,7 +248,7 @@ export class AiService extends Context.Service<AiService, {
             // No embedded host: a stateless one-shot stream through the AI SDK.
             const sessionId = input.sessionId ?? crypto.randomUUID()
             let text = ""
-            return direct.streamText({ prompt: input.message, system, model: input.model ?? { provider: resolved.provider, model: resolved.modelId } }).pipe(
+            return direct.streamText({ prompt: message, system, model: input.model ?? { provider: resolved.provider, model: resolved.modelId } }).pipe(
               Stream.flatMap((part): Stream.Stream<AiEvent> => {
                 if (part.type === "delta") { text += part.text; return Stream.succeed({ type: "delta", sessionId, text: part.text }) }
                 return Stream.succeed({ type: "done", sessionId, text, usage: part.usage })
@@ -308,6 +314,15 @@ export class AiService extends Context.Service<AiService, {
             input.model
           ),
         analyzeGcode: (input) => Effect.sync(() => analyzeGcode(input.gcode, input.machine)),
+        sessionState: (sessionId, projectId) =>
+          Effect.gen(function* () {
+            if (Option.isNone(host)) return { busy: false, text: "" } satisfies HostSessionState
+            const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+            if (mapped !== undefined) return yield* readHostSessionState(mapped.host, mapped.sessionId)
+            const projectHost = yield* host.value.runtime.host(projectId ?? "default")
+            if (!(yield* sessionExists(projectHost, sessionId))) return { busy: false, text: "" } satisfies HostSessionState
+            return yield* readHostSessionState(projectHost, sessionId)
+          }),
         abort: (sessionId) =>
           Effect.gen(function* () {
             const map = yield* Ref.get(controllers)

@@ -181,10 +181,10 @@ export default function CadPage(): JSX.Element {
 
   return (
     <Motion.div
-      class="h-full w-full flex bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex-col overflow-hidden"
+      class="cad-workspace h-full w-full flex flex-col overflow-hidden"
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
     >
-      <Motion.div class="flex flex-col backdrop-blur-md bg-white/80 dark:bg-gray-900/80 h-full w-full border border-white/20 dark:border-gray-700/30 shadow-xl" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
+      <Motion.div class="cad-workspace__frame flex flex-col h-full w-full" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
         <EnhancedToolbar
           sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save}
           setDialogMode={setDialogMode} setShowImportExportDialog={setShowImportExport} setShowLibraryView={() => navigate("/library")}
@@ -192,10 +192,10 @@ export default function CadPage(): JSX.Element {
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}
         />
 
-        <Motion.div class="flex flex-1 p-2 backdrop-blur-sm bg-gradient-to-br from-white/50 to-blue-50/30 dark:from-gray-800/50 dark:to-gray-900/30 border-b border-white/30 dark:border-gray-600/30 overflow-hidden w-full rounded-lg  shadow-lg" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
+        <Motion.div class="cad-workspace__body flex flex-1 overflow-hidden w-full" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
           <EnhancedSidebarCad isOpen={sidebarOpen()} setIsOpen={setSidebarOpen} activeSidebarTab={sidebarTab()} setActiveSidebarTab={setSidebarTab} />
 
-          <Motion.div class="flex-1 flex rounded-2xl bg-gradient-to-br from-white/90 to-blue-50/50 dark:from-gray-800/90 dark:to-gray-900/50 relative shadow-xl border border-white/30 mr-2 dark:border-gray-600/30 backdrop-blur-md" {...rise} transition={{ duration: 0.8, delay: 0.6 }}>
+          <Motion.div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2" {...rise} transition={{ duration: 0.8, delay: 0.6 }}>
             <CADCanvas
               width="100%" height="100%" previewComponent={libraryComponent()}
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
@@ -214,10 +214,10 @@ export default function CadPage(): JSX.Element {
           </Motion.div>
 
           <Motion.div
-            class={`${rightOpen() ? "w-80" : "w-0"} flex-shrink-0 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white border border-white/30 dark:border-gray-600/30  rounded-2xl shadow-xl transition-all duration-300 ease-in-out overflow-y-auto`}
+            class={`${rightOpen() ? "w-72" : "w-0"} cad-workspace__inspector flex-shrink-0 dark:text-white transition-all duration-300 ease-in-out overflow-y-auto`}
             animate={{ x: rightOpen() ? 0 : 300, opacity: rightOpen() ? 1 : 0.7 }} transition={{ duration: 0.5 }}
           >
-            <Motion.div class="w-full border-b border-white/30 dark:border-gray-600/30 p-2 rounded-t-2xl bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-gray-700/50 dark:to-gray-800/50 backdrop-blur-sm flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
+            <Motion.div class="cad-workspace__tabs w-full p-2 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
               <div class="flex justify-center w-full text-center">
                 <Motion.button onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
                   <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />Proprieties</div>

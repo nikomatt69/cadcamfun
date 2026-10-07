@@ -106,12 +106,24 @@ describe("cad tools provision what is missing", () => {
     expect(described.settings.tolerance).toBe(0.001)
   })
 
-  test("cad_add_elements adds nothing when any element is invalid, and says why", async () => {
-    const before = ((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length
-    const out = await run("cad_add_elements", { elements: [{ type: "sphere", radius: 5 }, { type: "revolution" }, { type: "cube", width: -3 }] }) as { ok: boolean; problems: string[] }
-    expect(out.ok).toBe(false)
-    expect(out.problems).toHaveLength(2)
-    expect(((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length).toBe(before)
+  test("cad_add_elements judges each element: the valid ones are added, the others are named, a boolean follows its operands", async () => {
+    const count = async () => ((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length
+    const before = await count()
+    const out = await run("cad_add_elements", { elements: [{ type: "sphere", radius: 5, name: "Ball" }, { type: "revolution" }, { type: "cube", width: -3 }, { type: "cube", width: 4, height: 4, depth: 4, name: "Block" }] }) as { ok: boolean; ids: string[]; skipped: Array<{ index: number; error: string }>; note: string }
+    expect(out.ok).toBe(true)
+    expect(out.ids).toHaveLength(2)
+    expect(out.skipped.map((s) => s.index)).toEqual([1, 2])
+    expect(out.note).toContain("2 of 4")
+    expect(await count()).toBe(before + 2)
+    // A boolean over a skipped element is skipped too; operand indexes still point at the right elements after the gap.
+    const boolean = await run("cad_add_elements", { elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, { type: "cube", width: -1 }, { type: "cylinder", radius: 2, height: 30 }, { type: "boolean-subtract", operands: [0, 2] }, { type: "boolean-union", operands: [0, 1] }] }) as { ok: boolean; elements: Array<{ id: string; type: string; operands?: string[] }>; skipped: Array<{ index: number }> }
+    expect(boolean.skipped.map((s) => s.index).sort()).toEqual([1, 4])
+    const sub = boolean.elements.find((e) => e.type === "boolean-subtract")!
+    expect(sub.operands).toEqual([boolean.elements[0]!.id, boolean.elements[1]!.id])
+    // Every element invalid: nothing added, every reason listed.
+    const none = await run("cad_add_elements", { elements: [{ type: "revolution" }, { type: "cube", width: -3 }] }) as { ok: boolean; problems: string[] }
+    expect(none.ok).toBe(false)
+    expect(none.problems).toHaveLength(2)
     const bad = await handlers.addElements(projectId, [{ type: "boolean-union", operands: [0, 7] }]) as { ok: boolean }
     expect(bad.ok).toBe(false)
   })
@@ -121,6 +133,72 @@ describe("cad tools provision what is missing", () => {
     const solids = stored.filter((e) => ["cube", "sphere", "cylinder", "cone", "torus", "circle"].includes(String(e["type"])))
     expect(solids.length).toBeGreaterThan(0)
     for (const e of solids) for (const k of ["x", "y", "z"]) expect(typeof e[k], `${e["type"]}.${k}`).toBe("number")
+  })
+
+  test("cad_check_design reads the model and the design space, and finds what is illogical", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Design" } })).body.id as string
+      await h.addElements(project, [
+        { type: "cube", name: "Body", width: 100, height: 40, depth: 20, x: 0, y: 0, z: 10 },
+        { type: "cylinder", name: "Wheel", radius: 12, height: 8, x: 0, y: 24, z: 10 },
+        { type: "cube", name: "Lost", width: 10, height: 10, depth: 10, x: 900, y: 900, z: 900 },
+        { type: "cube", name: "Turned", width: 10, height: 10, depth: 10, x: 0, y: 0, z: 30, rotation: { x: 1.5708, y: 0, z: 0 } }
+      ])
+      const out = await h.checkDesign(project) as { ok: boolean; issues: Array<{ code: string }>; designSpace: { handedness: string; angles: { rotation: string } }; stats: { elements: number } }
+      expect(out.designSpace.handedness).toBe("right-handed")
+      expect(out.designSpace.angles.rotation).toContain("DEGREES")
+      expect(out.stats.elements).toBe(4)
+      const codes = out.issues.map((i) => i.code)
+      expect(codes).toContain("FLOATING")
+      expect(codes).toContain("ROTATION_IN_RADIANS")
+      expect(out.ok).toBe(true)
+      const bad = await h.addElements(project, [{ type: "cube", rotation: "ninety" }]) as { ok: boolean; problems: string[] }
+      expect(bad.ok).toBe(false)
+      expect(bad.problems[0]).toContain("rotation must be {x, y, z} in degrees")
+    } finally { await fresh.dispose() }
+  })
+
+  test("cad_import_drawing turns a DXF into a 3D plate with a hole, stored with real operand ids", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Import" } })).body.id as string
+      const line = (a: number, b: number, c: number, d: number) => `0\nLINE\n8\n0\n10\n${a}\n20\n${b}\n11\n${c}\n21\n${d}\n`
+      const dxf = `0\nSECTION\n2\nENTITIES\n${line(0, 0, 80, 0)}${line(80, 0, 80, 40)}${line(80, 40, 0, 40)}${line(0, 40, 0, 0)}0\nCIRCLE\n8\n0\n10\n40\n20\n20\n40\n6\n0\nENDSEC\n0\nEOF\n`
+      const tool = buildTools(h, project).find((t) => t.id === "cad_import_drawing")!
+      const out = JSON.parse(String(await tool.execute({ format: "dxf", content: dxf, depth: 8, name: "Plate" }, ctx))) as { ok: boolean; stats: { solids: number; holes: number }; elements: Array<Record<string, unknown>> }
+      expect(out.ok).toBe(true)
+      expect(out.stats).toMatchObject({ solids: 1, holes: 1 })
+      const sub = out.elements.find((e) => e["type"] === "boolean-subtract")!
+      const ids = out.elements.map((e) => e["id"])
+      for (const operand of sub["operands"] as unknown[]) expect(ids).toContain(operand)
+      const stored = (await fresh.call(`/api/projects/${project}/drawings`)).body[0].data.elements as unknown[]
+      expect(stored).toHaveLength(3)
+      const none = JSON.parse(String(await tool.execute({ format: "dxf", content: `0\nSECTION\n2\nENTITIES\n${line(0, 0, 10, 0)}0\nENDSEC\n0\nEOF\n`, depth: 8 }, ctx))) as { ok: boolean }
+      expect(none.ok).toBe(false)
+    } finally { await fresh.dispose() }
+  })
+
+  test("a lathe operation needs no drawing, and a probing operation needs none either", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Machines" } })).body.id as string
+      const lathe = await h.createOperation(project, { type: "turning", params: { machineType: "lathe", toolType: "turning", stockDiameter: 40, stockLength: 80, depth: 2, stepdown: 1 } }) as { ok: boolean; operationId: string }
+      expect(lathe.ok).toBe(true)
+      const gcode = await h.generateGcode(project, lathe.operationId)
+      expect(gcode.gcode).toContain("G18")
+      expect(gcode.gcode).toContain("G1 Z-80.000")
+      const probing = await h.createOperation(project, { type: "probing", params: { toolType: "probe", probeCycle: "corner", workOffset: "G55" } }) as { ok: boolean; operationId: string }
+      expect(probing.ok).toBe(true)
+      const program = await h.generateGcode(project, probing.operationId)
+      expect(program.gcode).toContain("G10 L20 P2 X-2.000")
+      expect(program.gcode).not.toMatch(/\bM3\b/)
+      // A mill contour still needs something to cut.
+      expect(await h.createOperation(project, { type: "contour", params: {} })).toMatchObject({ ok: false })
+    } finally { await fresh.dispose() }
   })
 
   test("a cam operation needs something to machine", async () => {

@@ -1,4 +1,4 @@
-import { AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -6,6 +6,8 @@ import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Database, schema } from "@cadcamfun/db"
 import { eq } from "drizzle-orm"
+import { join } from "node:path"
+import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 
 const fail = (message: string) => (e: unknown) =>
@@ -29,6 +31,19 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const host = yield* Effect.serviceOption(AiHost)
   const { query } = yield* Database
   const kv = yield* KvStore
+  const appConfig = yield* AppConfigService
+  const skillStore = createUserSkillStore(join(appConfig.dataDir, "ai", "skills"))
+  const skillInfos = Effect.promise(async () => {
+    const user = await skillStore.list()
+    return [
+      ...CADCAM_SKILLS.map((s) => ({ name: s.name, description: s.description, builtIn: true, category: s.category })),
+      ...user.map((s) => ({ name: s.name, description: s.description, builtIn: false, category: "user" }))
+    ]
+  })
+  /** Live hosts re-read the skills; false when there is no embedded host (the next start loads them). */
+  const reloadSkills = Option.isSome(host)
+    ? host.value.runtime.reloadSkills().pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
+    : Effect.succeed(false)
 
   const status = Effect.gen(function*() {
     const providers = yield* credentials.status
@@ -49,10 +64,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     if (payload.context?.trim()) parts.push(payload.context.trim())
     if (payload.projectId) {
       const stored = yield* kv.get(`ai.context.${payload.projectId}`)
-      if (stored) parts.push(typeof stored.value === "string" ? stored.value : JSON.stringify(stored.value))
+      if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
     }
     const memory = yield* kv.list("ai.memory.")
-    if (memory.length > 0) parts.push(`Saved notes:\n${memory.map((m) => `- ${m.key.slice("ai.memory.".length)}: ${String(m.value)}`).join("\n")}`)
+    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice("ai.memory.".length), value: m.value })).reverse())
+    if (notes !== "") parts.push(notes)
     return parts.join("\n\n")
   })
   /** Legacy single-shot call: the model selector is the vendor-neutral tier unless a model id is given. */
@@ -99,16 +115,61 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
       const context = yield* contextFor(payload)
-      return ai.chat({
+      return withHeartbeat(ai.chat({
         message: payload.message,
         ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
         ...(payload.projectId ? { projectId: payload.projectId } : {}),
         ...(context ? { context } : {}),
-        ...(payload.model ? { model: payload.model } : {})
+        ...(payload.model ? { model: payload.model } : {}),
+        ...(payload.attachments && payload.attachments.length > 0 ? { attachments: payload.attachments } : {})
       }).pipe(Stream.catch((e) => Stream.succeed({
         type: "error" as const, sessionId: payload.sessionId ?? "", code: e._tag === "AiConfigError" ? "config" as const : e._tag === "AiAborted" ? "aborted" as const : "provider" as const,
         message: aiError(e)
-      })))
+      }))))
+    }))
+    .handle("sessionState", ({ payload }) => Effect.gen(function*() {
+      if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
+      const state = yield* ai.sessionState(payload.sessionId, payload.projectId).pipe(
+        Effect.mapError((e) => new InternalError({ message: e.message }))
+      )
+      return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}) }
+    }))
+    .handle("removeSession", ({ payload }) => Effect.gen(function*() {
+      if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
+      yield* ai.abort(payload.sessionId)
+      if (!Option.isSome(host)) return { removed: false }
+      const removed = yield* Effect.promise(async () => {
+        try {
+          const projectHost = await Effect.runPromise(host.value.runtime.host(payload.projectId ?? "default"))
+          return await projectHost.client.session.remove({ sessionID: payload.sessionId })
+        } catch { return false }
+      })
+      return { removed }
+    }))
+    .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))
+    .handle("saveSkill", ({ payload }) => Effect.gen(function*() {
+      const parsed = payload.markdown !== undefined
+        ? parseSkillMarkdown(payload.markdown)
+        : (() => {
+            const skill = { name: payload.name ?? "", description: payload.description ?? "", body: payload.body ?? "" }
+            const problems = skillProblems(skill)
+            return problems.length > 0 ? { ok: false as const, problems } : { ok: true as const, value: skill }
+          })()
+      if (!parsed.ok) return yield* new BadRequest({ message: `Skill not loaded: ${parsed.problems.join("; ")}` })
+      const saved = yield* Effect.promise(() => skillStore.save(parsed.value))
+      if (!saved.ok) return yield* new BadRequest({ message: `Skill not loaded: ${saved.problems.join("; ")}` })
+      const live = yield* reloadSkills
+      const skills = yield* skillInfos
+      return { skill: { name: saved.value.name, description: saved.value.description, builtIn: false, category: "user" }, skills, live }
+    }))
+    .handle("deleteSkill", ({ params }) => Effect.gen(function*() {
+      if (!SKILL_NAME_PATTERN.test(params.name)) return yield* new BadRequest({ message: "Invalid skill name" })
+      if (CADCAM_SKILLS.some((s) => s.name === params.name)) return yield* new BadRequest({ message: "Built-in skills cannot be removed" })
+      const removed = yield* Effect.promise(() => skillStore.remove(params.name))
+      if (!removed) return yield* new BadRequest({ message: `No loaded skill called ${params.name}` })
+      yield* reloadSkills
+      const skills = yield* skillInfos
+      return { skills, max: MAX_USER_SKILLS }
     }))
     .handle("chatAbort", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })

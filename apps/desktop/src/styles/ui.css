@@ -10,9 +10,7 @@
 
 /* ---- System font + optical sizing ---- */
 :root {
-  font-family:
-    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
   font-feature-settings: "ss01", "cv11", "calt";
   --ui-radius-sm: 0.5rem;
@@ -27,6 +25,48 @@
   --ui-blur-md: blur(20px) saturate(180%);
   --ui-blur-lg: blur(32px) saturate(200%);
   --ui-ring: 0 0 0 3px rgba(59, 130, 246, 0.35);
+
+  /* Shared response curves for direct, interruptible control feedback. */
+  --ui-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ui-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ui-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ui-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Button feedback responds on press and releases without lingering. */
+  --ui-press-duration: 80ms;
+  --ui-release-duration: 160ms;
+}
+
+/* --- Native system font, optical sizing, vibrancy --- */
+.ui-vibrancy {
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  /* Slight contrast bump keeps text legible over translucent materials. */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* --- Origin-aware popover (transform-origin is set inline per trigger) --- */
+.ui-popover {
+  transform-origin: var(--ui-popover-origin, center);
+}
+
+/* --- Hardware-accelerated press feedback (Emil: scale 0.97 on :active) --- */
+.ui-press {
+  transition: transform var(--ui-release-duration) var(--ui-ease-out);
+  will-change: transform;
+}
+.ui-press:active {
+  transform: scale(0.97);
+  transition-duration: var(--ui-press-duration);
+}
+
+/* --- Touch-guard: gate hover effects behind fine pointer --- */
+@media (hover: hover) and (pointer: fine) {
+  .ui-hover-lift:hover { transform: translateY(-2px); }
+  .ui-hover-glow:hover { box-shadow: 0 12px 32px -12px rgba(59, 130, 246, 0.4); }
+}
+@media (hover: none) {
+  .ui-press, .ui-press:active { transform: none !important; }
 }
 
 html.dark {
@@ -35,6 +75,78 @@ html.dark {
   --ui-shadow-lg: 0 24px 48px -24px rgba(0, 0, 0, 0.7);
 }
 
+/* CAD/CAM workspaces prioritize an uninterrupted, high-contrast work surface. */
+.cad-workspace,
+.cam-workspace {
+  --workspace-border: rgba(148, 163, 184, 0.24);
+  --workspace-panel: rgba(248, 250, 252, 0.94);
+  --workspace-stage: #f2f5f8;
+  background: #e9edf2;
+  color: #17212b;
+}
+.cad-workspace__frame,
+.cam-workspace__frame {
+  background: #e9edf2;
+}
+.cad-workspace__body,
+.cam-workspace__body {
+  min-height: 0;
+  gap: 0.625rem;
+  padding: 0.625rem;
+  background: linear-gradient(145deg, #e9edf2, #e3e9ef);
+}
+.cad-workspace__sidebar,
+.cam-workspace__sidebar,
+.cad-workspace__inspector,
+.cam-workspace__inspector {
+  background: var(--workspace-panel);
+  border: 1px solid var(--workspace-border);
+  border-radius: 0.8rem;
+  box-shadow: 0 5px 18px rgba(30, 45, 60, 0.07);
+}
+.cad-workspace__sidebar,
+.cam-workspace__sidebar {
+  overflow: hidden;
+}
+.cad-workspace__tabs,
+.cam-workspace__tabs {
+  border-bottom: 1px solid var(--workspace-border);
+  background: rgba(235, 241, 246, 0.8);
+}
+.cad-workspace__stage,
+.cam-workspace__stage {
+  border: 1px solid rgba(123, 141, 158, 0.28);
+  border-radius: 0.8rem;
+  background-color: var(--workspace-stage);
+  background-image: radial-gradient(rgba(92, 112, 130, 0.13) 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
+  box-shadow: inset 0 1px 2px rgba(28, 42, 54, 0.06), 0 3px 12px rgba(30, 45, 60, 0.05);
+}
+html.dark .cad-workspace,
+html.dark .cam-workspace {
+  --workspace-border: rgba(148, 163, 184, 0.17);
+  --workspace-panel: rgba(27, 35, 44, 0.97);
+  --workspace-stage: #171e25;
+  background: #11171d;
+  color: #e6edf3;
+}
+html.dark .cad-workspace__frame,
+html.dark .cam-workspace__frame { background: #11171d; }
+html.dark .cad-workspace__body,
+html.dark .cam-workspace__body { background: linear-gradient(145deg, #11171d, #151d25); }
+html.dark .cad-workspace__tabs,
+html.dark .cam-workspace__tabs { background: rgba(38, 49, 60, 0.82); }
+html.dark .cad-workspace__stage,
+html.dark .cam-workspace__stage {
+  border-color: rgba(148, 163, 184, 0.2);
+  background-image: radial-gradient(rgba(168, 184, 198, 0.12) 0.7px, transparent 0.7px);
+}
+@media (max-width: 900px) {
+  .cad-workspace__body,
+  .cam-workspace__body { gap: 0.375rem; padding: 0.375rem; }
+  .cad-workspace__stage,
+  .cam-workspace__stage { margin-right: 0.25rem; margin-left: 0.25rem; }
+}
 /* ---- Typography scale ---- */
 .ui-display {
   font-size: clamp(2.25rem, 4.5vw, 3.75rem);
@@ -90,10 +202,7 @@ html.dark .ui-caption { color: rgb(156, 163, 175); }
   border-radius: var(--ui-radius-2xl);
   padding: 1.25rem;
   overflow: hidden;
-  transition:
-    box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+  transition: box-shadow 180ms var(--ui-ease-out), transform 180ms var(--ui-ease-out);
 }
 .ui-card-default {
   background: rgba(255, 255, 255, 0.62);
@@ -147,8 +256,8 @@ html.dark .ui-caption { color: rgb(156, 163, 175); }
   pointer-events: none;
   z-index: -1;
 }
-.ui-card:hover::before {
-  transform: translateX(100%);
+@media (hover: hover) and (pointer: fine) {
+  .ui-card:hover::before { transform: translateX(100%); }
 }
 .ui-card-interactive {
   cursor: pointer;
@@ -195,7 +304,7 @@ html.dark .ui-card-holographic {
 
 /* ---- Button ---- */
 .ui-btn {
-  --ui-btn-bg: linear-gradient(135deg, rgb(37, 99, 235), rgb(6, 182, 212));
+  --ui-btn-bg: linear-gradient(135deg, rgb(32, 91, 194), rgb(28, 121, 148));
   --ui-btn-fg: white;
   --ui-btn-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.45), 0 1px 2px rgba(15, 23, 42, 0.06);
   display: inline-flex;
@@ -214,10 +323,11 @@ html.dark .ui-card-holographic {
   white-space: nowrap;
   box-shadow: var(--ui-btn-shadow);
   transition:
-    box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    background 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    color 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform 140ms var(--ui-ease-out),
+    box-shadow 180ms var(--ui-ease-out),
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
   -webkit-tap-highlight-color: transparent;
 }
 .ui-btn:focus-visible {
@@ -229,17 +339,19 @@ html.dark .ui-card-holographic {
   transition-duration: 80ms;
 }
 .ui-btn:disabled,
-.ui-btn[aria-disabled="true"] {
+.ui-btn[aria-disabled="true"],
+.ui-icon-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
   filter: saturate(0.4);
+  transform: none;
 }
 .ui-btn-sm { padding: 0.375rem 0.875rem; font-size: 0.8125rem; }
 .ui-btn-md { padding: 0.5rem 1.125rem; font-size: 0.875rem; }
 .ui-btn-lg { padding: 0.75rem 1.5rem; font-size: 1rem; }
 
 .ui-btn-primary {
-  --ui-btn-bg: linear-gradient(135deg, rgb(37, 99, 235) 0%, rgb(6, 182, 212) 100%);
+  --ui-btn-bg: linear-gradient(135deg, rgb(32, 91, 194) 0%, rgb(28, 121, 148) 100%);
   --ui-btn-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.55), 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .ui-btn-secondary {
@@ -250,9 +362,14 @@ html.dark .ui-card-holographic {
   backdrop-filter: var(--ui-blur-sm);
   -webkit-backdrop-filter: var(--ui-blur-sm);
 }
-.ui-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(59, 130, 246, 0.5);
+@media (hover: hover) and (pointer: fine) {
+  .ui-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  .ui-btn-primary:hover,
+  .ui-btn-danger:hover,
+  .ui-btn-success:hover { box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.38); }
 }
 .ui-btn-ghost {
   --ui-btn-bg: transparent;
@@ -260,8 +377,8 @@ html.dark .ui-card-holographic {
   --ui-btn-shadow: none;
   border-color: transparent;
 }
-.ui-btn-ghost:hover {
-  background: rgba(59, 130, 246, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .ui-btn-ghost:hover { background: rgba(59, 130, 246, 0.08); }
 }
 .ui-btn-danger {
   --ui-btn-bg: linear-gradient(135deg, rgb(239, 68, 68), rgb(220, 38, 38));
@@ -276,9 +393,11 @@ html.dark .ui-btn-secondary {
   --ui-btn-fg: rgb(241, 245, 249);
   border-color: rgba(71, 85, 105, 0.6);
 }
-html.dark .ui-btn-secondary:hover {
-  background: rgba(30, 41, 59, 0.85);
-  border-color: rgba(96, 165, 250, 0.5);
+@media (hover: hover) and (pointer: fine) {
+  html.dark .ui-btn-secondary:hover {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(96, 165, 250, 0.5);
+  }
 }
 html.dark .ui-btn-ghost {
   --ui-btn-fg: rgb(96, 165, 250);
@@ -295,6 +414,119 @@ html.dark .ui-btn-ghost {
 }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 
+/* ---- Bouncing-dots processing indicator (Apple spring feel) ---- */
+/* Used by the AI assistant to signal "thinking" without a spinner.
+   Each dot bounces on its own loop with a staggered phase, like the
+   reference CADAssistantOpenai processing card. Apple: damping 1.0
+   (critically damped, no overshoot) — the bounce is one cycle per dot,
+   not an overshoot loop. Emil: animate only transform/opacity for frame
+   consistency. */
+@keyframes ui-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+  40%           { transform: translateY(-6px); opacity: 1; }
+}
+.ui-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ui-dots > span {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  animation: ui-bounce 1.2s var(--ui-ease-in-out, cubic-bezier(0.77, 0, 0.175, 1)) infinite;
+  will-change: transform, opacity;
+}
+.ui-dots > span:nth-child(1) { animation-delay: 0ms;    background: rgb(96, 165, 250); }
+.ui-dots > span:nth-child(2) { animation-delay: 160ms;  background: rgb(129, 140, 248); }
+.ui-dots > span:nth-child(3) { animation-delay: 320ms;  background: rgb(168, 85, 247); }
+
+/* ---- Pulsing glow (used behind the empty-state hero icon) ---- */
+@keyframes ui-pulse-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.95; transform: scale(1.06); }
+}
+.ui-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  filter: blur(14px);
+  pointer-events: none;
+  animation: ui-pulse-glow 2.6s var(--ui-ease-in-out, cubic-bezier(0.77, 0, 0.175, 1)) infinite;
+  will-change: transform, opacity;
+}
+
+/* ---- Status dot (8px coloured circle for the tool indicator row) ---- */
+.ui-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+.ui-status-dot-pulse { animation: ui-pulse-soft 1.8s ease-in-out infinite; }
+@keyframes ui-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ---- Header overlay (matches the glassmorphism strip on top of
+   the reference's gradient header: white at 10% over the gradient,
+   back-blurred, sits behind the controls). ---- */
+.ui-header-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px) saturate(180%);
+  -webkit-backdrop-filter: blur(6px) saturate(180%);
+  pointer-events: none;
+}
+
+/* ---- Panel entrance (Apple: damping 1.0, response 0.4) ---- */
+/* Slide in from off-screen with translate (not keyframe left/right), so the
+   transform is GPU-only and interruptible if the user opens/closes quickly.
+   Emil: 200–500ms for modals/drawers; this is the lower end at 360ms. */
+@keyframes ui-panel-in {
+  from { transform: translateX(8px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.ui-panel-in {
+  animation: ui-panel-in 360ms var(--ui-ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
+  will-change: transform, opacity;
+}
+
+/* ---- Empty-state hero icon (Apple spring: damping 1.0) ---- */
+/* Subtle scale-in once the panel mounts, then the glow ring takes over. */
+@keyframes ui-hero-in {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.ui-hero-in {
+  animation: ui-hero-in 480ms var(--ui-ease-out, cubic-bezier(0.23, 1, 0.32, 1)) 80ms both;
+  will-change: transform, opacity;
+}
+
+/* ---- Reduced motion: respect the user's preference ---- */
+/* Apple: replace loops/springs with cross-fades; keep opacity changes that
+   aid comprehension. Emil: drop elastic, replace with static. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-dots > span,
+  .ui-glow,
+  .ui-status-dot-pulse,
+  .ui-panel-in,
+  .ui-hero-in {
+    animation: none !important;
+  }
+  .ui-dots > span { opacity: 0.85; transform: translateY(0); }
+  .ui-glow { opacity: 0.5; transform: scale(1); }
+}
+
+/* ---- Hover gate (Emil: hover only on fine-pointer devices) ---- */
+@media (hover: none) {
+  .ui-press, .ui-press:active { transform: none !important; }
+}
+
 /* ---- IconButton ---- */
 .ui-icon-btn {
   display: inline-flex;
@@ -308,16 +540,19 @@ html.dark .ui-btn-ghost {
   color: rgb(55, 65, 81);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 160ms cubic-bezier(0.22, 1, 0.36, 1), border-color 160ms;
+  transition: transform 140ms var(--ui-ease-out), background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 .ui-icon-btn-sm { width: 28px; height: 28px; }
 .ui-icon-btn-md { width: 36px; height: 36px; }
 .ui-icon-btn-lg { width: 44px; height: 44px; }
-.ui-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(59, 130, 246, 0.4);
+@media (hover: hover) and (pointer: fine) {
+  .ui-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(59, 130, 246, 0.4);
+  }
 }
-.ui-icon-btn:active { transform: scale(0.92); }
+.ui-icon-btn:active { transform: scale(0.96); transition-duration: 90ms; }
+.ui-icon-btn:focus-visible { outline: none; box-shadow: var(--ui-ring); }
 .ui-icon-btn-active {
   background: rgba(37, 99, 235, 0.12);
   color: rgb(37, 99, 235);
@@ -326,6 +561,11 @@ html.dark .ui-btn-ghost {
 html.dark .ui-icon-btn {
   background: rgba(30, 41, 59, 0.6);
   color: rgb(203, 213, 225);
+}
+html.dark .ui-icon-btn-active {
+  background: rgba(37, 99, 235, 0.22);
+  color: rgb(147, 197, 253);
+  border-color: rgba(96, 165, 250, 0.55);
 }
 html.dark .ui-icon-btn:hover {
   background: rgba(30, 41, 59, 0.85);
@@ -402,6 +642,7 @@ html.dark .ui-textarea {
 
 /* ---- Switch ---- */
 .ui-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.625rem;
@@ -434,7 +675,7 @@ html.dark .ui-textarea {
   border-radius: 50%;
   background: white;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
-  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 180ms var(--ui-ease-out);
 }
 .ui-switch-on::before {
   background: linear-gradient(135deg, rgb(37, 99, 235), rgb(6, 182, 212));
@@ -443,6 +684,7 @@ html.dark .ui-textarea {
   transform: translateX(1rem);
 }
 .ui-switch-disabled { opacity: 0.5; cursor: not-allowed; }
+.ui-switch:focus-visible { outline: none; border-radius: 0.5rem; box-shadow: var(--ui-ring); }
 .ui-switch-label { font-size: 0.875rem; color: rgb(55, 65, 81); }
 html.dark .ui-switch-label { color: rgb(203, 213, 225); }
 
@@ -634,7 +876,7 @@ html.dark .ui-badge-gradient { color: rgb(196, 181, 253); }
   -webkit-backdrop-filter: blur(8px) saturate(140%);
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 .ui-modal {
   background: rgba(255, 255, 255, 0.92);
@@ -643,7 +885,7 @@ html.dark .ui-badge-gradient { color: rgb(196, 181, 253); }
   border-radius: var(--ui-radius-2xl);
   box-shadow: var(--ui-shadow-lg);
   border: 1px solid rgba(226, 232, 240, 0.6);
-  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -669,7 +911,10 @@ html.dark .ui-badge-gradient { color: rgb(196, 181, 253); }
   cursor: pointer;
   transition: background 150ms;
 }
-.ui-modal-close:hover { background: rgba(148, 163, 184, 0.15); }
+.ui-modal-close:focus-visible { outline: none; box-shadow: var(--ui-ring); }
+@media (hover: hover) and (pointer: fine) {
+  .ui-modal-close:hover { background: rgba(148, 163, 184, 0.15); }
+}
 .ui-modal-body { padding: 1.25rem 1.5rem 1.5rem; overflow-y: auto; }
 html.dark .ui-modal { background: rgba(17, 24, 39, 0.92); border-color: rgba(51, 65, 85, 0.6); color: rgb(241, 245, 249); }
 html.dark .ui-modal-header { border-color: rgba(51, 65, 85, 0.6); }
@@ -687,8 +932,8 @@ html.dark .ui-modal-close { color: rgb(148, 163, 184); }
   flex-direction: column;
   border: 1px solid rgba(226, 232, 240, 0.5);
 }
-.ui-sheet-right { top: 0; right: 0; height: 100vh; width: min(28rem, 92vw); border-radius: var(--ui-radius-2xl) 0 0 var(--ui-radius-2xl); }
-.ui-sheet-left { top: 0; left: 0; height: 100vh; width: min(28rem, 92vw); border-radius: 0 var(--ui-radius-2xl) var(--ui-radius-2xl) 0; }
+.ui-sheet-right { top: 0; right: 0; height: 100dvh; width: min(28rem, 92vw); border-radius: var(--ui-radius-2xl) 0 0 var(--ui-radius-2xl); padding-bottom: env(safe-area-inset-bottom); }
+.ui-sheet-left { top: 0; left: 0; height: 100dvh; width: min(28rem, 92vw); border-radius: 0 var(--ui-radius-2xl) var(--ui-radius-2xl) 0; padding-bottom: env(safe-area-inset-bottom); }
 .ui-sheet-bottom { left: 0; right: 0; bottom: 0; max-height: 80vh; border-radius: var(--ui-radius-2xl) var(--ui-radius-2xl) 0 0; }
 .ui-sheet-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -702,7 +947,10 @@ html.dark .ui-modal-close { color: rgb(148, 163, 184); }
   border-radius: 0.5rem; color: rgb(107, 114, 128); cursor: pointer;
   transition: background 150ms;
 }
-.ui-sheet-close:hover { background: rgba(148, 163, 184, 0.15); }
+.ui-sheet-close:focus-visible { outline: none; box-shadow: var(--ui-ring); }
+@media (hover: hover) and (pointer: fine) {
+  .ui-sheet-close:hover { background: rgba(148, 163, 184, 0.15); }
+}
 .ui-sheet-body { padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1; }
 html.dark .ui-sheet { background: rgba(17, 24, 39, 0.92); border-color: rgba(51, 65, 85, 0.5); color: rgb(241, 245, 249); }
 
@@ -716,6 +964,8 @@ html.dark .ui-sheet { background: rgba(17, 24, 39, 0.92); border-color: rgba(51,
   flex-direction: column;
   gap: 0.625rem;
   pointer-events: none;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-right: env(safe-area-inset-right);
 }
 .ui-toast {
   pointer-events: auto;
@@ -729,7 +979,7 @@ html.dark .ui-sheet { background: rgba(17, 24, 39, 0.92); border-color: rgba(51,
   -webkit-backdrop-filter: var(--ui-blur-md);
   box-shadow: var(--ui-shadow-lg);
   border: 1px solid rgba(226, 232, 240, 0.6);
-  min-width: 18rem;
+  min-width: min(18rem, calc(100vw - 2rem));
   max-width: 26rem;
   color: rgb(17, 24, 39);
 }
@@ -742,6 +992,7 @@ html.dark .ui-sheet { background: rgba(17, 24, 39, 0.92); border-color: rgba(51,
   border-radius: 0.375rem;
   color: rgb(107, 114, 128); cursor: pointer;
 }
+.ui-toast-close:focus-visible { outline: none; box-shadow: var(--ui-ring); }
 .ui-toast-success .ui-toast-icon { color: rgb(16, 185, 129); }
 .ui-toast-warning .ui-toast-icon { color: rgb(245, 158, 11); }
 .ui-toast-error .ui-toast-icon { color: rgb(239, 68, 68); }
@@ -788,6 +1039,9 @@ html.dark .ui-alert-error { color: rgb(252, 165, 165); }
 @keyframes ui-skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton { animation: none; }
 }
 
 /* ---- Tap-highlight removal for fast taps on touch ---- */
@@ -866,4 +1120,13 @@ html.dark .ui-alert-error { color: rgb(252, 165, 165); }
   .ui-sheet {
     border-width: 2px;
   }
+}
+
+@media (max-width: 600px) {
+  .ui-toast-viewport { right: 0.75rem; bottom: 0.75rem; left: 0.75rem; }
+  .ui-toast { width: 100%; max-width: none; }
+  .ui-modal-scrim { align-items: end; padding: 0.75rem; }
+  .ui-modal { width: 100%; max-height: calc(100dvh - 1.5rem); border-radius: 1.25rem; }
+  .ui-modal-header { padding: 1rem 1.125rem; }
+  .ui-modal-body { padding: 1rem 1.125rem 1.25rem; }
 }

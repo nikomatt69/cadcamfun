@@ -11,9 +11,9 @@ Do not use it
 - To change an existing element: cad_modify_entities with its id.
 
 Parameters
-- elements: 1 to 200 objects, each {"type": <one of the types below>, ...fields}. Fields you leave out take the defaults of the editor's tool panel; fields you give must have the right JSON type (number, string, array).
-- Common to every type: tolerance, x, y, z (position in mm; the centre of a solid, the origin of a profile), name, color ("#rrggbb"), rotation {x,y,z} in radians, wireframe, layer (a layer name; it is created if it does not exist).
-- The call is all-or-nothing: if any element is invalid nothing is added and every problem is listed under "problems"; fix them all and send the call again.
+- elements: 1 to 40 objects per call (a bigger model is several calls, each part of it logical: body, then wheels, then details; a very long call is cut off by the model's own output limit and fails), each {"type": <one of the types below>, ...fields}. Fields you leave out take the defaults of the editor's tool panel; fields you give must have the right JSON type (number, string, array).
+- Common to every type: tolerance, x, y, z (position in mm; the centre of a solid, the origin of a profile), name, color ("#rrggbb"), rotation {x,y,z} in DEGREES (the editor's own unit; arc and revolution angles stay in radians), wireframe, layer (a layer name; it is created if it does not exist).
+- Each element is judged on its own: the valid ones are added, the invalid ones are listed under "skipped" ({index, error}) and are NOT in the drawing. Resend only those, corrected; never resend the ones that were added. A boolean whose operand was skipped is skipped too. If every element is invalid, "ok" is false and "problems" lists them all.
 - operands (booleans): ids of existing elements, or the index (0-based) of an earlier element of the SAME call.
 
 Precision (microns)

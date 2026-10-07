@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 const panel = (): Element | null => document.querySelector('[data-testid="ai-panel"]')

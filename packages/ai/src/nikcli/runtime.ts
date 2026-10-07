@@ -6,7 +6,8 @@ import { join } from "node:path"
 import type { NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import { installSkills } from "../skills/index.ts"
-import { buildHostConfig, type HostProviderSpec } from "./config.ts"
+import { createUserSkillStore } from "../skills/user.ts"
+import { buildHostConfig, type HostProviderSpec, type HostCompactionSettings } from "./config.ts"
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
 import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
@@ -35,6 +36,8 @@ export interface NikCliRuntimeOptions {
   readonly catalogue?: { readonly network?: boolean }
   /** Receives the host's own log lines. Default: warnings and errors only, dropped otherwise. */
   readonly hostLogs?: HostLogSink
+  /** Automatic compaction can spend model calls; omission preserves host defaults. */
+  readonly compaction?: HostCompactionSettings
 }
 
 export interface ProjectHost {
@@ -57,6 +60,16 @@ export interface NikCliRuntime {
   clearProviderKey(providerId: string): Effect.Effect<void>
   /** Replace the provider declarations (e.g. new MiniMax base URL) and reload live hosts. */
   updateProviders(providers: ReadonlyArray<HostProviderSpec>): Effect.Effect<void, AiConfigError>
+  /** Rewrite the skills (built-in + the user's) into the host config and make live hosts see them. */
+  reloadSkills(): Effect.Effect<void, AiConfigError>
+  /**
+   * Open a child session under the given `parentSessionId` using the read-only
+   * `cadcam-worker` agent. The child inherits the parent's project directory but
+   * a separate permission allow-list, so it cannot mutate geometry, spawn more
+   * agents or set goals. The caller is responsible for removing the session
+   * (`client.session.remove`) once it has the answer.
+   */
+  worker(input: { projectId: string; parentSessionId: string; title?: string }): Effect.Effect<ProjectHost & { readonly workerSessionId: string }, AiConfigError>
 }
 
 type Sdk = typeof import("@nikcli-ai/sdk-next")
@@ -132,11 +145,21 @@ export const makeNikCliRuntime = (
     const pendingKeys = new Map<string, string>()
     const toolIdsOf = (projectId: string) => options.toolsFor(projectId).map((t) => t.id)
 
+    const userSkills = createUserSkillStore(join(options.dataDir, "ai", "skills"))
     const writeConfig = async (projectId: string) => {
-      await installSkills(paths.config)
+      await installSkills(paths.config, await userSkills.list())
       await writeFile(
         join(paths.config, "nikcli.json"),
-        JSON.stringify(buildHostConfig({ providers, toolIds: toolIdsOf(projectId), systemPrompt: options.systemPrompt }), null, 2)
+        JSON.stringify(
+          buildHostConfig({
+            providers,
+            toolIds: toolIdsOf(projectId),
+            systemPrompt: options.systemPrompt,
+            ...(options.compaction ? { compaction: options.compaction } : {})
+          }),
+          null,
+          2
+        )
       )
     }
 
@@ -200,6 +223,18 @@ export const makeNikCliRuntime = (
             await host?.client.provider.removeAuth({ providerID: providerId }).catch(() => undefined)
           }
         }),
+      reloadSkills: () =>
+        Effect.tryPromise({
+          try: async () => {
+            for (const [projectId, promise] of hosts) {
+              const host = await promise
+              await writeConfig(projectId)
+              await host.client["config-management"].reload()
+              for (const [providerId, key] of pendingKeys) await host.client.provider.api({ providerID: providerId, key })
+            }
+          },
+          catch: toConfigError("Failed to reload the skills")
+        }),
       updateProviders: (next) =>
         Effect.tryPromise({
           try: async () => {
@@ -212,6 +247,30 @@ export const makeNikCliRuntime = (
             }
           },
           catch: toConfigError("Failed to update the host provider configuration")
+        }),
+      worker: ({ projectId, parentSessionId, title }) =>
+        Effect.gen(function* () {
+          const projectHost = yield* Effect.tryPromise({
+            try: () => {
+              let existing = hosts.get(projectId)
+              if (existing === undefined) {
+                existing = createHost(projectId)
+                hosts.set(projectId, existing)
+                existing.catch(() => hosts.delete(projectId))
+              }
+              return existing
+            },
+            catch: toConfigError("Failed to start the embedded nikcli host")
+          })
+          const session = yield* Effect.tryPromise({
+            try: () =>
+              projectHost.client.session.create({
+                parentID: parentSessionId,
+                title: title ?? `worker for ${parentSessionId}`
+              }),
+            catch: toConfigError("Failed to open a worker session")
+          })
+          return { ...projectHost, workerSessionId: session.id }
         })
     }
 
@@ -238,3 +297,45 @@ export const hostFailure = (cause: unknown, provider?: string): AiProviderError 
     message: cause instanceof Error ? cause.message : String(cause),
     ...(provider ? { provider } : {})
   })
+
+/**
+ * The background-worker agent that the application delegates read-only
+ * investigations to. It is a separate agent from `CADCAM_AGENT` because it must
+ * not share the parent's tool allow-list (CAD/CAM mutation tools are forbidden
+ * here). See `specs/08-ai.md` §"Continuous-agent contract".
+ */
+export const CADCAM_WORKER_AGENT = "cadcam-worker"
+
+/**
+ * Default read-only tool allow-list for the worker agent. A worker may look at
+ * the document, suggest parameters, run deterministic G-code checks and verify
+ * toolpaths, but never mutate geometry, modify CAM operations or delegate.
+ *
+ * `cam_verify_toolpath` is read-only because the existing implementation
+ * (WP2 §10) only returns a verification report — the caller decides what to
+ * apply. This must stay true: if WP2 ever starts persisting its own fixes,
+ * `cam_verify_toolpath` moves out of this list.
+ */
+export const DEFAULT_WORKER_TOOL_IDS: ReadonlyArray<string> = [
+  "cad_describe_drawing",
+  "cad_check_design",
+  "cam_list_operations",
+  "cam_suggest_parameters",
+  "cam_describe_machine",
+  "cam_analyze_gcode",
+  "cam_verify_toolpath",
+  "lib_lookup_material",
+  "lib_lookup_tool",
+  "memory_recall"
+]
+
+/**
+ * Build the worker agent's permission block: the read-only tool allow-list
+ * and an explicit deny for everything else. The parent agent's permission is
+ * independent and lives in `buildHostConfig`.
+ */
+export const buildWorkerPermissions = (toolIds: ReadonlyArray<string>): Record<string, "allow" | "deny" | "ask"> => {
+  const permission: Record<string, "allow" | "deny" | "ask"> = { "*": "deny" }
+  for (const id of toolIds) permission[id] = "allow"
+  return permission
+}

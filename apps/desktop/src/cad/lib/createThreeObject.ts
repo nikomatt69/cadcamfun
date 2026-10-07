@@ -147,6 +147,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
         const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
         pyramid.position.set(element.x + originOffset.x, element.y + originOffset.y, (element.z || 0) + originOffset.z);
 
+        // Built with its apex on +Y; the scene is Z-up like every other primitive and like the toolpath.
+        pyramid.rotation.x = Math.PI / 2;
         return pyramid;
 
       case "prism":
@@ -188,11 +190,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           (element.z || 0) + originOffset.z
         );
 
-        // Rotate based on direction
-        if (element.direction === "down") {
-          hemisphere.rotation.x = Math.PI;
-        }
-
+        // The dome is built on +Y; stand it on Z: up = dome toward +Z, down = toward -Z.
+        hemisphere.rotation.x = element.direction === "down" ? -Math.PI / 2 : Math.PI / 2;
         return hemisphere;
 
       case "ellipsoid":

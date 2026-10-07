@@ -503,15 +503,55 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   // ---------------------------------------------------------------------------------------------------- pointer
-  const finishInteraction = () => {
+  const finishInteraction = (additive = pointerDown?.additive ?? false) => {
     if (activeDragPoint) {
       activeDragPoint = undefined
       if (orbit) orbit.enabled = true
     }
     if (selection.isBoxSelecting) {
-      selection.endBoxSelection()
+      selection.endBoxSelection(boxSelectionHits(), additive)
       if (orbit) orbit.enabled = !isPlacing()
     }
+  }
+
+  const boxSelectionHits = (): string[] => {
+    const start = selection.boxStartPosition
+    const end = selection.boxEndPosition
+    if (!start || !end || !camera || !container || !scene) return []
+
+    const rect = container.getBoundingClientRect()
+    const activeCamera = camera!
+    const fromScreen = worldToScreen({ ...start, z: 0 })
+    const toScreen = worldToScreen({ ...end, z: 0 })
+    if (!fromScreen || !toScreen) return []
+    const leftToRight = toScreen.x >= fromScreen.x
+    const boxLeft = Math.min(fromScreen.x, toScreen.x) + rect.left
+    const boxRight = Math.max(fromScreen.x, toScreen.x) + rect.left
+    const boxTop = Math.min(fromScreen.y, toScreen.y) + rect.top
+    const boxBottom = Math.max(fromScreen.y, toScreen.y) + rect.top
+    const bounds = new THREE.Box3()
+    const entities = cadObjects().filter((object) => object.visible && !isLocked(object.userData.elementId))
+    return entities.filter((object) => {
+      object.updateMatrixWorld(true)
+      bounds.setFromObject(object)
+      if (bounds.isEmpty()) return false
+      const projected = [
+        new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.min.z), new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.max.z),
+        new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.min.z), new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
+        new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.min.z), new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.max.z),
+        new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.min.z), new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z)
+      ].map((point) => {
+        point.project(activeCamera)
+        return { x: rect.left + (point.x + 1) * rect.width / 2, y: rect.top + (1 - point.y) * rect.height / 2 }
+      })
+      const left = Math.min(...projected.map((point) => point.x))
+      const right = Math.max(...projected.map((point) => point.x))
+      const top = Math.min(...projected.map((point) => point.y))
+      const bottom = Math.max(...projected.map((point) => point.y))
+      return leftToRight
+        ? left >= boxLeft && right <= boxRight && top >= boxTop && bottom <= boxBottom
+        : right >= boxLeft && left <= boxRight && bottom >= boxTop && top <= boxBottom
+    }).map((object) => object.userData.elementId as string)
   }
 
   const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point) ?? point : point)
@@ -582,8 +622,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
   const onMouseUp = (event: MouseEvent) => {
     const down = pointerDown
+    finishInteraction(down?.additive ?? (event.shiftKey || event.ctrlKey || event.metaKey || isMultiSelectMode()))
     pointerDown = undefined
-    finishInteraction()
     if (!down || !container || !camera || isPlacing()) return
     if (gizmo && (gizmo.dragging || gizmo.axis)) return
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return // an orbit drag, not a click

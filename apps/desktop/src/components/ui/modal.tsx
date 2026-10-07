@@ -1,6 +1,9 @@
 /**
- * Modal — Apple pattern: dims to focus, separate scrim. Spring-driven.
+ * Modal — dims to focus and separates the active task from the workspace.
  * Enter and exit along the same axis (slide up = slide down) for spatial consistency.
+ *
+ * A concise response keeps the task in focus. Mirroring the entry axis on exit avoids the
+ * "appears from one place, vanishes to another" disconnect.
  */
 import { Motion } from "solid-motionone"
 import { type JSX, Show, createEffect, onCleanup } from "solid-js"
@@ -49,13 +52,15 @@ export function Modal(props: ModalProps): JSX.Element {
         >
           <Motion.div
             class={sizeClass(size())}
+            // Entry: scale 0.96 + y 24, never scale(0) (Emil). Exit mirrors
+            // entry so the modal returns where it came from.
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
-            transition={{ duration: 0.35, easing: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.24, easing: [0.23, 1, 0.32, 1] }}
             role="dialog"
             aria-modal="true"
-            aria-label={props.title}
+            aria-label={props.title ?? "Dialog"}
             onClick={(event) => event.stopPropagation()}
           >
             <Show when={props.title !== undefined}>
@@ -74,7 +79,9 @@ export function Modal(props: ModalProps): JSX.Element {
   )
 }
 
-/** Sheet — side panel that slides along its edge. Translucent, no scrim, doesn't break flow. */
+/** Sheet — side panel that slides along its edge. Translucent, no scrim, doesn't break flow.
+ *  Slide direction matches the side (right/left/bottom); entry distance is 8%
+ *  of the panel size, not 32px (Emil: percentages adapt to content). */
 export interface SheetProps {
   readonly open: boolean
   readonly onClose: () => void
@@ -83,11 +90,11 @@ export interface SheetProps {
   readonly children: JSX.Element
 }
 
-const slideFrom = (side: "right" | "left" | "bottom"): { x: number; y: number } => {
+const slideFrom = (side: "right" | "left" | "bottom"): { x: string; y: string } => {
   switch (side) {
-    case "right": return { x: 32, y: 0 }
-    case "left": return { x: -32, y: 0 }
-    case "bottom": return { x: 0, y: 32 }
+    case "right": return { x: "8%", y: "0" }
+    case "left": return { x: "-8%", y: "0" }
+    case "bottom": return { x: "0", y: "8%" }
   }
 }
 
@@ -99,12 +106,13 @@ export function Sheet(props: SheetProps): JSX.Element {
         <Motion.aside
           class={["ui-sheet", `ui-sheet-${side()}`].join(" ")}
           initial={{ opacity: 0, ...slideFrom(side()) }}
-          animate={{ opacity: 1, x: 0, y: 0 }}
+          animate={{ opacity: 1, x: "0", y: "0" }}
           exit={{ opacity: 0, ...slideFrom(side()) }}
-          transition={{ duration: 0.32, easing: [0.22, 1, 0.36, 1] }}
+          // Drawer curve (iOS-like) from the reference: slower open, faster close.
+          transition={{ duration: 0.32, easing: [0.32, 0.72, 0, 1] }}
           role="dialog"
           aria-modal="true"
-          aria-label={props.title}
+          aria-label={props.title ?? "Panel"}
         >
           <Show when={props.title !== undefined}>
             <header class="ui-sheet-header">

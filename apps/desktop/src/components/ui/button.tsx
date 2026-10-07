@@ -1,10 +1,9 @@
 /**
  * Button — Apple pattern: instant pointer-down feedback, no click latency.
  *
- * Press scales subtly (Motion.press) the same frame the pointer touches. Disabled
- * buttons stay in the layout but render inert.
+ * CSS handles pointer-down feedback directly, avoiding animation work on
+ * frequently used controls. Reduced-motion users get a static press.
  */
-import { Motion } from "solid-motionone"
 import { type JSX, type ParentProps, Show, splitProps } from "solid-js"
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "success"
@@ -42,37 +41,34 @@ export function Button(props: ButtonProps): JSX.Element {
   const size = () => own.size ?? "md"
   const isDisabled = () => own.disabled === true || own.loading === true
   return (
-    <Motion.button
+    <button
       class={[variantClass(variant()), sizeClass(size()), own.class ?? ""].filter(Boolean).join(" ")}
-      press={isDisabled() ? undefined : { scale: 0.97 }}
-      hover={isDisabled() ? undefined : { scale: 1.02 }}
-      transition={{ duration: 0.2, easing: [0.22, 1, 0.36, 1] }}
       disabled={isDisabled()}
+      aria-busy={own.loading === true ? "true" : undefined}
       {...rest}
     >
       <Show when={own.loading === true}>
         <span class="ui-btn-spinner" aria-hidden="true" />
       </Show>
       <span classList={{ "opacity-0": own.loading === true }}>{own.children}</span>
-    </Motion.button>
+    </button>
   )
 }
 
-/** IconButton — square hit area for tool palettes and card headers. */
+/** IconButton — square hit area for tool palettes and card headers.
+ *  Smaller press (0.92) since the surface is smaller; press still 80ms/160ms asymmetric. */
 export function IconButton(
   props: ParentProps<JSX.HTMLAttributes<HTMLButtonElement> & { readonly active?: boolean; readonly size?: ButtonSize }>
 ): JSX.Element {
   const [own, rest] = splitProps(props, ["active", "class", "children", "size"])
   const size = () => own.size ?? "md"
   return (
-    <Motion.button
+    <button
       class={["ui-icon-btn", sizeClass(size()), own.active === true ? "ui-icon-btn-active" : "", own.class ?? ""].filter(Boolean).join(" ")}
-      press={{ scale: 0.92 }}
-      hover={{ scale: 1.05 }}
-      transition={{ duration: 0.15, easing: [0.22, 1, 0.36, 1] }}
+      aria-pressed={own.active}
       {...rest}
     >
       {own.children}
-    </Motion.button>
+    </button>
   )
 }

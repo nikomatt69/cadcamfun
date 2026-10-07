@@ -21,9 +21,11 @@ import { useCamStore } from "../cam/store/camStore.ts"
 import { useGeneratorStore } from "../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../cam/store/verifyStore.ts"
 import { appProjectId, persistDrawingContext, prepareWorkspace, verificationState } from "./drawing-context.ts"
+import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "./persisted.ts"
+import type { ChatAttachment } from "./attachments.ts"
 import { mirrorCamResult } from "./cam-sync.ts"
 import { mirrorToolResult, reconcileFromStored } from "./editor-sync.ts"
-import type { AiEvent, AiMessage, AiPermission, AiSession, AiToolCalls, ChatModel } from "./types.ts"
+import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTodo, AiToolCalls, ChatModel } from "./types.ts"
 
 export interface AiStats {
   readonly exchanges: number
@@ -42,6 +44,12 @@ export interface AiStore {
   readonly messages: Accessor<ReadonlyArray<AiMessage>>
   readonly toolCalls: Accessor<AiToolCalls>
   readonly permissions: Accessor<ReadonlyArray<AiPermission>>
+  /** The agent's plan (its todo list) for the conversation. */
+  readonly plan: Accessor<ReadonlyArray<AiTodo>>
+  /** The goal the agent is working toward, when it set one. */
+  readonly goal: Accessor<AiGoal | undefined>
+  /** What the agent is doing now: step, a tool being written, a retry, a compaction. */
+  readonly activity: Accessor<AiActivity>
   readonly model: Accessor<ChatModel | undefined>
   readonly setModel: (next: ChatModel | undefined | ((prev: ChatModel | undefined) => ChatModel | undefined)) => void
   readonly includeContext: Accessor<boolean>
@@ -50,10 +58,14 @@ export interface AiStore {
   readonly suggestions: Accessor<ReadonlyArray<Suggestion>>
   readonly dismissSuggestion: (id: string) => void
   readonly projectId: Accessor<string | undefined>
-  readonly send: (prompt: string) => Promise<void>
+  readonly send: (prompt: string, attachments?: ReadonlyArray<ChatAttachment>) => Promise<void>
   readonly abort: () => void
   readonly clear: () => void
   readonly newSession: () => void
+  /** Reopens a conversation (its text comes back from this device; the host keeps its own context while it runs). */
+  readonly openSession: (id: string) => void
+  readonly renameSession: (id: string, title: string) => void
+  readonly deleteSession: (id: string) => void
   readonly replyPermission: (requestId: string, decision: "once" | "always" | "reject") => Promise<void>
 }
 
@@ -96,6 +108,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const [messages, setMessages] = createSignal<ReadonlyArray<AiMessage>>([])
   const [toolCalls, setToolCalls] = createSignal<AiToolCalls>({})
   const [permissions, setPermissions] = createSignal<ReadonlyArray<AiPermission>>([])
+  const [plan, setPlan] = createSignal<ReadonlyArray<AiTodo>>([])
+  const [goal, setGoal] = createSignal<AiGoal | undefined>()
+  const [activity, setActivity] = createSignal<AiActivity>({ step: 0, compacted: false })
   const [stats, setStats] = createSignal<AiStats>(emptyStats())
   const [dismissedSuggestions, setDismissedSuggestions] = createSignal<ReadonlyArray<string>>([])
   const [projectContextRevision, setProjectContextRevision] = createSignal(0)
@@ -119,11 +134,21 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     persist({ model: modelSig(), includeContext: includeContextSig(), sessions: next })
   }
 
+  // Conversations are kept as text so they can be reopened; see persisted.ts.
+  let transcripts: Record<string, ReadonlyArray<StoredMessage>> = { ...loadTranscripts() }
+  const saveTranscript = (): void => {
+    const id = sessionId()
+    if (id === undefined) return
+    transcripts = { ...transcripts, [id]: messages().flatMap((m) => { const stored = toStored(m); return stored === undefined ? [] : [stored] }) }
+    saveTranscripts(transcripts, sessionsSig().map((s) => s.id))
+  }
+
   let handle: StreamHandle | undefined
   let activeAssistantId: string | undefined
+  const thinkingCounted = new Set<number>()
 
-  const upsertSession = (id: string, title: string, startedAt: string): void => {
-    const next = [{ id, title, startedAt, updatedAt: startedAt, exchanges: 0 }, ...sessionsSig().filter((s) => s.id !== id)].slice(0, MAX_SESSIONS)
+  const upsertSession = (id: string, title: string, startedAt: string, project?: string): void => {
+    const next = [{ id, title, startedAt, updatedAt: startedAt, exchanges: 0, ...(project !== undefined ? { projectId: project } : {}) }, ...sessionsSig().filter((s) => s.id !== id)].slice(0, MAX_SESSIONS)
     setSessionsPersisted(next)
   }
 
@@ -144,7 +169,32 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   const applyEvent = (event: AiEvent): void => {
     const idForEvent = activeAssistantId ?? `${event.sessionId}:assistant`
+    if (event.type === "reasoning") {
+      const id = idForEvent
+      if (!messages().some((m) => m.id === id)) appendMessage({ id, role: "assistant", text: "", createdAt: new Date().toISOString(), events: [], status: "streaming", thinking: event.text })
+      else patchMessage(id, (prev) => ({ ...prev, thinking: (prev.thinking ?? "") + event.text }))
+      // One thinking step per step of the turn, however many deltas it arrives in.
+      if (!thinkingCounted.has(activity().step)) { thinkingCounted.add(activity().step); setStats((s) => ({ ...s, thinkingSteps: s.thinkingSteps + 1 })) }
+      return
+    }
+    if (event.type === "tool_progress") {
+      setToolCalls((current) => current[event.callId]?.status === "running" || current[event.callId]?.status === "ok" || current[event.callId]?.status === "error"
+        ? current
+        : { ...current, [event.callId]: { tool: event.tool, input: {}, status: "preparing", chars: event.chars, sessionId: event.sessionId } })
+      setActivity((a) => ({ ...a, preparing: { tool: event.tool, chars: event.chars } }))
+      return
+    }
+    if (event.type === "step") {
+      if (event.phase === "start") { setActivity((a) => ({ ...a, step: event.index, preparing: undefined })) }
+      else if (event.usage) setStats((s) => ({ ...s, totalInputTokens: s.totalInputTokens + event.usage!.inputTokens, totalOutputTokens: s.totalOutputTokens + event.usage!.outputTokens }))
+      return
+    }
+    if (event.type === "todo") { setPlan(event.todos); return }
+    if (event.type === "goal") { setGoal(event.goal ?? undefined); return }
+    if (event.type === "retry") { setActivity((a) => ({ ...a, retry: { attempt: event.attempt, message: event.message } })); return }
+    if (event.type === "compacted") { setActivity((a) => ({ ...a, compacted: true })); return }
     if (event.type === "delta") {
+      if (activity().retry !== undefined) setActivity((a) => ({ ...a, retry: undefined }))
       const id = idForEvent
       const exists = messages().some((m) => m.id === id)
       if (!exists) {
@@ -156,6 +206,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
     if (event.type === "tool_call") {
       const id = idForEvent
+      setActivity((a) => ({ ...a, preparing: undefined, retry: undefined }))
       setToolCalls((current) => ({ ...current, [event.callId]: { tool: event.tool, input: event.input, status: "running", sessionId: event.sessionId } }))
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       setStats((s) => ({ ...s, toolCalls: s.toolCalls + 1 }))
@@ -193,6 +244,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
         totalOutputTokens: s.totalOutputTokens + (event.usage?.outputTokens ?? 0)
       }))
       touchSession(event.sessionId, new Date().toISOString(), 1)
+      saveTranscript()
+      // The tool results of a recovered turn never reached us: the stored drawing is the truth, so the editor catches up with it.
+      if (event.recovered === true) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
       return
     }
     if (event.type === "error") {
@@ -203,6 +257,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
         appendMessage({ id, role: "assistant", text: event.message, createdAt: new Date().toISOString(), events: [], status: "error", error: event.message })
       }
       setError(event.message)
+      saveTranscript()
     }
   }
 
@@ -238,23 +293,26 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     handle = undefined
   }
 
-  const send: AiStore["send"] = async (prompt) => {
+  const send: AiStore["send"] = async (prompt, attachments = []) => {
     const text = prompt.trim()
     if (text.length === 0 || status() === "connecting" || status() === "streaming") return
     const sid = sessionId() ?? newSessionId()
     const at = new Date().toISOString()
     if (!sessionId()) {
       setSessionId(sid)
-      upsertSession(sid, text.slice(0, 60), at)
+      upsertSession(sid, text.slice(0, 60), at, projectId())
     }
     const userId = nextMessageId()
-    appendMessage({ id: userId, role: "user", text, createdAt: at, events: [], status: "done" })
+    appendMessage({ id: userId, role: "user", text, createdAt: at, events: [], status: "done", ...(attachments.length > 0 ? { attachments: attachments.map((a) => a.name) } : {}) })
     const assistantId = nextMessageId()
     activeAssistantId = assistantId
     appendMessage({ id: assistantId, role: "assistant", text: "", createdAt: at, events: [], status: "streaming" })
+    saveTranscript()
+    thinkingCounted.clear()
     batch(() => {
       setStatus("connecting")
       setError(undefined)
+      setActivity({ step: 0, compacted: false })
     })
     // One document for the editor and the tools: make sure it exists and holds what is on screen. Never a reason to refuse
     // the message: if the sidecar is slow the tools still create what they need.
@@ -282,6 +340,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }, {
       message: text,
       sessionId: sid,
+      ...(attachments.length > 0 ? { attachments } : {}),
       ...(activeProjectId ? { projectId: activeProjectId } : {}),
       ...(m ? { model: m } : {}),
     })
@@ -305,7 +364,11 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setPermissions([])
       setStats(emptyStats())
       setError(undefined)
+      setPlan([])
+      setGoal(undefined)
+      setActivity({ step: 0, compacted: false })
     })
+    saveTranscript()
   }
 
   const newSession: AiStore["newSession"] = () => {
@@ -317,7 +380,54 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setPermissions([])
       setStats(emptyStats())
       setError(undefined)
+      setPlan([])
+      setGoal(undefined)
+      setActivity({ step: 0, compacted: false })
     })
+  }
+
+  const resetConversation = (): void => {
+    batch(() => {
+      setMessages([])
+      setToolCalls({})
+      setPermissions([])
+      setStats(emptyStats())
+      setError(undefined)
+      setPlan([])
+      setGoal(undefined)
+      setActivity({ step: 0, compacted: false })
+    })
+  }
+
+  const openSession: AiStore["openSession"] = (id) => {
+    if (id === sessionId() || !sessionsSig().some((s) => s.id === id)) return
+    if (status() === "streaming" || status() === "connecting") abort()
+    handle = undefined
+    activeAssistantId = undefined
+    resetConversation()
+    batch(() => {
+      setSessionId(id)
+      setStatus("idle")
+      setMessages((transcripts[id] ?? []).map((m) => ({ ...m, events: [] })))
+    })
+  }
+
+  const renameSession: AiStore["renameSession"] = (id, title) => {
+    const clean = title.replace(/\s+/g, " ").trim().slice(0, 80)
+    if (clean === "") return
+    setSessionsPersisted(sessionsSig().map((s) => s.id === id ? { ...s, title: clean } : s))
+  }
+
+  const deleteSession: AiStore["deleteSession"] = (id) => {
+    const session = sessionsSig().find((s) => s.id === id)
+    if (session === undefined) return
+    if (id === sessionId()) newSession()
+    setSessionsPersisted(sessionsSig().filter((s) => s.id !== id))
+    const { [id]: _removed, ...rest } = transcripts
+    transcripts = rest
+    saveTranscripts(transcripts, sessionsSig().map((s) => s.id))
+    // The host forgets the conversation too; failing to reach it leaves nothing to undo locally.
+    app.runtime.runVoid(app.client.ai.removeSession({ payload: { sessionId: id, ...(session.projectId !== undefined ? { projectId: session.projectId } : {}) } }))
   }
 
   const replyPermission: AiStore["replyPermission"] = async (requestId, decision) => {
@@ -355,9 +465,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   })
 
   return {
-    status, error, sessionId, sessions, messages, toolCalls, permissions,
+    status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity,
     model, setModel, includeContext, setIncludeContext, stats, suggestions, dismissSuggestion,
-    projectId, send, abort, clear, newSession, replyPermission
+    projectId, send, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission
   }
 })
 

@@ -70,6 +70,7 @@ export function ToolSection(): JSX.Element {
             <select class={INPUT} value={gen.settings.toolType} onChange={select}>
               <option value="endmill">Endmill</option><option value="ballnose">Ballnose</option><option value="drill">Drill</option><option value="vbit">V-bit</option>
               <option value="chamfer">Chamfer</option><option value="threadmill">Threadmill</option><option value="reamer">Reamer</option>
+              <option value="probe">Touch probe</option><option value="toolsetter">Tool setter</option>
             </select>
           </Match>
           <Match when={machine() === "lathe"}>

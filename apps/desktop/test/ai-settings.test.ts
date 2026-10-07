@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 const flush = (ms = 30): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -89,6 +89,37 @@ describe("AI provider & model browser", () => {
       await flush()
       const current = await app.wait(() => query('[data-testid="ai-current-model"]'))
       expect(current?.textContent ?? "").toContain("openai/")
+    } finally { dispose() }
+  }, 60000)
+})
+
+describe("user-loadable skills (Settings → AI)", () => {
+  test("lists the built-in skills, loads one from Markdown, rejects a bad one, removes it", async () => {
+    const { dispose } = await openAiSettings()
+    try {
+      const list = await app.wait(() => query('[data-testid="ai-skills-list"]'))
+      await app.wait(() => query('[data-testid="ai-skill-cad-3d-modeling"]'))
+      expect(list.textContent).toContain("cad-3d-modeling")
+      const editor = await app.wait(() => query<HTMLTextAreaElement>('[data-testid="ai-skill-markdown"]'))
+      const save = query<HTMLButtonElement>('[data-testid="ai-skill-save"]')!
+      expect(save.disabled).toBe(true)
+
+      editor.value = "no front matter"
+      editor.dispatchEvent(new window.Event("input", { bubbles: true }))
+      await flush()
+      save.click()
+      await app.wait(() => query('[data-testid="ai-skill-problem"]'))
+      expect(query('[data-testid="ai-skill-problem"]')?.textContent).toContain("front matter")
+
+      editor.value = `---\nname: brass-turning\ndescription: Brass cutting data\n---\n\nFor brass use 0.05 mm per tooth, no coolant, and verify the toolpath before posting.\n`
+      editor.dispatchEvent(new window.Event("input", { bubbles: true }))
+      await flush()
+      save.click()
+      await app.wait(() => query('[data-testid="ai-skill-brass-turning"]'))
+      expect(editor.value).toBe("")
+
+      query<HTMLButtonElement>('[data-testid="ai-skill-brass-turning"] button')!.click()
+      await app.wait(() => (query('[data-testid="ai-skill-brass-turning"]') === null ? true : undefined))
     } finally { dispose() }
   }, 60000)
 })

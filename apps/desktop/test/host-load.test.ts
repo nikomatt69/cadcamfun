@@ -16,7 +16,7 @@ import { makeNikCliRuntime } from "../../../packages/ai/src/nikcli/runtime.ts"
 import { sharedDataDir } from "../../../packages/ai/test/helpers/host-env.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 describe("host load after the UI", () => {

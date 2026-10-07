@@ -15,7 +15,7 @@ describe("tool prompts (one .txt per tool)", () => {
   test("every tool has exactly one prompt file and nothing else is there", () => {
     const files = readdirSync(new URL("../src/tools/prompts/", import.meta.url).pathname).filter((f) => f.endsWith(".txt")).map((f) => f.slice(0, -4)).sort()
     expect(files).toEqual([...TOOL_IDS].sort())
-    expect([...TOOL_PROMPT_IDS].sort()).toEqual([...TOOL_IDS].sort())
+    expect<string[]>([...TOOL_PROMPT_IDS].sort()).toEqual([...TOOL_IDS].sort())
   })
 
   test("the model reads the prompt as the tool's description", () => {

@@ -67,7 +67,11 @@ export const LegacyChatBody = Schema.Struct({
   messages: opt(Schema.Unknown), mcpServerId: opt(Schema.String), mcpReference: opt(Schema.String)
 })
 export const LegacyChatReply = Schema.Struct({ reply: Schema.String, hasMcpData: Schema.Boolean })
+export const ChatAttachment = Schema.Struct({
+  name: Schema.String, mime: opt(Schema.String), data: Schema.String, encoding: opt(Schema.Literals(["base64", "text"]))
+})
 export const StreamChatBody = Schema.Struct({
+  attachments: opt(Schema.Array(ChatAttachment)),
   message: opt(Schema.String), sessionId: opt(Schema.String), projectId: opt(Schema.String),
   context: opt(Schema.String), model: opt(AiModelSelector)
 })
@@ -112,12 +116,31 @@ export const AnthropicMessage = Schema.Struct({
   content: Schema.Array(Schema.Struct({ type: Schema.Literal("text"), text: Schema.String })),
   stop_reason: nullable, usage: Schema.Struct({ input_tokens: Schema.Number, output_tokens: Schema.Number })
 })
+export const SkillInfo = Schema.Struct({
+  name: Schema.String, description: Schema.String, builtIn: Schema.Boolean, category: Schema.String
+})
+export const SkillList = Schema.Struct({ skills: Schema.Array(SkillInfo), max: Schema.Number })
+/** Either `markdown` (a whole SKILL.md) or `name` + `description` + `body`. */
+export const SkillBody = Schema.Struct({
+  markdown: opt(Schema.String), name: opt(Schema.String), description: opt(Schema.String), body: opt(Schema.String)
+})
+export const SkillSaved = Schema.Struct({ skill: SkillInfo, skills: Schema.Array(SkillInfo), live: Schema.Boolean })
+const skillParam = { name: Schema.String }
+export const RemoveSessionBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String) })
+export const SessionStateBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String) })
+export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String) })
+export const RemoveSessionReply = Schema.Struct({ removed: Schema.Boolean })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Unknown
 
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(
+    HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("removeSession", "/api/ai/sessions/remove", { payload: RemoveSessionBody, success: RemoveSessionReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("skills", "/api/ai/skills", { success: SkillList, error: [InternalError] }),
+    HttpApiEndpoint.put("saveSkill", "/api/ai/skills", { payload: SkillBody, success: SkillSaved, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.delete("deleteSkill", "/api/ai/skills/:name", { params: skillParam, success: SkillList, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.put("setCredentials", "/api/ai/credentials", { payload: CredentialBody, success: AiStatus, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.delete("clearCredentials", "/api/ai/credentials/:provider", { params: providerParam, success: AiStatus, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("status", "/api/ai/status", { success: AiStatus, error: InternalError }),

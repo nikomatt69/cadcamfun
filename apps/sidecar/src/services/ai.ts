@@ -2,7 +2,7 @@ import {
   AiConfig, AiCredentials, AiHost, AiService, DirectModel, defaultModelFactory, ToolHandlers, buildTools, defaultProviderSpecs,
   makeNikCliRuntime, systemPrompt, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
-import { cam } from "@cadcamfun/core"
+import { DESIGN_SPACE, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted } from "effect"
 import { AppConfigService } from "../config.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
@@ -119,6 +119,25 @@ const toolHandlers = Effect.gen(function*() {
     describeDrawing: async (projectId) => {
       const loaded = await load(projectId)
       return { ...describeElements(loaded.elements), settings: loaded.data["settings"] ?? null, ...where(loaded) }
+    },
+    checkDesign: async (projectId) => {
+      const loaded = await load(projectId)
+      const settings = (loaded.data["settings"] ?? {}) as { tolerance?: unknown; units?: unknown }
+      const tolerance = typeof settings.tolerance === "number" ? settings.tolerance : undefined
+      const bounds = (element: Record<string, unknown>) => {
+        try {
+          const b = cam.generator.elementBounds(element as never)
+          return Number.isFinite(b.min.x) && Number.isFinite(b.max.z) ? { min: b.min, max: b.max } : undefined
+        } catch { return undefined }
+      }
+      const issues = checkModel(loaded.elements, { ...(tolerance !== undefined ? { tolerance } : {}), boundsOf: bounds })
+      const described = describeElements(loaded.elements, 0)
+      return {
+        ok: !issues.some((issue) => issue.severity === "error"),
+        issues: issues.slice(0, 50), omitted: Math.max(0, issues.length - 50),
+        stats: { elements: described.total, counts: described.counts, bounds: described.bounds, settings: loaded.data["settings"] ?? null },
+        designSpace: DESIGN_SPACE, ...where(loaded)
+      }
     },
     createOperation: async (drawingId, operation) => {
       const { id, projectId, elements, data } = await load(drawingId)

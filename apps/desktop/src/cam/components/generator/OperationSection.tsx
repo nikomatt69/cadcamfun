@@ -184,6 +184,44 @@ const SAMPLE = [
   "G0 Z5 ; Torna a posizione sicura", ""
 ].join("\n")
 
+const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT_SETTINGS.probeCycle; readonly label: string }> = [
+  { value: "zSurface", label: "Z zero on the top surface" }, { value: "edgeX", label: "X zero on an edge" }, { value: "edgeY", label: "Y zero on an edge" },
+  { value: "corner", label: "X and Y zero on a corner" }, { value: "bore", label: "Centre of a bore" }, { value: "boss", label: "Centre of a boss" },
+  { value: "toolLength", label: "Tool length (tool setter)" }
+]
+
+/** The touch probe / tool setter: which cycle, how it approaches, the stylus, and the dialect of the control. */
+function ProbeSettings(): JSX.Element {
+  const gen = useGeneratorStore()
+  const s = () => gen.settings
+  return (
+    <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="probe-settings">
+      <div>
+        <label class={LABEL}>Probe cycle</label>
+        <select class={INPUT} aria-label="Probe cycle" value={s().probeCycle} onChange={(event) => gen.updateSettings("probeCycle", event.currentTarget.value as typeof gen.settings.probeCycle)}>
+          <For each={PROBE_CYCLES}>{(cycle) => <option value={cycle.value}>{cycle.label}</option>}</For>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class={LABEL}>Probe feed (mm/min)</label><NumberField min="1" value={s().probeFeed} onValue={(value) => gen.updateSettings("probeFeed", value)} /></div>
+        <div><label class={LABEL}>Search distance (mm)</label><NumberField min="0.1" step="0.5" value={s().probeSearch} onValue={(value) => gen.updateSettings("probeSearch", value)} /></div>
+        <div><label class={LABEL}>Stylus tip Ø (mm)</label><NumberField min="0.1" step="0.1" value={s().probeStylus} onValue={(value) => gen.updateSettings("probeStylus", value)} /></div>
+        <Show when={s().probeCycle === "bore" || s().probeCycle === "boss"}>
+          <div><label class={LABEL}>Nominal Ø (mm)</label><NumberField min="0.1" step="0.5" value={s().probeFeatureSize} onValue={(value) => gen.updateSettings("probeFeatureSize", value)} /></div>
+        </Show>
+      </div>
+      <div>
+        <label class={LABEL}>Control dialect</label>
+        <select class={INPUT} aria-label="Probe dialect" value={s().probeDialect} onChange={(event) => gen.updateSettings("probeDialect", event.currentTarget.value as "linuxcnc" | "fanuc")}>
+          <option value="linuxcnc">LinuxCNC / Grbl style (G38.2, G10 L20)</option>
+          <option value="fanuc">Fanuc style (G31, macro variables)</option>
+        </select>
+      </div>
+      <p class="text-xs text-gray-500">The spindle stays off. The result is written to work offset {s().workOffset}; the stylus is a ball, so contact is half its diameter before the surface and the cycle corrects for it.</p>
+    </div>
+  )
+}
+
 /** "Operation": which operation, and what it works on (own geometry, a selected element, or a custom path). */
 export function OperationSection(): JSX.Element {
   const gen = useGeneratorStore()
@@ -205,6 +243,7 @@ export function OperationSection(): JSX.Element {
               <option value="profile">3D Profile</option>
               <option value="threading">Threading</option>
               <option value="3d_surface">3D Surface</option>
+              <option value="probing">Probing (touch probe / tool setter)</option>
             </select>
           </Match>
           <Match when={gen.settings.machineType === "lathe"}>
@@ -237,6 +276,10 @@ export function OperationSection(): JSX.Element {
       <div class="p-4 bg-blue-50 rounded-md">
         <p class="text-blue-700 text-sm">{info().description}</p>
       </div>
+
+      <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "probing"}>
+        <ProbeSettings />
+      </Show>
 
       <Show when={gen.settings.machineType === "mill"}>
         <div>

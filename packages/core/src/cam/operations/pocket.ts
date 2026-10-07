@@ -55,7 +55,12 @@ export class PocketParams extends Schema.Class<PocketParams>("cam/PocketParams")
     /** Tool-centre helix radius, mm; `0` = the tool radius. */
     helixRadius: withDefault(NonNegative, 0),
     rampAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0.1, maximum: 45 })), 3),
-    tolerance: withDefault(Positive, 0.01)
+    tolerance: withDefault(Positive, 0.01),
+    /**
+     * The geometry is already the region the tool CENTRE may occupy (as the 3D roughing computes it), so the tool radius is not
+     * taken off the walls again. `allowance` is then the distance kept from that region's walls.
+     */
+    toolCentre: withDefault(Schema.Boolean, false)
   }).check(heightsOrdered)
 ) {}
 
@@ -211,7 +216,7 @@ export const generatePocket = (
     b.comment("nothing to cut: no closed boundary")
     return done()
   }
-  const d0 = r + params.allowance
+  const d0 = (params.toolCentre ? 0 : r) + params.allowance
   const step = (params.stepover / 100) * tool.diameter
 
   // Offset levels from the wall inwards.
@@ -286,7 +291,7 @@ export const generatePocket = (
   })
 
   // Optional finishing wall pass at full depth.
-  if (params.finishPass && params.allowance > 0) {
+  if (params.finishPass && params.allowance > 0 && !params.toolCentre) {
     const z = levels.bottomZ
     const finishFeasible = makeFeasible(region, r)
     const chains = sequence(chainsAt(region, r).map((c) => toPath(c, params.climb)), b.started ? b.pos : undefined)

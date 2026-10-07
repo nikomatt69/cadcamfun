@@ -3231,7 +3231,7 @@ function hasCheck(checks, id) {
 }
 var number2 = /* @__PURE__ */ new Number4;
 
-class Boolean extends Base2 {
+class Boolean2 extends Base2 {
   _tag = "Boolean";
   getParser() {
     return fromRefinement(this, isBoolean);
@@ -3240,7 +3240,7 @@ class Boolean extends Base2 {
     return "boolean";
   }
 }
-var boolean = /* @__PURE__ */ new Boolean;
+var boolean = /* @__PURE__ */ new Boolean2;
 class Arrays extends Base2 {
   _tag = "Arrays";
   isMutable;
@@ -4981,7 +4981,7 @@ var Unknown2 = /* @__PURE__ */ make6(unknown);
 var Undefined2 = /* @__PURE__ */ make6(undefined_2);
 var String4 = /* @__PURE__ */ make6(string2);
 var Number5 = /* @__PURE__ */ make6(number2);
-var Boolean2 = /* @__PURE__ */ make6(boolean);
+var Boolean3 = /* @__PURE__ */ make6(boolean);
 function makeStruct(ast, fields) {
   return make6(ast, {
     fields,
@@ -5767,7 +5767,7 @@ var PluginManifestSchema = Struct({
   capabilities: ArraySchema(CapabilitySchema),
   contributes: optional2(ContributionsSchema),
   signature: optional2(String4),
-  dev: optional2(Boolean2)
+  dev: optional2(Boolean3)
 });
 var decodeManifest = decodeUnknownEffect2(PluginManifestSchema);
 var encodeManifest = encodeEffect(PluginManifestSchema);
@@ -5837,8 +5837,8 @@ var Transform2DSchema = Struct({
 var baseFields = {
   id: String4.check(isMinLength(1)),
   layerId: String4,
-  visible: Boolean2,
-  locked: Boolean2,
+  visible: Boolean3,
+  locked: Boolean3,
   lineStyle: optionalKey2(LineStyleSchema),
   transform: optionalKey2(Transform2DSchema),
   userData: optionalKey2(Record(String4, Unknown2))
@@ -5859,12 +5859,12 @@ var ArcSchema = TaggedStruct("Arc", {
   radius: PositiveNum,
   startAngle: NormalizedAngle,
   endAngle: NormalizedAngle,
-  clockwise: Boolean2
+  clockwise: Boolean3
 });
 var PolylineSchema = TaggedStruct("Polyline", {
   ...baseFields,
   points: ArraySchema(Point).check(isMinLength(2)),
-  closed: Boolean2,
+  closed: Boolean3,
   bulge: optionalKey2(ArraySchema(Num))
 }).check(makeFilter2((p) => p.bulge === undefined || p.bulge.length === p.points.length ? undefined : { path: ["bulge"], issue: "bulge must have exactly one entry per point" }));
 var RectangleSchema = TaggedStruct("Rectangle", {
@@ -5883,7 +5883,7 @@ var SplineSchema = TaggedStruct("Spline", {
   ...baseFields,
   controlPoints: ArraySchema(Point).check(isMinLength(2)),
   degree: Int.check(isBetween({ minimum: 1, maximum: 5 })),
-  closed: Boolean2,
+  closed: Boolean3,
   knots: optionalKey2(ArraySchema(Num))
 });
 var TextAlignmentSchema = Literals(["left", "center", "right"]);
@@ -5944,8 +5944,8 @@ var UnitsSchema = Literals(["mm", "inch"]);
 var LayerSchema = Struct({
   id: String4.check(isMinLength(1)),
   name: String4,
-  visible: Boolean2,
-  locked: Boolean2,
+  visible: Boolean3,
+  locked: Boolean3,
   color: String4
 });
 var CURRENT_SCHEMA_VERSION = 1;
@@ -6060,6 +6060,10 @@ var decodeSolid = decodeUnknownEffect2(SolidSchema);
 // packages/core/src/cad/migrate.ts
 class DrawingMigrationError extends TaggedError2("DrawingMigrationError") {
 }
+// packages/core/src/cad/design.ts
+var SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"]);
+var BOOLEANS = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
+var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 * Math.PI / 2, 2 * Math.PI];
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -6071,7 +6075,7 @@ var LinearSchema = TaggedStruct("Linear", {
 var ArcSchema2 = TaggedStruct("Arc", {
   to: Vec3Schema,
   center: Vec2Schema,
-  clockwise: Boolean2,
+  clockwise: Boolean3,
   feed: Positive
 });
 var DwellSchema = TaggedStruct("Dwell", { seconds: NonNegative });
@@ -6187,7 +6191,7 @@ var TabSchema = Struct({
 class ProfileParams extends Class3("cam/ProfileParams")(Struct({
   ...OperationFields,
   side: withDefault2(ProfileSideSchema, "outside"),
-  climb: withDefault2(Boolean2, true),
+  climb: withDefault2(Boolean3, true),
   allowance: withDefault2(NonNegative3, 0),
   leadIn: withDefault2(LeadInSchema, "direct"),
   helixPitch: withDefault2(Positive3, 1),
@@ -6195,7 +6199,7 @@ class ProfileParams extends Class3("cam/ProfileParams")(Struct({
   leadRadius: withDefault2(Positive3, 2),
   rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
   tabs: withDefault2(ArraySchema(TabSchema), []),
-  arcFit: withDefault2(Boolean2, false),
+  arcFit: withDefault2(Boolean3, false),
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
@@ -6207,8 +6211,8 @@ class PocketParams extends Class3("cam/PocketParams")(Struct({
   ...OperationFields,
   stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 40),
   allowance: withDefault2(NonNegative3, 0),
-  finishPass: withDefault2(Boolean2, false),
-  climb: withDefault2(Boolean2, true),
+  finishPass: withDefault2(Boolean3, false),
+  climb: withDefault2(Boolean3, true),
   entry: withDefault2(PocketEntrySchema, "helix"),
   order: withDefault2(PocketOrderSchema, "insideOut"),
   helixPitch: withDefault2(Positive3, 1),
@@ -6223,7 +6227,7 @@ var { stepdown: _stepdown, feed: _feed, ...commonFields } = OperationFields;
 class DrillParams extends Class3("cam/DrillParams")(Struct({
   ...commonFields,
   peck: withDefault2(NonNegative3, 0),
-  chipBreak: withDefault2(Boolean2, false),
+  chipBreak: withDefault2(Boolean3, false),
   dwell: withDefault2(NonNegative3, 0)
 }).check(heightsOrdered)) {
 }
@@ -6232,7 +6236,7 @@ class FaceParams extends Class3("cam/FaceParams")(Struct({
   ...OperationFields,
   stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 60),
   overshoot: withDefault2(NonNegative3, 0),
-  alongX: withDefault2(Boolean2, true),
+  alongX: withDefault2(Boolean3, true),
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
@@ -6306,12 +6310,12 @@ var Num2 = Finite;
 var PositiveInt = Int.check(isGreaterThan2(0));
 var Percent = Finite.check(isGreaterThan2(0), isLessThanOrEqualTo2(100));
 var MachineTypeSchema = Literals(["mill", "lathe", "3dprinter"]);
-var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface"]);
+var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"]);
 var LatheOperationSchema = Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]);
 var PrinterOperationSchema = Literals(["standard", "vase", "support", "infill", "raft", "brim"]);
 var OperationTypeSchema = Union2([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema]);
 var MaterialTypeSchema = Literals(["aluminum", "steel", "wood", "plastic", "brass", "titanium", "composite", "other"]);
-var ToolTypeSchema = Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"]);
+var ToolTypeSchema = Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer", "probe", "toolsetter"]);
 var LatheToolTypeSchema = Literals(["turning", "facing", "threading", "grooving", "boring", "parting"]);
 var PrinterNozzleSchema = Literals(["brass", "hardened", "ruby", "standard"]);
 var AllToolTypeSchema = Union2([ToolTypeSchema, LatheToolTypeSchema, PrinterNozzleSchema]);
@@ -6352,33 +6356,45 @@ var ToolpathSettingsSchema = Struct({
   tolerance: withDefault2(NonNegative3, 0.01),
   offset: withDefault2(Literals(["inside", "outside", "center"]), "outside"),
   direction: withDefault2(Literals(["climb", "conventional"]), "climb"),
-  coolant: withDefault2(Boolean2, true),
-  finishingPass: withDefault2(Boolean2, false),
+  coolant: withDefault2(Boolean3, true),
+  finishingPass: withDefault2(Boolean3, false),
   finishingAllowance: withDefault2(NonNegative3, 0.2),
   finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
-  useAI: withDefault2(Boolean2, false),
+  useAI: withDefault2(Boolean3, false),
   aiDifficulty: withDefault2(Literals(["simple", "moderate", "complex"]), "moderate"),
   aiOptimize: withDefault2(Literals(["speed", "quality", "balance"]), "balance"),
-  optimizePath: withDefault2(Boolean2, false),
-  useArcFitting: withDefault2(Boolean2, false),
-  useHighSpeedMode: withDefault2(Boolean2, false),
-  useExactStop: withDefault2(Boolean2, false),
-  useToolCompensation: withDefault2(Boolean2, false),
-  useAdaptiveFeeds: withDefault2(Boolean2, false),
-  useRestMachining: withDefault2(Boolean2, false),
+  optimizePath: withDefault2(Boolean3, false),
+  useArcFitting: withDefault2(Boolean3, false),
+  useHighSpeedMode: withDefault2(Boolean3, false),
+  useExactStop: withDefault2(Boolean3, false),
+  useToolCompensation: withDefault2(Boolean3, false),
+  useAdaptiveFeeds: withDefault2(Boolean3, false),
+  useRestMachining: withDefault2(Boolean3, false),
   toolNumber: withDefault2(PositiveInt, 1),
+  workOffset: withDefault2(Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
+  probeCycle: withDefault2(Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
+  probeFeed: withDefault2(Positive3, 100),
+  probeSearch: withDefault2(Positive3, 10),
+  probeStylus: withDefault2(Positive3, 4),
+  probeDialect: withDefault2(Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
+  probeFeatureSize: withDefault2(Positive3, 20),
+  latheZero: withDefault2(Literals(["face", "chuck"]), "face"),
+  bedOrigin: withDefault2(Literals(["corner", "center"]), "corner"),
   nozzleDiameter: withDefault2(Positive3, 0.4),
   filamentDiameter: withDefault2(Positive3, 1.75),
   layerHeight: withDefault2(Positive3, 0.2),
   extrusionWidth: withDefault2(Positive3, 0.4),
   printSpeed: withDefault2(Positive3, 60),
   printTemperature: withDefault2(Positive3, 200),
+  bedWidth: withDefault2(Positive3, 220),
+  bedDepth: withDefault2(Positive3, 220),
+  centerOnBed: withDefault2(Boolean3, true),
   bedTemperature: withDefault2(NonNegative3, 60),
   stockDiameter: withDefault2(Positive3, 50),
   stockLength: withDefault2(Positive3, 100),
   spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
   turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
-  applyToolCompensation: withDefault2(Boolean2, true),
+  applyToolCompensation: withDefault2(Boolean3, true),
   originType: withDefault2(OriginTypeSchema, "workpiece-center"),
   originX: withDefault2(Num2, 0),
   originY: withDefault2(Num2, 0),
@@ -6560,7 +6576,7 @@ var VerifyPreviewSchema = Struct({
   gouge: ArraySchema(Int)
 });
 var VerifyResponseSchema = Struct({
-  ok: Boolean2,
+  ok: Boolean3,
   issues: ArraySchema(VerifyIssueSchema),
   stats: VerifyStatsSchema,
   preview: VerifyPreviewSchema

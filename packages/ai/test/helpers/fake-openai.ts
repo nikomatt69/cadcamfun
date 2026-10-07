@@ -10,7 +10,7 @@ export interface ChatRequestBody {
 }
 
 export type Completion =
-  | { readonly text: string; readonly chunks?: ReadonlyArray<string> }
+  | { readonly text: string; readonly chunks?: ReadonlyArray<string>; readonly usage?: { readonly prompt_tokens: number; readonly completion_tokens: number; readonly total_tokens: number } }
   | { readonly toolCalls: ReadonlyArray<{ readonly name: string; readonly args: unknown }> }
   | { readonly status: number; readonly body: string }
 
@@ -71,7 +71,7 @@ export const startFakeOpenAi = (script: (request: ChatRequestBody, index: number
       const pieces = completion.chunks ?? [completion.text]
       const parts = [chunk({ role: "assistant", content: "" })]
       for (const piece of pieces) parts.push(chunk({ content: piece }))
-      parts.push(chunk({}, "stop", { prompt_tokens: 21, completion_tokens: 9, total_tokens: 30 }))
+      parts.push(chunk({}, "stop", completion.usage ?? { prompt_tokens: 21, completion_tokens: 9, total_tokens: 30 }))
       return sse(parts)
     }
   })

@@ -1960,6 +1960,56 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "attachments": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "data": {
+                              "type": "string",
+                            },
+                            "encoding": {
+                              "anyOf": [
+                                {
+                                  "enum": [
+                                    "base64",
+                                    "text",
+                                  ],
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "mime": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
+                            "name": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "name",
+                            "data",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "context": {
                     "anyOf": [
                       {
@@ -3457,6 +3507,586 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/sessions/remove": {
+      "post": {
+        "operationId": "ai.removeSession",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "sessionId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "sessionId",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "removed": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "removed",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/sessions/state": {
+      "post": {
+        "operationId": "ai.sessionState",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "sessionId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "sessionId",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "busy": {
+                      "type": "boolean",
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "text": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "busy",
+                    "text",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/skills": {
+      "get": {
+        "operationId": "ai.skills",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    "skills": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "builtIn": {
+                            "type": "boolean",
+                          },
+                          "category": {
+                            "type": "string",
+                          },
+                          "description": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "builtIn",
+                          "category",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "skills",
+                    "max",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+      "put": {
+        "operationId": "ai.saveSkill",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "markdown": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "live": {
+                      "type": "boolean",
+                    },
+                    "skill": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "builtIn": {
+                          "type": "boolean",
+                        },
+                        "category": {
+                          "type": "string",
+                        },
+                        "description": {
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "name",
+                        "description",
+                        "builtIn",
+                        "category",
+                      ],
+                      "type": "object",
+                    },
+                    "skills": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "builtIn": {
+                            "type": "boolean",
+                          },
+                          "category": {
+                            "type": "string",
+                          },
+                          "description": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "builtIn",
+                          "category",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "skill",
+                    "skills",
+                    "live",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/skills/{name}": {
+      "delete": {
+        "operationId": "ai.deleteSkill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                        },
+                        {
+                          "enum": [
+                            "Infinity",
+                            "-Infinity",
+                            "NaN",
+                          ],
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    "skills": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "builtIn": {
+                            "type": "boolean",
+                          },
+                          "category": {
+                            "type": "string",
+                          },
+                          "description": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "builtIn",
+                          "category",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "skills",
+                    "max",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
           },
           "401": {
             "content": {
@@ -36306,9 +36936,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "applyToolCompensation": {
                         "type": "boolean",
                       },
+                      "bedDepth": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "bedOrigin": {
+                        "enum": [
+                          "corner",
+                          "center",
+                        ],
+                        "type": "string",
+                      },
                       "bedTemperature": {
                         "minimum": 0,
                         "type": "number",
+                      },
+                      "bedWidth": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "centerOnBed": {
+                        "type": "boolean",
                       },
                       "coolant": {
                         "type": "boolean",
@@ -36356,6 +37004,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "integer",
                       },
+                      "latheZero": {
+                        "enum": [
+                          "face",
+                          "chuck",
+                        ],
+                        "type": "string",
+                      },
                       "layerHeight": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -36402,6 +37057,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "profile",
                           "threading",
                           "3d_surface",
+                          "probing",
                           "facing",
                           "turning",
                           "boring",
@@ -36449,6 +37105,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "number",
                       },
                       "printTemperature": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeCycle": {
+                        "enum": [
+                          "zSurface",
+                          "edgeX",
+                          "edgeY",
+                          "corner",
+                          "bore",
+                          "boss",
+                          "toolLength",
+                        ],
+                        "type": "string",
+                      },
+                      "probeDialect": {
+                        "enum": [
+                          "linuxcnc",
+                          "fanuc",
+                        ],
+                        "type": "string",
+                      },
+                      "probeFeatureSize": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeFeed": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeSearch": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeStylus": {
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
@@ -36501,6 +37192,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "chamfer",
                           "threadmill",
                           "reamer",
+                          "probe",
+                          "toolsetter",
                           "turning",
                           "facing",
                           "threading",
@@ -36542,6 +37235,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "useToolCompensation": {
                         "type": "boolean",
+                      },
+                      "workOffset": {
+                        "enum": [
+                          "G54",
+                          "G55",
+                          "G56",
+                          "G57",
+                          "G58",
+                          "G59",
+                        ],
+                        "type": "string",
                       },
                     },
                     "type": "object",
@@ -37696,9 +38400,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "applyToolCompensation": {
                         "type": "boolean",
                       },
+                      "bedDepth": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "bedOrigin": {
+                        "enum": [
+                          "corner",
+                          "center",
+                        ],
+                        "type": "string",
+                      },
                       "bedTemperature": {
                         "minimum": 0,
                         "type": "number",
+                      },
+                      "bedWidth": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "centerOnBed": {
+                        "type": "boolean",
                       },
                       "coolant": {
                         "type": "boolean",
@@ -37746,6 +38468,13 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "integer",
                       },
+                      "latheZero": {
+                        "enum": [
+                          "face",
+                          "chuck",
+                        ],
+                        "type": "string",
+                      },
                       "layerHeight": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -37792,6 +38521,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "profile",
                           "threading",
                           "3d_surface",
+                          "probing",
                           "facing",
                           "turning",
                           "boring",
@@ -37839,6 +38569,41 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "number",
                       },
                       "printTemperature": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeCycle": {
+                        "enum": [
+                          "zSurface",
+                          "edgeX",
+                          "edgeY",
+                          "corner",
+                          "bore",
+                          "boss",
+                          "toolLength",
+                        ],
+                        "type": "string",
+                      },
+                      "probeDialect": {
+                        "enum": [
+                          "linuxcnc",
+                          "fanuc",
+                        ],
+                        "type": "string",
+                      },
+                      "probeFeatureSize": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeFeed": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeSearch": {
+                        "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "probeStylus": {
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
@@ -37891,6 +38656,8 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "chamfer",
                           "threadmill",
                           "reamer",
+                          "probe",
+                          "toolsetter",
                           "turning",
                           "facing",
                           "threading",
@@ -37932,6 +38699,17 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "useToolCompensation": {
                         "type": "boolean",
+                      },
+                      "workOffset": {
+                        "enum": [
+                          "G54",
+                          "G55",
+                          "G56",
+                          "G57",
+                          "G58",
+                          "G59",
+                        ],
+                        "type": "string",
                       },
                     },
                     "type": "object",
@@ -37984,6 +38762,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "profile",
                             "threading",
                             "3d_surface",
+                            "probing",
                             "facing",
                             "turning",
                             "boring",

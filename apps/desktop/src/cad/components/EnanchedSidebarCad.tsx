@@ -170,11 +170,11 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
 
   return (
     <Motion.div
-      class="flex-shrink-0 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white border border-white/30 dark:border-gray-600/30 mr-2 rounded-2xl border-r h-full flex flex-col shadow-xl"
-      animate={{ width: props.isOpen ? "20rem" : "5rem", opacity: props.isOpen ? 1 : 0.9 }} transition={{ duration: 0.5, easing: "ease-in-out" }}
+      class="cad-workspace__sidebar flex-shrink-0 dark:text-white mr-2 h-full flex flex-col"
+      animate={{ width: props.isOpen ? "17rem" : "3.5rem", opacity: props.isOpen ? 1 : 0.9 }} transition={{ duration: 0.35, easing: "ease-in-out" }}
     >
       <Motion.div
-        class="w-full border-b border-white/30 dark:border-gray-600/30 rounded-t-2xl bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-gray-700/50 dark:to-gray-800/50 backdrop-blur-sm flex justify-center"
+        class="cad-workspace__tabs w-full flex justify-center"
         {...rise} transition={{ duration: 0.6, delay: 0.2 }}
       >
         <div class={props.isOpen ? "flex justify-center w-full text-center gap-1 p-2" : "flex flex-col w-full gap-1 p-2"}>

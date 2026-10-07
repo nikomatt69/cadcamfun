@@ -32,7 +32,7 @@ interface SelectionState {
   clearSelection: () => void;
   startBoxSelection: (position: { x: number; y: number }) => void;
   updateBoxSelection: (position: { x: number; y: number }) => void;
-  endBoxSelection: () => void;
+  endBoxSelection: (elementIds?: string[], additive?: boolean) => void;
   selectElementsInBox: () => void;
   getSelectionBounds: () => SelectionBounds | null;
   saveAsComponent: () => string;
@@ -87,27 +87,29 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     set({ boxEndPosition: position });
   },
 
-  endBoxSelection: () => {
-    set(state => {
-      // Don't end box selection if we haven't moved the box
-      if (state.boxStartPosition && state.boxEndPosition) {
-        const dx = Math.abs(state.boxStartPosition.x - state.boxEndPosition.x);
-        const dy = Math.abs(state.boxStartPosition.y - state.boxEndPosition.y);
-
-        // If the box is too small, it's likely a click, not a drag
-        if (dx < 5 && dy < 5) {
-          return {
-            isBoxSelecting: false,
-            boxStartPosition: null,
-            boxEndPosition: null
-          };
-        }
-      }
-
-      return { isBoxSelecting: false };
-    });
-
-    get().selectElementsInBox();
+  endBoxSelection: (elementIds, additive = false) => {
+    const state = get();
+    if (elementIds) {
+      const moved = state.boxStartPosition && state.boxEndPosition
+        ? Math.hypot(
+            state.boxEndPosition.x - state.boxStartPosition.x,
+            state.boxEndPosition.y - state.boxStartPosition.y
+          ) >= 1e-3
+        : false;
+      const next = !moved
+        ? state.selectedElementIds
+        : additive
+        ? Array.from(new Set([...state.selectedElementIds, ...elementIds]))
+        : elementIds;
+      set({
+        selectedElementIds: next,
+        isBoxSelecting: false,
+        boxStartPosition: null,
+        boxEndPosition: null
+      });
+      return;
+    }
+    set({ isBoxSelecting: false, boxStartPosition: null, boxEndPosition: null });
   },
 
   selectElementsInBox: () => {

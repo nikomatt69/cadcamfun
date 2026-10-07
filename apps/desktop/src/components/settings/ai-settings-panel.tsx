@@ -8,6 +8,7 @@ import { t } from "../../i18n/index.ts"
 import { useApp } from "../../state/context.ts"
 import { useAiStore } from "../../ai/context.tsx"
 import { ProviderSettings } from "../../ai/ProviderSettings.tsx"
+import { SkillsSettings } from "../../ai/SkillsSettings.tsx"
 import { DEFAULT_TEMPERATURE, defaultAiSettings, loadAiSettings, saveAiSettings, type AiSettings, type McpStrategy } from "./ai-settings.ts"
 import { getEndpoint } from "../../app/sidecar.ts"
 
@@ -181,6 +182,7 @@ export function AISettingsPanel(): JSX.Element {
 
       <fieldset disabled={isLoading() || isSaving()} class="space-y-4 min-w-0">
         <ProviderSettings />
+        <SkillsSettings />
 
         <div>
           <label for="ai-temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

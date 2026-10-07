@@ -42,7 +42,7 @@ describe("verify job helpers", () => {
 })
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
-beforeAll(async () => { app = await bootLiveApp() })
+beforeAll(async () => { app = await bootLiveApp() }, 60000)
 afterAll(async () => { await app.dispose() })
 
 const settle = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms))

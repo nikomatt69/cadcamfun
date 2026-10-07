@@ -7,6 +7,7 @@ import type { AiEvent } from "../src/events.ts"
 import { hostChatStream, createHostSession } from "../src/nikcli/chat.ts"
 import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
+import { compactHostSession, readHostContextPolicy } from "../src/nikcli/context.ts"
 import { buildTools, TOOL_IDS, type ToolHandlersShape } from "../src/tools/catalogue.ts"
 import { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime } from "../src/nikcli/runtime.ts"
 import { chatTurns, startFakeOpenAi, toolNames, type Completion } from "./helpers/fake-openai.ts"
@@ -65,6 +66,9 @@ afterAll(async () => {
 })
 
 const collect = (stream: Stream.Stream<AiEvent, unknown>) => Effect.runPromise(Stream.runCollect(stream)).then((c) => [...c])
+/** What the agent shows besides the answer itself: steps, progress of a tool call being written, plan, retries. */
+const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry", "compacted"])
+const content = (events: ReadonlyArray<AiEvent>) => events.filter((e) => !PROGRESS.has(e.type))
 
 describe("embedded nikcli host", () => {
   test("keeps state under the isolated app data dir", async () => {
@@ -117,7 +121,9 @@ describe("embedded nikcli host", () => {
         expect(names).not.toContain(forbidden)
       }
       // `skill` loads the playbooks this package installed (skills/index.ts); nothing else is offered.
-      expect(names.every((n) => n === "cad_probe" || n === "invalid" || n === "skill" || (TOOL_IDS as ReadonlyArray<string>).includes(n))).toBe(true)
+      // The host's own planning tools (plan, goal, skills) are offered besides ours; nothing that touches files or a shell is.
+      const HOST_PLANNING = ["skill", "todowrite", "todoread", "create_goal", "get_goal", "update_goal"]
+      expect(names.every((n) => n === "cad_probe" || n === "invalid" || HOST_PLANNING.includes(n) || (TOOL_IDS as ReadonlyArray<string>).includes(n))).toBe(true)
     }
     expect(existsSync(marker)).toBe(false)
     expect(executed.some((e) => e.tool !== "cad_probe")).toBe(false)
@@ -156,7 +162,7 @@ describe("embedded nikcli host", () => {
     const sessionId = await Effect.runPromise(createHostSession(host, "e2e"))
     const events = await collect(hostChatStream({ host, sessionId, message: "probe 42", model }))
     expect(executed).toEqual([{ tool: "cad_probe", input: { value: 42 }, projectId: "project-b" }])
-    const types = events.map((e) => e.type)
+    const types = content(events).map((e) => e.type)
     expect(types).toEqual(["tool_call", "tool_result", "delta", "delta", "done"])
     const result = events.find((e) => e.type === "tool_result")
     expect(result).toMatchObject({ ok: true, tool: "cad_probe" })
@@ -170,9 +176,35 @@ describe("embedded nikcli host", () => {
     const host = await Effect.runPromise(runtime.host("project-b"))
     script = () => ({ status: 500, body: JSON.stringify({ error: { message: "boom" } }) })
     const sessionId = await Effect.runPromise(createHostSession(host, "failing"))
-    const events = await collect(hostChatStream({ host, sessionId, message: "hello", model }))
+    const events = await collect(hostChatStream({ host, sessionId, message: "hello", model, continues: 0 }))
     expect(events.at(-1)?.type).toBe("error")
   }, 60_000)
+
+  test("real host automatically compacts overflow and keeps summaries out of chat", async () => {
+    const host = await Effect.runPromise(runtime.host("project-context"))
+    expect(await Effect.runPromise(readHostContextPolicy(host))).toEqual({ source: "host-config", auto: true, prune: true })
+    let calls = 0
+    script = () => {
+      calls++
+      if (calls === 1) return { text: "Initial answer", usage: { prompt_tokens: 99_000, completion_tokens: 9, total_tokens: 99_009 } }
+      if (calls === 2) return { text: "INTERNAL CONTEXT SUMMARY" }
+      return { text: "Continued answer" }
+    }
+    const sessionId = await Effect.runPromise(createHostSession(host, "auto context"))
+    const firstEvents = await collect(hostChatStream({ host, sessionId, message: "Remember the plate is 40 mm wide", model }))
+    const events = await collect(hostChatStream({ host, sessionId, message: "Continue", model }))
+    const messages = await host.client.session.messages({ sessionID: sessionId })
+    expect(messages.some((message) => message.info.summary === true && !message.info.error)).toBe(true)
+    expect([...firstEvents, ...events].filter((event) => event.type === "delta").map((event) => event.text).join("")).not.toContain("INTERNAL CONTEXT SUMMARY")
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "Continued answer" })
+    // Overflow is handled in the first prompt loop: answer, summary, continuation;
+    // the second user prompt then makes its own normal request.
+    expect(calls).toBe(4)
+    script = () => ({ text: "Explicit summary" })
+    const before = fake.requests.length
+    await Effect.runPromise(compactHostSession(host, sessionId, model))
+    expect(fake.requests.length - before).toBe(1)
+  }, 30_000)
 
   test("keys are pushed to the host and removed again", async () => {
     await Effect.runPromise(runtime.host("project-b"))
@@ -182,4 +214,25 @@ describe("embedded nikcli host", () => {
     await Effect.runPromise(runtime.clearProviderKey("fake"))
     expect(existsSync(authFile) ? readFileSync(authFile, "utf8") : "").not.toContain("sk-test-host-key")
   })
+})
+
+describe("a turn does not depend on the client staying connected", () => {
+  test("the consumer walks away mid-turn: the host finishes the turn and its state can be read back", async () => {
+    const { readHostSessionState } = await import("../src/nikcli/chat.ts")
+    // An earlier test removes the key again; this one needs it.
+    await Effect.runPromise(runtime.setProviderKey("fake", "sk-fake-test-key"))
+    const host = await Effect.runPromise(runtime.host("project-leave"))
+    script = (_index, _turn, lastRole) => (lastRole === "tool" ? { text: "All built: a plate with two holes." } : { toolCalls: [{ name: "cad_probe", args: { value: 1 } }] })
+    const sessionId = await Effect.runPromise(createHostSession(host, "leave"))
+    // Read only the first event, then drop the stream like a closed connection would.
+    await Effect.runPromise(Stream.runCollect(Stream.take(hostChatStream({ host, sessionId, message: "build it", model }), 1)))
+    let state = await Effect.runPromise(readHostSessionState(host, sessionId))
+    // Right after the first event the host may not have stored anything yet; wait for the turn itself, not just for "idle".
+    for (let i = 0; i < 150 && (state.busy || state.text === ""); i++) {
+      await new Promise((r) => setTimeout(r, 100))
+      state = await Effect.runPromise(readHostSessionState(host, sessionId))
+    }
+    expect(state.busy).toBe(false)
+    expect(state.text).toContain("All built: a plate with two holes.")
+  }, 30000)
 })

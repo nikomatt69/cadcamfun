@@ -1,8 +1,9 @@
-import { Show, type JSX } from "solid-js"
+import { For, Match, Show, Switch, type JSX } from "solid-js"
 import { Target } from "lucide-solid"
 import { Motion } from "solid-motionone"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
-import { NumberField, Section } from "./ui.tsx"
+import { cam } from "@cadcamfun/core"
+import { CheckRow, NumberField, Section } from "./ui.tsx"
 
 const FIELD = "w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
 const BLUE = "#3B82F6"
@@ -19,6 +20,27 @@ export function OriginSection(): JSX.Element {
   )
   return (
     <Section id="origin" delay={0.15} tone="orange" icon={Target} title="Origin Coordinates" testId="origin-section">
+      <Switch>
+        <Match when={gen.settings.machineType === "lathe"}>
+          <MachineZero setting="latheZero" machine="lathe" label="Z zero" />
+        </Match>
+        <Match when={gen.settings.machineType === "3dprinter"}>
+          <MachineZero setting="bedOrigin" machine="3dprinter" label="Plate origin" />
+          <div class="grid grid-cols-2 gap-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Plate width (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedWidth} onValue={(value) => gen.updateSettings("bedWidth", value)} /></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">Plate depth (mm)</label><NumberField min="10" class={FIELD} value={gen.settings.bedDepth} onValue={(value) => gen.updateSettings("bedDepth", value)} /></div>
+          </div>
+          <CheckRow id="center-on-bed" checked={gen.settings.centerOnBed} onChange={(checked) => gen.updateSettings("centerOnBed", checked)}>Centre the part on the plate</CheckRow>
+          <p class="text-xs text-gray-500">The part is always set down on the plate: its bottom is Z0, so the first layer prints one layer height above it.</p>
+        </Match>
+        <Match when={gen.settings.machineType === "mill"}>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Work offset</label>
+        <select class={FIELD} aria-label="Work offset" data-testid="origin-work-offset" value={gen.settings.workOffset} onChange={(event) => gen.updateSettings("workOffset", event.currentTarget.value as typeof gen.settings.workOffset)}>
+          <For each={cam.ORIGINS.mill.offsets ?? []}>{(offset) => <option value={offset}>{offset}{offset === "G54" ? " (default)" : ""}</option>}</For>
+        </select>
+        <p class="text-xs text-gray-500 mt-1">The zero of the part on the machine table. Probing and machining use the same one.</p>
+      </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Origin Type</label>
         <select class={FIELD} value={origin()} onChange={(event) => gen.updateSettings("originType", event.currentTarget.value as typeof gen.settings.originType)}>
@@ -100,6 +122,24 @@ export function OriginSection(): JSX.Element {
           </div>
         </div>
       </Motion.div>
+        </Match>
+      </Switch>
     </Section>
+  )
+}
+
+/** A machine's own zero choice (lathe: finished face or chuck; printer: plate corner or centre), with what each means. */
+function MachineZero(props: { readonly setting: "latheZero" | "bedOrigin"; readonly machine: "lathe" | "3dprinter"; readonly label: string }): JSX.Element {
+  const gen = useGeneratorStore()
+  const options = () => cam.ORIGINS[props.machine]
+  const current = () => String(gen.settings[props.setting])
+  return (
+    <div data-testid={`origin-${props.setting}`}>
+      <label class="block text-sm font-medium text-gray-700 mb-1">{props.label}</label>
+      <select class={FIELD} aria-label={props.label} value={current()} onChange={(event) => gen.updateSettings(props.setting, event.currentTarget.value as never)}>
+        <For each={options().choices}>{(choice) => <option value={choice.value}>{choice.label}</option>}</For>
+      </select>
+      <p class="text-xs text-gray-500 mt-1">{options().choices.find((choice) => choice.value === current())?.meaning}</p>
+    </div>
   )
 }
