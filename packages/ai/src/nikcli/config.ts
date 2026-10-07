@@ -57,6 +57,8 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   const permission: Record<string, "allow" | "deny" | "ask"> = { "*": "deny" }
   for (const id of input.toolIds) permission[id] = "allow"
   permission["invalid"] = "allow"
+  // The playbooks in `skills/index.ts`: loading one only reads text this package wrote.
+  permission["skill"] = "allow"
 
   const provider: Record<string, unknown> = {}
   for (const p of input.providers) {

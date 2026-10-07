@@ -14,7 +14,8 @@ const Finite = Schema.Finite
 const Positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const NonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
 
-export const Point2 = Schema.Struct({ x: Finite, y: Finite })
+/** A point in millimetres; `z` is optional and defaults to 0 (the drawing plane). */
+export const Point2 = Schema.Struct({ x: Finite, y: Finite, z: Schema.optionalKey(Finite) })
 export type Point2 = typeof Point2.Type
 
 const common = {
@@ -46,8 +47,15 @@ export const RectangleInput = Schema.Struct({
   ...common
 })
 
-/** A new entity (no id yet). */
-export const EntityInput = Schema.Union([LineInput, CircleInput, ArcInput, PolylineInput, RectangleInput])
+const solid = { center: Point2, color: Schema.optionalKey(Schema.NonEmptyString), name: Schema.optionalKey(Schema.NonEmptyString), ...common }
+export const CubeInput = Schema.Struct({ type: Schema.Literal("cube"), width: Positive, height: Positive, depth: Positive, ...solid })
+export const SphereInput = Schema.Struct({ type: Schema.Literal("sphere"), radius: Positive, ...solid })
+export const CylinderInput = Schema.Struct({ type: Schema.Literal("cylinder"), radius: Positive, height: Positive, ...solid })
+export const ConeInput = Schema.Struct({ type: Schema.Literal("cone"), radius: Positive, height: Positive, ...solid })
+export const TorusInput = Schema.Struct({ type: Schema.Literal("torus"), radius: Positive, tube: Positive, ...solid })
+
+/** A new entity (no id yet): 2D drawing entities and the 3D primitives the editor renders. */
+export const EntityInput = Schema.Union([LineInput, CircleInput, ArcInput, PolylineInput, RectangleInput, CubeInput, SphereInput, CylinderInput, ConeInput, TorusInput])
 export type EntityInput = typeof EntityInput.Type
 
 /** Field changes for an existing entity; the entity `type` itself cannot change. */
@@ -63,13 +71,17 @@ export const EntityChanges = Schema.Struct({
   height: Schema.optionalKey(Positive),
   points: Schema.optionalKey(Schema.Array(Point2).check(Schema.isMinLength(2))),
   closed: Schema.optionalKey(Schema.Boolean),
+  depth: Schema.optionalKey(Positive),
+  tube: Schema.optionalKey(Positive),
+  name: Schema.optionalKey(Schema.NonEmptyString),
+  color: Schema.optionalKey(Schema.NonEmptyString),
   layer: Schema.optionalKey(Schema.NonEmptyString)
 })
 export type EntityChanges = typeof EntityChanges.Type
 
 export const EntityId = Schema.NonEmptyString
 
-export const OPERATION_TYPES = ["contour", "pocket", "drill", "face"] as const
+export const OPERATION_TYPES = ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface"] as const
 export const OperationType = Schema.Literals(OPERATION_TYPES)
 
 export const OperationInput = Schema.Struct({

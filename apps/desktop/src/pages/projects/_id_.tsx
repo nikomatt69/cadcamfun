@@ -1,1 +1,1 @@
-export { CadScreen as default } from "../../screens/cad.tsx"
+export { ProjectDetailScreen as default } from "../../screens/project-detail.tsx"

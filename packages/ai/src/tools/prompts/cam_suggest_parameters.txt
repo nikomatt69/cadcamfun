@@ -1,0 +1,16 @@
+Get cutting guidance for the drawing and a set of settings, from the same rules the generator panel uses.
+
+Use it
+- Before cam_create_operation when the user gave no numbers, or to sanity-check numbers they gave.
+- To explain why a feed or depth is risky.
+
+Parameters
+- params (optional): settings to evaluate, same names as cam_create_operation (toolDiameter, depth, stepdown, feedrate, rpm, material, operationType...). Omitted ones take the defaults.
+
+Result (JSON)
+- parameters: depth, stepdown and operationType the selected element suggests (when something is selected).
+- suggestions: short tips. feedback: whether the chip load is in range.
+- statistics: cuttingSpeed (m/min), chipLoad (mm/tooth), materialRemovalRate, effectiveStepover (mm).
+- operation: {title, description}. warnings: e.g. depth deeper than the stock, element too small for the tool.
+
+Use the numbers as a starting point and say so; the skill cutting-parameters has the rules of thumb behind them.

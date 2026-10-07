@@ -1,0 +1,31 @@
+Create a machining operation (a toolpath job) from the elements of the drawing.
+
+Use it
+- After the geometry exists and the user wants it machined: a contour around a part, a pocket, drilling holes, engraving.
+
+Do not use it
+- On an empty drawing: build the geometry first (the call is refused with a message if there is nothing to machine).
+- To change an operation that exists: cam_update_operation.
+
+Parameters
+- type: the operation. One of contour (follow the outline), pocket (clear the inside), drill (holes), engrave, profile, threading, 3d_surface.
+- params (optional): any of these settings; what you leave out takes the default shown.
+  toolType endmill|ballnose|drill|vbit|chamfer|threadmill|reamer (endmill), toolDiameter mm (6), flutes (2),
+  depth mm below the stock top, positive (5), stepdown mm per pass (1), stepover percent of the diameter (40),
+  feedrate mm/min (800), plungerate mm/min (300), rpm (10000), tolerance mm (0.01; path and arc-fit tolerance, 0.001 = 1 micron),
+  offset inside|outside|center (outside), direction climb|conventional (climb), coolant true|false,
+  finishingPass true|false, finishingAllowance mm (0.2),
+  material aluminum|steel|wood|plastic|brass|titanium|composite|other (aluminum).
+- Use lib_lookup_tool and lib_lookup_material first when the user names a tool or material, and cam_suggest_parameters when you are unsure of the numbers.
+- For toleranced work: tolerance 0.001 or finer, a finishingPass with a finishingAllowance of 0.05 to 0.2 mm, and a smaller stepdown. G-code coordinates are written to 0.001 mm; it cannot express finer.
+- The operation machines every element of the drawing. Elements that must not be cut should not be in the drawing.
+
+Result (JSON)
+- ok, operationId, name, elements (how many it works on). Keep operationId: every later CAM call needs it.
+- The generator panel of the CAM page shows these settings.
+
+Errors
+- An unknown operation type, a non-positive diameter or depth, or an empty drawing is rejected with the reason.
+
+After it
+- cam_generate_gcode, then cam_analyze_gcode, then cam_verify_toolpath.

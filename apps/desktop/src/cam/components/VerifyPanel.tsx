@@ -7,9 +7,10 @@
  * as a height map with gouges in red. Nothing is checked that was not modelled, and the panel says so.
  */
 import { For, Show, createEffect, type JSX } from "solid-js"
-import { AlertTriangle, Check, ShieldCheck } from "lucide-solid"
+import { AlertTriangle, Check, ShieldCheck, Sparkles } from "lucide-solid"
 import { cam as camCore } from "@cadcamfun/core"
 import { t } from "../../i18n/index.ts"
+import { fixVerificationPrompt, useAskAi } from "../../ai/ask.ts"
 import { useApp } from "../../state/context.ts"
 import { makeToolpathGenerator, type VerifyResponse } from "../api/generator.ts"
 import { geometryOf } from "../lib/job.ts"
@@ -47,6 +48,7 @@ export default function VerifyPanel(): JSX.Element {
   const cam = useCamStore()
   const job = useJob()
   const verify = useVerifyStore()
+  const ask = useAskAi()
   const generator = makeToolpathGenerator(app.client)
   let canvas: HTMLCanvasElement | undefined
 
@@ -124,6 +126,11 @@ export default function VerifyPanel(): JSX.Element {
               <Show when={report().ok} fallback={<AlertTriangle size={18} class="mr-2" />}><Check size={18} class="mr-2" /></Show>
               <span class="text-sm font-medium">{report().ok ? t("cam.verify.passed") : t("cam.verify.failed", { count: errors() })}</span>
             </div>
+            <Show when={errors() > 0}>
+              <button type="button" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-blue-300 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
+                <Sparkles size={16} />Ask the assistant to fix it
+              </button>
+            </Show>
             <Show when={stale()}><p class="text-xs text-yellow-700" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
 
             <ul class="space-y-1" data-testid="verify-issues">

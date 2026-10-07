@@ -6,6 +6,8 @@ import { z } from "zod"
 import type { AiEvent } from "../src/events.ts"
 import { hostChatStream, createHostSession } from "../src/nikcli/chat.ts"
 import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
+import { CADCAM_SKILLS } from "../src/skills/index.ts"
+import { buildTools, TOOL_IDS, type ToolHandlersShape } from "../src/tools/catalogue.ts"
 import { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime } from "../src/nikcli/runtime.ts"
 import { chatTurns, startFakeOpenAi, toolNames, type Completion } from "./helpers/fake-openai.ts"
 import { sharedDataDir } from "./helpers/host-env.ts"
@@ -21,6 +23,14 @@ const probeTool: HostToolSpec = {
     return JSON.stringify({ ok: true })
   }
 }
+
+const added: Array<{ projectId: string; elements: ReadonlyArray<Record<string, unknown>> }> = []
+const stubHandlers = new Proxy({} as ToolHandlersShape, {
+  get: (_target, name: string) => async (projectId: string, elements: ReadonlyArray<Record<string, unknown>>) => {
+    if (name === "addElements") { added.push({ projectId, elements }); return { ok: true, ids: elements.map((_, i) => `id-${i}`), elements } }
+    return { ok: true }
+  }
+})
 
 let script: (index: number, turn: number, lastRole: string) => Completion = () => ({ text: "hi" })
 const fake = startFakeOpenAi((request, index) => {
@@ -42,7 +52,7 @@ const runtime: NikCliRuntime = await Effect.runPromise(
     dataDir: sharedDataDir,
     providers: [...defaultProviderSpecs(), fakeProvider],
     systemPrompt: "You are a CAD test assistant.",
-    toolsFor: () => [probeTool],
+    toolsFor: (projectId) => [probeTool, ...buildTools(stubHandlers, projectId)],
     hostLogs: (level, line) => { if (level === 'warn' || level === 'error') console.log('HOSTLOG', line.slice(0, 300)) }
   }).pipe(Scope.provide(scope))
 )
@@ -68,6 +78,16 @@ describe("embedded nikcli host", () => {
   test("registered tools are visible to the host registry", async () => {
     const host = await Effect.runPromise(runtime.host("project-a"))
     expect(await host.client.experimental.toolIDs()).toContain("cad_probe")
+  })
+
+  test("the cadcam skills are installed, discovered by the host, and the agent may load them", async () => {
+    const host = await Effect.runPromise(runtime.host("project-a"))
+    const skills = await host.client["top-level"].skill()
+    const names = skills.map((skill) => skill.name)
+    for (const skill of CADCAM_SKILLS) expect(names).toContain(skill.name)
+    const modeling = skills.find((skill) => skill.name === "cad-3d-modeling")!
+    expect(modeling.location.startsWith(runtime.paths.config)).toBe(true)
+    expect(await host.client.experimental.toolIDs()).toContain("skill")
   })
 
   test("session create, list and abort", async () => {
@@ -96,11 +116,36 @@ describe("embedded nikcli host", () => {
       for (const forbidden of ["bash", "edit", "write", "read", "webfetch", "websearch", "task", "glob", "grep", "apply_patch", "plugin", "monitor"]) {
         expect(names).not.toContain(forbidden)
       }
-      expect(names.every((n) => n === "cad_probe" || n === "invalid")).toBe(true)
+      // `skill` loads the playbooks this package installed (skills/index.ts); nothing else is offered.
+      expect(names.every((n) => n === "cad_probe" || n === "invalid" || n === "skill" || (TOOL_IDS as ReadonlyArray<string>).includes(n))).toBe(true)
     }
     expect(existsSync(marker)).toBe(false)
     expect(executed.some((e) => e.tool !== "cad_probe")).toBe(false)
     expect(events.at(-1)?.type).toBe("done")
+  })
+
+  test("the model builds in 3D: cad_add_elements goes through the real host with a revolved bottle and a cube", async () => {
+    const host = await Effect.runPromise(runtime.host("project-3d"))
+    added.length = 0
+    const profile = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 150 }, { x: 10, y: 200 }, { x: 10, y: 260 }]
+    script = (_index, _turn, lastRole) =>
+      lastRole === "tool"
+        ? { text: "Built." }
+        : { toolCalls: [{ name: "cad_add_elements", args: { elements: [{ type: "revolution", name: "Bottle", profile }, { type: "cube", width: 40, height: 40, depth: 40, color: "#cc0000" }] } }] }
+    const before = fake.requests.length
+    const sessionId = await Effect.runPromise(createHostSession(host, "3d"))
+    const events = await collect(hostChatStream({ host, sessionId, message: "make a bottle and a block", model }))
+    expect(added).toHaveLength(1)
+    expect(added[0]!.projectId).toBe("project-3d")
+    expect(added[0]!.elements.map((e) => e["type"])).toEqual(["revolution", "cube"])
+    // Defaults are filled by the catalogue before the handler sees the elements.
+    expect(added[0]!.elements[0]).toMatchObject({ axis: "y", segments: 32, name: "Bottle" })
+    expect(added[0]!.elements[1]).toMatchObject({ depth: 40, color: "#cc0000", x: 0 })
+    expect(events.at(-1)?.type).toBe("done")
+    // The model is offered the 3D tool first and told, in the tool list itself, which one is for objects.
+    const first = chatTurns(fake.requests.slice(before))[0]!
+    const names = toolNames(first)
+    expect(names.indexOf("cad_add_elements")).toBeLessThan(names.indexOf("cad_add_entities"))
   })
 
   test("tool call -> handler -> result -> final text", async () => {

@@ -1,0 +1,9 @@
+List the notes saved with memory_remember.
+
+Use it
+- At the start of work on a part, or when the user refers to something they told you before.
+
+Parameters
+- prefix (optional): only keys that start with it ("stock.").
+
+Result (JSON): a list of {key, value}. An empty list means nothing was saved; do not guess.

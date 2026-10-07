@@ -1,18 +1,23 @@
-import { Match, Show, Switch, type JSX } from "solid-js"
-import { Motion } from "solid-motionone"
-import { Eye, EyeOff, Grid3x3, Layers, Maximize2, MousePointer, Move, RotateCw, Zap } from "lucide-solid"
+import { Show, type JSX } from "solid-js"
+import { Seg, Sep, ShellSegs, Strip } from "../../components/workspace-strip.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
+import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { useTransformControlsStore } from "../store/transformControlsStore.ts"
 
-const MONO = "font-mono text-xs bg-gray-800 px-2 py-1 rounded"
+const mm = (value: number | undefined): string => (value ?? 0).toFixed(2)
 
-/** The editor's bottom bar: mode, active transform tool, units, stock, view toggles, counts and the cursor coordinates. */
+/**
+ * The CAD editor's information strip: mode, transform tool, material and stock, the grid / axes / dimensions
+ * toggles, layer, counts, the selection (type, id, size), the cursor and the transform shortcuts, on one thin row.
+ * The shell's own footer keeps units, snap and the sidecar state.
+ */
 export default function StatusBar(): JSX.Element {
   const cad = useCADStore()
   const elements = useElementsStore()
   const selection = useSelectionStore()
+  const layers = useLayerStore()
   const transform = useTransformControlsStore()
 
   const workpiece = () => ({
@@ -23,86 +28,54 @@ export default function StatusBar(): JSX.Element {
   })
   const is2D = () => cad.viewMode === "2d"
   const selectedCount = () => selection.selectedElementIds?.length || 0
-  const transformText = () => {
-    if (transform.isTransforming) return `${transform.mode.toUpperCase()} (Active)`
+  const transformText = (): string => {
+    if (transform.isTransforming) return `${transform.mode.toUpperCase()} (active)`
     return transform.mode !== "none" ? transform.mode.toUpperCase() : "Select"
   }
-  const fadeIn = (delay: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.3, delay } })
+  const layer = () => layers.layers.find((candidate) => candidate.id === layers.activeLayer)
+  const bounds = () => (selectedCount() > 0 ? selection.getSelectionBounds() : null)
+  const hidden = () => elements.elements.filter((element) => element.visible === false).length
 
   return (
-    <Motion.div
-      class="bg-gradient-to-r from-[#1a1a1a] via-[#2a2a2a] to-[#1a1a1a] text-white px-4 py-2 flex items-center justify-between shadow-lg border-t border-gray-700"
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-    >
-      <div class="flex items-center space-x-6">
-        <Motion.div class="flex items-center" {...fadeIn(0)}>
-          <span class="text-gray-400 mr-2">Mode:</span>
-          <span class={`font-medium px-2 py-1 rounded text-xs ${is2D() ? "bg-blue-900 text-blue-200" : "bg-purple-900 text-purple-200"}`}>{is2D() ? "2D (XY)" : "3D"}</span>
-        </Motion.div>
-        <Motion.div class="flex items-center" {...fadeIn(0.1)}>
-          <span class="text-gray-400 mr-2">Tool:</span>
-          <div class="flex items-center space-x-1">
-            <Switch fallback={<MousePointer size={12} class="text-gray-400" />}>
-              <Match when={transform.mode === "translate"}><Move size={12} class="text-blue-400" /></Match>
-              <Match when={transform.mode === "rotate"}><RotateCw size={12} class="text-green-400" /></Match>
-              <Match when={transform.mode === "scale"}><Maximize2 size={12} class="text-yellow-400" /></Match>
-            </Switch>
-            <span class={`font-medium text-xs ${transform.isTransforming ? "text-yellow-300" : "text-gray-300"}`}>{transformText()}</span>
-          </div>
-        </Motion.div>
-        <Motion.div class="flex items-center" {...fadeIn(0.2)}>
-          <span class="text-gray-400 mr-2">Units:</span><span class="font-medium text-orange-300">mm</span>
-        </Motion.div>
-        <Motion.div class="flex items-center" {...fadeIn(0.3)}>
-          <span class="text-gray-400 mr-2">Material:</span><span class="font-medium capitalize text-green-300">{workpiece().material}</span>
-        </Motion.div>
-        <Motion.div class="flex items-center" {...fadeIn(0.4)}>
-          <span class="text-gray-400 mr-2">Stock:</span>
-          <span class="font-medium text-xs text-cyan-300">{workpiece().width.toFixed(1)} × {workpiece().height.toFixed(1)} × {workpiece().depth.toFixed(1)}</span>
-        </Motion.div>
-      </div>
-
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center">
-          <Grid3x3 size={12} class={`mr-1 ${cad.gridVisible ? "text-green-400" : "text-gray-600"}`} />
-          <span class={`text-xs ${cad.gridVisible ? "text-green-300" : "text-gray-500"}`}>Grid</span>
-        </div>
-        <div class="flex items-center">
-          <Show when={cad.axisVisible} fallback={<EyeOff size={12} class="text-gray-600 mr-1" />}><Eye size={12} class="text-blue-400 mr-1" /></Show>
-          <span class={`text-xs ${cad.axisVisible ? "text-blue-300" : "text-gray-500"}`}>Axis</span>
-        </div>
-        <div class="flex items-center">
-          <Layers size={12} class={`mr-1 ${cad.showDimensions ? "text-yellow-400" : "text-gray-600"}`} />
-          <span class={`text-xs ${cad.showDimensions ? "text-yellow-300" : "text-gray-500"}`}>Dims</span>
-        </div>
-        <div class="flex items-center">
-          <span class="text-gray-400 mr-1 text-xs">Elements:</span>
-          <span class="font-medium text-xs bg-gray-800 px-2 py-1 rounded">{elements.elements?.length || 0}</span>
-        </div>
-        <Show when={selectedCount() > 0}>
-          <div class="flex items-center"><Zap size={12} class="text-orange-400 mr-1" /><span class="text-xs text-orange-300">{selectedCount()} selected</span></div>
-        </Show>
-      </div>
-
-      <div class="flex items-center space-x-6">
-        <div class="flex items-center space-x-3">
-          <div class="flex items-center"><span class="mr-1 text-xs font-bold" style={{ color: "#0066ff" }}>X:</span><span class={MONO} style={{ color: "#66b3ff" }}>{(elements.mousePosition?.x || 0).toFixed(2)}</span></div>
-          <div class="flex items-center"><span class="mr-1 text-xs font-bold" style={{ color: "#ff00ff" }}>Y:</span><span class={MONO} style={{ color: "#ff99ff" }}>{(elements.mousePosition?.y || 0).toFixed(2)}</span></div>
-          <Show when={!is2D()}>
-            <div class="flex items-center"><span class="mr-1 text-xs font-bold" style={{ color: "#00ff7f" }}>Z:</span><span class={MONO} style={{ color: "#66ffb3" }}>{(elements.mousePosition?.z || 0).toFixed(2)}</span></div>
+    <Strip
+      label="CAD status"
+      testId="cad-status-bar"
+      left={
+        <>
+          <Seg label="Mode" value={is2D() ? "2D (XY)" : "3D"} tone={is2D() ? "blue" : "purple"} />
+          <Seg label="Tool" value={transformText()} tone={transform.isTransforming ? "amber" : "neutral"} title="Active transform tool" />
+          <Sep />
+          <Seg label="Material" value={<span class="capitalize">{workpiece().material}</span>} tone="green" hideBelow="md" />
+          <Seg label="Stock" value={`${workpiece().width.toFixed(1)} × ${workpiece().height.toFixed(1)} × ${workpiece().depth.toFixed(1)}`} tone="cyan" hideBelow="md" title="Workpiece size, mm" />
+          <Sep />
+          <Seg value="Grid" tone="green" pressed={cad.gridVisible} onClick={() => cad.toggleGrid()} title="Toggle grid" testId="status-grid" />
+          <Seg value="Axis" tone="blue" pressed={cad.axisVisible} onClick={() => cad.toggleAxis()} title="Toggle axes" testId="status-axis" />
+          <Seg value="Dims" tone="amber" pressed={cad.showDimensions} onClick={() => cad.toggleDimensions()} title="Toggle dimensions" testId="status-dims" />
+          <Sep />
+          <Seg label="Layer" value={layer()?.name ?? "—"} hideBelow="lg" title="Active layer" />
+          <Seg label="Elements" value={elements.elements?.length || 0} hideBelow="md" />
+          <Show when={hidden() > 0}><Seg label="Hidden" value={hidden()} tone="muted" hideBelow="lg" /></Show>
+          <Show when={selectedCount() > 0}><Seg value={`${selectedCount()} selected`} tone="amber" /></Show>
+          <Show when={elements.selectedElement}>
+            {(selected) => <Seg label="Selected" value={`${selected().type} ${selected().id.substring(0, 6)}`} tone="blue" hideBelow="lg" title={selected().id} />}
           </Show>
-        </div>
-        <div class="flex items-center">
-          <span class="text-gray-400 mr-2 text-xs">Selected:</span>
-          <Show when={elements.selectedElement} fallback={<span class="text-gray-500 text-xs italic">None</span>}>{(selected) =>
-            <div class="flex items-center bg-blue-900 px-2 py-1 rounded text-xs">
-              <span class="text-blue-200 font-medium">{selected().type}</span>
-              <span class="text-blue-400 ml-1">({selected().id.substring(0, 6)}...)</span>
-            </div>}
+          <Show when={bounds()}>
+            {(box) => <Seg label="Size" value={`${box().width.toFixed(1)} × ${box().height.toFixed(1)}${is2D() ? "" : ` × ${box().depth.toFixed(1)}`}`} tone="cyan" hideBelow="xl" title="Selection size, mm" />}
           </Show>
-        </div>
-        <div class="text-xs text-gray-500"><span class="hidden lg:inline">G-Move | R-Rotate | S-Scale | ESC-Cancel</span></div>
-      </div>
-    </Motion.div>
+        </>
+      }
+      right={
+        <>
+          <span class="flex items-center gap-2 font-mono" title="Cursor position, mm">
+            <span class="text-blue-400">X</span><span class="text-blue-200">{mm(elements.mousePosition?.x)}</span>
+            <span class="text-fuchsia-400">Y</span><span class="text-fuchsia-200">{mm(elements.mousePosition?.y)}</span>
+            <Show when={!is2D()}><span class="text-emerald-400">Z</span><span class="text-emerald-200">{mm(elements.mousePosition?.z)}</span></Show>
+          </span>
+          <span class="hidden text-gray-500 2xl:inline">G Move · R Rotate · S Scale · Esc Cancel</span>
+          <Sep />
+          <ShellSegs />
+        </>
+      }
+    />
   )
 }

@@ -9,7 +9,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Motion, Presence } from "solid-motionone"
-import { Box, ChevronDown, ChevronRight, Circle, Code, Database, Eye, EyeOff, Folder, Layers, List, RefreshCw, Square, Trash2, Wrench, X } from "lucide-solid"
+import { Box, ChevronDown, ChevronRight, Circle, Code, Database, Folder, Layers, List, RefreshCw, Square, Trash2, Wrench, X } from "lucide-solid"
 import { toast } from "../../../components/ui/toast.tsx"
 import { useApp } from "../../../state/context.ts"
 import { useCADStore } from "../../../cad/store/cadStore.ts"
@@ -28,6 +28,8 @@ import {
   selectionSummary,
   type ExplorerNode
 } from "../../lib/explorer.ts"
+import { createBrowser } from "../../../cad/components/browser/browserState.ts"
+import { BrowserSections, BrowserToolbar, OriginBlock, RenameName, RowActions } from "../../../cad/components/browser/BrowserParts.tsx"
 import { assignmentProblem } from "../../lib/elementJob.ts"
 import { generateForElement } from "../../lib/elementGenerate.ts"
 import { useJob } from "../../lib/useJob.ts"
@@ -83,6 +85,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
   const [panel, setPanel] = createSignal<"tool" | "material" | null>(null)
   const [showToolProperties, setShowToolProperties] = createSignal(false)
   const [multiOpen, setMultiOpen] = createSignal(false)
+  const browser = createBrowser()
 
   const tree = createMemo(() => buildTree(elements.elements))
   const visibleTree = createMemo(() => filterTree(tree(), query()))
@@ -180,7 +183,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
             </Show>
           </button>
           <div class="mr-2 flex-shrink-0"><ElementIcon type={nodeProps.node.type} /></div>
-          <span class="flex-1 truncate font-medium text-gray-900 dark:text-gray-100">{nodeProps.node.name}</span>
+          <RenameName id={id()} name={nodeProps.node.name} browser={browser} />
           <Show when={isStock()}>
             <span class="mr-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Raw piece">Stock</span>
           </Show>
@@ -189,15 +192,7 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
             <span class={`h-2 w-2 rounded-full inline-block ${materialOf(id()) ? "bg-blue-500" : "bg-gray-300"}`} title={materialOf(id()) ? "Material assigned" : "No material"} />
             <span class={`h-2 w-2 rounded-full inline-block ${toolpathOf(id()) ? "bg-purple-500" : "bg-gray-300"}`} title={toolpathOf(id()) ? "GCode generated" : "No GCode"} />
           </div>
-          <div class="flex items-center space-x-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              title={isVisible() ? "Hide" : "Show"}
-              onClick={event => { event.stopPropagation(); elements.updateElement(id(), { visible: !nodeProps.node.visible }) }}
-            >
-              <Show when={isVisible()} fallback={<EyeOff size={12} />}><Eye size={12} /></Show>
-            </button>
-          </div>
+          <RowActions id={id()} visible={isVisible()} locked={elements.elements.find(element => element.id === id())?.locked === true} browser={browser} />
         </div>
 
         <Show when={isSelected()}>
@@ -313,6 +308,9 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
         <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>Collapse All</button>
       </div>
 
+      <OriginBlock />
+      <BrowserToolbar browser={browser} />
+
       <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm text-center font-medium" data-testid="cam-selection-summary">
         {summary()}
       </div>
@@ -342,10 +340,10 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
 
       <div class="flex-1 overflow-y-auto">
         <Show
-          when={visibleTree().length > 0}
+          when={visibleTree().length > 0 || browser.mode() === "layer"}
           fallback={<p class="p-4 text-xs text-center text-gray-500 dark:text-gray-400">{elements.elements.length === 0 ? "No elements yet. Draw something in the CAD editor." : "No elements match the search."}</p>}
         >
-          <For each={visibleTree()}>{node => <Node node={node} depth={0} />}</For>
+          <BrowserSections roots={visibleTree()} browser={browser} renderNode={node => <Node node={node} depth={0} />} emptyText="No elements yet. Draw something in the CAD editor." />
         </Show>
       </div>
 

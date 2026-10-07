@@ -1,0 +1,16 @@
+Delete elements by id. Destructive: it needs confirm:true, and you set that only when the user asked for the deletion in this conversation.
+
+Use it
+- "Remove the left wheel", "clear the holes", cleaning up a duplicate you created by mistake and told the user about.
+
+Do not use it
+- On your own initiative to "tidy up". Offer it, and wait for a yes.
+- To move or resize (cad_modify_entities).
+
+Parameters
+- ids: 1 or more element ids, from cad_describe_drawing or an add result.
+- confirm: must be the literal true. Without it nothing is deleted and the result says so.
+
+Result (JSON)
+- ok, deleted (count), ids (the ones removed). Unknown ids are ignored; the count tells how many existed.
+- The elements disappear from the user's editor immediately. The user can undo with the editor's undo.

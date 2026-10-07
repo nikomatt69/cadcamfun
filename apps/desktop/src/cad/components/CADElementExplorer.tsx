@@ -1,9 +1,11 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { Motion, Presence } from "solid-motionone"
-import { Box, ChevronDown, ChevronRight, Circle, Copy, Eye, EyeOff, Folder, List, Lock, RefreshCw, Square, Trash2, Unlock, X } from "lucide-solid"
+import { Box, ChevronDown, ChevronRight, Circle, Copy, Eye, EyeOff, Folder, List, Lock, Square, Trash2, Unlock, X } from "lucide-solid"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
+import { createBrowser } from "./browser/browserState.ts"
+import { BrowserSections, BrowserToolbar, OriginBlock, RenameName, RowActions } from "./browser/BrowserParts.tsx"
 
 interface CADElementExplorerProps { readonly width?: number; onElementSelect?: (id: string) => void }
 
@@ -13,6 +15,7 @@ interface ElementNode {
   type: string
   children: ElementNode[]
   visible: boolean
+  locked: boolean
   layerId: string
 }
 
@@ -41,7 +44,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
   const [query, setQuery] = createSignal("")
   const [multiSelect, setMultiSelect] = createSignal(false)
-  const [groupByLayer, setGroupByLayer] = createSignal(true)
+  const browser = createBrowser()
   const [propertiesFor, setPropertiesFor] = createSignal<string | null>(null)
   const [showProperties, setShowProperties] = createSignal(false)
 
@@ -49,7 +52,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     const nodes: Record<string, ElementNode> = {}
     const roots: ElementNode[] = []
     for (const element of elements.elements) {
-      nodes[element.id] = { id: element.id, name: element.name || `${element.type}-${element.id.slice(0, 6)}`, type: element.type, children: [], visible: element.visible !== false, layerId: element.layerId }
+      nodes[element.id] = { id: element.id, name: element.name || `${element.type}-${element.id.slice(0, 6)}`, type: element.type, children: [], visible: element.visible !== false, locked: element.locked === true, layerId: element.layerId }
     }
     for (const element of elements.elements) {
       const node = nodes[element.id]!
@@ -123,19 +126,9 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
             </Show>
           </button>
           <div class="mr-2 flex-shrink-0"><ElementIcon type={nodeProps.node.type} /></div>
-          <span class="flex-1 truncate font-medium text-gray-900 dark:text-gray-100">{nodeProps.node.name}</span>
-          <span class="mr-2 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400 flex-shrink-0">{nodeProps.node.type}</span>
-          <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Show when={!isVisible()}><EyeOff size={12} class="text-gray-400" /></Show>
-          </div>
-          <div class="flex items-center space-x-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={(event) => { event.stopPropagation(); elements.updateElement(nodeProps.node.id, { visible: !nodeProps.node.visible }) }}
-              class="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title={isVisible() ? "Hide" : "Show"}
-            >
-              <Show when={isVisible()} fallback={<EyeOff size={12} />}><Eye size={12} /></Show>
-            </button>
-          </div>
+          <RenameName id={nodeProps.node.id} name={nodeProps.node.name} browser={browser} />
+          <span class="mr-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400 flex-shrink-0">{nodeProps.node.type}</span>
+          <RowActions id={nodeProps.node.id} visible={isVisible()} locked={nodeProps.node.locked} browser={browser} />
         </div>
         <Presence>
           <Show when={hasChildren() && isExpanded()}>
@@ -177,11 +170,6 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
           <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Elements</h3>
           <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{elements.elements.length}</span>
         </div>
-        <div class="flex items-center space-x-1">
-          <button class="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" onClick={() => setGroupByLayer(!groupByLayer())} title={groupByLayer() ? "Group by type" : "Group by layer"}>
-            <RefreshCw size={14} />
-          </button>
-        </div>
       </div>
 
       <div class="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -197,6 +185,9 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
         <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-4 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={expandAll}>Expand All</button>
         <button class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setExpanded({})}>Collapse All</button>
       </div>
+
+      <OriginBlock />
+      <BrowserToolbar browser={browser} />
 
       <Show when={selection.selectedElementIds.length > 0}>
         <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm text-center font-medium">
@@ -220,10 +211,12 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
       </Show>
 
       <div class="flex-1 overflow-y-auto">
-        <Show when={filtered().length > 0} fallback={
+        <Show when={filtered().length > 0 || browser.mode() === "layer"} fallback={
           <div class="p-4 text-center text-sm text-gray-500 dark:text-gray-400 italic">{query() ? "No elements match your search" : "No elements found in project"}</div>
         }>
-          <div class="py-1"><For each={filtered()}>{(node) => <Node node={node} depth={0} />}</For></div>
+          <div class="py-1">
+            <BrowserSections roots={filtered()} browser={browser} renderNode={(node) => <Node node={node} depth={0} />} emptyText="No elements found in project" />
+          </div>
         </Show>
       </div>
 

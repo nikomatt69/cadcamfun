@@ -1,0 +1,10 @@
+Search the user's material library.
+
+Use it
+- When the user names a material ("6061 aluminium") and you need its id or to confirm it exists, before choosing cutting parameters.
+
+Parameters
+- query: words from the name; an empty or very general query returns the first entries.
+
+Result (JSON): up to 10 of {id, name}, public library entries included.
+- No match: say so and state which material you assumed (aluminum, steel, wood, plastic, brass, titanium, composite, other are the generator's own groups).

@@ -1,0 +1,13 @@
+Save a short note that you will see again in later conversations: a preference, a fact about the part, the stock or the machine.
+
+Use it
+- When the user says "always", "remember", gives units, stock size, machine or material they will reuse.
+
+Do not use it
+- For things visible in the drawing, or for secrets: never store passwords, keys or personal data.
+
+Parameters
+- key: letters, digits, dot, underscore, hyphen, 1 to 80 characters (e.g. "stock.size"). The same key replaces the old note.
+- value: the note, 1 to 2000 characters, plain text.
+
+Result (JSON): {ok, key}.

@@ -1,0 +1,24 @@
+Add FLAT 2D sketch geometry to the drawing: line, circle, arc, polyline, rectangle on the drawing plane. Only when the user asks for a sketch, a profile or a plan view.
+
+Use it
+- "Draw a 30 mm circle at the origin", "a 100 x 60 rectangle", a closed profile that will be machined as a contour.
+
+Do not use it
+- To represent an object, part or shape: build it in 3D with cad_add_elements. A car is not rectangles and circles.
+- To change or remove something already drawn: cad_modify_entities / cad_delete_entities.
+
+Parameters
+- entities: 1 to 500 objects, each with a "type":
+  line {start:{x,y,z?}, end:{x,y,z?}}
+  circle {center:{x,y,z?}, radius}
+  arc {center, radius, startAngle, endAngle} (radians, counter-clockwise from +X)
+  polyline {points:[{x,y,z?}] (>= 2), closed?} (stored as line segments)
+  rectangle {origin:{x,y,z?} (a corner), width, height}
+- Optional on each: name, color ("#rrggbb"), layer (a layer name; created if missing).
+- Millimetres. z defaults to 0.
+
+Result (JSON)
+- ok, ids, elements (as stored), projectId, drawingId. They appear in the editor immediately.
+
+Errors
+- Invalid input (a radius <= 0, fewer than 2 polyline points) is rejected before anything is added; the message names the field.

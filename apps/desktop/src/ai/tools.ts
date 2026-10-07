@@ -6,6 +6,7 @@
  */
 export const TOOL_IDS = [
   "cad_add_entities",
+  "cad_add_elements",
   "cad_modify_entities",
   "cad_delete_entities",
   "cad_describe_drawing",
@@ -33,6 +34,7 @@ export interface ToolSummary {
 
 export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
   { id: "cad_add_entities", category: "cad", title: "Add entities", description: "Append 2D entities (mm, radians) to the active drawing." },
+  { id: "cad_add_elements", category: "cad", title: "Add 3D elements", description: "Model solids, revolved / extruded profiles, lofts, sweeps, booleans, curves and parts in the open editor." },
   { id: "cad_modify_entities", category: "cad", title: "Modify entities", description: "Change fields of existing entities by id." },
   { id: "cad_delete_entities", category: "cad", title: "Delete entities", description: "Delete entities by id (requires confirm: true)." },
   { id: "cad_describe_drawing", category: "cad", title: "Describe drawing", description: "Counts, bounds and layers of the active drawing." },

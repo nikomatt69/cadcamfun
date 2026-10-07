@@ -27,6 +27,13 @@ import {
 
 const ENDPOINT = "projects"
 
+/** The reason a request failed, short enough for the error box. */
+const describeError = (error: unknown): string | undefined => {
+  if (error === undefined || error === null) return undefined
+  const message = typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string" ? (error as { message: string }).message : String(error)
+  return message.length > 200 ? `${message.slice(0, 200)}…` : message
+}
+
 interface ProjectRow {
   readonly id: string
   readonly name: string
@@ -137,7 +144,7 @@ export function ProjectsScreen(): JSX.Element {
             <LoadingState label={t("projects.loading")} />
           </Show>
           <Show when={projects.state()._tag === "error"}>
-            <ErrorState label={t("projects.error")} />
+            <ErrorState label={t("projects.error")} detail={describeError(projects.error())} onRetry={refresh} />
           </Show>
           <Show when={projects.state()._tag === "success"}>
             <Show when={rows().length > 0} fallback={<EmptyState label={t("projects.empty")} />}>

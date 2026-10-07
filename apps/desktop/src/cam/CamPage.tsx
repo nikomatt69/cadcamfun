@@ -14,7 +14,7 @@ import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-soli
 import { Toaster, toast } from "../components/ui/toast.tsx"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
-import StatusBar from "../cad/components/StatusBar.tsx"
+import CamStatusBar from "./components/CamStatusBar.tsx"
 import { buildPlayback } from "../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "./api/generator.ts"
 import { useCamStore } from "./store/camStore.ts"
@@ -57,6 +57,9 @@ export default function CamPage(): JSX.Element {
     setGcodeSignal(next)
     camStore.setGcode(next)
   }
+
+  // The assistant (or another panel) can set the program in the store: the editor shows it too.
+  createEffect(on(() => camStore.gcode, (next) => { if (next !== gcode()) setGcodeSignal(next) }, { defer: true }))
 
   // The raw piece follows the CAD (legacy `syncWorkpieceFromCAD` on mount).
   onMount(() => camStore.syncWorkpieceFromCAD())
@@ -334,7 +337,7 @@ export default function CamPage(): JSX.Element {
         </Motion.div>
 
         <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1.6 }}>
-          <StatusBar />
+          <CamStatusBar />
         </Motion.div>
       </Motion.div>
 

@@ -78,7 +78,7 @@ export interface StatusBarProps {
   readonly toolLabel?: string
 }
 
-const sidecarKey = (status: SidecarStatus): Key => {
+export const sidecarKey = (status: SidecarStatus): Key => {
   switch (status) {
     case "starting":
       return "status.sidecarStarting"

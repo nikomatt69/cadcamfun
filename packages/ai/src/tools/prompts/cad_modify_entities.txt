@@ -1,0 +1,19 @@
+Change fields of elements that already exist, by id.
+
+Use it
+- Resize, move, recolour, rename or move to another layer something you or the user created.
+
+Do not use it
+- To create elements (cad_add_elements / cad_add_entities) or to remove them (cad_delete_entities).
+- With an id you have not read: get ids from cad_describe_drawing or from an add result.
+
+Parameters
+- changes: 1 or more {id, changes}. changes may hold any of: center {x,y,z?}, start, end, origin (rectangles: the corner), radius, startAngle, endAngle, width, height, depth, tube (torus), points, closed, name, color, layer. Only the fields you give change.
+- Millimetres, radians. radius, width, height, depth, tube must be > 0.
+
+Result (JSON)
+- ok, modified (count), elements (the updated elements), projectId, drawingId.
+- If any id is unknown nothing is changed and the result is {ok:false, error:"Unknown element ids: ..."}: list the drawing again.
+
+Example
+- Make wheel "w1" bigger and move it: {"changes":[{"id":"w1","changes":{"radius":35,"center":{"x":-120,"y":60,"z":35}}}]}

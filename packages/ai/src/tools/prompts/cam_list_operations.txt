@@ -1,0 +1,14 @@
+List the machining operations of the drawing the user has open.
+
+Use it
+- To find an operationId you do not have (a new conversation, an operation the user made in the CAM page).
+- To tell the user what is already set up before creating more.
+
+Parameters
+- none.
+
+Result (JSON): a list of {id, name, type, operationType, generated, tool:{type, diameter}, depth, stepdown, feedrate}.
+- generated is true when G-code has been produced for the operation's current settings (it becomes false after cam_update_operation).
+
+After it
+- Pick the operation and continue with cam_generate_gcode, cam_update_operation or cam_verify_toolpath.

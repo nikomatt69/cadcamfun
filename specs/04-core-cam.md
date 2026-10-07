@@ -135,6 +135,20 @@ Audit limitations remaining for commercial machine release: `validate` assumes s
 
 `offsetRings`/`offsetPolyline` were rewritten (see `03-core-cad.md`): CAM needs correct trimming, islands and a no-gouge round join.
 
+## 10. Toolpath verification (`verify/*.ts`)
+
+`cam.verify.verifyToolpath(request)` replays G-code text or a Toolpath IR `Program` against a stock model and reports what the program does to it. Pure and deterministic; nothing here reads a store, a file or the clock.
+
+- **Stock model** (`heightfield.ts`): a height field with one column per cell (a dexel model). Exact for 3-axis work, where a vertical tool can only lower a column. The grid divides the stock box evenly; the cell defaults to a tenth of the tool diameter and is coarsened (with a `ResolutionCoarsened` info issue) to stay inside the cell, sample and work budgets (`MAX_CELLS`, `MAX_SAMPLES`, `WORK_BUDGET`).
+- **Tool model** (`tool-model.ts`): coaxial zones from the tip: flutes (flat, ball, bull-nose, V and drill-point profiles), shank, holder. Shank and holder are modelled only when `cuttingLength` / `holderDiameter` are given; an unknown holder never produces a collision.
+- **Path** (`path.ts`): lines, arcs and helices are sampled every cell (and every `4 x cell` of vertical travel), canned cycles come from the reference interpreter or `expandCycle`.
+- **Findings** (each carries severity, first line, first point, count): `RapidInMaterial`, `ShankCollision`, `HolderCollision`, `FixtureCollision` (box fixtures against every tool zone), `BelowStock`, `InterpreterWarning`, `InvalidInput`. Shank and holder are checked against the stock *before* a sample cuts, because the flutes are about to remove the column the shank must clear.
+- **Target** (optional `target.solids`, rasterised from `meshOf`): `Gouge` (error) when a column is cut below the finished part by more than `tolerance`, `UncutStock` (info) for what is left above it. Comparison allows one cell of lateral slack, so quantised walls do not produce false gouges; the price is that a gouge shallower than `tolerance` or narrower than a cell can be missed.
+- **Result**: `ok` (no error issue), `issues`, `stats` (removed / remaining volume, engaged vs air-cut feed length, gouge and uncut volumes), and a block-averaged `preview` height map (at most 64 cells on the longer side) for display.
+- `request.ts` builds a request from a generator request (`verifyRequestFor`): the tool from the settings, the stock box from the stock and the origin section, a box around the toolpath when there is no stock. Milling only.
+
+Limits, stated so they are not mistaken for guarantees: 3-axis height-field model (no undercuts, no 4/5-axis), one tool per run, box stock and box fixtures, the interpreter's G-code subset. A clean report is evidence about the modelled tool, stock and fixtures at the reported resolution, not a machine certification.
+
 ## 9. Change log
 
 - Manufacturing setup contract: `setup.ts` defines rigid right-handed work frames, revisioned stock/fixtures/tool assemblies and pure world/work point conversions. `validateSetup` reports finite geometry, orthonormal frame, unique tool/fixture identifiers and clearance-envelope errors. All geometry uses mm; the frame maps work coordinates to world coordinates. This is setup validation, not collision certification. Public functions are exported through the CAM barrel.
@@ -143,3 +157,4 @@ Audit limitations remaining for commercial machine release: `validate` assumes s
 - v2: WP2 implemented; status set to done. Added the as-built section: IR `Cycle` extension, operations, posts (`generic`, `fanuc`, `grbl`), reference interpreter, goldens (`UPDATE_GOLDEN=1` instead of `--update-snapshots`), regression tests per legacy bug, and the deviations listed above (`linuxcnc`/`haas` not implemented, `useCannedCycles` defaults to true, `emit` takes partial options).
 - v3: Safety audit: document fail-closed arc/cycle emission, bounded peck expansion, R-plane positioning, repeated-hole execution and modal dwell reset before implementation. Regression tests stay inside the WP2-owned source directory.
 - v3 verification: `bun test packages/core` passed (573 tests, 0 failures, 275451 assertions); `bunx tsc -p packages/core/tsconfig.json --noEmit` exited 0. Existing test assertions and all golden files remain unchanged; `src/cam/safety.test.ts` adds 11 targeted safety tests. No cross-WP edits.
+- v4: Added §10 toolpath verification (`cam.verify`): height-field stock removal, rapid / shank / holder / fixture / below-stock findings, gouge and uncut stock against `target.solids`, a display preview, and the generator bridge. Exposed as `POST /api/toolpaths/verify`, the AI tool `cam_verify_toolpath` and the desktop "Verify" tab.

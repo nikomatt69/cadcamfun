@@ -6115,6 +6115,22 @@ var decodeToolpath = decodeUnknownEffect2(ToolpathSchema);
 var encodeToolpath = encodeEffect(ToolpathSchema);
 var decodeProgram = decodeUnknownEffect2(ProgramSchema);
 var encodeProgram = encodeEffect(ProgramSchema);
+var MachineProfileSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  travel: Struct({
+    minX: Finite,
+    maxX: Finite,
+    minY: Finite,
+    maxY: Finite,
+    minZ: Finite,
+    maxZ: Finite
+  }),
+  maxFeed: optionalKey2(Positive),
+  maxSpindleRpm: optionalKey2(NonNegative),
+  tools: optionalKey2(ArraySchema(Struct({ id: String4.check(isMinLength(1)) })))
+});
+var validateProgramInput = decodeUnknownSync(ProgramSchema, { errors: "all" });
+var validateMachineInput = decodeUnknownSync(MachineProfileSchema, { errors: "all" });
 // packages/core/src/cam/tool.ts
 var ToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
 var NonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -6457,6 +6473,97 @@ var SuggestResponseSchema = Struct({
   }),
   operation: Struct({ title: String4, description: String4 }),
   warnings: ArraySchema(String4)
+});
+// packages/core/src/cam/verify/schema.ts
+var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
+var VerifyToolSchema = Struct({
+  kind: withDefault2(VerifyToolKindSchema, "endmill"),
+  diameter: Positive3,
+  cuttingLength: optionalKey2(Positive3),
+  shankDiameter: optionalKey2(Positive3),
+  stickout: optionalKey2(Positive3),
+  holderDiameter: optionalKey2(Positive3),
+  holderLength: optionalKey2(Positive3),
+  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 179 }))),
+  tipRadius: optionalKey2(Positive3)
+});
+var BoundsSchema = Struct({
+  minX: Finite,
+  maxX: Finite,
+  minY: Finite,
+  maxY: Finite,
+  minZ: Finite,
+  maxZ: Finite
+});
+var VerifyFixtureSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  bounds: BoundsSchema
+});
+var VerifyRequestSchema = Struct({
+  gcode: optionalKey2(String4),
+  program: optionalKey2(ProgramSchema),
+  stock: BoundsSchema,
+  tool: VerifyToolSchema,
+  fixtures: withDefault2(ArraySchema(VerifyFixtureSchema), []),
+  target: optionalKey2(Struct({ solids: ArraySchema(SolidSchema) })),
+  resolution: optionalKey2(Positive3),
+  tolerance: withDefault2(NonNegative3, 0.05),
+  start: optionalKey2(Vec3Schema)
+});
+var VerifyCodeSchema = Literals([
+  "InvalidInput",
+  "InterpreterWarning",
+  "RapidInMaterial",
+  "ShankCollision",
+  "HolderCollision",
+  "FixtureCollision",
+  "BelowStock",
+  "Gouge",
+  "UncutStock",
+  "ResolutionCoarsened"
+]);
+var VerifySeveritySchema = Literals(["error", "warning", "info"]);
+var VerifyIssueSchema = Struct({
+  code: VerifyCodeSchema,
+  severity: VerifySeveritySchema,
+  message: String4,
+  line: optionalKey2(Int),
+  point: optionalKey2(Vec3Schema),
+  count: Int,
+  fixtureId: optionalKey2(String4)
+});
+var VerifyStatsSchema = Struct({
+  cellSize: Finite,
+  cellsX: Int,
+  cellsY: Int,
+  samples: Int,
+  stockVolume: Finite,
+  removedVolume: Finite,
+  remainingVolume: Finite,
+  engagedLength: Finite,
+  airCutLength: Finite,
+  gougeVolume: optionalKey2(Finite),
+  maxGouge: optionalKey2(Finite),
+  uncutVolume: optionalKey2(Finite),
+  maxUncut: optionalKey2(Finite)
+});
+var VerifyPreviewSchema = Struct({
+  nx: Int,
+  ny: Int,
+  minX: Finite,
+  minY: Finite,
+  cellX: Finite,
+  cellY: Finite,
+  minZ: Finite,
+  maxZ: Finite,
+  heights: ArraySchema(Finite),
+  gouge: ArraySchema(Int)
+});
+var VerifyResponseSchema = Struct({
+  ok: Boolean2,
+  issues: ArraySchema(VerifyIssueSchema),
+  stats: VerifyStatsSchema,
+  preview: VerifyPreviewSchema
 });
 // packages/plugin-sdk/examples/hello-gear/index.ts
 var gearEntity = (id) => ({

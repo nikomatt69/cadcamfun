@@ -14,6 +14,10 @@ export interface SuggestionInput {
   readonly selectedCount: number
   readonly activeTool: EditorTool
   readonly layers: number
+  /** There is G-code in the CAM page. */
+  readonly hasGcode?: boolean
+  /** The last verification: never run, out of date, clean, or with errors. */
+  readonly verification?: "not-run" | "stale" | "ok" | "errors"
 }
 
 export interface Suggestion {
@@ -64,6 +68,11 @@ export const buildSuggestions = (input: SuggestionInput): ReadonlyArray<Suggesti
     })
   } else {
     out.push(...DRAFT_TEMPLATE_PROMPTS)
+  }
+  if (input.hasGcode === true && input.verification === "errors") {
+    out.unshift({ id: "s.fix-verification", title: "Fix the verification errors", description: "The last verification found errors: have the assistant change the operation and verify again.", prompt: "The last toolpath verification found errors. Read them, change the operation to fix them (cam_update_operation), generate the G-code and verify it again.", category: "gcode" })
+  } else if (input.hasGcode === true && input.verification !== "ok") {
+    out.unshift({ id: "s.verify", title: "Verify the toolpath", description: input.verification === "stale" ? "The G-code changed since the last verification." : "Simulate the G-code on the stock before cutting.", prompt: "Verify the current toolpath on the stock and tell me what the simulation did and did not model.", category: "gcode" })
   }
   if (input.entityCount > 0) out.push(...REVIEW_PROMPTS)
   if (input.layers <= 1) out.push(...LIBRARY_PROMPTS)

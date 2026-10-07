@@ -1,6 +1,6 @@
 # Professional CAD/CAM Architecture
 
-Status: foundation hardening implemented; commercial parity not established.
+Status: foundation hardening and a first verification module implemented; commercial parity not established.
 
 ## Evidence and scope
 
@@ -27,7 +27,7 @@ Keep geometry and toolpath Implementation pure and I/O-free. The existing public
 
 1. **Geometry kernel Module:** preserve mesh primitives as a rendering Adapter, introduce exact topology only through a documented kernel Seam. Select a kernel based on license, Bun/Tauri deployment and deterministic STEP round trips. Gate: Boolean/fillet/shell reference parts, valid manifold topology, measured dimensions and STEP re-import equality within declared tolerance. A mesh must never masquerade as exact geometry.
 2. **Manufacturing setup Module:** immutable work coordinate frame, revisioned part/stock/fixture/tool-holder geometry and machine profile. Gate: all transformations and units have round-trip tests; changes invalidate derived toolpaths and verification evidence.
-3. **Verification Module:** consume both Toolpath IR and emitted NC through their existing Seams. Start with the real interpreter Adapter, then add stock-removal and swept cutter/holder collision tests. Gate: detect deliberate gouges, remaining stock and fixture collisions, including arcs, helices and cycles. Path animation alone is not verification.
+3. **Verification Module** (first version implemented, spec 04 §10: height-field stock removal, rapid / shank / holder / fixture / below-stock findings, gouge against target solids, AI tool and desktop tab; 3-axis only, no swept-volume collision against the finished part or machine kinematics): consume both Toolpath IR and emitted NC through their existing Seams. Start with the real interpreter Adapter, then add stock-removal and swept cutter/holder collision tests. Gate: detect deliberate gouges, remaining stock and fixture collisions, including arcs, helices and cycles. Path animation alone is not verification.
 4. **Strategy Module:** extend current Profile/Pocket/Drill/Face/Engrave only after setup and stock evidence exist; add surface finishing, rest machining and engagement-bounded roughing. Gate: independent geometric no-gouge tests, declared chord/scallop tolerances and bounded computation on benchmark parts.
 5. **Machine/post Module:** preserve existing generic/Fanuc/GRBL Adapters and deterministic goldens. Add explicit machine kinematics, axis travel, safe tool changes, holder clearance and controller limits before simultaneous multi-axis strategies. Gate: emitted-NC replay agrees with intended motion, then controller simulation and supervised machine dry runs on identified machines.
 6. **Desktop integration:** expose verified capability and structured failures through documented API contracts before changing sidecar/UI-owned directories. Gate: desktop project-to-export workflow tests, stale-result invalidation, cancellation and large-part responsiveness.

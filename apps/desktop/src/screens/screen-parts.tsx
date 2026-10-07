@@ -49,17 +49,20 @@ export function EmptyState(props: { readonly label: string }): JSX.Element {
   )
 }
 
-export function ErrorState(props: { readonly label: string; readonly detail?: string }): JSX.Element {
+export function ErrorState(props: { readonly label: string; readonly detail?: string; readonly onRetry?: () => void }): JSX.Element {
   return (
-    <p class="alert alert-danger flex items-start gap-2" role="alert">
+    <div class="alert alert-danger flex items-start gap-2" role="alert">
       <Triangle size={18} aria-hidden="true" class="shrink-0" />
-      <span>
+      <span class="flex-1">
         {props.label}
         <Show when={props.detail !== undefined}>
           <span class="mt-1 block font-mono text-xs opacity-80">{props.detail}</span>
         </Show>
       </span>
-    </p>
+      <Show when={props.onRetry !== undefined}>
+        <button type="button" class="btn btn-secondary shrink-0" onClick={() => props.onRetry?.()}>{t("common.retry")}</button>
+      </Show>
+    </div>
   )
 }
 

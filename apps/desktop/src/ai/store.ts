@@ -13,7 +13,16 @@ import { useApp } from "../state/context.ts"
 import { streamChat, type StreamHandle } from "./stream.ts"
 import { buildSuggestions, type Suggestion } from "./suggestions.ts"
 import { loadPersisted, savePersisted } from "./persisted.ts"
-import { appProjectId, persistDrawingContext } from "./drawing-context.ts"
+import { useDocumentStore } from "../cad/store/documentStore.ts"
+import { useElementsStore } from "../cad/store/elementsStore.ts"
+import { useLayerStore } from "../cad/store/layerStore.ts"
+import { useSelectionStore } from "../cad/store/selectorStore.ts"
+import { useCamStore } from "../cam/store/camStore.ts"
+import { useGeneratorStore } from "../cam/store/generatorStore.ts"
+import { useVerifyStore } from "../cam/store/verifyStore.ts"
+import { appProjectId, persistDrawingContext, prepareWorkspace, verificationState } from "./drawing-context.ts"
+import { mirrorCamResult } from "./cam-sync.ts"
+import { mirrorToolResult, reconcileFromStored } from "./editor-sync.ts"
 import type { AiEvent, AiMessage, AiPermission, AiSession, AiToolCalls, ChatModel } from "./types.ts"
 
 export interface AiStats {
@@ -153,6 +162,11 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       return
     }
     if (event.type === "tool_result") {
+      // The CAD tools ran in the sidecar: show their result in the editor the user has open.
+      try { mirrorToolResult(event.tool, event.ok, event.output) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
+      // Whatever the tool answered, the stored drawing is the truth: bring the editor in line with it.
+      if (event.ok && event.tool.includes("cad_")) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+      if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output)
       const id = idForEvent
       setToolCalls((current) => {
         const existing = current[event.callId]
@@ -192,9 +206,23 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
   }
 
+  // The assistant's context follows the workspace: elements, selection, layers, generator, program and verification.
+  const liveElements = useElementsStore()
+  const liveSelection = useSelectionStore()
+  const liveLayers = useLayerStore()
+  const liveCam = useCamStore()
+  const liveGenerator = useGeneratorStore()
+  const liveVerify = useVerifyStore()
+  const liveDocument = useDocumentStore()
   createEffect(() => {
-    app.drawing()
-    app.editor.selection()
+    void liveElements.elements
+    void liveSelection.selectedElementIds
+    void liveLayers.layers
+    void liveCam.gcode
+    void liveCam.program
+    void liveGenerator.settings
+    void liveVerify.report
+    void liveDocument.projectId
     app.tool()
     projectContextRevision()
     const project = projectId()
@@ -228,25 +256,18 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setStatus("connecting")
       setError(undefined)
     })
-    const activeProjectId = projectId()
-    if (includeContext()) {
-      if (!activeProjectId) {
-        const message = "Open a project before sending a request to nikcli"
-        patchMessage(assistantId, (previous) => ({ ...previous, status: "error", error: message }))
-        setError(message)
-        setStatus("error")
-        return
-      }
-      try {
-        await persistDrawingContext(app)
+    // One document for the editor and the tools: make sure it exists and holds what is on screen. Never a reason to refuse
+    // the message: if the sidecar is slow the tools still create what they need.
+    let activeProjectId = projectId()
+    try {
+      const workspace = await prepareWorkspace(app)
+      activeProjectId = workspace.projectId
+      if (includeContext()) {
+        await persistDrawingContext(app, workspace.projectId)
         setProjectContextRevision((revision) => revision + 1)
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : "Unable to save drawing context"
-        patchMessage(assistantId, (previous) => ({ ...previous, status: "error", error: message }))
-        setError(message)
-        setStatus("error")
-        return
       }
+    } catch (cause) {
+      console.error("Could not prepare the workspace for the assistant", cause)
     }
     const m = modelSig()
     handle = streamChat({
@@ -310,14 +331,15 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   const suggestions = createMemo<ReadonlyArray<Suggestion>>(() => {
     void dismissedSuggestions()
-    const drawing = app.drawing()
-    void drawing.entities.length
-    void app.tool()
+    void liveVerify.report
+    const verification = verificationState()
     const built = buildSuggestions({
-      entityCount: drawing.entities.length,
-      selectedCount: app.editor.selection().length,
+      entityCount: liveElements.elements.length,
+      selectedCount: liveSelection.selectedElementIds.length,
       activeTool: app.tool(),
-      layers: drawing.layers.length
+      layers: liveLayers.layers.length,
+      hasGcode: liveCam.gcode.trim() !== "",
+      verification: verification.state
     })
     return built.filter((s: Suggestion) => !dismissedSuggestions().includes(s.id))
   })

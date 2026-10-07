@@ -3,6 +3,8 @@ import { z } from "zod"
 import type { HostToolSpec } from "../nikcli/runtime.ts"
 import { analyzeGcode, type MachineProfile } from "../gcode-analysis.ts"
 import { EntityChanges, EntityInput } from "../domain-schemas.ts"
+import { ELEMENT_TYPES, normalizeElement } from "../element-catalog.ts"
+import { toolPrompt } from "./prompts/index.ts"
 import { cad, cam } from "@cadcamfun/core"
 
 /** What `cam_verify_toolpath` adds to the operation's own settings and stock; validated before the handler runs. */
@@ -21,6 +23,8 @@ export interface VerifyToolOptions {
  */
 export interface ToolHandlersShape {
   addEntities(projectId: string, entities: ReadonlyArray<unknown>): Promise<unknown>
+  /** Elements in the editor's own shape (see `element-catalog.ts`); a number in `operands` is the index of an earlier element of the batch. */
+  addElements(projectId: string, elements: ReadonlyArray<Record<string, unknown>>): Promise<unknown>
   modifyEntities(projectId: string, changes: ReadonlyArray<{ id: string; changes: unknown }>): Promise<unknown>
   deleteEntities(projectId: string, ids: ReadonlyArray<string>): Promise<unknown>
   describeDrawing(projectId: string): Promise<unknown>
@@ -43,18 +47,19 @@ export class ToolHandlers extends Context.Service<ToolHandlers, ToolHandlersShap
 
 /** The only tool ids the `cadcam` agent may call. */
 export const TOOL_IDS = [
-  "cad_add_entities", "cad_modify_entities", "cad_delete_entities", "cad_describe_drawing",
+  "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_delete_entities", "cad_describe_drawing",
   "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode",
   "cam_verify_toolpath", "lib_lookup_material", "lib_lookup_tool", "memory_remember", "memory_recall"
 ] as const
 
-const point = z.object({ x: z.number(), y: z.number() })
+const point = z.object({ x: z.number(), y: z.number(), z: z.number().optional() })
+const label = { layer: z.string().min(1).optional(), name: z.string().min(1).optional(), color: z.string().min(1).optional() }
 export const entityZod = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("line"), start: point, end: point, layer: z.string().min(1).optional() }),
-  z.object({ type: z.literal("circle"), center: point, radius: z.number().positive(), layer: z.string().min(1).optional() }),
-  z.object({ type: z.literal("arc"), center: point, radius: z.number().positive(), startAngle: z.number(), endAngle: z.number(), layer: z.string().min(1).optional() }),
-  z.object({ type: z.literal("polyline"), points: z.array(point).min(2), closed: z.boolean().optional(), layer: z.string().min(1).optional() }),
-  z.object({ type: z.literal("rectangle"), origin: point, width: z.number().positive(), height: z.number().positive(), layer: z.string().min(1).optional() })
+  z.object({ type: z.literal("line"), start: point, end: point, ...label }),
+  z.object({ type: z.literal("circle"), center: point, radius: z.number().positive(), ...label }),
+  z.object({ type: z.literal("arc"), center: point, radius: z.number().positive(), startAngle: z.number(), endAngle: z.number(), ...label }),
+  z.object({ type: z.literal("polyline"), points: z.array(point).min(2), closed: z.boolean().optional(), ...label }),
+  z.object({ type: z.literal("rectangle"), origin: point, width: z.number().positive(), height: z.number().positive(), ...label })
 ])
 
 /** Every handler re-validates with the Effect Schema, so zod and Effect cannot drift apart silently. */
@@ -63,7 +68,29 @@ const json = (value: unknown): string => JSON.stringify(value)
 
 export const buildTools = (handlers: ToolHandlersShape, projectId: string): ReadonlyArray<HostToolSpec> => [
   {
-    id: "cad_add_entities", description: "Append 2D entities (millimetres, radians) to the active drawing.",
+    id: "cad_add_elements",
+    description: toolPrompt("cad_add_elements"),
+    parameters: z.object({ elements: z.array(z.looseObject({ type: z.enum(ELEMENT_TYPES as unknown as [string, ...string[]]) })).min(1).max(200) }),
+    execute: async (input) => {
+      const { elements } = input as { elements: Array<Record<string, unknown>> }
+      const normalized: Array<Record<string, unknown>> = []
+      const problems: string[] = []
+      const warnings: string[] = []
+      elements.forEach((element, index) => {
+        const result = normalizeElement(element)
+        if (!result.ok) problems.push(`elements[${index}]: ${result.error}`)
+        else {
+          normalized.push(result.element)
+          if (result.warning !== undefined) warnings.push(`elements[${index}]: ${result.warning}`)
+        }
+      })
+      if (problems.length > 0) return json({ ok: false, error: "Nothing was added.", problems })
+      const stored = await handlers.addElements(projectId, normalized)
+      return json(warnings.length > 0 && stored !== null && typeof stored === "object" ? { ...stored, warnings } : stored)
+    }
+  },
+  {
+    id: "cad_add_entities", description: toolPrompt("cad_add_entities"),
     parameters: z.object({ entities: z.array(entityZod).min(1).max(500) }),
     execute: async (input) => {
       const { entities } = input as { entities: unknown[] }
@@ -71,7 +98,7 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
     }
   },
   {
-    id: "cad_modify_entities", description: "Change fields of existing entities by id.",
+    id: "cad_modify_entities", description: toolPrompt("cad_modify_entities"),
     parameters: z.object({ changes: z.array(z.object({ id: z.string().min(1), changes: z.record(z.string(), z.unknown()) })).min(1) }),
     execute: async (input) => {
       const { changes } = input as { changes: Array<{ id: string; changes: unknown }> }
@@ -79,7 +106,7 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
     }
   },
   {
-    id: "cad_delete_entities", description: "Delete entities by id. Requires confirm: true.",
+    id: "cad_delete_entities", description: toolPrompt("cad_delete_entities"),
     parameters: z.object({ ids: z.array(z.string().min(1)).min(1), confirm: z.boolean() }),
     execute: async (input) => {
       const { ids, confirm } = input as { ids: string[]; confirm: boolean }
@@ -87,20 +114,20 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
       return json(await handlers.deleteEntities(projectId, ids))
     }
   },
-  { id: "cad_describe_drawing", description: "Counts, bounds and layers of the active drawing.", parameters: z.object({}),
+  { id: "cad_describe_drawing", description: toolPrompt("cad_describe_drawing"), parameters: z.object({}),
     execute: async () => json(await handlers.describeDrawing(projectId)) },
   {
-    id: "cam_create_operation", description: "Add a CAM operation (profile, pocket, drill...) with its parameters.",
+    id: "cam_create_operation", description: toolPrompt("cam_create_operation"),
     parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()).optional() }),
     execute: async (input) => {
       const operation = input as { type: string; params?: unknown }
       return json(await handlers.createOperation(projectId, { type: operation.type, params: operation.params ?? {} }))
     }
   },
-  { id: "cam_list_operations", description: "List the CAM operations of the active drawing (id, type, tool, depth).", parameters: z.object({}),
+  { id: "cam_list_operations", description: toolPrompt("cam_list_operations"), parameters: z.object({}),
     execute: async () => json(await handlers.listOperations(projectId)) },
   {
-    id: "cam_update_operation", description: "Change parameters of an existing CAM operation (depth, stepdown, feedrate, toolDiameter...). Regenerate and verify afterwards.",
+    id: "cam_update_operation", description: toolPrompt("cam_update_operation"),
     parameters: z.object({ operationId: z.string().min(1), params: z.record(z.string(), z.unknown()) }),
     execute: async (input) => {
       const { operationId, params } = input as { operationId: string; params: Record<string, unknown> }
@@ -108,12 +135,12 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
     }
   },
   {
-    id: "cam_suggest_parameters", description: "Suggested depth, stepdown, cutting speed, chip load and warnings (depth over stock, small element) for the drawing and the given settings.",
+    id: "cam_suggest_parameters", description: toolPrompt("cam_suggest_parameters"),
     parameters: z.object({ params: z.record(z.string(), z.unknown()).optional() }),
     execute: async (input) => json(await handlers.suggestParameters(projectId, (input as { params?: Record<string, unknown> }).params ?? {}))
   },
   {
-    id: "cam_generate_gcode", description: "Run the CAM pipeline and return statistics plus the first lines of G-code.",
+    id: "cam_generate_gcode", description: toolPrompt("cam_generate_gcode"),
     parameters: z.object({ operationId: z.string().optional(), maxLines: z.number().int().min(1).max(200).optional() }),
     execute: async (input) => {
       const { operationId, maxLines = 40 } = input as { operationId?: string; maxLines?: number }
@@ -122,13 +149,13 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
     }
   },
   {
-    id: "cam_analyze_gcode", description: "Static safety checks of G-code (travel limits, rapids below Z0, missing spindle/feed).",
+    id: "cam_analyze_gcode", description: toolPrompt("cam_analyze_gcode"),
     parameters: z.object({ gcode: z.string().min(1) }),
     execute: async (input) => json(analyzeGcode((input as { gcode: string }).gcode, await handlers.machine?.(projectId)))
   },
   {
     id: "cam_verify_toolpath",
-    description: "Simulate an operation's G-code against its stock: material removal, rapids through material, shank/holder/fixture collisions, cutting below the stock and, with targetSolids, gouges. Run it before calling any toolpath safe. Describe the holder and fixtures when you know them: an unmodelled holder is not checked.",
+    description: toolPrompt("cam_verify_toolpath"),
     parameters: z.object({
       operationId: z.string().min(1),
       tool: z.object({
@@ -159,19 +186,19 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
       return json(await handlers.verifyOperation(projectId, operationId, options))
     }
   },
-  { id: "lib_lookup_material", description: "Search the material library.", parameters: z.object({ query: z.string() }),
+  { id: "lib_lookup_material", description: toolPrompt("lib_lookup_material"), parameters: z.object({ query: z.string() }),
     execute: async (input) => json(await handlers.lookupMaterial((input as { query: string }).query)) },
-  { id: "lib_lookup_tool", description: "Search the tool library.", parameters: z.object({ query: z.string() }),
+  { id: "lib_lookup_tool", description: toolPrompt("lib_lookup_tool"), parameters: z.object({ query: z.string() }),
     execute: async (input) => json(await handlers.lookupTool((input as { query: string }).query)) },
   {
-    id: "memory_remember", description: "Save a short note (a preference, a fact about the part or the machine) that you will see again in later conversations.",
+    id: "memory_remember", description: toolPrompt("memory_remember"),
     parameters: z.object({ key: z.string().regex(/^[A-Za-z0-9_.-]{1,80}$/), value: z.string().min(1).max(2000) }),
     execute: async (input) => {
       const { key, value } = input as { key: string; value: string }
       return json(await handlers.remember(key, value))
     }
   },
-  { id: "memory_recall", description: "List the notes saved with memory_remember, optionally only those whose key starts with a prefix.",
+  { id: "memory_recall", description: toolPrompt("memory_recall"),
     parameters: z.object({ prefix: z.string().optional() }),
     execute: async (input) => json(await handlers.recall((input as { prefix?: string }).prefix)) }
 ]

@@ -1,10 +1,11 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
-import { useNavigate, useSearchParams } from "@solidjs/router"
+import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Puzzle, Settings, Wrench } from "lucide-solid"
 import { Toaster, toast } from "../components/ui/toast.tsx"
 import { useApp } from "../state/context.ts"
 import { useCADStore } from "./store/cadStore.ts"
+import { useDocumentStore } from "./store/documentStore.ts"
 import { useElementsStore } from "./store/elementsStore.ts"
 import { useLayerStore } from "./store/layerStore.ts"
 import { useSelectionStore } from "./store/selectorStore.ts"
@@ -23,6 +24,7 @@ import UnifiedLibraryModal from "./components/UnifiedLibraryModal.tsx"
 import LibraryBrowser, { type LibraryComponent } from "./components/LibraryBrowser.tsx"
 import { CADAssistantButton } from "./components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../ai/CADAssistantBridge.tsx"
+import { FIT_VIEW_EVENT } from "../ai/editor-sync.ts"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 type RightPanel = "proprieties" | "settings" | "constraints"
@@ -36,6 +38,8 @@ const toggleThumb = (on: boolean) => `absolute top-0.5 left-0.5 inline-block h-3
 export default function CadPage(): JSX.Element {
   const app = useApp()
   const navigate = useNavigate()
+  const location = useLocation()
+  const params = useParams<{ id?: string }>()
   const [search, setSearch] = useSearchParams()
   const cad = useCADStore()
   const elements = useElementsStore()
@@ -57,6 +61,54 @@ export default function CadPage(): JSX.Element {
   const [canvas, setCanvas] = createSignal<CADCanvasApi>()
   const [pluginId, setPluginId] = createSignal<string | null>(null)
   const [sidebarPlugins, setSidebarPlugins] = createSignal<ReadonlyArray<{ id: string; title: string; description: string }>>([])
+
+  // A stored drawing: `/cad?drawingId=<id>` (from the project page) or `/drawings/<id>`. It replaces what is on the canvas.
+  const [drawingId, setDrawingId] = createSignal<string | null>(null)
+  const [drawingName, setDrawingName] = createSignal<string | null>(null)
+  const requestedDrawing = (): string | undefined =>
+    location.pathname.startsWith("/drawings/") ? params.id : typeof search.drawingId === "string" ? search.drawingId : undefined
+  let loadedFor: string | undefined
+  createEffect(() => {
+    const id = requestedDrawing()
+    if (id === undefined || id === loadedFor) return
+    loadedFor = id
+    void app.runtime.run(app.client.drawings.get({ params: { id } })).then((row) => {
+      const stored = row.data as { elements?: unknown } | null
+      const fallbackLayer = layers.activeLayer
+      const known = new Set(layers.layers.map((layer) => layer.id))
+      const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>
+        known.has(String(element["layerId"])) ? element : { ...element, layerId: fallbackLayer })
+      useElementsStore.setState({ elements: loaded as never, selectedElement: null })
+      selection.clearSelection()
+      setDrawingId(row.id)
+      setDrawingName(row.name)
+      useDocumentStore.getState().setDocument({ projectId: row.project.id, drawingId: row.id, name: row.name })
+      app.rememberProject(row.project.id, row.project.name)
+      toast.success(`Drawing "${row.name}" opened`)
+    }, () => toast.error("The drawing could not be opened"))
+  })
+
+  /** Saves the open stored drawing in place; a drawing that was never stored goes through the export / save-as dialog. */
+  const save = (): void => {
+    const id = drawingId()
+    if (id === null) { openExport(); return }
+    const { elements: current, selectedElement } = useElementsStore.getState()
+    void app.runtime.run(app.client.drawings.update({ params: { id }, payload: { data: { elements: current, selectedElement: selectedElement?.id ?? null, version: "1.0" } } })).then(
+      () => toast.success(`Saved "${drawingName() ?? "drawing"}"`),
+      () => toast.error("The drawing could not be saved")
+    )
+  }
+  // The assistant added something: frame it once the canvas has drawn it.
+  onMount(() => {
+    const onFit = () => { setTimeout(() => canvas()?.fitToView(), 150) }
+    window.addEventListener(FIT_VIEW_EVENT, onFit)
+    onCleanup(() => window.removeEventListener(FIT_VIEW_EVENT, onFit))
+  })
+  onMount(() => {
+    const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save() } }
+    window.addEventListener("keydown", onKey)
+    onCleanup(() => window.removeEventListener("keydown", onKey))
+  })
 
   // The legacy page set its document title through `MetaTags`.
   onMount(() => {
@@ -129,7 +181,7 @@ export default function CadPage(): JSX.Element {
     >
       <Motion.div class="flex flex-col backdrop-blur-md bg-white/80 dark:bg-gray-900/80 h-full w-full border border-white/20 dark:border-gray-700/30 shadow-xl" {...rise} transition={{ duration: 0.8, delay: 0.2 }}>
         <EnhancedToolbar
-          sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={openExport}
+          sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save}
           setDialogMode={setDialogMode} setShowImportExportDialog={setShowImportExport} setShowLibraryView={() => navigate("/library")}
           setShowUnifiedLibrary={setShowLibrary} setShowFloatingToolbar={setShowFloating} showFloatingToolbar={showFloating()}
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}

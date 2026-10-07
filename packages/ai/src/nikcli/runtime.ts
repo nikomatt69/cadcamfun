@@ -5,6 +5,7 @@ import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
+import { installSkills } from "../skills/index.ts"
 import { buildHostConfig, type HostProviderSpec } from "./config.ts"
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
@@ -131,11 +132,13 @@ export const makeNikCliRuntime = (
     const pendingKeys = new Map<string, string>()
     const toolIdsOf = (projectId: string) => options.toolsFor(projectId).map((t) => t.id)
 
-    const writeConfig = (projectId: string) =>
-      writeFile(
+    const writeConfig = async (projectId: string) => {
+      await installSkills(paths.config)
+      await writeFile(
         join(paths.config, "nikcli.json"),
         JSON.stringify(buildHostConfig({ providers, toolIds: toolIdsOf(projectId), systemPrompt: options.systemPrompt }), null, 2)
       )
+    }
 
     const createHost = async (projectId: string): Promise<ProjectHost> => {
       const scratch = projectScratchDir(paths, projectId)

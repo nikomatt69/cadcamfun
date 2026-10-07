@@ -204,14 +204,17 @@ export function Shell(props: ShellProps): JSX.Element {
         <AssistantPanel open={app.panelOpen()} onClose={() => app.setPanelOpen(false)} />
       </div>
 
-      <StatusBar
-        units={settings().units}
-        snapEnabled={settings().snapEnabled}
-        cursor={app.cursor()}
-        sidecar={app.sidecar()}
-        decimals={settings().decimals}
-        toolLabel={toolLabel()}
-      />
+      {/* The CAD and CAM pages carry these facts in their own strip: one bar, not two. */}
+      <Show when={layout() !== "workspace"}>
+        <StatusBar
+          units={settings().units}
+          snapEnabled={settings().snapEnabled}
+          cursor={app.cursor()}
+          sidecar={app.sidecar()}
+          decimals={settings().decimals}
+          toolLabel={toolLabel()}
+        />
+      </Show>
 
       <Show when={app.paletteOpen()}>
         <CommandPalette commands={commands()} onClose={() => app.setPaletteOpen(false)} />

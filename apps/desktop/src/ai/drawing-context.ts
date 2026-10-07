@@ -1,82 +1,160 @@
-import { type Drawing, cam } from "@cadcamfun/core"
+/**
+ * What the assistant knows about the workspace, and how the workspace and the assistant's stored drawing are kept
+ * the same document.
+ *
+ * The context is built from the editor the user is looking at (the elements, layers and selection stores, the
+ * generator and the CAM program, the last verification), not from a second model. Before a message is sent the
+ * live elements are written into the stored drawing the assistant's tools work on (creating the project and the
+ * drawing if there are none), so "what you see" and "what the tools change" are one thing.
+ */
+import { cam } from "@cadcamfun/core"
 import type { AppState } from "../state/context.ts"
+import { useCADStore } from "../cad/store/cadStore.ts"
+import { useDocumentStore } from "../cad/store/documentStore.ts"
+import { useElementsStore } from "../cad/store/elementsStore.ts"
+import { useLayerStore } from "../cad/store/layerStore.ts"
+import { useSelectionStore } from "../cad/store/selectorStore.ts"
 import { useCamStore } from "../cam/store/camStore.ts"
+import { forgetPushed, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../cam/store/generatorStore.ts"
+import { useVerifyStore } from "../cam/store/verifyStore.ts"
 
 const { estimateTime } = cam
 
-// Bound geometry in prompts; selected entities take priority over the rest of the drawing.
-const MAX_CONTEXT_ENTITIES = 100
-
-/** Default rapid rate (mm/min) used by `estimateTime` for AI context summaries. */
+/** Elements listed in the prompt; selected ones come first. */
+const MAX_CONTEXT_ELEMENTS = 100
+const MAX_GCODE_LINES = 60
 const RAPID_RATE_MM_PER_MIN = 5000
 
-export function buildDrawingContext(drawing: Drawing, selectedIds: ReadonlyArray<string>, activeTool: string) {
-  const selected = new Set(selectedIds)
-  const selectedEntities = drawing.entities.filter((entity) => selected.has(entity.id))
-  const entities = [...selectedEntities, ...drawing.entities.filter((entity) => !selected.has(entity.id))]
-    .slice(0, MAX_CONTEXT_ENTITIES)
-  return {
-    drawingId: drawing.id,
-    name: drawing.name,
-    units: "mm",
-    activeTool,
-    totalElementCount: drawing.entities.length,
-    selectedElementCount: selectedEntities.length,
-    selectedIds: selectedEntities.map((entity) => entity.id),
-    entities,
-    layers: drawing.layers,
-    omittedEntityCount: drawing.entities.length - entities.length
-  }
+const KEYS = ["x", "y", "z", "x1", "y1", "z1", "x2", "y2", "z2", "width", "height", "depth", "radius", "visible", "locked"] as const
+
+const summary = (element: Record<string, unknown>) => ({
+  id: element["id"], type: element["type"], name: element["name"], layerId: element["layerId"],
+  ...Object.fromEntries(KEYS.filter((key) => element[key] !== undefined).map((key) => [key, element[key]]))
+})
+
+/** The verdict of the last verification, in the words the assistant needs. */
+export const verificationState = (): { readonly state: "not-run" | "stale" | "ok" | "errors"; readonly errors: number; readonly issues: ReadonlyArray<{ code: string; severity: string; message: string; line?: number }> } => {
+  const verify = useVerifyStore.getState()
+  const report = verify.report
+  if (report === null) return { state: "not-run", errors: 0, issues: [] }
+  const errors = report.issues.filter((issue) => issue.severity === "error").length
+  const issues = report.issues.slice(0, 8).map((issue) => ({ code: issue.code, severity: issue.severity, message: issue.message, ...(issue.line !== undefined ? { line: issue.line } : {}) }))
+  if (verify.verifiedGcode !== useCamStore.getState().gcode) return { state: "stale", errors, issues }
+  return { state: errors > 0 ? "errors" : "ok", errors, issues }
 }
 
+/** The workspace as the assistant sees it. `page` is where the user is: the CAD editor or the CAM page. */
 export function currentDrawingContext(app: AppState) {
+  const elements = useElementsStore.getState().elements as ReadonlyArray<Record<string, unknown>>
+  const selectedIds = new Set(useSelectionStore.getState().selectedElementIds)
+  const layers = useLayerStore.getState()
+  const cad = useCADStore.getState()
   const camStore = useCamStore.getState()
   const generator = useGeneratorStore.getState()
-  const selectedIds = new Set([...app.editor.selection(), ...camStore.selectedEntities])
-  const selectedEntities = app.drawing().entities.filter((entity) => selectedIds.has(entity.id))
+  const document = useDocumentStore.getState()
+  const listed = [...elements.filter((e) => selectedIds.has(String(e["id"]))), ...elements.filter((e) => !selectedIds.has(String(e["id"])))].slice(0, MAX_CONTEXT_ELEMENTS)
   const program = camStore.program
-  const postprocessor = app.settings.settings().postProcessor
+  const gcode = camStore.gcode || generator.currentGCode
+  const page = typeof window !== "undefined" && window.location.pathname.startsWith("/cam") ? "cam" : "cad"
   return {
-    ...buildDrawingContext(app.drawing(), [...selectedIds], app.tool()),
+    page,
+    projectId: document.projectId,
+    drawingId: document.drawingId,
+    name: document.name,
+    units: "mm",
     displayUnits: app.settings.settings().units,
-    postProcessor: postprocessor,
-    solidCount: app.editor.solids().length,
-    selectedSolidIndices: app.editor.solidSelection(),
+    viewMode: cad.viewMode,
+    totalElementCount: elements.length,
+    selectedElementCount: selectedIds.size,
+    selectedIds: [...selectedIds],
+    elements: listed.map(summary),
+    omittedElementCount: Math.max(0, elements.length - listed.length),
+    layers: layers.layers.map((layer) => ({ id: layer.id, name: layer.name, visible: layer.visible, locked: layer.locked })),
+    activeLayer: layers.layers.find((layer) => layer.id === layers.activeLayer)?.name ?? null,
+    workpiece: cad.workpiece,
     cam: {
-      gcode: camStore.gcode || generator.currentGCode,
-      postprocessor,
+      gcodeLines: gcode.trim() === "" ? 0 : gcode.split(/\r?\n/).length,
+      gcodePreview: gcode.split(/\r?\n/).slice(0, MAX_GCODE_LINES).join("\n"),
       operation: camStore.operation,
       settings: generator.settings,
-      geometryType: generator.geometryType,
-      printer: generator.printer,
-      workpiece: camStore.workpiece,
       material: camStore.material || generator.settings.material,
       controller: camStore.controller,
-      selectedEntityIds: [...selectedIds],
-      selectedEntities,
+      postProcessor: app.settings.settings().postProcessor,
+      selectedOperationId: camStore.selectedOperationId ?? null,
       toolpaths: program.toolpaths.map((toolpath) => ({
-        id: toolpath.id,
-        name: toolpath.name,
-        toolId: toolpath.toolId,
-        moveCount: toolpath.moves.length,
+        id: toolpath.id, name: toolpath.name, toolId: toolpath.toolId, moveCount: toolpath.moves.length,
         duration: estimateTime(toolpath, RAPID_RATE_MM_PER_MIN)
       })),
-      toolpathCount: program.toolpaths.length
+      verification: verificationState()
     }
   }
 }
 
-export function appProjectId(app: AppState): string | undefined {
-  return app.recents()[0]?.id
+type Run = <A>(effect: unknown) => Promise<A>
+const run = (app: AppState): Run => app.runtime.run as unknown as Run
+
+/**
+ * The stored drawing the editor and the assistant share. Uses the open document; otherwise the newest project the
+ * user has (or a new "Untitled project") and its newest drawing (or a new one holding the live elements), and
+ * remembers the choice so every later call agrees.
+ */
+export async function ensureDocument(app: AppState): Promise<{ projectId: string; drawingId: string }> {
+  const current = useDocumentStore.getState()
+  if (current.projectId !== null && current.drawingId !== null) return { projectId: current.projectId, drawingId: current.drawingId }
+  const elements = useElementsStore.getState().elements
+  let projectId = app.recents()[0]?.id
+  if (projectId !== undefined) {
+    try { await run(app)(app.client.projects.get({ params: { id: projectId } })) } catch { projectId = undefined }
+  }
+  if (projectId === undefined) {
+    const project = await run(app)<{ id: string; name: string }>(app.client.projects.create({ payload: { name: "Untitled project", description: null, organizationId: null, isPublic: false } }))
+    projectId = project.id
+    app.rememberProject(project.id, project.name)
+  }
+  const existing = (await run(app)<ReadonlyArray<{ id: string; name: string }>>(app.client.drawings.listForProject({ params: { id: projectId } })))[0]
+  const drawing = existing ?? await run(app)<{ id: string; name: string }>(app.client.drawings.createForProject({
+    params: { id: projectId }, payload: { name: "Drawing 1", data: { elements, version: "1.0" } }
+  }))
+  useDocumentStore.getState().setDocument({ projectId, drawingId: drawing.id, name: drawing.name })
+  return { projectId, drawingId: drawing.id }
 }
 
-export async function persistDrawingContext(app: AppState): Promise<void> {
-  const value = currentDrawingContext(app)
-  const projectId = appProjectId(app)
-  if (!projectId) throw new Error("Open a project before asking nikcli to use the current drawing context")
-  await app.runtime.run(app.client.kv.set({
-    params: { key: `ai.context.${projectId}` },
-    payload: { value }
+/** Writes the live elements into the stored drawing, which also makes it the newest one the tools will pick. */
+export async function pushLiveDrawing(app: AppState, drawingId: string): Promise<void> {
+  const { elements, selectedElement } = useElementsStore.getState()
+  await run(app)(app.client.drawings.update({
+    params: { id: drawingId },
+    payload: { data: { elements, selectedElement: selectedElement?.id ?? null, version: "1.0" } }
   }))
+  rememberPushed(elements as unknown as ReadonlyArray<Record<string, unknown>>)
+}
+
+/**
+ * Makes the document exist and match the editor; returns where the assistant should work. A remembered document that
+ * is gone (its drawing was deleted, another database) is dropped and replaced, never an obstacle.
+ */
+export async function prepareWorkspace(app: AppState): Promise<{ projectId: string; drawingId: string }> {
+  const document = await ensureDocument(app)
+  try {
+    await pushLiveDrawing(app, document.drawingId)
+    return document
+  } catch (cause) {
+    useDocumentStore.getState().clear()
+    forgetPushed()
+    const replacement = await ensureDocument(app)
+    await pushLiveDrawing(app, replacement.drawingId)
+    return replacement
+  }
+}
+
+export function appProjectId(app: AppState): string | undefined {
+  return useDocumentStore.getState().projectId ?? app.recents()[0]?.id
+}
+
+/** The context the sidecar puts into the system prompt for this project (`ai.context.<projectId>`). */
+export async function persistDrawingContext(app: AppState, projectId?: string): Promise<void> {
+  const target = projectId ?? appProjectId(app)
+  if (!target) return
+  await run(app)(app.client.kv.set({ params: { key: `ai.context.${target}` }, payload: { value: currentDrawingContext(app) } }))
 }

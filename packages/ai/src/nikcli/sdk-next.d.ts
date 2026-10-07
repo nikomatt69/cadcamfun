@@ -169,6 +169,7 @@ declare module "@nikcli-ai/sdk-next" {
     readonly "top-level": {
       agent(options?: RequestOptions): Promise<ReadonlyArray<Record<string, unknown>>>
       dispose(options?: RequestOptions): Promise<unknown>
+      skill(options?: RequestOptions): Promise<ReadonlyArray<{ name: string; description: string; location: string }>>
     }
     readonly experimental: {
       toolIDs(options?: RequestOptions): Promise<ReadonlyArray<string>>

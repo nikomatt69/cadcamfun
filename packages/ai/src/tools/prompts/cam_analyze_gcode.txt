@@ -1,0 +1,17 @@
+Static safety checks of G-code text: fast, deterministic, no simulation.
+
+Use it
+- On G-code the user pasted or you generated, before verification: it catches missing spindle or feed, rapids below Z0, limits.
+
+Do not use it
+- As proof of safety. It reads lines; it does not model stock, tool or fixtures. For that, cam_verify_toolpath.
+
+Parameters
+- gcode: the program text.
+
+Result (JSON)
+- issues: a list of {severity error|warning|info, code, line, message}. Codes: CUT_WITHOUT_SPINDLE, CUT_WITHOUT_FEED, RAPID_BELOW_ZERO, OUT_OF_TRAVEL, SPINDLE_OVER_LIMIT, FEED_OVER_LIMIT, NO_UNITS, NO_PROGRAM_END.
+- stats: lines, rapidMoves, cutMoves, bounds, toolChanges.
+- Limits come from the machine configuration of the project when there is one.
+
+Report each error with its line number and the fix; an empty issues list means "no static findings", not "safe".

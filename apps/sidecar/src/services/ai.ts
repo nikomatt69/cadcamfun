@@ -2,121 +2,130 @@ import {
   AiConfig, AiCredentials, AiHost, AiService, DirectModel, defaultModelFactory, ToolHandlers, buildTools, defaultProviderSpecs,
   makeNikCliRuntime, systemPrompt, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
-import { baseEntity, cam, emptyDrawing, type Drawing } from "@cadcamfun/core"
+import { cam } from "@cadcamfun/core"
 import { Effect, Layer, Redacted } from "effect"
 import { AppConfigService } from "../config.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
+import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
+import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
-
-type Entity = Drawing["entities"][number]
-
-/** Builds core entities from the model's plain tool input (ids are assigned here, never by the model). */
-const toEntity = (input: Record<string, unknown>, layerId: string): Entity => {
-  const base = baseEntity(crypto.randomUUID(), typeof input["layer"] === "string" ? input["layer"] : layerId)
-  const p = (key: string) => input[key] as { x: number; y: number }
-  switch (input["type"]) {
-    case "line": return { ...base, _tag: "Line", start: p("start"), end: p("end") }
-    case "circle": return { ...base, _tag: "Circle", center: p("center"), radius: input["radius"] as number }
-    case "arc": return {
-      ...base, _tag: "Arc", center: p("center"), radius: input["radius"] as number,
-      startAngle: input["startAngle"] as number, endAngle: input["endAngle"] as number, clockwise: false
-    }
-    case "polyline": return { ...base, _tag: "Polyline", points: input["points"] as Array<{ x: number; y: number }>, closed: input["closed"] === true }
-    default: {
-      const o = p("origin"); const w = input["width"] as number; const h = input["height"] as number
-      return { ...base, _tag: "Rectangle", corner1: o, corner2: { x: o.x + w, y: o.y + h } }
-    }
-  }
-}
 
 /** The tool handlers the model can call, over the active project's newest drawing and the libraries. */
 const toolHandlers = Effect.gen(function*() {
   const drawings = yield* DrawingRepo
   const materials = yield* MaterialRepo
   const tools = yield* ToolRepo
+  const projects = yield* ProjectRepo
   const toolpaths = yield* ToolpathRepo
   const { user } = yield* LocalProfile
   const kv = yield* KvStore
 
-  const load = async (projectId: string): Promise<{ id: string; projectId: string; drawing: Drawing }> => {
-    const rows = await Effect.runPromise(drawings.listByProject(projectId))
-    const row = rows[0]
-    if (!row) {
-      throw new Error(`No drawing found for nikcli project ${projectId}`)
+  /**
+   * The drawing the assistant works on. `projectId` is what the UI last opened (or "default"); when it names no
+   * project, or a project without a drawing, the assistant gets one instead of an error: the user's newest
+   * project (a new "Untitled project" if there is none) and its newest drawing (a new empty "Drawing 1").
+   */
+  const load = async (projectId: string): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean }> => {
+    let project: { id: string } | undefined = (await Effect.runPromise(projects.find(user.id, projectId)))?.project
+    let created = false
+    if (!project) {
+      const own = (await Effect.runPromise(projects.list(user.id))).find((candidate) => candidate.ownerId === user.id)
+      project = own ?? await Effect.runPromise(projects.create(user.id, { name: "Untitled project" }))
+      created = own === undefined
     }
-    const data = (row as { data?: unknown }).data
-    const drawing = data && typeof data === "object" && "entities" in data ? (data as Drawing) : emptyDrawing(row.id, row.name)
-    return { id: row.id, projectId: (row as { projectId: string }).projectId, drawing }
+    let row = (await Effect.runPromise(drawings.listByProject(project.id)))[0]
+    if (!row) {
+      row = await Effect.runPromise(drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } }))
+      created = true
+    }
+    const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
+    return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created }
   }
-  const save = async (id: string, drawing: Drawing) => {
-    await Effect.runPromise(drawings.update(id, { data: { ...drawing, version: drawing.version + 1 } }))
+  const save = async (id: string, data: Record<string, unknown>, elements: ReadonlyArray<Element>) => {
+    await Effect.runPromise(drawings.update(id, { data: { ...data, elements, version: "1.0" } }))
   }
+  /** What the UI needs to mirror a change in the open editor: where it went and the resulting elements. */
+  const where = (loaded: { id: string; projectId: string; created: boolean }) => ({ drawingId: loaded.id, projectId: loaded.projectId, ...(loaded.created ? { createdDrawing: true } : {}) })
 
-  /** A stored operation of the active drawing with its request rebuilt over the drawing's current entities. */
+  /** A stored operation of the active drawing with its request rebuilt over the drawing's current elements. */
   const operation = async (drawingId: string, operationId: string | undefined): Promise<{ id: string; request: Record<string, unknown> } | { error: string }> => {
-    const { id, projectId, drawing } = await load(drawingId)
+    const { id, projectId, elements } = await load(drawingId)
     if (!operationId) return { error: "operationId is required" }
     const found = await Effect.runPromise(toolpaths.find(user.id, operationId))
     if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { error: "Operation not found in the active drawing" }
     const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
     if (!stored?.request) return { error: "Operation has no generation settings" }
     const savedGeometry = stored.request.geometry !== null && typeof stored.request.geometry === "object" ? stored.request.geometry : {}
-    return {
-      id: operationId,
-      request: { ...stored.request, geometry: { ...savedGeometry, selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag })) } }
-    }
+    return { id: operationId, request: { ...stored.request, geometry: { ...savedGeometry, selectedElements: elements } } }
   }
 
   const handlers: ToolHandlersShape = {
     addEntities: async (projectId, entities) => {
-      const { id, drawing } = await load(projectId)
-      const layerId = drawing.layers[0]?.id ?? "layer-0"
-      const created = entities.map((e) => toEntity(e as Record<string, unknown>, layerId))
-      await save(id, { ...drawing, entities: [...drawing.entities, ...created] })
-      return { ok: true, ids: created.map((e) => e.id) }
+      const loaded = await load(projectId)
+      const created = newElements(entities as Array<Record<string, unknown> & { type: string }>, "default", () => crypto.randomUUID())
+      await save(loaded.id, loaded.data, [...loaded.elements, ...created])
+      return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
+    },
+    addElements: async (projectId, raw) => {
+      const loaded = await load(projectId)
+      const created: Element[] = raw.map((fields) => ({ ...fields, id: crypto.randomUUID(), layerId: typeof fields["layer"] === "string" ? fields["layer"] : typeof fields["layerId"] === "string" ? fields["layerId"] : "default" }) as Element)
+      // Booleans refer to their operands by id; inside one batch a number is the index of an earlier element.
+      for (const element of created) {
+        const operands = element["operands"]
+        if (!Array.isArray(operands)) continue
+        const resolved = operands.map((operand) => (typeof operand === "number" ? created[operand]?.id : operand))
+        if (resolved.some((operand) => typeof operand !== "string" || (!created.some((e) => e.id === operand) && !loaded.elements.some((e) => e.id === operand)))) {
+          return { ok: false, error: "A boolean operand is not an element of this drawing or batch.", ...where(loaded) }
+        }
+        element["operands"] = resolved
+      }
+      await save(loaded.id, loaded.data, [...loaded.elements, ...created])
+      return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
     modifyEntities: async (projectId, changes) => {
-      const { id, drawing } = await load(projectId)
-      const missing = changes.filter((c) => !drawing.entities.some((e) => e.id === c.id)).map((c) => c.id)
-      if (missing.length > 0) return { ok: false, error: `Unknown entity ids: ${missing.join(", ")}` }
-      const entities = drawing.entities.map((e) => {
+      const loaded = await load(projectId)
+      const missing = changes.filter((c) => !loaded.elements.some((e) => e.id === c.id)).map((c) => c.id)
+      if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad_describe_drawing to list the ids.`, ...where(loaded) }
+      const updated: Element[] = []
+      const elements = loaded.elements.map((e) => {
         const change = changes.find((c) => c.id === e.id)
-        return change ? ({ ...e, ...(change.changes as object) } as Entity) : e
+        if (!change) return e
+        const next = applyChanges(e, change.changes as Record<string, unknown>)
+        updated.push(next)
+        return next
       })
-      await save(id, { ...drawing, entities })
-      return { ok: true, modified: changes.length }
+      await save(loaded.id, loaded.data, elements)
+      return { ok: true, modified: updated.length, elements: updated, ...where(loaded) }
     },
     deleteEntities: async (projectId, ids) => {
-      const { id, drawing } = await load(projectId)
-      const entities = drawing.entities.filter((e) => !ids.includes(e.id))
-      await save(id, { ...drawing, entities })
-      return { ok: true, deleted: drawing.entities.length - entities.length }
+      const loaded = await load(projectId)
+      const elements = loaded.elements.filter((e) => !ids.includes(e.id))
+      await save(loaded.id, loaded.data, elements)
+      return { ok: true, deleted: loaded.elements.length - elements.length, ids: loaded.elements.filter((e) => ids.includes(e.id)).map((e) => e.id), ...where(loaded) }
     },
     describeDrawing: async (projectId) => {
-      const { drawing } = await load(projectId)
-      const counts: Record<string, number> = {}
-      for (const e of drawing.entities) counts[e._tag] = (counts[e._tag] ?? 0) + 1
-      return { name: drawing.name, units: drawing.units, layers: drawing.layers.map((l) => ({ id: l.id, name: l.name })), counts,
-        entities: drawing.entities.slice(0, 200).map((e) => ({ id: e.id, type: e._tag, layerId: e.layerId })) }
+      const loaded = await load(projectId)
+      return { ...describeElements(loaded.elements), ...where(loaded) }
     },
     createOperation: async (drawingId, operation) => {
-      const { id, projectId, drawing } = await load(drawingId)
+      const { id, projectId, elements, data } = await load(drawingId)
+      if (elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_add_entities first." }
       const params = operation.params !== null && typeof operation.params === "object" ? operation.params : {}
       const settings = cam.generator.decodeSettings({ ...params, operationType: operation.type })
       const geometry = {
         geometryType: "selected" as const,
-        selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag }))
+        selectedElements: elements
       }
       const request = { settings, geometry }
       const row = await Effect.runPromise(toolpaths.create(user.id, {
         name: `${operation.type} operation`, description: "Created by the nikcli CAD/CAM agent",
         data: { request }, projectId, drawingId: id, type: settings.machineType, operationType: settings.operationType
       }))
-      return { ok: true, operationId: row.id, name: row.name, drawing: drawing.name }
+      return { ok: true, operationId: row.id, name: row.name, drawing: typeof data["name"] === "string" ? data["name"] : "Drawing", elements: elements.length }
     },
     listOperations: async (drawingId) => {
       const { id } = await load(drawingId)
@@ -142,12 +151,9 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, operationId, settings: { operationType: settings.operationType, toolDiameter: settings.toolDiameter, depth: settings.depth, stepdown: settings.stepdown, feedrate: settings.feedrate }, note: "Generate G-code again, then verify it." }
     },
     suggestParameters: async (drawingId, params) => {
-      const { drawing } = await load(drawingId)
+      const { elements } = await load(drawingId)
       const settings = cam.generator.decodeSettings(params)
-      const geometry = cam.generator.GeometrySchema.make({
-        geometryType: "selected",
-        selectedElements: drawing.entities.map((entity) => ({ ...entity, type: entity._tag }))
-      } as never)
+      const geometry = cam.generator.GeometrySchema.make({ geometryType: "selected", selectedElements: elements } as never)
       return cam.generator.suggestFor(settings, geometry as never)
     },
     generateGcode: async (drawingId, operationId) => {
@@ -173,6 +179,10 @@ const toolHandlers = Effect.gen(function*() {
       })
       if (!built.ok) return { ok: false, error: built.error }
       const report = cam.verify.verifyToolpath(built.request)
+      // Keep the full report (with the height map) and the program it is about on the operation: the CAM page shows it.
+      const row = await Effect.runPromise(toolpaths.find(user.id, found.id))
+      const previous = row?.row.data !== null && typeof row?.row.data === "object" ? (row!.row.data as Record<string, unknown>) : {}
+      await Effect.runPromise(toolpaths.update(found.id, { data: { ...previous, request: found.request, response, verification: { report, request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures }, at: new Date().toISOString() } }, gcode: response.gcode }))
       // The height field is for the UI; the model gets the verdict, the numbers and where it went wrong.
       return {
         ok: report.ok, issues: report.issues.slice(0, 20), stats: report.stats,
