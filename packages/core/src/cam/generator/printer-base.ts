@@ -20,6 +20,12 @@ export interface PrinterSettings {
   brimWidth?: number
   material?: string
   nozzleDiameter?: number
+  /** Build plate, mm; the part is centred on it unless `centerOnBed` is false. */
+  bedWidth?: number
+  bedDepth?: number
+  centerOnBed?: boolean
+  /** `center`: X0 Y0 is the middle of the plate (delta printers); default the front-left corner. */
+  bedOrigin?: "corner" | "center"
 }
 
 export interface P3 { x: number; y: number; z: number }

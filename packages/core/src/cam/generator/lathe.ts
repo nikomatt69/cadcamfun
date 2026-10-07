@@ -28,7 +28,7 @@ const latheTurning = (s: ToolpathSettings): string => {
       const diameter = d - currentDepth * 2
       gcode += `G0 X${f3(diameter + 1)} ; Rapid to diameter\n`
       gcode += `G1 X${f3(diameter)} F${s.feedrate / 2} ; Plunge to depth\n`
-      gcode += `G1 Z${f3(length)} F${s.feedrate} ; Turn along Z\n`
+      gcode += `G1 Z${f3(-length)} F${s.feedrate} ; Turn along -Z, towards the chuck\n`
       gcode += `G0 X${f3(d + 2)} ; Retract\n`
       gcode += "G0 Z0 ; Return to face\n"
     }
@@ -41,7 +41,7 @@ const latheTurning = (s: ToolpathSettings): string => {
       const diameter = hole + currentDepth * 2
       gcode += `G0 X${f3(diameter - 1)} ; Rapid to diameter\n`
       gcode += `G1 X${f3(diameter)} F${s.feedrate / 2} ; Plunge to depth\n`
-      gcode += `G1 Z${f3(length * 0.7)} F${s.feedrate} ; Turn along Z\n`
+      gcode += `G1 Z${f3(-length * 0.7)} F${s.feedrate} ; Turn along -Z, towards the chuck\n`
       gcode += `G0 X${f3(hole - 1)} ; Retract\n`
       gcode += "G0 Z0 ; Return to face\n"
     }
@@ -68,7 +68,7 @@ const latheThreading = (s: ToolpathSettings): string => {
   const d = s.stockDiameter!
   const pitch = 1.5
   const startZ = 2
-  const endZ = startZ + s.stockLength! * 0.7
+  const endZ = startZ - s.stockLength! * 0.7
   let gcode = "\n; Threading operation\n"
   gcode += `G0 X${f3(d + 5)} Z${f3(startZ)} ; Position tool\n`
   const passes = Math.round(s.depth / 0.1)
@@ -84,7 +84,7 @@ const latheThreading = (s: ToolpathSettings): string => {
 const latheGrooving = (s: ToolpathSettings): string => {
   const d = s.stockDiameter!
   const width = 3
-  const positionZ = 20
+  const positionZ = -20
   let gcode = "\n; Grooving operation\n"
   gcode += `G0 X${f3(d + 2)} Z${f3(positionZ)} ; Position tool\n`
   for (let cut = 0; cut < s.depth; cut += 0.5) {
@@ -102,7 +102,7 @@ const latheGrooving = (s: ToolpathSettings): string => {
 const latheParting = (s: ToolpathSettings): string => {
   const d = s.stockDiameter!
   let gcode = "\n; Parting operation\n"
-  gcode += `G0 X${f3(d + 2)} Z${f3(30)} ; Position tool\n`
+  gcode += `G0 X${f3(d + 2)} Z${f3(-30)} ; Position tool\n`
   gcode += `G1 X-1 F${s.feedrate / 3} ; Part off\n`
   gcode += `G0 X${f3(d + 5)} ; Retract\n`
   return gcode
@@ -110,8 +110,8 @@ const latheParting = (s: ToolpathSettings): string => {
 
 const latheKnurling = (s: ToolpathSettings): string => {
   const d = s.stockDiameter!
-  const startZ = 5
-  const endZ = startZ + 30
+  const startZ = 2
+  const endZ = startZ - 30
   let gcode = "\n; Knurling operation\n"
   gcode += `G0 X${f3(d + 2)} Z${f3(startZ)} ; Position tool\n`
   gcode += `G1 X${f3(d)} F${s.feedrate / 2} ; Approach to diameter\n`
@@ -123,6 +123,19 @@ const latheKnurling = (s: ToolpathSettings): string => {
   gcode += `G0 X${f3(d + 5)} ; Retract\n`
   return gcode
 }
+
+/**
+ * Moves the Z zero of a lathe program. With the zero on the chuck face, Z grows towards the front face of the stock, so every
+ * Z word of a motion block is `stockLength` larger than with the zero on the finished face; moving towards the chuck is still -Z.
+ */
+export const shiftLatheZ = (gcode: string, dz: number): string =>
+  gcode.split("\n").map((line) => {
+    if (!/^\s*G(0|1|32|00|01)\b/.test(line)) return line
+    const comment = line.indexOf(";")
+    const code = comment < 0 ? line : line.slice(0, comment)
+    const rest = comment < 0 ? "" : line.slice(comment)
+    return code.replace(/\bZ(-?\d+(?:\.\d+)?)/g, (_, z: string) => `Z${f3(Number(z) + dz)}`) + rest
+  }).join("\n")
 
 export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions = {}): string => {
   let gcode = ""
@@ -136,7 +149,7 @@ export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions
   gcode += "G90 ; Absolute positioning\n"
   gcode += "G21 ; Metric units\n"
   gcode += "G18 ; XZ plane selection (standard for lathes)\n"
-  gcode += `M3 S${s.rpm} ; Start spindle ${s.spindleDirection === "cw" ? "clockwise" : "counter-clockwise"}\n`
+  gcode += `${s.spindleDirection === "cw" ? "M3" : "M4"} S${s.rpm} ; Start spindle ${s.spindleDirection === "cw" ? "clockwise" : "counter-clockwise"}\n`
   if (s.coolant) gcode += "M8 ; Coolant on\n"
 
   const ops: Record<LatheOperationType, (s: ToolpathSettings) => string> = {
@@ -144,10 +157,15 @@ export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions
     grooving: latheGrooving, parting: latheParting, knurling: latheKnurling
   }
   const op = ops[s.operationType as LatheOperationType]
-  if (op) gcode += op(s)
-
-  gcode += "\n; End of program\n"
-  gcode += "G0 X50 Z50 ; Retract to safe position\n"
+  let body = ""
+  if (op) body += op(s)
+  body += "\n; End of program\n"
+  body += "G0 X50 Z50 ; Retract to safe position\n"
+  if (s.latheZero === "chuck") {
+    gcode += `; Z zero is the chuck face: Z grows towards the front face of the ${f3(s.stockLength!)} mm stock\n`
+    body = shiftLatheZ(body, s.stockLength!)
+  }
+  gcode += body
   if (s.coolant) gcode += "M9 ; Coolant off\n"
   gcode += "M5 ; Stop spindle\n"
   gcode += "M30 ; Program end\n"

@@ -1,0 +1,24 @@
+Describe how a kind of machine works: what turns, what moves, the direction of every axis, where the zeros are, which operations and settings exist for it.
+
+Use it
+- BEFORE programming for a machine you have not described in this conversation, and whenever the user changes machine (a lathe, a printer, a mill).
+- When you must reason about directions: which way is +Z, what X means on a lathe, whether the part or the tool rotates.
+
+Do not use it
+- To read G-code (cam_analyze_gcode) or to see what a project has set up (cam_list_operations).
+
+Parameters
+- machineType: mill, lathe or 3dprinter.
+
+Result (JSON)
+- title, rotates (tool | workpiece | nothing), process (subtractive | additive), plane (G17 | G18), xIsDiameter.
+- axes: [{name, moves (tool | workpiece | bed | filament), positive (what + means), note}]. Program as if the TOOL moves round a fixed workpiece (ISO 841), whichever part the machine really moves.
+- zero: where Z0 and X0 are. spindle: what the spindle / extruder words do. cutting: which way a cut goes.
+- operations: the operationType values valid for this machine. settings: the settings only this machine uses.
+- origins: {setting, choices:[{value, label, meaning}], offsets} the zeros you can choose (cam_create_operation params carry the setting; offsets are the G54..G59 work offsets of a mill).
+- drawingMapping: how drawing coordinates become machine axes.
+
+Rules that follow from it
+- Lathe: the workpiece rotates, there is no Y, X is a diameter, the stock is at negative Z behind the face (Z0), turning feeds -Z.
+- Mill: the tool rotates, Z0 is the top of the stock and cuts are negative Z.
+- Printer: nothing cuts; Z only grows, E pushes filament, the nozzle must be hot before E moves.

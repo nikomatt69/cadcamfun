@@ -11,7 +11,7 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
-import { withDefaultTolerance } from "@cadcamfun/ai"
+import { normalizeElement, withDefaultTolerance } from "@cadcamfun/ai"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
 
@@ -71,7 +71,13 @@ const toolHandlers = Effect.gen(function*() {
       await save(loaded.id, loaded.data, [...loaded.elements, ...created])
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
-    addElements: async (projectId, raw) => {
+    addElements: async (projectId, rawInput) => {
+      let raw = rawInput
+      // Whoever calls this gets the same guarantees as the tool: defaults filled, types and counts checked, nothing added on error.
+      const checked = raw.map((input) => normalizeElement(input))
+      const problems = checked.flatMap((result, index) => (result.ok ? [] : [`elements[${index}]: ${result.error}`]))
+      if (problems.length > 0) return { ok: false, error: "Nothing was added.", problems }
+      raw = checked.flatMap((result) => (result.ok ? [result.element] : []))
       const loaded = await load(projectId)
       const settings = loaded.data["settings"] as { tolerance?: unknown } | undefined
       const drawingTolerance = typeof settings?.tolerance === "number" ? settings.tolerance : 0
@@ -116,9 +122,11 @@ const toolHandlers = Effect.gen(function*() {
     },
     createOperation: async (drawingId, operation) => {
       const { id, projectId, elements, data } = await load(drawingId)
-      if (elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_add_entities first." }
       const params = operation.params !== null && typeof operation.params === "object" ? operation.params : {}
       const settings = cam.generator.decodeSettings({ ...params, operationType: operation.type })
+      // A lathe works from its stock size and a probe from the machine, so only drawing-based operations need elements.
+      const needsElements = settings.machineType !== "lathe" && settings.operationType !== "probing"
+      if (needsElements && elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_add_elements first." }
       const geometry = {
         geometryType: "selected" as const,
         selectedElements: elements

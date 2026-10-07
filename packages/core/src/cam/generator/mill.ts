@@ -1,11 +1,14 @@
 /** Mill program: header, prologue, tool compensation, geometry toolpath, finishing block, epilogue. */
 import { millToolpath, stockComment } from "./dispatch.ts"
+import { generateProbingGCode } from "./probe.ts"
 import type { GenerateOptions } from "./common.ts"
 import type { GeometryInput, ToolpathSettings } from "./schema.ts"
 
 // -- mill program --------------------------------------------------------------------------------
 
 export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options: GenerateOptions = {}): string => {
+  // A probe is not a cutter: its own program (spindle off, slow approach, offsets written).
+  if (s.operationType === "probing") return generateProbingGCode(s, options)
   let gcode = ""
   gcode += "; CAD/CAM SYSTEM - Generated Mill G-code with AI assistance\n"
   gcode += `; Operation: ${s.operationType}\n`
@@ -17,6 +20,8 @@ export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options
   gcode += "G90 ; Absolute positioning\n"
   gcode += "G21 ; Metric units\n"
   gcode += "G17 ; XY plane selection\n"
+  // G54 is the control's default work offset: only another one needs to be selected.
+  if (s.workOffset !== "G54") gcode += `${s.workOffset} ; Work offset\n`
   gcode += `M3 S${s.rpm} ; Start spindle\n`
   if (s.coolant) gcode += "M8 ; Coolant on\n"
   gcode += "G0 Z10 ; Move to safe height\n\n"

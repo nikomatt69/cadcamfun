@@ -15,6 +15,7 @@ import cad_describe_drawing from "./cad_describe_drawing.txt" with { type: "text
 import cad_modify_entities from "./cad_modify_entities.txt" with { type: "text" }
 import cam_analyze_gcode from "./cam_analyze_gcode.txt" with { type: "text" }
 import cam_create_operation from "./cam_create_operation.txt" with { type: "text" }
+import cam_describe_machine from "./cam_describe_machine.txt" with { type: "text" }
 import cam_generate_gcode from "./cam_generate_gcode.txt" with { type: "text" }
 import cam_list_operations from "./cam_list_operations.txt" with { type: "text" }
 import cam_suggest_parameters from "./cam_suggest_parameters.txt" with { type: "text" }
@@ -33,6 +34,7 @@ const PROMPTS = {
   cad_modify_entities,
   cam_analyze_gcode,
   cam_create_operation,
+  cam_describe_machine,
   cam_generate_gcode,
   cam_list_operations,
   cam_suggest_parameters,

@@ -17,12 +17,12 @@ const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
 const Percent = Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100))
 
 export const MachineTypeSchema = Schema.Literals(["mill", "lathe", "3dprinter"])
-export const MillOperationSchema = Schema.Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface"])
+export const MillOperationSchema = Schema.Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"])
 export const LatheOperationSchema = Schema.Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"])
 export const PrinterOperationSchema = Schema.Literals(["standard", "vase", "support", "infill", "raft", "brim"])
 export const OperationTypeSchema = Schema.Union([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema])
 export const MaterialTypeSchema = Schema.Literals(["aluminum", "steel", "wood", "plastic", "brass", "titanium", "composite", "other"])
-export const ToolTypeSchema = Schema.Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"])
+export const ToolTypeSchema = Schema.Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer", "probe", "toolsetter"])
 export const LatheToolTypeSchema = Schema.Literals(["turning", "facing", "threading", "grooving", "boring", "parting"])
 export const PrinterNozzleSchema = Schema.Literals(["brass", "hardened", "ruby", "standard"])
 export const AllToolTypeSchema = Schema.Union([ToolTypeSchema, LatheToolTypeSchema, PrinterNozzleSchema])
@@ -79,6 +79,23 @@ export const ToolpathSettingsSchema = Schema.Struct({
   useAdaptiveFeeds: withDefault(Schema.Boolean, false),
   useRestMachining: withDefault(Schema.Boolean, false),
   toolNumber: withDefault(PositiveInt, 1),
+  /** Work offset the program runs in (the zero of the part on the machine table). G54 is the control's default and is not written. */
+  workOffset: withDefault(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
+  // touch probe / tool setter (`probing`)
+  probeCycle: withDefault(Schema.Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
+  probeFeed: withDefault(Positive, 100),
+  /** How far the probe may travel looking for contact, mm. */
+  probeSearch: withDefault(Positive, 10),
+  /** Stylus tip diameter, mm: contact happens half of it before the edge. */
+  probeStylus: withDefault(Positive, 4),
+  /** Probe move and result variables: linuxcnc / grbl style G38.2, or Fanuc style G31 skip. */
+  probeDialect: withDefault(Schema.Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
+  /** Nominal feature size for `bore` and `boss`, mm (the probe starts at the centre and searches +/- this much). */
+  probeFeatureSize: withDefault(Positive, 20),
+  /** Lathe Z zero: the finished front face (Z negative into the part) or the chuck face (Z positive towards the front). */
+  latheZero: withDefault(Schema.Literals(["face", "chuck"]), "face"),
+  /** 3D printer XY zero: the front-left corner of the plate, or its centre (delta and some bed-slinger profiles). */
+  bedOrigin: withDefault(Schema.Literals(["corner", "center"]), "corner"),
   // 3D printer
   nozzleDiameter: withDefault(Positive, 0.4),
   filamentDiameter: withDefault(Positive, 1.75),
@@ -86,6 +103,10 @@ export const ToolpathSettingsSchema = Schema.Struct({
   extrusionWidth: withDefault(Positive, 0.4),
   printSpeed: withDefault(Positive, 60),
   printTemperature: withDefault(Positive, 200),
+  /** Build plate, mm: the part is set down on it (Z0) and centred (see `centerOnBed`). */
+  bedWidth: withDefault(Positive, 220),
+  bedDepth: withDefault(Positive, 220),
+  centerOnBed: withDefault(Schema.Boolean, true),
   bedTemperature: withDefault(NonNegative, 60),
   // lathe
   stockDiameter: withDefault(Positive, 50),

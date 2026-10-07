@@ -300,7 +300,9 @@ describe("3D printer program", () => {
     const { gcode } = printer({ type: "cube", x: 0, y: 0, z: 1, width: 10, height: 10, depth: 1 })
     expect(gcode.startsWith("; Print Start G-code\nM82")).toBe(true)
     expect(gcode).toContain("M104 S200")
-    expect(gcode).toContain("; Layer 1 / 5 at Z=0.700")
+    // The part is set down on the plate: its bottom is Z0, so the first layer is printed at one layer height (CAD Z is not the plate's).
+    expect(gcode).toContain("; Layer 1 / 5 at Z=0.200")
+    expect(gcode).toContain("; Part placed on the bed")
     expect(gcode.trimEnd().endsWith("M84 ; Disable motors")).toBe(true)
     const e = [...gcode.matchAll(/ E(\d+\.\d+) F/g)].map(m => Number(m[1]))
     expect(e.length).toBeGreaterThan(10)

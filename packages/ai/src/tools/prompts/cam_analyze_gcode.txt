@@ -8,9 +8,10 @@ Do not use it
 
 Parameters
 - gcode: the program text.
+- machineType (optional): mill, lathe or 3dprinter. Adds the checks that follow from the machine's axes: a lathe has no Y and never crosses its axis, a cut away from the chuck, a mill cutting with its spindle off, a printer extruding cold or building downwards, the wrong plane (G17 / G18). Pass it whenever you know the machine.
 
 Result (JSON)
-- issues: a list of {severity error|warning|info, code, line, message}. Codes: CUT_WITHOUT_SPINDLE, CUT_WITHOUT_FEED, RAPID_BELOW_ZERO, OUT_OF_TRAVEL, SPINDLE_OVER_LIMIT, FEED_OVER_LIMIT, NO_UNITS, NO_PROGRAM_END.
+- issues: a list of {severity error|warning|info, code, line, message}. Codes: LATHE_Y_AXIS, LATHE_X_NEGATIVE, LATHE_Z_AWAY, LATHE_NO_SPINDLE, THREAD_NO_PITCH, MILL_NO_SPINDLE, MILL_EXTRUDER, PRINTER_SPINDLE, PRINTER_COLD_EXTRUSION, PRINTER_LAYER_DOWN, PRINTER_NOT_HOMED, PLANE_MISMATCH, PLANE_MISSING (with machineType); CUT_WITHOUT_SPINDLE, CUT_WITHOUT_FEED, RAPID_BELOW_ZERO, OUT_OF_TRAVEL, SPINDLE_OVER_LIMIT, FEED_OVER_LIMIT, NO_UNITS, NO_PROGRAM_END.
 - stats: lines, rapidMoves, cutMoves, bounds, toolChanges.
 - Limits come from the machine configuration of the project when there is one.
 

@@ -9,6 +9,7 @@
 import type { CadElement } from "./schema.ts"
 import { calculateExtrusion, polygonLayer, printEndGCode, printStartGCode, type P3, type PrinterSettings } from "./printer-base.ts"
 import { generateCompositeElement3D } from "./printer-composite.ts"
+import { elementBounds, shiftElement } from "./elements.ts"
 
 export { calculateExtrusion, printEndGCode, printStartGCode, generateCompositeElement3D }
 export type { PrinterSettings }
@@ -187,14 +188,43 @@ const elementBody = (el: CadElement, s: PrinterSettings): string => {
   }
 }
 
-export const generate3DPrinterGCodeForElement = (el: CadElement, s: PrinterSettings): string => {
-  if (el.type === "composite" || el.type === "component" || el.type === "group") return generateCompositeElement3D(el, s)
+/**
+ * Sets the part down on the build plate: its lowest point goes to Z0 (so the first layer is printed one layer height above
+ * the bed and every layer above that: a build only goes up), and it is centred on the plate. Returns the moved element and a
+ * note when it does not fit. The CAD model keeps its own coordinates; only the program uses the plate's.
+ */
+export const placeOnBed = (el: CadElement, s: PrinterSettings): { readonly element: CadElement; readonly note: string } => {
+  let bounds
+  try { bounds = elementBounds(el) } catch { return { element: el, note: "" } }
+  if (!Number.isFinite(bounds.min.z) || !Number.isFinite(bounds.min.x)) return { element: el, note: "" }
+  const cx = (bounds.min.x + bounds.max.x) / 2
+  const cy = (bounds.min.y + bounds.max.y) / 2
+  const centre = s.centerOnBed !== false
+  // Zero at the plate's centre: the part's own centre is X0 Y0. Zero at the corner: its centre is the plate's centre.
+  const originX = s.bedOrigin === "center" ? 0 : (s.bedWidth ?? 220) / 2
+  const originY = s.bedOrigin === "center" ? 0 : (s.bedDepth ?? 220) / 2
+  const dx = centre ? originX - cx : s.bedOrigin === "center" ? -(s.bedWidth ?? 220) / 2 : 0
+  const dy = centre ? originY - cy : s.bedOrigin === "center" ? -(s.bedDepth ?? 220) / 2 : 0
+  const dz = -bounds.min.z
+  const moved = shiftElement(el, dx, dy, dz)
+  const width = bounds.max.x - bounds.min.x
+  const depth = bounds.max.y - bounds.min.y
+  const fits = width <= (s.bedWidth ?? 220) + 1e-9 && depth <= (s.bedDepth ?? 220) + 1e-9
+  const note = `; Part placed on the bed (XY zero: ${s.bedOrigin === "center" ? "plate centre" : "front-left corner"}): bottom at Z0${centre ? `, centred at X${(cx + dx).toFixed(3)} Y${(cy + dy).toFixed(3)}` : ""}\n` +
+    (fits ? "" : `; WARNING: the part (${width.toFixed(1)} x ${depth.toFixed(1)} mm) does not fit the ${s.bedWidth ?? 220} x ${s.bedDepth ?? 220} mm bed\n`)
+  return { element: moved, note }
+}
+
+export const generate3DPrinterGCodeForElement = (original: CadElement, s: PrinterSettings): string => {
+  const placed = placeOnBed(original, s)
+  const el = placed.element
+  if (el.type === "composite" || el.type === "component" || el.type === "group") return placed.note + generateCompositeElement3D(el, s)
   if (el.type === "line") {
     // A lone line has no area to print: like the legacy code it becomes a one-layer composite (the layer is as
     // thick as the stroke), and the result says so.
     const layerHeight = el.strokeWidth || s.extrusionWidth
     const wrapper = { id: "line-wrapper", type: "composite", elements: [el], z: el.z, height: layerHeight }
-    return generateCompositeElement3D(wrapper, { ...s, layerHeight }) + "; Warning: a line element has no printable area - nothing was extruded\n"
+    return placed.note + generateCompositeElement3D(wrapper, { ...s, layerHeight }) + "; Warning: a line element has no printable area - nothing was extruded\n"
   }
-  return printStartGCode(s) + elementBody(el, s) + printEndGCode(s)
+  return printStartGCode(s) + placed.note + elementBody(el, s) + printEndGCode(s)
 }

@@ -34,7 +34,7 @@ export const DEFAULT_EXPANDED: Readonly<Record<string, boolean>> = {
 }
 
 export const MILL_OPERATIONS: ReadonlyArray<MillOperationType> =
-  ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface"]
+  ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"]
 export const LATHE_OPERATIONS: ReadonlyArray<LatheOperationType> =
   ["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]
 export const PRINTER_OPERATIONS: ReadonlyArray<PrinterOperationType> =

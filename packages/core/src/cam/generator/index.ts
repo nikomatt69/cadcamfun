@@ -86,7 +86,11 @@ export const printerSettingsOf = (settings: ToolpathSettings, extras: PrinterExt
   raftLayers: 0,
   brimWidth: 0,
   material: settings.material,
-  nozzleDiameter: settings.nozzleDiameter
+  nozzleDiameter: settings.nozzleDiameter,
+  bedWidth: settings.bedWidth,
+  bedDepth: settings.bedDepth,
+  centerOnBed: settings.centerOnBed,
+  bedOrigin: settings.bedOrigin
 })
 
 const warningsIn = (gcode: string): string[] =>

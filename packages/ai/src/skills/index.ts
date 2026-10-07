@@ -130,6 +130,34 @@ An H hole starts at its nominal size and goes up by the grade; a shaft size has 
 - \`cam_verify_toolpath\` is exact in height and one cell wide sideways. For micron checks narrow \`stock\` to the feature (a few mm), \`resolution\` 0.002-0.005, \`tolerance\` 0.001, and give the finished part in \`targetSolids\`.
 - A pass means "no gouge beyond the tolerance at that resolution", never "in tolerance on the machine".`
 
+const MACHINES = `# Machines, axes and zeros
+
+The same drawing becomes a different program on each machine. Program as if the TOOL moves round a fixed workpiece (ISO 841); what differs is what turns and what is made. Call \`cam_describe_machine\` for the exact table.
+
+| | Mill | Lathe | 3D printer |
+| --- | --- | --- | --- |
+| What turns | the tool (spindle) | the workpiece (chuck) | nothing |
+| Process | removes material | removes material | adds material |
+| Axes | X Y Z | X (diameter) Z, no Y | X Y Z, E (filament) |
+| +Z | up, away from the part | away from the chuck | up the build |
+| Z0 | top of the stock | finished front face | the plate |
+| A cut goes | to negative Z, then in XY | -Z towards the chuck, X towards the axis | Z up, layer by layer |
+| Plane | G17 | G18 | G17 |
+
+## Zeros
+- Mill: choose the origin (\`originType\`: stock centre, stock corner, machine zero, custom) and the work offset (\`workOffset\` G54..G59: G54 is the default and is not written). Several parts or setups use different offsets.
+- Lathe: \`latheZero\` is the finished face (stock at negative Z) or the chuck face (Z grows towards the front). Moving towards the chuck is -Z in both.
+- Printer: \`bedOrigin\` is the plate's front-left corner or its centre (delta printers); the part is always set down on the plate (bottom at Z0) and centred, and it is reported if it does not fit (\`bedWidth\`, \`bedDepth\`).
+
+## Touch probes and tool setters
+- \`toolType\` probe or toolsetter, operation \`probing\`, spindle OFF. Cycles: zSurface, edgeX, edgeY, corner, bore, boss, toolLength. The stylus is a ball: contact is half a tip diameter before the surface; the cycles correct for it (\`probeStylus\`).
+- The result goes into the chosen work offset, so probing and machining share \`workOffset\`. \`probeDialect\`: linuxcnc (G38.2, G10 L20) or fanuc (G31, macro variables).
+- Probe first, machine after: a program that measures its own zero removes setup error. Say which offset it wrote.
+
+## Checking
+- \`cam_analyze_gcode\` with \`machineType\` catches what is illogical for the axes: Y on a lathe, X through the axis, a cut away from the chuck, a spindle that never started, cold extrusion, a build that goes down.
+- \`cam_verify_toolpath\` simulates mills only.`
+
 export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cad-3d-modeling", description: `Model 3D and 2D geometry in the open editor (${Object.keys(ELEMENT_SPECS).length} element types): conventions, recipes for common parts, how to build complex objects.`, category: "cad", tags: ["cad", "3d", "modeling"], body: MODELING },
   { name: "cam-operation-workflow", description: "The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.", category: "cam", tags: ["cam", "workflow", "gcode"], body: WORKFLOW },
@@ -137,6 +165,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cutting-parameters", description: "Speeds, feeds, stepdown and stepover starting points by material, and the formulas behind them.", category: "cam", tags: ["cam", "feeds", "speeds"], body: PARAMETERS },
   { name: "drilling-and-holes", description: "Drilling operations: cycles, peck rules, through-hole depth, large holes.", category: "cam", tags: ["cam", "drilling"], body: DRILLING },
   { name: "precision-and-tolerances", description: "Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.", category: "cam", tags: ["precision", "tolerance", "iso286"], body: PRECISION },
+  { name: "machines-and-axes", description: "Mill, lathe and 3D printer: what turns, the sense of every axis, zeros and work offsets, touch probes and tool setters, and how to check a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: MACHINES },
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: SETUP }
 ]
 

@@ -8,6 +8,7 @@
 export * from "./ir.ts"
 export * from "./tool.ts"
 export * from "./setup.ts"
+export * from "./machine.ts"
 export * from "./params.ts"
 export * from "./path.ts"
 export * from "./arc-fit.ts"

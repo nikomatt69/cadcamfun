@@ -48,7 +48,7 @@ export class ToolHandlers extends Context.Service<ToolHandlers, ToolHandlersShap
 /** The only tool ids the `cadcam` agent may call. */
 export const TOOL_IDS = [
   "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_delete_entities", "cad_describe_drawing",
-  "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode",
+  "cam_describe_machine", "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode",
   "cam_verify_toolpath", "lib_lookup_material", "lib_lookup_tool", "memory_remember", "memory_recall"
 ] as const
 
@@ -117,6 +117,15 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
   { id: "cad_describe_drawing", description: toolPrompt("cad_describe_drawing"), parameters: z.object({}),
     execute: async () => json(await handlers.describeDrawing(projectId)) },
   {
+    id: "cam_describe_machine", description: toolPrompt("cam_describe_machine"),
+    parameters: z.object({ machineType: z.enum(["mill", "lathe", "3dprinter"]) }),
+    execute: async (input) => {
+      const { machineType } = input as { machineType: "mill" | "lathe" | "3dprinter" }
+      const kinematics = cam.kinematicsOf(machineType)
+      return json({ ...kinematics, origins: cam.ORIGINS[machineType] })
+    }
+  },
+  {
     id: "cam_create_operation", description: toolPrompt("cam_create_operation"),
     parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()).optional() }),
     execute: async (input) => {
@@ -150,8 +159,15 @@ export const buildTools = (handlers: ToolHandlersShape, projectId: string): Read
   },
   {
     id: "cam_analyze_gcode", description: toolPrompt("cam_analyze_gcode"),
-    parameters: z.object({ gcode: z.string().min(1) }),
-    execute: async (input) => json(analyzeGcode((input as { gcode: string }).gcode, await handlers.machine?.(projectId)))
+    parameters: z.object({ gcode: z.string().min(1), machineType: z.enum(["mill", "lathe", "3dprinter"]).optional() }),
+    execute: async (input) => {
+      const { gcode, machineType } = input as { gcode: string; machineType?: "mill" | "lathe" | "3dprinter" }
+      const report = analyzeGcode(gcode, await handlers.machine?.(projectId))
+      if (machineType === undefined) return json(report)
+      // The checks of the line scanner plus the ones that follow from the machine's own axes and what rotates.
+      const axes = cam.checkAxes(gcode, machineType).map((issue) => ({ severity: issue.severity, code: issue.code, line: issue.line, message: issue.message }))
+      return json({ ...report, machineType, issues: [...report.issues, ...axes] })
+    }
   },
   {
     id: "cam_verify_toolpath",
