@@ -3,6 +3,7 @@ import { Cause, Effect, Layer, Logger, Runtime, Schedule } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
+import { ObservabilityLive } from "./observability.ts"
 import { awaitShutdown } from "./shutdown.ts"
 import { markAnnounced } from "./startup.ts"
 
@@ -29,6 +30,7 @@ const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(
   // real Bun server so the port is reported but nothing ever accepts a connection.
   Layer.provide(BunServer()),
   Layer.provide(DatabaseLive),
+  Layer.provide(ObservabilityLive),
   Layer.provide(AppConfigService.layer)
 )
 

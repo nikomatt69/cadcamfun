@@ -91,10 +91,11 @@ export function LegacyNotifications(): JSX.Element {
         <button class="btn btn-outline" disabled={pending() || notifications.loading()} onClick={() => void update(notification.id, !notification.isRead)}>{lt(notification.isRead ? "legacy.markUnread" : "legacy.markRead")}</button>
       </li>}</For>
     </ul>
-    <div class="flex items-center gap-3">
-      <button class="btn btn-outline" disabled={page() === 0 || notifications.loading() || pending()} onClick={() => { setPage((p) => p - 1); void notifications.refetch() }}>{lt("legacy.previous")}</button>
+    {/* flex-wrap: the three controls stay complete (no shrink/clip) on narrow cards. */}
+    <div class="flex flex-wrap items-center gap-3">
+      <button class="btn btn-outline shrink-0" disabled={page() === 0 || notifications.loading() || pending()} onClick={() => { setPage((p) => p - 1); void notifications.refetch() }}>{lt("legacy.previous")}</button>
       <span class="text-sm">{lt("legacy.page", { page: page() + 1 })}</span>
-      <button class="btn btn-outline" disabled={notifications.loading() || pending() || (notifications.data()?.notifications.length ?? 0) < 20} onClick={() => { setPage((p) => p + 1); void notifications.refetch() }}>{lt("legacy.next")}</button>
+      <button class="btn btn-outline shrink-0" disabled={notifications.loading() || pending() || (notifications.data()?.notifications.length ?? 0) < 20} onClick={() => { setPage((p) => p + 1); void notifications.refetch() }}>{lt("legacy.next")}</button>
     </div>
   </article>
 }

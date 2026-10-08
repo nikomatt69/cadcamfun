@@ -3,16 +3,22 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./sdk": "./src/sdk/generated/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo -p tsconfig.json --noEmit",
-    "coverage": "bun scripts/api-coverage.ts"
+    "coverage": "bun scripts/api-coverage.ts",
+    "generate": "bun scripts/generate-clients.ts",
+    "generate:check": "bun scripts/generate-clients.ts --check"
   },
   "dependencies": {
     "effect": "4.0.0-rc.112",
     "@cadcamfun/core": "workspace:*",
     "zod": "^4.1.8"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@cadcamfun/httpapi-codegen": "workspace:*",
+    "@effect/platform-bun": "4.0.0-rc.112"
+  }
 }

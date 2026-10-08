@@ -4,6 +4,7 @@ import { useApp } from "../../state/context.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import type { CADCanvasApi } from "./CADCanvas.tsx"
 import SaveCADAsProjectModal from "./SaveCADAsProjectModal.tsx"
+import { t } from "../../i18n/index.ts"
 
 interface Props {
   readonly isOpen: boolean
@@ -88,18 +89,18 @@ export default function ImportExportDialog(props: Props): JSX.Element {
             <Show when={props.mode === "export"} fallback={
               <>
                 <div class="mb-4">
-                  <label class={LABEL}>Select File</label>
+                  <label class={LABEL}>{t("cad.importExport.selectFile")}</label>
                   <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md bg-gray-50 dark:bg-gray-700/50">
                     <div class="space-y-1 text-center">
                       <Upload class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
                       <div class="flex text-sm text-gray-600 dark:text-gray-400">
                         <label for="file-upload" class="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400 dark:ring-offset-gray-800 transition-colors">
-                          <span>Upload a file</span>
+                          <span>{t("cad.importExport.upload")}</span>
                           <input id="file-upload" name="file-upload" type="file" accept=".json,.cad,.stl,.obj,.step" class="sr-only" onChange={importFile} />
                         </label>
-                        <p class="pl-1">or drag and drop</p>
+                        <p class="pl-1">{t("cad.importExport.orDrag")}</p>
                       </div>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">JSON, STL, OBJ, STEP or CAD/CAM FUN files</p>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">{t("cad.importExport.formats")}</p>
                     </div>
                   </div>
                 </div>
@@ -111,34 +112,34 @@ export default function ImportExportDialog(props: Props): JSX.Element {
                       </svg>
                     </div>
                     <div class="ml-3">
-                      <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Attention</h3>
-                      <div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300"><p>Importing a file will replace your current drawing. Make sure to save your work before importing.</p></div>
+                      <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">{t("cad.importExport.attention")}</h3>
+                      <div class="mt-2 text-sm text-yellow-700 dark:text-yellow-300"><p>{t("cad.importExport.importWarning")}</p></div>
                     </div>
                   </div>
                 </div>
               </>
             }>
               <div class="mb-4">
-                <label for="fileName" class={LABEL}>File Name</label>
+                <label for="fileName" class={LABEL}>{t("cad.importExport.fileName")}</label>
                 <input type="text" id="fileName" value={fileName()} onInput={(e) => setFileName(e.currentTarget.value)} class={FIELD} />
               </div>
               <div class="mb-4">
-                <label for="fileFormat" class={LABEL}>File Format</label>
+                <label for="fileFormat" class={LABEL}>{t("cad.importExport.fileFormat")}</label>
                 <select id="fileFormat" value={fileFormat()} onChange={(e) => setFileFormat(e.currentTarget.value)} class={FIELD}>
-                  <option value="json">JSON (.json)</option>
-                  <option value="stl">STL (.stl)</option>
-                  <option value="obj">OBJ (.obj)</option>
-                  <option value="step">STEP (.step)</option>
-                  <option value="cad">CAD/CAM FUN Format (.cad)</option>
+                  <option value="json">{t("cad.importExport.formatJson")}</option>
+                  <option value="stl">{t("cad.importExport.formatStl")}</option>
+                  <option value="obj">{t("cad.importExport.formatObj")}</option>
+                  <option value="step">{t("cad.importExport.formatStep")}</option>
+                  <option value="cad">{t("cad.importExport.formatCad")}</option>
                 </select>
               </div>
               <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-md p-4 flex items-start mb-4">
                 <div class="flex-shrink-0"><FolderPlus class="h-5 w-5 text-blue-400 dark:text-blue-300" /></div>
                 <div class="ml-3">
-                  <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Save as Project</h3>
+                  <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">{t("cad.importExport.saveAsProject")}</h3>
                   <div class="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                    <p>You can also save this drawing as a new project to organize it better and collaborate with others.</p>
-                    <button type="button" onClick={() => setShowProject(true)} class="mt-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">Save as Project</button>
+                    <p>{t("cad.importExport.saveAsProjectBody")}</p>
+                    <button type="button" onClick={() => setShowProject(true)} class="mt-1 text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">{t("cad.importExport.saveAsProject")}</button>
                   </div>
                 </div>
               </div>
@@ -146,10 +147,10 @@ export default function ImportExportDialog(props: Props): JSX.Element {
           </div>
 
           <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 flex justify-end space-x-3 rounded-b-lg">
-            <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors" onClick={props.onClose}>Cancel</button>
+            <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors" onClick={props.onClose}>{t("common.cancel")}</button>
             <Show when={props.mode === "export"}>
               <button type="button" onClick={exportFile} class="px-4 py-2 bg-blue-600 dark:bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors">
-                <span class="flex items-center"><Save size={18} class="mr-1.5" />Export File</span>
+                <span class="flex items-center"><Save size={18} class="mr-1.5" />{t("cad.importExport.exportFile")}</span>
               </button>
             </Show>
           </div>

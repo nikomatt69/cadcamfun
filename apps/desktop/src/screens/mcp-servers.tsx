@@ -23,7 +23,7 @@ const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const HOVER_SHADOW = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
 
 const PAGE_BG = "min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
-const CARD = "rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md dark:border-gray-700/30 dark:bg-gray-900/80"
+const CARD = "rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md dark:border-gray-700/30 dark:bg-gray-800/80"
 
 /** The status dot that pulses while the server is active. */
 function McpStatusDot(props: { readonly enabled: boolean; readonly size: "sm" | "md" }): JSX.Element {
@@ -103,7 +103,7 @@ export function McpDirectoryScreen(): JSX.Element {
       >
         <div class="mx-auto max-w-7xl p-4 md:p-6">
           <Motion.div
-            class={`mb-8 rounded-2xl border border-white/20 bg-white/80 px-6 py-6 shadow-xl backdrop-blur-md dark:border-gray-700/30 dark:bg-gray-900/80`}
+            class={`mb-8 rounded-2xl border border-white/20 bg-white/80 px-6 py-6 shadow-xl backdrop-blur-md dark:border-gray-700/30 dark:bg-gray-800/80`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2, easing: CARD_EASE }}
@@ -166,7 +166,7 @@ export function McpDirectoryScreen(): JSX.Element {
                   const entry = () => info()[server.id]
                   return (
                     <Motion.div
-                      class="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md transition-all duration-300 hover:shadow-2xl dark:border-gray-700/30 dark:bg-gray-900/80"
+                      class="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md transition-all duration-300 hover:shadow-2xl dark:border-gray-700/30 dark:bg-gray-800/80"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.2 + index() * 0.1, easing: CARD_EASE }}
@@ -252,7 +252,8 @@ export function McpDirectoryScreen(): JSX.Element {
                         </Show>
                       </div>
 
-                      <div class="flex justify-between border-t border-gray-100/50 bg-gray-50/50 px-6 py-4 dark:border-gray-700/50 dark:bg-gray-800/50">
+                      {/* flex-wrap: Enable/Disable + View stay fully visible in narrow grid columns. */}
+                      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100/50 bg-gray-50/50 px-6 py-4 dark:border-gray-700/50 dark:bg-gray-800/50">
                         <Motion.button
                           class={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${server.enabled
                             ? "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 hover:from-gray-200 hover:to-gray-300 dark:from-gray-700 dark:to-gray-600 dark:text-gray-200 dark:hover:from-gray-600 dark:hover:to-gray-500"

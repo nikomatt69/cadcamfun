@@ -18,6 +18,8 @@ export interface AppConfig {
   /** E-mail of the administrator (legacy `ADMIN_EMAIL`); the local profile is the admin of its own installation by default. */
   readonly adminEmail?: string
   readonly aiHost?: "nikcli" | "direct"
+  /** OTLP/HTTP collector base URL (standard `OTEL_EXPORTER_OTLP_ENDPOINT`); telemetry is off without it. */
+  readonly otlpEndpoint?: string
   /** Test hook: replaces the vendor SDK model construction (never set in production). */
   readonly aiModelFactory?: LanguageModelFactory
 }
@@ -36,11 +38,13 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const stripeWebhookSecret = yield* Config.option(Config.string("STRIPE_WEBHOOK_SECRET"))
       const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
       const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
+      const otlpEndpoint = yield* Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT"))
       return AppConfigService.of({
         ...(adminEmail._tag === "Some" ? { adminEmail: adminEmail.value } : {}),
         ...(stripeWebhookSecret._tag === "Some" ? { stripeWebhookSecret: stripeWebhookSecret.value } : {}),
         ...(cronSecret._tag === "Some" ? { cronSecret: cronSecret.value } : {}),
         aiHost,
+        ...(otlpEndpoint._tag === "Some" && otlpEndpoint.value.trim() ? { otlpEndpoint: otlpEndpoint.value.trim() } : {}),
         ...(appUrl._tag === "Some" ? { appUrl: appUrl.value } : {}),
         debugLinks,
         token,

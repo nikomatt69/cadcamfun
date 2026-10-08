@@ -114,5 +114,21 @@
   "cad.field.name": "Name",
   "cad.field.basePoint": "Base Point",
   "cad.field.transform": "Transform",
-  "cad.field.translation": "Translation"
+  "cad.field.translation": "Translation",
+  "cad.importExport.selectFile": "Select CAD file",
+  "cad.importExport.upload": "Upload a file",
+  "cad.importExport.orDrag": "or drag and drop",
+  "cad.importExport.formats": "JSON, STL, OBJ, STEP or CAD/CAM FUN files",
+  "cad.importExport.attention": "Attention",
+  "cad.importExport.importWarning": "Importing a file will replace your current drawing. Make sure to save your work before importing.",
+  "cad.importExport.fileName": "File Name",
+  "cad.importExport.fileFormat": "File Format",
+  "cad.importExport.formatJson": "JSON (.json)",
+  "cad.importExport.formatStl": "STL (.stl)",
+  "cad.importExport.formatObj": "OBJ (.obj)",
+  "cad.importExport.formatStep": "STEP (.step)",
+  "cad.importExport.formatCad": "CAD/CAM FUN Format (.cad)",
+  "cad.importExport.saveAsProject": "Save as Project",
+  "cad.importExport.saveAsProjectBody": "You can also save this drawing as a new project to organize it better and collaborate with others.",
+  "cad.importExport.exportFile": "Export File"
 }

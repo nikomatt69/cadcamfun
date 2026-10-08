@@ -38,10 +38,8 @@ Professional CAD/CAM Desktop Application built with Tauri v2, Next.js, and TypeS
 ### Prerequisites
 
 ```bash
-# Install Node.js 18+ and Yarn
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 18
-npm install -g yarn
+# Install Bun (the package manager and runtime this repo uses)
+curl -fsSL https://bun.sh/install | bash
 
 # Install Rust (required for Tauri)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -75,39 +73,39 @@ git clone https://github.com/nikomatt69/cad-cam-app-main-prod.git
 cd cad-cam-app-main-prod
 
 # Install dependencies
-yarn install
+bun install
 
 # Setup environment variables
 cp .env.example .env.local
 # Edit .env.local with your configurations
 
 # Generate Prisma client
-yarn prisma:generate
+bun prisma:generate
 
 # Run database migrations
-yarn prisma:migrate
+bun prisma:migrate
 ```
 
 ### Development Commands
 
 ```bash
 # Start development server (web)
-yarn dev
+bun dev
 
 # Start Tauri development (desktop)
-yarn tauri:dev
+bun tauri:dev
 
 # Build for production (web)
-yarn build
+bun build
 
 # Build desktop application
-yarn build:desktop
+bun build:desktop
 
 # Run linting
-yarn lint
+bun lint
 
 # Build plugins
-yarn build-plugins
+bun build-plugins
 ```
 
 ## 🏗️ Production Build
@@ -138,10 +136,10 @@ The build script will:
 
 ```bash
 # 1. Install dependencies and build frontend
-yarn install --frozen-lockfile
-yarn build-plugins
-yarn prisma:generate
-NODE_ENV=production yarn build:export
+bun install --frozen-lockfile
+bun build-plugins
+bun prisma:generate
+NODE_ENV=production bun build:export
 
 # 2. Build Tauri application
 tauri build --verbose
@@ -252,13 +250,13 @@ let update_url = "https://api.cadcamfun.xyz/updates/check".to_string();
 
 ```bash
 # Run unit tests
-yarn test
+bun test
 
 # Test desktop functionality
-yarn tauri:dev
+bun tauri:dev
 
 # Build and test production bundle
-yarn build:desktop
+bun build:desktop
 # Install and test the generated installer
 ```
 
@@ -287,8 +285,8 @@ yarn build:desktop
 ```bash
 # Install platform-specific dependencies (see Prerequisites)
 # Clear cache and reinstall
-rm -rf node_modules yarn.lock
-yarn install
+rm -rf node_modules bun.lock
+bun install
 ```
 
 **Tauri build errors:**
@@ -314,7 +312,7 @@ Enable debug mode for detailed logging:
 ```bash
 # Set environment variable
 export TAURI_DEBUG=true
-yarn tauri:dev
+bun tauri:dev
 ```
 
 ## 🤝 Contributing

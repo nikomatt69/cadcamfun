@@ -197,10 +197,11 @@ export function McpSettingsScreen(): JSX.Element {
                     </div>
                   </div>
 
-                  <div class="flex justify-between border-t bg-gray-50 p-3">
-                    <div>
+                  {/* flex-wrap: Enable/Disable + Delete + Edit stay fully visible in narrow cards. */}
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-t bg-gray-50 p-3">
+                    <div class="flex flex-wrap gap-2">
                       <button
-                        class={`mr-2 rounded px-3 py-1 text-sm ${server.enabled
+                        class={`rounded px-3 py-1 text-sm ${server.enabled
                           ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
                           : "bg-green-100 text-green-800 hover:bg-green-200"}`}
                         onClick={() => void toggleStatus(server, !server.enabled)}

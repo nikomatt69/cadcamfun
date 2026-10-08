@@ -1,0 +1,17 @@
+{
+  "name": "@cadcamfun/httpapi-codegen",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsgo -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112",
+    "prettier": "3.6.2"
+  },
+  "devDependencies": {
+    "@effect/platform-bun": "4.0.0-rc.112"
+  }
+}

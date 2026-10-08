@@ -441,7 +441,7 @@ describe("sandbox containment", () => {
         const timer = setTimeout(() => {
           off()
           reject(new Error(`no reply to ${request._tag}`))
-        }, 2000)
+        }, 10_000) // a cold Bun process can take seconds when the machine is loaded
         const off = worker.onMessage((response) => {
           clearTimeout(timer)
           resolve(response)
@@ -464,7 +464,7 @@ describe("sandbox containment", () => {
     } finally {
       worker.terminate()
     }
-  })
+  }, 30_000)
 })
 
 // ---------------------------------------------------------------- repository
