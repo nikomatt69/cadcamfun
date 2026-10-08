@@ -57,30 +57,57 @@ jobs:
         working-directory: apps/mobile
         run: bunx tauri ios build --debug --target aarch64-sim --ci
 
-      # Runs the app, not just compiles it: boots an iPhone simulator, installs and launches the build, and fails if the
-      # process is not alive after a while (a crash on start leaves no running process). The screenshot is an artifact.
-      - name: Launch in the iOS simulator
+      # Runs the app end to end, not just compiles it. The runner hosts a real sidecar with the companion gateway on; the
+      # simulator shares the Mac's network, so the app pairs with it over pinned TLS, and the job then asserts, from the
+      # desktop side, that this device authenticated and listed the projects. The app process must also still be alive.
+      - name: Pair the simulator app with a desktop and check the round trip
         run: |
           set -euo pipefail
+          export CADCAMFUN_TOKEN=ci-sidecar-token CADCAMFUN_DATA_DIR="$RUNNER_TEMP/cadcamfun-data" CADCAMFUN_MIGRATIONS_DIR="$PWD/packages/db/drizzle" CADCAMFUN_AI_OFFLINE=1
+          mkdir -p "$CADCAMFUN_DATA_DIR" simulator-out
+          # The sidecar exits when its stdin closes (the Tauri shell's lifeline), so keep a pipe open.
+          (tail -f /dev/null | bun apps/sidecar/src/main.ts > simulator-out/sidecar.out 2> simulator-out/sidecar.err) &
+          for i in $(seq 1 60); do grep -q '"event":"ready"' simulator-out/sidecar.out 2>/dev/null && break; sleep 1; done
+          PORT=$(python3 -c 'import json; print(json.loads(open("simulator-out/sidecar.out").readline())["port"])')
+          echo "sidecar on $PORT"
+          api() { curl -fsS -H "authorization: Bearer $CADCAMFUN_TOKEN" -H 'content-type: application/json' "$@"; }
+          api -X POST "http://127.0.0.1:$PORT/api/companion/enable" -d '{"port":18443}' > /dev/null
+          api -X POST "http://127.0.0.1:$PORT/api/projects" -d '{"name":"CI bracket"}' > /dev/null
+          LINK=$(api -X POST "http://127.0.0.1:$PORT/api/companion/pair" -d '{"name":"CI simulator","host":"127.0.0.1"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["link"])')
+
           APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" -path "*sim*" 2>/dev/null | head -n 1)
           if [ -z "$APP" ]; then APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" 2>/dev/null | grep -i -E "iphonesimulator|sim" | head -n 1); fi
           echo "app bundle: $APP"
           test -n "$APP"
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
-          echo "bundle id: $BUNDLE_ID"
           UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for rt in sorted(d, reverse=True) if "iOS" in rt for x in d[rt] if "iPhone" in x["name"]))')
-          echo "simulator: $UDID"
+          echo "simulator: $UDID, bundle: $BUNDLE_ID"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" "$BUNDLE_ID"
-          sleep 20
-          mkdir -p simulator-out
+          xcrun simctl launch "$UDID" "$BUNDLE_ID" --pair-link "$LINK"
+
+          # The desktop's view: the device token was accepted (lastSeen is set only after a pinned-TLS request authenticated).
+          SEEN=""
+          for i in $(seq 1 45); do
+            SEEN=$(api "http://127.0.0.1:$PORT/api/companion" | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print((d[0]["lastSeen"] or "") if d else "")')
+            [ -n "$SEEN" ] && break
+            sleep 2
+          done
+          echo "device last seen: ${SEEN:-never}"
+          LISTED=""
+          for i in $(seq 1 20); do
+            # Only a GET counts: the script's own POST to create the project logs the same URL.
+            if grep -B1 '"http.url": "/api/projects"' simulator-out/sidecar.err | grep -q '"http.method": "GET"'; then LISTED=yes; break; fi
+            sleep 2
+          done
+          echo "projects listed by the app: ${LISTED:-no}"
           xcrun simctl io "$UDID" screenshot simulator-out/companion.png
-          xcrun simctl spawn "$UDID" launchctl list | tee simulator-out/launchctl.txt | grep "$BUNDLE_ID"
-          # A running app has a numeric PID in the first column; "-" means it exited.
           PID=$(xcrun simctl spawn "$UDID" launchctl list | grep "UIKitApplication:$BUNDLE_ID" | awk '{print $1}')
-          echo "pid: $PID"
+          echo "app pid: ${PID:-none}"
+          tail -n 30 simulator-out/sidecar.err || true
+          test -n "$SEEN"
+          test -n "$LISTED"
           test -n "$PID" && [ "$PID" != "-" ]
 
       - name: Upload the simulator screenshot

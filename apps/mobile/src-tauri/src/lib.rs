@@ -89,6 +89,25 @@ mod keychain {
     }
 }
 
+/// The pairing link passed at launch (`--pair-link cadcamfun://pair?...`). Only the launcher of the process can pass arguments
+/// on iOS (Xcode, `simctl launch`, `devicectl`), never another app; the CI uses it to pair the simulator with a desktop.
+fn pair_link_from(args: impl Iterator<Item = String>) -> Option<String> {
+    let mut args = args.skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "--pair-link" {
+            return args
+                .next()
+                .filter(|link| link.starts_with("cadcamfun://pair?"));
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn launch_pair_link() -> Option<String> {
+    pair_link_from(std::env::args())
+}
+
 #[tauri::command]
 fn secret_get(key: String) -> Result<Option<String>, String> {
     keychain::get(&key)
@@ -111,11 +130,48 @@ pub fn run() {
         companion_stream,
         secret_get,
         secret_set,
-        secret_delete
+        secret_delete,
+        launch_pair_link
     ]);
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
     builder
         .run(tauri::generate_context!())
         .expect("error while running the CADCAM FUN companion");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pair_link_from;
+
+    fn args(list: &[&str]) -> impl Iterator<Item = String> {
+        list.iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    #[test]
+    fn reads_the_pairing_link_after_the_flag() {
+        let link = "cadcamfun://pair?host=https%3A%2F%2F127.0.0.1%3A8443&token=x";
+        assert_eq!(
+            pair_link_from(args(&["app", "--pair-link", link])),
+            Some(link.to_string())
+        );
+    }
+
+    #[test]
+    fn ignores_everything_that_is_not_a_pairing_link() {
+        assert_eq!(pair_link_from(args(&["app"])), None);
+        assert_eq!(pair_link_from(args(&["app", "--pair-link"])), None);
+        assert_eq!(
+            pair_link_from(args(&["app", "--pair-link", "https://evil.example/pair"])),
+            None
+        );
+        assert_eq!(
+            pair_link_from(args(&["--pair-link", "cadcamfun://pair?x=1"])),
+            None,
+            "the first argument is the program name"
+        );
+    }
 }

@@ -2,7 +2,7 @@ import type { EntityChange, PullRequestRow, VcsCommit, WorkflowRunRow } from "@c
 import { createResource, createSignal, For, Match, Show, Switch, type Component } from "solid-js"
 import { CompanionClient, type PullRequestDetail } from "./companion/client.ts"
 import { parsePairingLink } from "./companion/pairing.ts"
-import { keychainStore, pinnedFetch, scanPairingCode, tauriBridge, type NativeBridge } from "./companion/native.ts"
+import { keychainStore, launchPairLink, pinnedFetch, scanPairingCode, tauriBridge, type NativeBridge } from "./companion/native.ts"
 import { browserStore, type SecretStore } from "./companion/store.ts"
 import type { Pairing } from "./companion/pairing.ts"
 import type { ChatEvent } from "./companion/sse.ts"
@@ -181,7 +181,22 @@ export const App: Component = () => {
   const [project, setProject] = createSignal<{ id: string; name: string }>()
   const [env] = createResource(async () => makeEnvironment(await tauriBridge()))
   const [saved] = createResource(env, async (e) => {
-    const p = await e.store.load()
+    // A link passed at launch wins over a stored pairing: it is how the CI pairs the simulator with a desktop.
+    const link = await launchPairLink(e.bridge).catch(() => undefined)
+    if (link) {
+      try {
+        const pairing = parsePairingLink(link)
+        const client = e.connect(pairing)
+        await client.health()
+        // A Keychain that refuses the write (an unsigned simulator build) must not undo a pairing that works.
+        await e.store.save(pairing).catch(() => undefined)
+        setClient(client)
+        return true
+      } catch {
+        // Fall through to the stored pairing or the pairing screen.
+      }
+    }
+    const p = await e.store.load().catch(() => undefined)
     if (p) setClient(e.connect(p))
     return true
   })

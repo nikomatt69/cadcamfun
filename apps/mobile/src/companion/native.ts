@@ -93,3 +93,7 @@ export const scanPairingCode = async (): Promise<string> => {
   if ((await requestPermissions()) !== "granted") throw new Error("Camera access is needed to scan the pairing code")
   return (await scan({ windowed: false, formats: [Format.QRCode] })).content
 }
+
+/** A pairing link given to the app at launch (`--pair-link`), if any; `undefined` in a plain browser or when none was passed. */
+export const launchPairLink = async (bridge: NativeBridge | undefined): Promise<string | undefined> =>
+  bridge ? ((await bridge.invoke<string | null>("launch_pair_link")) ?? undefined) : undefined

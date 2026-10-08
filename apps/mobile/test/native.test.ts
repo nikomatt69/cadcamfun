@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { keychainStore, pinnedFetch, type NativeBridge } from "../src/companion/native.ts"
+import { keychainStore, launchPairLink, pinnedFetch, type NativeBridge } from "../src/companion/native.ts"
 
 const FP = "ab".repeat(32)
 
@@ -69,5 +69,13 @@ describe("keychainStore", () => {
     expect(await store.load()).toEqual(pairing)
     await store.clear()
     expect(await store.load()).toBeUndefined()
+  })
+})
+
+describe("launchPairLink", () => {
+  test("asks Rust for the launch argument; none in a browser", async () => {
+    expect(await launchPairLink(undefined)).toBeUndefined()
+    expect(await launchPairLink(bridge({ launch_pair_link: () => "cadcamfun://pair?x=1" }))).toBe("cadcamfun://pair?x=1")
+    expect(await launchPairLink(bridge({ launch_pair_link: () => null }))).toBeUndefined()
   })
 })
