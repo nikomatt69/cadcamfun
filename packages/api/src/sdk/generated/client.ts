@@ -373,6 +373,38 @@ import type {
   LibraryToolsOutput,
   ProjectToolpathsListInput,
   ProjectToolpathsListOutput,
+  VcsStatusInput,
+  VcsStatusOutput,
+  VcsLogInput,
+  VcsLogOutput,
+  VcsCommitInput,
+  VcsCommitOutput,
+  VcsBranchesInput,
+  VcsBranchesOutput,
+  VcsCreateBranchInput,
+  VcsCreateBranchOutput,
+  VcsCheckoutInput,
+  VcsCheckoutOutput,
+  VcsRestoreInput,
+  VcsRestoreOutput,
+  VcsDiffInput,
+  VcsDiffOutput,
+  VcsListPullRequestsInput,
+  VcsListPullRequestsOutput,
+  VcsOpenPullRequestInput,
+  VcsOpenPullRequestOutput,
+  VcsPullRequestInput,
+  VcsPullRequestOutput,
+  VcsReviewInput,
+  VcsReviewOutput,
+  VcsMergePullRequestInput,
+  VcsMergePullRequestOutput,
+  VcsClosePullRequestInput,
+  VcsClosePullRequestOutput,
+  VcsRunsInput,
+  VcsRunsOutput,
+  VcsDispatchInput,
+  VcsDispatchOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -3190,6 +3222,200 @@ export function make(options: ClientOptions) {
             query: { projectId: input["projectId"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    vcs: {
+      status: (input: VcsStatusInput, requestOptions?: RequestOptions) =>
+        request<VcsStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/status`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      log: (input: VcsLogInput, requestOptions?: RequestOptions) =>
+        request<VcsLogOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/log`,
+            query: { rev: input["rev"], limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commit: (input: VcsCommitInput, requestOptions?: RequestOptions) =>
+        request<VcsCommitOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/commit`,
+            body: { message: input["message"], authorKind: input["authorKind"], files: input["files"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      branches: (input: VcsBranchesInput, requestOptions?: RequestOptions) =>
+        request<VcsBranchesOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/branches`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createBranch: (input: VcsCreateBranchInput, requestOptions?: RequestOptions) =>
+        request<VcsCreateBranchOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/branches`,
+            body: { name: input["name"], from: input["from"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      checkout: (input: VcsCheckoutInput, requestOptions?: RequestOptions) =>
+        request<VcsCheckoutOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/checkout`,
+            body: { branch: input["branch"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      restore: (input: VcsRestoreInput, requestOptions?: RequestOptions) =>
+        request<VcsRestoreOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/restore`,
+            body: { rev: input["rev"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      diff: (input: VcsDiffInput, requestOptions?: RequestOptions) =>
+        request<VcsDiffOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/diff`,
+            query: { from: input["from"], to: input["to"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listPullRequests: (input: VcsListPullRequestsInput, requestOptions?: RequestOptions) =>
+        request<VcsListPullRequestsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls`,
+            query: { state: input["state"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      openPullRequest: (input: VcsOpenPullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsOpenPullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls`,
+            body: {
+              title: input["title"],
+              body: input["body"],
+              head: input["head"],
+              base: input["base"],
+              authorKind: input["authorKind"],
+            },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pullRequest: (input: VcsPullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsPullRequestOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      review: (input: VcsReviewInput, requestOptions?: RequestOptions) =>
+        request<VcsReviewOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/reviews`,
+            body: { verdict: input["verdict"], body: input["body"], path: input["path"], pointer: input["pointer"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      mergePullRequest: (input: VcsMergePullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsMergePullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/merge`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      closePullRequest: (input: VcsClosePullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsClosePullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/close`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runs: (input: VcsRunsInput, requestOptions?: RequestOptions) =>
+        request<VcsRunsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/runs`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      dispatch: (input: VcsDispatchInput, requestOptions?: RequestOptions) =>
+        request<VcsDispatchOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/dispatch`,
+            body: { ref: input["ref"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,
           },
           requestOptions,

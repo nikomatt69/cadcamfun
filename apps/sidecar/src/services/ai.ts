@@ -16,6 +16,10 @@ import { KvStore } from "./kv.ts"
 import { normalizeElement, withDefaultTolerance } from "@cadcamfun/ai"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
 import { LocalProfile } from "./local-profile.ts"
+import { ProjectVcs } from "./project-vcs.ts"
+import { WorkflowRunner } from "./workflow-runner.ts"
+import { vcsToolSpecs } from "./ai-vcs-tools.ts"
+import { ProjectRepo as ProjectsForVcs } from "../repos/project-repo.ts"
 
 /** The tool handlers the model can call, over the active project's newest drawing and the libraries. */
 const toolHandlers = Effect.gen(function*() {
@@ -241,6 +245,11 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const config = yield* AppConfigService
   const handlers = yield* ToolHandlers
   const credentials = yield* AiCredentials
+  const vcs = yield* ProjectVcs
+  const runner = yield* WorkflowRunner
+  const projectsRepo = yield* ProjectsForVcs
+  const { user } = yield* LocalProfile
+  const actor = { userId: user.id, name: user.name ?? "User", email: user.email ?? "unknown@cadcamfun.local" }
   // Runtime-wide scheduler: instantiated before the host so `toolsFor` can
   // hand its four `agent_task*` tool specs to every project's host. The same
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
@@ -258,6 +267,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     catalogue: { network: process.env.CADCAMFUN_AI_OFFLINE !== "1" },
     toolsFor: (projectId) => [
       ...buildTools(handlers, projectId),
+      ...vcsToolSpecs({ vcs, runner, projects: projectsRepo, actor }),
       ...backgroundToolSpecs(scheduler)
     ]
   })
