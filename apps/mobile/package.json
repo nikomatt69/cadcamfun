@@ -9,7 +9,8 @@
     "tauri": "tauri",
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",
-    "ios:build": "tauri ios build"
+    "ios:build": "tauri ios build",
+    "ios:install": "bash scripts/install-on-device.sh"
   },
   "dependencies": {
     "@cadcamfun/api": "workspace:*",
