@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "The companion webview: IPC to our own commands and the QR scanner. No filesystem, shell or network plugin.",
+  "windows": ["main"],
+  "platforms": ["iOS", "android"],
+  "permissions": ["core:default", "barcode-scanner:default"]
+}

@@ -6,10 +6,15 @@
     "typecheck": "tsgo -p tsconfig.json --noEmit",
     "dev": "vite",
     "build": "vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build"
   },
   "dependencies": {
     "@cadcamfun/api": "workspace:*",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-barcode-scanner": "^2.0.0",
     "solid-js": "^1.9.0"
   },
   "devDependencies": {

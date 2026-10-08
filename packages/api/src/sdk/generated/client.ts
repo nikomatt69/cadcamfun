@@ -405,6 +405,14 @@ import type {
   VcsRunsOutput,
   VcsDispatchInput,
   VcsDispatchOutput,
+  CompanionStatusOutput,
+  CompanionEnableInput,
+  CompanionEnableOutput,
+  CompanionDisableOutput,
+  CompanionPairInput,
+  CompanionPairOutput,
+  CompanionRevokeInput,
+  CompanionRevokeOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -3416,6 +3424,59 @@ export function make(options: ClientOptions) {
             body: { ref: input["ref"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    companion: {
+      status: (requestOptions?: RequestOptions) =>
+        request<CompanionStatusOutput>(
+          { method: "GET", path: `/api/companion`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      enable: (input?: CompanionEnableInput, requestOptions?: RequestOptions) =>
+        request<CompanionEnableOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/enable`,
+            body: { port: input?.["port"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      disable: (requestOptions?: RequestOptions) =>
+        request<CompanionDisableOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/disable`,
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pair: (input: CompanionPairInput, requestOptions?: RequestOptions) =>
+        request<CompanionPairOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/pair`,
+            body: { name: input["name"], host: input["host"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      revoke: (input: CompanionRevokeInput, requestOptions?: RequestOptions) =>
+        request<CompanionRevokeOutput>(
+          {
+            method: "DELETE",
+            path: `/api/companion/devices/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,

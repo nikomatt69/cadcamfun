@@ -1,0 +1,79 @@
+import { describe, expect, test } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { CompanionClient } from "../../mobile/src/companion/client.ts"
+import { parsePairingLink } from "../../mobile/src/companion/pairing.ts"
+import { fingerprintOf } from "../src/services/companion-gateway.ts"
+
+const entry = new URL("../src/main.ts", import.meta.url).pathname
+const migrations = new URL("../../../packages/db/drizzle", import.meta.url).pathname
+const token = "companion-e2e-main-token"
+
+/** Boots the real sidecar process, as the Tauri shell does, and waits for its ready line. */
+async function boot(dataDir: string) {
+  const child = Bun.spawn([process.execPath, entry], {
+    env: { ...process.env, CADCAMFUN_TOKEN: token, CADCAMFUN_DATA_DIR: dataDir, CADCAMFUN_MIGRATIONS_DIR: migrations, CADCAMFUN_AI_OFFLINE: "1" },
+    stdin: "pipe", stdout: "pipe", stderr: "ignore",
+  })
+  const reader = child.stdout.getReader()
+  let out = ""
+  const deadline = Date.now() + 30_000
+  while (!out.includes("\n")) {
+    if (Date.now() > deadline) throw new Error("ready timeout")
+    const { done, value } = await reader.read()
+    if (done) throw new Error("sidecar exited early")
+    out += new TextDecoder().decode(value)
+  }
+  const port = JSON.parse(out.split("\n")[0]!).port as number
+  return { child, port, local: (path: string, init: RequestInit = {}) => fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers } }) }
+}
+
+describe("companion end to end", () => {
+  test("a paired phone client drives history, a pull request and the Actions list over HTTPS; nothing else is reachable", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-"))
+    const sidecar = await boot(dataDir)
+    try {
+      const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
+      // Off by default: the desktop UI enables it and shows a pairing QR.
+      expect((await (await sidecar.local("/api/companion")).json()).enabled).toBe(false)
+      const enabled = await (await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })).json()
+      expect(enabled).toMatchObject({ enabled: true, port: gatewayPort })
+      const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Test iPhone", host: "127.0.0.1" }) })).json()
+
+      const pairing = parsePairingLink(paired.link)
+      expect(pairing.baseUrl).toBe(`https://127.0.0.1:${gatewayPort}`)
+      // The phone pins the fingerprint from the QR; here we verify it matches what the gateway really serves.
+      const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
+      expect(fingerprintOf(pem)).toBe(pairing.fingerprint)
+      const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const phone = new CompanionClient(pairing, pinned)
+
+      const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
+      await sidecar.local(`/api/projects/${project.id}/drawings`, { method: "POST", body: JSON.stringify({ name: "Plate", data: { w: 100 } }) })
+
+      expect((await phone.projects()).map((p) => p.name)).toEqual(["Bracket"])
+      await phone.commit(project.id, "Initial import")
+      expect((await phone.log(project.id)).map((c) => c.message.trim())).toEqual(["Initial import"])
+      expect(await phone.runs(project.id)).toEqual([])
+      expect((await phone.branches(project.id)).current).toBe("main")
+
+      // Not reachable from a phone, even with a valid companion token:
+      const denied = await pinned(`${pairing.baseUrl}/api/ai/credentials`, { method: "PUT", headers: { authorization: `Bearer ${pairing.token}` } })
+      expect(denied.status).toBe(403)
+      expect((await pinned(`${pairing.baseUrl}/api/companion`, { headers: { authorization: `Bearer ${pairing.token}` } })).status).toBe(403)
+      // The sidecar's own token is not a companion token.
+      expect((await pinned(`${pairing.baseUrl}/api/projects`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(401)
+
+      // Revoking from the desktop cuts the phone off at once.
+      const status = await (await sidecar.local("/api/companion")).json()
+      expect(status.devices).toHaveLength(1)
+      await sidecar.local(`/api/companion/devices/${paired.id}`, { method: "DELETE" })
+      expect(await phone.projects().then(() => "ok", (e) => e.status)).toBe(401)
+    } finally {
+      sidecar.child.kill("SIGTERM")
+      await sidecar.child.exited
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  }, 60_000)
+})

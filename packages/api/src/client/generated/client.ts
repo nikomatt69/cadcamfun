@@ -2500,6 +2500,36 @@ const adaptGroup29 = (raw: RawClient["vcs"]) => ({
   dispatch: Endpoint29_15(raw),
 })
 
+const Endpoint30_0 = (raw: RawClient["companion"]) => () => raw["status"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint30_1Request = Parameters<RawClient["companion"]["enable"]>[0]
+type Endpoint30_1Input = { readonly port?: Endpoint30_1Request["payload"]["port"] }
+const Endpoint30_1 = (raw: RawClient["companion"]) => (input?: Endpoint30_1Input) =>
+  raw["enable"]({ payload: { port: input?.["port"] } }).pipe(Effect.mapError(mapClientError))
+
+const Endpoint30_2 = (raw: RawClient["companion"]) => () => raw["disable"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint30_3Request = Parameters<RawClient["companion"]["pair"]>[0]
+type Endpoint30_3Input = {
+  readonly name: Endpoint30_3Request["payload"]["name"]
+  readonly host?: Endpoint30_3Request["payload"]["host"]
+}
+const Endpoint30_3 = (raw: RawClient["companion"]) => (input: Endpoint30_3Input) =>
+  raw["pair"]({ payload: { name: input["name"], host: input["host"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint30_4Request = Parameters<RawClient["companion"]["revoke"]>[0]
+type Endpoint30_4Input = { readonly id: Endpoint30_4Request["params"]["id"] }
+const Endpoint30_4 = (raw: RawClient["companion"]) => (input: Endpoint30_4Input) =>
+  raw["revoke"]({ params: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup30 = (raw: RawClient["companion"]) => ({
+  status: Endpoint30_0(raw),
+  enable: Endpoint30_1(raw),
+  disable: Endpoint30_2(raw),
+  pair: Endpoint30_3(raw),
+  revoke: Endpoint30_4(raw),
+})
+
 const adaptClient = (raw: RawClient) => ({
   health: adaptGroup0(raw["health"]),
   system: adaptGroup1(raw["system"]),
@@ -2531,6 +2561,7 @@ const adaptClient = (raw: RawClient) => ({
   library: adaptGroup27(raw["library"]),
   projectToolpaths: adaptGroup28(raw["projectToolpaths"]),
   vcs: adaptGroup29(raw["vcs"]),
+  companion: adaptGroup30(raw["companion"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

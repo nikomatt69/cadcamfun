@@ -181,3 +181,66 @@ jobs:
       - name: cargo test
         working-directory: apps/desktop/src-tauri
         run: cargo test --all-features
+
+  mobile-native:
+    name: companion net crate (fmt, clippy, test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/mobile/native/target
+          key: cargo-mobile-native-${{ runner.os }}-${{ hashFiles('apps/mobile/native/Cargo.toml') }}
+          restore-keys: cargo-mobile-native-${{ runner.os }}-
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: cargo fmt
+        working-directory: apps/mobile/native
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        working-directory: apps/mobile/native
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: apps/mobile/native
+        run: cargo test
+
+  # Compiles the iOS shell against the iOS SDK. Manual only: needs a macOS runner and has not run in CI yet.
+  ios-check:
+    name: iOS shell (cargo check, manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the web assets
+        run: bun run --filter @cadcamfun/mobile build
+
+      - name: cargo check (aarch64-apple-ios)
+        working-directory: apps/mobile/src-tauri
+        run: cargo check --target aarch64-apple-ios

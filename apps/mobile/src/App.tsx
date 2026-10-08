@@ -2,7 +2,9 @@ import type { EntityChange, PullRequestRow, VcsCommit, WorkflowRunRow } from "@c
 import { createResource, createSignal, For, Match, Show, Switch, type Component } from "solid-js"
 import { CompanionClient, type PullRequestDetail } from "./companion/client.ts"
 import { parsePairingLink } from "./companion/pairing.ts"
-import { browserStore } from "./companion/store.ts"
+import { keychainStore, pinnedFetch, scanPairingCode, tauriBridge, type NativeBridge } from "./companion/native.ts"
+import { browserStore, type SecretStore } from "./companion/store.ts"
+import type { Pairing } from "./companion/pairing.ts"
 import type { ChatEvent } from "./companion/sse.ts"
 
 type Tab = "history" | "pulls" | "actions" | "assistant"
@@ -11,15 +13,23 @@ const TABS: ReadonlyArray<readonly [Tab, string]> = [["history", "History"], ["p
 const ago = (iso: string) => new Date(iso).toLocaleString()
 const short = (oid: string) => oid.slice(0, 7)
 
-const Pair: Component<{ onPaired: (c: CompanionClient) => void }> = (props) => {
+/** In the iOS shell: Keychain + certificate-pinned Rust requests. In a plain browser (development): web storage + fetch. */
+interface Environment { readonly bridge: NativeBridge | undefined; readonly store: SecretStore; readonly connect: (p: Pairing) => CompanionClient }
+const makeEnvironment = (bridge: NativeBridge | undefined): Environment => ({
+  bridge,
+  store: bridge ? keychainStore(bridge) : browserStore,
+  connect: (p) => new CompanionClient(p, bridge ? pinnedFetch(bridge, p.fingerprint) : fetch),
+})
+
+const Pair: Component<{ env: Environment; onPaired: (c: CompanionClient) => void }> = (props) => {
   const [link, setLink] = createSignal("")
   const [error, setError] = createSignal("")
   const connect = async () => {
     try {
       const pairing = parsePairingLink(link())
-      const client = new CompanionClient(pairing)
+      const client = props.env.connect(pairing)
       await client.health()
-      await browserStore.save(pairing)
+      await props.env.store.save(pairing)
       props.onPaired(client)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -31,6 +41,9 @@ const Pair: Component<{ onPaired: (c: CompanionClient) => void }> = (props) => {
       <p class="muted">On the desktop open Settings → Companion and scan the QR code, or paste the pairing link.</p>
       <textarea rows="4" placeholder="cadcamfun://pair?…" value={link()} onInput={(e) => setLink(e.currentTarget.value)} />
       <Show when={error()}><p class="error">{error()}</p></Show>
+      <Show when={props.env.bridge}>
+        <button onClick={async () => { try { setLink(await scanPairingCode()); await connect() } catch (e) { setError(e instanceof Error ? e.message : String(e)) } }}>Scan QR code</button>
+      </Show>
       <button class="primary" onClick={connect}>Connect</button>
     </main>
   )
@@ -166,21 +179,28 @@ const ProjectView: Component<{ client: CompanionClient; projectId: string; name:
 export const App: Component = () => {
   const [client, setClient] = createSignal<CompanionClient>()
   const [project, setProject] = createSignal<{ id: string; name: string }>()
-  void browserStore.load().then((p) => p && setClient(new CompanionClient(p)))
+  const [env] = createResource(async () => makeEnvironment(await tauriBridge()))
+  const [saved] = createResource(env, async (e) => {
+    const p = await e.store.load()
+    if (p) setClient(e.connect(p))
+    return true
+  })
   const [projects] = createResource(client, (c) => c.projects())
   return (
-    <Show when={client()} fallback={<Pair onPaired={setClient} />}>
+    <Show when={env() && saved() && (client() ? true : env())} fallback={<p class="muted">Loading…</p>}>
+      <Show when={client()} fallback={<Pair env={env()!} onPaired={setClient} />}>
       {(c) => (
         <Show when={project()} fallback={
           <main class="screen">
             <h1>Projects</h1>
             <ul class="list"><For each={projects()}>{(p) => <li onClick={() => setProject({ id: p.id, name: p.name })}>{p.name}<br /><span class="muted">{ago(p.updatedAt)}</span></li>}</For></ul>
-            <button onClick={async () => { await browserStore.clear(); setClient(undefined) }}>Unpair</button>
+            <button onClick={async () => { await env()!.store.clear(); setClient(undefined) }}>Unpair</button>
           </main>
         }>
           {(p) => <ProjectView client={c()} projectId={p().id} name={p().name} onBack={() => setProject(undefined)} />}
         </Show>
       )}
+      </Show>
     </Show>
   )
 }

@@ -1142,6 +1142,10 @@ export type VcsReviewPayload = {
 
 export type VcsDispatchPayload = { readonly ref?: string | undefined }
 
+export type CompanionEnablePayload = { readonly port?: number | undefined }
+
+export type CompanionPairPayload = { readonly name: string; readonly host?: string | undefined }
+
 export type HealthCheckOutput = { status: string; timestamp: string }
 
 export type SystemReadyOutput = { status: string; timestamp: string }
@@ -4871,3 +4875,46 @@ export type VcsDispatchOutput = Array<{
   startedAt: string
   finishedAt: string | null
 }>
+
+export type CompanionStatusOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionEnableInput = { readonly port?: CompanionEnablePayload["port"] }
+
+export type CompanionEnableOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionDisableOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionPairInput = {
+  readonly name: CompanionPairPayload["name"]
+  readonly host?: CompanionPairPayload["host"]
+}
+
+export type CompanionPairOutput = { id: string; link: string }
+
+export type CompanionRevokeInput = { readonly id: { readonly id: string }["id"] }
+
+export type CompanionRevokeOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}

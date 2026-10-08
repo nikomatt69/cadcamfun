@@ -60,6 +60,7 @@ export const routes: AppRoute[] = [
   { path: "/projects/create", component: lazy(() => import("../pages/projects/create.tsx")) },
   { path: "/projects", component: lazy(() => import("../pages/projects/index.tsx")) },
   { path: "/settings", component: lazy(() => import("../pages/settings/index.tsx")) },
+  { path: "/settings/companion", component: lazy(() => import("../pages/settings/companion.tsx")) },
   { path: "/settings/mcp/config-editor", component: lazy(() => import("../pages/settings/mcp/config-editor.tsx")) },
   { path: "/settings/mcp/edit/:id", component: lazy(() => import("../pages/settings/mcp/edit/_id_.tsx")) },
   { path: "/settings/mcp", component: lazy(() => import("../pages/settings/mcp/index.tsx")) },

@@ -1,6 +1,6 @@
 # WP11–WP13 — Git-style history, pull requests, workflows (Actions) and the iOS companion
 
-Status: **WP11 and WP12 built and tested; WP13 scaffolded** (client library tested, UI builds, iOS project not generated). Owner dirs: `packages/vcs`, `packages/workflow`, `apps/mobile`, plus the explicit additions to WP0 (`packages/db` schema), WP3 (`packages/api/src/groups/vcs.ts`) and WP4 (`apps/sidecar`) listed in §4.
+Status: **WP11 and WP12 built and tested; WP13 built up to the Xcode step**: companion gateway, pairing UI on the desktop, certificate-pinned Rust client, iOS shell sources and the phone UI exist; the Xcode project (`tauri ios init`) and an on-device run need a Mac. Owner dirs: `packages/vcs`, `packages/workflow`, `apps/mobile`, plus the explicit additions to WP0 (`packages/db` schema), WP3 (`packages/api/src/groups/vcs.ts`) and WP4 (`apps/sidecar`) listed in §4.
 
 ## 1. Decisions
 
@@ -75,15 +75,22 @@ A commit/merge triggers the `push` workflows of the pushed branch; opening a PR 
 
 ## 6. Transport and the iOS app
 
-The sidecar listens on `127.0.0.1` only. Reaching it from a phone needs a **companion gateway** — *not built yet*, and security-sensitive, so it is specified here before any code:
+The sidecar listens on `127.0.0.1` only. A phone reaches it through the **companion gateway** (`apps/sidecar/src/services/companion*.ts`, built and tested end to end against a real sidecar process):
 
-- Opt-in in Settings → Companion; off by default; shows a QR `cadcamfun://pair?host=…&token=…&fp=…&name=…`.
-- HTTPS only, with a per-install self-signed certificate; the phone pins its SHA-256 fingerprint from the QR (no trust-on-first-use, no plain HTTP).
-- A separate **scoped token** (revocable, listed in Settings), accepted only for an allow-list of route families: `projects` (read), `vcs`, `pulls`, `actions`, `ai/chat*`. Everything else (credentials, plugins, files, billing…) is refused.
-- LAN first; remote access later through a tunnel/relay that carries only the same TLS stream end-to-end.
-- Offline desktop: the phone shows the last synced GitHub mirror (read-only) through `restTransport`; edits wait for the desktop.
+- Opt-in: Settings → Mobile companion (`/settings/companion`) turns it on and shows the pairing QR; off by default and re-enabled automatically after a restart only if it was on.
+- Separate HTTPS listener (`0.0.0.0`, default port 8443) with a per-install self-signed P-256 certificate stored under `<dataDir>/companion/` (key `0600`). The QR carries the certificate's SHA-256 fingerprint; the phone pins it (no trust-on-first-use, no HTTP).
+- **Scoped, revocable device tokens** (32 random bytes, only their SHA-256 is stored, compared in constant time; shown once, inside the QR). The gateway swaps in the sidecar's real bearer token when forwarding, so the phone never holds it.
+- Route allow-list (`COMPANION_ROUTES`): `GET /api/health`, `GET /api/projects`, `/api/projects/:id/(vcs|pulls|actions)/**`, `GET /api/ai/status`, `POST /api/ai/chat/stream|chat/abort|permission/reply`. Everything else (credentials, plugins, files, billing, `/api/companion`…) answers 403. 10 failed authentications per minute from one address → 429.
+- Revoking a device from the desktop cuts it off on the next request.
+- Not built: remote access outside the LAN (a relay/tunnel would have to carry this same TLS stream end to end).
 
-iOS project steps (need macOS + Xcode, therefore not done here): `bunx tauri ios init` in `apps/mobile`; add a Keychain-backed `SecretStore` command (replace `browserStore`); a `fetch` implementation with certificate pinning; QR scanning plugin; App Transport Security exception for the local-network host; push notifications for PR/Actions events (APNs via GitHub-like webhook relay, later).
+Phone side (`apps/mobile`):
+
+- `native/` — Rust crate `cadcamfun-companion-net`: reqwest + rustls with a custom verifier that accepts only the pinned leaf certificate, https-only, no redirects, JSON and streamed (SSE) responses. Tests (fmt, clippy `-D warnings`, 6 tests incl. rejection of a different certificate) run on any OS and in CI.
+- `src-tauri/` — Tauri v2 iOS shell: commands `companion_request`, `companion_stream` (Tauri `Channel`), `secret_get|set|delete` (iOS Keychain via `keyring`), QR scanner plugin, `Info.ios.plist` (local-network and camera usage strings), CSP without any network `connect-src`, icons generated.
+- `src/companion/native.ts` — `pinnedFetch` routes the unchanged `CompanionClient` through those commands; `keychainStore` keeps the pairing in the Keychain; plain browsers fall back to `fetch` + web storage for development.
+
+Steps that need macOS + Xcode and have **not** been run: `bun run --filter @cadcamfun/mobile ios:init` (generates `src-tauri/gen/apple`), set `APPLE_DEVELOPMENT_TEAM`, `ios:dev` on a device, then TestFlight signing. The `src-tauri` crate is not compiled in this repo's Linux CI (Tauri needs webkit2gtk); the manual `ios-check` workflow job compiles it for `aarch64-apple-ios`.
 
 ## 7. GitHub mirror
 
@@ -91,7 +98,7 @@ iOS project steps (need macOS + Xcode, therefore not done here): `bunx tauri ios
 
 ## 8. Limits and next steps
 
-1. Companion gateway + pairing UI in the desktop (WP4/WP5/WP6).
+1. Run the iOS shell on a device (Mac), APNs push for PR/Actions events, remote access beyond the LAN.
 2. History/branches/PR panels in the desktop UI (WP6) over the new API; commit graph view.
 3. Register `cam/verify`, `cam/gcode`, `ai/prompt` workflow steps; `needs`-scoped outputs if workflows grow.
 4. GitHub routes and PR mirroring (§7); `deletedAt`/sync interplay with `10-release-sync.md` §5 (git history supersedes the change-log idea there).

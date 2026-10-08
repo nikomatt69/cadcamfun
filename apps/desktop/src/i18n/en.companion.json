@@ -1,0 +1,21 @@
+{
+  "companion.title": "Mobile companion",
+  "companion.subtitle": "Review and update your projects from your phone. The assistant proposes changes on its own branch; you approve them.",
+  "companion.status.on": "Listening on port {port}",
+  "companion.status.off": "Off. Nothing is reachable from other devices.",
+  "companion.enable": "Turn on",
+  "companion.disable": "Turn off",
+  "companion.fingerprint": "Certificate fingerprint (SHA-256)",
+  "companion.devices": "Paired devices",
+  "companion.devices.empty": "No paired devices.",
+  "companion.devices.lastSeen": "Last seen {when}",
+  "companion.devices.never": "Never connected",
+  "companion.revoke": "Revoke",
+  "companion.pair": "Pair a phone",
+  "companion.pair.name": "Device name",
+  "companion.pair.host": "Address of this computer",
+  "companion.pair.create": "Show QR code",
+  "companion.pair.hint": "Open CADCAM FUN on your phone, choose Scan QR code and point the camera here. The code contains a one-time token and is shown only now.",
+  "companion.error.load": "Could not load the companion settings",
+  "companion.error.action": "The action failed: {message}"
+}

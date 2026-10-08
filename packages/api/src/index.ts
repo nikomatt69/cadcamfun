@@ -25,6 +25,7 @@ import { BillingGroup } from "./groups/billing.ts"
 import { MiscGroup } from "./groups/misc.ts"
 import { KvGroup } from "./groups/kv.ts"
 import { VcsGroup } from "./groups/vcs.ts"
+import { CompanionGroup } from "./groups/companion.ts"
 
 export * from "./errors.ts"
 export * from "./auth.ts"
@@ -45,6 +46,7 @@ export * from "./groups/billing.ts"
 export * from "./groups/misc.ts"
 export * from "./groups/kv.ts"
 export * from "./groups/vcs.ts"
+export * from "./groups/companion.ts"
 export * from "./groups/materials.ts"
 export * from "./groups/tools.ts"
 export * from "./groups/drawings.ts"
@@ -88,5 +90,6 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(LibraryGroup.middleware(Authorization))
   .add(ProjectToolpathsGroup.middleware(Authorization))
   .add(VcsGroup.middleware(Authorization))
+  .add(CompanionGroup.middleware(Authorization))
   .annotateMerge(OpenApi.annotations({ title: "CADCAMFUN sidecar API" }))
 {}
