@@ -12,6 +12,7 @@
  * a cube; cylinders, cones, prisms and capsules extend along Z by `height`; a pyramid is
  * `width` x `depth` in XY and `height` in Z.
  */
+import { elementMesh } from "../model/element-mesh.ts"
 import type { CadElement, OperationType, Stock, ToolpathSettings } from "./schema.ts"
 
 export interface V3 { x: number; y: number; z: number }
@@ -125,6 +126,18 @@ export const elementBounds = (e: CadElement): Bounds => {
       return boundsOf({ x: Math.min(...xs), y: Math.min(...ys), z: Math.min(...zs) }, { x: Math.max(...xs), y: Math.max(...ys), z: Math.max(...zs) })
     }
     default: {
+      // A solid with no formula of its own here (an extrusion, a revolution, a mesh, a parametric part) has the bounds of its mesh:
+      // reading width / height / radius off it would give a box of nothing, and the part would be placed on the stock by it.
+      const solid = elementMesh(e as never, 0.05)
+      if (solid !== undefined) {
+        const lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
+        for (let k = 0; k + 2 < solid.positions.length; k += 3) {
+          lo.x = Math.min(lo.x, solid.positions[k]!); hi.x = Math.max(hi.x, solid.positions[k]!)
+          lo.y = Math.min(lo.y, solid.positions[k + 1]!); hi.y = Math.max(hi.y, solid.positions[k + 1]!)
+          lo.z = Math.min(lo.z, solid.positions[k + 2]!); hi.z = Math.max(hi.z, solid.positions[k + 2]!)
+        }
+        return boundsOf(lo, hi)
+      }
       if (isContainer(e)) {
         if (e["width"] !== undefined && e["height"] !== undefined) return centered(e, num(e["width"]) / 2, num(e["height"]) / 2, -num(e["depth"]) / 2, num(e["depth"]) / 2)
         const kids = childrenOf(e)

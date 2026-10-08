@@ -1,4 +1,5 @@
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
+import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js"
@@ -360,7 +361,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         mesh.geometry?.dispose?.()
       })
     }
+    // A Boolean draws its result; the operands it consumes are not drawn on their own.
+    const consumed = cam.model.consumedOperands(all as never)
     for (const element of all) {
+      if (consumed.has(element.id)) continue
       const layer = known.find((candidate) => candidate.id === element.layerId)
       if (!layer || !layer.visible || element.visible === false) continue
       const object = buildElementObject(element)

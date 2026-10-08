@@ -38,7 +38,8 @@ export const CATEGORIZED_TOOLS: ReadonlyArray<ToolCategory> = [
     { name: "Intersect", icon: svg("boolIntersect"), action: "boolean-intersect" }] },
   { name: "Transformation Operations", tools: [
     { name: "Extrude", icon: svg("extrude"), action: "extrusion" }, { name: "Revolve", icon: svg("revolution"), action: "revolution" },
-    { name: "Sweep", icon: svg("sweep"), action: "sweep" }, { name: "Loft", icon: svg("loft"), action: "loft" }] },
+    { name: "Sweep", icon: svg("sweep"), action: "sweep" }, { name: "Loft", icon: svg("loft"), action: "loft" },
+    { name: "Parametric", icon: svg("extrude"), action: "parametric" }] },
   { name: "Industrial Elements", tools: [
     { name: "Thread", icon: svg("thread"), action: "thread" }, { name: "Chamfer", icon: svg("chamfer"), action: "chamfer" },
     { name: "Fillet", icon: svg("fillet"), action: "fillet" }, { name: "Gear", icon: svg("gear"), action: "gear" },

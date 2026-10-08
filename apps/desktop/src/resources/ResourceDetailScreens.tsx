@@ -85,7 +85,8 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const meta = CONFIG[props.kind]
 
   const [row, setRow] = createSignal<Row>()
-  const [form, setForm] = createSignal<Row>({})
+  const [form, setFormSignal] = createSignal<Row>({})
+  const setForm = (next: Row): void => { setFormSignal(next) }
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
@@ -97,8 +98,10 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
     setLoading(true)
     setError(undefined)
     try {
-      const data = await run<Row>(fetchEffect(app, props.kind, params.id))
-      const normalized = asRecord(props.kind === "machines" ? (data as Record<string, unknown>)["data"] ?? data : data) as Row
+      const response = await run<unknown>(fetchEffect(app, props.kind, params.id))
+      // Machine configs answer the legacy envelope `{ success, data }`; the other kinds answer the row itself.
+      const record = props.kind === "machines" ? asRecord(asRecord(response)["data"]) : asRecord(response)
+      const normalized = record as Row
       setRow(normalized)
       setForm(formOf(props.kind, normalized))
     } catch (cause) {

@@ -7,7 +7,7 @@
  * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
-import { MAX_CURVE_SEGMENTS, chordError, segmentsFor } from "@cadcamfun/core"
+import { MAX_CURVE_SEGMENTS, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
 
 type Fields = Readonly<Record<string, unknown>>
 
@@ -58,6 +58,12 @@ export const ELEMENT_SPECS = {
   "boolean-union": { defaults: { ...at, operands: [] }, required: ["operands"], doc: "union of >=2 operands (ids, or indexes of earlier elements of the same call)" },
   "boolean-subtract": { defaults: { ...at, operands: [] }, required: ["operands"], doc: "first operand minus the others" },
   "boolean-intersect": { defaults: { ...at, operands: [] }, required: ["operands"], doc: "intersection of >=2 operands" },
+  // ---- parametric
+  parametric: {
+    defaults: { ...at, history: { parameters: {}, features: [] } },
+    required: ["history"],
+    doc: "a dimension-driven part: history {parameters: {name: number | \"expression\"}, features: [...]} rebuilt from the top whenever a parameter changes. Features: sketch {id, type:\"sketch\", plane: XY|YZ|ZX, offset?, sketch: {entities: points/lines/circles/arcs, constraints}}, extrude {id, type:\"extrude\", sketch, depth, operation: new|union|subtract|intersect, direction?: up|down|symmetric}, revolve {sketch, axis: x|y|{line}, angle? (deg)}, hole {plane, offset?, at:[u,v], diameter, depth}, pattern {feature, kind: linear|circular, count, step | centre, span?}. Any dimension may be an expression of the parameters"
+  },
   // ---- 2D and curves
   circle: { defaults: { ...at, radius: 50, linewidth: 1 }, doc: "circle: radius" },
   rectangle: { defaults: { ...at, width: 100, height: 100, linewidth: 1 }, doc: "rectangle centred on x,y: width, height" },
@@ -174,6 +180,17 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     element[key] = given
   }
   let warning: string | undefined
+  if (type === "parametric") {
+    const history = element["history"] as History
+    if (!Array.isArray((history as { features?: unknown }).features) || typeof (history as { parameters?: unknown }).parameters !== "object") {
+      return { ok: false, error: "parametric.history needs {parameters: {...}, features: [...]}" }
+    }
+    // Build it now: a history that makes nothing is the model's mistake to hear about, not the user's to find on screen.
+    const built = rebuild(history)
+    const issues = built.issues.map((i) => `${i.feature}: ${i.message}`)
+    if (built.bodies.length === 0) return { ok: false, error: `The history builds no solid. ${issues.length > 0 ? issues.join("; ") : "It has no extrude or revolve."}` }
+    if (issues.length > 0) warning = `The history builds ${built.bodies.length} solid(s) with problems: ${issues.join("; ")}`
+  }
   if (input["tolerance"] !== undefined) {
     const tolerance = input["tolerance"]
     if (typeof tolerance !== "number" || !Number.isFinite(tolerance) || tolerance <= 0) return { ok: false, error: `${type}.tolerance must be a positive number of millimetres (0.001 = 1 micron)` }
@@ -190,7 +207,7 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     const v = element[key]
     if (typeof v === "number" && v <= 0 && type !== "arc") return { ok: false, error: `${type}.${key} must be positive` }
   }
-  if (typeof element["tolerance"] === "number") warning = tessellate(element, element["tolerance"])
+  if (typeof element["tolerance"] === "number") warning = warning ?? tessellate(element, element["tolerance"])
   return warning === undefined ? { ok: true, element } : { ok: true, element, warning }
 }
 

@@ -4,6 +4,7 @@ import { Copy, Lock, Trash2 } from "lucide-solid"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { getFieldsForElementType, type PropertyField } from "../lib/propertyFields.ts"
+import ParametricPanel from "./ParametricPanel.tsx"
 import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
 import { ColorListInput, ElementListInput, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
 
@@ -138,6 +139,10 @@ export default function PropertyPanel(): JSX.Element {
             </Motion.div>
           </div>
         </form>
+
+        <Show when={selected().type === "parametric" && selected().history}>
+          <ParametricPanel element={selected()} locked={locked()} />
+        </Show>
       </Motion.div>}
     </Show>
   )

@@ -2,6 +2,8 @@
  * Default parameters of every element the CAD tool panel can create (2D drawing, 3D primitives, advanced solids,
  * mechanical parts, architecture, free-form). One entry per legacy toolbar tool, same values as the legacy editor.
  */
+import { plateTemplate } from "@cadcamfun/core";
+
 export type ElementTemplate = Record<string, unknown> & { type: string }
 
 /** Returns the element a tool creates, or `undefined` for an unknown tool id. */
@@ -295,6 +297,10 @@ export const elementTemplate = (type: string): ElementTemplate | undefined => {
           color: "#1e88e5",
           linewidth: 1
         };
+        break;
+      case "parametric":
+        // A dimension-driven starting part: a plate with a hole, from the parameters width, depth, thick and hole.
+        newElement = { type: "parametric", name: "Parametric plate", x: 0, y: 0, z: 0, color: "#26A69A", history: plateTemplate() };
         break;
       case "boolean-union":
         newElement = { type: "boolean-union", operands: [], x: 0, y: 0, z: 0, color: "#4CAF50" };

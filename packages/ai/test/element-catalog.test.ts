@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { ELEMENT_SPECS, ELEMENT_TYPES, chordError, elementCatalogueText, normalizeElement, segmentsFor } from "../src/element-catalog.ts"
+import { plateTemplate } from "@cadcamfun/core"
+import { ELEMENT_SPECS, ELEMENT_TYPES, chordError, elementCatalogueLines, elementCatalogueText, normalizeElement, segmentsFor } from "../src/element-catalog.ts"
 
 describe("element catalogue", () => {
   test("every type normalises from just its name (or tells what it still needs)", () => {
@@ -85,5 +86,42 @@ describe("precision", () => {
     expect(normalizeElement({ type: "circle", radius: 5, segments: 64.5 })).toMatchObject({ ok: false })
     const exact = normalizeElement({ type: "cylinder", radius: 12.50525, height: 30.0001, x: 0.0005 })
     expect(exact.ok && exact.element).toMatchObject({ radius: 12.50525, height: 30.0001, x: 0.0005 })
+  })
+})
+
+describe("parametric elements", () => {
+  const history = () => structuredClone(plateTemplate())
+
+  test("a history that builds is accepted as it is, with no warning", () => {
+    const r = normalizeElement({ type: "parametric", history: history() })
+    expect(r).toMatchObject({ ok: true })
+    expect((r as { warning?: string }).warning).toBeUndefined()
+  })
+
+  test("the history is required and must have parameters and features", () => {
+    expect(normalizeElement({ type: "parametric" })).toMatchObject({ ok: false, error: 'parametric needs "history"' })
+    expect(normalizeElement({ type: "parametric", history: { parameters: {} } })).toMatchObject({ ok: false })
+    expect(normalizeElement({ type: "parametric", history: "plate" })).toMatchObject({ ok: false })
+  })
+
+  test("a history that builds nothing is refused with the reasons, so the model can fix it", () => {
+    const r = normalizeElement({ type: "parametric", history: { parameters: { w: 10 }, features: [{ id: "e", type: "extrude", sketch: "nowhere", depth: "ghost", operation: "new" }] } })
+    expect(r).toMatchObject({ ok: false })
+    expect((r as { error: string }).error).toContain("builds no solid")
+    expect((r as { error: string }).error).toContain("nowhere")
+    expect(normalizeElement({ type: "parametric", history: { parameters: {}, features: [] } })).toMatchObject({ ok: false })
+  })
+
+  test("a history that builds with problems is accepted with the problems as a warning", () => {
+    const h = history()
+    const broken = { ...h, parameters: { ...h.parameters, unused: "1 +" } }
+    const r = normalizeElement({ type: "parametric", history: broken })
+    expect(r).toMatchObject({ ok: true })
+    expect((r as { warning: string }).warning).toContain("parameter unused")
+  })
+
+  test("it is in the catalogue the prompt is made from", () => {
+    expect(elementCatalogueLines()).toContain("- parametric:")
+    expect(elementCatalogueText()).toContain("parametric (")
   })
 })

@@ -1,6 +1,52 @@
-import { segmentsFor } from "@cadcamfun/core";
+import { cam, segmentsFor } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
+import { useElementsStore } from "../store/elementsStore.ts";
 import * as THREE from "three";
+
+interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
+
+/** A solid mesh in scene coordinates as a Three mesh (the drawing's origin offset is added; smooth normals are not wanted on a CAD solid). */
+const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }): THREE.Mesh => {
+  const positions = new Float32Array(mesh.positions.length);
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] = mesh.positions[i]! + offset.x;
+    positions[i + 1] = mesh.positions[i + 1]! + offset.y;
+    positions[i + 2] = mesh.positions[i + 2]! + offset.z;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setIndex(Array.from(mesh.indices));
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false });
+  return new THREE.Mesh(geometry, material);
+};
+
+/** The elements a Boolean depends on, itself included, so a cached result is invalidated when any operand changes. */
+const dependencies = (element: any, all: ReadonlyArray<any>, seen = new Set<string>()): any[] => {
+  if (seen.has(element.id)) return [];
+  seen.add(element.id);
+  const out: any[] = [element];
+  if (Array.isArray(element.operands)) for (const id of element.operands) {
+    const operand = all.find((candidate) => candidate.id === id);
+    if (operand) out.push(...dependencies(operand, all, seen));
+  }
+  return out;
+};
+
+const booleanCache = new Map<string, SolidMesh | null>();
+
+/** The solid a Boolean element stands for (cached on its operands), or null when it cannot be formed. */
+const booleanSolid = (element: any): SolidMesh | null => {
+  const all = useElementsStore.getState().elements;
+  const key = JSON.stringify(dependencies(element, all));
+  const hit = booleanCache.get(key);
+  if (hit !== undefined) return hit;
+  let result: SolidMesh | null = null;
+  try { result = cam.model.booleanElementMesh(all as any, element)?.mesh ?? null; } catch { result = null; }
+  if (booleanCache.size >= 32) booleanCache.delete(booleanCache.keys().next().value as string);
+  booleanCache.set(key, result);
+  return result;
+};
 
 /** The editor never draws a curve with more chords than this by default (an element can ask for more with `segments`). */
 const DISPLAY_SEGMENT_CAP = 256;
@@ -1210,34 +1256,34 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
       // ======= BOOLEAN OPERATIONS =======
       case "boolean-union":
       case "boolean-subtract":
-      case "boolean-intersect":
+      case "boolean-intersect": {
         if (!element.operands || element.operands.length < 2) return null;
-
-        // This requires the three-csg library for CSG operations
-        // For now, we'll just render a placeholder or the first operand
-
-        // Create a placeholder for boolean operation result
+        // The real result of the operation on the operands' solids (mesh CSG). Where it cannot be formed (an operand that is not a
+        // solid, a missing one) the wireframe marker stays, so the element is still there to select and fix.
+        const solid = booleanSolid(element);
+        if (solid) {
+          const result = solidObject(solid, { color: 0x4caf50, ...element }, originOffset);
+          result.userData.isBooleanOperation = true;
+          result.userData.operationType = element.type;
+          result.userData.operandIds = element.operands;
+          return result;
+        }
         const booleanPlaceholder = new THREE.Mesh(
           new THREE.SphereGeometry(1, 16, 16),
-          new THREE.MeshStandardMaterial({
-            color: element.color || 0x4caf50,
-            wireframe: true,
-            opacity: 0.7,
-            transparent: true
-          })
+          new THREE.MeshStandardMaterial({ color: element.color || 0xf44336, wireframe: true, opacity: 0.7, transparent: true })
         );
-
-        booleanPlaceholder.position.set(
-          (element.x || 0) + originOffset.x,
-          (element.y || 0) + originOffset.y,
-          (element.z || 0) + originOffset.z
-        );
-
+        booleanPlaceholder.position.set((element.x || 0) + originOffset.x, (element.y || 0) + originOffset.y, (element.z || 0) + originOffset.z);
         booleanPlaceholder.userData.isBooleanOperation = true;
         booleanPlaceholder.userData.operationType = element.type;
         booleanPlaceholder.userData.operandIds = element.operands;
-
         return booleanPlaceholder;
+      }
+
+      // A parametric model: its feature history rebuilt into one solid (the same solid the CAM machines).
+      case "parametric": {
+        const solid = cam.model.elementMesh(element);
+        return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset) : null;
+      }
 
       // ======= INDUSTRIAL ELEMENTS =======
       case "thread":
