@@ -45,7 +45,12 @@
 }
 
 .reference-shell :is(button, a):focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
-.reference-shell :is(button, a):active { transform: scale(.97); }
+/* Press feedback on pointer-down (Apple), subtle and quick (Emil: 0.95–0.98, fast
+   in / slower out). Scoped to controls: plain text links highlight but never scale. */
+.reference-shell :is(button, a.btn, [role="button"]):not(:disabled):active {
+  transform: scale(0.97);
+  transition-duration: var(--ui-press-duration, 60ms);
+}
 .reference-shell .reference-native-titlebar { position: relative; z-index: 70; background: var(--shell-chrome); border-color: var(--shell-border); }
 .reference-navbar { position: relative; z-index: 50; flex-shrink: 0; background: var(--shell-chrome); border-bottom: 1px solid var(--shell-border); box-shadow: 0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1); backdrop-filter: blur(12px); }
 .reference-navbar-inner { display: flex; align-items: center; justify-content: space-between; height: 4rem; padding: 0 2rem; border-radius: 0 0 1rem 1rem; }

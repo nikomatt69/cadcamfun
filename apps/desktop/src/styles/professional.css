@@ -41,7 +41,17 @@ html.dark body { background-image: none !important; background-color: #111418; }
 .reference-navbar { box-shadow: 0 1px 0 var(--shell-border); }
 .reference-icon-button { box-shadow: none; }
 .reference-popover { box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14); }
-.reference-shell :is(button, a):active { transform: none; }
+/* Press feedback is deliberately kept, not removed: it is the cheapest and most
+   reliable "the interface heard me" signal (Apple: respond on pointer-down; Emil:
+   scale on :active). What this pass calms down is the amount — 3% of travel, fast
+   in, slightly slower out, on controls only. Text links and large surfaces never
+   scale, and nothing bounces. The rule itself lives in reference-shell.css. */
+:where(.reference-shell) :where(button):not(:disabled) {
+  /* Zero-specificity base, so any Tailwind transition utility on the element wins. */
+  transition-property: transform;
+  transition-duration: var(--ui-release-duration);
+  transition-timing-function: var(--ui-ease-out);
+}
 
 /* ---- Cards and controls: no shimmer, holographic tint, glow, lift or pulse ---- */
 .ui-card::before { display: none; }

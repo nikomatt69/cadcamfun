@@ -16,18 +16,28 @@ export interface ScreenHeaderProps {
   readonly actions?: JSX.Element
 }
 
-/** `h1` + subtitle + actions; every screen starts with exactly one `h1`. */
+/**
+ * `h1` + subtitle + actions; every screen starts with exactly one `h1`.
+ *
+ * Type is set as a set, not size alone (Apple's typography rules): tighter
+ * tracking as size grows, tight leading on the title, looser on the subtitle,
+ * and the subtitle drops in weight and contrast instead of shrinking.
+ */
 export function ScreenHeader(props: ScreenHeaderProps): JSX.Element {
   return (
-    <header class="flex flex-wrap items-start gap-3 border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+    <header class="flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-gray-200 px-6 py-5 dark:border-gray-700">
       <div class="min-w-0">
-        <h1 class="text-xl font-semibold">{props.title}</h1>
+        <h1 class="text-[1.375rem] font-semibold leading-tight tracking-[-0.015em] text-gray-900 dark:text-gray-50">
+          {props.title}
+        </h1>
         <Show when={props.subtitle !== undefined}>
-          <p class="text-sm text-gray-600 dark:text-gray-300">{props.subtitle}</p>
+          <p class="mt-1 max-w-prose text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+            {props.subtitle}
+          </p>
         </Show>
       </div>
       <Show when={props.actions !== undefined}>
-        <div class="ml-auto flex items-center gap-2">{props.actions}</div>
+        <div class="ml-auto flex flex-wrap items-center gap-2">{props.actions}</div>
       </Show>
     </header>
   )
@@ -36,16 +46,19 @@ export function ScreenHeader(props: ScreenHeaderProps): JSX.Element {
 /** Centred spinner with an accessible label. */
 export function LoadingState(props: { readonly label: string }): JSX.Element {
   return (
-    <div class="flex items-center gap-2 p-6 text-sm text-gray-600 dark:text-gray-300" aria-busy="true">
+    <div class="flex items-center gap-2 px-6 py-8 text-sm text-gray-600 dark:text-gray-300" aria-busy="true">
       <LoaderCircle size={18} aria-hidden="true" class="animate-spin" />
       <span>{props.label}</span>
     </div>
   )
 }
 
+/** Nothing here yet — says so in the same voice as the heading, never a bare word. */
 export function EmptyState(props: { readonly label: string }): JSX.Element {
   return (
-    <p class="p-6 text-sm text-gray-500 dark:text-gray-400">{props.label}</p>
+    <p class="px-6 py-10 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      {props.label}
+    </p>
   )
 }
 
