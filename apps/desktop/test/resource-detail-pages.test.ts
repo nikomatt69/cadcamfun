@@ -27,6 +27,8 @@ const PAGE_TIMEOUT = 20000
 
 const settle = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms))
 const find = <T extends Element = HTMLElement>(selector: string): Promise<T> => app.wait(() => document.querySelector<T>(selector), 30000)
+const toolbarButton = (text: string): HTMLElement | undefined =>
+  [...document.querySelectorAll<HTMLElement>(".cam-workspace button")].find((el) => el.textContent?.trim() === text)
 const byText = (tag: string, text: string): HTMLElement | undefined =>
   [...document.querySelectorAll<HTMLElement>(tag)].find((el) => el.textContent?.trim() === text)
 
@@ -77,15 +79,19 @@ describe("resource detail pages", () => {
     try {
       await find(".cam-workspace")
       await app.wait(() => byText("h1", "Brass Alloy"), 30000)
-      byText("button", "Edit")?.click()
+      // The shell's menu bar also has an "Edit" button, so the page's own buttons are looked up inside the workspace.
+      toolbarButton("Edit")?.click()
       await settle()
-      byText("button", "Details")?.click()
+      toolbarButton("Details")?.click()
       await settle()
-      const nameInput = await find<HTMLInputElement>("#res-name")
+      const nameInput = await app.wait(() => document.querySelector<HTMLInputElement>("#res-name") ?? null, 15000).catch((cause: unknown) => {
+        const buttons = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim()).filter(Boolean).join(" | ")
+        throw new Error(`no #res-name; buttons: ${buttons}; cause: ${String(cause).slice(0, 120)}`)
+      })
       nameInput.value = "Brass Alloy 360"
       nameInput.dispatchEvent(new window.Event("input", { bubbles: true }))
       await settle()
-      byText("button", "Save")?.click()
+      toolbarButton("Save")?.click()
       await settle(400)
       const { body } = await app.sidecar.call(`/api/materials/${materialId}`)
       expect(body.name).toBe("Brass Alloy 360")
