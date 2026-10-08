@@ -61,7 +61,7 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 | WP10 | Updates, sync, packaging, CI | `.github/workflows`, `scripts/`, `apps/desktop/src-tauri` (updater only) | `10-release-sync.md` | WP5 | **done** (pipeline + CI + updater; release secrets unset) |
 | WP11 | Git-style history + GitHub mirror | `packages/vcs` (+ `GitRepo/GitObject/GitRef/PullRequest*` tables, sidecar `vcs` services) | `13-vcs-actions-mobile.md` | WP0, WP4 | **done** core + sidecar + API; desktop panels and GitHub routes pending |
 | WP12 | Workflows (Actions-style) | `packages/workflow` | `13-vcs-actions-mobile.md` | WP11 | **done** engine + runner; only `project/*` steps registered |
-| WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **builds for the iOS simulator** (macOS CI) — companion gateway + desktop pairing screen + pinned Rust client + iOS shell; device run, signing and TestFlight pending |
+| WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **builds and launches in the iOS simulator** (macOS CI) — companion gateway + desktop pairing screen + pinned Rust client + iOS shell; device run, signing and TestFlight pending |
 
 ### Parallelisation map
 
