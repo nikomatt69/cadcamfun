@@ -94,7 +94,7 @@ export function McpSettingsScreen(): JSX.Element {
     >
       <div class="container mx-auto p-4">
         <div class="mb-6 flex items-center justify-between">
-          <h1 class="text-2xl font-bold">{t("mcp.settings.title")}</h1>
+          <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.settings.title")}</h1>
 
           <div class="flex space-x-2">
             <A href="/mcp/directory">
@@ -295,7 +295,7 @@ export function McpConfigEditorScreen(): JSX.Element {
   return (
     <div class="container mx-auto p-4">
       <div class="mb-4 flex items-center justify-between">
-        <h1 class="text-2xl font-bold">{t("mcp.editor.title")}</h1>
+        <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.editor.title")}</h1>
         <A href="/settings/mcp">
           <button class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-800 hover:bg-gray-300">
             {t("mcp.editor.back")}
@@ -427,7 +427,7 @@ export function McpEditServerScreen(): JSX.Element {
             </A>
           </div>
 
-          <h1 class="mb-6 text-2xl font-bold">{t("mcp.edit.title")}</h1>
+          <h1 class="mb-6 text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.edit.title")}</h1>
 
           <Show when={error() !== undefined}>
             <McpErrorBanner message={error() ?? ""} onDismiss={() => setError(undefined)} />

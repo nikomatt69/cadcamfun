@@ -2,6 +2,10 @@
 
 Status: core flows implemented and tested (83 desktop tests). Boot/runtime with the generated typed client and the browser fake, the app shell, and the Projects, CAD, CAM, Library and Settings screens are working end to end against the contract; the 3D viewport plays back toolpaths, and the 2D editor drives the tool state machines. Remaining work is the long tail of legacy pages, which are still generated stubs rather than implemented screens.
 
+Visual status (2026-10-08): compact CAD/CAM workstation chrome implemented in WP6-owned components; geometry, state and viewport rendering remain unchanged.
+
+Both workspaces also share the generator inspector's blue glass tab treatment and the CAD quick-navigation menu, now available at the bottom of the CAM sidebar. Navigation and panel content scroll independently; collapse controls stay available.
+
 - **WP6** owns `apps/desktop/src/app/`, `src/screens/`, `src/components/`, `src/state/`, `src/i18n/` — app shell, navigation, project/library screens, forms, API wiring.
 - **WP7** owns `apps/desktop/src/viewport/` — 2D drawing canvas, 3D viewport, toolpath preview.
 - Shared by both (edited only by whoever creates it first, then frozen): `apps/desktop/package.json`, `vite.config.ts`, `index.html`, `src/main.tsx`.
@@ -52,6 +56,12 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## 5. Change log
 
+- 2026-10-08: shared page-consistency stylesheet applies compact surface/control radii, neutral borders, aligned controls and generator-style glass tabs to page and standalone route containers; CAD/CAM workspace-specific styles remain isolated. Individual route visual verification remains outstanding; no browser control used.
+
+- 2026-10-08 follow-up: extracted the existing CAD quick-navigation routes into keyboard-reachable `components/workspace-navigation.tsx` and reused them in CAM. All sidebar/inspector tabs and CAM workspace tabs share the generator inspector's neutral inactive, outlined charcoal hover/focus, and translucent blue selected rectangle with bottom underline. Added source-contract regression tests for shared navigation, tab styling and narrow-window stage protection; browser verification intentionally not performed per user instruction.
+- 2026-10-08: library indexes and material/tool/machine detail cards use shared screen headers, neutral theme surfaces, compact controls and responsive data rows. Legacy CAM/toolpath chrome now uses shell surfaces and compact panel/button radii; Quick Navigation matches sidebar control spacing and contrast without hover translation. No API or machining behavior changes.
+- 2026-10-08: component index/detail styling aligned with shared screen headers, card/form controls, brand and gray theme tokens, responsive spacing, visible link focus, and bounded data panels; API calls and interactions are unchanged. Route audit: `/components` and `/components/:id` use `legacy-components.tsx`; `/materials`, `/tools`, `/machine` use `library.tsx` and their detail routes use `library-detail-screen.tsx` (separately owned); `/toolpaths` and `/toolpaths/:id` both still use `screens/cam.tsx`, left unchanged to preserve the CAM workspace.
+- 2026-10-08: modest CAD/CAM visual polish, preserving blue accents and light/dark identity. Shared `components/workstation.css` reduces toolbar padding, panel gaps, shadows and radii, aligns 12px control typography, and gives properties/generator sections clearer hierarchy. Sidebars use responsive CSS widths without delayed slide-away transforms; narrow windows retain a 320px minimum stage in a horizontally scrollable workspace with all collapse controls preserved. CAD browser type metadata moves below the name, CAM inline assignment actions wrap, and shared row actions remain visible on keyboard focus and touch. No geometry, state, API, or viewport rendering changes; existing dirty `AdvancedSection.tsx` and `project-detail.tsx` edits are untouched.
 - v1: initial spec.
 - Editor core implemented and tested without a canvas or a DOM (`bun test`, 54 tests):
   - `src/state/commands.ts` + `src/state/history.ts`: the command pattern and a

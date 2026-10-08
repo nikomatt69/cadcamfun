@@ -91,14 +91,14 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      class={`bg-gradient-to-br from-white to-blue-50 dark:from-gray-800 dark:to-gray-900 dark:text-white rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto" : "p-6"}`}
+      class={`workstation-generator__form dark:text-white ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto bg-white dark:bg-gray-900" : "p-2"}`}
       data-testid="toolpath-generator"
     >
-      <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+      <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} class="flex justify-between items-center gap-2 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center space-x-3">
           <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg"><Settings size={24} class="text-blue-600 dark:text-blue-400" /></div>
           <div>
-            <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">{t("cam.generator")}</h2>
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{t("cam.generator")}</h2>
             <p class="text-sm text-gray-600 dark:text-gray-400">{t("cam.generator.subtitle")}</p>
           </div>
         </div>

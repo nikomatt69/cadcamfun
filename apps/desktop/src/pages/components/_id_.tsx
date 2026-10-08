@@ -1,1 +1,1 @@
-export { LegacyComponentDetail as default } from "../../screens/legacy-components.tsx"
+export { ComponentDetailScreen as default } from "../../resources/ResourceDetailScreens.tsx"

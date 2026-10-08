@@ -163,7 +163,7 @@ export function MagicLinkVerifyScreen(): JSX.Element {
           </div>
           <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.expiredTitle")}</h2>
           <p class="mb-6 text-gray-600 dark:text-gray-400">{t("magicverify.expiredBody")}</p>
-          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700" href="/auth/signin">
+          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/auth/signin">
             {t("magicverify.getNew")}
           </A>
         </Show>
@@ -173,7 +173,7 @@ export function MagicLinkVerifyScreen(): JSX.Element {
           </div>
           <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("magicverify.errorTitle")}</h2>
           <p class="mb-6 text-gray-600 dark:text-gray-400">{message()}</p>
-          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700" href="/auth/signin">
+          <A class="inline-block rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/auth/signin">
             {t("magicverify.tryAgain")}
           </A>
         </Show>

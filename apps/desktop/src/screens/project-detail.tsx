@@ -16,9 +16,9 @@ interface Card { readonly id: string; readonly name: string; readonly descriptio
 type Tab = "drawings" | "components" | "toolpaths"
 type ModalKind = "edit" | "delete" | "drawing" | "component" | "toolpath" | undefined
 
-const BUTTON = "px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center text-sm font-medium transition-colors"
-const PRIMARY = "bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center shadow-md shadow-blue-500/20 transition-colors"
-const CARD = "bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-800 group hover:-translate-y-1 hover:shadow-xl transition-all duration-200"
+const BUTTON = "px-3.5 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center text-sm font-medium transition-colors duration-150"
+const PRIMARY = "bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 flex items-center justify-center shadow-md shadow-blue-500/20 transition-colors duration-150"
+const CARD = "bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden cursor-pointer border border-gray-100 dark:border-gray-800 group hover:shadow-xl transition-[background-color,border-color,box-shadow,opacity] duration-200"
 const ICON_BTN = "p-1.5 text-gray-500 dark:text-gray-400 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400"
 const TABS: ReadonlyArray<{ readonly id: Tab; readonly label: string }> = [
   { id: "drawings", label: "Drawings" }, { id: "components", label: "Components" }, { id: "toolpaths", label: "Toolpaths" }
@@ -42,7 +42,7 @@ function Modal(props: { readonly open: boolean; readonly onClose: () => void; re
         >
           <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h3 class="text-lg font-medium text-gray-900 dark:text-white">{props.title}</h3>
-            <button type="button" class="text-gray-400 hover:text-gray-500 transition-colors" aria-label="Close" onClick={() => props.onClose()}><X size={20} /></button>
+            <button type="button" class="text-gray-400 hover:text-gray-500 transition-colors duration-150" aria-label="Close" onClick={() => props.onClose()}><X size={20} /></button>
           </div>
           <div class="px-6 py-4 space-y-3">{props.children}</div>
         </div>
@@ -171,7 +171,7 @@ export function ProjectDetailScreen(): JSX.Element {
               <Show when={row.thumbnail} fallback={thumb}>{(src) => <img src={src()} alt={row.name} class="h-full w-full object-contain" />}</Show>
             </div>
             <div class="p-5">
-              <h3 class="text-lg font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{row.name}</h3>
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-150">{row.name}</h3>
               <Show when={row.description}><p class="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{row.description}</p></Show>
               <Show when={showDate && row.updatedAt}><div class="mt-2 text-xs text-gray-500">Updated: {formatDate(row.updatedAt)}</div></Show>
             </div>
@@ -213,7 +213,7 @@ export function ProjectDetailScreen(): JSX.Element {
           <Show when={project()} fallback={
             <div class="flex flex-col items-center justify-center p-6 text-center min-h-[60vh]">
               <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6"><File size={36} class="text-gray-400" /></div>
-              <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Project Not Found</h1>
+              <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50 mb-4">Project Not Found</h1>
               <p class="text-gray-600 dark:text-gray-300 mb-8 max-w-md">The project you are looking for doesn't exist or you don't have access to it.</p>
               <button type="button" class={PRIMARY} onClick={() => navigate("/projects")}>Back to Projects</button>
             </div>
@@ -223,7 +223,7 @@ export function ProjectDetailScreen(): JSX.Element {
                 <div class="bg-white dark:bg-gray-900 shadow-lg rounded-xl p-5 md:p-6 mb-8 border border-gray-100 dark:border-gray-800">
                   <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                     <div>
-                      <h1 class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{current().name}</h1>
+                      <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{current().name}</h1>
                       <Show when={current().description}><p class="text-gray-600 dark:text-gray-300 mt-2">{current().description}</p></Show>
                       <div class="mt-4 flex flex-wrap items-center text-sm text-gray-500 dark:text-gray-400 gap-4">
                         <div class="flex items-center"><Clock size={16} class="mr-1.5" /><span>Updated: {formatDate(current().updatedAt)}</span></div>
@@ -243,7 +243,7 @@ export function ProjectDetailScreen(): JSX.Element {
                       {(item) => (
                         <button
                           type="button" role="tab" aria-selected={tab() === item.id}
-                          class={`px-4 py-2 font-medium text-sm focus:outline-none relative border-b-2 transition-colors ${tab() === item.id ? "text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300"}`}
+                          class={`px-4 py-2 font-medium text-sm focus:outline-none relative border-b-2 transition-colors duration-150 ${tab() === item.id ? "text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300"}`}
                           onClick={() => setTab(item.id)}
                         >{item.label}</button>
                       )}

@@ -120,6 +120,16 @@ Rendering, hit-testing in screen space, command history/undo (UI state, WP6/WP7)
 - `applyTransform` converts a non-similar transform of an **arc** into a sampled polyline (an elliptical arc has no entity); circles, ellipses, rectangles (axis-aligned results) and polylines with bulge are handled exactly.
 - Tests live in `packages/core/test/` (`geometry.test.ts`, `offset.test.ts`, `spline.test.ts`, `dxf.test.ts`); run `bun test packages/core`.
 
+## 7b. Parametric modelling (supersedes the exclusions of §4 and §6 for sketch constraints and Boolean CSG)
+
+Added after v6.0, each with tests; all pure, in `cad/`:
+
+- **`expr.ts`** — parameter expressions (`width / 2 + 3in`, `sin(30deg)`, `max(a, b)`), units `mm cm m in deg rad`, functions and constants, and `resolveParameters`, which evaluates a table of named parameters in dependency order and reports cycles and unknown names per parameter instead of throwing.
+- **`sketch.ts`** — a constraint sketch (points, lines, circles, arcs) with 22 constraint kinds (coincident, fixed, horizontal / vertical, distance / length / distanceX / distanceY, parallel, perpendicular, equal length / radius, radius / diameter, angle, point on line / circle, midpoint, symmetric, tangent line-circle and circle-circle, concentric). Solved by Levenberg-Marquardt with a central-difference Jacobian; the result carries a status (`fully-constrained`, `under-constrained`, `over-constrained`, `conflicting`, `failed`), the degrees of freedom (unknowns minus the rank of the Jacobian), the points that can still move, and, on a conflict, the constraints that miss. `sketchProfiles` chains lines and arcs through their shared points into closed polygons (circles on their own) within a tolerance.
+- **`csg.ts`** — Boolean union / subtraction / intersection of closed triangle meshes by BSP. The result is a closed triangle mesh whose volume and outline are right up to the meshing tolerance. **It is not an exact B-rep**: faces are not trimmed analytic surfaces, splitting leaves T-junctions, and there is no topology to fillet or to measure a face on (spec 12 gate 1 is still open). Also `translateMesh`, `rotateMesh`, `mergeMeshes`.
+- **`history.ts`** — a parametric feature history: a parameter table and an ordered list of features (sketch on XY / YZ / ZX with an offset, extrude, revolve, hole, linear and circular pattern), replayed from the top by `rebuild`. Dimensions are numbers or expressions, so `withParameter(history, "width", 60)` re-solves every sketch and rebuilds every solid and Boolean after it. Bodies are meshes; `cam/model` turns them into a part model (`buildPartModelFromMeshes`). A feature that cannot be built is an entry in `issues` and is skipped.
+- **Not covered:** fillet, chamfer, shell, draft, sweep, loft; sketch constraints between entities of different sketches (projection); an editor UI for the sketch and the timeline.
+
 ## 8. Change log
 
 - Current drawing migration direct-decodes complete tagged documents, preserving every entity kind, recursive blocks, transforms and metadata. Legacy lower-case documents and sparse early tagged exports retain migration compatibility. Import reporting no longer counts preserved current entities as dropped. Invalid current drawings and future versions still fail with `DrawingMigrationError`.
@@ -130,6 +140,7 @@ Rendering, hit-testing in screen space, command history/undo (UI state, WP6/WP7)
 
 - Solid correctness hardening: cylinder meshes honor the declared axis using orientation-preserving coordinate permutations; torus meshes sweep a circular tube in the radial/axial plane, with rotation as tube phase. Analytic torus bounds use major plus minor radius in the radial plane and minor radius along the axis. Negative extrusions have ordered bounds and outward-facing meshes. Regression tests live beside the solid implementation.
 
+- v6.1: Added §7b (expressions, constraint sketch solver, mesh CSG, parametric history).
 - v1: initial spec.
 - v2: WP1 implemented; status set to done. Added the as-built section (barrel layout, exports, semantics, deviations). Replaced the single-polyline offsetter by the robust split/trim/chain algorithm with `offsetRings` for islands; analytic tolerance bounds for splines and ellipses; blocks are block-local; `applyTransform` folds the local transform exactly once; DXF import/export rewritten (layers, units, sequential bulge parsing, correct clockwise arcs).
 - Geometry fixes found while making the acceptance suite green:

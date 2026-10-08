@@ -18,7 +18,16 @@
 .cad-workspace .cad-tabs button{display:flex;justify-content:center;align-items:center;gap:.4rem;flex:1;padding:.75rem .4rem;border:1px solid transparent;border-radius:.75rem;color:var(--cad-muted);font-size:.8rem;font-weight:500}
 .cad-workspace .collapsed .cad-tabs{flex-direction:column}
 .cad-workspace .cad-sidebar-content{padding:.5rem;overflow-y:auto;flex:1;min-height:0}
-.cad-workspace .cad-sidebar-footer{padding:.75rem;border-top:1px solid var(--cad-border);text-align:center}
+.cad-workspace .cad-sidebar-footer{padding:.5rem;border-top:1px solid var(--cad-border);text-align:center}
+.cad-workspace .cad-sidebar-footer>.cad-button{width:100%;min-height:2rem;padding:.375rem .75rem;border-radius:.375rem;font-size:.75rem;color:var(--cad-text);box-shadow:none}
+.cad-workspace.cam-workspace{--cad-surface:var(--shell-popover);--cad-card:var(--shell-popover);--cad-text:var(--shell-text);--cad-muted:var(--shell-muted);background:var(--shell-popover)}
+.cad-workspace.cam-workspace :is(.cad-surface,.cad-toolbar-group,.cad-card,.cad-view-settings){border-radius:.375rem;box-shadow:none;backdrop-filter:none}
+.cad-workspace.cam-workspace .cad-toolbar{gap:.5rem;padding:.5rem .75rem}
+.cad-workspace.cam-workspace .cad-toolbar-group{gap:.25rem;padding:.25rem}
+.cad-workspace.cam-workspace .cad-button{min-height:2rem;padding:.375rem .5rem;border-radius:.375rem;box-shadow:none;font-size:.75rem;color:var(--cad-text)}
+.cad-workspace.cam-workspace .cad-tabs{background:var(--cad-card);border-radius:.375rem .375rem 0 0}
+.cad-workspace.cam-workspace .cad-tabs button{padding:.5rem .375rem;border-radius:.375rem;font-size:.75rem}
+.cad-workspace.cam-workspace .cad-card h3{font-size:.875rem;font-weight:600}
 .cad-workspace .cad-navigation{display:grid;gap:.3rem;margin-top:.5rem;text-align:left}
 .cad-workspace .cad-navigation a{padding:.4rem .7rem;border-radius:.5rem}
 .cad-workspace .cad-canvas{flex:1;min-width:0;position:relative;overflow:hidden;display:flex;background:linear-gradient(135deg,#ffffffdd,#eff6ff80)}

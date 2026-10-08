@@ -38,9 +38,9 @@ export function Section(props: SectionProps): JSX.Element {
   const gen = useGeneratorStore()
   const open = (): boolean => gen.expanded[props.id] === true
   return (
-    <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: props.delay }} class="mb-6" data-testid={props.testId}>
+    <Motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: props.delay }} class="workstation-section" data-testid={props.testId}>
       <Motion.div
-        class="flex items-center justify-between cursor-pointer p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
+        class="workstation-section__header flex items-center justify-between cursor-pointer bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
         role="button"
         tabindex="0"
         aria-expanded={open()}
@@ -66,7 +66,7 @@ export function Section(props: SectionProps): JSX.Element {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            class="mt-4 space-y-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+            class="workstation-section__body bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
           >
             {props.children}
           </Motion.div>

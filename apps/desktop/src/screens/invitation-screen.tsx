@@ -20,7 +20,7 @@ export function InvitationScreen(): JSX.Element {
     <section class="flex min-h-screen flex-col bg-gray-50">
       <header class="bg-white py-4 shadow-sm">
         <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <h1 class="text-xl font-bold text-gray-900">{t("invite.heading")}</h1>
+          <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("invite.heading")}</h1>
         </div>
       </header>
 
@@ -32,7 +32,7 @@ export function InvitationScreen(): JSX.Element {
             <p class="text-red-700">{t("invite.notFound")}</p>
             <button
               type="button"
-              class="mt-6 rounded-md bg-gray-100 px-5 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-200"
+              class="mt-6 rounded-md bg-gray-100 px-5 py-2 font-medium text-gray-800 transition-colors duration-150 hover:bg-gray-200"
               onClick={() => navigate("/")}
             >
               {t("invite.returnHome")}

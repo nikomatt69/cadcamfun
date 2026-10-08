@@ -55,6 +55,16 @@ module.exports = {
         "80": "20rem",
         "96": "24rem"
       },
+      /* House motion curves. Tailwind's built-in easings are too weak — they
+         start too slowly to read as a response — so every `transition-*`
+         utility defaults to a decisive decelerate (strong ease-out), and the
+         in-out / drawer variants are the ones the design system uses. */
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+        out: "cubic-bezier(0.2, 0, 0, 1)",
+        "in-out": "cubic-bezier(0.77, 0, 0.175, 1)",
+        drawer: "cubic-bezier(0.32, 0.72, 0, 1)"
+      },
       borderRadius: {
         "md": "0.375rem",
         "lg": "0.5rem",

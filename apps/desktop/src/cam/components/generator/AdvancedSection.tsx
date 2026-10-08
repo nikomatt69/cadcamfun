@@ -31,7 +31,16 @@ export function AdvancedSection(): JSX.Element {
         <h4 class="text-sm font-medium text-gray-800 mb-2">Advanced Cutting Strategies</h4>
         <div class="space-y-3">
           <CheckRow id="use-adaptive-feeds" checked={s().useAdaptiveFeeds || false} onChange={(checked) => gen.updateSettings("useAdaptiveFeeds", checked)}>Enable adaptive feeds in curves</CheckRow>
-          <CheckRow id="use-rest-machining" checked={s().useRestMachining || false} onChange={(checked) => gen.updateSettings("useRestMachining", checked)}>Use rest machining (Rest Machining)</CheckRow>
+          {/* Rest machining continues the tool before it on a surface: roughing (what it left) or finishing (pencil, where it did not reach). */}
+          <Show when={s().operationType === "3d_surface"}>
+            <CheckRow id="use-rest-machining" checked={s().useRestMachining || false} onChange={(checked) => gen.updateSettings("useRestMachining", checked)}>{s().surfaceStrategy === "roughing" ? "Rest machining: cut only what a larger tool left" : "Rest finishing (pencil): only where a larger tool did not reach"}</CheckRow>
+            <Show when={s().useRestMachining}>
+              <div>
+                <label class={LABEL}>Previous tool diameter (mm)</label>
+                <NumberField min="0.1" step="0.1" value={s().restToolDiameter} onValue={(value) => gen.updateSettings("restToolDiameter", value)} />
+              </div>
+            </Show>
+          </Show>
           <Show when={s().finishingPass}>
             <div>
               <label class={LABEL}>Finishing Strategy</label>

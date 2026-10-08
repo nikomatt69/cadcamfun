@@ -193,9 +193,11 @@ describe("operations decide what an element becomes", () => {
     expect(gcode).toContain("; Return point 1")
   })
 
-  test("threading is a contour with a note", () => {
+  test("threading an element that is not round is refused, with no contour cut in its place", () => {
     const { gcode } = run(settings({ operationType: "threading", depth: 1 }), selected([rect], { stock: st }))
-    expect(gcode).toContain("Threading needs a thread-milling cycle")
+    expect(gcode).toContain("thread milling needs a circle or a cylinder")
+    expect(gcode).not.toContain("following the contour instead")
+    expect(gcode).not.toMatch(/^G[123] /m)
   })
 
   test("several elements run top level first, inner before outer", () => {

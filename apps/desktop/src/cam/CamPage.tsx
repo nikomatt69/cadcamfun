@@ -30,6 +30,7 @@ import MachineCycles from "./components/MachineCycles.tsx"
 import PostProcessorTab, { type PostProcessorType } from "./components/PostProcessorTab.tsx"
 import { CostsModal, ToolLibraryModal } from "./components/CamModals.tsx"
 import { FixedCycleEditor } from "./components/generator/FixedCyclesSection.tsx"
+import "../components/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 const PARSE_DELAY_MS = 400
@@ -200,12 +201,12 @@ export default function CamPage(): JSX.Element {
     <Show
       when={camStore.rightOpen}
       fallback={
-        <button class={`w-full py-5 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} onClick={() => camStore.setRightTab(id)} title={label}>
+        <button class={`w-full py-5 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} aria-pressed={camStore.rightTab === id} onClick={() => camStore.setRightTab(id)} title={label}>
           {icon(20)}
         </button>
       }
     >
-      <button class={`flex-1 py-4 px-3 text-sm font-medium glass-hover-light rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} onClick={() => camStore.setRightTab(id)}>
+      <button class={`flex-1 py-4 px-3 text-sm font-medium glass-hover-light rounded-xl transition-all duration-200 ${camStore.rightTab === id ? RIGHT_TAB_ON : RIGHT_TAB_OFF}`} aria-pressed={camStore.rightTab === id} onClick={() => camStore.setRightTab(id)}>
         <div class="flex items-center justify-center">
           <span class="mr-2">{icon(16)}</span>
           {label}
@@ -289,9 +290,8 @@ export default function CamPage(): JSX.Element {
           </Motion.div>
 
           <Motion.div
-            class={`${camStore.rightOpen ? "w-72" : "w-14"} cam-workspace__inspector flex-shrink-0 dark:text-white transition-all duration-300 ease-in-out h-full flex flex-col`}
-            animate={{ x: camStore.rightOpen ? 0 : 300, opacity: camStore.rightOpen ? 1 : 0.7 }}
-            transition={{ duration: 0.5 }}
+            class="cam-workspace__inspector flex-shrink-0 dark:text-white h-full flex flex-col"
+            data-open={camStore.rightOpen}
           >
             <div class="cam-workspace__tabs w-full flex justify-center">
               <div class={camStore.rightOpen ? "flex justify-center w-full text-center" : "flex flex-col w-full"}>
@@ -302,7 +302,7 @@ export default function CamPage(): JSX.Element {
             </div>
 
             <Show when={camStore.rightOpen}>
-              <div class=" space-y-6 flex-1 rounded-xl overflow-y-auto">
+              <div class="workstation-generator min-h-0 flex-1 overflow-y-auto">
                 <Show when={camStore.rightTab === "generator" || camStore.rightTab === "control"}>
                   <ToolpathGenerator onGCodeGenerated={setGcode} />
                 </Show>

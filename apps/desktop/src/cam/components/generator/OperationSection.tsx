@@ -207,6 +207,18 @@ function SurfaceSettings(): JSX.Element {
           <option value="waterline">Waterline finishing (constant Z contours)</option>
         </select>
       </div>
+      <Show when={s().surfaceStrategy === "roughing"}>
+        <div>
+          <label class={LABEL}>Clearing</label>
+          <select class={INPUT} aria-label="Clearing" value={s().surfaceClearing} onChange={(event) => gen.updateSettings("surfaceClearing", event.currentTarget.value as typeof gen.settings.surfaceClearing)}>
+            <option value="contour">Contour-parallel (stepover)</option>
+            <option value="adaptive">Adaptive (constant radial load)</option>
+          </select>
+        </div>
+        <Show when={s().surfaceClearing === "adaptive"}>
+          <div><label class={LABEL}>Radial engagement (% of tool diameter)</label><NumberField min="1" max="50" step="1" value={s().adaptiveEngagement} onValue={(value) => gen.updateSettings("adaptiveEngagement", value)} /></div>
+        </Show>
+      </Show>
       <Show when={raster()}>
         <div class="grid grid-cols-2 gap-3">
           <div><label class={LABEL}>Raster angle (°)</label><NumberField step="1" value={s().rasterAngle} onValue={(value) => gen.updateSettings("rasterAngle", value)} /></div>
@@ -218,6 +230,35 @@ function SurfaceSettings(): JSX.Element {
         </label>
       </Show>
       <p class="text-xs text-gray-500">The selected solids are cut as one part: undercuts, holes and boolean results included. A ball nose cutter follows the surface exactly; a cusp height of 0 uses the stepover instead. Turn on the finishing pass to leave material in the roughing and finish it afterwards.</p>
+    </div>
+  )
+}
+
+function ThreadSettings(): JSX.Element {
+  const gen = useGeneratorStore()
+  const s = () => gen.settings
+  return (
+    <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="thread-settings">
+      <p class="text-xs text-gray-600">The selected circle or cylinder is the hole (or boss) to thread; its diameter is the nominal diameter, the depth is the thread length.</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class={LABEL}>Pitch (mm)</label><NumberField min="0.05" step="0.05" value={s().threadPitch} onValue={(value) => gen.updateSettings("threadPitch", value)} /></div>
+        <div>
+          <label class={LABEL}>Thread</label>
+          <select class={INPUT} aria-label="Thread type" value={s().threadType} onChange={(event) => gen.updateSettings("threadType", event.currentTarget.value as typeof gen.settings.threadType)}>
+            <option value="internal">Internal (hole)</option>
+            <option value="external">External (boss)</option>
+          </select>
+        </div>
+        <div>
+          <label class={LABEL}>Hand</label>
+          <select class={INPUT} aria-label="Thread hand" value={s().threadHand} onChange={(event) => gen.updateSettings("threadHand", event.currentTarget.value as typeof gen.settings.threadHand)}>
+            <option value="right">Right-hand</option>
+            <option value="left">Left-hand</option>
+          </select>
+        </div>
+        <div><label class={LABEL}>Radial passes</label><NumberField min="1" max="20" step="1" value={s().threadPasses} onValue={(value) => gen.updateSettings("threadPasses", Math.round(value))} /></div>
+        <div><label class={LABEL}>Spring passes</label><NumberField min="0" max="5" step="1" value={s().threadSpringPasses} onValue={(value) => gen.updateSettings("threadSpringPasses", Math.round(value))} /></div>
+      </div>
     </div>
   )
 }
@@ -310,6 +351,10 @@ export function OperationSection(): JSX.Element {
 
       <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "probing"}>
         <ProbeSettings />
+      </Show>
+
+      <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "threading"}>
+        <ThreadSettings />
       </Show>
 
       <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "3d_surface"}>

@@ -58,7 +58,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
 
   return (
     <Motion.div
-      class="backdrop-blur-md bg-white/90 dark:bg-gray-900/90 border-b border-white/30 dark:border-gray-600/30 rounded-2xl w-full px-6 py-3 flex items-center justify-between shadow-lg"
+      class="workstation-toolbar w-full flex items-center justify-between"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.4 }}
@@ -146,7 +146,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
       </Motion.div>
 
       <Motion.div
-        class="flex space-x-3"
+        class="workstation-workspace-tabs flex space-x-3"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6, delay: 0.8 }}

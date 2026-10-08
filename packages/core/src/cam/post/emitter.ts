@@ -15,6 +15,7 @@ import {
   type ArcMove,
   type CycleMove,
   type Move,
+  type OrientMove,
   type Program,
   type Toolpath,
   arcSweepBetween,
@@ -74,6 +75,8 @@ class Writer {
   private py: number | undefined
   private pz: number | undefined
   private motion: string | undefined
+  /** Last written angle of each rotary axis. */
+  private readonly rotary: Record<string, string> = {}
   private feed: string | undefined
   private retractMode: string | undefined
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
@@ -180,6 +183,22 @@ class Writer {
     this.block(this.motion === "G1" ? undefined : "G1", ...a.words, this.feedWord(feed))
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
+  }
+
+  /** Rotary positioning (degrees, never converted to inches): only the axes that changed are written. */
+  orient(move: OrientMove): void {
+    this.endCycle()
+    const words: string[] = []
+    for (const [letter, value] of [["A", move.a], ["B", move.b], ["C", move.c]] as const) {
+      if (value === undefined) continue
+      const text = formatNumber(value, this.options.decimals)
+      if (this.rotary[letter] === text) continue
+      this.rotary[letter] = text
+      words.push(`${letter}${text}`)
+    }
+    if (words.length === 0) return
+    this.block(this.motion === "G0" ? undefined : "G0", ...words)
+    this.motion = "G0"
   }
 
   dwell(seconds: number): void {
@@ -343,6 +362,9 @@ class Writer {
         break
       case "Cycle":
         this.cycleMove(move)
+        break
+      case "Orient":
+        this.orient(move)
         break
     }
   }

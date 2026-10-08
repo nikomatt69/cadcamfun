@@ -55,3 +55,8 @@ export * from "./tolerance.ts"
 export * from "./design.ts"
 export * from "./import-drawing.ts"
 export * from "./import-step.ts"
+
+export * from "./expr.ts"
+export * from "./sketch.ts"
+export * from "./csg.ts"
+export * from "./history.ts"

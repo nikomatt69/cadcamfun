@@ -196,8 +196,8 @@ export default function CamElementExplorer(props: CamElementExplorerProps): JSX.
         </div>
 
         <Show when={isSelected()}>
-          <div class="pl-10 py-1 bg-gray-50 dark:bg-gray-700/30 border-l-2 border-blue-300 dark:border-blue-600/50 ml-5 text-xs overflow-visible">
-            <div class="flex space-x-4 mb-1">
+          <div class="px-2 py-2 bg-gray-50 dark:bg-gray-700/30 border-l-2 border-blue-300 dark:border-blue-600/50 ml-2 text-xs">
+            <div class="flex flex-wrap gap-2 mb-1">
               <button class={`flex items-center ${panel() === "tool" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-300"}`} onClick={() => setPanel(panel() === "tool" ? null : "tool")}>
                 <Wrench size={12} class="mr-1" /><span>Tool</span>
               </button>

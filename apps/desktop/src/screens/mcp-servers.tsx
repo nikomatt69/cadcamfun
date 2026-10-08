@@ -114,13 +114,12 @@ export function McpDirectoryScreen(): JSX.Element {
                   class="mr-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  hover={{ scale: 1.05, rotate: 5 }}
                   transition={{ duration: 0.5, delay: 0.2, easing: CARD_EASE }}
                 >
                   <Server size={24} class="text-white" />
                 </Motion.div>
                 <div>
-                  <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
+                  <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
                     {t("mcp.directory.title")}
                   </h1>
                   <p class="mt-1 text-gray-600 dark:text-gray-400">{countLabel()}</p>
@@ -135,7 +134,7 @@ export function McpDirectoryScreen(): JSX.Element {
                 press={{ scale: 0.95 }}
               >
                 <A href="/settings/mcp">
-                  <button class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 px-6 py-3 text-white shadow-lg shadow-blue-500/25 hover:from-blue-600 hover:to-cyan-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none">
+                  <button class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-500 to-cyan-600 px-6 py-3 text-white shadow-lg shadow-blue-500/25 hover:from-blue-600 hover:to-cyan-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus:outline-none">
                     <Settings size={18} class="mr-2" />
                     {t("mcp.directory.manage")}
                   </button>
@@ -166,11 +165,10 @@ export function McpDirectoryScreen(): JSX.Element {
                   const entry = () => info()[server.id]
                   return (
                     <Motion.div
-                      class="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md transition-all duration-300 hover:shadow-2xl dark:border-gray-700/30 dark:bg-gray-800/80"
+                      class="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md transition-[background-color,border-color,box-shadow,opacity] duration-300 ease-out hover:shadow-2xl dark:border-gray-700/30 dark:bg-gray-800/80"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: 0.2 + index() * 0.1, easing: CARD_EASE }}
-                      hover={{ y: -8 }}
                     >
                       <div class={`p-6 ${server.enabled
                         ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20"
@@ -255,7 +253,7 @@ export function McpDirectoryScreen(): JSX.Element {
                       {/* flex-wrap: Enable/Disable + View stay fully visible in narrow grid columns. */}
                       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100/50 bg-gray-50/50 px-6 py-4 dark:border-gray-700/50 dark:bg-gray-800/50">
                         <Motion.button
-                          class={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${server.enabled
+                          class={`rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server.enabled
                             ? "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 hover:from-gray-200 hover:to-gray-300 dark:from-gray-700 dark:to-gray-600 dark:text-gray-200 dark:hover:from-gray-600 dark:hover:to-gray-500"
                             : "bg-gradient-to-r from-green-100 to-emerald-200 text-green-800 hover:from-green-200 hover:to-emerald-300 dark:from-green-900/50 dark:to-emerald-900/50 dark:text-green-300 dark:hover:from-green-800/50 dark:hover:to-emerald-800/50"}`}
                           onClick={() => void toggleServer(server, !server.enabled)}
@@ -288,7 +286,6 @@ export function McpDirectoryScreen(): JSX.Element {
             >
               <Motion.div
                 class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700"
-                hover={{ scale: 1.05, rotate: 5 }}
               >
                 <Database size={32} class="text-gray-400 dark:text-gray-500" />
               </Motion.div>
@@ -359,7 +356,7 @@ export function McpServerDetailsScreen(): JSX.Element {
   const backToDirectory = (): JSX.Element => (
     <A href="/mcp/directory">
       <Motion.button
-        class="inline-flex items-center rounded-xl border border-gray-200/50 bg-white/70 px-4 py-2 text-gray-600 transition-all hover:bg-white/90 hover:text-gray-800 dark:border-gray-700/50 dark:bg-gray-800/70 dark:text-gray-400 dark:hover:bg-gray-800/90 dark:hover:text-gray-200"
+        class="inline-flex items-center rounded-xl border border-gray-200/50 bg-white/70 px-4 py-2 text-gray-600 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-white/90 hover:text-gray-800 dark:border-gray-700/50 dark:bg-gray-800/70 dark:text-gray-400 dark:hover:bg-gray-800/90 dark:hover:text-gray-200"
         hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW }}
         press={{ scale: 0.95 }}
       >
@@ -433,12 +430,11 @@ export function McpServerDetailsScreen(): JSX.Element {
                   <div class="flex items-center">
                     <Motion.div
                       class="mr-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600"
-                      hover={{ scale: 1.05, rotate: 5 }}
                     >
                       <Server size={24} class="text-white" />
                     </Motion.div>
                     <div>
-                      <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-2xl font-bold text-transparent">
+                      <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
                         {server()?.name}
                       </h1>
                       <span
@@ -454,7 +450,7 @@ export function McpServerDetailsScreen(): JSX.Element {
 
                   <div class="flex flex-wrap gap-3">
                     <Motion.button
-                      class={`inline-flex items-center rounded-xl px-4 py-2.5 font-medium text-white shadow-lg transition-all ${server()?.enabled
+                      class={`inline-flex items-center rounded-xl px-4 py-2.5 font-medium text-white shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out ${server()?.enabled
                         ? "bg-gradient-to-r from-red-500 to-pink-600 shadow-red-500/25 hover:from-red-600 hover:to-pink-700"
                         : "bg-gradient-to-r from-green-500 to-emerald-600 shadow-green-500/25 hover:from-green-600 hover:to-emerald-700"}`}
                       onClick={() => void toggleStatus()}
@@ -589,11 +585,10 @@ export function McpServerDetailsScreen(): JSX.Element {
                           <div class="grid gap-4">
                             <For each={details()?.tools ?? []}>{(tool) =>
                               <Motion.div
-                                class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-all hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
+                                class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
                                 initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
                                 animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                                 transition={{ duration: 0.4, easing: EASE }}
-                                hover={{ scale: 1.02 }}
                               >
                                 <div class="mb-2 font-medium text-gray-900 dark:text-white">{tool.name}</div>
                                 <Show when={tool.description !== undefined}>
@@ -643,11 +638,10 @@ export function McpServerDetailsScreen(): JSX.Element {
                         <div class="grid gap-4">
                           <For each={details()?.resources ?? []}>{(resource) =>
                             <Motion.div
-                              class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-all hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
+                              class="rounded-xl border border-gray-200/50 bg-white/50 p-4 backdrop-blur-sm transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out hover:bg-white/70 dark:border-gray-700/50 dark:bg-gray-800/50 dark:hover:bg-gray-800/70"
                               initial={{ opacity: 0, x: -5, filter: "blur(5px)" }}
                               animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
                               transition={{ duration: 0.4, easing: EASE }}
-                              hover={{ scale: 1.02 }}
                             >
                               <div class="mb-2 font-medium text-gray-900 dark:text-white">{resource.name}</div>
                               <div class="mb-2 rounded bg-gray-100/50 px-2 py-1 font-mono text-sm text-gray-600 dark:bg-gray-900/50 dark:text-gray-400">

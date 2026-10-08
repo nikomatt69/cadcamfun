@@ -73,6 +73,13 @@ export const ToolpathSettingsSchema = Schema.Struct({
    * finishing strategy below); `parallel` and `waterline` finish the surface directly.
    */
   surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline"]), "roughing"),
+  /**
+   * `3d_surface` roughing (and rest roughing) only: how each region is cleared. `contour` is contour-parallel offsets at `stepover`;
+   * `adaptive` keeps the radial depth of cut at `adaptiveEngagement` percent of the tool diameter wherever the tool goes.
+   */
+  surfaceClearing: withDefault(Schema.Literals(["contour", "adaptive"]), "contour"),
+  /** `adaptive` clearing: the maximum radial depth of cut, percent of the tool diameter. */
+  adaptiveEngagement: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 50 })), 12),
   /** Cusp height left between raster lines of a ball nose cutter, mm; 0 = use `stepover`. */
   scallop: withDefault(NonNegative, 0),
   /** Direction of the raster lines, degrees from +X. */
@@ -88,7 +95,13 @@ export const ToolpathSettingsSchema = Schema.Struct({
   useExactStop: withDefault(Schema.Boolean, false),
   useToolCompensation: withDefault(Schema.Boolean, false),
   useAdaptiveFeeds: withDefault(Schema.Boolean, false),
+  /**
+   * `3d_surface` roughing only: clear just what a previous, larger tool (`restToolDiameter`) left behind, instead of the whole part.
+   * It is ignored by the finishing strategies and by the 2D operations, which have no previous tool to continue.
+   */
   useRestMachining: withDefault(Schema.Boolean, false),
+  /** Diameter of the tool that already roughed the part, mm (the rest region is what its disc could not reach). */
+  restToolDiameter: withDefault(Positive, 10),
   toolNumber: withDefault(PositiveInt, 1),
   /** Work offset the program runs in (the zero of the part on the machine table). G54 is the control's default and is not written. */
   workOffset: withDefault(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
@@ -103,6 +116,13 @@ export const ToolpathSettingsSchema = Schema.Struct({
   probeDialect: withDefault(Schema.Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
   /** Nominal feature size for `bore` and `boss`, mm (the probe starts at the centre and searches +/- this much). */
   probeFeatureSize: withDefault(Positive, 20),
+  // thread milling (`threading` on a mill): the element is the hole (or boss), its diameter the nominal diameter of the thread
+  threadPitch: withDefault(Positive, 1.5),
+  threadType: withDefault(Schema.Literals(["internal", "external"]), "internal"),
+  threadHand: withDefault(Schema.Literals(["right", "left"]), "right"),
+  /** Radial passes from the first cut to full depth, and extra passes at full depth. */
+  threadPasses: withDefault(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 20 })), 2),
+  threadSpringPasses: withDefault(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 5 })), 0),
   /** Lathe Z zero: the finished front face (Z negative into the part) or the chuck face (Z positive towards the front). */
   latheZero: withDefault(Schema.Literals(["face", "chuck"]), "face"),
   /** 3D printer XY zero: the front-left corner of the plate, or its centre (delta and some bed-slinger profiles). */

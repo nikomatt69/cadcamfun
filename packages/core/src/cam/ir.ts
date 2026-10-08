@@ -44,6 +44,16 @@ export const DwellSchema = Schema.TaggedStruct("Dwell", { seconds: NonNegative }
 
 export const CommentSchema = Schema.TaggedStruct("Comment", { text: Schema.String })
 
+/**
+ * Rotary positioning for indexed (3+2) machining: the rotary axes turn to these angles (degrees) with the tool retracted, and the
+ * moves that follow are in machine coordinates for that orientation (see `indexing.ts`). An axis that is not given is not moved.
+ */
+export const OrientSchema = Schema.TaggedStruct("Orient", {
+  a: Schema.optionalKey(Schema.Finite),
+  b: Schema.optionalKey(Schema.Finite),
+  c: Schema.optionalKey(Schema.Finite)
+})
+
 export const CycleKindSchema = Schema.Literals(["drill", "dwell", "peck", "chipBreak"])
 export type CycleKind = typeof CycleKindSchema.Type
 
@@ -72,7 +82,8 @@ export const MoveSchema = Schema.Union([
   ArcSchema,
   DwellSchema,
   CommentSchema,
-  CycleSchema
+  CycleSchema,
+  OrientSchema
 ])
 
 export type RapidMove = typeof RapidSchema.Type
@@ -80,6 +91,7 @@ export type LinearMove = typeof LinearSchema.Type
 export type ArcMove = typeof ArcSchema.Type
 export type DwellMove = typeof DwellSchema.Type
 export type CommentMove = typeof CommentSchema.Type
+export type OrientMove = typeof OrientSchema.Type
 export type CycleMove = typeof CycleSchema.Type
 export type Move = typeof MoveSchema.Type
 
@@ -101,6 +113,7 @@ export const moveTarget = (move: Move): Vec3 | undefined => {
       return { x: move.to.x, y: move.to.y, z: move.retractHeight }
     case "Dwell":
     case "Comment":
+    case "Orient":
       return undefined
   }
 }
@@ -154,6 +167,7 @@ export const moveLength = (move: Move, from: Vec3): number => {
     case "Cycle":
     case "Dwell":
     case "Comment":
+    case "Orient":
       return 0
   }
 }
@@ -362,7 +376,7 @@ export const toolpathBounds = (toolpath: Toolpath): Bounds3D => {
   }
   let started = false
   walk(toolpath, (move, from) => {
-    if (move._tag === "Dwell" || move._tag === "Comment") return
+    if (move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Orient") return
     if (!started) {
       include(from.x, from.y, from.z)
       started = true

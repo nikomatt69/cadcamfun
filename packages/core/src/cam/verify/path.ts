@@ -48,7 +48,7 @@ export const pathFromProgram = (program: Program, start?: P3): ReplayedPath => {
     let index = 0
     for (const move of expandMoves(toolpath.moves, at)) {
       const to = moveTarget(move)
-      if (to === undefined || move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Cycle") {
+      if (to === undefined || move._tag === "Dwell" || move._tag === "Comment" || move._tag === "Cycle" || move._tag === "Orient") {
         index++
         continue
       }

@@ -61,7 +61,7 @@ export const KINEMATICS: Readonly<Record<MachineKind, Kinematics>> = {
     spindle: "M3 spindle clockwise, M4 counter-clockwise, M5 stop; S is rpm. The tool turns, the workpiece does not.",
     cutting: "plunge to negative Z, then feed in XY; climb milling runs counter-clockwise (G3) round an outside contour with a clockwise spindle",
     operations: ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"],
-    settings: ["toolType", "toolDiameter", "flutes", "depth", "stepdown", "stepover", "feedrate", "plungerate", "rpm", "offset", "direction", "workOffset", "probeCycle", "probeFeed", "probeSearch", "probeStylus", "probeDialect", "probeFeatureSize"],
+    settings: ["toolType", "toolDiameter", "flutes", "depth", "stepdown", "stepover", "feedrate", "plungerate", "rpm", "offset", "direction", "workOffset", "probeCycle", "probeFeed", "probeSearch", "probeStylus", "probeDialect", "probeFeatureSize", "threadPitch", "threadType", "threadHand", "threadPasses", "threadSpringPasses"],
     drawingMapping: "CAD X, Y, Z are machine X, Y, Z; the top face of the part is Z0"
   },
   lathe: {

@@ -116,7 +116,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
     return (
       <div class="select-none">
         <div
-          class={`flex items-center px-2 py-2 cursor-pointer text-sm group transition-all duration-150 border-l-2 ${isSelected() ? "bg-blue-50 dark:bg-blue-900/30 border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
+           class={`workstation-browser-row workstation-browser-row--cad flex items-center px-2 py-2 cursor-pointer text-sm group transition-colors duration-150 border-l-2 ${isSelected() ? "bg-blue-50 dark:bg-blue-900/30 border-l-blue-500 text-blue-700 dark:text-blue-300" : "hover:bg-gray-50 dark:hover:bg-gray-800/60 border-l-transparent text-gray-700 dark:text-gray-300"}`}
           style={{ "padding-left": `${nodeProps.depth * 16 + 8}px` }}
           onClick={(event) => selectNode(nodeProps.node.id, event)}
         >
@@ -127,7 +127,7 @@ export default function CADElementExplorer(props: CADElementExplorerProps): JSX.
           </button>
           <div class="mr-2 flex-shrink-0"><ElementIcon type={nodeProps.node.type} /></div>
           <RenameName id={nodeProps.node.id} name={nodeProps.node.name} browser={browser} />
-          <span class="mr-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400 flex-shrink-0">{nodeProps.node.type}</span>
+           <span class="workstation-browser-type text-gray-500 dark:text-gray-400">{nodeProps.node.type}</span>
           <RowActions id={nodeProps.node.id} visible={isVisible()} locked={nodeProps.node.locked} browser={browser} />
         </div>
         <Presence>

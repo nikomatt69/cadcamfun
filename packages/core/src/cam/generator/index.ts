@@ -22,7 +22,7 @@
  *    the other containers are machined member by member, and a group is machined (legacy: "Invalid component element");
  *  - unknown element types get the generic contour without the nested program header the legacy wrapper added.
  */
-import { convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
+import { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
 import { generateLatheGCode } from "./lathe.ts"
@@ -45,7 +45,7 @@ export { generateMillGCode } from "./mill.ts"
 export { generateLatheGCode } from "./lathe.ts"
 export { elementToolpath } from "./element-paths.ts"
 export { generate3DPrinterGCodeForElement, generateCompositeElement3D, calculateExtrusion, printStartGCode, printEndGCode, type PrinterSettings } from "./printer.ts"
-export { convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
+export { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 export * from "./cycles.ts"
 export {
   calculate3DComponentDetails,
@@ -123,6 +123,8 @@ export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
   let gcode = generated.gcode
   if (settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
   if (settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
+  // Feed that follows the path is a mill's concern: a printer or a lathe has its own feed model.
+  if (settings.useAdaptiveFeeds && settings.machineType === "mill") gcode = adaptFeeds(gcode, settings.toolDiameter)
   const analysis = analyseGcode(gcode, `${settings.machineType}-${settings.operationType}`)
   return {
     response: {

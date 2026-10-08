@@ -13,7 +13,13 @@
  * them enters and leaves in pairs, which is what the dexel model needs. Doubles throughout: float32 positions would lose
  * microns on a large part. Shapes that are not a plain solid (gear, spring, thread, text, sweep, loft, architecture) return
  * `undefined` and the caller reports them: a block of the bounding box would be a lie.
+ *
+ * Two kinds of element carry their own geometry instead of parameters: `mesh` (vertices and faces, what the editor's Boolean command
+ * leaves behind) and `parametric` (a feature history, `cad/history.ts`, rebuilt and united into one solid). Both are in the same
+ * scene coordinates as every other element.
  */
+import { booleanAll } from "../../cad/csg.ts"
+import { rebuild, type History } from "../../cad/history.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { segmentsFor } from "../../cad/tolerance.ts"
 import { triangulateRing } from "../../cad/triangulate.ts"
@@ -205,10 +211,57 @@ export interface MeshResult {
 const profileOf = (value: unknown): Vec2[] =>
   Array.isArray(value) ? value.filter((p): p is { x: number; y: number } => typeof p === "object" && p !== null && Number.isFinite((p as Vec2).x) && Number.isFinite((p as Vec2).y)).map((p) => ({ x: p.x, y: p.y })) : []
 
+const meshOfElement = (e: Element): Mesh64 | undefined => {
+  const verts = Array.isArray(e["vertices"]) ? (e["vertices"] as unknown[]) : []
+  const faces = Array.isArray(e["faces"]) ? (e["faces"] as unknown[]) : []
+  if (verts.length < 4 || faces.length < 4) return undefined
+  const positions = new Float64Array(verts.length * 3)
+  for (let i = 0; i < verts.length; i++) {
+    const v = verts[i] as Record<string, unknown> | null
+    if (v === null || typeof v !== "object" || !Number.isFinite(v["x"] as number) || !Number.isFinite(v["y"] as number)) return undefined
+    positions[i * 3] = v["x"] as number
+    positions[i * 3 + 1] = v["y"] as number
+    positions[i * 3 + 2] = num(v["z"])
+  }
+  const indices: number[] = []
+  for (const face of faces) {
+    if (!Array.isArray(face) || face.length < 3) continue
+    for (let k = 2; k < face.length; k++) {
+      const a = face[0], b = face[k - 1], c = face[k]
+      if (![a, b, c].every((i) => Number.isInteger(i) && i >= 0 && i < verts.length)) return undefined
+      indices.push(a, b, c)
+    }
+  }
+  return indices.length >= 12 ? { positions, indices: Uint32Array.from(indices) } : undefined
+}
+
+const parametricCache = new Map<string, Mesh64 | null>()
+
+/** The solid of a feature history: its bodies united. Remembered, because the union is not free and callers ask more than once. */
+const parametricMesh = (history: unknown): Mesh64 | undefined => {
+  if (typeof history !== "object" || history === null) return undefined
+  const key = JSON.stringify(history)
+  const hit = parametricCache.get(key)
+  if (hit !== undefined) return hit ?? undefined
+  let result: Mesh64 | undefined
+  try {
+    const built = rebuild(history as History)
+    if (built.bodies.length > 0) {
+      const united = built.bodies.length === 1 ? built.bodies[0]!.mesh : booleanAll(built.bodies.map((b) => b.mesh), "union")
+      result = { positions: Float64Array.from(united.positions), indices: Uint32Array.from(united.indices) }
+    }
+  } catch { result = undefined }
+  if (parametricCache.size >= 16) parametricCache.delete(parametricCache.keys().next().value as string)
+  parametricCache.set(key, result ?? null)
+  return result
+}
+
 /** Local mesh around the origin, or `undefined` when the element is not a plain solid. */
 const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: readonly [number, number, number] } | undefined => {
   const seg = (radius: number, minimum = 16, cap = 256): number => typeof e["segments"] === "number" && e["segments"] >= 3 ? Math.min(2048, Math.floor(e["segments"] as number)) : Math.max(minimum, segmentsFor(radius, typeof e["tolerance"] === "number" ? e["tolerance"] : tolerance, cap))
   switch (e["type"]) {
+    case "mesh": { const m = meshOfElement(e); return m === undefined ? undefined : { mesh: m } }
+    case "parametric": { const m = parametricMesh(e["history"]); return m === undefined ? undefined : { mesh: m } }
     case "cube": return { mesh: box(positive(e["width"], 1), positive(e["height"], 1), positive(e["depth"], 1)) }
     case "sphere": { const r = positive(e["radius"], 1); return { mesh: sphere(r, r, r, seg(r)) } }
     case "ellipsoid": {
@@ -288,11 +341,15 @@ const bounds = (m: Mesh64): { min: [number, number, number]; max: [number, numbe
  */
 export const elementMesh = (e: Element, tolerance = 0.01): Mesh64 | undefined => {
   const local = localMesh(e, tolerance)
-  if (local === undefined) return undefined
+  return local === undefined ? undefined : placeElementMesh(e, local.mesh)
+}
+
+/** A mesh given around the element's own origin, moved to where the element is: its x, y, z, then its gizmo transform. */
+export const placeElementMesh = (e: Element, local: Mesh64): Mesh64 => {
   const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
-  const p = Float64Array.from(local.mesh.positions)
+  const p = Float64Array.from(local.positions)
   for (let k = 0; k < p.length; k += 3) { p[k] = p[k]! + x; p[k + 1] = p[k + 1]! + y; p[k + 2] = p[k + 2]! + z }
-  let mesh: Mesh64 = { positions: p, indices: local.mesh.indices }
+  let mesh: Mesh64 = { positions: p, indices: local.indices }
   // Gizmo transform about the centre of the element's bounding box.
   const r = typeof e["rotation"] === "object" && e["rotation"] !== null ? e["rotation"] as Record<string, unknown> : {}
   const s = typeof e["scale"] === "object" && e["scale"] !== null ? e["scale"] as Record<string, unknown> : {}

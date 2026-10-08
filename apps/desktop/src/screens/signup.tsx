@@ -107,7 +107,7 @@ export function SignUpScreen(): JSX.Element {
               type="button"
               onClick={handleGitHubSignUp}
               disabled={busy("github")}
-              class="w-full bg-gray-800 text-white py-3 px-4 rounded-xl hover:bg-gray-900 disabled:opacity-50 flex items-center justify-center font-medium transition-colors"
+              class="w-full bg-gray-800 text-white py-3 px-4 rounded-xl hover:bg-gray-900 disabled:opacity-50 flex items-center justify-center font-medium transition-colors duration-150"
             >
               {busy("github") ? t("signup.connecting") : t("signup.github")}
             </button>
@@ -116,7 +116,7 @@ export function SignUpScreen(): JSX.Element {
               type="button"
               onClick={handleGoogleSignUp}
               disabled={busy("google")}
-              class="w-full bg-red-600 text-white py-3 px-4 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center font-medium transition-colors"
+              class="w-full bg-red-600 text-white py-3 px-4 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center font-medium transition-colors duration-150"
             >
               {busy("google") ? t("signup.connecting") : t("signup.google")}
             </button>
@@ -153,7 +153,7 @@ export function SignUpScreen(): JSX.Element {
                 name="name"
                 type="text"
                 required
-                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-[border-color,box-shadow,background-color] duration-150"
                 placeholder="Enter your name"
               />
             </div>
@@ -167,7 +167,7 @@ export function SignUpScreen(): JSX.Element {
                 name="email"
                 type="email"
                 required
-                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-[border-color,box-shadow,background-color] duration-150"
                 placeholder="Enter your email"
               />
             </div>
@@ -181,7 +181,7 @@ export function SignUpScreen(): JSX.Element {
                 name="password"
                 type="password"
                 required
-                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-[border-color,box-shadow,background-color] duration-150"
                 placeholder="Enter your password"
                 minLength={8}
               />
@@ -193,7 +193,7 @@ export function SignUpScreen(): JSX.Element {
             <button
               type="submit"
               disabled={busy("email")}
-              class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-medium disabled:opacity-50 transition-all shadow-lg hover:shadow-xl"
+              class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-medium disabled:opacity-50 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 shadow-lg hover:shadow-xl"
             >
               {busy("email") ? t("signup.submitBusy") : t("signup.title")}
             </button>
@@ -219,7 +219,7 @@ export function SignUpScreen(): JSX.Element {
                   type="email"
                   value={magicLinkEmail()}
                   onInput={(event) => setMagicLinkEmail(event.currentTarget.value)}
-                  class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-[border-color,box-shadow,background-color] duration-150"
                   placeholder="Enter your email"
                 />
               </div>
@@ -227,7 +227,7 @@ export function SignUpScreen(): JSX.Element {
                 type="button"
                 onClick={handleMagicLink}
                 disabled={busy("magic-link")}
-                class="w-full bg-purple-600 text-white py-3 px-4 rounded-xl hover:bg-purple-700 disabled:opacity-50 font-medium transition-colors"
+                class="w-full bg-purple-600 text-white py-3 px-4 rounded-xl hover:bg-purple-700 disabled:opacity-50 font-medium transition-colors duration-150"
               >
                 {busy("magic-link") ? t("auth.magicSending") : t("auth.magicSend")}
               </button>
@@ -240,7 +240,7 @@ export function SignUpScreen(): JSX.Element {
               {t("signup.haveAccount")}{" "}
               <A
                 href="/auth/signin"
-                class="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                class="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors duration-150"
               >
                 {t("signup.signinLink")}
               </A>

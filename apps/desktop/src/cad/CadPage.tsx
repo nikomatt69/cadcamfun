@@ -27,6 +27,7 @@ import { CADAssistantBridge } from "../ai/CADAssistantBridge.tsx"
 import { FIT_VIEW_EVENT } from "../ai/editor-sync.ts"
 import { toJsonSafe } from "../state/json-safe.ts"
 import { documentSettings, restoreDocumentSettings, syncDocumentSettings } from "../state/document-settings.ts"
+import "../components/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 type RightPanel = "proprieties" | "settings" | "constraints"
@@ -214,24 +215,24 @@ export default function CadPage(): JSX.Element {
           </Motion.div>
 
           <Motion.div
-            class={`${rightOpen() ? "w-72" : "w-0"} cad-workspace__inspector flex-shrink-0 dark:text-white transition-all duration-300 ease-in-out overflow-y-auto`}
-            animate={{ x: rightOpen() ? 0 : 300, opacity: rightOpen() ? 1 : 0.7 }} transition={{ duration: 0.5 }}
+            class="cad-workspace__inspector flex-shrink-0 dark:text-white overflow-y-auto"
+            data-open={rightOpen()}
           >
             <Motion.div class="cad-workspace__tabs w-full p-2 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
               <div class="flex justify-center w-full text-center">
-                <Motion.button onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
+                <Motion.button aria-pressed={rightPanel() === "proprieties"} onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
                   <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />Proprieties</div>
                 </Motion.button>
-                <Motion.button onClick={() => setRightPanel("settings")} class={tabClass(rightPanel() === "settings")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
+                <Motion.button aria-pressed={rightPanel() === "settings"} onClick={() => setRightPanel("settings")} class={tabClass(rightPanel() === "settings")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
                   <div class="flex items-center justify-center"><Settings size={16} class="mr-2" />Settings</div>
                 </Motion.button>
-                <Motion.button onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label="Plugins">
+                <Motion.button aria-pressed={rightPanel() === "constraints"} onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label="Plugins">
                   <div class="flex items-center justify-center"><Puzzle size={16} class="mr-2" /></div>
                 </Motion.button>
               </div>
             </Motion.div>
 
-            <Motion.div class="p-2 space-y-6 flex flex-col items-center" {...rise} transition={{ duration: 0.6, delay: 1 }}>
+            <Motion.div class="workstation-panel-content flex flex-col" {...rise} transition={{ duration: 0.6, delay: 1 }}>
               <Show when={rightPanel() === "proprieties"}><PropertyPanel /></Show>
 
               <Show when={rightPanel() === "settings"}>

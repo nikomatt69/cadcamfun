@@ -297,7 +297,7 @@ export function CamScreen() {
   const showPreview = () => tab() === "preview" || tab() === "toolpath"
 
   return (
-    <section class="cad-workspace" aria-label={t("cam.title")} style={{ position: "relative" }}>
+    <section class="cad-workspace cam-workspace" aria-label={t("cam.title")} style={{ position: "relative" }}>
       <header class="cad-toolbar cad-surface">
         <div class="cad-toolbar-group">
           <CadButton

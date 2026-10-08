@@ -82,12 +82,12 @@ export default function PropertyPanel(): JSX.Element {
 
   return (
     <Show when={elements.selectedElement} fallback={
-      <Motion.div class="bg-[#F8FBFF]  dark:bg-gray-800 dark:text-white shadow-md rounded-md p-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <Motion.div class="workstation-properties dark:text-white" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <h3 class="text-lg font-medium text-gray-900 mb-2">Properties</h3>
         <p class="text-gray-500 text-sm">No element selected</p>
       </Motion.div>
     }>{(selected) =>
-      <Motion.div class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-md rounded-xl rounded-md p-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <Motion.div class="workstation-properties dark:text-white" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-medium text-gray-900 dark:text-white">Element Properties</h3>
           <div class="flex space-x-2">

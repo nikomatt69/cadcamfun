@@ -90,7 +90,7 @@ export function PluginsScreen(): JSX.Element {
   return <section class="min-h-full bg-gray-50 p-6 dark:bg-gray-900">
     <div class="mx-auto max-w-4xl">
       <div class="mb-6 flex items-center justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-100">{t("plugins.title")}</h1>
+        <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("plugins.title")}</h1>
         <button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" onClick={openInstall}>
           <Upload size={16} class="mr-2" />{t("plugins.install")}
         </button>
@@ -340,7 +340,7 @@ export function PluginDetailScreen(): JSX.Element {
                 />}
               </Show>
               <div class="min-w-0">
-                <h1 class="truncate text-2xl font-bold text-gray-800 dark:text-gray-100 md:text-3xl" title={current().manifest.name}>
+                <h1 class="truncate text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50" title={current().manifest.name}>
                   {current().manifest.name}
                 </h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -366,7 +366,7 @@ export function PluginDetailScreen(): JSX.Element {
                 type="button"
                 disabled={pending()}
                 onClick={() => void uninstall()}
-                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-red-600 px-4 py-2 font-bold text-white transition duration-150 ease-in-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-red-600 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.uninstalling")}</>}>
                   {t("plugins.uninstall")}
@@ -380,7 +380,7 @@ export function PluginDetailScreen(): JSX.Element {
                     type="button"
                     disabled={pending()}
                     onClick={() => void toggleEnabled(true)}
-                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-green-500 px-4 py-2 font-bold text-white transition duration-150 ease-in-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-green-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.activating")}</>}>
                       {t("plugins.detail.activate")}
@@ -392,7 +392,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => void toggleEnabled(false)}
-                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-yellow-500 px-4 py-2 font-bold text-white transition duration-150 ease-in-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="flex min-w-[100px] items-center justify-center whitespace-nowrap rounded bg-yellow-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Show when={!pending()} fallback={<><LoadingSpinner /> {t("plugins.detail.deactivating")}</>}>
                     {t("plugins.detail.deactivate")}
@@ -405,7 +405,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => setShowSettings(true)}
-                  class="whitespace-nowrap rounded bg-gray-500 px-4 py-2 font-bold text-white transition duration-150 ease-in-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="whitespace-nowrap rounded bg-gray-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("plugins.detail.configure")}
                 </button>
@@ -419,7 +419,7 @@ export function PluginDetailScreen(): JSX.Element {
               type="button"
               disabled={pending() || generating()}
               onClick={() => void generateReadme()}
-              class="flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              class="flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm text-white shadow-sm transition-colors duration-150 ease-out hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <FileText size={16} class="mr-2" />
               {t(generating() ? "plugins.detail.generating" : "plugins.detail.generateReadme")}

@@ -14,6 +14,7 @@ import { ReferenceNavbar, ReferenceSidebar } from "../components/reference-navig
 import { ReferenceBreadcrumbs, ReferenceFooter, referenceLayout } from "../components/reference-page.tsx"
 import ChevronUp from "lucide-solid/icons/chevron-up"
 import "../styles/reference-shell.css"
+import "../styles/page-consistency.css"
 import { TitleBar } from "../components/title-bar.tsx"
 import { CommandPalette, type PaletteCommand } from "../components/command-palette.tsx"
 import { AssistantPanel } from "../ai/AssistantPanel.tsx"

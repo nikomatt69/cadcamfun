@@ -8,10 +8,13 @@
  *  - `pocket` — clear the inside of a closed shape, spiralling out from its centre;
  *  - `drill` — canned cycle (`G81`, or `G83` peck when `stepdown < depth`) at the element's drilling points;
  *  - `engrave` — follow the outline at one shallow, constant depth;
- *  - `threading` — no thread cycle exists for a mill here: contour with a note.
+ *  - `threading` — thread milling (`operations/thread.ts`): a helix round each hole or boss, pitch, hand, passes from the settings.
  *
  * Elements arrive already aligned to the stock (top face at Z0) and shifted to the machine origin.
  */
+import { Schema } from "effect"
+import { ThreadParams, generateThread } from "../operations/thread.ts"
+import { movesToGcode } from "./surface.ts"
 import { above, circleWords, cutLevels, f3, plunge, retractRapid, type Pt } from "./common.ts"
 import { elementToolpath } from "./element-paths.ts"
 import { elementOutline, getDrillingPoints, type V3 } from "./elements.ts"
@@ -187,6 +190,32 @@ export const engraveElement = (e: CadElement, s: ToolpathSettings): string => {
   return gcode
 }
 
+// ---------------------------------------------------------------- thread milling
+
+/** Nominal diameter a threaded element asks for, or undefined when it is not round. */
+const threadDiameter = (e: CadElement): number | undefined => {
+  switch (e["type"]) {
+    case "circle": case "cylinder": case "cone": case "sphere": case "hemisphere": case "capsule": return num(e["radius"]) > 0 ? num(e["radius"]) * 2 : undefined
+    default: return undefined
+  }
+}
+
+/** A thread-milling helix for a round element: the hole (internal) or the boss (external) of the thread. */
+export const threadElement = (e: CadElement, s: ToolpathSettings): string => {
+  const diameter = threadDiameter(e)
+  if (diameter === undefined) return `; Warning: thread milling needs a circle or a cylinder (a hole or a boss); '${String(e["type"])}' is not round\n`
+  const params = Schema.decodeUnknownSync(ThreadParams)({
+    name: `Thread ${String(e["type"])}`, x: num(e["x"]), y: num(e["y"]), diameter, pitch: s.threadPitch,
+    internal: s.threadType === "internal", rightHand: s.threadHand === "right", climb: s.direction === "climb",
+    passes: s.threadPasses, springPasses: s.threadSpringPasses, totalDepth: s.depth,
+    clearanceHeight: 10, safeHeight: 5, retractHeight: 2, feed: s.feedrate, plungeFeed: s.plungerate, spindleRpm: s.rpm, coolant: s.coolant ? "flood" : "off"
+  })
+  const tool = { id: "1", name: `${s.toolType} ${s.toolDiameter}`, kind: "endmill" as const, diameter: s.toolDiameter, flutes: s.flutes, maxRpm: Math.max(s.rpm, 1) }
+  const result = generateThread(params, tool, { x: 1, y: 1, z: 1, origin: { x: 0, y: 0, z: 0 }, material: s.material })
+  const header = `; Thread mill M${f3(diameter)}x${f3(s.threadPitch)} ${s.threadType} ${s.threadHand}-hand, minor Ø${f3(result.stats.minorDiameter)}, ${result.stats.radii.length} pass(es)\n`
+  return header + result.warnings.map((w) => `; Warning: ${w}\n`).join("") + movesToGcode(result.toolpath.moves)
+}
+
 // ---------------------------------------------------------------- dispatch
 
 /** What `operationType` does to one element. */
@@ -196,7 +225,7 @@ export const elementOperation = (e: CadElement, s: ToolpathSettings, g: Geometry
       return pocketElement(e, s) ?? `; Pocket is not available for '${String(e["type"])}' - following its contour instead\n${elementToolpath(e, s, g)}`
     case "drill": return drillElement(e, s)
     case "engrave": return engraveElement(e, s)
-    case "threading": return `; Threading needs a thread-milling cycle - following the contour instead\n${elementToolpath(e, s, g)}`
+    case "threading": return threadElement(e, s)
     default: return elementToolpath(e, s, g)
   }
 }

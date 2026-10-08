@@ -5,7 +5,7 @@ import { ToolsGroup, ToolsStorageGroup } from "./groups/tools.ts"
 import { MachineConfigsGroup, MachineConfigsStorageGroup } from "./groups/machine-configs.ts"
 import { DrawingsGroup } from "./groups/drawings.ts"
 import { ComponentsGroup } from "./groups/components.ts"
-import { ProjectToolpathsGroup, ToolpathsGroup } from "./groups/toolpaths.ts"
+import { ProjectToolpathsGroup, ToolpathExtrasGroup, ToolpathsGroup } from "./groups/toolpaths.ts"
 import { ToolpathGeneratorGroup } from "./groups/toolpath-generator.ts"
 import { LibraryGroup } from "./groups/library.ts"
 import { ProjectsGroup } from "./projects.ts"
@@ -82,6 +82,7 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(DrawingsGroup.middleware(Authorization))
   .add(ComponentsGroup.middleware(Authorization))
   .add(ToolpathsGroup.middleware(Authorization))
+  .add(ToolpathExtrasGroup.middleware(Authorization))
   .add(ToolpathGeneratorGroup.middleware(Authorization))
   .add(LibraryGroup.middleware(Authorization))
   .add(ProjectToolpathsGroup.middleware(Authorization))

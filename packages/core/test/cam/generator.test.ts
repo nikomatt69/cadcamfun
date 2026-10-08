@@ -6,6 +6,7 @@ import {
   DEFAULT_SETTINGS,
   aiSuggestionsFor,
   calculateCuttingStatistics,
+  adaptFeeds,
   convertLinesToArcs,
   cutLevels,
   generateToolpath,
@@ -444,8 +445,196 @@ describe("3d_surface runs the surface engine over the selected solids", () => {
     expect(report.issues.filter((i) => ["Gouge", "ShankCollision", "BelowStock", "HolderCollision", "FixtureCollision"].includes(i.code))).toEqual([])
   })
 
+  test("rest machining cuts only the inside corner a 6 mm tool left, never into the walls, and is a real program", () => {
+    // Two walls meeting at (10, 10), 12 mm high, on a 50 x 50 stock: the free floor is x < 10, y < 10.
+    const walls = [
+      { id: "a", type: "cube", width: 50, height: 15, depth: 12, x: 0, y: 17.5, z: -6 },
+      { id: "b", type: "cube", width: 15, height: 50, depth: 12, x: 17.5, y: 0, z: -6 }
+    ]
+    const cornerStock = { width: 50, height: 50, depth: 12, radius: 0, x: 0, y: 0, topZ: 0, allowance: 1 }
+    const corner = (patch: Partial<ToolpathSettings>) => gen(
+      settings({ operationType: "3d_surface", toolType: "endmill", toolDiameter: 2, depth: 6, stepdown: 3, stepover: 50, tolerance: 0.02, surfaceStrategy: "roughing", ...patch }),
+      geometry({ geometryType: "selected", selectedElements: walls, stock: cornerStock })
+    )
+    const full = corner({})
+    const rest = corner({ useRestMachining: true, restToolDiameter: 6 })
+    expect(rest.gcode).toContain("; 3D surface: 2 element(s) as one part model, rest")
+    expect(rest.gcode).toContain("; Rest machining: only what a 6.000 mm tool left behind")
+    const cuts = feedPoints(rest.gcode).filter((p) => p.z < -0.5)
+    expect(cuts.length).toBeGreaterThan(20)
+    // A 2 mm cutter beside walls at x = 10 and y = 10: its centre stays 1 mm away from both, and the pass stays near the corner.
+    for (const p of cuts) {
+      expect(p.x).toBeLessThanOrEqual(9 + 0.06)
+      expect(p.y).toBeLessThanOrEqual(9 + 0.06)
+      expect(Math.hypot(p.x - 10, p.y - 10)).toBeLessThan(4.5)
+    }
+    // The plain roughing covers the whole floor, far from the corner; the rest pass never leaves its neighbourhood.
+    const reach = (pts: Array<{ x: number; y: number }>) => Math.max(...pts.map((p) => Math.hypot(p.x - 10, p.y - 10)))
+    expect(reach(feedPoints(full.gcode).filter((p) => p.z < -0.5))).toBeGreaterThan(20)
+    expect(reach(cuts)).toBeLessThan(4.5)
+  })
+
+  test("adaptive clearing stays off the walls, covers the floor, and says what it is", () => {
+    const walls = [
+      { id: "a", type: "cube", width: 50, height: 15, depth: 12, x: 0, y: 17.5, z: -6 },
+      { id: "b", type: "cube", width: 15, height: 50, depth: 12, x: 17.5, y: 0, z: -6 }
+    ]
+    const cornerStock = { width: 50, height: 50, depth: 12, radius: 0, x: 0, y: 0, topZ: 0, allowance: 1 }
+    const run = (patch: Partial<ToolpathSettings>) => gen(
+      settings({ operationType: "3d_surface", toolType: "endmill", toolDiameter: 6, depth: 6, stepdown: 3, stepover: 40, tolerance: 0.02, surfaceStrategy: "roughing", ...patch }),
+      geometry({ geometryType: "selected", selectedElements: walls, stock: cornerStock })
+    )
+    const adaptive = run({ surfaceClearing: "adaptive", adaptiveEngagement: 12 })
+    expect(adaptive.gcode).toContain("; Adaptive clearing: radial depth of cut held at 12.000 % of the tool diameter")
+    const cuts = feedPoints(adaptive.gcode).filter((p) => p.z < -0.5)
+    expect(cuts.length).toBeGreaterThan(200)
+    // A 6 mm cutter beside walls at x = 10 and y = 10: its centre stays 3 mm away from both, wherever the walls are (over the stock;
+    // past its edge there is nothing to hit).
+    for (const p of cuts.filter((c) => c.x >= -25 && c.x <= 25 && c.y >= -25 && c.y <= 25)) {
+      expect(p.x).toBeLessThanOrEqual(10 - 3 + 0.1)
+      expect(p.y).toBeLessThanOrEqual(10 - 3 + 0.1)
+    }
+    // It reaches the far corners of the floor, like the contour-parallel clearing does.
+    const far = (pts: Array<{ x: number; y: number }>) => Math.min(...pts.map((p) => p.x + p.y))
+    expect(far(cuts)).toBeLessThan(far(feedPoints(run({}).gcode).filter((p) => p.z < -0.5)) + 6)
+    expect(run({}).gcode).not.toContain("Adaptive clearing")
+  })
+
+  test("rest machining on a finishing strategy is rest finishing, said in the program, not a silent no-op", () => {
+    const { gcode } = surface({ surfaceStrategy: "parallel", useRestMachining: true, restToolDiameter: 8 })
+    expect(gcode).toContain("; Rest finishing: only where a 8.000 mm tool did not reach as low")
+    expect(gcode).not.toContain("; Rest machining: only")
+  })
+
   test("a tool that cannot cut a surface is said so and replaced by an end mill of the same diameter", () => {
     const { gcode } = surface({ surfaceStrategy: "parallel", toolType: "vbit" })
     expect(gcode).toContain("; Warning: A vbit tool cannot machine a surface")
+  })
+})
+
+describe("adaptive feeds follow the path", () => {
+  const feedOf = (line: string): number | undefined => { const m = /\bF(\d+(?:\.\d+)?)/.exec(line); return m ? Number(m[1]) : undefined }
+  /** The feed in force at each G1/G2/G3 line, by reading the program the way a controller does (modal F). */
+  const feedsOf = (gcode: string): Array<{ line: string; feed: number }> => {
+    let feed = NaN
+    const out: Array<{ line: string; feed: number }> = []
+    for (const line of gcode.split("\n")) {
+      const f = feedOf(line)
+      if (f !== undefined) feed = f
+      if (/^G0?[123]\b/.test(line)) out.push({ line, feed })
+    }
+    return out
+  }
+
+  test("slows into and out of a corner, in proportion to the turn, and back to the programmed feed on the straights", () => {
+    const program = ["G90", "G0 X0 Y0 Z5", "G1 Z-1 F300", "G1 X0 Y0 F800", "G1 X50 Y0", "G1 X100 Y0", "G1 X100 Y50", "G1 X50 Y50", "G1 X0 Y50"].join("\n")
+    const feeds = feedsOf(adaptFeeds(program, 6))
+    const at = (x: string) => feeds.find((f) => f.line.includes(x))!.feed
+    // Straight along +X, a 90 degree turn at (100, 0) and another at (100, 50): the moves into and out of a turn run at half the
+    // feed, the straight before the first and after the second at the programmed one.
+    expect(at("X50 Y0")).toBe(800)
+    expect(at("X100 Y0")).toBe(400)
+    expect(at("X100 Y50")).toBe(400)
+    expect(at("X50 Y50")).toBe(400)
+    expect(at("X0 Y50")).toBe(800)
+  })
+
+  test("a gentle turn is slowed less than a sharp one, and a nearly straight path not at all", () => {
+    const turn = (deg: number) => {
+      const r = (deg * Math.PI) / 180
+      const program = ["G90", "G1 Z-1 F300", "G1 X0 Y0 F800", "G1 X50 Y0", `G1 X${(50 + 50 * Math.cos(r)).toFixed(3)} Y${(50 * Math.sin(r)).toFixed(3)}`].join("\n")
+      return feedsOf(adaptFeeds(program, 6)).at(-1)!.feed
+    }
+    expect(turn(5)).toBe(800)
+    expect(turn(45)).toBeLessThan(800)
+    expect(turn(45)).toBeGreaterThan(turn(90))
+    expect(turn(90)).toBe(400)
+    expect(turn(170)).toBe(400)
+  })
+
+  test("a tight arc is slowed by its radius, a wide one is not, and a helical entry is left to its plunge feed", () => {
+    const arc = (r: number, z = "") => {
+      const program = ["G90", "G1 Z-1 F300", "G1 X0 Y0 F800", `G3 X${r} Y${r} ${z}I0 J${r}`].join("\n")
+      return feedsOf(adaptFeeds(program, 6)).at(-1)!.feed
+    }
+    expect(arc(40)).toBe(800)
+    expect(arc(6)).toBeCloseTo(800 * (6 / 9), 0) // radius 6 of 9 (1.5 diameters): two thirds
+    expect(arc(3)).toBe(320) // a third would be 267, but the floor is 40 %
+    expect(arc(3, "Z-2 ")).toBe(800)
+  })
+
+  test("vertical moves, rapids and a program without a feed come out as they went in", () => {
+    const program = ["G90", "G0 X0 Y0 Z5", "G1 Z-1 F300", "G0 Z5", "G1 X10 Y0 F800", "G1 X10 Y10", "G0 Z10"].join("\n")
+    const out = adaptFeeds(program, 6).split("\n")
+    expect(out[0]).toBe("G90")
+    expect(out[1]).toBe("G0 X0 Y0 Z5")
+    expect(out[2]).toBe("G1 Z-1 F300")
+    expect(out[3]).toBe("G0 Z5")
+    expect(out[6]).toBe("G0 Z10")
+    const noFeed = ["G90", "G1 X0 Y0", "G1 X10 Y0", "G1 X10 Y10"].join("\n")
+    expect(adaptFeeds(noFeed, 6)).toBe(noFeed)
+  })
+
+  test("through the generator it is a mill setting: a square contour slows at its corners, with the flag off nothing changes", () => {
+    const geom = geometry({ geometryType: "rectangle", width: 40, height: 30 } as Partial<GeometryInput>)
+    const off = gen(settings({ operationType: "contour", offset: "outside" }), geom)
+    const on = gen(settings({ operationType: "contour", offset: "outside", useAdaptiveFeeds: true }), geom)
+    expect(off.gcode).not.toEqual(on.gcode)
+    const slowed = feedsOf(on.gcode).filter((f) => f.feed < 800 && f.feed >= 0.4 * 800 - 1e-9 && /X|Y/.test(f.line))
+    expect(slowed.length).toBeGreaterThan(0)
+    expect(feedsOf(off.gcode).every((f) => f.feed === 800 || f.feed === 300 || Number.isNaN(f.feed))).toBe(true)
+    // A printer has its own feed model: the flag does not touch it.
+    const printer = (flag: boolean) => gen(settings({ machineType: "3dprinter", operationType: "standard", toolType: "standard", useAdaptiveFeeds: flag }), geometry({ geometryType: "selected", selectedElements: [{ id: "c", type: "cube", width: 10, height: 10, depth: 5, x: 0, y: 0, z: 2.5 }] })).gcode
+    expect(printer(true)).toEqual(printer(false))
+  })
+})
+
+describe("thread milling from the generator", () => {
+  const hole = { id: "h", type: "circle", radius: 5, x: 3, y: -2, z: 0 }
+  const thread = (patch: Partial<ToolpathSettings> = {}, element: Record<string, unknown> = hole) => gen(
+    settings({ operationType: "threading", toolType: "endmill", toolDiameter: 6, depth: 9, feedrate: 300, plungerate: 100, threadPitch: 1.5, ...patch }),
+    geometry({ geometryType: "selected", selectedElements: [element] })
+  )
+
+  test("a circle becomes a thread-milling helix instead of a contour with a note", () => {
+    const { gcode } = thread({ threadPasses: 1 })
+    expect(gcode).toContain("; Thread mill M10.000x1.500 internal right-hand")
+    expect(gcode).not.toContain("following the contour instead")
+    const helical = gcode.split("\n").filter((l) => /^G3 /.test(l) && /Z-?\d/.test(l))
+    expect(helical.length).toBeGreaterThanOrEqual(6)
+  })
+
+  test("the settings reach the operation: external, left-hand, conventional and passes", () => {
+    const external = thread({ threadType: "external", threadPasses: 2, threadSpringPasses: 1 })
+    expect(external.gcode).toContain("external right-hand")
+    expect(external.gcode).toContain("3 pass(es)")
+    expect(thread({ threadHand: "left" }).gcode).toContain("left-hand")
+    expect(thread({ direction: "conventional", threadPasses: 1 }).gcode).toMatch(/^G2 .*Z/m)
+  })
+
+  test("a cutter too large for the thread, and an element that is not round, are said so", () => {
+    expect(thread({ toolDiameter: 8.6 }).gcode).toContain("does not fit the minor diameter")
+    expect(thread({}, { id: "r", type: "rectangle", width: 10, height: 10, x: 0, y: 0, z: 0 }).gcode).toContain("needs a circle or a cylinder")
+  })
+})
+
+describe("rest finishing from the generator", () => {
+  test("with a finishing strategy, the previous tool restricts the path and the program says so", () => {
+    const walls = [
+      { id: "floor", type: "cube", width: 50, height: 50, depth: 6, x: 0, y: 0, z: -9 },
+      { id: "wall", type: "cube", width: 15, height: 50, depth: 6, x: 17.5, y: 0, z: -3 }
+    ]
+    const stock = { width: 50, height: 50, depth: 12, radius: 0, x: 0, y: 0, topZ: 0, allowance: 1 }
+    const finish = (patch: Partial<ToolpathSettings>) => gen(
+      settings({ operationType: "3d_surface", toolType: "ballnose", toolDiameter: 2, depth: 6, stepdown: 3, stepover: 40, tolerance: 0.02, surfaceStrategy: "parallel", ...patch }),
+      geometry({ geometryType: "selected", selectedElements: walls, stock })
+    )
+    const all = finish({})
+    const pencil = finish({ useRestMachining: true, restToolDiameter: 6 })
+    expect(pencil.gcode).toContain("; Rest finishing: only where a 6.000 mm tool did not reach as low")
+    expect(all.gcode).not.toContain("Rest finishing")
+    const pts = (g: string) => g.split("\n").filter((l) => /^G1 /.test(l)).length
+    expect(pts(pencil.gcode)).toBeGreaterThan(0)
+    expect(pts(pencil.gcode)).toBeLessThan(pts(all.gcode))
   })
 })

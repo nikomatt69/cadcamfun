@@ -20,6 +20,7 @@ import WorkpieceSetup from "./WorkpieceSetup.tsx"
 import CamElementExplorer from "./explorer/CamElementExplorer.tsx"
 import ViewSettings from "./explorer/ViewSettings.tsx"
 import OperationsList from "./OperationsList.tsx"
+import WorkspaceNavigation from "../../components/workspace-navigation.tsx"
 
 export type SidebarTab = "explorer" | "settings" | "machine"
 
@@ -31,7 +32,7 @@ const TABS: ReadonlyArray<{ readonly id: SidebarTab; readonly label: "cam.explor
 ]
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
-const hover = { scale: 1.02, backgroundColor: "rgba(59, 130, 246, 0.1)" }
+const hover = { scale: 1.02 }
 const press = { scale: 0.98 }
 
 const tabClass = (active: boolean, shape: string): string =>
@@ -59,8 +60,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
   return (
     <Motion.div
       class="cam-workspace__sidebar flex-shrink-0 dark:text-white mr-2 h-full flex flex-col"
-      animate={{ width: props.isOpen ? "17rem" : "3.5rem", opacity: props.isOpen ? 1 : 0.9 }}
-      transition={{ duration: 0.35, easing: "ease-in-out" }}
+      data-open={props.isOpen}
     >
       <Motion.div
         class="cam-workspace__tabs w-full flex justify-center"
@@ -79,7 +79,6 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                     title={t(tab.title)}
                     aria-label={t(tab.title)}
                     aria-pressed={props.activeTab === tab.id}
-                    animate={props.activeTab === tab.id ? hover : {}}
                     hover={hover}
                     press={press}
                   >
@@ -91,7 +90,6 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                   class={tabClass(props.activeTab === tab.id, "flex-1 py-3 px-3 rounded-xl")}
                   onClick={() => props.onSelectTab(tab.id)}
                   aria-pressed={props.activeTab === tab.id}
-                  animate={props.activeTab === tab.id ? hover : {}}
                   hover={hover}
                   press={press}
                 >
@@ -106,7 +104,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
         </div>
       </Motion.div>
 
-      <Motion.div class="flex-1 flex-col rounded-xl overflow-y-auto" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
+      <Motion.div class="min-h-0 flex-1 flex-col rounded-xl overflow-y-auto" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
         <Show
           when={props.isOpen}
           fallback={
@@ -151,7 +149,7 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
             </div>
           }
         >
-          <div class="p-1 rounded-xl overflow-y-auto space-y-6 flex flex-col items-center">
+          <div class="workstation-panel-content flex flex-col">
             <Show when={props.activeTab === "explorer"}>
               <Motion.div class="w-full" {...rise} transition={{ duration: 0.4, delay: 0.2 }}>
                 <CamElementExplorer {...(props.onGCodeGenerated ? { onGCodeGenerated: props.onGCodeGenerated } : {})} />
@@ -182,6 +180,8 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
           </div>
         </Show>
       </Motion.div>
+
+      <WorkspaceNavigation isOpen={props.isOpen} />
 
       <Motion.div
         class="border-t border-white/30 dark:border-gray-600/30 p-3 flex justify-center"

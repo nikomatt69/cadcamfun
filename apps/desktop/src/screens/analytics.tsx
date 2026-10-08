@@ -74,7 +74,7 @@ const cardClass =
   "rounded-2xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-md dark:border-gray-600/30 dark:bg-gray-800/80"
 
 const inputClass =
-  "form-input rounded-xl border-white/30 bg-white/60 text-sm backdrop-blur-sm transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 dark:border-gray-600/30 dark:bg-gray-700/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/50"
+  "form-input rounded-xl border-white/30 bg-white/60 text-sm backdrop-blur-sm transition-[border-color,box-shadow,background-color] duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 dark:border-gray-600/30 dark:bg-gray-700/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/50"
 
 const inactiveTab =
   "text-gray-600 hover:bg-white/40 dark:text-gray-300 dark:hover:bg-gray-700/40"
@@ -141,7 +141,7 @@ export function AnalyticsScreen(): JSX.Element {
       {/* Header Section */}
       <div class="mb-8 flex flex-col justify-between md:flex-row md:items-center">
         <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-          <h1 class="mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
+          <h1 class="mb-2 text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
             {t("dash.title")}
           </h1>
           <p class="text-gray-600 dark:text-gray-400">{t("dash.subtitle")}</p>
@@ -161,7 +161,7 @@ export function AnalyticsScreen(): JSX.Element {
                 onClick={() => setActiveSection(tab.key)}
                 hover={{ scale: 1.03, transition: { duration: 0.15 } }}
                 press={{ scale: 0.98 }}
-                class={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                class={`rounded-xl px-4 py-2 text-sm font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ${
                   activeSection() === tab.key
                     ? "scale-105 bg-blue-500 text-white shadow-md"
                     : inactiveTab
@@ -188,7 +188,7 @@ export function AnalyticsScreen(): JSX.Element {
                   onClick={() => setDateRangePreset(preset)}
                   hover={{ scale: 1.05, y: -2, transition: { duration: 0.2 } }}
                   press={{ scale: 0.98, transition: { duration: 0.1 } }}
-                  class="rounded-xl border border-white/30 bg-white/60 px-4 py-2 text-sm font-medium backdrop-blur-sm transition-all duration-200 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:hover:bg-gray-700/80"
+                  class="rounded-xl border border-white/30 bg-white/60 px-4 py-2 text-sm font-medium backdrop-blur-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-200 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:hover:bg-gray-700/80"
                 >
                   {t(labelKey)}
                 </Motion.button>
@@ -249,7 +249,7 @@ export function AnalyticsScreen(): JSX.Element {
                   <select
                     value={selectedMetric()}
                     onChange={(event) => setSelectedMetric(event.currentTarget.value as ChartMetric)}
-                    class="form-select block w-full appearance-none rounded-xl border-white/30 bg-white/60 py-3 pr-10 text-sm backdrop-blur-sm transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 dark:border-gray-600/30 dark:bg-gray-700/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/50"
+                    class="form-select block w-full appearance-none rounded-xl border-white/30 bg-white/60 py-3 pr-10 text-sm backdrop-blur-sm transition-[border-color,box-shadow,background-color] duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 dark:border-gray-600/30 dark:bg-gray-700/60 dark:focus:border-blue-400 dark:focus:ring-blue-400/50"
                   >
                     <For each={METRIC_OPTIONS}>
                       {([value, labelKey]) => <option value={value}>{t(labelKey)}</option>}
@@ -266,7 +266,7 @@ export function AnalyticsScreen(): JSX.Element {
                   onClick={() => setChartType((previous) => (previous === "line" ? "bar" : "line"))}
                   hover={{ scale: 1.05, y: -2, transition: { duration: 0.2 } }}
                   press={{ scale: 0.98, transition: { duration: 0.1 } }}
-                  class="flex items-center rounded-xl border border-white/30 bg-white/60 px-4 py-3 text-sm text-gray-600 backdrop-blur-sm transition-all duration-200 hover:bg-white/80 hover:text-gray-900 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700/80 dark:hover:text-white"
+                  class="flex items-center rounded-xl border border-white/30 bg-white/60 px-4 py-3 text-sm text-gray-600 backdrop-blur-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-200 hover:bg-white/80 hover:text-gray-900 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700/80 dark:hover:text-white"
                 >
                   <BarChart2 class="mr-2 h-4 w-4" />
                   {t(chartType() === "line" ? "dash.showBar" : "dash.showLine")}

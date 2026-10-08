@@ -8,6 +8,13 @@
  *   parallel   Raster finishing: lines at `angle`, the tool dropped on the surface along each (drop-cutter), zig-zag or one way,
  *              stepover from the cusp height `scallop` for a ball cutter or from the stepover percentage.
  *   waterline  Constant-Z finishing: the contour of the surface at each depth, tool-centre offset by the cutter's own shape.
+ *   (clearing) Roughing and rest clear each region with `clearing`: "contour" (the pocket engine, contour-parallel) or "adaptive"
+ *              (`adaptive.ts`, the radial depth of cut held at `engagement` % of the tool diameter wherever the tool goes).
+ *   (rest finishing) `parallel` and `waterline` with `restFrom` finish only where the previous tool did not reach as low: the new tool's
+ *              own drop-cutter path, kept where the previous tool's is higher than it by more than `restThreshold`. With a larger ball
+ *              before it that is pencil machining: the creases and fillets the big ball bridged.
+ *   rest       Roughing of what a previous, larger tool (`restFrom`) left behind, at the same levels: only the regions whose
+ *              centres bring this tool's disc to unswept material are cleared (`rest.ts`).
  *
  * Every path is computed against the same drop-cutter (`Surface.tip`), which never answers lower than the true surface, so a path
  * does not gouge; `cam.verify` confirms it on the emitted G-code. Pure: same inputs, same moves.
@@ -22,10 +29,24 @@ import { OperationFields, Positive, NonNegative, heightsOrdered, levelsOf, withD
 import { pathFromPoints } from "../path.ts"
 import { MoveBuilder, approach, finish, followPath, liftTo } from "./common.ts"
 import { PocketEntrySchema, PocketParams, generatePocket } from "./pocket.ts"
+import { AdaptiveParams, generateAdaptive } from "./adaptive.ts"
+import { restField } from "./rest.ts"
 import { Surface, contour, cutterOf, nest, sampleNodes, simplify, simplify3, type Cutter, type Rect } from "./surface-field.ts"
+import { ToolKindSchema } from "../tool.ts"
 
-export const SurfaceStrategySchema = Schema.Literals(["roughing", "parallel", "waterline"])
+export const SurfaceStrategySchema = Schema.Literals(["roughing", "parallel", "waterline", "rest"])
 export type SurfaceStrategy = typeof SurfaceStrategySchema.Type
+
+/** The tool whose roughing a `rest` operation continues, and the stock it left on the part. */
+export const RestFromSchema = Schema.Struct({
+  diameter: Positive,
+  kind: withDefault(ToolKindSchema, "endmill" as const),
+  /** Corner radius of a bull-nose end mill, mm. */
+  tipRadius: Schema.optionalKey(Positive),
+  /** Stock to leave the previous tool left on the part, mm; defaults to this operation's own `allowance`. */
+  allowance: Schema.optionalKey(NonNegative)
+})
+export type RestFrom = typeof RestFromSchema.Type
 
 export class SurfaceParams extends Schema.Class<SurfaceParams>("cam/SurfaceParams")(
   Schema.Struct({
@@ -46,7 +67,15 @@ export class SurfaceParams extends Schema.Class<SurfaceParams>("cam/SurfaceParam
     tolerance: withDefault(Positive, 0.01),
     entry: withDefault(PocketEntrySchema, "helix" as const),
     helixPitch: withDefault(Positive, 1),
-    rampAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0.1, maximum: 45 })), 3)
+    rampAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0.1, maximum: 45 })), 3),
+    /** `rest` only: the previous tool. It is assumed to have cut at the same Z levels with the same stepover logic. */
+    restFrom: Schema.optionalKey(RestFromSchema),
+    /** `parallel` / `waterline` with `restFrom`: material thicker than this (mm) above what the new tool reaches is finished. */
+    restThreshold: withDefault(Positive, 0.02),
+    /** How `roughing` and `rest` clear a region: contour-parallel offsets, or adaptive clearing at a bounded radial engagement. */
+    clearing: withDefault(Schema.Literals(["contour", "adaptive"]), "contour" as const),
+    /** `adaptive` only: the maximum radial depth of cut, as a percentage of the tool diameter. */
+    engagement: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 50 })), 12)
   }).check(heightsOrdered)
 ) {}
 
@@ -90,9 +119,47 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   if (tool.kind === "drill") warnings.push("A drill cannot machine a surface; use an end mill or a ball nose cutter.")
   const bottomZ = levels.bottomZ
   const cell = Math.min(part.grid.cellX, part.grid.cellY)
+  // The previous tool, for rest roughing and rest finishing alike.
+  const previousTool: Tool | undefined = params.restFrom === undefined ? undefined : {
+    id: "rest-from", name: "previous tool", kind: params.restFrom.kind, diameter: params.restFrom.diameter, flutes: 2, maxRpm: 1,
+    ...(params.restFrom.tipRadius !== undefined ? { tipRadius: params.restFrom.tipRadius } : {})
+  }
+  const previous: Cutter | undefined = previousTool === undefined ? undefined : cutterOf(previousTool, params.restFrom?.allowance ?? params.allowance)
+  const finishing = params.strategy === "parallel" || params.strategy === "waterline"
+  if (finishing && params.restFrom !== undefined && params.restFrom.diameter < tool.diameter) {
+    warnings.push(`The previous tool (${params.restFrom.diameter} mm) is smaller than this one (${tool.diameter} mm): there is nothing a larger tool left behind.`)
+  }
+  /** Where this tool can go lower than the previous one did: there is material for it (always true without a previous tool). */
+  const leftAt = (x: number, y: number, tip: number): boolean => {
+    if (previous === undefined) return true
+    if (tip === -Infinity) return false
+    // Past the edge of the stock there is nothing to leave behind, however differently two cutters ride a cliff there.
+    if (x < stock.origin.x - 1e-9 || x > stock.origin.x + stock.x + 1e-9 || y < stock.origin.y - 1e-9 || y > stock.origin.y + stock.y + 1e-9) return false
+    return surface.tip(previous, x, y) - tip > params.restThreshold
+  }
+  /** Splits a ring (or chain) into the stretches where `keep` holds; a ring wholly kept stays closed. */
+  const piecesWhere = (pts: ReadonlyArray<Vec2>, keep: ReadonlyArray<boolean>): Array<{ readonly pts: Vec2[]; readonly closed: boolean }> => {
+    if (keep.every(Boolean)) return [{ pts: [...pts], closed: true }]
+    if (!keep.some(Boolean)) return []
+    const n = pts.length
+    const first = keep.findIndex((v) => !v)
+    const out: Array<{ pts: Vec2[]; closed: boolean }> = []
+    let cur: Vec2[] = []
+    for (let i = 1; i <= n; i++) {
+      const k = (first + i) % n
+      if (keep[k]) cur.push(pts[k]!)
+      else if (cur.length > 0) { out.push({ pts: cur, closed: false }); cur = [] }
+    }
+    if (cur.length > 0) out.push({ pts: cur, closed: false })
+    return out.filter((p) => p.pts.length >= 2)
+  }
 
-  if (params.strategy === "roughing") {
-    const step = Math.max(cell, Math.min(params.tolerance * 25, tool.diameter / 6, 0.5))
+  if (params.strategy === "roughing" || params.strategy === "rest") {
+    const isRest = params.strategy === "rest"
+    // Rest regions are small and bounded by the previous pass, so their grid is finer than a plain roughing's.
+    const step = isRest
+      ? Math.max(cell, Math.min(params.tolerance * 10, tool.diameter / 8, 0.25))
+      : Math.max(cell, Math.min(params.tolerance * 25, tool.diameter / 6, 0.5))
     const margin = cutter.radius + 2 * step
     const s = stockRect(stock)
     const reach = tool.diameter / 2
@@ -101,13 +168,48 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     const rect: Rect = { x0: keep.x0 - margin, y0: keep.y0 - margin, x1: keep.x1 + margin, y1: keep.y1 + margin }
     const value = (x: number, y: number): number => (x < keep.x0 || x > keep.x1 || y < keep.y0 || y > keep.y1 ? Infinity : surface.tip(cutter, x, y))
     const nodes = sampleNodes(value, rect, step)
+    let restAt: ReturnType<typeof restField> | undefined
+    if (isRest) {
+      const from = params.restFrom
+      if (from === undefined || previous === undefined) {
+        warnings.push("A rest operation needs `restFrom`: the previous tool it continues.")
+        b.comment("nothing to cut: no previous tool given for the rest machining")
+        return done(b.moves)
+      }
+      if (from.diameter < tool.diameter) warnings.push(`The previous tool (${from.diameter} mm) is smaller than this one (${tool.diameter} mm): there is nothing a larger tool left behind.`)
+      restAt = restField({
+        surface, previous, previousRadius: from.diameter / 2, radius: tool.diameter / 2,
+        keep, rect, step, stock: s, margin: 2 * cell, nodes, value
+      })
+    }
     let zPrev = levels.topZ
     for (const z of levels.passZ) {
       const level = Math.max(z, bottomZ)
-      const loops = contour(value, level + 1e-9, rect, step, true, nodes).map((l) => simplify(l, params.tolerance, true)).filter((l) => l.length >= 3)
+      const field = restAt?.(level)
+      const loops = contour(field?.value ?? value, level + 1e-9, rect, step, true, field?.nodes ?? nodes).map((l) => simplify(l, params.tolerance, true)).filter((l) => l.length >= 3)
       stats.levels += 1
       stats.loops += loops.length
       for (const group of nest(loops)) {
+        const levelStock: Stock = { ...stock, origin: { ...stock.origin, z: zPrev } }
+        if (params.clearing === "adaptive") {
+          const adaptive = Schema.decodeUnknownSync(AdaptiveParams)({
+            id: params.id, name: `${params.name} Z${level.toFixed(3)}`,
+            clearanceHeight: params.clearanceHeight, safeHeight: params.safeHeight, retractHeight: params.retractHeight,
+            totalDepth: zPrev - level, stepdown: zPrev - level, feed: params.feed, plungeFeed: params.plungeFeed,
+            spindleRpm: params.spindleRpm, coolant: params.coolant, engagement: params.engagement,
+            helixPitch: params.helixPitch, climb: params.climb, tolerance: params.tolerance
+          })
+          // Only the stock is material (the margin round it is air); a rest pass takes only what the previous tool left, from free air.
+          const result = generateAdaptive(adaptive, { boundary: group.boundary, islands: group.islands }, tool, levelStock, field === undefined
+            ? { material: (x, y) => x >= s.x0 && x <= s.x1 && y >= s.y0 && y <= s.y1, helix: true }
+            : { material: field.isUnswept })
+          warnings.push(...result.warnings)
+          for (const m of result.toolpath.moves) {
+            if (m._tag === "Comment") continue
+            b.push(m)
+          }
+          continue
+        }
         const pocket = Schema.decodeUnknownSync(PocketParams)({
           id: params.id, name: `${params.name} Z${level.toFixed(3)}`,
           clearanceHeight: params.clearanceHeight, safeHeight: params.safeHeight, retractHeight: params.retractHeight,
@@ -116,7 +218,6 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
           entry: params.entry, helixPitch: params.helixPitch, rampAngle: params.rampAngle, climb: params.climb,
           tolerance: params.tolerance, toolCentre: true, allowance: 0
         })
-        const levelStock: Stock = { ...stock, origin: { ...stock.origin, z: zPrev } }
         const path = generatePocket(pocket, { boundary: group.boundary, islands: group.islands }, tool, levelStock)
         for (const m of path.moves) {
           if (m._tag === "Comment") continue
@@ -125,7 +226,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
       }
       zPrev = level
     }
-    if (stats.loops === 0) b.comment("nothing to cut: the part leaves no room for the tool at any depth")
+    if (stats.loops === 0) b.comment(isRest ? "nothing to cut: the previous tool left no material this tool can reach" : "nothing to cut: the part leaves no room for the tool at any depth")
     if (b.started) finish(b, levels)
     return done(b.moves)
   }
@@ -144,24 +245,27 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
       if (loops.length === 0) continue
       stats.levels += 1
       // The contours run with the part on their left: that is climb milling; the other direction is conventional.
-      const remaining = loops.map((l) => (params.climb ? l : [...l].reverse()))
+      // With a previous tool only the stretches it left material on are cut, as open pieces.
+      const remaining = loops
+        .map((l) => (params.climb ? l : [...l].reverse()))
+        .flatMap((l) => (previous === undefined ? [{ pts: l, closed: true }] : piecesWhere(l, l.map((p) => leftAt(p.x, p.y, level)))))
       while (remaining.length > 0) {
         let bi = 0, bd = Infinity
-        remaining.forEach((l, i) => { const d = at === undefined ? 0 : Math.min(...l.map((p) => distance(p, at!))); if (d < bd) { bd = d; bi = i } })
-        const [loop] = remaining.splice(bi, 1)
-        const ring = startNear(loop!, at)
-        const path = pathFromPoints(ring, true)
+        remaining.forEach((l, i) => { const d = at === undefined ? 0 : Math.min(...l.pts.map((p) => distance(p, at!))); if (d < bd) { bd = d; bi = i } })
+        const [piece] = remaining.splice(bi, 1)
+        const ring = piece!.closed ? startNear(piece!.pts, at) : piece!.pts
+        const path = pathFromPoints(ring, piece!.closed)
         if (b.started) liftTo(b, levels.retractZ)
         approach(b, path.start, levels)
         b.rapid({ x: path.start.x, y: path.start.y, z: Math.max(levels.entryZ, level + 1) })
         b.linear({ x: path.start.x, y: path.start.y, z: level }, params.plungeFeed)
         followPath(b, path, level, params.feed)
-        at = path.start
+        at = piece!.closed ? path.start : ring[ring.length - 1]
         stats.loops += 1
         stats.points += ring.length
       }
     }
-    if (stats.loops === 0) b.comment("nothing to cut: no contour of the part at the requested depths")
+    if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no contour of the part at the requested depths" : "nothing to cut: the previous tool left no material this tool can reach")
     if (b.started) finish(b, levels)
     return done(b.moves)
   }
@@ -188,7 +292,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   const dropAt = (s: number, t: number): [number, number, number] | undefined => {
     const x = s * ux + t * nx, y = s * uy + t * ny
     const tip = surface.tip(cutter, x, y)
-    return tip === -Infinity ? undefined : [x, y, Math.max(tip, bottomZ)]
+    return tip === -Infinity || !leftAt(x, y, tip) ? undefined : [x, y, Math.max(tip, bottomZ)]
   }
   type P3 = readonly [number, number, number]
   const runs: P3[][] = []
@@ -209,7 +313,8 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
   const linkOk = (a: P3, c: P3): P3[] | undefined => {
     // Stay down between neighbouring runs when the surface under the straight link is all there is to follow.
     const len = Math.hypot(c[0] - a[0], c[1] - a[1])
-    if (len > 2.5 * spacing + 2 * cutter.radius * 0.1) return undefined
+    // Between pieces of a rest finish there is nothing to follow: the tool lifts.
+    if (previous !== undefined || len > 2.5 * spacing + 2 * cutter.radius * 0.1) return undefined
     const n = Math.max(1, Math.ceil(len / ds))
     const out: P3[] = []
     for (let k = 1; k < n; k++) {
@@ -236,7 +341,7 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     last = run[run.length - 1]
     stats.points += run.length
   }
-  if (runs.length === 0) b.comment("nothing to cut: the cutter finds no surface along any line")
+  if (runs.length === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along any line" : "nothing to cut: the previous tool left no material this tool can reach")
   if (b.started) finish(b, levels)
   return done(b.moves)
 }

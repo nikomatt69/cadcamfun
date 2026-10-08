@@ -38,7 +38,7 @@ export function BrowserToolbar(props: { readonly browser: Browser }): JSX.Elemen
   const count = (): number => selection.selectedElementIds.length
   const selected = () => elements.elements.filter((element) => selection.selectedElementIds.includes(element.id))
   return (
-    <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 space-y-2" data-testid="browser-toolbar">
+    <div class="workstation-browser-toolbar border-b border-gray-200 dark:border-gray-700 space-y-2" data-testid="browser-toolbar">
       <div class="flex items-center justify-between gap-2">
         <select
           class="text-xs p-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 flex-1"
@@ -81,7 +81,7 @@ export function RenameName(props: { readonly id: string; readonly name: string; 
     <Show
       when={b.renaming() === props.id}
       fallback={
-        <span class="flex-1 truncate font-medium text-gray-900 dark:text-gray-100" onDblClick={(event) => { event.stopPropagation(); b.startRename(props.id) }} title="Double-click to rename">
+        <span class="flex-1 min-w-0 truncate font-medium text-gray-900 dark:text-gray-100" onDblClick={(event) => { event.stopPropagation(); b.startRename(props.id) }} title="Double-click to rename">
           {props.name}
         </span>
       }
@@ -108,7 +108,7 @@ export function RowActions(props: { readonly id: string; readonly visible: boole
   const b = props.browser
   const stop = (action: () => void) => (event: MouseEvent) => { event.stopPropagation(); action() }
   return (
-    <div class="flex items-center space-x-0.5 ml-1" data-testid={`row-actions-${props.id}`}>
+    <div class="workstation-row-actions flex items-center space-x-0.5 ml-1" data-testid={`row-actions-${props.id}`}>
       <button class={`${MINI} ${props.locked ? "" : "opacity-0 group-hover:opacity-100"}`} title={props.locked ? "Unlock" : "Lock"} aria-label={props.locked ? "Unlock" : "Lock"} onClick={stop(() => b.toggleLocked(props.id))}>
         <Show when={props.locked} fallback={<Unlock size={12} />}><Lock size={12} class="text-orange-500" /></Show>
       </button>

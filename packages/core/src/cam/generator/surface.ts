@@ -55,6 +55,11 @@ export const movesToGcode = (moves: ReadonlyArray<Move>): string => {
         at = { ...move.to }
         break
       }
+      case "Orient": {
+        const words = [["A", move.a], ["B", move.b], ["C", move.c]].flatMap(([l, v]) => (typeof v === "number" ? [` ${l}${f3(v)}`] : [])).join("")
+        if (words !== "") out += `G0${words}\n`
+        break
+      }
       case "Cycle": break
     }
   }
@@ -76,14 +81,14 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
   // Roughing leaves stock to leave anyway, so its model can be coarse; a finishing pass follows the surface and needs a fine one.
   // A coarse grid only ever errs on the safe side (a path is never lower than the part), by at most slope x half a cell.
   const modelFor = (strategy: SurfaceStrategy) => {
-    const cell = strategy === "roughing"
+    const cell = strategy === "roughing" || strategy === "rest"
       ? Math.min(0.5, Math.max(0.1, s.toolDiameter / 30))
       : Math.min(0.3, Math.max(0.05, s.tolerance * 5, s.toolDiameter / 60))
     return buildPartModel(placed as never, { cell, tolerance: Math.max(0.005, s.tolerance / 2), maxCells: 800_000 })
   }
   const models = new Map<SurfaceStrategy, NonNullable<ReturnType<typeof modelFor>>>()
   const partFor = (strategy: SurfaceStrategy) => {
-    const key: SurfaceStrategy = strategy === "roughing" ? "roughing" : "parallel"
+    const key: SurfaceStrategy = strategy === "roughing" || strategy === "rest" ? "roughing" : "parallel"
     const hit = models.get(key)
     if (hit !== undefined) return hit
     const built = modelFor(key)!
@@ -91,10 +96,16 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
     models.set(key, built)
     return built
   }
-  const first = modelFor(s.surfaceStrategy)
+  // Rest machining continues the tool before it. On a roughing that is the `rest` strategy; on a finishing strategy it restricts the
+  // path to where the previous (larger) tool did not reach as low: pencil machining when that tool was a ball.
+  const rest = s.useRestMachining && s.surfaceStrategy === "roughing"
+  const restFinish = s.useRestMachining && (s.surfaceStrategy === "parallel" || s.surfaceStrategy === "waterline")
+  const strategy: SurfaceStrategy = rest ? "rest" : s.surfaceStrategy
+  const previousKind = s.toolType === "ballnose" ? "ballnose" : "endmill"
+  const first = modelFor(strategy)
   if (first === undefined) return undefined
   const part = first
-  models.set(s.surfaceStrategy === "roughing" ? "roughing" : "parallel", first)
+  models.set(strategy === "roughing" || strategy === "rest" ? "roughing" : "parallel", first)
   warnings.push(...part.warnings)
   if (part.skipped.length > 0) warnings.push(`Not machined as a surface (not solids): ${part.skipped.join(", ")}`)
 
@@ -119,10 +130,17 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
     return result
   }
 
-  let gcode = `; 3D surface: ${placed.length} element(s) as one part model, ${s.surfaceStrategy}${s.finishingPass ? " + finishing" : ""}\n`
+  let gcode = `; 3D surface: ${placed.length} element(s) as one part model, ${strategy}${s.finishingPass ? " + finishing" : ""}\n`
   const finishes = s.finishingPass && s.surfaceStrategy === "roughing"
-  const primary = run(finishes ? "Roughing" : s.surfaceStrategy, s.surfaceStrategy, {
-    allowance: finishes ? s.finishingAllowance : 0, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay
+  const allowance = finishes ? s.finishingAllowance : 0
+  if (rest) gcode += `; Rest machining: only what a ${f3(s.restToolDiameter)} mm tool left behind\n`
+  if (s.surfaceClearing === "adaptive" && (strategy === "roughing" || strategy === "rest")) gcode += `; Adaptive clearing: radial depth of cut held at ${f3(s.adaptiveEngagement)} % of the tool diameter\n`
+  if (restFinish) gcode += `; Rest finishing: only where a ${f3(s.restToolDiameter)} mm tool did not reach as low\n`
+  const primary = run(finishes ? (rest ? "Rest roughing" : "Roughing") : strategy, strategy, {
+    allowance, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay,
+    clearing: s.surfaceClearing, engagement: s.adaptiveEngagement,
+    ...(rest ? { restFrom: { diameter: s.restToolDiameter, kind: "endmill", allowance } } : {}),
+    ...(restFinish ? { restFrom: { diameter: s.restToolDiameter, kind: previousKind, allowance: 0 } } : {})
   })
   gcode += movesToGcode(primary.toolpath.moves)
   if (finishes) {

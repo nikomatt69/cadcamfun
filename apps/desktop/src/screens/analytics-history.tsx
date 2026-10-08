@@ -75,8 +75,8 @@ export function AnalyticsHistoryScreen(): JSX.Element {
       <div class="mx-auto max-w-7xl space-y-8 p-6">
         <div class="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center md:gap-0">
           <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
-            <h1 class="flex items-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
-              <span class="inline-flex transition-transform duration-200 hover:rotate-5 hover:scale-110">
+            <h1 class="flex items-center text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
+              <span class="inline-flex">
                 <BarChart2 size={28} class="mr-3 text-blue-500" />
               </span>
               {t("history.title")}
@@ -87,7 +87,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
           <Motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
             <A
               href="/analytics"
-              class="inline-block rounded-2xl border border-white/30 bg-white/80 px-6 py-3 font-medium text-gray-700 shadow-xl backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/90 dark:border-gray-600/30 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-700/90"
+              class="inline-block rounded-2xl border border-white/30 bg-white/80 px-6 py-3 font-medium text-gray-700 shadow-xl backdrop-blur-md transition-[background-color,border-color,color,box-shadow,opacity] duration-200 hover:bg-white/90 dark:border-gray-600/30 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-700/90"
             >
               {t("history.back")}
             </A>
@@ -106,7 +106,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
               >
                 <div class="mb-3 flex items-center justify-between">
                   <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">{card.label}</h3>
-                  <span class="inline-flex transition-transform duration-200 hover:scale-110">
+                  <span class="inline-flex">
                     <card.Icon size={20} class={card.accent} />
                   </span>
                 </div>
@@ -124,7 +124,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
           class="rounded-2xl border border-white/30 bg-white/80 p-6 shadow-xl backdrop-blur-md dark:border-gray-600/30 dark:bg-gray-800/80"
         >
           <div class="mb-4 flex items-center">
-            <span class="inline-flex transition-transform duration-200 hover:scale-110">
+            <span class="inline-flex">
               <Filter size={18} class="mr-2 text-gray-600 dark:text-gray-400" />
             </span>
             <h3 class="text-lg font-medium text-gray-700 dark:text-gray-300">{t("history.filterTitle")}</h3>
@@ -141,7 +141,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
                   transition={{ duration: 0.3, delay: index() * 0.05 }}
                   hover={{ scale: 1.03 }}
                   press={{ scale: 0.95 }}
-                  class={`flex items-center rounded-xl border px-4 py-2 text-sm font-medium backdrop-blur-sm transition-all duration-200 ${
+                  class={`flex items-center rounded-xl border px-4 py-2 text-sm font-medium backdrop-blur-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ${
                     selectedFilter() === option.key
                       ? "border-blue-400 bg-blue-500 text-white shadow-lg"
                       : "border-white/30 bg-white/60 text-gray-700 hover:bg-white/80 dark:border-gray-600/30 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700/80"
@@ -168,7 +168,7 @@ export function AnalyticsHistoryScreen(): JSX.Element {
         >
           <div class="border-b border-gray-200/50 p-6 dark:border-gray-600/50">
             <h3 class="flex items-center text-lg font-medium text-gray-700 dark:text-gray-300">
-              <span class="inline-flex transition-transform duration-200 hover:scale-110">
+              <span class="inline-flex">
                 <Activity size={18} class="mr-2 text-indigo-500" />
               </span>
               {t("history.timeline")}

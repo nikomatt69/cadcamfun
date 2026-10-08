@@ -121,7 +121,7 @@ export function SettingsScreen(): JSX.Element {
                 hover={{ scale: 1.05 }}
                 press={{ scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                class="inline-flex items-center justify-center px-4 py-2 border border-transparent font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-100 dark:bg-red-900/40 dark:hover:bg-red-900/60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                class="inline-flex items-center justify-center px-4 py-2 border border-transparent font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-100 dark:bg-red-900/40 dark:hover:bg-red-900/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out"
               >
                 {isDeleting() ? t("settings.account.deleting") : t("settings.account.delete")}
               </Motion.button>
@@ -381,7 +381,7 @@ export function SettingsScreen(): JSX.Element {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
             {t("settings.title")}
           </h1>
           <p class="mt-2 text-gray-600 dark:text-gray-300">{t("settings.index.subtitle")}</p>
@@ -406,7 +406,7 @@ export function SettingsScreen(): JSX.Element {
                       hover={{ scale: 1.05 }}
                       press={{ scale: 0.95 }}
                       transition={{ duration: 0.2 }}
-                      class="flex-1 py-4 px-2 border-b-2 font-medium text-sm transition-all duration-200 whitespace-nowrap rounded-t-lg"
+                      class="flex-1 py-4 px-2 border-b-2 font-medium text-sm transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out whitespace-nowrap rounded-t-lg"
                       classList={{
                         "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-900/20":
                           activeTab() === tab.id,
@@ -438,7 +438,7 @@ export function SettingsScreen(): JSX.Element {
                       hover={{ scale: 1.05 }}
                       press={{ scale: 0.95 }}
                       transition={{ duration: 0.2 }}
-                      class="flex-1 flex flex-col items-center py-2 px-1 text-xs font-medium transition-all duration-200 rounded-lg"
+                      class="flex-1 flex flex-col items-center py-2 px-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out rounded-lg"
                       classList={{
                         "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20": activeTab() === tab.id,
                         "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-700/30":

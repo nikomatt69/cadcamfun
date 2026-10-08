@@ -140,3 +140,112 @@ export interface GenerateResult {
   readonly gcode: string
   readonly error?: string
 }
+
+// -- adaptive feed -------------------------------------------------------------------------------
+
+interface FeedMove {
+  readonly index: number
+  readonly kind: 1 | 2 | 3
+  readonly from: readonly [number, number, number]
+  readonly to: readonly [number, number, number]
+  /** The feed in force after this line in the original program (mm/min), if one has been set. */
+  readonly feed: number | null
+  /** Tangent of the path (unit, XY) where the move starts and where it ends; undefined for a pure Z move. */
+  readonly tIn?: readonly [number, number]
+  readonly tOut?: readonly [number, number]
+  readonly length: number
+  /** Smallest radius of curvature inside the move (an arc's radius); Infinity for a line. */
+  readonly radius: number
+}
+
+const formatFeed = (feed: number): string => (feed >= 100 ? String(Math.round(feed)) : f3(feed))
+
+/**
+ * Feed that follows the path: the cutter is slowed where the path turns, so that the corner or curve is cut at a load the machine
+ * and the tool can follow, and brought back to the programmed feed on the straights.
+ *
+ *   corner   Between two consecutive cutting moves the direction changes by theta. Under 15 degrees nothing changes; from there the
+ *            feed falls linearly to half of the programmed one at 90 degrees and stays there. Both moves that meet at the corner
+ *            are slowed (the approach and the exit).
+ *   curve    A short-step polyline or an arc of radius rho smaller than 1.5 tool diameters is slowed in proportion to rho (never
+ *            below 40 %); a polyline's radius is its step over the turn between steps.
+ *   kept     Rapids, vertical moves and helical arcs (plunges have their own feed) are not touched, nor is a program with no feed
+ *            set before a move.
+ *
+ * Pure text transformation of a mill program; the factor is applied to the feed in force when each move is read, so it is meant to
+ * be applied once to a freshly generated program.
+ */
+export const adaptFeeds = (gcode: string, toolDiameter: number): string => {
+  const lines = gcode.split("\n")
+  const moves: FeedMove[] = []
+  const at = { x: 0, y: 0, z: 0 }
+  let known = false
+  let feed: number | null = null
+  const num = (line: string, axis: string): number | null => axisWord(line, axis)
+  lines.forEach((raw, index) => {
+    const line = raw.trim()
+    const m = /^G0?([0-3])\b/.exec(line)
+    if (m === null || line.startsWith(";")) return
+    const kind = Number(m[1])
+    const f = num(line, "F")
+    if (f !== null) feed = f
+    const to = { x: num(line, "X") ?? at.x, y: num(line, "Y") ?? at.y, z: num(line, "Z") ?? at.z }
+    if (kind >= 1 && known) {
+      const dx = to.x - at.x, dy = to.y - at.y
+      const xy = Math.hypot(dx, dy)
+      const base = { index, kind: kind as 1 | 2 | 3, from: [at.x, at.y, at.z] as const, to: [to.x, to.y, to.z] as const, feed }
+      if (kind === 1) {
+        moves.push(xy > 1e-9
+          ? { ...base, tIn: [dx / xy, dy / xy], tOut: [dx / xy, dy / xy], length: xy, radius: Infinity }
+          : { ...base, length: Math.abs(to.z - at.z), radius: Infinity })
+      } else {
+        const i = num(line, "I") ?? 0, j = num(line, "J") ?? 0
+        const r = Math.hypot(i, j)
+        const cx = at.x + i, cy = at.y + j
+        const cw = kind === 2
+        const tangent = (px: number, py: number): readonly [number, number] => {
+          const rx = (px - cx) / (r || 1), ry = (py - cy) / (r || 1)
+          return cw ? [ry, -rx] : [-ry, rx]
+        }
+        const helical = Math.abs(to.z - at.z) > 1e-6
+        moves.push(r > 1e-9 && !helical
+          ? { ...base, tIn: tangent(at.x, at.y), tOut: tangent(to.x, to.y), length: Math.max(xy, 1e-6), radius: r }
+          : { ...base, length: xy, radius: Infinity })
+      }
+    }
+    at.x = to.x; at.y = to.y; at.z = to.z
+    if (num(line, "X") !== null || num(line, "Y") !== null || num(line, "Z") !== null) known = true
+  })
+
+  const factor = new Map<number, number>()
+  const slow = (index: number, f: number): void => { factor.set(index, Math.min(factor.get(index) ?? 1, f)) }
+  const D = Math.max(toolDiameter, 1e-6)
+  moves.forEach((a, k) => {
+    if (a.tIn !== undefined && a.radius < 1.5 * D) slow(a.index, Math.max(0.4, a.radius / (1.5 * D)))
+    const b = moves[k + 1]
+    if (b === undefined || a.tOut === undefined || b.tIn === undefined) return
+    const cos = Math.max(-1, Math.min(1, a.tOut[0] * b.tIn[0] + a.tOut[1] * b.tIn[1]))
+    const theta = Math.acos(cos)
+    if (theta < 1e-3) return
+    let f = 1
+    if (theta >= (30 * Math.PI) / 180) f = theta >= Math.PI / 2 ? 0.5 : 1 - 0.5 * ((theta - (15 * Math.PI) / 180) / (Math.PI / 2 - (15 * Math.PI) / 180))
+    else {
+      // A gentle turn between short steps is a curve: its radius is the step over the turn.
+      const rho = (0.5 * (a.length + b.length)) / theta
+      if (rho < 1.5 * D) f = Math.max(0.4, rho / (1.5 * D))
+    }
+    if (f < 1) { slow(a.index, f); slow(b.index, f) }
+  })
+
+  const byIndex = new Map(moves.map((mv) => [mv.index, mv]))
+  let last: number | null = null
+  return lines.map((raw, index) => {
+    const mv = byIndex.get(index)
+    if (mv === undefined || mv.feed === null) return raw
+    const desired = Math.round(mv.feed * (factor.get(index) ?? 1) * 1000) / 1000
+    const stripped = raw.replace(/\s+F[+-]?\d*\.?\d+/i, "")
+    if (last === desired) { last = desired; return stripped }
+    last = desired
+    return `${stripped} F${formatFeed(desired)}`
+  }).join("\n")
+}

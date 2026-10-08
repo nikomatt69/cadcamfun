@@ -17,7 +17,7 @@ export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance 
   }
   for (const path of program.toolpaths) {
     for (const move of cam.expandMoves(path.moves, from)) {
-      if (move._tag === "Comment") continue
+      if (move._tag === "Comment" || move._tag === "Orient") continue
       if (move._tag === "Dwell") { append(from, false, move.seconds); continue }
       if (move._tag === "Cycle") continue
       const duration = cam.moveLength(move, from) / Math.max(1e-6, move._tag === "Rapid" ? rapidRate : move.feed) * 60

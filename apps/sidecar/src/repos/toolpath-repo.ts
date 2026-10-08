@@ -1,5 +1,6 @@
 import type { ToolpathRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import type { Db } from "@cadcamfun/db"
 import { and, desc, eq, inArray, like, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { orgIdsOf } from "./access.ts"
@@ -13,6 +14,34 @@ export interface ToolpathInput {
   materialId?: string | null | undefined; machineConfigId?: string | null | undefined; toolId?: string | null | undefined
 }
 
+export interface ToolpathVersionEntry {
+  readonly id: string; readonly toolpathId: string; readonly data: unknown; readonly gcode: string | null; readonly changeMessage: string | null
+  readonly userId: string; readonly createdAt: string
+}
+export interface ToolpathCommentEntry {
+  readonly id: string; readonly toolpathId: string; readonly content: string; readonly userId: string; readonly createdAt: string; readonly updatedAt: string
+  readonly user: { readonly id: string; readonly name: string | null; readonly email: string | null; readonly image: string | null } | null
+}
+
+const toVersion = (v: typeof schema.toolpathVersionTable.$inferSelect): ToolpathVersionEntry => ({
+  id: v.id, toolpathId: v.toolpathId, data: v.data, gcode: v.gcode, changeMessage: v.changeMessage, userId: v.userId, createdAt: v.createdAt.toISOString()
+})
+
+const userRefs = async (db: Db, ids: ReadonlyArray<string>) => {
+  const uniq = [...new Set(ids)]
+  const rows = uniq.length ? await db.select({ id: schema.userTable.id, name: schema.userTable.name, email: schema.userTable.email, image: schema.userTable.image })
+    .from(schema.userTable).where(inArray(schema.userTable.id, uniq)) : []
+  return new Map(rows.map((r) => [r.id, r]))
+}
+
+const withAuthors = async (db: Db, rows: ReadonlyArray<typeof schema.toolpathCommentTable.$inferSelect>): Promise<ToolpathCommentEntry[]> => {
+  const users = await userRefs(db, rows.map((r) => r.userId))
+  return rows.map((r) => ({
+    id: r.id, toolpathId: r.toolpathId, content: r.content, userId: r.userId,
+    createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(), user: users.get(r.userId) ?? null
+  }))
+}
+
 export class ToolpathRepo extends Context.Service<ToolpathRepo, {
   list(userId: string, f: { projectId?: string | undefined; type?: string | undefined; operationType?: string | undefined; search?: string | undefined; includePublic: boolean }): Effect.Effect<ToolpathRow[], DatabaseError>
   /** Visible when created by the user, in one of their organisations' projects, or public. */
@@ -24,6 +53,14 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
   /** Project-scoped list used by the envelope route: own, public, or organisation members' toolpaths, with project/organisation names. */
   listForProject(userId: string, projectId: string): Effect.Effect<unknown[], DatabaseError>
   drawingWithProject(userId: string, drawingId: string): Effect.Effect<{ projectId: string } | undefined, DatabaseError>
+  listVersions(toolpathId: string): Effect.Effect<Array<ToolpathVersionEntry & { user: { name: string | null; email: string | null } | null }>, DatabaseError>
+  findVersion(toolpathId: string, versionId: string): Effect.Effect<ToolpathVersionEntry | undefined, DatabaseError>
+  createVersion(toolpathId: string, userId: string, v: { data?: unknown; gcode?: string | undefined; changeMessage?: string | undefined }): Effect.Effect<ToolpathVersionEntry, DatabaseError>
+  listComments(toolpathId: string): Effect.Effect<ToolpathCommentEntry[], DatabaseError>
+  findComment(commentId: string): Effect.Effect<{ id: string; toolpathId: string; userId: string } | undefined, DatabaseError>
+  createComment(toolpathId: string, userId: string, content: string): Effect.Effect<ToolpathCommentEntry, DatabaseError>
+  updateComment(commentId: string, content: string): Effect.Effect<ToolpathCommentEntry, DatabaseError>
+  removeComment(commentId: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/ToolpathRepo") {
   static readonly layer = Layer.effect(
     ToolpathRepo,
@@ -31,6 +68,8 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
       const { query } = yield* Database
       const T = schema.toolpathTable
       const P = schema.projectTable
+      const V = schema.toolpathVersionTable
+      const C = schema.toolpathCommentTable
       return ToolpathRepo.of({
         list: (userId, f) =>
           query("toolpaths.list", async (db) => {
@@ -113,7 +152,46 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
               .where(and(eq(schema.drawingTable.id, drawingId), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined)))
               .limit(1)
             return hit
-          })
+          }),
+        listVersions: (toolpathId) =>
+          query("toolpaths.listVersions", async (db) => {
+            const rows = await db.select().from(V).where(eq(V.toolpathId, toolpathId)).orderBy(desc(V.createdAt))
+            const users = await userRefs(db, rows.map((r) => r.userId))
+            return rows.map((r) => ({ ...toVersion(r), user: users.get(r.userId) ?? null }))
+          }),
+        findVersion: (toolpathId, versionId) =>
+          query("toolpaths.findVersion", async (db) => {
+            const [row] = await db.select().from(V).where(and(eq(V.id, versionId), eq(V.toolpathId, toolpathId))).limit(1)
+            return row ? toVersion(row) : undefined
+          }),
+        createVersion: (toolpathId, userId, v) =>
+          query("toolpaths.createVersion", async (db) => {
+            const [row] = await db.insert(V).values({
+              toolpathId, userId, data: v.data ?? null, gcode: v.gcode ?? null, changeMessage: v.changeMessage ?? ""
+            }).returning()
+            return toVersion(row!)
+          }),
+        listComments: (toolpathId) =>
+          query("toolpaths.listComments", async (db) => {
+            const rows = await db.select().from(C).where(eq(C.toolpathId, toolpathId)).orderBy(desc(C.createdAt))
+            return withAuthors(db, rows)
+          }),
+        findComment: (commentId) =>
+          query("toolpaths.findComment", async (db) => {
+            const [row] = await db.select({ id: C.id, toolpathId: C.toolpathId, userId: C.userId }).from(C).where(eq(C.id, commentId)).limit(1)
+            return row
+          }),
+        createComment: (toolpathId, userId, content) =>
+          query("toolpaths.createComment", async (db) => {
+            const [row] = await db.insert(C).values({ toolpathId, userId, content }).returning()
+            return (await withAuthors(db, [row!]))[0]!
+          }),
+        updateComment: (commentId, content) =>
+          query("toolpaths.updateComment", async (db) => {
+            const [row] = await db.update(C).set({ content, updatedAt: new Date() }).where(eq(C.id, commentId)).returning()
+            return (await withAuthors(db, [row!]))[0]!
+          }),
+        removeComment: (commentId) => query("toolpaths.removeComment", async (db) => void (await db.delete(C).where(eq(C.id, commentId))))
       })
     })
   )

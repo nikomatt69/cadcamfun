@@ -93,3 +93,34 @@ export const buildPartModel = (elements: ReadonlyArray<Element>, options: ModelO
   const dexels = roots.map(fill).reduce((acc, d) => acc.union(d))
   return { dexels, grid, skipped, warnings, bounds: { min, max } }
 }
+
+/**
+ * The part to machine from solids that are already triangle meshes (the bodies of a parametric history, the result of a Boolean in
+ * `cad/csg.ts`): each is dropped into the same dexel grid and united, so the surface strategies cut it exactly as they cut a model
+ * built from elements. Positions and indices may be single precision; they are widened here.
+ */
+export const buildPartModelFromMeshes = (
+  meshes: ReadonlyArray<{ readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }>,
+  options: ModelOptions = {}
+): PartModel | undefined => {
+  const wide: Mesh64[] = meshes
+    .filter((m) => m.indices.length >= 3)
+    .map((m) => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
+  if (wide.length === 0) return undefined
+  const warnings: string[] = []
+  const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity]
+  for (const m of wide) { const b = meshBounds(m); for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a]!, b.min[a]!); max[a] = Math.max(max[a]!, b.max[a]!) } }
+  const margin = options.margin ?? 0
+  const grid = gridFor(min[0] - margin, min[1] - margin, max[0] + margin, max[1] + margin, options.cell ?? 0.25, options.maxCells)
+  if (grid.cellX > (options.cell ?? 0.25) * 1.001 || grid.cellY > (options.cell ?? 0.25) * 1.001) {
+    warnings.push(`Surface resolution coarsened to ${Math.max(grid.cellX, grid.cellY).toFixed(3)} mm to keep the model within ${options.maxCells ?? 1_500_000} columns`)
+  }
+  const dexels = wide
+    .map((m) => {
+      const { dexels: d, unpaired } = Dexels.fromMesh(m, grid)
+      if (unpaired > 0) warnings.push(`${unpaired} column(s) of a body had an odd number of surface hits (the mesh is not closed there)`)
+      return d
+    })
+    .reduce((acc, d) => acc.union(d))
+  return { dexels, grid, skipped: [], warnings, bounds: { min, max } }
+}

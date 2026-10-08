@@ -36,8 +36,8 @@ interface UserItem {
 
 type ItemIcon = (props: { readonly size?: number; readonly class?: string }) => JSX.Element
 
-const CARD = "bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-all border border-gray-200/50 dark:border-gray-700/50 overflow-hidden cursor-pointer group"
-const STAT_CARD = "bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-gray-700/40 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all group"
+const CARD = "bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out border border-gray-200/50 dark:border-gray-700/50 overflow-hidden cursor-pointer group"
+const STAT_CARD = "bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-gray-700/40 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out group"
 
 const formatMonth = (iso: string): string => {
   const parsed = Date.parse(iso)
@@ -56,7 +56,7 @@ const EmptyState = (props: { readonly icon: JSX.Element; readonly title: string;
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.3 }}
   >
-    <div class="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500 hover:scale-110 transition-transform">
+    <div class="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500">
       {props.icon}
     </div>
     <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">{props.title}</h3>
@@ -95,7 +95,7 @@ export function ProfileScreen(): JSX.Element {
     <Motion.button
       type="button"
       onClick={() => setActiveTab(id)}
-      class={`flex-1 px-6 py-4 text-sm font-semibold rounded-2xl transition-all relative flex items-center justify-center space-x-2 ${
+      class={`flex-1 px-6 py-4 text-sm font-semibold rounded-2xl transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out relative flex items-center justify-center space-x-2 ${
         activeTab() === id
           ? "text-white shadow-xl"
           : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50/50 dark:hover:bg-gray-700/30"
@@ -123,14 +123,14 @@ export function ProfileScreen(): JSX.Element {
     metaClass: string,
     withDescription: boolean
   ): JSX.Element => (
-    <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} hover={{ y: -8, scale: 1.02 }}>
+    <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <A href={href} class="block">
         <div class={CARD}>
           <div class={`h-48 ${thumbGradient} flex items-center justify-center`}>
             <Show
               when={typeof item.thumbnail === "string" && item.thumbnail.length > 0}
               fallback={
-                <div class="p-6 bg-white/20 dark:bg-white/10 rounded-xl backdrop-blur-sm hover:scale-110 transition-transform">
+                <div class="p-6 bg-white/20 dark:bg-white/10 rounded-xl backdrop-blur-sm">
                   <Icon size={48} class={iconClass} />
                 </div>
               }
@@ -139,7 +139,7 @@ export function ProfileScreen(): JSX.Element {
             </Show>
           </div>
           <div class="p-6">
-            <h3 class={`text-lg font-semibold text-gray-900 dark:text-white ${hoverClass} transition-colors`}>{item.name}</h3>
+            <h3 class={`text-lg font-semibold text-gray-900 dark:text-white ${hoverClass} transition-colors duration-150 ease-out`}>{item.name}</h3>
             <Show when={withDescription}>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.description ?? t("profile.noDescription")}</p>
             </Show>
@@ -166,7 +166,6 @@ export function ProfileScreen(): JSX.Element {
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.4 }}
-              hover={{ y: -8, scale: 1.02 }}
             >
               {/* Enhanced Background Pattern */}
               <div class="relative h-40 bg-gradient-to-br from-blue-500/30 via-purple-500/25 via-pink-500/20 to-indigo-500/30 dark:from-blue-600/40 dark:via-purple-600/35 dark:via-pink-600/25 dark:to-indigo-600/40">
@@ -192,8 +191,8 @@ export function ProfileScreen(): JSX.Element {
               <div class="relative px-8 pb-8">
                 {/* Enhanced Profile Avatar */}
                 <div class="flex flex-col xl:flex-row xl:items-end xl:space-x-8 -mt-20">
-                  <Motion.div class="relative group" hover={{ scale: 1.05 }} transition={{ duration: 0.3 }}>
-                    <div class="absolute -inset-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl blur-lg opacity-25 group-hover:opacity-40 transition-opacity" />
+                  <Motion.div class="relative group">
+                    <div class="absolute -inset-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-3xl blur-lg opacity-25 group-hover:opacity-40 transition-opacity duration-150 ease-out" />
                     <Show
                       when={typeof profile.data()?.image === "string" && (profile.data()?.image?.length ?? 0) > 0}
                       fallback={
@@ -245,7 +244,7 @@ export function ProfileScreen(): JSX.Element {
                         >
                           <Show when={typeof profile.data()?.email === "string" && (profile.data()?.email?.length ?? 0) > 0}>
                             <div class="flex items-center group">
-                              <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg mr-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
+                              <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg mr-3 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors duration-150 ease-out">
                                 <Mail class="h-4 w-4 text-blue-600 dark:text-blue-400" />
                               </div>
                               <div class="min-w-0 flex-1">
@@ -256,7 +255,7 @@ export function ProfileScreen(): JSX.Element {
                           </Show>
                           <Show when={typeof profile.data()?.location === "string" && (profile.data()?.location?.length ?? 0) > 0}>
                             <div class="flex items-center group">
-                              <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg mr-3 group-hover:bg-green-200 dark:group-hover:bg-green-900/50 transition-colors">
+                              <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg mr-3 group-hover:bg-green-200 dark:group-hover:bg-green-900/50 transition-colors duration-150 ease-out">
                                 <MapPin class="h-4 w-4 text-green-600 dark:text-green-400" />
                               </div>
                               <div class="min-w-0 flex-1">
@@ -266,7 +265,7 @@ export function ProfileScreen(): JSX.Element {
                             </div>
                           </Show>
                           <div class="flex items-center group">
-                            <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg mr-3 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/50 transition-colors">
+                            <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg mr-3 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/50 transition-colors duration-150 ease-out">
                               <Calendar class="h-4 w-4 text-purple-600 dark:text-purple-400" />
                             </div>
                             <div class="min-w-0 flex-1">
@@ -298,7 +297,7 @@ export function ProfileScreen(): JSX.Element {
                           <Show when={typeof profile.data()?.website === "string" && (profile.data()?.website?.length ?? 0) > 0}>
                             <a href={profile.data()?.website ?? ""} target="_blank" rel="noopener noreferrer">
                               <Motion.div
-                                class="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all"
+                                class="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out"
                                 hover={{ scale: 1.05, y: -2 }}
                                 press={{ scale: 0.95 }}
                               >
@@ -322,7 +321,7 @@ export function ProfileScreen(): JSX.Element {
                           <a href="/admin">
                             <Motion.button
                               type="button"
-                              class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 text-white rounded-2xl hover:from-red-700 hover:via-pink-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 transition-all font-medium"
+                              class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 text-white rounded-2xl hover:from-red-700 hover:via-pink-700 hover:to-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out font-medium"
                               hover={{ scale: 1.05, y: -2 }}
                               press={{ scale: 0.95 }}
                             >
@@ -336,7 +335,7 @@ export function ProfileScreen(): JSX.Element {
                         <A href="/profile/settings" class="inline-block">
                           <Motion.button
                             type="button"
-                            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all font-medium"
+                            class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out font-medium"
                             hover={{ scale: 1.05, y: -2 }}
                             press={{ scale: 0.95 }}
                           >
@@ -348,7 +347,7 @@ export function ProfileScreen(): JSX.Element {
                         {/* Share Profile Button */}
                         <Motion.button
                           type="button"
-                          class="inline-flex items-center px-6 py-2.5 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-gray-700 dark:text-gray-300 rounded-xl hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md hover:shadow-lg transition-all text-sm font-medium"
+                          class="inline-flex items-center px-6 py-2.5 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-gray-700 dark:text-gray-300 rounded-xl hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md hover:shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out text-sm font-medium"
                           hover={{ scale: 1.02, y: -1 }}
                           press={{ scale: 0.98 }}
                         >
@@ -364,9 +363,9 @@ export function ProfileScreen(): JSX.Element {
               {/* Enhanced Stats Section */}
               <div class="bg-gradient-to-r from-gray-50/80 via-white/50 to-gray-50/80 dark:from-gray-700/40 dark:via-gray-800/30 dark:to-gray-700/40 border-t border-gray-200/30 dark:border-gray-600/30 backdrop-blur-sm">
                 <div class="px-8 py-6 grid grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} hover={{ scale: 1.02, y: -2 }}>
+                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
                     <div class="flex items-center space-x-3">
-                      <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:shadow-blue-500/25 transition-shadow">
+                      <div class="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:shadow-blue-500/25 transition-shadow duration-150 ease-out">
                         <Folder class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
@@ -376,9 +375,9 @@ export function ProfileScreen(): JSX.Element {
                     </div>
                   </Motion.div>
 
-                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.3 }} hover={{ scale: 1.02, y: -2 }}>
+                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.3 }}>
                     <div class="flex items-center space-x-3">
-                      <div class="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-purple-500/25 transition-shadow">
+                      <div class="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:shadow-purple-500/25 transition-shadow duration-150 ease-out">
                         <Box class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
@@ -388,9 +387,9 @@ export function ProfileScreen(): JSX.Element {
                     </div>
                   </Motion.div>
 
-                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.3 }} hover={{ scale: 1.02, y: -2 }}>
+                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.3 }}>
                     <div class="flex items-center space-x-3">
-                      <div class="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-green-500/25 transition-shadow">
+                      <div class="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-green-500/25 transition-shadow duration-150 ease-out">
                         <Wrench class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
@@ -400,9 +399,9 @@ export function ProfileScreen(): JSX.Element {
                     </div>
                   </Motion.div>
 
-                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.3 }} hover={{ scale: 1.02, y: -2 }}>
+                  <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.3 }}>
                     <div class="flex items-center space-x-3">
-                      <div class="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg group-hover:shadow-orange-500/25 transition-shadow">
+                      <div class="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg group-hover:shadow-orange-500/25 transition-shadow duration-150 ease-out">
                         <Layout class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">

@@ -1,2 +1,1 @@
-import { MachineDetailScreen } from "../../screens/library-detail-screen.tsx"
-export default function Page() { return <MachineDetailScreen /> }
+export { MachineDetailScreen as default } from "../../resources/ResourceDetailScreens.tsx"

@@ -109,7 +109,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
           <section class="flex h-96 flex-col items-center justify-center">
             <div class="mb-4 text-xl text-red-600">{t("admin.analytics.accessDenied")}</div>
             <p class="mb-4 text-gray-600">{t("admin.analytics.noPermission")}</p>
-            <a class="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700" href="/analytics">
+            <a class="rounded-md bg-blue-600 px-4 py-2 text-white transition-colors duration-150 hover:bg-blue-700" href="/analytics">
               {t("admin.analytics.goAnalytics")}
             </a>
           </section>
@@ -117,7 +117,7 @@ export function AdminAnalyticsScreen(): JSX.Element {
       >
         <section class="px-4 py-6">
           <div class="mb-6 flex flex-col justify-between md:flex-row md:items-center">
-            <h1 class="mb-4 text-2xl font-bold text-gray-900 md:mb-0 dark:text-white">{t("admin.analytics.heading")}</h1>
+            <h1 class="mb-4 text-2xl font-semibold tracking-[-0.015em] text-gray-900 md:mb-0 dark:text-gray-50">{t("admin.analytics.heading")}</h1>
 
             <div class="flex flex-col items-center space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0">
               <div class="relative flex w-full items-center sm:w-auto">

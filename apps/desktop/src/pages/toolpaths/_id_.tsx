@@ -1,1 +1,1 @@
-export { CamScreen as default } from "../../screens/cam.tsx"
+export { ToolpathDetailScreen as default } from "../../toolpaths/ToolpathDetailScreen.tsx"

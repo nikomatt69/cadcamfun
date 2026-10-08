@@ -99,7 +99,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
 
   return (
     <Motion.div
-      class="backdrop-blur-md bg-white/90 dark:bg-gray-900/90 border-b border-white/30 dark:border-gray-600/30 px-6 py-3 flex items-center justify-between w-full rounded-2xl text-gray-900 dark:text-white shadow-lg"
+      class="workstation-toolbar flex items-center justify-between w-full text-gray-900 dark:text-white"
       initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, easing: "ease-out" }}
     >
       <Motion.div
