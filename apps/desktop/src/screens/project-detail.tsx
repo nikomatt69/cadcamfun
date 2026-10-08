@@ -6,7 +6,7 @@
 import { For, Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Check, Clock, Copy, Download, Edit, File, Grid, Plus, Trash2, Users, Wrench, X } from "lucide-solid"
+import { Check, Clock, Copy, Download, Edit, File, Grid, History, Plus, Trash2, Users, Wrench, X } from "lucide-solid"
 import { Field, Select, TextInput, Textarea } from "../components/ui/field.tsx"
 import { useApp } from "../state/context.ts"
 import { invalidatePrefix } from "../state/query-cache.ts"
@@ -152,6 +152,10 @@ export function ProjectDetailScreen(): JSX.Element {
   })
 
   const stop = (action: () => void) => (event: MouseEvent): void => { event.stopPropagation(); action() }
+  /** Version history of one item: the commits that touched its file in the project's repository. */
+  const historyButton = (directory: "drawings" | "components" | "toolpaths", row: Card): JSX.Element => (
+    <button type="button" class={ICON_BTN} title="History" aria-label={`History of ${row.name}`} onClick={stop(() => navigate(`/projects/${params.id}/history?path=${directory}/${row.id}.json`))}><History size={16} /></button>
+  )
 
   const empty = (icon: JSX.Element, tone: string, title: string, text: string, label: string, kind: ModalKind): JSX.Element => (
     <Motion.div class="bg-white dark:bg-gray-900 shadow-lg rounded-xl p-8 text-center border border-gray-100 dark:border-gray-800" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
@@ -231,6 +235,7 @@ export function ProjectDetailScreen(): JSX.Element {
                       </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
+                      <button type="button" class={BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>Version control</button>
                       <button type="button" class={BUTTON} onClick={() => open("edit")}><Edit size={16} class="mr-1.5" />Edit</button>
                       <button type="button" class={`${BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} class="mr-1.5" />Delete</button>
                     </div>
@@ -259,6 +264,7 @@ export function ProjectDetailScreen(): JSX.Element {
                   <Show when={drawings().length > 0} fallback={empty(<File size={32} class="text-blue-500" />, "bg-blue-50 dark:bg-blue-900/20", "No drawings yet", "Create your first drawing to start designing in the CAD editor.", "Create Drawing", "drawing")}>
                     {cards(drawings(), <div class="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-full"><Grid size={40} class="text-blue-500" /></div>, (row) => navigate(`/cad?drawingId=${row.id}`), (row) => (
                       <>
+                        {historyButton("drawings", row)}
                         <button type="button" class={ICON_BTN} title="Duplicate" aria-label={`Duplicate ${row.name}`} onClick={stop(() => void duplicateDrawing(row))}><Copy size={16} /></button>
                         <button type="button" class={ICON_BTN} title="Download" aria-label={`Download ${row.name}`} onClick={stop(() => void downloadDrawing(row))}><Download size={16} /></button>
                         <button type="button" class={`${ICON_BTN} hover:!text-red-600`} title="Delete" aria-label={`Delete ${row.name}`} onClick={stop(() => void deleteDrawing(row))}><Trash2 size={16} /></button>
@@ -273,7 +279,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <button type="button" class={PRIMARY} onClick={() => open("component")}><Plus size={16} class="mr-1.5" />New Component</button>
                   </div>
                   <Show when={components().length > 0} fallback={empty(<File size={32} class="text-purple-500" />, "bg-purple-50 dark:bg-purple-900/20", "No components yet", "Create reusable components to use across your CAD drawings.", "Create Component", "component")}>
-                    {cards(components(), <div class="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-full"><File size={36} class="text-purple-500" /></div>, (row) => navigate(`/components/${row.id}`))}
+                    {cards(components(), <div class="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-full"><File size={36} class="text-purple-500" /></div>, (row) => navigate(`/components/${row.id}`), (row) => historyButton("components", row))}
                   </Show>
                 </Show>
 
@@ -283,7 +289,7 @@ export function ProjectDetailScreen(): JSX.Element {
                     <button type="button" class={PRIMARY} onClick={() => open("toolpath")}><Plus size={16} class="mr-1.5" />New Toolpath</button>
                   </div>
                   <Show when={toolpaths().length > 0} fallback={empty(<Wrench size={32} class="text-green-500" />, "bg-green-50 dark:bg-green-900/20", "No toolpaths yet", "Create toolpaths to generate G-code for your machine.", "Create Toolpath", "toolpath")}>
-                    {cards(toolpaths(), <div class="p-6 bg-green-50 dark:bg-green-900/20 rounded-full"><Wrench size={36} class="text-green-500" /></div>, openToolpath, undefined, true)}
+                    {cards(toolpaths(), <div class="p-6 bg-green-50 dark:bg-green-900/20 rounded-full"><Wrench size={36} class="text-green-500" /></div>, openToolpath, (row) => historyButton("toolpaths", row), true)}
                   </Show>
                 </Show>
               </>

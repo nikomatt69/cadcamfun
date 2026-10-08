@@ -2,7 +2,9 @@ import {
   Api, AuthBadRequest, AuthInternal, AuthNotFound, AuthUnauthorized, CurrentUser, PasskeyNotImplemented, TestCreateBadRequest, TestCreateFailure
 } from "@cadcamfun/api"
 import { Effect } from "effect"
+import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+import { SESSION_HEADER } from "./authorization.ts"
 import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
@@ -76,6 +78,7 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       if (user.email !== claims.email) return yield* bad("Token non valido", "L'email associata al token non corrisponde")
       const hash = yield* Effect.promise(() => Bun.password.hash(newPassword, { algorithm: "bcrypt", cost: 12 }))
       yield* repo.setPassword(user.id, hash)
+      yield* tokens.revoke(token) // a reset link works once
       return {
         success: true as const,
         message: "Password resettata con successo! Ora puoi effettuare il login con la nuova password.",
@@ -163,17 +166,24 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       if (claims.type !== "magic-link") return yield* bad("Token non valido", "Il token non è un magic link valido")
       const user = yield* repo.findById(claims.userId)
       if (!user) return yield* notFound("Utente non trovato", "L'utente associato al magic link non esiste")
+      yield* tokens.revoke(payload.token) // a magic link works once
       const authToken = tokens.sign({ userId: user.id, email: user.email ?? "", type: "session" }, 7 * 24 * 3600)
       return HttpApiSchema.withHeaders({
-        body: { success: true as const, message: "Magic link verified successfully", user: { id: user.id, email: user.email, name: user.name } },
+        body: { success: true as const, message: "Magic link verified successfully", user: { id: user.id, email: user.email, name: user.name }, token: authToken },
         headers: { "set-cookie": [`auth-token=${authToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 3600}`] }
       })
     }).pipe(Effect.catchTag("DatabaseError", internal("Magic link verification failed", "Errore interno del server",
       "Si è verificato un errore durante la verifica del magic link"))))
-    .handle("signout", () => Effect.succeed(HttpApiSchema.withHeaders({
-      body: { success: true as const, message: "Logout effettuato con successo!" },
-      headers: { "set-cookie": [COOKIE] }
-    })))
+    .handle("signout", () => Effect.gen(function*() {
+      // Sign-out ends the session token for real: it stops verifying, wherever a copy of it was kept.
+      const request = yield* HttpServerRequest.HttpServerRequest
+      const token = request.headers[SESSION_HEADER]
+      if (token) yield* tokens.revoke(token)
+      return HttpApiSchema.withHeaders({
+        body: { success: true as const, message: "Logout effettuato con successo!" },
+        headers: { "set-cookie": [COOKIE] }
+      })
+    }))
     .handle("registerPasskey", () => Effect.fail(new PasskeyNotImplemented({
       error: "Passkey registration not yet implemented",
       details: "Passkey authentication sarà disponibile in futuro",

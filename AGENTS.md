@@ -27,7 +27,7 @@ bun run db:migrate                            # apply migrations to ./data/cadca
 
 ## Current state
 
-WP0 (`packages/db`) is done: Drizzle schema (51 tables), migration, `Database` Effect service, tests. Everything else is specified but not built yet.
+WP0–WP10 are built to the levels recorded in `specs/00-overview.md`. WP11–WP13 (`packages/vcs`, `packages/workflow`, `apps/mobile`; spec `13-vcs-actions-mobile.md`) add git-style history, pull requests, Actions-style workflows and the iOS companion.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

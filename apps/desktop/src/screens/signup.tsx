@@ -14,6 +14,7 @@ import { Show, createSignal, type JSX } from "solid-js"
 import { A, useNavigate } from "@solidjs/router"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { startSession } from "../state/session.ts"
 import { describe } from "./auth.tsx"
 
 type LoadingType = "email" | "github" | "google" | "magic-link"
@@ -53,6 +54,8 @@ export function SignUpScreen(): JSX.Element {
       await app.runtime.run(app.client.auth.signup({
         payload: { name, email, password, confirmPassword: password }
       }))
+      const session = await app.runtime.run(app.client.auth.signinDirect({ payload: { email, password } }))
+      startSession(app.cache, session.body.token)
       navigate("/")
     })
   }

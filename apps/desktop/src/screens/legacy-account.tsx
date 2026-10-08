@@ -1,6 +1,7 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { useApp } from "../state/context.ts"
+import { endSession } from "../state/session.ts"
 import { ErrorState, ScreenHeader, Toast } from "./screen-parts.tsx"
 import { LegacyNotice, lt } from "./legacy-parts.tsx"
 
@@ -14,6 +15,7 @@ export function LegacyProfile(props: { readonly settings?: boolean }): JSX.Eleme
     setPending(true); setError(undefined); setMessage(undefined)
     try {
       const result = await app.runtime.run(app.client.auth.signout())
+      endSession(app.cache)
       setMessage(result.body.message)
     } catch (cause) { setError(String(cause)) } finally { setPending(false) }
   }

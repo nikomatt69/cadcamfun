@@ -11,55 +11,12 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { AlertTriangle, Clock, Crown, Shield, Star } from "lucide-solid"
+import { openExternal } from "../app/external.ts"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { ErrorState, LoadingState, ScreenHeader } from "./screen-parts.tsx"
-
-interface PlanLimits {
-  readonly maxProjects: number
-  readonly maxComponents: number
-  readonly maxStorage: number
-}
-
-interface PlanFeatures {
-  readonly name: string
-  readonly price: string
-  readonly features: readonly string[]
-  readonly limits: PlanLimits
-}
-
-/** `.reference/src/lib/stripe.ts` `PLAN_FEATURES`, keyed by the plan ids the sidecar serves. */
-const PLAN_FEATURES: Readonly<Record<string, PlanFeatures>> = {
-  FREE: {
-    name: "Free",
-    price: "$0",
-    features: ["Basic CAD functionality", "2 projects", "Limited components", "Community support"],
-    limits: { maxProjects: 2, maxComponents: 10, maxStorage: 100 }
-  },
-  BASIC: {
-    name: "Basic",
-    price: "$9.99",
-    features: ["Full CAD functionality", "10 projects", "Unlimited components", "Email support", "1GB storage"],
-    limits: { maxProjects: 10, maxComponents: 100, maxStorage: 1024 }
-  },
-  PRO: {
-    name: "Professional",
-    price: "$49.99",
-    features: ["Full CAD/CAM functionality", "Unlimited projects", "Advanced AI assistance", "Priority support", "10GB storage"],
-    limits: { maxProjects: 50, maxComponents: 1000, maxStorage: 5120 }
-  },
-  ENTERPRISE: {
-    name: "Enterprise",
-    price: "$100.00",
-    features: ["Full CAD/CAM functionality", "Unlimited projects", "Advanced AI assistance", "Priority support", "10GB storage"],
-    limits: { maxProjects: 100, maxComponents: 5000, maxStorage: 10240 }
-  }
-}
-
-const FREE = PLAN_FEATURES.FREE!
-
-const planFeatures = (plan: string): PlanFeatures => PLAN_FEATURES[plan] ?? FREE
+import { planFeatures } from "./plans.ts"
 
 /** Storage limits are MB in the API; show whole MB below 1 GB (100 MB, not 0.0977 GB). */
 const storageValue = (mb: number): string =>
@@ -96,7 +53,7 @@ function SubscriptionCard(): JSX.Element {
     setBillingError(undefined)
     try {
       const reply = await app.runtime.run(app.client.billing.portal({ payload: {} }))
-      if (reply.url) window.open(reply.url, "_blank", "noopener,noreferrer")
+      if (reply.url) openExternal(reply.url)
     } catch {
       setBillingError(t("subscription.billingError"))
     } finally {

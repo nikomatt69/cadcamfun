@@ -1,0 +1,9 @@
+{
+  "name": "@cadcamfun/vcs",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsgo -p tsconfig.json --noEmit" },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -354,6 +354,22 @@ import type {
   ToolpathsListForDrawingOutput,
   ToolpathsCreateForDrawingInput,
   ToolpathsCreateForDrawingOutput,
+  ToolpathExtrasLibraryInput,
+  ToolpathExtrasLibraryOutput,
+  ToolpathExtrasListVersionsInput,
+  ToolpathExtrasListVersionsOutput,
+  ToolpathExtrasCreateVersionInput,
+  ToolpathExtrasCreateVersionOutput,
+  ToolpathExtrasRestoreVersionInput,
+  ToolpathExtrasRestoreVersionOutput,
+  ToolpathExtrasListCommentsInput,
+  ToolpathExtrasListCommentsOutput,
+  ToolpathExtrasCreateCommentInput,
+  ToolpathExtrasCreateCommentOutput,
+  ToolpathExtrasUpdateCommentInput,
+  ToolpathExtrasUpdateCommentOutput,
+  ToolpathExtrasRemoveCommentInput,
+  ToolpathExtrasRemoveCommentOutput,
   ToolpathGeneratorParseInput,
   ToolpathGeneratorParseOutput,
   ToolpathGeneratorVerifyInput,
@@ -373,6 +389,54 @@ import type {
   LibraryToolsOutput,
   ProjectToolpathsListInput,
   ProjectToolpathsListOutput,
+  VcsStatusInput,
+  VcsStatusOutput,
+  VcsLogInput,
+  VcsLogOutput,
+  VcsCommitInput,
+  VcsCommitOutput,
+  VcsBranchesInput,
+  VcsBranchesOutput,
+  VcsCreateBranchInput,
+  VcsCreateBranchOutput,
+  VcsCheckoutInput,
+  VcsCheckoutOutput,
+  VcsRestoreInput,
+  VcsRestoreOutput,
+  VcsDiffInput,
+  VcsDiffOutput,
+  VcsListPullRequestsInput,
+  VcsListPullRequestsOutput,
+  VcsOpenPullRequestInput,
+  VcsOpenPullRequestOutput,
+  VcsPullRequestInput,
+  VcsPullRequestOutput,
+  VcsReviewInput,
+  VcsReviewOutput,
+  VcsMergePullRequestInput,
+  VcsMergePullRequestOutput,
+  VcsClosePullRequestInput,
+  VcsClosePullRequestOutput,
+  VcsRemoteInput,
+  VcsRemoteOutput,
+  VcsSetRemoteInput,
+  VcsSetRemoteOutput,
+  VcsPushInput,
+  VcsPushOutput,
+  VcsPullInput,
+  VcsPullOutput,
+  VcsRunsInput,
+  VcsRunsOutput,
+  VcsDispatchInput,
+  VcsDispatchOutput,
+  CompanionStatusOutput,
+  CompanionEnableInput,
+  CompanionEnableOutput,
+  CompanionDisableOutput,
+  CompanionPairInput,
+  CompanionPairOutput,
+  CompanionRevokeInput,
+  CompanionRevokeOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -3038,6 +3102,107 @@ export function make(options: ClientOptions) {
           requestOptions,
         ),
     },
+    toolpathExtras: {
+      library: (input: ToolpathExtrasLibraryInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasLibraryOutput>(
+          {
+            method: "GET",
+            path: `/api/toolpaths/library`,
+            query: {
+              projectId: input["projectId"],
+              type: input["type"],
+              operationType: input["operationType"],
+              category: input["category"],
+              search: input["search"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listVersions: (input: ToolpathExtrasListVersionsInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasListVersionsOutput>(
+          {
+            method: "GET",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/versions`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createVersion: (input: ToolpathExtrasCreateVersionInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasCreateVersionOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/versions`,
+            body: { data: input["data"], gcode: input["gcode"], changeMessage: input["changeMessage"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      restoreVersion: (input: ToolpathExtrasRestoreVersionInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasRestoreVersionOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/versions/restore`,
+            body: { versionId: input["versionId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listComments: (input: ToolpathExtrasListCommentsInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasListCommentsOutput>(
+          {
+            method: "GET",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/comments`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createComment: (input: ToolpathExtrasCreateCommentInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasCreateCommentOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/comments`,
+            body: { content: input["content"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      updateComment: (input: ToolpathExtrasUpdateCommentInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasUpdateCommentOutput>(
+          {
+            method: "PUT",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/comments/${encodeURIComponent(input.commentId)}`,
+            body: { content: input["content"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeComment: (input: ToolpathExtrasRemoveCommentInput, requestOptions?: RequestOptions) =>
+        request<ToolpathExtrasRemoveCommentOutput>(
+          {
+            method: "DELETE",
+            path: `/api/toolpaths/${encodeURIComponent(input.id)}/comments/${encodeURIComponent(input.commentId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
     toolpathGenerator: {
       parse: (input: ToolpathGeneratorParseInput, requestOptions?: RequestOptions) =>
         request<ToolpathGeneratorParseOutput>(
@@ -3190,6 +3355,302 @@ export function make(options: ClientOptions) {
             query: { projectId: input["projectId"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 405, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    vcs: {
+      status: (input: VcsStatusInput, requestOptions?: RequestOptions) =>
+        request<VcsStatusOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/status`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      log: (input: VcsLogInput, requestOptions?: RequestOptions) =>
+        request<VcsLogOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/log`,
+            query: { rev: input["rev"], limit: input["limit"], path: input["path"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commit: (input: VcsCommitInput, requestOptions?: RequestOptions) =>
+        request<VcsCommitOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/commit`,
+            body: { message: input["message"], authorKind: input["authorKind"], files: input["files"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      branches: (input: VcsBranchesInput, requestOptions?: RequestOptions) =>
+        request<VcsBranchesOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/branches`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createBranch: (input: VcsCreateBranchInput, requestOptions?: RequestOptions) =>
+        request<VcsCreateBranchOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/branches`,
+            body: { name: input["name"], from: input["from"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      checkout: (input: VcsCheckoutInput, requestOptions?: RequestOptions) =>
+        request<VcsCheckoutOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/checkout`,
+            body: { branch: input["branch"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      restore: (input: VcsRestoreInput, requestOptions?: RequestOptions) =>
+        request<VcsRestoreOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/restore`,
+            body: { rev: input["rev"], paths: input["paths"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      diff: (input: VcsDiffInput, requestOptions?: RequestOptions) =>
+        request<VcsDiffOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/diff`,
+            query: { from: input["from"], to: input["to"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listPullRequests: (input: VcsListPullRequestsInput, requestOptions?: RequestOptions) =>
+        request<VcsListPullRequestsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls`,
+            query: { state: input["state"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      openPullRequest: (input: VcsOpenPullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsOpenPullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls`,
+            body: {
+              title: input["title"],
+              body: input["body"],
+              head: input["head"],
+              base: input["base"],
+              authorKind: input["authorKind"],
+            },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pullRequest: (input: VcsPullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsPullRequestOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      review: (input: VcsReviewInput, requestOptions?: RequestOptions) =>
+        request<VcsReviewOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/reviews`,
+            body: { verdict: input["verdict"], body: input["body"], path: input["path"], pointer: input["pointer"] },
+            successStatus: 201,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      mergePullRequest: (input: VcsMergePullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsMergePullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/merge`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      closePullRequest: (input: VcsClosePullRequestInput, requestOptions?: RequestOptions) =>
+        request<VcsClosePullRequestOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/close`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remote: (input: VcsRemoteInput, requestOptions?: RequestOptions) =>
+        request<VcsRemoteOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/remote`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setRemote: (input: VcsSetRemoteInput, requestOptions?: RequestOptions) =>
+        request<VcsSetRemoteOutput>(
+          {
+            method: "PUT",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/remote`,
+            body: { remote: input["remote"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      push: (input: VcsPushInput, requestOptions?: RequestOptions) =>
+        request<VcsPushOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/push`,
+            headers: { "x-github-token": input["x-github-token"] },
+            body: { branch: input["branch"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pull: (input: VcsPullInput, requestOptions?: RequestOptions) =>
+        request<VcsPullOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/pull`,
+            headers: { "x-github-token": input["x-github-token"] },
+            body: { branch: input["branch"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runs: (input: VcsRunsInput, requestOptions?: RequestOptions) =>
+        request<VcsRunsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/runs`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      dispatch: (input: VcsDispatchInput, requestOptions?: RequestOptions) =>
+        request<VcsDispatchOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/dispatch`,
+            body: { ref: input["ref"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    companion: {
+      status: (requestOptions?: RequestOptions) =>
+        request<CompanionStatusOutput>(
+          { method: "GET", path: `/api/companion`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      enable: (input?: CompanionEnableInput, requestOptions?: RequestOptions) =>
+        request<CompanionEnableOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/enable`,
+            body: { port: input?.["port"] },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      disable: (requestOptions?: RequestOptions) =>
+        request<CompanionDisableOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/disable`,
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pair: (input: CompanionPairInput, requestOptions?: RequestOptions) =>
+        request<CompanionPairOutput>(
+          {
+            method: "POST",
+            path: `/api/companion/pair`,
+            body: { name: input["name"], host: input["host"] },
+            successStatus: 201,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      revoke: (input: CompanionRevokeInput, requestOptions?: RequestOptions) =>
+        request<CompanionRevokeOutput>(
+          {
+            method: "DELETE",
+            path: `/api/companion/devices/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
             empty: false,
           },
           requestOptions,

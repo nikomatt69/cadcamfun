@@ -32,9 +32,12 @@ packages/
   api/                 @cadcamfun/api     schema-first HttpApi definitions + shared domain schemas
   ai/                  @cadcamfun/ai      AI layer: nikcli sdk-next host + AI SDK v7 (Effect services)
   plugin-sdk/          @cadcamfun/plugin-sdk  public plugin API types + host contract
+  vcs/                 @cadcamfun/vcs     git-compatible history: objects, branches, merge, diff, GitHub sync
+  workflow/            @cadcamfun/workflow  Actions-style workflow schema, triggers, runner
 apps/
   sidecar/             @cadcamfun/sidecar Bun Effect server (HttpApi handlers, services, wiring)
   desktop/             @cadcamfun/desktop Vite + React UI and src-tauri/ (Rust shell)
+  mobile/              @cadcamfun/mobile  iOS companion (Tauri v2 + Solid), thin client of a paired desktop
 ```
 
 Dependency direction (no cycles): `core` ← `api` ← `sidecar`; `db` ← `sidecar`; `ai`, `plugin-sdk` ← `sidecar`; `api` (types only) ← `desktop`. `core` and `api` must not import `db`.
@@ -56,6 +59,9 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 | WP8 | AI layer (nikcli + AI SDK v7) | `packages/ai` | `08-ai.md` | — | **done** |
 | WP9 | Plugin system | `packages/plugin-sdk`, `apps/sidecar/src/plugins` | `09-plugins.md` | WP3, WP4 | **done** (SDK + host; legacy `/api/plugins/*` HTTP group served, SDK host not exposed over HTTP yet) |
 | WP10 | Updates, sync, packaging, CI | `.github/workflows`, `scripts/`, `apps/desktop/src-tauri` (updater only) | `10-release-sync.md` | WP5 | **done** (pipeline + CI + updater; release secrets unset) |
+| WP11 | Git-style history + GitHub mirror | `packages/vcs` (+ `GitRepo/GitObject/GitRef/PullRequest*` tables, sidecar `vcs` services) | `13-vcs-actions-mobile.md` | WP0, WP4 | **done** core + sidecar + API; desktop panels and GitHub routes pending |
+| WP12 | Workflows (Actions-style) | `packages/workflow` | `13-vcs-actions-mobile.md` | WP11 | **done** engine + runner; only `project/*` steps registered |
+| WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **builds and launches in the iOS simulator** (macOS CI) — companion gateway + desktop pairing screen + pinned Rust client + iOS shell; device run, signing and TestFlight pending |
 
 ### Parallelisation map
 
@@ -83,9 +89,9 @@ Agents in the same wave never touch the same directory, so they can run concurre
 
 ## 7. Open questions (decide before WP9/WP10)
 
-1. Cloud sync backend: reuse the old `cadcamfun.xyz` API, or design a new one? (Affects WP10 only.)
+1. Cloud sync backend: reuse the old `cadcamfun.xyz` API, or design a new one? (Affects WP10 only.) Partly answered by `13-vcs-actions-mobile.md`: project history syncs through a per-project GitHub mirror, no custom server.
 2. Plugin sandboxing: run plugins in a Bun `Worker` (recommended) vs. separate processes.
-3. Keep Stripe billing at all in v6.x, or drop licensing to a signed license-key check?
+3. ~~Keep Stripe billing at all in v6.x, or drop licensing to a signed license-key check?~~ **Decided: Stripe.** Billing goes through the optional `PaymentProvider` (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_*`); there is no license-key path.
 4. Does the nikcli host (`sdk-next`, ~20 MB, 60 deps) survive `bun build --compile` inside the sidecar, or must it run as a separate process? (Tracked in `08-ai.md` §6; decided by WP8/WP4.)
 
 ## 8. Change log

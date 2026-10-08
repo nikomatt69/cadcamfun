@@ -5,7 +5,7 @@ import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
 import { ObservabilityLive } from "./observability.ts"
 import { awaitShutdown } from "./shutdown.ts"
-import { markAnnounced } from "./startup.ts"
+import { markAnnounced, setLocalPort } from "./startup.ts"
 
 /** Prints the one-line ready event the Tauri shell waits for (specs/05 §1). */
 const Ready = Layer.effectDiscard(Effect.gen(function*() {
@@ -19,6 +19,7 @@ const Ready = Layer.effectDiscard(Effect.gen(function*() {
     if (!res.ok) throw new Error(`health ${res.status}`)
   })
   yield* probe.pipe(Effect.retry({ schedule: Schedule.spaced("50 millis"), times: 400 }), Effect.orDie)
+  setLocalPort(address.port)
   console.log(JSON.stringify({ event: "ready", port: address.port }))
   markAnnounced()
 }))

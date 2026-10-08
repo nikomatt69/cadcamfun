@@ -16,6 +16,7 @@ import { Motion } from "solid-motionone"
 import { Bell, Cpu, Globe, Lock, Shield, Tag, User } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { endSession } from "../state/session.ts"
 import { toast } from "../components/ui/feedback.tsx"
 import { ProfileSettings } from "../components/settings/profile-settings.tsx"
 import { SessionManagement } from "../components/settings/session-management.tsx"
@@ -71,8 +72,9 @@ export function SettingsScreen(): JSX.Element {
       try {
         await app.runtime.run(app.client.auth.signout())
       } catch {
-        /* the local profile has no server session to end */
+        /* the server keeps no session state: dropping the token below is the sign-out */
       }
+      endSession(app.cache)
       navigate("/")
     } catch (cause) {
       const message = failureMessage(cause, t("settings.account.deleteFailed"))

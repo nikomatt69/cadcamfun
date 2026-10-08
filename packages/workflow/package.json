@@ -1,0 +1,9 @@
+{
+  "name": "@cadcamfun/workflow",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsgo -p tsconfig.json --noEmit" },
+  "dependencies": { "effect": "4.0.0-rc.112" },
+  "devDependencies": {}
+}
