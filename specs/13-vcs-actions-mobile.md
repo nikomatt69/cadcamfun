@@ -90,7 +90,7 @@ Phone side (`apps/mobile`):
 - `src-tauri/` — Tauri v2 iOS shell: commands `companion_request`, `companion_stream` (Tauri `Channel`), `secret_get|set|delete` (iOS Keychain via `keyring`), QR scanner plugin, `Info.ios.plist` (local-network and camera usage strings), CSP without any network `connect-src`, icons generated.
 - `src/companion/native.ts` — `pinnedFetch` routes the unchanged `CompanionClient` through those commands; `keychainStore` keeps the pairing in the Keychain; plain browsers fall back to `fetch` + web storage for development.
 
-Steps that need macOS + Xcode and have **not** been run: `bun run --filter @cadcamfun/mobile ios:init` (generates `src-tauri/gen/apple`), set `APPLE_DEVELOPMENT_TEAM`, `ios:dev` on a device, then TestFlight signing. The `src-tauri` crate is not compiled in this repo's Linux CI (Tauri needs webkit2gtk); the manual `ios-check` workflow job compiles it for `aarch64-apple-ios`.
+Steps that need macOS + Xcode and have **not** been run: `bun run --filter @cadcamfun/mobile ios:init` (generates `src-tauri/gen/apple`), set `APPLE_DEVELOPMENT_TEAM`, `ios:dev` on a device, then TestFlight signing. The `src-tauri` crate compiles and passes clippy `-D warnings` for the host (Linux CI job `mobile-native`, with the web assets built and the Tauri config and capabilities validated by `tauri-build`). The iOS-only Keychain module was type-checked for `aarch64-apple-ios`; the full iOS target cannot be checked off macOS (`ring` needs `xcrun`), so the manual `ios-check` job does that on a Mac runner.
 
 ## 7. GitHub mirror
 

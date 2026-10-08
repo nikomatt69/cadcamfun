@@ -183,11 +183,27 @@ jobs:
         run: cargo test --all-features
 
   mobile-native:
-    name: companion net crate (fmt, clippy, test)
+    name: companion shell (fmt, clippy, test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libsoup-3.0-dev librsvg2-dev libssl-dev pkg-config build-essential
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the web assets
+        run: bun run --filter @cadcamfun/mobile build
 
       - name: Cache Cargo
         uses: actions/cache@v4
@@ -196,6 +212,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             apps/mobile/native/target
+            apps/mobile/src-tauri/target
           key: cargo-mobile-native-${{ runner.os }}-${{ hashFiles('apps/mobile/native/Cargo.toml') }}
           restore-keys: cargo-mobile-native-${{ runner.os }}-
 
@@ -215,6 +232,12 @@ jobs:
       - name: cargo test
         working-directory: apps/mobile/native
         run: cargo test
+
+      # The iOS shell compiled for the host: checks the commands, the Tauri configuration and the capability files.
+      # The iOS-only Keychain code and the device build are covered by the manual `ios-check` job.
+      - name: cargo clippy (iOS shell, host target)
+        working-directory: apps/mobile/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
 
   # Compiles the iOS shell against the iOS SDK. Manual only: needs a macOS runner and has not run in CI yet.
   ios-check:

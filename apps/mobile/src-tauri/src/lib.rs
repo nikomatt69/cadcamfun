@@ -46,11 +46,9 @@ async fn companion_stream(
     Ok(())
 }
 
-const SERVICE: &str = "com.cadcamfun.companion";
-
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 mod keychain {
-    use super::SERVICE;
+    const SERVICE: &str = "com.cadcamfun.companion";
 
     fn entry(key: &str) -> Result<keyring::Entry, String> {
         keyring::Entry::new(SERVICE, key).map_err(|e| e.to_string())
