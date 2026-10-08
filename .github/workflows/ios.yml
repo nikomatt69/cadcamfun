@@ -57,6 +57,40 @@ jobs:
         working-directory: apps/mobile
         run: bunx tauri ios build --debug --target aarch64-sim --ci
 
+      # Runs the app, not just compiles it: boots an iPhone simulator, installs and launches the build, and fails if the
+      # process is not alive after a while (a crash on start leaves no running process). The screenshot is an artifact.
+      - name: Launch in the iOS simulator
+        run: |
+          set -euo pipefail
+          APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" -path "*sim*" 2>/dev/null | head -n 1)
+          if [ -z "$APP" ]; then APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" 2>/dev/null | grep -i -E "iphonesimulator|sim" | head -n 1); fi
+          echo "app bundle: $APP"
+          test -n "$APP"
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          echo "bundle id: $BUNDLE_ID"
+          UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for rt in sorted(d, reverse=True) if "iOS" in rt for x in d[rt] if "iPhone" in x["name"]))')
+          echo "simulator: $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          sleep 20
+          mkdir -p simulator-out
+          xcrun simctl io "$UDID" screenshot simulator-out/companion.png
+          xcrun simctl spawn "$UDID" launchctl list | tee simulator-out/launchctl.txt | grep "$BUNDLE_ID"
+          # A running app has a numeric PID in the first column; "-" means it exited.
+          PID=$(xcrun simctl spawn "$UDID" launchctl list | grep "UIKitApplication:$BUNDLE_ID" | awk '{print $1}')
+          echo "pid: $PID"
+          test -n "$PID" && [ "$PID" != "-" ]
+
+      - name: Upload the simulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-screenshot
+          path: simulator-out
+          if-no-files-found: warn
+
       - name: Upload the generated Xcode project
         if: always()
         uses: actions/upload-artifact@v4
