@@ -1053,3 +1053,110 @@ export const twoFactorTable = sqliteTable(
 export type TwoFactor = typeof twoFactorTable.$inferSelect
 export type NewTwoFactor = typeof twoFactorTable.$inferInsert
 
+
+// ── Version control (WP11): one git-compatible repository per project ───────
+
+export const gitRepoTable = sqliteTable(
+  "GitRepo",
+  {
+  projectId: text("projectId").primaryKey().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  /** Symbolic HEAD, e.g. `refs/heads/main`. */
+  head: text("head").notNull().default("refs/heads/main"),
+  /** Optional GitHub mirror as `owner/repo`; the token lives in the OS keychain, never here. */
+  remote: text("remote"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  }
+)
+
+export type GitRepo = typeof gitRepoTable.$inferSelect
+
+export const gitObjectTable = sqliteTable(
+  "GitObject",
+  {
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  oid: text("oid").notNull(),
+  type: text("type", { enum: ["blob", "tree", "commit"] }).notNull(),
+  body: blob("body", { mode: "buffer" }).notNull(),
+  },
+  (t) => [uniqueIndex("GitObject_projectId_oid_key").on(t.projectId, t.oid)]
+)
+
+export type GitObject = typeof gitObjectTable.$inferSelect
+
+export const gitRefTable = sqliteTable(
+  "GitRef",
+  {
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  oid: text("oid").notNull(),
+  },
+  (t) => [uniqueIndex("GitRef_projectId_name_key").on(t.projectId, t.name)]
+)
+
+export type GitRef = typeof gitRefTable.$inferSelect
+
+export const pullRequestTable = sqliteTable(
+  "PullRequest",
+  {
+  id: text("id").primaryKey().$defaultFn(newId),
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  /** Per-project sequence, shown as `#n`. */
+  number: integer("number").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  /** Source and target branch names. */
+  head: text("head").notNull(),
+  base: text("base").notNull(),
+  state: text("state", { enum: ["open", "merged", "closed"] }).notNull().default("open"),
+  authorId: text("authorId").notNull().references((): AnySQLiteColumn => userTable.id),
+  /** `user`, or `ai` when opened by the mobile companion / an AI agent on the author's behalf. */
+  authorKind: text("authorKind", { enum: ["user", "ai"] }).notNull().default("user"),
+  mergeCommit: text("mergeCommit"),
+  /** Number of the mirrored pull request on GitHub, when the project has a remote. */
+  remoteNumber: integer("remoteNumber"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date()),
+  },
+  (t) => [uniqueIndex("PullRequest_projectId_number_key").on(t.projectId, t.number)]
+)
+
+export type PullRequest = typeof pullRequestTable.$inferSelect
+
+export const pullRequestReviewTable = sqliteTable(
+  "PullRequestReview",
+  {
+  id: text("id").primaryKey().$defaultFn(newId),
+  pullRequestId: text("pullRequestId").notNull().references((): AnySQLiteColumn => pullRequestTable.id, { onDelete: "cascade" }),
+  reviewerId: text("reviewerId").notNull().references((): AnySQLiteColumn => userTable.id),
+  verdict: text("verdict", { enum: ["comment", "approve", "request-changes"] }).notNull(),
+  body: text("body").notNull().default(""),
+  /** Optional anchor: repository path and JSON pointer of the entity property being discussed. */
+  path: text("path"),
+  pointer: text("pointer"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  },
+  (t) => [index("PullRequestReview_pullRequestId_idx").on(t.pullRequestId)]
+)
+
+export type PullRequestReview = typeof pullRequestReviewTable.$inferSelect
+
+export const workflowRunTable = sqliteTable(
+  "WorkflowRun",
+  {
+  id: text("id").primaryKey().$defaultFn(newId),
+  projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+  /** Workflow file name under `.cadcamfun/workflows/`. */
+  workflow: text("workflow").notNull(),
+  event: text("event", { enum: ["push", "pull-request", "manual"] }).notNull(),
+  ref: text("ref").notNull(),
+  sha: text("sha").notNull(),
+  status: text("status", { enum: ["queued", "running", "success", "failure"] }).notNull().default("queued"),
+  /** Streamed `RunEvent`s of @cadcamfun/workflow. */
+  events: text("events", { mode: "json" }).notNull().$defaultFn(() => []),
+  startedAt: integer("startedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  finishedAt: integer("finishedAt", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("WorkflowRun_projectId_idx").on(t.projectId)]
+)
+
+export type WorkflowRun = typeof workflowRunTable.$inferSelect

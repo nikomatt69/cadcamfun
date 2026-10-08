@@ -15,6 +15,8 @@
     "@cadcamfun/core": "workspace:*",
     "@cadcamfun/db": "workspace:*",
     "@cadcamfun/plugin-sdk": "workspace:*",
+    "@cadcamfun/vcs": "workspace:*",
+    "@cadcamfun/workflow": "workspace:*",
     "@effect/opentelemetry": "4.0.0-rc.112",
     "@effect/platform-bun": "4.0.0-rc.112",
     "@opentelemetry/api": "1.9.1",
@@ -31,7 +33,9 @@
     "@opentelemetry/semantic-conventions": "1.43.0",
     "drizzle-orm": "1.0.0-beta.22",
     "effect": "4.0.0-rc.112",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "selfsigned": "^5.5.0",
+    "zod": "^4.1.8"
   },
   "devDependencies": {
     "ai": "7.0.127"

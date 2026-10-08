@@ -1113,6 +1113,45 @@ export type LibraryUpdatePayload = {
   readonly isPublic?: boolean | undefined
 }
 
+export type VcsCommitPayload = {
+  readonly message: string
+  readonly authorKind?: "user" | "ai" | undefined
+  readonly files?: { readonly [x: string]: string } | undefined
+}
+
+export type VcsCreateBranchPayload = { readonly name: string; readonly from?: string | undefined }
+
+export type VcsCheckoutPayload = { readonly branch: string }
+
+export type VcsRestorePayload = { readonly rev: string; readonly paths?: ReadonlyArray<string> | undefined }
+
+export type VcsOpenPullRequestPayload = {
+  readonly title: string
+  readonly body?: string | undefined
+  readonly head: string
+  readonly base?: string | undefined
+  readonly authorKind?: "user" | "ai" | undefined
+}
+
+export type VcsReviewPayload = {
+  readonly verdict: "comment" | "approve" | "request-changes"
+  readonly body?: string | undefined
+  readonly path?: string | undefined
+  readonly pointer?: string | undefined
+}
+
+export type VcsSetRemotePayload = { readonly remote: string | null }
+
+export type VcsPushPayload = { readonly branch?: string | undefined }
+
+export type VcsPullPayload = { readonly branch?: string | undefined }
+
+export type VcsDispatchPayload = { readonly ref?: string | undefined }
+
+export type CompanionEnablePayload = { readonly port?: number | undefined }
+
+export type CompanionPairPayload = { readonly name: string; readonly host?: string | undefined }
+
 export type HealthCheckOutput = { status: string; timestamp: string }
 
 export type SystemReadyOutput = { status: string; timestamp: string }
@@ -4589,3 +4628,366 @@ export type ProjectToolpathsListInput = {
 }
 
 export type ProjectToolpathsListOutput = { success: true; data: unknown | null; message?: string | undefined }
+
+export type VcsStatusInput = { readonly id: { readonly id: string }["id"] }
+
+export type VcsStatusOutput = { branch: string; head: string | null; dirty: Array<string> }
+
+export type VcsLogInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly rev?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["rev"]
+  readonly limit?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["limit"]
+  readonly path?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["path"]
+}
+
+export type VcsLogOutput = Array<{
+  oid: string
+  parents: Array<string>
+  message: string
+  author: { name: string; email: string; time: number }
+}>
+
+export type VcsCommitInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly message: VcsCommitPayload["message"]
+  readonly authorKind?: VcsCommitPayload["authorKind"]
+  readonly files?: VcsCommitPayload["files"]
+}
+
+export type VcsCommitOutput = {
+  oid: string
+  parents: Array<string>
+  message: string
+  author: { name: string; email: string; time: number }
+}
+
+export type VcsBranchesInput = { readonly id: { readonly id: string }["id"] }
+
+export type VcsBranchesOutput = { current: string; branches: { [x: string]: string } }
+
+export type VcsCreateBranchInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name: VcsCreateBranchPayload["name"]
+  readonly from?: VcsCreateBranchPayload["from"]
+}
+
+export type VcsCreateBranchOutput = { current: string; branches: { [x: string]: string } }
+
+export type VcsCheckoutInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly branch: VcsCheckoutPayload["branch"]
+}
+
+export type VcsCheckoutOutput = { branch: string; head: string | null; dirty: Array<string> }
+
+export type VcsRestoreInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly rev: VcsRestorePayload["rev"]
+  readonly paths?: VcsRestorePayload["paths"]
+}
+
+export type VcsRestoreOutput = {
+  oid: string
+  parents: Array<string>
+  message: string
+  author: { name: string; email: string; time: number }
+}
+
+export type VcsDiffInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly from?: { readonly from?: string | undefined; readonly to: string }["from"]
+  readonly to: { readonly from?: string | undefined; readonly to: string }["to"]
+}
+
+export type VcsDiffOutput = Array<{
+  path: string
+  kind:
+    | "drawings"
+    | "components"
+    | "toolpaths"
+    | "materials"
+    | "tools"
+    | "machine-configs"
+    | "costs"
+    | "project"
+    | "other"
+  id?: string | undefined
+  name?: string | undefined
+  status: "added" | "modified" | "deleted"
+  changes: Array<{ pointer: string; before?: unknown | undefined; after?: unknown | undefined }>
+}>
+
+export type VcsListPullRequestsInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly state?: { readonly state?: "open" | "merged" | "closed" | undefined }["state"]
+}
+
+export type VcsListPullRequestsOutput = Array<{
+  id: string
+  projectId: string
+  number: number
+  title: string
+  body: string
+  head: string
+  base: string
+  state: "open" | "merged" | "closed"
+  authorId: string
+  authorKind: "user" | "ai"
+  mergeCommit: string | null
+  remoteNumber: number | null
+  createdAt: string
+  updatedAt: string
+}>
+
+export type VcsOpenPullRequestInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly title: VcsOpenPullRequestPayload["title"]
+  readonly body?: VcsOpenPullRequestPayload["body"]
+  readonly head: VcsOpenPullRequestPayload["head"]
+  readonly base?: VcsOpenPullRequestPayload["base"]
+  readonly authorKind?: VcsOpenPullRequestPayload["authorKind"]
+}
+
+export type VcsOpenPullRequestOutput = {
+  id: string
+  projectId: string
+  number: number
+  title: string
+  body: string
+  head: string
+  base: string
+  state: "open" | "merged" | "closed"
+  authorId: string
+  authorKind: "user" | "ai"
+  mergeCommit: string | null
+  remoteNumber: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type VcsPullRequestInput = {
+  readonly id: { readonly id: string; readonly number: string }["id"]
+  readonly number: { readonly id: string; readonly number: string }["number"]
+}
+
+export type VcsPullRequestOutput = {
+  pullRequest: {
+    id: string
+    projectId: string
+    number: number
+    title: string
+    body: string
+    head: string
+    base: string
+    state: "open" | "merged" | "closed"
+    authorId: string
+    authorKind: "user" | "ai"
+    mergeCommit: string | null
+    remoteNumber: number | null
+    createdAt: string
+    updatedAt: string
+  }
+  reviews: Array<{
+    id: string
+    pullRequestId: string
+    reviewerId: string
+    verdict: "comment" | "approve" | "request-changes"
+    body: string
+    path: string | null
+    pointer: string | null
+    createdAt: string
+  }>
+  changes: Array<{
+    path: string
+    kind:
+      | "drawings"
+      | "components"
+      | "toolpaths"
+      | "materials"
+      | "tools"
+      | "machine-configs"
+      | "costs"
+      | "project"
+      | "other"
+    id?: string | undefined
+    name?: string | undefined
+    status: "added" | "modified" | "deleted"
+    changes: Array<{ pointer: string; before?: unknown | undefined; after?: unknown | undefined }>
+  }>
+}
+
+export type VcsReviewInput = {
+  readonly id: { readonly id: string; readonly number: string }["id"]
+  readonly number: { readonly id: string; readonly number: string }["number"]
+  readonly verdict: VcsReviewPayload["verdict"]
+  readonly body?: VcsReviewPayload["body"]
+  readonly path?: VcsReviewPayload["path"]
+  readonly pointer?: VcsReviewPayload["pointer"]
+}
+
+export type VcsReviewOutput = {
+  id: string
+  pullRequestId: string
+  reviewerId: string
+  verdict: "comment" | "approve" | "request-changes"
+  body: string
+  path: string | null
+  pointer: string | null
+  createdAt: string
+}
+
+export type VcsMergePullRequestInput = {
+  readonly id: { readonly id: string; readonly number: string }["id"]
+  readonly number: { readonly id: string; readonly number: string }["number"]
+}
+
+export type VcsMergePullRequestOutput = {
+  id: string
+  projectId: string
+  number: number
+  title: string
+  body: string
+  head: string
+  base: string
+  state: "open" | "merged" | "closed"
+  authorId: string
+  authorKind: "user" | "ai"
+  mergeCommit: string | null
+  remoteNumber: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type VcsClosePullRequestInput = {
+  readonly id: { readonly id: string; readonly number: string }["id"]
+  readonly number: { readonly id: string; readonly number: string }["number"]
+}
+
+export type VcsClosePullRequestOutput = {
+  id: string
+  projectId: string
+  number: number
+  title: string
+  body: string
+  head: string
+  base: string
+  state: "open" | "merged" | "closed"
+  authorId: string
+  authorKind: "user" | "ai"
+  mergeCommit: string | null
+  remoteNumber: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type VcsRemoteInput = { readonly id: { readonly id: string }["id"] }
+
+export type VcsRemoteOutput = { remote: string | null }
+
+export type VcsSetRemoteInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly remote: VcsSetRemotePayload["remote"]
+}
+
+export type VcsSetRemoteOutput = { remote: string | null }
+
+export type VcsPushInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly "x-github-token": { readonly "x-github-token": string }["x-github-token"]
+  readonly branch?: VcsPushPayload["branch"]
+}
+
+export type VcsPushOutput = { oid: string; objects: number }
+
+export type VcsPullInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly "x-github-token": { readonly "x-github-token": string }["x-github-token"]
+  readonly branch?: VcsPullPayload["branch"]
+}
+
+export type VcsPullOutput = { kind: string; oid: string }
+
+export type VcsRunsInput = { readonly id: { readonly id: string }["id"] }
+
+export type VcsRunsOutput = Array<{
+  id: string
+  projectId: string
+  workflow: string
+  event: "push" | "pull-request" | "manual"
+  ref: string
+  sha: string
+  status: "queued" | "running" | "success" | "failure"
+  events: Array<unknown>
+  startedAt: string
+  finishedAt: string | null
+}>
+
+export type VcsDispatchInput = { readonly id: { readonly id: string }["id"]; readonly ref?: VcsDispatchPayload["ref"] }
+
+export type VcsDispatchOutput = Array<{
+  id: string
+  projectId: string
+  workflow: string
+  event: "push" | "pull-request" | "manual"
+  ref: string
+  sha: string
+  status: "queued" | "running" | "success" | "failure"
+  events: Array<unknown>
+  startedAt: string
+  finishedAt: string | null
+}>
+
+export type CompanionStatusOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionEnableInput = { readonly port?: CompanionEnablePayload["port"] }
+
+export type CompanionEnableOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionDisableOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}
+
+export type CompanionPairInput = {
+  readonly name: CompanionPairPayload["name"]
+  readonly host?: CompanionPairPayload["host"]
+}
+
+export type CompanionPairOutput = { id: string; link: string }
+
+export type CompanionRevokeInput = { readonly id: { readonly id: string }["id"] }
+
+export type CompanionRevokeOutput = {
+  enabled: boolean
+  port: number | null
+  fingerprint: string | null
+  host: string
+  devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
+}

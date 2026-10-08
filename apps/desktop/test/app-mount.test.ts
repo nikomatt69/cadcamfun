@@ -20,7 +20,8 @@ const isStub = (file: string) => read(`pages/${file}`).includes("PageStub")
 const concrete = (pattern: string) => pattern.replace(/:\w+/g, "sample-id")
 
 describe("route table", () => {
-  test("covers every legacy page", () => { expect(table.length).toBe(66) })
+  // 66 legacy pages plus `/settings/companion` and `/projects/:id/history` (spec 13), which have no legacy counterpart.
+  test("covers every legacy page", () => { expect(table.length).toBe(68) })
 
   for (const route of table.filter((r) => r.path !== "*")) {
     test(`${route.path} mounts`, async () => {

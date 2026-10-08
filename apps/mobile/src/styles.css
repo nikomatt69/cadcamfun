@@ -1,0 +1,20 @@
+:root { --bg: #f7f8fa; --fg: #1f2937; --muted: #6b7280; --card: #fff; --line: #e5e7eb; --accent: #2563eb; --ok: #16a34a; --bad: #dc2626; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --fg: #e5e7eb; --muted: #9ca3af; --card: #181b22; --line: #2a2f3a; --accent: #60a5fa; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 -apple-system, system-ui, sans-serif; }
+.screen { padding: max(16px, env(safe-area-inset-top)) 16px calc(72px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 0 0 12px; } h2 { font-size: 1.15rem; } h3 { font-size: 1rem; margin: 16px 0 6px; }
+header { display: flex; align-items: center; gap: 8px; }
+.muted { color: var(--muted); font-size: .85rem; }
+.error { color: var(--bad); }
+.list { list-style: none; padding: 0; margin: 8px 0; } .list > li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.change ul { padding-left: 16px; font-size: .85rem; } ins { color: var(--ok); text-decoration: none; } del { color: var(--bad); }
+button { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); min-height: 44px; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+textarea, input { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.pill { font-size: .7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); margin-left: 4px; }
+.pill.open, .pill.running { color: var(--accent); } .pill.merged, .pill.success, .pill.approve { color: var(--ok); } .pill.failure, .pill.request-changes, .pill.closed { color: var(--bad); }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+.tabs button { flex: 1; border: 0; border-radius: 0; background: none; font-size: .8rem; } .tabs .active { color: var(--accent); font-weight: 600; }
+.chat form { display: flex; gap: 8px; margin-top: 12px; } .bubble.me { background: var(--accent); color: #fff; padding: 8px 12px; border-radius: 12px; display: inline-block; } .tool { color: var(--muted); font-size: .8rem; margin: 2px 0; }
