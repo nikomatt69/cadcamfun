@@ -16,6 +16,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { Api, Authorization } from "@cadcamfun/api"
 import { getEndpoint, isTauri, resetEndpoint, type Endpoint } from "../app/sidecar.ts"
+import { withSessionToken } from "./session.ts"
 import { createFakeApi, type ApiClient as FakeApiClient } from "../testing/fake-api.ts"
 
 /**
@@ -36,7 +37,7 @@ const bearerTokenRef = Effect.runSync(Ref.make<string | undefined>(undefined))
 
 const withBearerToken: HttpApiMiddleware.HttpApiMiddlewareClient<never, never, never> = ({ next, request }) =>
   Effect.flatMap(Ref.get(bearerTokenRef), (token) =>
-    next(token === undefined ? request : HttpClientRequest.bearerToken(request, token))
+    Effect.flatMap(withSessionToken(token === undefined ? request : HttpClientRequest.bearerToken(request, token)), next)
   )
 
 /**

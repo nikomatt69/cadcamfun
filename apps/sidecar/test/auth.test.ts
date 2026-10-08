@@ -165,5 +165,25 @@ describe("signup, signin-direct, get-session, magic link verification", () => {
     expect(ok.status).toBe(200)
     expect(ok.body.message).toBe("Magic link verified successfully")
     expect(ok.headers.get("set-cookie")).toContain("auth-token=")
+    expect(typeof ok.body.token).toBe("string")
+  })
+
+  test("a session token makes the request act as that account; anything else falls back to the local profile", async () => {
+    const session = (token: string) => app.call("/api/auth/get-session", { headers: { "x-session-token": token } })
+    const signin = await post("/api/auth/signin-direct", { email: "ada@example.com", password: "longpassword" })
+    const as = await session(signin.body.token)
+    expect(as.status).toBe(200)
+    expect(as.body.session.user.email).toBe("ada@example.com")
+    // Data is scoped to the signed-in account, not the local profile.
+    const mine = await app.call("/api/user/profile", { headers: { "x-session-token": signin.body.token } })
+    expect(mine.body.name).toBe("Ada")
+    // A forged, truncated or wrong-type token never lets a request through as someone else.
+    const link = await post("/api/auth/send-magic-link", { email: "ada@example.com" })
+    const wrongType = new URL(link.body.debugMagicLink).searchParams.get("token")!
+    for (const token of ["garbage", `${signin.body.token}x`, wrongType]) {
+      expect((await session(token)).body.session.user.email).toBe("local@cadcamfun.local")
+    }
+    // The launch bearer token is still required.
+    expect((await app.call("/api/auth/get-session", { auth: false, headers: { "x-session-token": signin.body.token } })).status).toBe(401)
   })
 })

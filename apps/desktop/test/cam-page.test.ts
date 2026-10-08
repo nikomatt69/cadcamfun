@@ -51,11 +51,17 @@ describe("CAM page", () => {
       const downloads: string[] = []
       const proto = window.HTMLAnchorElement.prototype as unknown as { click: () => void }
       const nativeClick = proto.click
+      // The stubs are process-wide: restore them, or the plugin worker tests later in the same run get "blob:test".
+      const nativeCreate = URL.createObjectURL
+      const nativeRevoke = URL.revokeObjectURL
       ;(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:test"
       ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined
       proto.click = function (this: HTMLAnchorElement) { downloads.push(this.download) }
-      await click('button[title="Save G-Code"]')
-      proto.click = nativeClick
+      try { await click('button[title="Save G-Code"]') } finally {
+        proto.click = nativeClick
+        URL.createObjectURL = nativeCreate
+        URL.revokeObjectURL = nativeRevoke
+      }
       expect(downloads[0]).toMatch(/^toolpath-\d{4}-\d{2}-\d{2}\.nc$/)
 
       // Play with a parsed program turns into Stop; without one it explains itself (no dead button).

@@ -165,7 +165,7 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
       if (!user) return yield* notFound("Utente non trovato", "L'utente associato al magic link non esiste")
       const authToken = tokens.sign({ userId: user.id, email: user.email ?? "", type: "session" }, 7 * 24 * 3600)
       return HttpApiSchema.withHeaders({
-        body: { success: true as const, message: "Magic link verified successfully", user: { id: user.id, email: user.email, name: user.name } },
+        body: { success: true as const, message: "Magic link verified successfully", user: { id: user.id, email: user.email, name: user.name }, token: authToken },
         headers: { "set-cookie": [`auth-token=${authToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${7 * 24 * 3600}`] }
       })
     }).pipe(Effect.catchTag("DatabaseError", internal("Magic link verification failed", "Errore interno del server",
