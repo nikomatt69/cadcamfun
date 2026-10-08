@@ -1,4 +1,4 @@
-import { A, useLocation } from "@solidjs/router"
+import { A, useLocation, useNavigate } from "@solidjs/router"
 import { For, Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import Home from "lucide-solid/icons/house"
 import FileText from "lucide-solid/icons/file-text"
@@ -28,12 +28,15 @@ import X from "lucide-solid/icons/x"
 import Menu from "lucide-solid/icons/menu"
 import Sun from "lucide-solid/icons/sun"
 import Moon from "lucide-solid/icons/moon"
+import LogIn from "lucide-solid/icons/log-in"
+import LogOut from "lucide-solid/icons/log-out"
 import Bell from "lucide-solid/icons/bell"
-import { open } from "@tauri-apps/plugin-shell"
+import { openExternal } from "../app/external.ts"
 import { isTauri } from "../app/sidecar.ts"
 import { t, type Key } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { prefersDark } from "../state/settings.ts"
+import { endSession, getSessionToken, sessionVersion } from "../state/session.ts"
 
 interface NavItem {
   readonly key: Key
@@ -88,7 +91,7 @@ export function ReferenceLink(props: { readonly href: string; readonly class?: s
     props.onNavigate?.()
     if (external() && isTauri()) {
       event.preventDefault()
-      void open(props.href).catch(() => window.open(props.href, "_blank", "noopener,noreferrer"))
+      openExternal(props.href)
     }
   }
   return <Show when={external()} fallback={<A href={props.href} class={props.class} aria-label={props.label} aria-current={props.current ? "page" : undefined} onClick={follow}>{props.children}</A>}>
@@ -101,7 +104,23 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
   let header: HTMLElement | undefined
   let profileButton: HTMLButtonElement | undefined
   let notificationButton: HTMLButtonElement | undefined
+  const navigate = useNavigate()
   const [popover, setPopover] = createSignal<"profile" | "notifications">()
+  const [account, setAccount] = createSignal<{ readonly name: string | null; readonly email: string | null }>()
+  // Re-read the acting account whenever a sign-in or sign-out changes the session.
+  createEffect(() => {
+    sessionVersion()
+    app.runtime.run(app.client.auth.getSession()).then((reply) => setAccount(reply.session.user), () => setAccount(undefined))
+  })
+  const signedIn = () => { sessionVersion(); return getSessionToken() !== undefined }
+  const displayName = () => (signedIn() ? account()?.name || account()?.email : undefined) || t("shell.localUser")
+  const initial = () => (signedIn() ? displayName().trim().charAt(0).toUpperCase() : "") || t("shell.userInitial")
+  const signOut = async () => {
+    close()
+    await app.runtime.run(app.client.auth.signout()).catch(() => undefined)
+    endSession(app.cache)
+    navigate("/")
+  }
   const dark = () => app.settings.settings().theme === "dark" || (app.settings.settings().theme === "system" && prefersDark())
   const close = () => setPopover(undefined)
   const outside = (event: PointerEvent) => { if (event.target instanceof Node && !header?.contains(event.target)) close() }
@@ -127,9 +146,9 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
         </div>
         <ReferenceLink href="/settings" class="reference-icon-button reference-navbar-settings" label={t("shell.settings")}><Settings size={24} /></ReferenceLink>
         <div class="relative">
-          <button ref={profileButton} type="button" class="reference-avatar" aria-label={t("shell.openUserMenu")} aria-expanded={popover() === "profile"} aria-controls="reference-profile-menu" onClick={() => setPopover(popover() === "profile" ? undefined : "profile")}><span>{t("shell.userInitial")}</span></button>
+          <button ref={profileButton} type="button" class="reference-avatar" aria-label={t("shell.openUserMenu")} aria-expanded={popover() === "profile"} aria-controls="reference-profile-menu" onClick={() => setPopover(popover() === "profile" ? undefined : "profile")}><span>{initial()}</span></button>
           <Show when={popover() === "profile"}><nav id="reference-profile-menu" class="reference-popover" aria-label={t("shell.openUserMenu")}>
-            <div class="reference-profile-heading"><p>{t("shell.localUser")}</p><small>{t("shell.localProfile")}</small></div>
+            <div class="reference-profile-heading"><p>{displayName()}</p><small>{signedIn() ? account()?.email : t("shell.localProfile")}</small></div>
             <For each={[
               { href: "/profile", key: "shell.myProfile" as const, icon: User },
               { href: "/settings", key: "shell.settings" as const, icon: Settings },
@@ -137,6 +156,9 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
               { href: "https://site.cadcamfun.xyz", key: "shell.website" as const, icon: Globe },
               { href: "https://docs.cadcamfun.xyz", key: "shell.documentation" as const, icon: BookOpen }
             ]}>{(item) => <ReferenceLink href={item.href} class="reference-profile-link" onNavigate={close}><item.icon size={16} /><span>{t(item.key)}</span></ReferenceLink>}</For>
+            <Show when={signedIn()} fallback={<ReferenceLink href="/auth/signin" class="reference-profile-link" onNavigate={close}><LogIn size={16} /><span>{t("shell.signIn")}</span></ReferenceLink>}>
+              <button type="button" class="reference-profile-link w-[calc(100%-1rem)] text-left" data-testid="sign-out" onClick={() => void signOut()}><LogOut size={16} /><span>{t("shell.signOut")}</span></button>
+            </Show>
           </nav></Show>
         </div>
       </div>

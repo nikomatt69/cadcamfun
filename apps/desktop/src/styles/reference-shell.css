@@ -114,6 +114,8 @@
 .reference-button-secondary:hover { background: var(--shell-hover); }
 .reference-button-primary { display: inline-flex; align-items: center; gap: .25rem; padding: .5rem 1rem; border-radius: .5rem; background: #2563eb; color: #fff; font-size: .875rem; font-weight: 500; box-shadow: 0 10px 15px -3px rgb(59 130 246 / .35); }
 .reference-button-primary:hover { background: #1d4ed8; }
+.reference-button-primary:disabled { opacity: .55; cursor: not-allowed; }
+.reference-button-primary:disabled:hover { background: #2563eb; }
 
 /* Legal pages. */
 .reference-legal-card { max-width: 56rem; margin: 0 auto; padding: 2.5rem; border-radius: 1.5rem; border: 1px solid var(--shell-border); background: var(--shell-button); box-shadow: 0 20px 25px -5px rgb(0 0 0 / .08); }

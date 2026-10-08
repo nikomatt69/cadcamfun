@@ -412,5 +412,7 @@
   "waitlist.signup.perk4": "Unsubscribe anytime",
   "waitlist.cta.line1": "Don't Miss Out on the",
   "waitlist.cta.line2": "Engineering Revolution",
-  "waitlist.cta.join": "Join the Waitlist Now"
+  "waitlist.cta.join": "Join the Waitlist Now",
+  "shell.signIn": "Sign in",
+  "shell.signOut": "Sign out"
 }

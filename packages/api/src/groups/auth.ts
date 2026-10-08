@@ -39,8 +39,14 @@ export const SignUpBody = Schema.Struct({
   email: Schema.optional(Schema.String), password: Schema.optional(Schema.String),
   confirmPassword: Schema.optional(Schema.String), name: Schema.optional(Schema.String)
 })
+/**
+ * The session cookie. Optional on purpose: `fetch` hides `Set-Cookie` from scripts, so the
+ * typed client of a webview never sees the header and must not fail to decode without it
+ * (runtimes that expose it give a single joined string; the same token also travels in the body, for the `x-session-token` header).
+ */
+const SET_COOKIE = { "set-cookie": Schema.optional(Schema.Union([Schema.Array(Schema.String), Schema.String])) }
 export const SignInResponse = HttpApiSchema.WithHeaders(
-  Schema.Struct({ ...AuthMessage.fields, user: FullUser, token: Schema.String }), { "set-cookie": Schema.Array(Schema.String) })
+  Schema.Struct({ ...AuthMessage.fields, user: FullUser, token: Schema.String }), SET_COOKIE)
 export const SignUpResponse = Schema.Struct({ ...AuthMessage.fields, user: FullUser })
 export const SessionResponse = Schema.Struct({
   session: Schema.Struct({
@@ -56,9 +62,14 @@ export const TestCreateResponse = Schema.Struct({ success: Schema.Literal(true),
 export class TestCreateBadRequest extends Schema.TaggedError<TestCreateBadRequest>()("TestCreateBadRequest", { error: Schema.String }, { httpApiStatus: 400 }) {}
 export class TestCreateFailure extends Schema.TaggedError<TestCreateFailure>()("TestCreateFailure", { error: Schema.String, message: Schema.String }, { httpApiStatus: 500 }) {}
 export const MagicVerifyResponse = HttpApiSchema.WithHeaders(
-  Schema.Struct({ ...AuthMessage.fields, user: Schema.Struct({ id: Schema.String, email: Schema.NullOr(Schema.String), name: Schema.NullOr(Schema.String) }) }),
-  { "set-cookie": Schema.Array(Schema.String) })
-export const SignoutResponse = HttpApiSchema.WithHeaders(AuthMessage, { "set-cookie": Schema.Array(Schema.String) })
+  Schema.Struct({
+    ...AuthMessage.fields,
+    user: Schema.Struct({ id: Schema.String, email: Schema.NullOr(Schema.String), name: Schema.NullOr(Schema.String) }),
+    /** Session token for the `x-session-token` header (the desktop client cannot rely on the cookie). */
+    token: Schema.optional(Schema.String)
+  }),
+  SET_COOKIE)
+export const SignoutResponse = HttpApiSchema.WithHeaders(AuthMessage, SET_COOKIE)
 
 export class AuthGroup extends HttpApiGroup.make("auth")
   .add(

@@ -13,6 +13,12 @@ export interface AppConfig {
   /** `nikcli` (default) runs chat through the embedded host; `direct` uses the AI SDK only. */
   /** Stripe webhook signing secret (legacy `STRIPE_WEBHOOK_SECRET`); without it webhooks are refused. */
   readonly stripeWebhookSecret?: string
+  /** Stripe API key (`STRIPE_SECRET_KEY`); without it paid checkout and the billing portal stay unavailable. */
+  readonly stripeSecretKey?: Redacted.Redacted<string>
+  /** Stripe price id per paid plan (`STRIPE_PRICE_BASIC|PRO|ENTERPRISE`). */
+  readonly stripePrices?: Readonly<Record<string, string>>
+  /** Test hook: Stripe API origin (defaults to `https://api.stripe.com`). */
+  readonly stripeApiBase?: string
   /** Shared secret for `/api/cron/*` (legacy `CRON_SECRET`); without it the cron route is open to the local app. */
   readonly cronSecret?: string
   /** E-mail of the administrator (legacy `ADMIN_EMAIL`); the local profile is the admin of its own installation by default. */
@@ -39,12 +45,20 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const aiHost = yield* Config.withDefault(Config.literals(["nikcli", "direct"], "CADCAMFUN_AI_HOST"), "nikcli" as const)
       const aiMinimaxBaseUrl = yield* Config.option(Config.string("CADCAMFUN_AI_MINIMAX_BASE_URL"))
       const stripeWebhookSecret = yield* Config.option(Config.string("STRIPE_WEBHOOK_SECRET"))
+      const stripeSecretKey = yield* Config.option(Config.redacted("STRIPE_SECRET_KEY"))
+      const stripePrices: Record<string, string> = {}
+      for (const plan of ["BASIC", "PRO", "ENTERPRISE"]) {
+        const price = yield* Config.option(Config.string(`STRIPE_PRICE_${plan}`))
+        if (price._tag === "Some" && price.value.trim()) stripePrices[plan] = price.value.trim()
+      }
       const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
       const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
       const otlpEndpoint = yield* Config.option(Config.string("OTEL_EXPORTER_OTLP_ENDPOINT"))
       return AppConfigService.of({
         ...(adminEmail._tag === "Some" ? { adminEmail: adminEmail.value } : {}),
         ...(stripeWebhookSecret._tag === "Some" ? { stripeWebhookSecret: stripeWebhookSecret.value } : {}),
+        ...(stripeSecretKey._tag === "Some" ? { stripeSecretKey: stripeSecretKey.value } : {}),
+        stripePrices,
         ...(cronSecret._tag === "Some" ? { cronSecret: cronSecret.value } : {}),
         aiHost,
         ...(aiMinimaxBaseUrl._tag === "Some" && aiMinimaxBaseUrl.value.trim() ? { aiMinimaxBaseUrl: aiMinimaxBaseUrl.value.trim() } : {}),

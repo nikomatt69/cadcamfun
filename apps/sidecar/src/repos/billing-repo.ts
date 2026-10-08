@@ -1,5 +1,5 @@
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { and, eq, lte } from "drizzle-orm"
+import { and, eq, lte, or } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 
 export type SubscriptionRow = typeof schema.subscriptionTable.$inferSelect
@@ -48,9 +48,18 @@ export class BillingRepo extends Context.Service<BillingRepo, {
       cancel: (userId) => query("billing.cancel", async (db) =>
         (await db.update(T).set({ plan: "FREE", status: "canceled", cancelAtPeriodEnd: false, stripeSubscriptionId: null }).where(eq(T.id, userId)).returning({ id: T.id })).length > 0),
       updateFromStripe: (match, data) => query("billing.updateFromStripe", async (db) => {
-        const where = match.subscriptionId ? eq(T.stripeSubscriptionId, match.subscriptionId) : match.userId ? eq(T.id, match.userId) : undefined
+        // A subscription id matches once it has been stored; the first event of a subscription only knows the user.
+        const by = [
+          ...(match.subscriptionId ? [eq(T.stripeSubscriptionId, match.subscriptionId)] : []),
+          ...(match.userId ? [eq(T.id, match.userId)] : [])
+        ]
+        const where = by.length === 0 ? undefined : or(...by)
         if (!where) return false
-        return (await db.update(T).set(data).where(where).returning({ id: T.id })).length > 0
+        if ((await db.update(T).set(data).where(where).returning({ id: T.id })).length > 0) return true
+        // A user can pay before ever opening the subscription page, so no row exists yet.
+        if (!match.userId) return false
+        await db.insert(T).values({ plan: "FREE", status: "active", ...data, id: match.userId, referenceId: match.userId })
+        return true
       }),
       updateExpiredTrials: (() => query("billing.updateExpiredTrials", async (db) =>
         (await db.update(T).set({ status: "expired", plan: "FREE", trialEndsAt: null, lsSubscriptionId: null, lsVariantId: null, lsCurrentPeriodEnd: null })
