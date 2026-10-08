@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { Check, Clock, Copy, Download, Edit, File, Grid, History, Plus, Trash2, Users, Wrench, X } from "lucide-solid"
 import { Field, Select, TextInput, Textarea } from "../components/ui/field.tsx"
+import { PANEL, TOOLBAR_BUTTON, WorkspaceDetail } from "../components/WorkspacePage.tsx"
 import { useApp } from "../state/context.ts"
 import { invalidatePrefix } from "../state/query-cache.ts"
 
@@ -200,8 +201,19 @@ export function ProjectDetailScreen(): JSX.Element {
   )
 
   return (
-    <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900" data-testid="project-detail">
-      <div class="p-4 md:p-6 max-w-7xl mx-auto">
+    <WorkspaceDetail
+      testId="project-detail"
+      title={project()?.name ?? "Project"}
+      subtitle="Project"
+      backHref="/projects"
+      backLabel="Back to Projects"
+      actions={<Show when={project()}>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>Version control</button>
+        <button type="button" class={TOOLBAR_BUTTON} onClick={() => open("edit")}><Edit size={16} aria-hidden="true" />Edit</button>
+        <button type="button" class={`${TOOLBAR_BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} aria-hidden="true" />Delete</button>
+      </Show>}
+    >
+      <div class="mx-auto w-full max-w-7xl">
         <Show when={message()}>
           <div class="fixed top-4 right-4 z-50 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-lg max-w-sm flex items-center" role="status">
             <Check size={20} class="mr-2 flex-shrink-0" /><p>{message()}</p>
@@ -224,20 +236,15 @@ export function ProjectDetailScreen(): JSX.Element {
           }>
             {(current) => (
               <>
-                <div class="bg-white dark:bg-gray-900 shadow-lg rounded-xl p-5 md:p-6 mb-8 border border-gray-100 dark:border-gray-800">
+                <div class={`${PANEL} mb-8`}>
                   <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
                     <div>
-                      <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{current().name}</h1>
+                      <h2 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{current().name}</h2>
                       <Show when={current().description}><p class="text-gray-600 dark:text-gray-300 mt-2">{current().description}</p></Show>
                       <div class="mt-4 flex flex-wrap items-center text-sm text-gray-500 dark:text-gray-400 gap-4">
                         <div class="flex items-center"><Clock size={16} class="mr-1.5" /><span>Updated: {formatDate(current().updatedAt)}</span></div>
                         <div class="flex items-center"><Users size={16} class="mr-1.5" /><span>{current().organizationId ? "Organization" : "Personal"}</span></div>
                       </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                      <button type="button" class={BUTTON} onClick={() => navigate(`/projects/${params.id}/history`)}>Version control</button>
-                      <button type="button" class={BUTTON} onClick={() => open("edit")}><Edit size={16} class="mr-1.5" />Edit</button>
-                      <button type="button" class={`${BUTTON} !text-red-600 dark:!text-red-400`} onClick={() => open("delete")}><Trash2 size={16} class="mr-1.5" />Delete</button>
                     </div>
                   </div>
                 </div>
@@ -324,6 +331,6 @@ export function ProjectDetailScreen(): JSX.Element {
           {submit("Create Toolpath", "Creating...")}
         </form>
       </Modal>
-    </div>
+    </WorkspaceDetail>
   )
 }

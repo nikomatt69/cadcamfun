@@ -13,6 +13,7 @@ import { useApp } from "../state/context.ts"
 import { useKeyedRead, useRead } from "../app/queries.ts"
 import { t } from "../i18n/index.ts"
 import { McpLoading, McpServerForm, legacyFailure, legacyRead, serversFrom, type McpServerCard } from "../components/mcp.tsx"
+import { TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../components/WorkspacePage.tsx"
 
 /** Legacy red banner with the dismiss button. */
 function McpErrorBanner(props: { readonly message: string; readonly onDismiss: () => void }): JSX.Element {
@@ -82,41 +83,18 @@ export function McpSettingsScreen(): JSX.Element {
   }
 
   return (
-    <Show
-      when={!config.loading()}
-      fallback={
-        <div class="container mx-auto p-4">
-          <div class="p-8 text-center">
-            <McpLoading />
-          </div>
-        </div>
-      }
+    <WorkspacePage
+      title={t("mcp.settings.title")}
+      actions={<>
+        <A href="/mcp/directory" class={TOOLBAR_BUTTON}>{t("mcp.settings.directory")}</A>
+        <A href="/settings/mcp/config-editor" class={TOOLBAR_BUTTON}>{t("mcp.settings.editor")}</A>
+        <Show when={!showAddForm()}>
+          <button type="button" class={TOOLBAR_PRIMARY} onClick={() => setShowAddForm(true)}>{t("mcp.settings.add")}</button>
+        </Show>
+      </>}
     >
-      <div class="container mx-auto p-4">
-        <div class="mb-6 flex items-center justify-between">
-          <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.settings.title")}</h1>
-
-          <div class="flex space-x-2">
-            <A href="/mcp/directory">
-              <button class="rounded bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">
-                {t("mcp.settings.directory")}
-              </button>
-            </A>
-            <A href="/settings/mcp/config-editor">
-              <button class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700">
-                {t("mcp.settings.editor")}
-              </button>
-            </A>
-            <Show when={!showAddForm()}>
-              <button
-                class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
-                onClick={() => setShowAddForm(true)}
-              >
-                {t("mcp.settings.add")}
-              </button>
-            </Show>
-          </div>
-        </div>
+    <Show when={!config.loading()} fallback={<div class="p-8 text-center"><McpLoading /></div>}>
+      <div class="mx-auto max-w-5xl">
 
         <Show when={error() !== undefined}>
           <McpErrorBanner message={error() ?? ""} onDismiss={() => setError(undefined)} />
@@ -242,6 +220,7 @@ export function McpSettingsScreen(): JSX.Element {
         </Show>
       </div>
     </Show>
+    </WorkspacePage>
   )
 }
 
@@ -293,16 +272,8 @@ export function McpConfigEditorScreen(): JSX.Element {
   }
 
   return (
-    <div class="container mx-auto p-4">
-      <div class="mb-4 flex items-center justify-between">
-        <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.editor.title")}</h1>
-        <A href="/settings/mcp">
-          <button class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-800 hover:bg-gray-300">
-            {t("mcp.editor.back")}
-          </button>
-        </A>
-      </div>
-
+    <WorkspaceDetail title={t("mcp.editor.title")} backHref="/settings/mcp" backLabel={t("mcp.editor.back")}>
+      <div class="mx-auto w-full max-w-5xl">
       <Show when={error() !== undefined}>
         <div class="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700">{error()}</div>
       </Show>
@@ -364,7 +335,8 @@ export function McpConfigEditorScreen(): JSX.Element {
           <li><code>enabled</code>: {t("mcp.editor.infoEnabled")}</li>
         </ul>
       </div>
-    </div>
+      </div>
+    </WorkspaceDetail>
   )
 }
 
@@ -393,7 +365,7 @@ export function McpEditServerScreen(): JSX.Element {
   }
 
   return (
-    <div class="container mx-auto p-4">
+    <WorkspaceDetail title={t("mcp.edit.title")} backHref="/settings/mcp" backLabel={t("mcp.edit.back")}>
       <Show
         when={!read.loading()}
         fallback={
@@ -419,16 +391,6 @@ export function McpEditServerScreen(): JSX.Element {
             </>
           }
         >
-          <div class="mb-4">
-            <A href="/settings/mcp">
-              <button class="rounded bg-gray-200 px-3 py-1 text-sm text-gray-800 hover:bg-gray-300">
-                {t("mcp.edit.back")}
-              </button>
-            </A>
-          </div>
-
-          <h1 class="mb-6 text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("mcp.edit.title")}</h1>
-
           <Show when={error() !== undefined}>
             <McpErrorBanner message={error() ?? ""} onDismiss={() => setError(undefined)} />
           </Show>
@@ -443,6 +405,6 @@ export function McpEditServerScreen(): JSX.Element {
           </div>
         </Show>
       </Show>
-    </div>
+    </WorkspaceDetail>
   )
 }

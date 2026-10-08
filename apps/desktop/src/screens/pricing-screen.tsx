@@ -14,6 +14,7 @@ import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { openExternal } from "../app/external.ts"
 import { PLAN_FEATURES, PLAN_ORDER, type PlanId } from "./plans.ts"
+import { WorkspacePage } from "../components/WorkspacePage.tsx"
 
 const daysLeft = (iso: string | undefined): number =>
   iso === undefined ? 0 : Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000))
@@ -54,10 +55,10 @@ export function PricingScreen(): JSX.Element {
     return t("pricing.cta.choose")
   }
 
-  return <section class="reference-page-container">
+  return <WorkspacePage title={t("pricing.title")}><section class="reference-page-container">
     <div class="reference-pricing-hero">
       <div class="reference-pricing-icon"><Sparkles size={32} aria-hidden="true" /></div>
-      <h1 class="reference-pricing-title">{t("pricing.title")}</h1>
+      <h2 class="reference-pricing-title">{t("pricing.title")}</h2>
       <p class="reference-pricing-intro">{t("pricing.subtitle")}</p>
       <Show when={onTrial()}>
         <p class="reference-pricing-trial"><Clock size={16} aria-hidden="true" />{t("pricing.trial", { days: daysLeft(subscription.data()?.trialEnd) })}</p>
@@ -91,5 +92,5 @@ export function PricingScreen(): JSX.Element {
       <h2>{t("pricing.faq.title")}</h2>
       <p>{t("pricing.faq.detail")}</p>
     </div>
-  </section>
+  </section></WorkspacePage>
 }

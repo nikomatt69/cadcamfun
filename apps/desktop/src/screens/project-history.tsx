@@ -8,6 +8,7 @@ import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { useApp } from "../state/context.ts"
 import { t } from "../i18n/index.ts"
 import { readGithubToken, saveGithubToken } from "../app/github-token.ts"
+import { WorkspaceDetail } from "../components/WorkspacePage.tsx"
 
 type Tab = "changes" | "history" | "branches" | "pulls" | "actions" | "github"
 const TABS: ReadonlyArray<readonly [Tab, Parameters<typeof t>[0]]> = [
@@ -23,7 +24,7 @@ interface Run { readonly id: string; readonly workflow: string; readonly event: 
 
 const BTN = "px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
 const PRIMARY = "px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
-const CARD = "rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+const CARD = "rounded-xl border border-white/40 bg-white/70 p-4 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
 const INPUT = "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 text-sm"
 const PILL = (state: string): string => `ml-2 rounded-full border px-2 py-0.5 text-xs ${state === "open" || state === "running" ? "text-blue-600" : state === "merged" || state === "success" || state === "approve" ? "text-green-600" : "text-red-600"}`
 
@@ -171,15 +172,14 @@ export function ProjectHistoryScreen(): JSX.Element {
   })
 
   return (
-    <main class="mx-auto max-w-5xl space-y-4 p-6" data-testid="project-history">
-      <header class="flex items-center justify-between">
-        <div>
-          <button class={BTN} onClick={() => navigate(`/projects/${id()}`, { state: {} })}>{t("vcs.back")}</button>
-          <h1 class="mt-3 text-2xl font-semibold">{t("vcs.title")}</h1>
-          <p class="text-sm text-gray-500">{t("vcs.branch")}: <strong>{branch()}</strong> <Show when={head()}>· <code>{short(head()!)}</code></Show></p>
-        </div>
-      </header>
-
+    <WorkspaceDetail
+      testId="project-history"
+      title={t("vcs.title")}
+      subtitle={`${t("vcs.branch")}: ${branch()}${head() ? ` · ${short(head()!)}` : ""}`}
+      backHref={`/projects/${id()}`}
+      backLabel={t("vcs.back")}
+    >
+    <div class="mx-auto w-full max-w-5xl space-y-4">
       <Show when={problem()}><p role="alert" class="text-red-600">{problem()}</p></Show>
       <Show when={notice()}><p role="status" class="text-green-600">{notice()}</p></Show>
 
@@ -313,6 +313,7 @@ export function ProjectHistoryScreen(): JSX.Element {
           </div>
         </section>
       </Show>
-    </main>
+    </div>
+    </WorkspaceDetail>
   )
 }

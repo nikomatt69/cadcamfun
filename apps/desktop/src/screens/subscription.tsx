@@ -15,7 +15,8 @@ import { openExternal } from "../app/external.ts"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
-import { ErrorState, LoadingState, ScreenHeader } from "./screen-parts.tsx"
+import { PANEL, TOOLBAR_PRIMARY, WorkspacePage } from "../components/WorkspacePage.tsx"
+import { ErrorState, LoadingState } from "./screen-parts.tsx"
 import { planFeatures } from "./plans.ts"
 
 /** Storage limits are MB in the API; show whole MB below 1 GB (100 MB, not 0.0977 GB). */
@@ -175,19 +176,18 @@ function SubscriptionCard(): JSX.Element {
 /** `/settings/subscription` — header, the subscription card and the support card. */
 export function SubscriptionScreen(): JSX.Element {
   return (
-    <section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <ScreenHeader
-        title={t("settings.subscription.title")}
-        subtitle={t("settings.subscription.subtitle")}
-        actions={<A class="btn btn-primary" href="/pricing">{t("settings.subscription.viewPlans")}</A>}
-      />
-      <div class="mt-8 grid max-w-3xl grid-cols-1 gap-6 lg:mx-auto lg:max-w-7xl lg:grid-cols-3">
+    <WorkspacePage
+      title={t("settings.subscription.title")}
+      actions={<A class={TOOLBAR_PRIMARY} href="/pricing">{t("settings.subscription.viewPlans")}</A>}
+    >
+      <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("settings.subscription.subtitle")}</p>
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-3">
           <SubscriptionCard />
-          <div class="rounded-lg bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-              <h3 class="text-lg font-medium leading-6 text-gray-900">{t("settings.subscription.helpTitle")}</h3>
-              <div class="mt-2 max-w-xl text-sm text-gray-500">
+          <div class={PANEL}>
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.subscription.helpTitle")}</h3>
+              <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
                 <p>{t("settings.subscription.helpBody")}</p>
               </div>
               <div class="mt-5">
@@ -197,6 +197,6 @@ export function SubscriptionScreen(): JSX.Element {
           </div>
         </div>
       </div>
-    </section>
+    </WorkspacePage>
   )
 }

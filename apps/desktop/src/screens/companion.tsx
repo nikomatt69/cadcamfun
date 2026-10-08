@@ -9,6 +9,7 @@ import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { toast } from "../components/ui/feedback.tsx"
 import { t } from "../i18n/index.ts"
+import { PANEL, WorkspacePage } from "../components/WorkspacePage.tsx"
 
 const qrSvg = (text: string): string => {
   const qr = qrcode(0, "M")
@@ -36,18 +37,16 @@ export function CompanionScreen(): JSX.Element {
   const state = () => status.data()
 
   return (
-    <main class="mx-auto max-w-2xl space-y-6 p-6">
-      <header>
-        <h1 class="text-2xl font-semibold">{t("companion.title")}</h1>
-        <p class="text-sm text-gray-500">{t("companion.subtitle")}</p>
-      </header>
+    <WorkspacePage title={t("companion.title")}>
+      <div class="mx-auto max-w-2xl space-y-6">
+      <p class="text-sm text-gray-500 dark:text-gray-400">{t("companion.subtitle")}</p>
 
       <Show when={status.error()}><p class="text-red-600">{t("companion.error.load")}</p></Show>
 
       <Show when={state()}>
         {(s) => (
           <>
-            <section class="rounded-2xl border p-4">
+            <section class={PANEL}>
               <p>{s().enabled ? t("companion.status.on", { port: String(s().port ?? "") }) : t("companion.status.off")}</p>
               <Show when={s().fingerprint}><p class="mt-2 break-all text-xs text-gray-500">{t("companion.fingerprint")}: <code>{s().fingerprint}</code></p></Show>
               <div class="mt-3">
@@ -61,7 +60,7 @@ export function CompanionScreen(): JSX.Element {
             </section>
 
             <Show when={s().enabled}>
-              <section class="rounded-2xl border p-4 space-y-3">
+              <section class={`${PANEL} space-y-3`}>
                 <h2 class="font-medium">{t("companion.pair")}</h2>
                 <label class="block text-sm">{t("companion.pair.name")}
                   <input class="mt-1 w-full rounded border p-2" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
@@ -81,7 +80,7 @@ export function CompanionScreen(): JSX.Element {
               </section>
             </Show>
 
-            <section class="rounded-2xl border p-4">
+            <section class={PANEL}>
               <h2 class="font-medium">{t("companion.devices")}</h2>
               <ul class="mt-2 space-y-2">
                 <For each={s().devices} fallback={<li class="text-sm text-gray-500">{t("companion.devices.empty")}</li>}>
@@ -97,6 +96,7 @@ export function CompanionScreen(): JSX.Element {
           </>
         )}
       </Show>
-    </main>
+      </div>
+    </WorkspacePage>
   )
 }

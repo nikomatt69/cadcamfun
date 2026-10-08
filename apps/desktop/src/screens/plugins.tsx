@@ -2,14 +2,15 @@
  * Plugins screens (`/plugins`, `/plugins/:id`): the installed list with enable/disable,
  * zip install, and a detail view with the manifest and the JSON configuration.
  */
-import { For, Show, createSignal, onCleanup, createEffect, type JSX } from "solid-js"
+import { For, Show, createSignal, createMemo, onCleanup, createEffect, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
 import { Effect } from "effect"
-import { CheckCircle, ExternalLink, FileText, Info, ToggleLeft, ToggleRight, Trash2, Upload, X } from "lucide-solid"
+import { CheckCircle, ExternalLink, FileText, Info, Puzzle, Search, ToggleLeft, ToggleRight, Trash2, Upload, X } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { ErrorState, LoadingState, Toast } from "./screen-parts.tsx"
+import { CARD, CardBanner, FIELD, ICON_BUTTON, RAIL_LABEL, StageEmpty, StageLoading, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage } from "../components/WorkspacePage.tsx"
 import { PluginSettingsDialog } from "../components/plugins/plugin-settings-dialog.tsx"
 
 const describe = (cause: unknown): string => {
@@ -23,6 +24,7 @@ const describe = (cause: unknown): string => {
 
 export function PluginsScreen(): JSX.Element {
   const app = useApp()
+  const navigate = useNavigate()
   const plugins = useRead((c) => c.plugins.list())
   const [notice, setNotice] = createSignal<string>()
   const [error, setError] = createSignal<string>()
@@ -87,37 +89,40 @@ export function PluginsScreen(): JSX.Element {
     if (!error()) setRemoving(undefined)
   }
 
-  return <section class="min-h-full bg-gray-50 p-6 dark:bg-gray-900">
-    <div class="mx-auto max-w-4xl">
-      <div class="mb-6 flex items-center justify-between gap-3">
-        <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">{t("plugins.title")}</h1>
-        <button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700" onClick={openInstall}>
-          <Upload size={16} class="mr-2" />{t("plugins.install")}
-        </button>
-      </div>
-      <Toast message={notice()} />
-      <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
-      <Show when={plugins.error()}><ErrorState label={t("plugins.error")} detail={plugins.error()} /></Show>
-      <Show when={plugins.loading() && !plugins.data()}><LoadingState label={t("common.loading")} /></Show>
-      <Show when={plugins.data()?.length === 0}><p class="py-10 text-center text-gray-500 dark:text-gray-400">{t("plugins.empty")}</p></Show>
-      <ul class="divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow dark:divide-gray-700 dark:bg-gray-800">
-        <For each={plugins.data() ?? []}>{(plugin) =>
-          <li class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-            <div class="min-w-0 flex-1">
-              <h2 class="truncate text-sm font-medium text-gray-800 dark:text-gray-100"><A href={`/plugins/${encodeURIComponent(plugin.id)}`} class="hover:underline">{plugin.manifest.name || plugin.id}</A></h2>
-              <p class="truncate text-sm text-gray-500 dark:text-gray-400">v{plugin.version} - {plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
-              <p class="mt-1 text-xs" classList={{ "text-green-600 dark:text-green-400": plugin.enabled, "text-gray-500 dark:text-gray-400": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</p>
-            </div>
-            <div class="ml-4 flex items-center gap-3">
-              <button class="rounded-full p-1" classList={{ "text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50": plugin.enabled, "text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600": !plugin.enabled }} aria-label={`${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}: ${plugin.manifest.name}`} disabled={pending()} onClick={() => void toggle(plugin.id, plugin.enabled)}>
-                <Show when={plugin.enabled} fallback={<ToggleLeft size={20} />}><ToggleRight size={20} /></Show>
-              </button>
-              <A class="text-gray-400 hover:text-blue-500" href={`/plugins/${encodeURIComponent(plugin.id)}`} aria-label={`${t("plugins.info")}: ${plugin.manifest.name}`}><Info size={18} /></A>
-              <button class="text-gray-400 hover:text-red-500" aria-label={`${t("plugins.uninstall")}: ${plugin.manifest.name}`} disabled={pending()} onClick={() => setRemoving(plugin.id)}><Trash2 size={18} /></button>
-            </div>
-          </li>}</For>
-      </ul>
-    </div>
+  const [search, setSearch] = createSignal("")
+  const [status, setStatus] = createSignal("")
+  const filtered = createMemo(() => {
+    const needle = search().trim().toLowerCase()
+    return (plugins.data() ?? [])
+      .filter((plugin) => needle === "" || `${plugin.manifest.name ?? ""} ${plugin.id} ${plugin.manifest.description ?? ""}`.toLowerCase().includes(needle))
+      .filter((plugin) => status() === "" || (status() === "enabled") === plugin.enabled)
+  })
+  const hasFilters = () => search() !== "" || status() !== ""
+  const clearFilters = () => { setSearch(""); setStatus("") }
+
+  return <WorkspacePage
+    title={t("plugins.title")}
+    actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}><Upload size={16} aria-hidden="true" />{t("plugins.install")}</button>}
+    rail={<>
+      <label class="block">
+        <span class={RAIL_LABEL}>Search</span>
+        <div class="relative">
+          <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search plugins..." value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
+        </div>
+      </label>
+      <label class="block">
+        <span class={RAIL_LABEL}>Status</span>
+        <select name="status" class={FIELD} value={status()} onChange={(e) => setStatus(e.currentTarget.value)}>
+          <option value="">All</option>
+          <option value="enabled">{t("plugins.enabled")}</option>
+          <option value="disabled">{t("plugins.disabled")}</option>
+        </select>
+      </label>
+      <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
+      <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {plugins.data()?.length ?? 0} plugins</p>
+    </>}
+    overlays={<>
     <Show when={installOpen()}>
       <div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeInstall() }}>
         <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
@@ -133,7 +138,43 @@ export function PluginsScreen(): JSX.Element {
       </div>
     </Show>
     <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
-  </section>
+    </>}
+  >
+    <Toast message={notice()} />
+    <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
+    <Show when={plugins.error()}><ErrorState label={t("plugins.error")} detail={plugins.error()} /></Show>
+    <Show when={plugins.loading() && !plugins.data()}><StageLoading label={t("common.loading")} /></Show>
+    <Show when={!plugins.loading() || plugins.data()}>
+      <Show
+        when={filtered().length > 0}
+        fallback={<StageEmpty icon={<Puzzle size={24} aria-hidden="true" />} title="No plugins found" hint={hasFilters() ? "No plugins match your search criteria." : t("plugins.empty")}>
+          <Show when={hasFilters()} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openInstall}>{t("plugins.install")}</button>}><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button></Show>
+        </StageEmpty>}
+      >
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <For each={filtered()}>{(plugin) =>
+            <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => navigate(`/plugins/${encodeURIComponent(plugin.id)}`)} onKeyDown={(e) => { if (e.key === "Enter") navigate(`/plugins/${encodeURIComponent(plugin.id)}`) }}>
+              <CardBanner icon={<Puzzle size={28} aria-hidden="true" />} badge={`v${plugin.version}`} leftBadge={plugin.enabled ? t("plugins.enabled") : undefined} />
+              <div class="flex flex-1 flex-col gap-2 p-4">
+                <h2 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{plugin.manifest.name || plugin.id}</h2>
+                <p class="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
+                <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  <div class="flex justify-between"><span>Status:</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-gray-200/80 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
+                  <div class="flex justify-between"><span>ID:</span><code class="font-mono text-[#007ACC] dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
+                </div>
+              </div>
+              <div class="flex items-center justify-end gap-1 border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30" onClick={(e) => e.stopPropagation()}>
+                <button type="button" class={ICON_BUTTON} classList={{ "!text-green-600": plugin.enabled }} title={plugin.enabled ? t("plugins.disable") : t("plugins.enable")} aria-label={`${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}: ${plugin.manifest.name || plugin.id}`} aria-pressed={plugin.enabled} disabled={pending()} onClick={() => void toggle(plugin.id, plugin.enabled)}>
+                  <Show when={plugin.enabled} fallback={<ToggleLeft size={18} aria-hidden="true" />}><ToggleRight size={18} aria-hidden="true" /></Show>
+                </button>
+                <A class={ICON_BUTTON} href={`/plugins/${encodeURIComponent(plugin.id)}`} title={t("plugins.info")} aria-label={`${t("plugins.info")}: ${plugin.manifest.name}`}><Info size={16} aria-hidden="true" /></A>
+                <button type="button" class={ICON_BUTTON} title={t("plugins.uninstall")} aria-label={`${t("plugins.uninstall")}: ${plugin.manifest.name}`} disabled={pending()} onClick={() => setRemoving(plugin.id)}><Trash2 size={16} aria-hidden="true" /></button>
+              </div>
+            </div>}</For>
+        </div>
+      </Show>
+    </Show>
+  </WorkspacePage>
 }
 
 /** `DetailSection` — the legacy card with the `<h2>` rule under the title. */
@@ -302,7 +343,7 @@ export function PluginDetailScreen(): JSX.Element {
     return icon !== undefined && icon.startsWith("http") ? icon : undefined
   }
 
-  return <section class="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8 dark:bg-gray-900">
+  return <WorkspaceDetail title={plugin.data()?.manifest.name || t("plugins.title")} subtitle="Plugin" backHref="/plugins" backLabel={t("plugins.detail.backToPlugins")}>
     <Show when={plugin.data() !== undefined || !plugin.loading()} fallback={
       <div class="mx-auto p-8 text-center">{t("plugins.detail.loading")}</div>
     }>
@@ -340,9 +381,9 @@ export function PluginDetailScreen(): JSX.Element {
                 />}
               </Show>
               <div class="min-w-0">
-                <h1 class="truncate text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50" title={current().manifest.name}>
+                <h2 class="truncate text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50" title={current().manifest.name}>
                   {current().manifest.name}
-                </h1>
+                </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   {t("plugins.version")} {current().manifest.version}
                   <Show when={current().manifest.author !== undefined && current().manifest.author.length > 0}>
@@ -624,5 +665,5 @@ export function PluginDetailScreen(): JSX.Element {
         </>}</Show>
       </Show>
     </Show>
-  </section>
+  </WorkspaceDetail>
 }

@@ -35,6 +35,7 @@ import { AnimatedSection, FloatingOrbs, StaggerGroup } from "../components/ui/an
 import { Badge, IconChip, ProgressBar } from "../components/ui/badge.tsx"
 import { Skeleton } from "../components/ui/feedback.tsx"
 import { t, type Key } from "../i18n/index.ts"
+import { WorkspacePage } from "../components/WorkspacePage.tsx"
 
 interface ModuleCardData {
   readonly id: "cad" | "cam" | "projects"
@@ -122,6 +123,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
   ])
 
   return (
+    <WorkspacePage title={t("shell.dashboard")}>
     <div class="dashboard-page">
       <Hero />
 
@@ -145,6 +147,7 @@ export function DashboardScreen(props: { readonly data: DashboardData; readonly 
         <QuickAccess />
       </AnimatedSection>
     </div>
+    </WorkspacePage>
   )
 }
 
@@ -173,7 +176,7 @@ function Hero(): JSX.Element {
           />
         </div>
 
-        <Motion.h1
+        <Motion.h2
           class="ui-display dashboard-hero-name"
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -181,7 +184,7 @@ function Hero(): JSX.Element {
         >
           <Sparkles size={28} class="dashboard-hero-sparkle" aria-hidden="true" />
           <span class="dashboard-hero-name-text">{t("dashboard.hero.name")}</span>
-        </Motion.h1>
+        </Motion.h2>
 
         <Motion.p
           class="ui-headline dashboard-hero-tagline"

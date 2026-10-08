@@ -1,1 +1,1 @@
-export { LibraryScreen as default } from "../../screens/library.tsx"
+export { MachinesScreen as default } from "../../resources/ResourcesScreen.tsx"

@@ -19,6 +19,7 @@ import { useApp } from "../state/context.ts"
 import { endSession } from "../state/session.ts"
 import { toast } from "../components/ui/feedback.tsx"
 import { ProfileSettings } from "../components/settings/profile-settings.tsx"
+import { WorkspacePage } from "../components/WorkspacePage.tsx"
 import { SessionManagement } from "../components/settings/session-management.tsx"
 import { PasskeySettings } from "../components/settings/passkey-settings.tsx"
 import { SubscriptionSettings } from "../components/settings/subscription-settings.tsx"
@@ -369,25 +370,9 @@ export function SettingsScreen(): JSX.Element {
   )
 
   return (
-    <Motion.div
-      class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <Motion.div
-          class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl shadow-lg rounded-2xl border border-gray-200/50 dark:border-gray-700/50 p-6 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <h1 class="text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50">
-            {t("settings.title")}
-          </h1>
-          <p class="mt-2 text-gray-600 dark:text-gray-300">{t("settings.index.subtitle")}</p>
-        </Motion.div>
+    <WorkspacePage title={t("settings.title")}>
+      <div class="mx-auto w-full max-w-7xl">
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">{t("settings.index.subtitle")}</p>
 
         {/* Main Content */}
         <Motion.div
@@ -463,6 +448,6 @@ export function SettingsScreen(): JSX.Element {
           </Show>
         </Motion.div>
       </div>
-    </Motion.div>
+    </WorkspacePage>
   )
 }

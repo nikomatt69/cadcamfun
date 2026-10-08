@@ -21,6 +21,7 @@ import { Motion } from "solid-motionone"
 import { Box, Calendar, Folder, Globe, Layout, Mail, MapPin, Pencil, Settings, Shield, User, Wrench } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useRead } from "../app/queries.ts"
+import { WorkspacePage } from "../components/WorkspacePage.tsx"
 import { LoadingState } from "./screen-parts.tsx"
 
 type TabId = "projects" | "components" | "toolpaths"
@@ -153,13 +154,8 @@ export function ProfileScreen(): JSX.Element {
   return (
     <Show when={!isLoading()} fallback={<LoadingState label={t("common.loading")} />}>
       <Show when={profile.data() !== undefined} fallback={notFound}>
-        <Motion.div
-          class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+        <WorkspacePage title={profile.data()?.name || "Profile"}>
+          <div class="max-w-7xl mx-auto">
             {/* Profile Header */}
             <Motion.div
               class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/20 dark:border-gray-700/20 mb-8 overflow-hidden relative"
@@ -498,7 +494,7 @@ export function ProfileScreen(): JSX.Element {
               )}
             </Show>
           </div>
-        </Motion.div>
+        </WorkspacePage>
       </Show>
     </Show>
   )

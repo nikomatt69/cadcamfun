@@ -17,15 +17,19 @@
  * `image`, `role`, `joinedAt`) plus `projectCount` and the caller's `userRole`, which is
  * what the legacy page used to derive from the members list.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { A, useNavigate, useParams } from "@solidjs/router"
 import { Effect } from "effect"
 import { Motion, Presence } from "solid-motionone"
-import { ArrowLeft, Building, Mail, Plus, User, UserPlus, Users } from "lucide-solid"
+import { ArrowLeft, Building, Mail, Plus, Search, User, UserPlus, Users, X } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { ErrorState, LoadingState } from "./screen-parts.tsx"
+import {
+  CANCEL_BUTTON, FIELD, INPUT, LABEL, PANEL, RAIL_LABEL, StageEmpty, StageError, StageLoading, SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage
+} from "../components/WorkspacePage.tsx"
+import { Modal } from "../toolpaths/shared.tsx"
 import { OrganizationCard } from "../components/organizations/organization-card.tsx"
 
 /** framer's page easing, verbatim from the legacy `pageVariants`. */
@@ -58,9 +62,7 @@ const TAB_BASE = "whitespace-nowrap rounded-md px-3 py-2 font-medium text-sm"
 const TAB_ACTIVE = "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400"
 const TAB_IDLE = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 
-const GRADIENT_PAGE =
-  "min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
-const LEGACY_CARD = "bg-[#F8FBFF] shadow-md rounded-lg dark:bg-gray-800"
+const LEGACY_CARD = "rounded-xl border border-white/40 bg-white/70 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
 const LEGACY_INPUT =
   "block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
 
@@ -95,217 +97,69 @@ export function OrganizationsScreen(): JSX.Element {
     }
   }
 
-  const createButton = "inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const [search, setSearch] = createSignal("")
+  const filtered = createMemo(() => {
+    const needle = search().trim().toLowerCase()
+    return (orgs.data() ?? []).filter((org) => needle === "" || `${org.name} ${org.description ?? ""}`.toLowerCase().includes(needle))
+  })
+  const openCreate = (): void => { setError(undefined); setShowModal(true) }
 
   return (
-    <Motion.section
-      class={`min-h-screen p-4 md:p-6 lg:p-8 ${GRADIENT_PAGE}`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, easing: EASE }}
-    >
-      <div class="mx-auto max-w-7xl">
-        {/* Header Section */}
-        <Motion.div
-          class="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, easing: EASE }}
-        >
-          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
-                {t("org.title")}
-              </h1>
-              <p class="mt-2 text-gray-600 dark:text-gray-400">{t("org.subtitle")}</p>
-            </div>
-            <Motion.button
-              type="button"
-              onClick={() => setShowModal(true)}
-              hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
-              press={{ scale: 0.95 }}
-              class={createButton}
-            >
-              <Plus size={20} class="mr-2" />
-              {t("org.new")}
-            </Motion.button>
+    <WorkspacePage
+      title={t("org.title")}
+      actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("org.new")}</button>}
+      rail={<>
+        <label class="block">
+          <span class={RAIL_LABEL}>Search</span>
+          <div class="relative">
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search organizations..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
-        </Motion.div>
-
-        {/* Organizations Content */}
-        <Show
-          when={orgs.data() !== undefined || !orgs.loading()}
-          fallback={<LoadingState label={t("common.loading")} />}
-        >
-          <Show when={orgs.error() === undefined} fallback={<ErrorState label={t("common.error")} detail={orgs.error()} />}>
-            <Show
-              when={(orgs.data() ?? []).length > 0}
-              fallback={
-                /* Empty State */
-                <Motion.div
-                  class="rounded-2xl border border-gray-200/50 bg-white/70 p-12 text-center shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/70"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5, delay: 0.2, easing: CARD_EASE }}
-                >
-                  <Motion.div
-                    class="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20"
-                    hover={{ scale: 1.1, rotate: 5, transition: { duration: 0.3, easing: CARD_EASE } }}
-                  >
-                    <Building size={48} class="text-blue-500 dark:text-blue-400" />
-                  </Motion.div>
-                  <h3 class="mb-3 text-xl font-semibold text-gray-900 dark:text-white">{t("org.empty.title")}</h3>
-                  <p class="mx-auto mb-8 max-w-md text-gray-600 dark:text-gray-400">{t("org.empty.body")}</p>
-                  <Motion.button
-                    type="button"
-                    onClick={() => setShowModal(true)}
-                    hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
-                    press={{ scale: 0.95 }}
-                    class={createButton}
-                  >
-                    <Plus size={20} class="mr-2" />
-                    {t("org.empty.cta")}
-                  </Motion.button>
-                </Motion.div>
-              }
-            >
-              {/* Organizations Grid */}
-              <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <For each={orgs.data() ?? []}>
-                  {(org, index) => (
-                    <OrganizationCard
-                      org={org}
-                      index={index()}
-                      memberCount={org.userCount}
-                      projectCount={org.projectCount}
-                    />
-                  )}
-                </For>
-              </div>
-            </Show>
+        </label>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />Clear Filters</button>
+        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} organizations</p>
+      </>}
+      overlays={
+        <Modal open={showModal()} title={t("org.modal.title")} onClose={() => { if (!isSubmitting()) setShowModal(false) }}>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.modal.body")}</p>
+          {/* The legacy modal shows the list hook's `error`; a failed create lands here too. */}
+          <Show when={error() ?? orgs.error()}><StageError message={String(error() ?? orgs.error())} /></Show>
+          <form onSubmit={(event) => void submit(event)} class="space-y-4">
+            <div>
+              <label for="name" class={LABEL}>{t("org.modal.nameLabel")}</label>
+              <input type="text" id="name" name="name" required value={name()} onInput={(event) => setName(event.currentTarget.value)} placeholder={t("org.modal.namePlaceholder")} class={INPUT} />
+            </div>
+            <div>
+              <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
+              <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
+            </div>
+            <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+              <button type="button" disabled={isSubmitting()} onClick={() => setShowModal(false)} class={CANCEL_BUTTON}>{t("org.modal.cancel")}</button>
+              <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
+            </div>
+          </form>
+        </Modal>
+      }
+    >
+      <Show when={orgs.data() !== undefined || !orgs.loading()} fallback={<StageLoading label={t("common.loading")} />}>
+        <Show when={orgs.error() === undefined} fallback={<StageError message={String(orgs.error())} onRetry={() => void orgs.refetch()} />}>
+          <Show
+            when={filtered().length > 0}
+            fallback={
+              <StageEmpty icon={<Building size={24} aria-hidden="true" />} title={search() !== "" ? "No organizations found" : t("org.empty.title")} hint={search() !== "" ? "No organizations match your search criteria." : t("org.empty.body")}>
+                <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("org.empty.cta")}</button>}>
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>Clear filters</button>
+                </Show>
+              </StageEmpty>
+            }
+          >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <For each={filtered()}>{(org) => <OrganizationCard org={org} memberCount={org.userCount} projectCount={org.projectCount} />}</For>
+            </div>
           </Show>
         </Show>
-      </div>
-
-      {/* Create Organization Modal */}
-      <Presence>
-        <Show when={showModal()}>
-          <div class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
-              {/* Background overlay */}
-              <Motion.div
-                class="fixed inset-0 bg-gray-500/75 backdrop-blur-sm transition-opacity dark:bg-gray-900/75"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, easing: EASE }}
-                onClick={() => setShowModal(false)}
-              />
-
-              {/* Modal panel */}
-              <Motion.div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="create-organization-title"
-                class="inline-block w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200/50 bg-white/90 px-4 pb-4 pt-5 text-left align-bottom shadow-2xl backdrop-blur-xl sm:my-8 sm:align-middle sm:p-6 dark:border-gray-700/50 dark:bg-gray-800/90"
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2, easing: EASE } }}
-                transition={{ duration: 0.3, easing: CARD_EASE }}
-              >
-                <div>
-                  <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                    <Building class="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div class="mt-3 text-center sm:mt-5">
-                    <h3 id="create-organization-title" class="text-lg font-semibold leading-6 text-gray-900 dark:text-white">
-                      {t("org.modal.title")}
-                    </h3>
-                    <div class="mt-2">
-                      <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.modal.body")}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* The legacy modal shows the list hook's `error`; a failed create lands here too. */}
-                <Show when={error() ?? orgs.error()}>
-                  <Motion.div
-                    class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.2, easing: EASE }}
-                  >
-                    <div class="text-sm text-red-700 dark:text-red-300">{error()}</div>
-                  </Motion.div>
-                </Show>
-
-                <form onSubmit={(event) => void submit(event)} class="mt-6 space-y-4">
-                  <div>
-                    <label for="name" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t("org.modal.nameLabel")}
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      required
-                      value={name()}
-                      onInput={(event) => setName(event.currentTarget.value)}
-                      placeholder={t("org.modal.namePlaceholder")}
-                      class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label for="description" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t("org.modal.descriptionLabel")}
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={3}
-                      value={description()}
-                      onInput={(event) => setDescription(event.currentTarget.value)}
-                      placeholder={t("org.modal.descriptionPlaceholder")}
-                      class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 shadow-sm transition-all focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-
-                  <div class="mt-6 flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      disabled={isSubmitting()}
-                      onClick={() => setShowModal(false)}
-                      class="rounded-xl border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                    >
-                      {t("org.modal.cancel")}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting()}
-                      class="inline-flex items-center rounded-xl border border-transparent bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Show
-                        when={!isSubmitting()}
-                        fallback={
-                          <>
-                            <span class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            {t("org.modal.creating")}
-                          </>
-                        }
-                      >
-                        <Building size={16} class="mr-2" />
-                        {t("org.modal.submit")}
-                      </Show>
-                    </button>
-                  </div>
-                </form>
-              </Motion.div>
-            </div>
-          </div>
-        </Show>
-      </Presence>
-    </Motion.section>
+      </Show>
+    </WorkspacePage>
   )
 }
 
@@ -336,99 +190,34 @@ export function CreateOrganizationScreen(): JSX.Element {
   }
 
   return (
-    <section class="p-6">
-      <div class="mb-6 flex items-center">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          class="mr-4 text-gray-500 hover:text-gray-700"
-          aria-label={t("common.back")}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{t("org.modal.title")}</h1>
-      </div>
-
-      <div class="mx-auto max-w-3xl">
-        <div class="overflow-hidden rounded-lg bg-[#F8FBFF] shadow-md dark:bg-gray-800 dark:text-white">
-          <div class="p-6">
-            <div class="mb-6 flex items-center">
-              <div class="mr-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                <Users class="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <h2 class="text-lg font-medium text-gray-900 dark:text-white">{t("org.create.details")}</h2>
-                <p class="text-sm text-gray-500">{t("org.create.lead")}</p>
-              </div>
+    <WorkspaceDetail title={t("org.modal.title")} subtitle={t("org.create.details")} backHref="/organizations" backLabel={t("common.back")}>
+      <div class="mx-auto w-full max-w-3xl">
+        <div class={PANEL}>
+          <div class="mb-6 flex items-center gap-4">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30"><Users class="h-6 w-6 text-blue-600 dark:text-blue-400" /></div>
+            <div>
+              <h2 class="text-lg font-medium text-gray-900 dark:text-white">{t("org.create.details")}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.create.lead")}</p>
             </div>
-
-            <Show when={error()}>
-              <div class="mb-4 rounded border border-red-400 bg-red-50 px-4 py-3 text-red-700" role="alert">
-                <span class="block sm:inline">{error()}</span>
-              </div>
-            </Show>
-
-            <form onSubmit={(event) => void submit(event)}>
-              <div class="space-y-6">
-                <div>
-                  <label for="name" class="block text-sm font-medium text-gray-700">
-                    {t("org.modal.nameLabel")}
-                  </label>
-                  <div class="mt-1">
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      required
-                      value={name()}
-                      onInput={(event) => setName(event.currentTarget.value)}
-                      placeholder={t("org.modal.namePlaceholder")}
-                      class={LEGACY_INPUT}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label for="description" class="block text-sm font-medium text-gray-700">
-                    {t("org.modal.descriptionLabel")}
-                  </label>
-                  <div class="mt-1">
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={3}
-                      value={description()}
-                      onInput={(event) => setDescription(event.currentTarget.value)}
-                      placeholder={t("org.modal.descriptionPlaceholder")}
-                      class={LEGACY_INPUT}
-                    />
-                  </div>
-                </div>
-
-                <div class="border-t border-gray-200 pt-6">
-                  <div class="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => navigate(-1)}
-                      class="rounded-md border border-gray-300 bg-[#F8FBFF] px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-white"
-                    >
-                      {t("common.cancel")}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting()}
-                      class="ml-3 inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-                    >
-                      {isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
           </div>
+          <Show when={error()}><div class="mb-4"><StageError message={error() ?? ""} /></div></Show>
+          <form onSubmit={(event) => void submit(event)} class="space-y-5">
+            <div>
+              <label for="name" class={LABEL}>{t("org.modal.nameLabel")}</label>
+              <input type="text" id="name" name="name" required value={name()} onInput={(event) => setName(event.currentTarget.value)} placeholder={t("org.modal.namePlaceholder")} class={INPUT} />
+            </div>
+            <div>
+              <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
+              <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
+            </div>
+            <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+              <button type="button" onClick={() => navigate(-1)} class={CANCEL_BUTTON}>{t("common.cancel")}</button>
+              <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
+            </div>
+          </form>
         </div>
       </div>
-    </section>
+    </WorkspaceDetail>
   )
 }
 
@@ -474,69 +263,21 @@ export function OrganizationDetailScreen(): JSX.Element {
           const newProjectHref = () => `/projects/create?organizationId=${encodeURIComponent(params.id)}`
 
           return (
-            <Motion.div
-              class={`min-h-screen p-4 md:p-6 lg:p-8 ${GRADIENT_PAGE}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, easing: EASE }}
+            <WorkspaceDetail
+              title={org().name}
+              subtitle={`${t("org.detail.memberCount", { count: org().members.length })} · ${t("org.detail.projectCount", { count: org().projectCount })} · ${t("org.detail.created", { date: formatDate(org().createdAt) })}`}
+              backHref="/organizations"
+              backLabel={t("common.back")}
+              actions={<>
+                <button type="button" class={TOOLBAR_PRIMARY} onClick={() => navigate(newProjectHref())}><Plus size={16} aria-hidden="true" />{t("org.detail.newProject")}</button>
+                <Show when={canManageMembers()}>
+                  <button type="button" class={TOOLBAR_BUTTON} onClick={() => setShowInviteModal(true)}><UserPlus size={16} aria-hidden="true" />{t("org.detail.inviteMember")}</button>
+                </Show>
+              </>}
             >
-              <div class="mx-auto max-w-7xl">
-                {/* Header Section */}
-                <Motion.div
-                  class="mb-8 rounded-2xl border border-gray-200/50 bg-white/70 p-6 shadow-lg backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/70"
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, easing: EASE }}
-                >
-                  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div class="flex items-center">
-                      <div class="mr-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg">
-                        <Users class="h-8 w-8 text-white" />
-                      </div>
-                      <div>
-                        <h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-3xl font-bold text-transparent">
-                          {org().name}
-                        </h1>
-                        <Show when={(org().description ?? "").length > 0}>
-                          <p class="mt-2 text-gray-600 dark:text-gray-400">{org().description}</p>
-                        </Show>
-                        <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                          <span>{t("org.detail.created", { date: formatDate(org().createdAt) })}</span>
-                          <span>•</span>
-                          <span>{t("org.detail.memberCount", { count: org().members.length })}</span>
-                          <span>•</span>
-                          <span>{t("org.detail.projectCount", { count: org().projectCount })}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                      <Motion.button
-                        type="button"
-                        onClick={() => navigate(newProjectHref())}
-                        hover={{ scale: 1.05, y: -2, boxShadow: HOVER_SHADOW, transition: { duration: 0.2, easing: CARD_EASE } }}
-                        press={{ scale: 0.95 }}
-                        class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2.5 text-white shadow-lg shadow-blue-500/25 transition-all hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <Plus size={18} class="mr-2" />
-                        {t("org.detail.newProject")}
-                      </Motion.button>
-                      <Show when={canManageMembers()}>
-                        <Motion.button
-                          type="button"
-                          onClick={() => setShowInviteModal(true)}
-                          hover={{ scale: 1.05, y: -2, transition: { duration: 0.2, easing: CARD_EASE } }}
-                          press={{ scale: 0.95 }}
-                          class="inline-flex items-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-2.5 text-white shadow-lg shadow-green-500/25 transition-all hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        >
-                          <UserPlus size={18} class="mr-2" />
-                          {t("org.detail.inviteMember")}
-                        </Motion.button>
-                      </Show>
-                    </div>
-                  </div>
-                </Motion.div>
-              </div>
+              <Show when={(org().description ?? "").length > 0}>
+                <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{org().description}</p>
+              </Show>
 
               {/* Tabs */}
               <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -925,7 +666,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                   </div>
                 </Show>
               </Presence>
-            </Motion.div>
+            </WorkspaceDetail>
           )
         }}
       </Show>

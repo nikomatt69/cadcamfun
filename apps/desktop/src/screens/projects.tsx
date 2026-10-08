@@ -1,29 +1,25 @@
 /**
- * Projects screen (spec 06-desktop-ui.md §1: list/create/open/rename/delete, recent).
+ * Projects screen (spec 06-desktop-ui.md §1: list/create/open/rename/delete, recent), in the CAM workspace style
+ * of the toolpaths list: a glass toolbar, a filter rail (search and the recents list) and a grid of project cards.
  *
  * Reads go through `useQuery` (endpoint + params keyed), writes through `useMutation`,
  * and Open records the project in the recents list — which is what the "Recent" panel and
  * the shell's tray menu read.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
-import FolderOpen from "lucide-solid/icons/folder-open"
-import Pencil from "lucide-solid/icons/pencil"
-import Plus from "lucide-solid/icons/plus"
-import Trash2 from "lucide-solid/icons/trash-2"
+import { Edit, FolderKanban, FolderOpen, Plus, Search, Trash2, X } from "lucide-solid"
+import { toast } from "../components/ui/feedback.tsx"
+import {
+  CANCEL_BUTTON, CARD, CardBanner, DANGER_BUTTON, FIELD, ICON_BUTTON, INPUT, LABEL, RAIL_LABEL, StageEmpty, StageError,
+  StageLoading, SUBMIT_BUTTON, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspacePage
+} from "../components/WorkspacePage.tsx"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { invalidatePrefix } from "../state/query-cache.ts"
 import { useMutation, useQuery } from "../app/screen-queries.ts"
 import { formatRecent } from "../state/recents.ts"
-import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  ScreenHeader,
-  Toast,
-  formatDate
-} from "./screen-parts.tsx"
+import { Modal, formatDate } from "../toolpaths/shared.tsx"
 
 const ENDPOINT = "projects"
 
@@ -37,6 +33,7 @@ const describeError = (error: unknown): string | undefined => {
 interface ProjectRow {
   readonly id: string
   readonly name: string
+  readonly description?: string | null
   readonly updatedAt: string
   readonly _count: { readonly drawings: number; readonly components: number }
 }
@@ -44,10 +41,11 @@ interface ProjectRow {
 export function ProjectsScreen(): JSX.Element {
   const app = useApp()
   const navigate = useNavigate()
-  const [editing, setEditing] = createSignal<string | undefined>(undefined)
+  const [createOpen, setCreateOpen] = createSignal(false)
+  const [editing, setEditing] = createSignal<ProjectRow | undefined>(undefined)
   const [name, setName] = createSignal("")
   const [description, setDescription] = createSignal("")
-  const [notice, setNotice] = createSignal<string | undefined>(undefined)
+  const [search, setSearch] = createSignal("")
   const [deleting, setDeleting] = createSignal<ProjectRow | undefined>(undefined)
 
   const runtime = { run: app.runtime.run, cache: app.cache }
@@ -84,35 +82,46 @@ export function ProjectsScreen(): JSX.Element {
   )
 
   const rows = (): ReadonlyArray<ProjectRow> => projects.data() ?? []
+  const filtered = createMemo(() => {
+    const needle = search().trim().toLowerCase()
+    return rows().filter((row) => needle === "" || `${row.name} ${row.description ?? ""}`.toLowerCase().includes(needle))
+  })
+  const busy = (): boolean => create.pending() || rename.pending() || remove.pending()
+  const mutationError = (): string | undefined => {
+    const cause = create.error() || rename.error() || remove.error()
+    return cause ? describeError(cause) : undefined
+  }
   const refresh = (): void => {
     invalidatePrefix(app.cache, ENDPOINT)
     projects.refetch()
   }
 
-  const open = (row: ProjectRow): void => {
+  const open = (row: { readonly id: string; readonly name: string }): void => {
     app.rememberProject(row.id, row.name)
     app.setActivity("cad")
     navigate(`/projects/${row.id}`)
   }
 
+  const openCreate = (): void => { setName(""); setDescription(""); setCreateOpen(true) }
+  const openRename = (row: ProjectRow): void => { setName(row.name); setEditing(row) }
+
   const submitCreate = async (event: Event): Promise<void> => {
     event.preventDefault()
     const created = await create.mutate(name().trim(), description())
     refresh()
-    setName("")
-    setDescription("")
-    setNotice(t("projects.created"))
+    setCreateOpen(false)
+    toast.success(t("projects.created"))
     app.rememberProject(created.id, created.name)
   }
 
   const submitRename = async (event: Event): Promise<void> => {
     event.preventDefault()
-    const id = editing()
-    if (id === undefined) return
-    await rename.mutate(id, name().trim())
+    const row = editing()
+    if (row === undefined) return
+    await rename.mutate(row.id, name().trim())
     refresh()
     setEditing(undefined)
-    setNotice(t("projects.renamed"))
+    toast.success(t("projects.renamed"))
   }
 
   const confirmDelete = async (): Promise<void> => {
@@ -122,185 +131,122 @@ export function ProjectsScreen(): JSX.Element {
     refresh()
     app.forgetProject(row.id)
     setDeleting(undefined)
-    setNotice(t("projects.deleted"))
+    toast.success(t("projects.deleted"))
   }
 
-  return (
-    <div>
-      <ScreenHeader
-        title={t("projects.title")}
-        subtitle={t("projects.subtitle")}
-        actions={
-          <button type="button" class="btn btn-primary" onClick={() => { setEditing(undefined); setName("") }}>
-            <Plus size={16} aria-hidden="true" />
-            {t("projects.create")}
-          </button>
-        }
-      />
+  const swallow = (): undefined => undefined
 
-      <div class="grid gap-6 p-6 lg:grid-cols-[2fr_1fr]">
-        <section aria-label={t("projects.title")}>
-          <Show when={projects.state()._tag === "loading"}>
-            <LoadingState label={t("projects.loading")} />
-          </Show>
-          <Show when={projects.state()._tag === "error"}>
-            <ErrorState label={t("projects.error")} detail={describeError(projects.error())} onRetry={refresh} />
-          </Show>
-          <Show when={projects.state()._tag === "success"}>
-            <Show when={rows().length > 0} fallback={<EmptyState label={t("projects.empty")} />}>
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th scope="col">{t("projects.column.name")}</th>
-                    <th scope="col">{t("projects.column.updated")}</th>
-                    <th scope="col">{t("projects.column.drawings")}</th>
-                    <th scope="col">{t("projects.column.components")}</th>
-                    <th scope="col"><span class="sr-only">{t("projects.open")}</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(row) => (
-                      <tr>
-                        <th scope="row" class="font-medium">{row.name}</th>
-                        <td>{formatDate(row.updatedAt)}</td>
-                        <td>{row._count.drawings}</td>
-                        <td>{row._count.components}</td>
-                        <td>
-                          <div class="flex justify-end gap-1">
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-outline-primary"
-                              aria-label={`${t("projects.open")}: ${row.name}`}
-                              onClick={() => open(row)}
-                            >
-                              <FolderOpen size={14} aria-hidden="true" />
-                              {t("projects.open")}
-                            </button>
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-outline"
-                              aria-label={`${t("projects.rename")}: ${row.name}`}
-                              onClick={() => {
-                                setEditing(row.id)
-                                setName(row.name)
-                              }}
-                            >
-                              <Pencil size={14} aria-hidden="true" />
-                            </button>
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-danger"
-                              aria-label={`${t("projects.delete")}: ${row.name}`}
-                              onClick={() => setDeleting(row)}
-                            >
-                              <Trash2 size={14} aria-hidden="true" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </Show>
+  return (
+    <WorkspacePage
+      title={t("projects.title")}
+      overlays={<>
+      <Modal open={createOpen()} title={t("projects.createTitle")} onClose={() => setCreateOpen(false)}>
+        <form class="space-y-4" onSubmit={(event) => void submitCreate(event).catch(swallow)}>
+          <div>
+            <label class={LABEL} for="project-name">{t("projects.nameLabel")}</label>
+            <input id="project-name" class={INPUT} type="text" required placeholder={t("projects.namePlaceholder")} value={name()} onInput={(event) => setName(event.currentTarget.value)} />
+          </div>
+          <div>
+            <label class={LABEL} for="project-description">{t("projects.descriptionLabel")}</label>
+            <textarea id="project-description" class={INPUT} rows={3} placeholder={t("projects.descriptionPlaceholder")} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} />
+          </div>
+          <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button type="button" class={CANCEL_BUTTON} onClick={() => setCreateOpen(false)}>{t("projects.cancel")}</button>
+            <button type="submit" class={SUBMIT_BUTTON} disabled={create.pending() || !name().trim()}>{t("projects.create")}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={editing() !== undefined} title={t("projects.renameTitle")} onClose={() => setEditing(undefined)}>
+        <form class="space-y-4" onSubmit={(event) => void submitRename(event).catch(swallow)}>
+          <div>
+            <label class={LABEL} for="project-rename">{t("projects.nameLabel")}</label>
+            <input id="project-rename" class={INPUT} type="text" required value={name()} onInput={(event) => setName(event.currentTarget.value)} />
+          </div>
+          <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button type="button" class={CANCEL_BUTTON} onClick={() => setEditing(undefined)}>{t("projects.cancel")}</button>
+            <button type="submit" class={SUBMIT_BUTTON} disabled={rename.pending() || !name().trim()}>{t("projects.save")}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={deleting() !== undefined} title={t("projects.delete")} onClose={() => setDeleting(undefined)}>
+        <p class="text-sm text-gray-700 dark:text-gray-300">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
+          <button type="button" class={DANGER_BUTTON} disabled={remove.pending()} onClick={() => void confirmDelete().catch(swallow)}>{t("common.delete")}</button>
+        </div>
+      </Modal>
+      </>}
+      actions={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}><Plus size={16} aria-hidden="true" />{t("projects.create")}</button>}
+      rail={<>
+        <label class="block">
+          <span class={RAIL_LABEL}>Search</span>
+          <div class="relative">
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search projects..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+          </div>
+        </label>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}>
+          <X size={14} aria-hidden="true" />Clear Filters
+        </button>
+        <section aria-labelledby="recent-heading">
+          <h2 id="recent-heading" class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("projects.recent")}</h2>
+          <Show when={app.recents().length > 0} fallback={<p class="text-sm text-gray-500 dark:text-gray-400">{t("projects.recentEmpty")}</p>}>
+            <ul class="flex flex-col gap-1">
+              <For each={app.recents()}>{(recent) => (
+                <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm hover:bg-white/60 dark:hover:bg-gray-700/60">
+                  <button type="button" class="truncate text-left text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-200" onClick={() => open(recent)}>{recent.name}</button>
+                  <span class="shrink-0 text-xs text-gray-500">{formatRecent(recent.openedAt)}</span>
+                </li>
+              )}</For>
+            </ul>
           </Show>
         </section>
-
-        <aside class="flex flex-col gap-4">
-          <section aria-labelledby="recent-heading">
-            <h2 id="recent-heading" class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-              {t("projects.recent")}
-            </h2>
-            <Show when={app.recents().length > 0} fallback={<EmptyState label={t("projects.recentEmpty")} />}>
-              <ul class="flex flex-col gap-1">
-                <For each={app.recents()}>
-                  {(recent) => (
-                    <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
-                      <button
-                        type="button"
-                        class="truncate text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                        onClick={() => {
-                          app.rememberProject(recent.id, recent.name)
-                          app.setActivity("cad")
-                           navigate(`/projects/${recent.id}`)
-                        }}
-                      >
-                        {recent.name}
-                      </button>
-                      <span class="shrink-0 text-xs text-gray-500">{formatRecent(recent.openedAt)}</span>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </Show>
-          </section>
-
-          <Show when={editing() === undefined}>
-             <form class="card p-4" onSubmit={(event) => void submitCreate(event).catch(() => undefined)}>
-              <h2 class="mb-2 text-sm font-semibold">{t("projects.createTitle")}</h2>
-              <label class="form-label" for="project-name">{t("projects.nameLabel")}</label>
-              <input
-                id="project-name"
-                class="form-input mb-3"
-                type="text"
-                required
-                placeholder={t("projects.namePlaceholder")}
-                value={name()}
-                onInput={(event) => setName(event.currentTarget.value)}
-              />
-              <label class="form-label" for="project-description">{t("projects.descriptionLabel")}</label>
-              <textarea
-                id="project-description"
-                class="form-textarea"
-                rows={2}
-                placeholder={t("projects.descriptionPlaceholder")}
-                value={description()}
-                onInput={(event) => setDescription(event.currentTarget.value)}
-              />
-               <button type="submit" disabled={create.pending() || !name().trim()} class="btn btn-primary mt-3">{t("projects.create")}</button>
-            </form>
-          </Show>
-
-          <Show when={editing() !== undefined}>
-             <form class="card p-4" onSubmit={(event) => void submitRename(event).catch(() => undefined)}>
-              <h2 class="mb-2 text-sm font-semibold">{t("projects.renameTitle")}</h2>
-              <label class="form-label" for="project-rename">{t("projects.nameLabel")}</label>
-              <input
-                id="project-rename"
-                class="form-input"
-                type="text"
-                required
-                value={name()}
-                onInput={(event) => setName(event.currentTarget.value)}
-              />
-              <div class="mt-3 flex gap-2">
-                 <button type="submit" disabled={rename.pending() || !name().trim()} class="btn btn-primary">{t("projects.save")}</button>
-                <button type="button" class="btn btn-outline" onClick={() => setEditing(undefined)}>
-                  {t("projects.cancel")}
-                </button>
+        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {rows().length} projects</p>
+      </>}
+    >
+      <Show when={mutationError()}>{(message) => <div class="mb-4"><StageError message={message()} /></div>}</Show>
+      <Show when={projects.state()._tag === "loading"}><StageLoading label={t("projects.loading")} /></Show>
+      <Show when={projects.state()._tag === "error"}><StageError message={`${t("projects.error")}${describeError(projects.error()) ? `: ${describeError(projects.error())}` : ""}`} onRetry={refresh} /></Show>
+      <Show when={projects.state()._tag === "success"}>
+        <Show
+          when={filtered().length > 0}
+          fallback={
+            <StageEmpty icon={<FolderKanban size={24} aria-hidden="true" />} title="No projects found" hint={search() !== "" ? "No projects match your search criteria." : t("projects.empty")}>
+              <Show when={search() !== ""} fallback={<button type="button" class={TOOLBAR_PRIMARY} onClick={openCreate}>{t("projects.create")}</button>}>
+                <button type="button" class={TOOLBAR_BUTTON} onClick={() => setSearch("")}>Clear filters</button>
+              </Show>
+            </StageEmpty>
+          }
+        >
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <For each={filtered()}>{(row) => (
+              <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(row)} onKeyDown={(event) => { if (event.key === "Enter") open(row) }}>
+                <CardBanner icon={<FolderKanban size={28} aria-hidden="true" />} badge="Project" />
+                <div class="flex flex-1 flex-col gap-2 p-4">
+                  <h3 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
+                  <Show when={row.description}><p class="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{row.description}</p></Show>
+                  <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div class="flex justify-between"><span>{t("projects.column.drawings")}:</span><span class="rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">{row._count.drawings}</span></div>
+                    <div class="flex justify-between"><span>{t("projects.column.components")}:</span><span class="rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">{row._count.components}</span></div>
+                    <div class="flex justify-between"><span>ID:</span><code class="font-mono text-[#007ACC] dark:text-blue-400">{row.id.substring(0, 8)}...</code></div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
+                  <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
+                    <button type="button" class={ICON_BUTTON} title={t("projects.open")} aria-label={`${t("projects.open")}: ${row.name}`} onClick={() => open(row)}><FolderOpen size={16} aria-hidden="true" /></button>
+                    <button type="button" class={ICON_BUTTON} title={t("projects.rename")} aria-label={`${t("projects.rename")}: ${row.name}`} onClick={() => openRename(row)}><Edit size={16} aria-hidden="true" /></button>
+                    <button type="button" class={ICON_BUTTON} title={t("projects.delete")} aria-label={`${t("projects.delete")}: ${row.name}`} disabled={busy()} onClick={() => setDeleting(row)}><Trash2 size={16} aria-hidden="true" /></button>
+                  </div>
+                </div>
               </div>
-            </form>
-          </Show>
+            )}</For>
+          </div>
+        </Show>
+      </Show>
 
-          <Show when={deleting() !== undefined}>
-            <div class="card p-4" role="alertdialog" aria-label={t("projects.delete")}>
-              <p class="mb-3 text-sm">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
-              <div class="flex gap-2">
-                 <button type="button" disabled={remove.pending()} class="btn btn-danger" onClick={() => void confirmDelete().catch(() => undefined)}>
-                  {t("common.delete")}
-                </button>
-                <button type="button" class="btn btn-outline" onClick={() => setDeleting(undefined)}>
-                  {t("common.cancel")}
-                </button>
-              </div>
-            </div>
-          </Show>
-
-           <Show when={create.error() || rename.error() || remove.error()}><ErrorState label={String(create.error() || rename.error() || remove.error())} /></Show>
-           <Toast message={notice()} />
-        </aside>
-      </div>
-    </div>
+    </WorkspacePage>
   )
 }

@@ -1,5 +1,5 @@
 /**
- * Detail pages of the Resources list (`/library`): materials, tools, machines and components, each opened from
+ * Detail pages of the Resources lists (`/materials`, `/tools`, `/machine`, `/components`): materials, tools, machines and components, each opened from
  * its card. Legacy `pages/{materials,tools,machine,components}/[id].tsx`, in the CAM workspace style used by the
  * toolpaths detail: a glass toolbar with back and the page actions, a tab rail, a details panel with an edit form
  * (save / cancel), delete with confirmation, and a side information panel.
@@ -29,10 +29,10 @@ const TAB_ON = "border-[#007ACC] text-[#007ACC] dark:text-blue-400"
 const TAB_OFF = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
 
 const CONFIG: Readonly<Record<Kind, { readonly title: string; readonly listPath: string; readonly icon: typeof Package; readonly plural: string }>> = {
-  materials: { title: "Material", listPath: "/library", icon: Layers, plural: "materials" },
-  tools: { title: "Tool", listPath: "/library", icon: Wrench, plural: "tools" },
-  machines: { title: "Machine", listPath: "/library", icon: Cpu, plural: "machines" },
-  components: { title: "Component", listPath: "/library", icon: Box, plural: "components" }
+  materials: { title: "Material", listPath: "/materials", icon: Layers, plural: "materials" },
+  tools: { title: "Tool", listPath: "/tools", icon: Wrench, plural: "tools" },
+  machines: { title: "Machine", listPath: "/machine", icon: Cpu, plural: "machines" },
+  components: { title: "Component", listPath: "/components", icon: Box, plural: "components" }
 }
 
 const str = (value: unknown): string => (value === null || value === undefined ? "" : String(value))

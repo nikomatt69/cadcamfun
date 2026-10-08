@@ -1,46 +1,25 @@
 /**
- * Marketplace — visual parity with .reference/src/pages/marketplace/*.
+ * Marketplace, in the CAM workspace style shared with the toolpaths and resources pages.
  *
- * Five views share this component: browse, item, purchases, seller, success.
- * Apple design principles throughout:
- * - Hero: translucent gradient + floating orbs, optical typography on the title
- * - Category pills: pointer-down feedback (Motion.press)
- * - Item grid: holographic cards with press/hover lift
- * - Reduced-motion fallback: opacity-only transitions
+ * Five views share this component: browse (filter rail + card grid or table), item, purchases, seller, success.
+ * The data is the local sample catalogue; the listing/purchase endpoints are not part of the v6 contract yet.
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { A } from "@solidjs/router"
-import { Motion } from "solid-motionone"
+import { A, useNavigate } from "@solidjs/router"
+import { Download as DownloadIcon, Grid3x3, List, Package, Plus, Receipt, Search, Star, Store, X } from "lucide-solid"
 import {
-  Search,
-  Filter,
-  Grid3X3,
-  List,
-  Plus,
-  TrendingUp,
-  Users,
-  Award,
-  ArrowLeft,
-  Download as DownloadIcon,
-  Star,
-  Package
-} from "lucide-solid"
-import { Card, InteractiveCard } from "../components/ui/card.tsx"
-import { Button, IconButton } from "../components/ui/button.tsx"
-import { AnimatedSection, FloatingOrbs, StaggerGroup } from "../components/ui/animated-section.tsx"
-import { Badge, IconChip } from "../components/ui/badge.tsx"
-import { Field, TextInput, Select } from "../components/ui/field.tsx"
-import { Skeleton } from "../components/ui/feedback.tsx"
+  CARD, CardBanner, FIELD, PANEL, RAIL_LABEL, StageEmpty, TOOLBAR_BUTTON, TOOLBAR_PRIMARY, WorkspaceDetail, WorkspacePage
+} from "../components/WorkspacePage.tsx"
 import { t } from "../i18n/index.ts"
 
-interface Category { readonly id: string; readonly icon: string; readonly label: string }
+interface Category { readonly id: string; readonly label: string }
 
 const categories = (): ReadonlyArray<Category> => [
-  { id: "components", icon: "🔧", label: t("marketplace.category.components") },
-  { id: "drawings", icon: "📐", label: t("marketplace.category.drawings") },
-  { id: "assemblies", icon: "⚙️", label: t("marketplace.category.assemblies") },
-  { id: "gcode", icon: "🤖", label: t("marketplace.category.gcode") },
-  { id: "toolpaths", icon: "🛠️", label: t("marketplace.category.toolpaths") }
+  { id: "components", label: t("marketplace.category.components") },
+  { id: "drawings", label: t("marketplace.category.drawings") },
+  { id: "assemblies", label: t("marketplace.category.assemblies") },
+  { id: "gcode", label: t("marketplace.category.gcode") },
+  { id: "toolpaths", label: t("marketplace.category.toolpaths") }
 ]
 
 interface SortOption { readonly id: string; readonly label: string }
@@ -61,16 +40,15 @@ interface ItemCardData {
   readonly downloads: number
   readonly category: string
   readonly emoji: string
-  readonly gradient: string
 }
 
 const sampleItems = (): ReadonlyArray<ItemCardData> => [
-  { id: "m1", title: "Hex Socket Cap Head M5", author: "StudioForge", price: 4.5, rating: 4.7, downloads: 1284, category: "components", emoji: "🔩", gradient: "ui-item-blue" },
-  { id: "m2", title: "Pneumatic Cylinder 50mm", author: "Mechanica", price: 28.0, rating: 4.9, downloads: 392, category: "components", emoji: "🛢️", gradient: "ui-item-green" },
-  { id: "m3", title: "Gear Set 24T/48T", author: "GearWorks", price: 12.0, rating: 4.5, downloads: 870, category: "assemblies", emoji: "⚙️", gradient: "ui-item-orange" },
-  { id: "m4", title: "Aluminium Bracket 6061", author: "AlcoLab", price: 6.5, rating: 4.8, downloads: 1620, category: "components", emoji: "📐", gradient: "ui-item-purple" },
-  { id: "m5", title: "CNC Pocket Toolpath — Demo", author: "ToolpathPro", price: 9.9, rating: 4.6, downloads: 421, category: "toolpaths", emoji: "🛠️", gradient: "ui-item-cyan" },
-  { id: "m6", title: "GRBL Post-Processor Pack", author: "PostLab", price: 0, rating: 4.4, downloads: 3081, category: "gcode", emoji: "🤖", gradient: "ui-item-red" }
+  { id: "m1", title: "Hex Socket Cap Head M5", author: "StudioForge", price: 4.5, rating: 4.7, downloads: 1284, category: "components", emoji: "🔩" },
+  { id: "m2", title: "Pneumatic Cylinder 50mm", author: "Mechanica", price: 28.0, rating: 4.9, downloads: 392, category: "components", emoji: "🛢️" },
+  { id: "m3", title: "Gear Set 24T/48T", author: "GearWorks", price: 12.0, rating: 4.5, downloads: 870, category: "assemblies", emoji: "⚙️" },
+  { id: "m4", title: "Aluminium Bracket 6061", author: "AlcoLab", price: 6.5, rating: 4.8, downloads: 1620, category: "components", emoji: "📐" },
+  { id: "m5", title: "CNC Pocket Toolpath — Demo", author: "ToolpathPro", price: 9.9, rating: 4.6, downloads: 421, category: "toolpaths", emoji: "🛠️" },
+  { id: "m6", title: "GRBL Post-Processor Pack", author: "PostLab", price: 0, rating: 4.4, downloads: 3081, category: "gcode", emoji: "🤖" }
 ]
 
 interface PurchaseRecord {
@@ -98,336 +76,174 @@ const sellerMetrics = (): ReadonlyArray<SellerMetric> => [
   { id: "rating", label: "Average rating", value: "4.7", change: "+0.1" }
 ]
 
+const priceLabel = (price: number): string => (price === 0 ? "Free" : `€${price.toFixed(2)}`)
+const PILL = "rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+const STATUS_PILL: Readonly<Record<PurchaseRecord["status"], string>> = {
+  completed: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  refunded: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+}
+
 export function MarketplaceScreen(props: {
   readonly view?: "browse" | "item" | "purchases" | "seller" | "success"
   readonly id?: string
 }): JSX.Element {
   const view = () => props.view ?? "browse"
   return (
-    <div class="marketplace-page">
-      <Show when={view() === "browse"}>
-        <MarketplaceBrowse id={props.id} />
-      </Show>
-      <Show when={view() === "item"}>
-        <MarketplaceItem id={props.id} />
-      </Show>
-      <Show when={view() === "purchases"}>
-        <MarketplacePurchases />
-      </Show>
-      <Show when={view() === "seller"}>
-        <MarketplaceSeller />
-      </Show>
-      <Show when={view() === "success"}>
-        <MarketplaceSuccess />
-      </Show>
-    </div>
-  )
-}
-
-/** ----- Browse: hero + categories + grid ----- */
-function MarketplaceBrowse(props: { readonly id: string | undefined }): JSX.Element {
-  void props.id
-  const [search, setSearch] = createSignal("")
-  const [category, setCategory] = createSignal<string | undefined>(undefined)
-  const [sort, setSort] = createSignal("newest")
-  const [view, setView] = createSignal<"grid" | "list">("grid")
-  const items = createMemo(() => {
-    let list = [...sampleItems()]
-    const c = category()
-    if (c !== undefined) list = list.filter((i) => i.category === c)
-    const q = search().toLowerCase().trim()
-    if (q !== "") list = list.filter((i) => i.title.toLowerCase().includes(q))
-    return list
-  })
-  return (
     <>
-      <MarketplaceHero search={search} setSearch={setSearch} />
-      <CategoryRow current={category()} onChange={setCategory} />
-      <AnimatedSection delay={0.05} class="marketplace-toolbar">
-        <div class="marketplace-toolbar-row">
-          <IconChip tone="blue"><Filter size={16} /></IconChip>
-          <Select
-            value={sort()}
-            onChange={(event) => setSort(event.currentTarget.value)}
-            class="marketplace-sort"
-          >
-            <For each={sortOptions()}>{(opt) => <option value={opt.id}>{opt.label}</option>}</For>
-          </Select>
-          <span class="marketplace-toolbar-count">{items().length} {t("marketplace.hero.stats.items").toLowerCase()}</span>
-          <div class="marketplace-view-toggle" role="tablist" aria-label="View">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view() === "grid"}
-              classList={{ "marketplace-view-active": view() === "grid" }}
-              onClick={() => setView("grid")}
-            >
-              <Grid3X3 size={16} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view() === "list"}
-              classList={{ "marketplace-view-active": view() === "list" }}
-              onClick={() => setView("list")}
-            >
-              <List size={16} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      </AnimatedSection>
-      <AnimatedSection delay={0.1} class="marketplace-section">
-        <Show when={view() === "grid"}>
-          <StaggerGroup class="marketplace-grid" delayStep={0.05}>
-            <For each={items()}>{(item) => <ItemCard item={item} />}</For>
-          </StaggerGroup>
-        </Show>
-        <Show when={view() === "list"}>
-          <div class="marketplace-list">
-            <For each={items()}>{(item) => <ItemListRow item={item} />}</For>
-          </div>
-        </Show>
-      </AnimatedSection>
+      <Show when={view() === "browse"}><MarketplaceBrowse /></Show>
+      <Show when={view() === "item"}><MarketplaceItem id={props.id} /></Show>
+      <Show when={view() === "purchases"}><MarketplacePurchases /></Show>
+      <Show when={view() === "seller"}><MarketplaceSeller /></Show>
+      <Show when={view() === "success"}><MarketplaceSuccess /></Show>
     </>
   )
 }
 
-/** ----- Hero ----- */
-function MarketplaceHero(props: {
-  readonly search: () => string
-  readonly setSearch: (next: string) => void
-}): JSX.Element {
-  return (
-    <section class="marketplace-hero">
-      <FloatingOrbs count={4} />
-      <div class="marketplace-hero-bg" aria-hidden="true" />
-      <div class="marketplace-hero-content">
-        <Motion.span
-          class="marketplace-hero-eyebrow"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          ✦ {t("marketplace.hero.eyebrow")}
-        </Motion.span>
-        <Motion.h1
-          class="ui-display marketplace-hero-title"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, easing: [0.22, 1, 0.36, 1] }}
-        >
-          {t("marketplace.hero.title")}
-        </Motion.h1>
-        <Motion.p
-          class="marketplace-hero-subtitle"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.18, easing: [0.22, 1, 0.36, 1] }}
-        >
-          {t("marketplace.hero.subtitle")}
-        </Motion.p>
-        <Motion.div
-          class="marketplace-hero-stats"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.26, easing: [0.22, 1, 0.36, 1] }}
-        >
-          <StatPill icon={TrendingUp} text={t("marketplace.hero.stats.items")} />
-          <StatPill icon={Users} text={t("marketplace.hero.stats.designers")} />
-          <StatPill icon={Award} text={t("marketplace.hero.stats.quality")} />
-        </Motion.div>
-        <Motion.form
-          class="marketplace-hero-search"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.34, easing: [0.22, 1, 0.36, 1] }}
-          onSubmit={(event) => event.preventDefault()}
-        >
-          <Search size={20} class="marketplace-hero-search-icon" aria-hidden="true" />
-          <input
-            type="search"
-            value={props.search()}
-            onInput={(event) => props.setSearch(event.currentTarget.value)}
-            placeholder={t("marketplace.hero.searchPlaceholder")}
-            aria-label={t("marketplace.hero.searchPlaceholder")}
-            class="marketplace-hero-search-input"
-          />
-        </Motion.form>
-        <Motion.div
-          class="marketplace-hero-actions"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.42, easing: [0.22, 1, 0.36, 1] }}
-        >
-          <Button variant="primary" size="lg">
-            <Plus size={18} aria-hidden="true" />
-            {t("marketplace.hero.sell")}
-          </Button>
-        </Motion.div>
-      </div>
-    </section>
-  )
-}
+const BACK = { backHref: "/marketplace", get backLabel() { return t("marketplace.hero.title") } } as const
 
-function StatPill(props: { readonly icon: typeof TrendingUp; readonly text: string }): JSX.Element {
-  return (
-    <span class="marketplace-stat-pill">
-      <props.icon size={14} aria-hidden="true" />
-      <span>{props.text}</span>
-    </span>
-  )
-}
+/** ----- Browse: filter rail + card grid / table ----- */
+function MarketplaceBrowse(): JSX.Element {
+  const navigate = useNavigate()
+  const [search, setSearch] = createSignal("")
+  const [category, setCategory] = createSignal("")
+  const [sort, setSort] = createSignal("newest")
+  const [view, setView] = createSignal<"grid" | "list">("grid")
+  const items = createMemo(() => {
+    const needle = search().toLowerCase().trim()
+    const list = sampleItems()
+      .filter((item) => category() === "" || item.category === category())
+      .filter((item) => needle === "" || `${item.title} ${item.author}`.toLowerCase().includes(needle))
+    const by: Readonly<Record<string, (a: ItemCardData, b: ItemCardData) => number>> = {
+      priceLow: (a, b) => a.price - b.price,
+      priceHigh: (a, b) => b.price - a.price,
+      rating: (a, b) => b.rating - a.rating,
+      downloads: (a, b) => b.downloads - a.downloads
+    }
+    const compare = by[sort()]
+    return compare === undefined ? [...list] : [...list].sort(compare)
+  })
+  const hasFilters = () => search() !== "" || category() !== ""
+  const clearFilters = () => { setSearch(""); setCategory("") }
+  const open = (item: ItemCardData): void => navigate(`/marketplace/items/${item.id}`)
 
-/** ----- Categories ----- */
-function CategoryRow(props: { readonly current: string | undefined; readonly onChange: (next: string | undefined) => void }): JSX.Element {
   return (
-    <section class="marketplace-categories">
-      <div class="marketplace-category-row">
-        <CategoryTile
-          active={props.current === undefined}
-          onClick={() => props.onChange(undefined)}
-          icon="🌟"
-          label={t("marketplace.category.all")}
-        />
-        <For each={categories()}>{(category) => (
-          <CategoryTile
-            active={props.current === category.id}
-            onClick={() => props.onChange(category.id)}
-            icon={category.icon}
-            label={category.label}
-          />
-        )}</For>
-      </div>
-    </section>
-  )
-}
-
-function CategoryTile(props: { readonly active: boolean; readonly onClick: () => void; readonly icon: string; readonly label: string }): JSX.Element {
-  return (
-    <Motion.button
-      type="button"
-      class="marketplace-category"
-      classList={{ "marketplace-category-active": props.active }}
-      onClick={props.onClick}
-      press={{ scale: 0.97 }}
-      hover={{ scale: 1.02 }}
-      transition={{ duration: 0.2, easing: [0.22, 1, 0.36, 1] }}
-    >
-      <span class="marketplace-category-icon" aria-hidden="true">{props.icon}</span>
-      <span class="marketplace-category-label">{props.label}</span>
-    </Motion.button>
-  )
-}
-
-/** ----- Item grid ----- */
-function ItemCard(props: { readonly item: ItemCardData }): JSX.Element {
-  const i = props.item
-  return (
-    <InteractiveCard
-      href={`/marketplace/items/${i.id}`}
-      variant="default"
-      class={["marketplace-item-card", i.gradient].join(" ")}
-    >
-      <div class="marketplace-item-thumb" aria-hidden="true">
-        <span class="marketplace-item-emoji">{i.emoji}</span>
-      </div>
-      <div class="marketplace-item-body">
-        <Badge tone="info">{i.category}</Badge>
-        <h3 class="ui-title marketplace-item-title">{i.title}</h3>
-        <p class="ui-caption marketplace-item-author">{t("marketplace.item.by")} {i.author}</p>
-        <div class="marketplace-item-meta">
-          <span class="marketplace-item-rating">
-            <Star size={14} aria-hidden="true" />
-            {i.rating}
-          </span>
-          <span class="marketplace-item-downloads">
-            <DownloadIcon size={14} aria-hidden="true" />
-            {i.downloads}
-          </span>
+    <WorkspacePage
+      title={t("marketplace.hero.title")}
+      actions={<>
+        <A href="/marketplace/purchases" class={TOOLBAR_BUTTON}><Receipt size={16} aria-hidden="true" />{t("marketplace.purchases.title")}</A>
+        <A href="/marketplace/seller/dashboard" class={TOOLBAR_BUTTON}><Store size={16} aria-hidden="true" />{t("marketplace.seller.title")}</A>
+        <button type="button" class={TOOLBAR_PRIMARY}><Plus size={16} aria-hidden="true" />{t("marketplace.hero.sell")}</button>
+      </>}
+      rail={<>
+        <label class="block">
+          <span class={RAIL_LABEL}>Search</span>
+          <div class="relative">
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("marketplace.hero.searchPlaceholder")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
+          </div>
+        </label>
+        <label class="block">
+          <span class={RAIL_LABEL}>Category</span>
+          <select name="category" class={FIELD} value={category()} onChange={(event) => setCategory(event.currentTarget.value)}>
+            <option value="">{t("marketplace.category.all")}</option>
+            <For each={categories()}>{(entry) => <option value={entry.id}>{entry.label}</option>}</For>
+          </select>
+        </label>
+        <label class="block">
+          <span class={RAIL_LABEL}>Sort</span>
+          <select name="sort" class={FIELD} value={sort()} onChange={(event) => setSort(event.currentTarget.value)}>
+            <For each={sortOptions()}>{(option) => <option value={option.id}>{option.label}</option>}</For>
+          </select>
+        </label>
+        <div class="flex items-center justify-between pt-1">
+          <button type="button" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
+          <div class="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600" role="group" aria-label="View">
+            <button type="button" class={`p-1.5 ${view() === "grid" ? "bg-blue-50 text-[#007ACC] dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-400"}`} title="Grid View" aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
+            <button type="button" class={`p-1.5 ${view() === "list" ? "bg-blue-50 text-[#007ACC] dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-400"}`} title="List View" aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
+          </div>
         </div>
-      </div>
-      <div class="marketplace-item-footer">
-        <span class="marketplace-item-price">{i.price === 0 ? "Free" : `€${i.price.toFixed(2)}`}</span>
-        <Button variant="primary" size="sm">
-          <A href={`/marketplace/items/${i.id}`}>{t("marketplace.item.buy")}</A>
-        </Button>
-      </div>
-    </InteractiveCard>
-  )
-}
-
-function ItemListRow(props: { readonly item: ItemCardData }): JSX.Element {
-  const i = props.item
-  return (
-    <InteractiveCard
-      href={`/marketplace/items/${i.id}`}
-      variant="default"
-      class="marketplace-item-row"
+        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{items().length} of {sampleItems().length} {t("marketplace.hero.stats.items").toLowerCase()}</p>
+      </>}
     >
-      <div class={["marketplace-item-thumb marketplace-item-thumb-sm", i.gradient].join(" ")} aria-hidden="true">
-        <span class="marketplace-item-emoji">{i.emoji}</span>
-      </div>
-      <div class="marketplace-item-body">
-        <h3 class="ui-title marketplace-item-title">{i.title}</h3>
-        <p class="ui-caption marketplace-item-author">{t("marketplace.item.by")} {i.author}</p>
-        <div class="marketplace-item-meta">
-          <span class="marketplace-item-rating">
-            <Star size={14} aria-hidden="true" />
-            {i.rating}
-          </span>
-          <span class="marketplace-item-downloads">
-            <DownloadIcon size={14} aria-hidden="true" />
-            {i.downloads}
-          </span>
-        </div>
-      </div>
-      <div class="marketplace-item-footer">
-        <span class="marketplace-item-price">{i.price === 0 ? "Free" : `€${i.price.toFixed(2)}`}</span>
-        <Button variant="primary" size="sm">
-          <A href={`/marketplace/items/${i.id}`}>{t("marketplace.item.buy")}</A>
-        </Button>
-      </div>
-    </InteractiveCard>
+      <Show
+        when={items().length > 0}
+        fallback={<StageEmpty icon={<Package size={24} aria-hidden="true" />} title="No items found" hint="No items match your search criteria."><button type="button" class={TOOLBAR_BUTTON} onClick={clearFilters}>Clear filters</button></StageEmpty>}
+      >
+        <Show
+          when={view() === "grid"}
+          fallback={
+            <div class="overflow-hidden rounded-xl border border-gray-200/60 bg-white/70 shadow-lg dark:border-gray-700/50 dark:bg-gray-800/70">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <For each={["Name", "Category", "Author", "Rating", "Downloads", "Price"]}>{(label) => <th scope="col" class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</th>}</For>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                  <For each={items()}>{(item) => (
+                    <tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50" onClick={() => open(item)}>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white"><span class="mr-2" aria-hidden="true">{item.emoji}</span>{item.title}</td>
+                      <td class="whitespace-nowrap px-4 py-3"><span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{item.category}</span></td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.author}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.rating}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.downloads}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{priceLabel(item.price)}</td>
+                    </tr>
+                  )}</For>
+                </tbody>
+              </table>
+            </div>
+          }
+        >
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <For each={items()}>{(item) => (
+              <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(item)} onKeyDown={(event) => { if (event.key === "Enter") open(item) }}>
+                <CardBanner icon={<span class="text-2xl leading-7" aria-hidden="true">{item.emoji}</span>} badge={item.category} />
+                <div class="flex flex-1 flex-col gap-2 p-4">
+                  <h3 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{item.title}</h3>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">{t("marketplace.item.by")} {item.author}</p>
+                  <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div class="flex justify-between"><span>{t("marketplace.item.rating")}:</span><span class={`inline-flex items-center gap-1 ${PILL}`}><Star size={12} aria-hidden="true" />{item.rating}</span></div>
+                    <div class="flex justify-between"><span>{t("marketplace.item.downloads")}:</span><span class={`inline-flex items-center gap-1 ${PILL}`}><DownloadIcon size={12} aria-hidden="true" />{item.downloads}</span></div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30">
+                  <span class="text-sm font-semibold text-gray-900 dark:text-white">{priceLabel(item.price)}</span>
+                  <A href={`/marketplace/items/${item.id}`} class={TOOLBAR_PRIMARY} onClick={(event) => event.stopPropagation()}>{t("marketplace.item.buy")}</A>
+                </div>
+              </div>
+            )}</For>
+          </div>
+        </Show>
+      </Show>
+    </WorkspacePage>
   )
 }
 
 /** ----- Item detail ----- */
 function MarketplaceItem(props: { readonly id: string | undefined }): JSX.Element {
   const item = () => sampleItems().find((i) => i.id === props.id) ?? sampleItems()[0]
-  if (item() === undefined) return <NotFoundMarketplace />
-  const i = item() as ItemCardData
   return (
-    <div class="marketplace-page marketpace-item-page">
-      <AnimatedSection>
-        <A class="marketplace-back-link" href="/marketplace">
-          <ArrowLeft size={16} aria-hidden="true" />
-          {t("marketplace.hero.title")}
-        </A>
-      </AnimatedSection>
-      <div class="marketplace-item-detail">
-        <Motion.div
-          class={["marketplace-item-hero", i.gradient].join(" ")}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, easing: [0.22, 1, 0.36, 1] }}
-        >
-          <span class="marketplace-item-emoji marketplace-item-emoji-lg">{i.emoji}</span>
-        </Motion.div>
-        <Card variant="default" class="marketplace-item-info">
-          <Badge tone="info">{i.category}</Badge>
-          <h1 class="ui-headline marketplace-item-title-lg">{i.title}</h1>
-          <p class="ui-caption marketplace-item-author">{t("marketplace.item.by")} {i.author}</p>
-          <div class="marketplace-item-stats">
-            <span class="marketplace-stat-pill"><Star size={14} aria-hidden="true" />{i.rating} {t("marketplace.item.rating")}</span>
-            <span class="marketplace-stat-pill"><DownloadIcon size={14} aria-hidden="true" />{i.downloads} {t("marketplace.item.downloads")}</span>
+    <Show when={item()} fallback={<NotFoundMarketplace />}>{(i) => (
+      <WorkspaceDetail title={i().title} subtitle={`${t("marketplace.item.by")} ${i().author}`} {...BACK}
+        actions={<button type="button" class={TOOLBAR_PRIMARY}>{t("marketplace.item.buy")}</button>}
+      >
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div class={`${PANEL} flex items-center justify-center md:col-span-1`}><span class="text-7xl" aria-hidden="true">{i().emoji}</span></div>
+          <div class={`${PANEL} md:col-span-2`}>
+            <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{i().category}</span>
+            <h2 class="mt-3 text-xl font-bold text-gray-900 dark:text-white">{i().title}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{t("marketplace.item.by")} {i().author}</p>
+            <div class="mt-5 grid grid-cols-3 gap-4">
+              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{t("marketplace.item.rating")}</h3><p class="font-medium text-gray-900 dark:text-white">{i().rating}</p></div>
+              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{t("marketplace.item.downloads")}</h3><p class="font-medium text-gray-900 dark:text-white">{i().downloads}</p></div>
+              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Price</h3><p class="font-medium text-gray-900 dark:text-white">{priceLabel(i().price)}</p></div>
+            </div>
           </div>
-          <div class="marketplace-item-price-row">
-            <span class="marketplace-item-price-lg">{i.price === 0 ? "Free" : `€${i.price.toFixed(2)}`}</span>
-            <Button variant="primary" size="lg">{t("marketplace.item.buy")}</Button>
-          </div>
-        </Card>
-      </div>
-    </div>
+        </div>
+      </WorkspaceDetail>
+    )}</Show>
   )
 }
 
@@ -435,85 +251,57 @@ function MarketplaceItem(props: { readonly id: string | undefined }): JSX.Elemen
 function MarketplacePurchases(): JSX.Element {
   const records = samplePurchases()
   return (
-    <div class="marketplace-page-content">
-      <AnimatedSection>
-        <A class="marketplace-back-link" href="/marketplace">
-          <ArrowLeft size={16} aria-hidden="true" />
-          {t("marketplace.hero.title")}
-        </A>
-      </AnimatedSection>
-      <h1 class="ui-headline marketplace-page-title">{t("marketplace.purchases.title")}</h1>
-      <Show when={records.length === 0}>
-        <Card variant="default" class="marketplace-empty">
-          <Package size={32} aria-hidden="true" />
-          <p>{t("marketplace.purchases.empty")}</p>
-        </Card>
-      </Show>
-      <StaggerGroup class="marketplace-purchases">
-        <For each={records}>{(r) => (
-          <Card variant="default" class="marketplace-purchase-row">
-            <div class="marketplace-purchase-row-left">
-              <h3 class="ui-title marketplace-item-title">{r.title}</h3>
-              <p class="ui-caption">{r.date}</p>
+    <WorkspaceDetail title={t("marketplace.purchases.title")} {...BACK}>
+      <Show when={records.length > 0} fallback={<StageEmpty icon={<Package size={24} aria-hidden="true" />} title={t("marketplace.purchases.title")} hint={t("marketplace.purchases.empty")} />}>
+        <div class="flex flex-col gap-3">
+          <For each={records}>{(r) => (
+            <div class={`${PANEL} flex flex-wrap items-center justify-between gap-3`}>
+              <div class="min-w-0">
+                <h3 class="truncate text-base font-semibold text-gray-900 dark:text-white">{r.title}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{r.date}</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[r.status]}`}>{r.status}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">€{r.amount.toFixed(2)}</span>
+              </div>
             </div>
-            <Badge tone={r.status === "completed" ? "success" : r.status === "pending" ? "warning" : "danger"}>{r.status}</Badge>
-            <span class="marketplace-item-price">€{r.amount.toFixed(2)}</span>
-          </Card>
-        )}</For>
-      </StaggerGroup>
-    </div>
+          )}</For>
+        </div>
+      </Show>
+    </WorkspaceDetail>
   )
 }
 
 /** ----- Seller dashboard ----- */
 function MarketplaceSeller(): JSX.Element {
-  const metrics = sellerMetrics()
   return (
-    <div class="marketplace-page-content">
-      <AnimatedSection>
-        <A class="marketplace-back-link" href="/marketplace">
-          <ArrowLeft size={16} aria-hidden="true" />
-          {t("marketplace.hero.title")}
-        </A>
-      </AnimatedSection>
-      <h1 class="ui-headline marketplace-page-title">{t("marketplace.seller.title")}</h1>
-      <p class="ui-subhead marketplace-page-subtitle">{t("marketplace.seller.metrics")}</p>
-      <StaggerGroup class="marketplace-seller-grid" delayStep={0.05}>
-        <For each={metrics}>{(m) => (
-          <Card variant="holographic" class="marketplace-seller-card">
-            <span class="ui-caption">{m.label}</span>
-            <strong class="marketplace-seller-value">{m.value}</strong>
-            <Badge tone="success">{m.change}</Badge>
-          </Card>
+    <WorkspaceDetail title={t("marketplace.seller.title")} subtitle={t("marketplace.seller.metrics")} {...BACK}>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <For each={sellerMetrics()}>{(m) => (
+          <div class={`${PANEL} flex flex-col gap-1`}>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{m.label}</span>
+            <strong class="text-2xl font-bold text-gray-900 dark:text-white">{m.value}</strong>
+            <span class="w-max rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">{m.change}</span>
+          </div>
         )}</For>
-      </StaggerGroup>
-    </div>
+      </div>
+    </WorkspaceDetail>
   )
 }
 
 /** ----- Purchase success ----- */
 function MarketplaceSuccess(): JSX.Element {
   return (
-    <div class="marketplace-page-content">
-      <AnimatedSection>
-        <Card variant="holographic" class="marketplace-success-card">
-          <h1 class="ui-headline">{t("marketplace.success.title")}</h1>
-          <p class="ui-body marketplace-success-warning">{t("marketplace.success.warning")}</p>
-          <Button variant="primary">
-            <A href="/marketplace/purchases">{t("marketplace.purchases.title")}</A>
-          </Button>
-        </Card>
-      </AnimatedSection>
-    </div>
+    <WorkspaceDetail title={t("marketplace.success.title")} {...BACK}>
+      <div class={`${PANEL} mx-auto mt-6 max-w-xl text-center`}>
+        <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("marketplace.success.title")}</h2>
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("marketplace.success.warning")}</p>
+        <A href="/marketplace/purchases" class={TOOLBAR_PRIMARY}>{t("marketplace.purchases.title")}</A>
+      </div>
+    </WorkspaceDetail>
   )
 }
 
 function NotFoundMarketplace(): JSX.Element {
-  return <div class="marketplace-page-content">{t("marketplace.error")}</div>
+  return <WorkspaceDetail title={t("marketplace.hero.title")} {...BACK}><p class="p-8 text-center text-sm text-gray-500 dark:text-gray-400" role="alert">{t("marketplace.error")}</p></WorkspaceDetail>
 }
-
-// Suppress unused warnings.
-void TextInput
-void IconButton
-void Skeleton
-void Field
