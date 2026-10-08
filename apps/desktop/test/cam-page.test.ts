@@ -51,11 +51,21 @@ describe("CAM page", () => {
       const downloads: string[] = []
       const proto = window.HTMLAnchorElement.prototype as unknown as { click: () => void }
       const nativeClick = proto.click
-      ;(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:test"
-      ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined
+      // The stubs are global, and `bun test` runs every file in one process: put the real ones back afterwards, or any later
+      // test that creates a blob URL (a plugin worker) would be handed "blob:test".
+      const urlApi = URL as unknown as { createObjectURL: (blob: Blob) => string; revokeObjectURL: (url: string) => void }
+      const nativeCreate = urlApi.createObjectURL
+      const nativeRevoke = urlApi.revokeObjectURL
+      urlApi.createObjectURL = () => "blob:test"
+      urlApi.revokeObjectURL = () => undefined
       proto.click = function (this: HTMLAnchorElement) { downloads.push(this.download) }
-      await click('button[title="Save G-Code"]')
-      proto.click = nativeClick
+      try {
+        await click('button[title="Save G-Code"]')
+      } finally {
+        proto.click = nativeClick
+        urlApi.createObjectURL = nativeCreate
+        urlApi.revokeObjectURL = nativeRevoke
+      }
       expect(downloads[0]).toMatch(/^toolpath-\d{4}-\d{2}-\d{2}\.nc$/)
 
       // Play with a parsed program turns into Stop; without one it explains itself (no dead button).

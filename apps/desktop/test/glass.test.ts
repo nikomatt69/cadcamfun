@@ -128,7 +128,7 @@ describe("the professional surface language", () => {
 
   test("switches off the decorative layers of the earlier styles", () => {
     const css = read("professional.css")
-    for (const needle of [".dashboard-hero-glow", ".ui-glow", ".ui-card::before", ".dark .reference-shell", ":active { transform: none; }"]) expect(css).toContain(needle)
+    for (const needle of [".dashboard-hero-glow", ".ui-glow", ".ui-card::before", ".dark .reference-shell", ".ui-card-interactive:hover", "--ui-press-duration"]) expect(css).toContain(needle)
     // It tones effects down; it never touches layout or type.
     expect(css).not.toMatch(/\b(font-family|font-size|height|width|padding|margin|gap|display\s*:\s*(flex|grid))\b/)
   })

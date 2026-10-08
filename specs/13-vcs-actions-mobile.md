@@ -91,7 +91,7 @@ The sidecar listens on `127.0.0.1` only. A phone reaches it through the **compan
 - **Scoped, revocable device tokens** (32 random bytes, only their SHA-256 is stored, compared in constant time; shown once, inside the QR). The gateway swaps in the sidecar's real bearer token when forwarding, so the phone never holds it.
 - Route allow-list (`COMPANION_ROUTES`): `GET /api/health`, `GET /api/projects`, `/api/projects/:id/(vcs|pulls|actions)/**`, `GET /api/ai/status`, `POST /api/ai/chat/stream|chat/abort|permission/reply`. Everything else (credentials, plugins, files, billing, `/api/companion`…) answers 403. 10 failed authentications per minute from one address → 429.
 - Revoking a device from the desktop cuts it off on the next request.
-- Not built: remote access outside the LAN (a relay/tunnel would have to carry this same TLS stream end to end).
+- Outside the home network: the gateway needs no relay when the phone can route to the desktop. The pairing screen takes any address for the desktop, so a private overlay network (Tailscale, WireGuard, a VPN) works as is: the phone still pins the certificate fingerprint and presents its device token. A hosted relay for users without such a network is not built; it would have to carry this same TLS stream end to end, never terminate it.
 
 Phone side (`apps/mobile`):
 
