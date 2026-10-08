@@ -71,7 +71,7 @@ export function PricingScreen(): JSX.Element {
         const info = PLAN_FEATURES[id]!
         return <article class="reference-pricing-card" classList={{ "is-featured": id === "PRO" }} aria-current={isCurrent(id) ? "true" : undefined}>
           <h2>{info.name}</h2>
-          <p class="reference-pricing-price">{id === "FREE" ? t("pricing.free.price") : t("subscription.perMonth", { price: info.price })}</p>
+          <p class="reference-pricing-price">{t("subscription.perMonth", { price: info.price })}</p>
           <ul>
             <For each={info.features}>{(feature) => <li><Check size={16} aria-hidden="true" />{feature}</li>}</For>
           </ul>

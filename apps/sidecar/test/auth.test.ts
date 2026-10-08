@@ -186,4 +186,25 @@ describe("signup, signin-direct, get-session, magic link verification", () => {
     // The launch bearer token is still required.
     expect((await app.call("/api/auth/get-session", { auth: false, headers: { "x-session-token": signin.body.token } })).status).toBe(401)
   })
+
+  test("signing out revokes the session token; one-time links cannot be replayed", async () => {
+    const session = (token: string) => app.call("/api/auth/get-session", { headers: { "x-session-token": token } })
+    const signin = await post("/api/auth/signin-direct", { email: "ada@example.com", password: "longpassword" })
+    expect((await session(signin.body.token)).body.session.user.email).toBe("ada@example.com")
+    const out = await app.call("/api/auth/signout", { method: "POST", headers: { "x-session-token": signin.body.token } })
+    expect(out.status).toBe(200)
+    // The same token now falls back to the local profile, and another session of the account is untouched.
+    expect((await session(signin.body.token)).body.session.user.email).toBe("local@cadcamfun.local")
+    const other = await post("/api/auth/signin-direct", { email: "ada@example.com", password: "longpassword" })
+    expect((await session(other.body.token)).body.session.user.email).toBe("ada@example.com")
+
+    const link = await post("/api/auth/send-magic-link", { email: "ada@example.com" })
+    const magic = new URL(link.body.debugMagicLink).searchParams.get("token")!
+    const first = await post("/api/auth/verify-magic-link", { token: magic })
+    expect(first.status).toBe(200)
+    expect((await session(first.body.token)).body.session.user.email).toBe("ada@example.com")
+    const replay = await post("/api/auth/verify-magic-link", { token: magic })
+    expect(replay.status).toBe(400)
+    expect(replay.body.error).toBe("Token non valido")
+  })
 })

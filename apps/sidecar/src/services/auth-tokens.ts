@@ -11,6 +11,8 @@ export interface TokenClaims {
   readonly email: string
   readonly type: string
   readonly exp: number
+  /** Random id of this token, the key under which it is revoked. */
+  readonly token: string
 }
 
 const b64 = (value: string | Buffer) => Buffer.from(value).toString("base64url")
@@ -24,6 +26,8 @@ const ISSUER = "cadcamfun"
 export class AuthTokens extends Context.Service<AuthTokens, {
   sign(claims: { userId: string; email: string; type: string }, expiresInSeconds: number): string
   verify(token: string): Effect.Effect<TokenClaims, TokenFailure>
+  /** Ends a token before its expiry (sign-out); a revoked token verifies as `invalid`. Unknown or forged tokens are ignored. */
+  revoke(token: string): Effect.Effect<void>
 }>()("cadcamfun/AuthTokens") {
   static readonly layer = Layer.effect(AuthTokens, Effect.gen(function*() {
     const config = yield* AppConfigService
@@ -35,7 +39,29 @@ export class AuthTokens extends Context.Service<AuthTokens, {
       writeFileSync(path, fresh, { mode: 0o600 })
       return fresh
     })
+    // Revoked token ids and their expiry. An entry only has to outlive its token, so expired ones are dropped on write.
+    const revokedPath = join(config.dataDir, "auth-revoked.json")
+    const revoked = new Map<string, number>(Object.entries(yield* Effect.sync((): Record<string, number> => {
+      try { return JSON.parse(readFileSync(revokedPath, "utf8")) } catch { return {} }
+    })))
     const mac = (data: string) => createHmac("sha256", secret).update(data).digest()
+    const decode = (token: string): TokenClaims | TokenFailure => {
+      const parts = token.split(".")
+      if (parts.length !== 3) return "invalid"
+      const head = `${parts[0]}.${parts[1]}`
+      const given = Buffer.from(parts[2]!, "base64url")
+      const expected = mac(head)
+      if (given.length !== expected.length || !timingSafeEqual(given, expected)) return "invalid"
+      try {
+        const claims = JSON.parse(Buffer.from(parts[1]!, "base64url").toString("utf8")) as TokenClaims & { iss?: string }
+        if (claims.iss !== ISSUER) return "invalid"
+        if (typeof claims.exp !== "number" || claims.exp * 1000 <= Date.now()) return "expired"
+        if (revoked.has(claims.token)) return "invalid"
+        return claims
+      } catch {
+        return "invalid"
+      }
+    }
     return AuthTokens.of({
       sign: (claims, expiresInSeconds) => {
         const now = Math.floor(Date.now() / 1000)
@@ -45,20 +71,17 @@ export class AuthTokens extends Context.Service<AuthTokens, {
         return `${head}.${b64(mac(head))}`
       },
       verify: (token) => Effect.suspend(() => {
-        const parts = token.split(".")
-        if (parts.length !== 3) return Effect.fail("invalid" as const)
-        const head = `${parts[0]}.${parts[1]}`
-        const given = Buffer.from(parts[2]!, "base64url")
-        const expected = mac(head)
-        if (given.length !== expected.length || !timingSafeEqual(given, expected)) return Effect.fail("invalid" as const)
-        try {
-          const claims = JSON.parse(Buffer.from(parts[1]!, "base64url").toString("utf8")) as TokenClaims & { iss?: string }
-          if (claims.iss !== ISSUER) return Effect.fail("invalid" as const)
-          if (typeof claims.exp !== "number" || claims.exp * 1000 <= Date.now()) return Effect.fail("expired" as const)
-          return Effect.succeed(claims)
-        } catch {
-          return Effect.fail("invalid" as const)
-        }
+        const claims = decode(token)
+        return typeof claims === "string" ? Effect.fail(claims) : Effect.succeed(claims)
+      }),
+      revoke: (token) => Effect.sync(() => {
+        const claims = decode(token)
+        if (typeof claims === "string") return
+        const now = Date.now()
+        revoked.set(claims.token, claims.exp)
+        for (const [id, exp] of revoked) if (exp * 1000 <= now) revoked.delete(id)
+        mkdirSync(config.dataDir, { recursive: true })
+        writeFileSync(revokedPath, JSON.stringify(Object.fromEntries(revoked)), { mode: 0o600 })
       })
     })
   }))
