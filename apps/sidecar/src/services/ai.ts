@@ -257,7 +257,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const scheduler = new BackgroundTaskManager({})
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
-    providers: defaultProviderSpecs(),
+    providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
     systemPrompt: systemPrompt(),
     // Import the (large) host bundle once the sidecar has announced itself, not while the API is still starting.
     warmAfter: announced,

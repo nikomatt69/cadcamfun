@@ -18,6 +18,8 @@ export interface AppConfig {
   /** E-mail of the administrator (legacy `ADMIN_EMAIL`); the local profile is the admin of its own installation by default. */
   readonly adminEmail?: string
   readonly aiHost?: "nikcli" | "direct"
+  /** Replaces MiniMax's default endpoint for the embedded host (a regional endpoint, a corporate proxy, or a fake model in tests). */
+  readonly aiMinimaxBaseUrl?: string
   /** OTLP/HTTP collector base URL (standard `OTEL_EXPORTER_OTLP_ENDPOINT`); telemetry is off without it. */
   readonly otlpEndpoint?: string
   /** Test hook: replaces the vendor SDK model construction (never set in production). */
@@ -35,6 +37,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const appUrl = yield* Config.option(Config.string("CADCAMFUN_APP_URL"))
       const debugLinks = yield* Config.withDefault(Config.boolean("CADCAMFUN_DEBUG_LINKS"), false)
       const aiHost = yield* Config.withDefault(Config.literals(["nikcli", "direct"], "CADCAMFUN_AI_HOST"), "nikcli" as const)
+      const aiMinimaxBaseUrl = yield* Config.option(Config.string("CADCAMFUN_AI_MINIMAX_BASE_URL"))
       const stripeWebhookSecret = yield* Config.option(Config.string("STRIPE_WEBHOOK_SECRET"))
       const cronSecret = yield* Config.option(Config.string("CRON_SECRET"))
       const adminEmail = yield* Config.option(Config.string("ADMIN_EMAIL"))
@@ -44,6 +47,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
         ...(stripeWebhookSecret._tag === "Some" ? { stripeWebhookSecret: stripeWebhookSecret.value } : {}),
         ...(cronSecret._tag === "Some" ? { cronSecret: cronSecret.value } : {}),
         aiHost,
+        ...(aiMinimaxBaseUrl._tag === "Some" && aiMinimaxBaseUrl.value.trim() ? { aiMinimaxBaseUrl: aiMinimaxBaseUrl.value.trim() } : {}),
         ...(otlpEndpoint._tag === "Some" && otlpEndpoint.value.trim() ? { otlpEndpoint: otlpEndpoint.value.trim() } : {}),
         ...(appUrl._tag === "Some" ? { appUrl: appUrl.value } : {}),
         debugLinks,
