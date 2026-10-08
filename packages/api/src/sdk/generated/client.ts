@@ -401,6 +401,14 @@ import type {
   VcsMergePullRequestOutput,
   VcsClosePullRequestInput,
   VcsClosePullRequestOutput,
+  VcsRemoteInput,
+  VcsRemoteOutput,
+  VcsSetRemoteInput,
+  VcsSetRemoteOutput,
+  VcsPushInput,
+  VcsPushOutput,
+  VcsPullInput,
+  VcsPullOutput,
   VcsRunsInput,
   VcsRunsOutput,
   VcsDispatchInput,
@@ -3252,7 +3260,7 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/projects/${encodeURIComponent(input.id)}/vcs/log`,
-            query: { rev: input["rev"], limit: input["limit"] },
+            query: { rev: input["rev"], limit: input["limit"], path: input["path"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,
@@ -3311,7 +3319,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/projects/${encodeURIComponent(input.id)}/vcs/restore`,
-            body: { rev: input["rev"] },
+            body: { rev: input["rev"], paths: input["paths"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,
@@ -3399,6 +3407,55 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/projects/${encodeURIComponent(input.id)}/pulls/${encodeURIComponent(input.number)}/close`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remote: (input: VcsRemoteInput, requestOptions?: RequestOptions) =>
+        request<VcsRemoteOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/remote`,
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setRemote: (input: VcsSetRemoteInput, requestOptions?: RequestOptions) =>
+        request<VcsSetRemoteOutput>(
+          {
+            method: "PUT",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/remote`,
+            body: { remote: input["remote"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      push: (input: VcsPushInput, requestOptions?: RequestOptions) =>
+        request<VcsPushOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/push`,
+            headers: { "x-github-token": input["x-github-token"] },
+            body: { branch: input["branch"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pull: (input: VcsPullInput, requestOptions?: RequestOptions) =>
+        request<VcsPullOutput>(
+          {
+            method: "POST",
+            path: `/api/projects/${encodeURIComponent(input.id)}/vcs/pull`,
+            headers: { "x-github-token": input["x-github-token"] },
+            body: { branch: input["branch"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
             empty: false,

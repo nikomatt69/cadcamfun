@@ -206,6 +206,35 @@ export class Repository {
     return [...seen.values()].sort((a, b) => b.committer.time - a.committer.time).slice(0, limit)
   }
 
+  /** Commits (newest first) that changed `path`: it appears, disappears or differs from the first parent. */
+  fileLog(path: string, rev: string = "HEAD", limit = Number.POSITIVE_INFINITY): LogEntry[] {
+    const at = (tree: Oid): Oid | undefined => this.flatten(tree).get(path)
+    const out: LogEntry[] = []
+    for (const c of this.log(rev)) {
+      const here = at(c.tree)
+      const before = c.parents[0] ? at(this.readCommit(c.parents[0]).tree) : undefined
+      if (here !== before) out.push(c)
+      if (out.length >= limit) break
+    }
+    return out
+  }
+
+  /**
+   * Makes `paths` match their content in `rev` (a path absent from `rev` is removed) on top of HEAD, as one new commit.
+   * The rest of the project is untouched, so one drawing can go back without undoing everyone else's work.
+   */
+  restorePaths(rev: string, paths: readonly string[], author: Signature, message?: string): Oid {
+    const head = this.resolve("HEAD")
+    const files: Record<string, Uint8Array> = this.readFiles(this.readCommit(head).tree)
+    const source = this.readFiles(this.readCommit(this.resolve(rev)).tree)
+    for (const path of paths) {
+      const content = source[path]
+      if (content === undefined) delete files[path]
+      else files[path] = content
+    }
+    return this.commit(files, { author, message: message ?? `Restore ${paths.join(", ")} from ${rev.slice(0, 7)}` })
+  }
+
   isAncestor(ancestor: Oid, descendant: Oid): boolean {
     return this.log(descendant).some((c) => c.oid === ancestor)
   }

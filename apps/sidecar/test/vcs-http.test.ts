@@ -49,6 +49,12 @@ describe("vcs HTTP", () => {
     expect((await app.call(v("/pulls?state=open"))).body).toEqual([])
     // main had not moved, so the merge fast-forwarded: the PR records the new tip.
     expect(merged.body.mergeCommit).toBe((await app.call(v("/vcs/log"))).body[0].oid)
+    // The history of one drawing, and restoring only that drawing to its first version.
+    const history = (await app.call(v(`/vcs/log?path=${encodeURIComponent(`drawings/${drawing.id}.json`)}`))).body
+    expect(history.map((c: { message: string }) => c.message.trim())).toEqual(["Widen plate to 140 mm", "Initial import"])
+    const restored = await app.call(v("/vcs/restore"), { method: "POST", json: { rev: history[1].oid, paths: [`drawings/${drawing.id}.json`] } })
+    expect(restored.status).toBe(200)
+    expect((await app.call(`/api/drawings/${drawing.id}`)).body.data).toEqual({ w: 100 })
   })
 
   test("a workflow committed with the model runs on push and on dispatch", async () => {

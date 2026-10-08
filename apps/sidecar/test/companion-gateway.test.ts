@@ -102,6 +102,9 @@ describe("companion gateway", () => {
     expect(isCompanionRoute("POST", "/api/projects")).toBe(false)
     expect(isCompanionRoute("GET", "/api/projects/x/vcs/log")).toBe(true)
     expect(isCompanionRoute("GET", "/api/projects/x/../../billing")).toBe(false)
+    // GitHub sync needs the owner's GitHub token and is desktop-only.
+    for (const path of ["remote", "push", "pull"]) expect(isCompanionRoute("POST", `/api/projects/x/vcs/${path}`)).toBe(false)
+    expect(isCompanionRoute("POST", "/api/projects/x/vcs/commit")).toBe(true)
   })
 
   test("repeated failures are rate limited", async () => {

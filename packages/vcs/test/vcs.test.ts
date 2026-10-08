@@ -21,9 +21,8 @@ import {
   TREE_MODE,
   FILE_MODE,
   type Commit,
-  type GitHubTransport,
+  repositoryTransport,
   type Oid,
-  type RemoteTreeEntry,
   type Signature,
 } from "../src/index.ts"
 
@@ -136,40 +135,12 @@ describe("snapshot", () => {
     const snap = { project: { id: "p1", name: "Part" }, drawings: [{ id: "d1", data: { e: [1] } }], components: [], toolpaths: [{ id: "t1", op: "pocket" }], extra: { ".cadcamfun/workflows/ci.yml": "name: ci\n" } }
     const files = snapshotToFiles(snap)
     expect(Object.keys(files).sort()).toEqual([".cadcamfun/workflows/ci.yml", "drawings/d1.json", "project.json", "toolpaths/t1.json"])
-    expect(filesToSnapshot(files)).toEqual(snap)
+    expect(filesToSnapshot(files)).toMatchObject(snap)
     expect(() => snapshotToFiles({ ...snap, drawings: [{ id: "../x" }] })).toThrow("Unsafe")
   })
 })
 
-/** Fake GitHub: a second repository behind the transport interface. */
-const fakeRemote = (remote: Repository): GitHubTransport => ({
-  getRef: async (b) => remote.backend.getRef(`refs/heads/${b}`),
-  updateRef: async (b, oid) => {
-    const cur = remote.backend.getRef(`refs/heads/${b}`)
-    if (cur && !remote.isAncestor(cur, oid)) throw new Error("non fast-forward")
-    remote.backend.setRef(`refs/heads/${b}`, oid)
-  },
-  createBlob: async (c) => {
-    const oid = hashObject("blob", c)
-    remote.backend.putObject(oid, { type: "blob", body: c })
-    return oid
-  },
-  createTree: async (entries) => {
-    const body = encodeTree(entries.map((e) => ({ mode: e.type === "tree" ? TREE_MODE : FILE_MODE, name: e.path, oid: e.sha })))
-    const oid = hashObject("tree", body)
-    remote.backend.putObject(oid, { type: "tree", body })
-    return oid
-  },
-  createCommit: async (c) => {
-    const body = encodeCommit(c)
-    const oid = hashObject("commit", body)
-    remote.backend.putObject(oid, { type: "commit", body })
-    return oid
-  },
-  getCommit: async (oid) => remote.readCommit(oid),
-  getTree: async (oid): Promise<RemoteTreeEntry[]> => remote.treeEntries(oid).map((e) => ({ path: e.name, mode: e.mode, type: e.mode === TREE_MODE ? "tree" : "blob", sha: e.oid })),
-  getBlob: async (oid) => remote.readBlob(oid),
-})
+const fakeRemote = repositoryTransport
 
 describe("github sync", () => {
   test("push to an empty remote, pull from a second device, then diverge", async () => {
@@ -231,5 +202,33 @@ describe("semantic diff", () => {
     expect(r.mergeInto("release", "feature", sig())).toEqual({ kind: "fast-forward", oid: f })
     expect(r.currentBranch()).toBe("main")
     expect(r.resolve("release")).toBe(f)
+  })
+})
+
+describe("per-file history", () => {
+  test("fileLog lists only commits touching the path; restorePaths reverts one file and keeps the rest", () => {
+    const r = repo()
+    const a = r.commit({ "drawings/d1.json": '{"w":1}\n', "drawings/d2.json": '{"w":1}\n' }, { message: "init", author: sig() })
+    const b = r.commit({ "drawings/d1.json": '{"w":2}\n', "drawings/d2.json": '{"w":1}\n' }, { message: "d1 wider", author: sig() })
+    const c = r.commit({ "drawings/d1.json": '{"w":2}\n', "drawings/d2.json": '{"w":9}\n' }, { message: "d2 wider", author: sig() })
+    expect(r.fileLog("drawings/d1.json").map((e) => e.oid)).toEqual([b, a])
+    expect(r.fileLog("drawings/d2.json").map((e) => e.oid)).toEqual([c, a])
+    expect(r.fileLog("drawings/d1.json", "HEAD", 1).length).toBe(1)
+    const restored = r.restorePaths(a, ["drawings/d1.json"], sig())
+    const files = r.readFiles(r.readCommit(restored).tree)
+    expect(toText(files["drawings/d1.json"]!)).toBe('{"w":1}\n')
+    expect(toText(files["drawings/d2.json"]!)).toBe('{"w":9}\n') // untouched
+    // A file that did not exist yet is removed.
+    const added = r.commit({ ...files, "drawings/d3.json": "{}\n" }, { message: "d3", author: sig() })
+    const gone = r.restorePaths(a, ["drawings/d3.json"], sig())
+    expect(Object.keys(r.readFiles(r.readCommit(gone).tree))).not.toContain("drawings/d3.json")
+    expect(added).not.toBe(gone)
+  })
+
+  test("library items and costs are part of the snapshot", () => {
+    const snap = { project: { id: "p" }, drawings: [], components: [], toolpaths: [{ id: "t1" }], materials: [{ id: "m1", name: "Al" }], tools: [{ id: "tl1" }], machineConfigs: [{ id: "mc1" }], costs: [{ id: "c1" }] }
+    const files = snapshotToFiles(snap)
+    expect(Object.keys(files).sort()).toEqual(["costs/c1.json", "machine-configs/mc1.json", "materials/m1.json", "project.json", "toolpaths/t1.json", "tools/tl1.json"])
+    expect(filesToSnapshot(files)).toMatchObject({ materials: [{ id: "m1" }], machineConfigs: [{ id: "mc1" }], costs: [{ id: "c1" }] })
   })
 })

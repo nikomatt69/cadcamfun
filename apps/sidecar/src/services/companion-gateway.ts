@@ -44,7 +44,8 @@ interface Rule {
 export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/health$/ },
   { methods: ["GET"], path: /^\/api\/projects$/ },
-  { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs|pulls|actions)(\/.*)?$/ },
+  // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.
+  { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs\/(?!remote$|push$|pull$)[^/]+|pulls|actions)(\/.*)?$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|permission\/reply)$/ },
 ]

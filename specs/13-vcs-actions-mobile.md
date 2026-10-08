@@ -1,6 +1,6 @@
 # WP11–WP13 — Git-style history, pull requests, workflows (Actions) and the iOS companion
 
-Status: **WP11 and WP12 built and tested; WP13 built up to the Xcode step**: companion gateway, pairing UI on the desktop, certificate-pinned Rust client, iOS shell sources and the phone UI exist; the Xcode project (`tauri ios init`) and an on-device run need a Mac. Owner dirs: `packages/vcs`, `packages/workflow`, `apps/mobile`, plus the explicit additions to WP0 (`packages/db` schema), WP3 (`packages/api/src/groups/vcs.ts`) and WP4 (`apps/sidecar`) listed in §4.
+Status: **WP11 and WP12 built and tested; WP13 builds for the iOS simulator**: companion gateway, pairing UI on the desktop, certificate-pinned Rust client, iOS shell and phone UI exist; the Xcode project is generated and the app compiled for the simulator by the `iOS` workflow on a real macOS runner. Not done: running on a device, signing/TestFlight, push notifications, access outside the LAN. Owner dirs: `packages/vcs`, `packages/workflow`, `apps/mobile`, plus the explicit additions to WP0 (`packages/db` schema), WP3 (`packages/api/src/groups/vcs.ts`) and WP4 (`apps/sidecar`) listed in §4.
 
 ## 1. Decisions
 
@@ -18,8 +18,16 @@ project.json                    name, description, isPublic
 drawings/<id>.json              one file per entity => diffs and merges stay local
 components/<id>.json
 toolpaths/<id>.json             includes the generated G-code
+materials/<id>.json             library items the project's toolpaths use (material, tool, machine)
+tools/<id>.json
+machine-configs/<id>.json
+costs/<id>.json                 production cost estimates of the toolpaths
 .cadcamfun/workflows/<n>.yml    workflows, versioned with the model
 ```
+
+**What is tracked, and why.** Everything that is part of a project's manufacturing state is in the tree: the project itself, its drawings, components and toolpaths (with G-code), the materials, tools and machine configurations those toolpaths reference, and their cost estimates. Library items are shared across projects, so applying a commit creates the ones that are missing and updates an existing one only when the current user owns it; owners and organisations are installation-specific and are not stored. Not tracked, on purpose: thumbnails (derived), comments and chat (conversation, not model state), uploaded binaries and per-user cost settings. Every history-changing action (commit, checkout, restore, pull-request open/merge) is also appended to the legacy `ActivityLog`, so it shows up in the same audit trail as every other change.
+
+**History of one item.** `GET …/vcs/log?path=drawings/<id>.json` lists only the commits that touched that file, and `POST …/vcs/restore` with `paths` puts only those files back to an older version as a new commit, leaving the rest of the project as it is. The desktop exposes both from each drawing/component/toolpath card (History button) and from the project's Version control screen.
 
 Canonical JSON (sorted keys, 2 spaces) keeps text diffs stable. Thumbnails are derived data and are not committed. `.json` files merge **structurally** (`mergeJson`): two people editing different properties of one drawing do not conflict; same property, or arrays, report a conflict with JSON pointers.
 
@@ -58,7 +66,8 @@ Built-in steps today: `project/validate`, `project/require-gcode`. Planned regis
 | Route | Purpose |
 | --- | --- |
 | `GET /api/projects/:id/vcs/status`, `/log`, `/branches`, `/diff?from&to` | read state |
-| `POST …/vcs/commit` (`message`, optional workflow `files`), `/branches`, `/checkout`, `/restore` | write state |
+| `POST …/vcs/commit` (`message`, optional workflow `files`), `/branches`, `/checkout`, `/restore` (`rev`, optional `paths`) | write state |
+| `GET/PUT …/vcs/remote`, `POST …/vcs/push|pull` (header `x-github-token`) | GitHub mirror; desktop only, never offered to a paired phone |
 | `GET/POST …/pulls`, `GET …/pulls/:n`, `POST …/pulls/:n/reviews`, `/merge`, `/close` | pull requests |
 | `GET …/actions/runs`, `POST …/actions/dispatch` | Actions |
 
@@ -90,16 +99,16 @@ Phone side (`apps/mobile`):
 - `src-tauri/` — Tauri v2 iOS shell: commands `companion_request`, `companion_stream` (Tauri `Channel`), `secret_get|set|delete` (iOS Keychain via `keyring`), QR scanner plugin, `Info.ios.plist` (local-network and camera usage strings), CSP without any network `connect-src`, icons generated.
 - `src/companion/native.ts` — `pinnedFetch` routes the unchanged `CompanionClient` through those commands; `keychainStore` keeps the pairing in the Keychain; plain browsers fall back to `fetch` + web storage for development.
 
-Steps that need macOS + Xcode and have **not** been run: `bun run --filter @cadcamfun/mobile ios:init` (generates `src-tauri/gen/apple`), set `APPLE_DEVELOPMENT_TEAM`, `ios:dev` on a device, then TestFlight signing. The `src-tauri` crate compiles and passes clippy `-D warnings` for the host (Linux CI job `mobile-native`, with the web assets built and the Tauri config and capabilities validated by `tauri-build`). The iOS-only Keychain module was type-checked for `aarch64-apple-ios`; the full iOS target cannot be checked off macOS (`ring` needs `xcrun`), so the manual `ios-check` job does that on a Mac runner.
+The `.github/workflows/ios.yml` workflow runs `tauri ios init` and `tauri ios build --debug --target aarch64-sim` on `macos-latest` (verified: both succeed) and uploads the generated Xcode project as an artifact. Still to do by the owner, because they need an Apple developer team and certificates: set `APPLE_DEVELOPMENT_TEAM`, `ios:dev` on a device, then TestFlight signing. The `src-tauri` crate compiles and passes clippy `-D warnings` for the host (Linux CI job `mobile-native`, with the web assets built and the Tauri config and capabilities validated by `tauri-build`). The iOS-only Keychain module was type-checked for `aarch64-apple-ios`; the full iOS target cannot be checked off macOS (`ring` needs `xcrun`), so the manual `ios-check` job does that on a Mac runner.
 
 ## 7. GitHub mirror
 
-`restTransport` + `push`/`pull` are implemented and tested against an in-memory remote that enforces fast-forward-only updates and verifies every object hash. Not done: HTTP routes (`PUT /vcs/remote`, `POST /vcs/push|pull`), storing the token in the OS keychain (never in SQLite), mirroring PRs to GitHub PRs (`PullRequest.remoteNumber` is reserved), and a live check that GitHub's Git Data API reproduces the exact commit oid for a given author/committer date (unit tests prove the hash logic, not GitHub's behaviour).
+`restTransport` + `push`/`pull` are implemented and tested against an in-memory remote that enforces fast-forward-only updates and verifies every object hash. The HTTP routes (`GET/PUT /vcs/remote`, `POST /vcs/push|pull`) exist: the desktop screen keeps the GitHub token in the OS keychain and sends it per request; the sidecar never stores it, and the companion gateway refuses these routes. Not done: mirroring PRs to GitHub PRs (`PullRequest.remoteNumber` is reserved), and a live check that GitHub's Git Data API reproduces the exact commit oid for a given author/committer date (unit tests prove the hash logic, not GitHub's behaviour).
 
 ## 8. Limits and next steps
 
 1. Run the iOS shell on a device (Mac), APNs push for PR/Actions events, remote access beyond the LAN.
-2. History/branches/PR panels in the desktop UI (WP6) over the new API; commit graph view.
+2. Desktop UI: `Version control` screen (`/projects/:id/history`: changes + commit, history with property-level diffs and restore, branches, pull requests with review/merge, Actions runs, GitHub push/pull) and per-item History buttons are built; a drawn commit-graph view and in-editor (CAD/CAM) history panels are not.
 3. Register `cam/verify`, `cam/gcode`, `ai/prompt` workflow steps; `needs`-scoped outputs if workflows grow.
 4. GitHub routes and PR mirroring (§7); `deletedAt`/sync interplay with `10-release-sync.md` §5 (git history supersedes the change-log idea there).
 5. Large binary assets (STL/DXF imports): store as blobs; packfile/delta compression is not implemented (object count per project stays small; revisit with real data).

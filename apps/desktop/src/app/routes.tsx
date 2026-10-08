@@ -56,6 +56,7 @@ export const routes: AppRoute[] = [
   { path: "/pricing", component: lazy(() => import("../pages/pricing.tsx")) },
   { path: "/profile", component: lazy(() => import("../pages/profile/index.tsx")) },
   { path: "/profile/settings", component: lazy(() => import("../pages/profile/settings.tsx")) },
+  { path: "/projects/:id/history", component: lazy(() => import("../pages/projects/history.tsx")) },
   { path: "/projects/:id", component: lazy(() => import("../pages/projects/_id_.tsx")) },
   { path: "/projects/create", component: lazy(() => import("../pages/projects/create.tsx")) },
   { path: "/projects", component: lazy(() => import("../pages/projects/index.tsx")) },

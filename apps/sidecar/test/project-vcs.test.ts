@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { Database, schema } from "@cadcamfun/db"
+import { Repository, fetchBranch, memoryBackend, push, repositoryTransport } from "@cadcamfun/vcs"
 import { eq } from "drizzle-orm"
 import { Effect, Layer } from "effect"
 import { ProjectVcsRepo } from "../src/repos/project-vcs-repo.ts"
-import { ProjectVcs, VcsFailure, type Actor } from "../src/services/project-vcs.ts"
+import { GitHubTransports, ProjectVcs, VcsFailure, type Actor } from "../src/services/project-vcs.ts"
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname
-const Live = ProjectVcs.layer.pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(Database.layer({ path: ":memory:", migrationsFolder })))
+/** The "GitHub" of these tests is a second repository; every project's remote resolves to it. */
+export const github = new Repository(memoryBackend())
+const FakeGitHub = Layer.succeed(GitHubTransports, GitHubTransports.of({ make: () => repositoryTransport(github) }))
+const Live = ProjectVcs.layer.pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(FakeGitHub), Layer.provideMerge(Database.layer({ path: ":memory:", migrationsFolder })))
 
 /** The expected VcsFailure of an effect (a DatabaseError would fail the test). */
 const failure = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -111,6 +115,55 @@ jobs:
       - uses: project/require-gcode
 `
 
+describe("everything linked to the project is tracked", () => {
+  test("library items and cost estimates ride with the toolpath; one item can be restored alone; actions are audited", () =>
+    withProject(({ projectId, owner, sql, vcs }) =>
+      Effect.gen(function*() {
+        const material = sql.insert(schema.materialTable).values({ id: "m1", name: "Aluminium 6061", properties: { density: 2.7 }, ownerId: owner.userId }).returning().get()
+        const tool = sql.insert(schema.toolTable).values({ id: "tl1", name: "6 mm endmill", type: "endmill", diameter: 6, material: "carbide", ownerId: owner.userId }).returning().get()
+        const machine = sql.insert(schema.machineConfigTable).values({ id: "mc1", name: "Mill", type: "mill", config: { axes: 3 }, ownerId: owner.userId }).returning().get()
+        sql.update(schema.toolpathTable).set({ materialId: material.id, toolId: tool.id, machineConfigId: machine.id }).where(eq(schema.toolpathTable.id, "t1")).run()
+        sql.insert(schema.productionCostEstimateTable).values({ id: "c1", toolpathId: "t1", materialCost: 1, toolWearCost: 2, machineTime: 3, machineTimeCost: 4, operatorTime: 5, operatorTimeCost: 6, setupCost: 7, totalCost: 28, ownerId: owner.userId }).run()
+
+        const first = yield* vcs.commit(projectId, { message: "init" }, owner)
+        const tracked = (yield* vcs.diff(projectId, undefined, first)).map((c) => c.path)
+        expect(tracked).toEqual(expect.arrayContaining(["materials/m1.json", "tools/tl1.json", "machine-configs/mc1.json", "costs/c1.json", "toolpaths/t1.json", "drawings/d1.json", "project.json"]))
+        expect(yield* vcs.status(projectId)).toEqual([])
+
+        // Edit the material and the drawing; both show up, and the history of one file lists only its own commits.
+        sql.update(schema.materialTable).set({ properties: { density: 9 } }).where(eq(schema.materialTable.id, "m1")).run()
+        sql.update(schema.drawingTable).set({ data: { w: 1 } }).where(eq(schema.drawingTable.id, "d1")).run()
+        expect(yield* vcs.status(projectId)).toEqual(["drawings/d1.json", "materials/m1.json"])
+        const second = yield* vcs.commit(projectId, { message: "tweak" }, owner)
+        expect((yield* vcs.log(projectId, "HEAD", undefined, "materials/m1.json")).map((c) => c.oid)).toEqual([second, first])
+        expect((yield* vcs.log(projectId, "HEAD", undefined, "tools/tl1.json")).map((c) => c.oid)).toEqual([first])
+
+        // Restore only the material: the drawing keeps its new content.
+        yield* vcs.restore(projectId, first, owner, ["materials/m1.json"])
+        expect(sql.select().from(schema.materialTable).get()!.properties).toEqual({ density: 2.7 })
+        expect(sql.select().from(schema.drawingTable).get()!.data).toEqual({ w: 1 })
+        expect(yield* vcs.status(projectId)).toEqual([])
+
+        // Version-control actions land in the same audit trail as every other change.
+        const actions = sql.select().from(schema.activityLogTable).where(eq(schema.activityLogTable.itemId, projectId)).all().map((a) => a.action)
+        expect(actions).toEqual(expect.arrayContaining(["vcs.commit", "vcs.restore"]))
+      })))
+
+  test("checkout restores library items and costs that were removed on the way", () =>
+    withProject(({ projectId, owner, sql, vcs }) =>
+      Effect.gen(function*() {
+        sql.insert(schema.productionCostEstimateTable).values({ id: "c1", toolpathId: "t1", materialCost: 1, toolWearCost: 1, machineTime: 1, machineTimeCost: 1, operatorTime: 1, operatorTimeCost: 1, setupCost: 1, totalCost: 6, ownerId: owner.userId }).run()
+        yield* vcs.commit(projectId, { message: "with cost" }, owner)
+        yield* vcs.createBranch(projectId, "no-cost")
+        sql.delete(schema.productionCostEstimateTable).run()
+        yield* vcs.checkout(projectId, "main", owner).pipe(Effect.flip) // dirty: refused
+        yield* vcs.commit(projectId, { message: "drop the estimate" }, owner)
+        expect(sql.select().from(schema.productionCostEstimateTable).all()).toHaveLength(0)
+        yield* vcs.checkout(projectId, "no-cost", owner)
+        expect(sql.select().from(schema.productionCostEstimateTable).all().map((c) => c.id)).toEqual(["c1"])
+      })))
+})
+
 describe("AI actor guard", () => {
   test("the companion cannot write to main, only propose via ai/* branches", () =>
     withProject(({ projectId, owner, companion, vcs }) =>
@@ -187,4 +240,38 @@ describe("assistant VCS tools", () => {
         expect((yield* vcs.pullRequest(project.id, 1)).pullRequest.state).toBe("open")
       }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(ProjectRepo.layer), Layer.provideMerge(Live))), Effect.scoped),
     ))
+})
+
+describe("GitHub mirror", () => {
+  test("push, then a second install pulls it; divergence is refused until pulled", () =>
+    withProject(({ projectId, owner, sql, vcs }) =>
+      Effect.gen(function*() {
+        expect((yield* failure(vcs.push(projectId, "tok"))).message).toContain("no GitHub remote")
+        expect((yield* failure(vcs.setRemote(projectId, "not a repo"))).code).toBe("invalid")
+        expect(yield* vcs.setRemote(projectId, "ada/bracket")).toBe("ada/bracket")
+        const first = yield* vcs.commit(projectId, { message: "init" }, owner)
+        expect((yield* vcs.push(projectId, "tok")).oid).toBe(first)
+        expect(github.resolve("main")).toBe(first)
+
+        // Someone else advances the mirror with a change to the drawing.
+        const clone = new Repository(memoryBackend())
+        yield* Effect.promise(() => fetchBranch(clone, repositoryTransport(github), "main"))
+        clone.backend.setRef("refs/heads/main", first)
+        const files = clone.readFiles(clone.readCommit(first).tree)
+        const edited = JSON.parse(new TextDecoder().decode(files["drawings/d1.json"]!))
+        edited.data = { w: 999, h: 50 }
+        const tip = clone.commit({ ...files, "drawings/d1.json": JSON.stringify(edited) }, { message: "remote edit", author: { name: "Bob", email: "b@x.io", time: Math.floor(Date.now() / 1000) + 10, tz: "+0000" } })
+        yield* Effect.promise(() => push(clone, repositoryTransport(github), "main"))
+
+        // Local divergence: the push is refused, the pull merges and updates the database.
+        sql.update(schema.toolpathTable).set({ gcode: "G0 X1" }).where(eq(schema.toolpathTable.id, "t1")).run()
+        yield* vcs.commit(projectId, { message: "local gcode" }, owner)
+        expect((yield* failure(vcs.push(projectId, "tok"))).message).toContain("pull")
+        const pulled = yield* vcs.pull(projectId, "tok", owner)
+        expect(pulled.kind).toBe("merge")
+        expect(sql.select().from(schema.drawingTable).get()!.data).toEqual({ w: 999, h: 50 })
+        expect(sql.select().from(schema.toolpathTable).get()!.gcode).toBe("G0 X1")
+        expect((yield* vcs.push(projectId, "tok")).oid).toBe(github.resolve("main"))
+        void tip
+      })))
 })

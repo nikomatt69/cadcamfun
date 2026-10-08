@@ -1123,7 +1123,7 @@ export type VcsCreateBranchPayload = { readonly name: string; readonly from?: st
 
 export type VcsCheckoutPayload = { readonly branch: string }
 
-export type VcsRestorePayload = { readonly rev: string }
+export type VcsRestorePayload = { readonly rev: string; readonly paths?: ReadonlyArray<string> | undefined }
 
 export type VcsOpenPullRequestPayload = {
   readonly title: string
@@ -1139,6 +1139,12 @@ export type VcsReviewPayload = {
   readonly path?: string | undefined
   readonly pointer?: string | undefined
 }
+
+export type VcsSetRemotePayload = { readonly remote: string | null }
+
+export type VcsPushPayload = { readonly branch?: string | undefined }
+
+export type VcsPullPayload = { readonly branch?: string | undefined }
 
 export type VcsDispatchPayload = { readonly ref?: string | undefined }
 
@@ -4624,8 +4630,21 @@ export type VcsStatusOutput = { branch: string; head: string | null; dirty: Arra
 
 export type VcsLogInput = {
   readonly id: { readonly id: string }["id"]
-  readonly rev?: { readonly rev?: string | undefined; readonly limit?: number | undefined }["rev"]
-  readonly limit?: { readonly rev?: string | undefined; readonly limit?: number | undefined }["limit"]
+  readonly rev?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["rev"]
+  readonly limit?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["limit"]
+  readonly path?: {
+    readonly rev?: string | undefined
+    readonly limit?: number | undefined
+    readonly path?: string | undefined
+  }["path"]
 }
 
 export type VcsLogOutput = Array<{
@@ -4668,7 +4687,11 @@ export type VcsCheckoutInput = {
 
 export type VcsCheckoutOutput = { branch: string; head: string | null; dirty: Array<string> }
 
-export type VcsRestoreInput = { readonly id: { readonly id: string }["id"]; readonly rev: VcsRestorePayload["rev"] }
+export type VcsRestoreInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly rev: VcsRestorePayload["rev"]
+  readonly paths?: VcsRestorePayload["paths"]
+}
 
 export type VcsRestoreOutput = {
   oid: string
@@ -4685,7 +4708,16 @@ export type VcsDiffInput = {
 
 export type VcsDiffOutput = Array<{
   path: string
-  kind: "drawings" | "components" | "toolpaths" | "project" | "other"
+  kind:
+    | "drawings"
+    | "components"
+    | "toolpaths"
+    | "materials"
+    | "tools"
+    | "machine-configs"
+    | "costs"
+    | "project"
+    | "other"
   id?: string | undefined
   name?: string | undefined
   status: "added" | "modified" | "deleted"
@@ -4774,7 +4806,16 @@ export type VcsPullRequestOutput = {
   }>
   changes: Array<{
     path: string
-    kind: "drawings" | "components" | "toolpaths" | "project" | "other"
+    kind:
+      | "drawings"
+      | "components"
+      | "toolpaths"
+      | "materials"
+      | "tools"
+      | "machine-configs"
+      | "costs"
+      | "project"
+      | "other"
     id?: string | undefined
     name?: string | undefined
     status: "added" | "modified" | "deleted"
@@ -4845,6 +4886,33 @@ export type VcsClosePullRequestOutput = {
   createdAt: string
   updatedAt: string
 }
+
+export type VcsRemoteInput = { readonly id: { readonly id: string }["id"] }
+
+export type VcsRemoteOutput = { remote: string | null }
+
+export type VcsSetRemoteInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly remote: VcsSetRemotePayload["remote"]
+}
+
+export type VcsSetRemoteOutput = { remote: string | null }
+
+export type VcsPushInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly "x-github-token": { readonly "x-github-token": string }["x-github-token"]
+  readonly branch?: VcsPushPayload["branch"]
+}
+
+export type VcsPushOutput = { oid: string; objects: number }
+
+export type VcsPullInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly "x-github-token": { readonly "x-github-token": string }["x-github-token"]
+  readonly branch?: VcsPullPayload["branch"]
+}
+
+export type VcsPullOutput = { kind: string; oid: string }
 
 export type VcsRunsInput = { readonly id: { readonly id: string }["id"] }
 

@@ -61,7 +61,7 @@ import { VcsHandlers } from "./http/vcs.ts"
 import { CompanionHandlers } from "./http/companion.ts"
 import { Companion } from "./services/companion.ts"
 import { ProjectVcsRepo } from "./repos/project-vcs-repo.ts"
-import { ProjectVcs } from "./services/project-vcs.ts"
+import { GitHubTransports, ProjectVcs } from "./services/project-vcs.ts"
 import { WorkflowRunner } from "./services/workflow-runner.ts"
 import { AnalyticsRepo } from "./repos/analytics-repo.ts"
 
@@ -69,7 +69,7 @@ import { AnalyticsRepo } from "./repos/analytics-repo.ts"
 export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathGeneratorHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, CompanionHandlers)
 
 /** Git-style history, pull requests and workflow runs (spec 13). */
-const VcsServices = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(Layer.provideMerge(ProjectVcsRepo.layer))
+const VcsServices = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(GitHubTransports.layer))
 
 /** Repositories + services the handlers depend on (needs `Database`). */
 const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, LibraryRepo.layer, NotificationService.layer, MachineConfigRepo.layer, StorageService.layer, LocalProfile.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, Companion.layer.pipe(Layer.provide(KvStore.layer)))

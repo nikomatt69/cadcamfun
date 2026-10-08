@@ -22,8 +22,9 @@ import system from "./en.system.json" with { type: "json" }
 import pricing from "./en.pricing.json" with { type: "json" }
 import detail from "./en.detail.json" with { type: "json" }
 import companion from "./en.companion.json" with { type: "json" }
+import vcsStrings from "./en.vcs.json" with { type: "json" }
 
-const table = { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion }
+const table = { ...base, ...shell, ...library, ...org, ...cad, ...cam, ...ai, ...plugins, ...legacy, ...settings, ...viewport, ...system, ...pricing, ...detail, ...companion, ...vcsStrings }
 
 /** The shipped locale, and the only one in v6.0. */
 export type Locale = "en"

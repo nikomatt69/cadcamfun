@@ -61,7 +61,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
 
   return handlers
     .handle("status", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(statusOf(params.id)))))
-    .handle("log", ({ params, query }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.log(params.id, query.rev, query.limit).pipe(Effect.map((l) => l.map(commitRow)))))))
+    .handle("log", ({ params, query }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.log(params.id, query.rev, query.limit, query.path).pipe(Effect.map((l) => l.map(commitRow)))))))
     .handle("commit", ({ params, payload }) =>
       Effect.gen(function*() {
         const actor = yield* access(params.id, "member")
@@ -91,7 +91,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
     .handle("restore", ({ params, payload }) =>
       Effect.gen(function*() {
         const actor = yield* access(params.id, "maintainer")
-        const oid = yield* wire(vcs.restore(params.id, payload.rev, actor))
+        const oid = yield* wire(vcs.restore(params.id, payload.rev, actor, payload.paths))
         const [entry] = yield* wire(vcs.log(params.id, oid, 1))
         return commitRow(entry!)
       }))
@@ -123,6 +123,25 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         return prRow(row)
       }))
     .handle("closePullRequest", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.closePullRequest(params.id, params.number).pipe(Effect.map(prRow))))))
+    .handle("remote", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.remote(params.id).pipe(Effect.map((remote) => ({ remote })))))))
+    .handle("setRemote", ({ params, payload }) =>
+      Effect.gen(function*() {
+        yield* access(params.id, "maintainer")
+        return { remote: yield* wire(vcs.setRemote(params.id, payload.remote)) }
+      }))
+    .handle("push", ({ params, payload, headers }) =>
+      Effect.gen(function*() {
+        yield* access(params.id, "maintainer")
+        return yield* wire(vcs.push(params.id, headers["x-github-token"], payload.branch))
+      }))
+    .handle("pull", ({ params, payload, headers }) =>
+      Effect.gen(function*() {
+        const actor = yield* access(params.id, "maintainer")
+        const result = yield* wire(vcs.pull(params.id, headers["x-github-token"], actor, payload.branch))
+        const { current } = yield* wire(vcs.branches(params.id))
+        yield* onPush(params.id, current)
+        return result
+      }))
     .handle("runs", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(runner.runs(params.id).pipe(Effect.map((l) => l.map(runRow)))))))
     .handle("dispatch", ({ params, payload }) =>
       Effect.gen(function*() {

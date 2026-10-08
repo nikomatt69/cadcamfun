@@ -10,8 +10,8 @@ export interface PropertyChange {
 
 export interface EntityChange {
   readonly path: string
-  /** `drawings`, `components`, `toolpaths`, `project`, or `other` for non-entity files. */
-  readonly kind: "drawings" | "components" | "toolpaths" | "project" | "other"
+  /** The entity directory (`drawings`, `components`, `toolpaths`, `materials`, `tools`, `machine-configs`, `costs`), `project`, or `other`. */
+  readonly kind: "drawings" | "components" | "toolpaths" | "materials" | "tools" | "machine-configs" | "costs" | "project" | "other"
   readonly id?: string
   readonly name?: string
   readonly status: "added" | "modified" | "deleted"
@@ -36,7 +36,7 @@ export const jsonChanges = (before: unknown, after: unknown, pointer = ""): Prop
 }
 
 const classify = (path: string): { kind: EntityChange["kind"]; id?: string } => {
-  const m = /^(drawings|components|toolpaths)\/([^/]+)\.json$/.exec(path)
+  const m = /^(drawings|components|toolpaths|materials|tools|machine-configs|costs)\/([^/]+)\.json$/.exec(path)
   if (m) return { kind: m[1] as EntityChange["kind"], id: m[2]! }
   return { kind: path === "project.json" ? "project" : "other" }
 }
