@@ -1,0 +1,66 @@
+name: iOS
+
+# Generates the Xcode project and builds the companion for the iOS simulator on a macOS runner (no signing needed).
+# Device builds and TestFlight need the owner's Apple developer team and certificates, which are not configured here.
+on:
+  push:
+    branches: ["claude/**", "main"]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator-build:
+    name: Xcode project + simulator build
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-apple-ios-sim
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/mobile/src-tauri/target
+          key: cargo-ios-${{ runner.os }}-${{ hashFiles('apps/mobile/src-tauri/Cargo.toml', 'apps/mobile/native/Cargo.toml') }}
+          restore-keys: cargo-ios-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate the Xcode project
+        working-directory: apps/mobile
+        run: bunx tauri ios init --ci
+
+      - name: Build for the iOS simulator
+        working-directory: apps/mobile
+        run: bunx tauri ios build --debug --target aarch64-sim --ci
+
+      - name: Upload the generated Xcode project
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcode-project
+          path: apps/mobile/src-tauri/gen/apple
+          if-no-files-found: warn
