@@ -156,6 +156,14 @@ export function SettingsScreen(): JSX.Element {
             </div>
 
             <div class="mt-8">
+              <h4 class="text-sm font-medium text-gray-900 dark:text-white">{t("settings.glass.title")}</h4>
+              <label class="mt-3 flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300" data-testid="glass-setting">
+                <input type="checkbox" class="mt-1" aria-label={t("settings.glass.title")} checked={app.settings.settings().glass} onChange={(event) => app.settings.update({ glass: event.currentTarget.checked })} />
+                <span>{t("settings.glass.body")}</span>
+              </label>
+            </div>
+
+            <div class="mt-8">
               <h4 class="text-sm font-medium text-gray-900 dark:text-white">{t("settings.lang.available")}</h4>
               <div class="mt-4 space-y-4">
                 <For each={Object.entries(SUPPORTED_LANGUAGES)}>

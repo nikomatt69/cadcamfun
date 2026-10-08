@@ -7,7 +7,7 @@
  * the typed client and "Manage Billing" posts `POST /api/subscriptions/portal` like the
  * legacy `createBillingPortalSession`.
  */
-import { For, Show, type JSX } from "solid-js"
+import { For, Show, createSignal, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { AlertTriangle, Clock, Crown, Shield, Star } from "lucide-solid"
 import { t } from "../../i18n/index.ts"
@@ -60,6 +60,10 @@ const FREE = PLAN_FEATURES.FREE!
 
 const planFeatures = (plan: string): PlanFeatures => PLAN_FEATURES[plan] ?? FREE
 
+/** Storage limits are MB in the API; show whole MB below 1 GB (100 MB, not 0.0977 GB). */
+const storageValue = (mb: number): string =>
+  mb >= 1024 ? t("subscription.limitStorage", { value: mb / 1024 }) : t("subscription.limitStorageMb", { value: mb })
+
 const formatDate = (iso: string): string =>
   new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })
 
@@ -84,12 +88,18 @@ export function SubscriptionSettings(): JSX.Element {
   const showManageBilling = () => (info()?.plan ?? "FREE") !== "FREE" && !isOnTrial()
   const showUpgradeLink = () => ((info()?.plan ?? "FREE") === "FREE" && !isOnTrial()) || isOnTrial()
 
+  const [billingPending, setBillingPending] = createSignal(false)
+  const [billingError, setBillingError] = createSignal<string>()
   const handleManageBilling = async (): Promise<void> => {
+    setBillingPending(true)
+    setBillingError(undefined)
     try {
       const reply = await app.runtime.run(app.client.billing.portal({ payload: {} }))
       if (reply.url) window.open(reply.url, "_blank", "noopener,noreferrer")
     } catch {
-      /* the card renders the read error above */
+      setBillingError(t("subscription.billingError"))
+    } finally {
+      setBillingPending(false)
     }
   }
 
@@ -181,7 +191,7 @@ export function SubscriptionSettings(): JSX.Element {
                 <ul class="list-disc pl-5 space-y-1">
                   <li>{t("subscription.limitProjects", { value: features().limits.maxProjects === -1 ? t("subscription.unlimited") : features().limits.maxProjects })}</li>
                   <li>{t("subscription.limitComponents", { value: features().limits.maxComponents === -1 ? t("subscription.unlimited") : features().limits.maxComponents })}</li>
-                  <li>{t("subscription.limitStorage", { value: features().limits.maxStorage / 1024 })}</li>
+                  <li>{storageValue(features().limits.maxStorage)}</li>
                 </ul>
               </dd>
             </div>
@@ -193,7 +203,8 @@ export function SubscriptionSettings(): JSX.Element {
             <button
               type="button"
               onClick={() => void handleManageBilling()}
-              class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={subscription.loading() || billingPending()}
+              class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-700 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t("subscription.manageBilling")}
             </button>
@@ -210,6 +221,9 @@ export function SubscriptionSettings(): JSX.Element {
             </A>
           </Show>
         </div>
+        <Show when={billingError() !== undefined}>
+          <p role="alert" class="mt-3 text-sm text-red-600 dark:text-red-400">{billingError()}</p>
+        </Show>
       </div>
     </div>
   )

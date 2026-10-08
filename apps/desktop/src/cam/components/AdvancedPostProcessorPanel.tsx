@@ -118,7 +118,19 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
   const heidenhain = (): cam.advanced.HeidenhainOptions => options().controllerSpecific.heidenhain
 
   const SectionHeader = (p: { readonly section: keyof ReturnType<typeof expanded>; readonly icon: JSX.Element; readonly title: JSX.Element }): JSX.Element => (
-    <div class="flex items-center justify-between p-4 cursor-pointer" onClick={() => toggleSection(p.section)}>
+    <div
+      class="flex items-center justify-between p-4 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded()[p.section]}
+      onClick={() => toggleSection(p.section)}
+      onKeyDown={(event: KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          toggleSection(p.section)
+        }
+      }}
+    >
       <h3 class="text-lg font-medium text-gray-800 flex items-center">
         {p.icon}
         {p.title}
@@ -446,8 +458,9 @@ export default function AdvancedPostProcessorPanel(props: AdvancedPostProcessorP
 
                   <button
                     type="button"
-                    class="flex items-center px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="flex items-center px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => void processGcode()}
+                    disabled={isProcessing()}
                   >
                     <Settings size={16} class="mr-2" />
                     Reprocess

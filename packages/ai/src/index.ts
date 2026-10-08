@@ -30,3 +30,22 @@ export { CADCAM_SKILLS } from "./skills/index.ts"
 export * from "./workspace-context.ts"
 export * from "./heartbeat.ts"
 export { readHostSessionState, type HostSessionState } from "./nikcli/chat.ts"
+export {
+  BACKGROUND_TOOL_IDS,
+  backgroundToolIds,
+  backgroundTools
+} from "./nikcli/background-tools.ts"
+export { BackgroundToolsRunner } from "./nikcli/background-tools-runner.ts"
+export {
+  BackgroundTaskManager,
+  BackgroundTaskManagerError,
+  MAX_BACKGROUND_TASKS,
+  MAX_QUEUED_BACKGROUND_TASKS,
+  type BackgroundTask,
+  type BackgroundTaskInput,
+  type BackgroundTaskManagerOptions,
+  type BackgroundTaskOwner,
+  type BackgroundTaskRunnerInput,
+  type BackgroundTaskStatus
+} from "./nikcli/background-tasks.ts"
+export { backgroundToolSpecs, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"

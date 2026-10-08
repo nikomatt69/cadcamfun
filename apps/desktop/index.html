@@ -4,9 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CADCAM FUN</title>
+    <style>
+      /* Neutral until the app paints; no opaque colour here, so the window material shows through in the desktop app. */
+      html, body { margin: 0; font: 16px system-ui, -apple-system, sans-serif; color: #475569; }
+      #root:empty::before { content: "Loading…"; position: fixed; inset: 0; display: grid; place-items: center; }
+    </style>
   </head>
-  <body style="margin:0;background:#b91c1c;color:#fff;font:16px sans-serif">
-    <div id="root">loading</div>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

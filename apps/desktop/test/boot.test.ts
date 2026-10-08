@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
-import { ApiClient, BOOT_TIMEOUT_MS, connect, createRuntime, withTimeout } from "../src/state/client.ts"
+import { ApiClient, BOOT_TIMEOUT_MS, connect, createRuntime, messageOf, withTimeout } from "../src/state/client.ts"
 import { startStubApi, type StubServer } from "./helpers/stub-server.ts"
 
 /** `projects.list()` resolved against the runtime's own client service. */
@@ -34,6 +34,16 @@ describe("withTimeout", () => {
   test("rejects with the reason when the deadline passes", async () => {
     const never = new Promise<never>(() => {})
     await expect(withTimeout(never, 10, "too slow")).rejects.toThrow("too slow")
+  })
+})
+
+describe("the reason shown when the sidecar cannot be reached", () => {
+  test("is readable for the plain objects the Tauri shell rejects with, never [object Object]", () => {
+    expect(messageOf(new Error("boom"))).toBe("boom")
+    expect(messageOf("plain")).toBe("plain")
+    expect(messageOf({ kind: "sidecar", message: "the sidecar did not become ready within 60 seconds" })).toBe("the sidecar did not become ready within 60 seconds")
+    expect(messageOf({ kind: "sidecar" })).toBe('{"kind":"sidecar"}')
+    expect(messageOf(undefined)).toBe("undefined")
   })
 })
 

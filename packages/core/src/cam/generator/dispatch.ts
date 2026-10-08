@@ -14,6 +14,7 @@ import { circleToolpath, polygonToolpath, rectangleToolpath } from "./basic.ts"
 import { applyOriginOffset, f3 } from "./common.ts"
 import { flattenElements, isContainer, orderForMachining, outsideStock, shiftElement, topOf } from "./elements.ts"
 import type { CadElement, GeometryInput, Stock, ToolpathSettings } from "./schema.ts"
+import { isSolidElement, surfaceProgram } from "./surface.ts"
 import { splitUnifiedMembers, unifiedGcode } from "./unified-geometry.ts"
 
 /** Operations that follow the element's outline: a `component` runs them as one unified geometry (legacy `generateComponentToolpath`). */
@@ -53,9 +54,54 @@ export const withinStock = (s: ToolpathSettings, stock: Stock | undefined, avail
   }
 }
 
+/**
+ * `3d_surface` over the selection: every solid (containers flattened) is placed on the stock like any other element and cut as
+ * one part by the surface engine; the elements that are not solids (outlines, text) keep their per-element path.
+ */
+const surfaceToolpath = (s0: ToolpathSettings, g: GeometryInput): string => {
+  const stock = g.stock
+  const { dx, dy } = originShift(s0, g)
+  const flat = flattenElements(g.selectedElements)
+  const groupTop = Math.max(...flat.map(topOf))
+  const dz = stock ? stock.topZ - groupTop : 0
+  const place = (element: CadElement): CadElement => shiftElement(shiftElement(element, 0, 0, dz), dx, dy, 0)
+  const solids = flat.filter(isSolidElement)
+  const rest = flat.filter(e => !isSolidElement(e))
+  let out = `; Toolpath from ${g.selectedElements.length} selected element(s), ${solids.length} solid(s) as a 3D surface\n`
+  out += stockComment(stock)
+  if (stock) out += `; Machining starts at the stock top (Z${f3(stock.topZ)}); elements aligned by ${f3(dz)}mm\n`
+  if (solids.length > 0) {
+    const placed = solids.map(place)
+    if (solids.some(element => outsideStock(element, stock))) out += "; Warning: element leaves the stock rectangle\n"
+    const below = stock ? Math.max(0, stock.topZ - Math.max(...placed.map(topOf))) : 0
+    const limited = withinStock(s0, stock, stock ? stock.depth - below : undefined)
+    if (limited.warning) out += `; Warning: ${limited.warning}\n`
+    if (!stock || stock.depth - below > 0) {
+      const program = surfaceProgram(placed, limited.settings, stock, { dx, dy })
+      if (program) {
+        for (const warning of program.warnings) out += `; Warning: ${warning}\n`
+        out += program.gcode
+      }
+    }
+  }
+  rest.forEach(element => {
+    const label = `${String(element["type"])}${element["id"] ? ` (${String(element["id"])})` : ""}`
+    try {
+      out += `\n; Element ${label} is not a solid: machined along its outline\n`
+      out += elementOperation(place(element), s0, g)
+    } catch (cause) {
+      out += `; Warning: ${label} skipped: ${cause instanceof Error ? cause.message : String(cause)}\n`
+    }
+  })
+  return out
+}
+
 export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string => {
   const picked = g.selectedElements
   if (picked.length === 0) return "; No element selected for toolpath generation\n"
+
+  // 3D surface: the solids are one part model for the surface engine; what is not a solid is machined as before.
+  if (s0.operationType === "3d_surface") return surfaceToolpath(s0, g)
 
   // Containers are machined through their members; the legacy comment block is kept for them. A `component` is
   // sliced as one unified geometry; the members it cannot slice (line, text, ...) are machined on their own.

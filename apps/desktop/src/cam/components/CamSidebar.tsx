@@ -15,6 +15,7 @@ import { Box, ChevronLeft, ChevronRight, Eye, EyeOff, Grid, List, Settings, Wren
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import OriginControls from "../../cad/components/OriginControls.tsx"
 import { useCamStore } from "../store/camStore.ts"
+import { t } from "../../i18n/index.ts"
 import WorkpieceSetup from "./WorkpieceSetup.tsx"
 import CamElementExplorer from "./explorer/CamElementExplorer.tsx"
 import ViewSettings from "./explorer/ViewSettings.tsx"
@@ -22,10 +23,11 @@ import OperationsList from "./OperationsList.tsx"
 
 export type SidebarTab = "explorer" | "settings" | "machine"
 
-const TABS: ReadonlyArray<{ readonly id: SidebarTab; readonly label: string; readonly title: string; readonly icon: (size: number) => JSX.Element }> = [
-  { id: "explorer", label: "Explorer", title: "CAD elements", icon: (size) => <List size={size} /> },
-  { id: "settings", label: "Settings", title: "View settings", icon: (size) => <Settings size={size} /> },
-  { id: "machine", label: "Machine", title: "Machine, workpiece and toolpaths", icon: (size) => <Wrench size={size} /> }
+/** Labels/titles are i18n keys resolved through `t()` at render. */
+const TABS: ReadonlyArray<{ readonly id: SidebarTab; readonly label: "cam.explorer" | "cam.settings" | "cam.machine"; readonly title: "cam.explorerTitle" | "cam.viewSettingsTitle" | "cam.machineTitle"; readonly icon: (size: number) => JSX.Element }> = [
+  { id: "explorer", label: "cam.explorer", title: "cam.explorerTitle", icon: (size) => <List size={size} /> },
+  { id: "settings", label: "cam.settings", title: "cam.viewSettingsTitle", icon: (size) => <Settings size={size} /> },
+  { id: "machine", label: "cam.machine", title: "cam.machineTitle", icon: (size) => <Wrench size={size} /> }
 ]
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
@@ -74,7 +76,9 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                   <Motion.button
                     class={tabClass(props.activeTab === tab.id, "w-full py-4 flex flex-col items-center justify-center rounded-xl")}
                     onClick={() => props.onSelectTab(tab.id)}
-                    title={tab.title}
+                    title={t(tab.title)}
+                    aria-label={t(tab.title)}
+                    aria-pressed={props.activeTab === tab.id}
                     animate={props.activeTab === tab.id ? hover : {}}
                     hover={hover}
                     press={press}
@@ -86,13 +90,14 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
                 <Motion.button
                   class={tabClass(props.activeTab === tab.id, "flex-1 py-3 px-3 rounded-xl")}
                   onClick={() => props.onSelectTab(tab.id)}
+                  aria-pressed={props.activeTab === tab.id}
                   animate={props.activeTab === tab.id ? hover : {}}
                   hover={hover}
                   press={press}
                 >
                   <div class="flex items-center justify-center">
                     {tab.icon(16)}
-                    <span class="ml-2">{tab.label}</span>
+                    <span class="ml-2">{t(tab.label)}</span>
                   </div>
                 </Motion.button>
               </Show>
@@ -109,20 +114,36 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
               <Show when={props.activeTab === "explorer"}>
                 <div class="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
                   <List size={20} class="mx-auto mb-2" />
-                  Open sidebar
-                  <br />
-                  to view elements
+                  {t("cam.openSidebarHint")}
                 </div>
               </Show>
               <Show when={props.activeTab === "settings"}>
                 <div class="space-y-4 p-1">
-                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle Grid" onClick={() => cad.toggleGrid()}>
+                  <button
+                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    title={t("cam.toggleGrid")}
+                    aria-label={t("cam.toggleGrid")}
+                    aria-pressed={cad.gridVisible}
+                    onClick={() => cad.toggleGrid()}
+                  >
                     <Grid size={20} class={cad.gridVisible ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
                   </button>
-                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle Axis" onClick={() => cad.toggleAxis()}>
+                  <button
+                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    title={t("cam.toggleAxis")}
+                    aria-label={t("cam.toggleAxis")}
+                    aria-pressed={cad.axisVisible}
+                    onClick={() => cad.toggleAxis()}
+                  >
                     <Show when={cad.axisVisible} fallback={<EyeOff size={20} class="text-gray-600 dark:text-gray-400" />}><Eye size={20} class="text-blue-600 dark:text-blue-400" /></Show>
                   </button>
-                  <button class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30" title="Toggle View Mode" onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}>
+                  <button
+                    class="p-3 rounded-xl hover:bg-white/40 dark:hover:bg-gray-700/40 shadow-md border border-white/30 dark:border-gray-600/30"
+                    title={t("cam.toggleViewMode")}
+                    aria-label={t("cam.toggleViewMode")}
+                    aria-pressed={cad.viewMode === "3d"}
+                    onClick={() => cad.setViewMode(cad.viewMode === "2d" ? "3d" : "2d")}
+                  >
                     <Box size={20} class={cad.viewMode === "3d" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"} />
                   </button>
                 </div>
@@ -170,7 +191,8 @@ export default function CamSidebar(props: CamSidebarProps): JSX.Element {
         <Motion.button
           class="p-3 rounded-xl hover:bg-white/60 dark:hover:bg-gray-700/60 transition-all duration-200 backdrop-blur-sm border border-white/40 dark:border-gray-600/40 shadow-sm"
           onClick={() => props.setIsOpen(!props.isOpen)}
-          title={props.isOpen ? "Collapse sidebar" : "Expand sidebar"}
+          title={t(props.isOpen ? "cam.collapse" : "cam.expand")}
+          aria-label={t(props.isOpen ? "cam.collapse" : "cam.expand")}
           hover={hover}
           press={press}
         >

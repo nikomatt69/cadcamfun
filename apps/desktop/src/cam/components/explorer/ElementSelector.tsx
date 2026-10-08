@@ -8,6 +8,7 @@ import { useElementsStore } from "../../../cad/store/elementsStore.ts"
 import type { ToolpathSettings } from "../../lib/elementJob.ts"
 import { formatDuration } from "../../lib/multiToolpath.ts"
 import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
+import { t } from "../../../i18n/index.ts"
 
 export interface ElementSelectorProps {
   readonly globalSettings: ToolpathSettings
@@ -68,10 +69,10 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
 
       {/* CAD elements */}
       <div class="mb-6">
-        <h4 class="text-sm font-semibold text-gray-300 mb-2">Elementi CAD Disponibili ({validElements().length})</h4>
+        <h4 class="text-sm font-semibold text-gray-300 mb-2">{t("cam.multi.availableElements", { count: validElements().length })}</h4>
 
         <div class="max-h-60 overflow-y-auto border border-gray-700 rounded-lg p-2">
-          <Show when={validElements().length > 0} fallback={<p class="text-gray-500 text-sm text-center py-4">Nessun elemento CAD disponibile</p>}>
+          <Show when={validElements().length > 0} fallback={<p class="text-gray-500 text-sm text-center py-4">{t("cam.multi.noElements")}</p>}>
             <div class="space-y-1">
               <For each={validElements()}>
                 {element => {
@@ -121,7 +122,7 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
             class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             <Layers size={16} />
-            Genera Toolpath per {selectedForGeneration().size} elementi
+            {t("cam.multi.generateFor", { count: selectedForGeneration().size })}
           </button>
         </Show>
       </div>
@@ -165,11 +166,11 @@ export default function ElementSelector(props: ElementSelectorProps): JSX.Elemen
                         <Settings size={16} />
                       </button>
 
-                      <button onClick={() => store.moveToolpathUp(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === 0} title="Sposta su">
+                      <button onClick={() => store.moveToolpathUp(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === 0} title={t("cam.multi.moveUp")} aria-label={t("cam.multi.moveUp")}>
                         <ChevronUp size={16} />
                       </button>
 
-                      <button onClick={() => store.moveToolpathDown(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === store.toolpaths.length - 1} title="Sposta giù">
+                      <button onClick={() => store.moveToolpathDown(toolpath.id)} class="p-1 text-gray-400 hover:text-white transition-colors" disabled={index() === store.toolpaths.length - 1} title={t("cam.multi.moveDown")} aria-label={t("cam.multi.moveDown")}>
                         <ChevronDown size={16} />
                       </button>
 

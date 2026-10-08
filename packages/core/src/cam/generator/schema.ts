@@ -68,6 +68,17 @@ export const ToolpathSettingsSchema = Schema.Struct({
   finishingPass: withDefault(Schema.Boolean, false),
   finishingAllowance: withDefault(NonNegative, 0.2),
   finishingStrategy: withDefault(Schema.Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
+  /**
+   * `3d_surface` only. `roughing` clears the stock level by level around the part (and, with `finishingPass`, is followed by the
+   * finishing strategy below); `parallel` and `waterline` finish the surface directly.
+   */
+  surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline"]), "roughing"),
+  /** Cusp height left between raster lines of a ball nose cutter, mm; 0 = use `stepover`. */
+  scallop: withDefault(NonNegative, 0),
+  /** Direction of the raster lines, degrees from +X. */
+  rasterAngle: withDefault(Num, 0),
+  /** Every raster line in the same direction (otherwise zig-zag). */
+  rasterOneWay: withDefault(Schema.Boolean, false),
   useAI: withDefault(Schema.Boolean, false),
   aiDifficulty: withDefault(Schema.Literals(["simple", "moderate", "complex"]), "moderate"),
   aiOptimize: withDefault(Schema.Literals(["speed", "quality", "balance"]), "balance"),

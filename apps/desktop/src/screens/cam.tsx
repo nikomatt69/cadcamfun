@@ -68,7 +68,6 @@ export function CamScreen() {
   const [toolId, setToolId] = createSignal("")
   const [error, setError] = createSignal<string>()
   const [pending, setPending] = createSignal(false)
-  const [busy, setBusy] = createSignal(false)
   const [gcode, setGcode] = createSignal("")
   const [program, setProgram] = createSignal<cam.Program>()
   const [playing, setPlaying] = createSignal(false)
@@ -429,7 +428,7 @@ export function CamScreen() {
               when={sidebarOpen()}
               fallback={
                 <div class="cad-empty">
-                  <button class="cad-button" onClick={() => setSidebarOpen(true)}>
+                  <button class="cad-button" aria-label={t("cam.expand")} onClick={() => setSidebarOpen(true)}>
                     <ChevronRight size={18} />
                   </button>
                   <p>{t("cam.expand")}</p>
@@ -512,8 +511,13 @@ export function CamScreen() {
                   <ul class="cad-solid-list">
                     <For each={app.drawing().entities}>
                       {(entity) => (
-                        <li class="cad-solid-row">
-                          <button type="button" class="cad-solid-name">
+                        <li class="cad-solid-row" classList={{ selected: app.editor.selection().includes(entity.id) }}>
+                          <button
+                            type="button"
+                            class="cad-solid-name"
+                            aria-pressed={app.editor.selection().includes(entity.id)}
+                            onClick={() => app.editor.setSelection([entity.id])}
+                          >
                             <Box size={14} />
                             <span>{entity._tag}</span>
                             <small>{entity.id.slice(0, 6)}</small>
@@ -777,7 +781,7 @@ export function CamScreen() {
         <div class="cad-status-group">
           <span>{t("cam.lines", { count: gcode() ? gcode().split("\n").length : 0 })}</span>
           <span>{t("cam.duration", { seconds: duration().toFixed(1) })}</span>
-          <span role="status" aria-live="polite">{busy() ? t("cam.loading") : notice() ?? t("cam.ready")}</span>
+          <span role="status" aria-live="polite">{pending() ? t("cam.loading") : notice() ?? t("cam.ready")}</span>
         </div>
       </footer>
 

@@ -46,6 +46,16 @@ describe("/api/ai credentials, status and models", () => {
     expect(models.body.every((m: { configured: boolean }) => !m.configured)).toBe(true)
   })
 
+  test("a saved key is kept in <data dir>/ai/credentials.json (owner-only) and removed again when cleared", async () => {
+    const { existsSync, readFileSync, statSync } = await import("node:fs")
+    const file = `${app.dataDir}/ai/credentials.json`
+    expect((await configure()).status).toBe(200)
+    expect(JSON.parse(readFileSync(file, "utf8")).providers.anthropic.key).toBe("sk-ant-sentinel-123456")
+    expect(statSync(file).mode & 0o077).toBe(0)
+    expect((await app.call("/api/ai/credentials/anthropic", { method: "DELETE" })).status).toBe(200)
+    expect(existsSync(file) && "anthropic" in JSON.parse(readFileSync(file, "utf8")).providers).toBe(false)
+  })
+
   test("credentials are validated, stored in memory, never echoed, and can be cleared", async () => {
     expect((await app.call("/api/ai/credentials", { method: "PUT", json: { provider: "nope", key: "k" } })).body.message).toBe("Unknown provider")
     expect((await app.call("/api/ai/credentials", { method: "PUT", json: { provider: "openai" } })).body.message).toBe("API key is required")

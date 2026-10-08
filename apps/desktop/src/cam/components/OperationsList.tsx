@@ -34,12 +34,12 @@ export default function OperationsList(props: OperationsListProps): JSX.Element 
   return (
     <Motion.div class="w-full" {...rise} transition={{ duration: 0.4 }}>
       <Card variant="default" delay={0.05} class="w-full p-4">
-        <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Operations</h3>
+        <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">{t("cam.operations")}</h3>
         <Show
           when={props.toolpaths.length > 0}
           fallback={<p class="text-xs text-gray-500 dark:text-gray-400">{t("cam.emptyOperations")}</p>}
         >
-          <div class="space-y-2">
+          <div class="space-y-2" role="listbox" aria-label={t("cam.operations")}>
             <For each={props.toolpaths}>
               {(row) => (
                 <Motion.div
@@ -48,24 +48,35 @@ export default function OperationsList(props: OperationsListProps): JSX.Element 
                       ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
                       : "bg-white/60 dark:bg-gray-800/60 border-white/40 dark:border-gray-600/40 hover:bg-white/80 dark:hover:bg-gray-700/80"
                   }`}
+                  role="option"
+                  aria-selected={props.selectedId === row.id}
+                  tabIndex={0}
                   onClick={() => props.onSelect(row.id)}
+                  onKeyDown={(event: KeyboardEvent) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      props.onSelect(row.id)
+                    }
+                  }}
                   hover={hover}
                   press={press}
                 >
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{row.name}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{row.toolId} · {row.moves} moves</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{row.toolId} · {t("cam.downloads", { count: row.moves })}</div>
                   </div>
                   <Motion.button
                     class="ml-2 p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
-                    title={t("cam.deleteOperation")}
+                    title={t("cam.deleteToolpath")}
+                    aria-label={t("cam.deleteToolpath")}
                     hover={{ scale: 1.1 }}
                     press={{ scale: 0.92 }}
                     onClick={(event: MouseEvent) => {
                       event.stopPropagation()
                       if (window.confirm(t("cam.confirmDelete"))) {
                         props.onDelete(row.id)
-                        toast.success("Operation deleted")
+                        toast.success(t("cam.operationDeleted"))
                       }
                     }}
                   >

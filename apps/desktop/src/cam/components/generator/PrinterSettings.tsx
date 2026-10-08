@@ -30,7 +30,7 @@ export function PrinterSettings(props: { readonly element: CadElement | undefine
           <label class={LABEL}>Layer Height (mm)</label>
           <div class="flex items-center">
             <NumberField min="0.05" max="0.4" step="0.05" value={gen.settings.layerHeight} onValue={(value) => gen.updateSettings("layerHeight", value)} />
-            <div class="ml-2 tooltip" data-tip="Layer height determines the resolution of your print. Lower values produce finer details but increase print time.">
+            <div class="ml-2 tooltip" data-tooltip="Layer height determines the resolution of your print. Lower values produce finer details but increase print time.">
               <Info size={18} class="text-gray-500" />
             </div>
           </div>

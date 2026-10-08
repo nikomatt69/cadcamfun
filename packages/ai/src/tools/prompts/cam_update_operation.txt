@@ -9,7 +9,7 @@ Do not use it
 
 Parameters
 - operationId: the id from cam_create_operation or cam_list_operations.
-- params: only the settings to change, same names and units as cam_create_operation (toolDiameter, depth, stepdown, stepover, feedrate, plungerate, rpm, offset, direction, material, finishingPass, finishingAllowance...). The others keep their values.
+- params: only the settings to change, same names and units as cam_create_operation (toolDiameter, depth, stepdown, stepover, feedrate, plungerate, rpm, offset, direction, material, finishingPass, finishingAllowance, and for 3d_surface surfaceStrategy, scallop, rasterAngle, rasterOneWay...). The others keep their values.
 
 Result (JSON)
 - ok, operationId, settings (the main values after the change), note.

@@ -42,6 +42,7 @@
   "titlebar.item.openLogs": "Show logs folder",
   "titlebar.item.close": "Close menu",
 
+  "status.label": "Status bar",
   "status.units": "Units",
   "status.snap": "Snap",
   "status.snapOff": "Off",

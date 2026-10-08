@@ -9,6 +9,7 @@ import { CirclePreview, PolygonPreview, RectanglePreview } from "./GeometryPrevi
 import { PrinterPreview } from "./PrinterPreview.tsx"
 import { PrinterSettings } from "./PrinterSettings.tsx"
 import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { t } from "../../../i18n/index.ts"
 
 const BTN_BLUE = "px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
 const BTN_GREEN = "px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -191,6 +192,36 @@ const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT
 ]
 
 /** The touch probe / tool setter: which cycle, how it approaches, the stylus, and the dialect of the control. */
+/** The 3D surface strategies (the surface engine over the selected solids); roughing is followed by the finishing pass of the Advanced section. */
+function SurfaceSettings(): JSX.Element {
+  const gen = useGeneratorStore()
+  const s = () => gen.settings
+  const raster = () => s().surfaceStrategy === "parallel" || (s().surfaceStrategy === "roughing" && s().finishingPass && s().finishingStrategy !== "contour")
+  return (
+    <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="surface-settings">
+      <div>
+        <label class={LABEL}>Surface strategy</label>
+        <select class={INPUT} aria-label="Surface strategy" value={s().surfaceStrategy} onChange={(event) => gen.updateSettings("surfaceStrategy", event.currentTarget.value as typeof gen.settings.surfaceStrategy)}>
+          <option value="roughing">Roughing (Z levels around the part)</option>
+          <option value="parallel">Parallel finishing (raster on the surface)</option>
+          <option value="waterline">Waterline finishing (constant Z contours)</option>
+        </select>
+      </div>
+      <Show when={raster()}>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class={LABEL}>Raster angle (°)</label><NumberField step="1" value={s().rasterAngle} onValue={(value) => gen.updateSettings("rasterAngle", value)} /></div>
+          <div><label class={LABEL}>Cusp height (mm)</label><NumberField min="0" step="0.005" value={s().scallop} onValue={(value) => gen.updateSettings("scallop", value)} /></div>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={s().rasterOneWay} onChange={(event) => gen.updateSettings("rasterOneWay", event.currentTarget.checked)} />
+          Cut every line in the same direction
+        </label>
+      </Show>
+      <p class="text-xs text-gray-500">The selected solids are cut as one part: undercuts, holes and boolean results included. A ball nose cutter follows the surface exactly; a cusp height of 0 uses the stepover instead. Turn on the finishing pass to leave material in the roughing and finish it afterwards.</p>
+    </div>
+  )
+}
+
 function ProbeSettings(): JSX.Element {
   const gen = useGeneratorStore()
   const s = () => gen.settings
@@ -281,6 +312,10 @@ export function OperationSection(): JSX.Element {
         <ProbeSettings />
       </Show>
 
+      <Show when={gen.settings.machineType === "mill" && gen.settings.operationType === "3d_surface"}>
+        <SurfaceSettings />
+      </Show>
+
       <Show when={gen.settings.machineType === "mill"}>
         <div>
           <label class={LABEL}>Geometry Type</label>
@@ -352,7 +387,7 @@ export function OperationSection(): JSX.Element {
                 <button
                   type="button"
                   class="absolute top-2 right-2 p-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                  title="Genera G-code con AI"
+                  title={t("cam.generateAi")}
                   onClick={() => {
                     const s = gen.settings
                     gen.setAIProcessing(true)

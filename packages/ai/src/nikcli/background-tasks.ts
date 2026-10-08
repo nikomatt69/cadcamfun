@@ -25,7 +25,7 @@ export interface BackgroundTask extends BackgroundTaskInput {
 }
 
 export interface BackgroundTaskManagerOptions {
-  readonly runner: (input: BackgroundTaskRunnerInput) => Promise<string>;
+  readonly runner?: (input: BackgroundTaskRunnerInput) => Promise<string>;
   readonly onCompletion?: (task: BackgroundTask) => void | Promise<void>;
 }
 
@@ -59,12 +59,25 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   private readonly entries = new Map<string, Entry>();
   private readonly queue: Entry[] = [];
   private readonly active = new Set<Promise<void>>();
-  private readonly options: BackgroundTaskManagerOptions;
+  private options: BackgroundTaskManagerOptions;
   private disposed = false;
   private disposal: Promise<void> | undefined;
 
   constructor(options: BackgroundTaskManagerOptions) {
     this.options = { ...options };
+  }
+
+  /** Install or replace the runner (the function that performs each task). */
+  setRunner(runner: (input: BackgroundTaskRunnerInput) => Promise<string>): void {
+    this.options = { ...this.options, runner };
+    // Wake any task that already drained to "queued" before the runner was
+    // attached — the previous `drain()` saw no runner and stopped.
+    this.drain();
+  }
+
+  /** Install or replace the completion callback (the host wake-up hook). */
+  setOnCompletion(callback: (task: BackgroundTask) => void | Promise<void>): void {
+    this.options = { ...this.options, onCompletion: callback };
   }
 
   enqueue(input: BackgroundTaskInput): BackgroundTask {
@@ -149,8 +162,14 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     while (!this.disposed && this.active.size < MAX_BACKGROUND_TASKS) {
       const entry = this.queue.shift();
       if (!entry) break;
+      const runner = this.options.runner;
+      if (runner === undefined) {
+        // No runner installed yet: push the entry back and wait for setRunner().
+        this.queue.unshift(entry);
+        break;
+      }
       entry.task = { ...entry.task, status: "running" };
-      const work = Promise.resolve().then(() => this.options.runner({
+      const work = Promise.resolve().then(() => runner({
         projectId: entry.task.projectId,
         parentSessionId: entry.task.parentSessionId,
         prompt: entry.task.prompt,

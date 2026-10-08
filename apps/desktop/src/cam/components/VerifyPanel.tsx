@@ -128,7 +128,7 @@ export default function VerifyPanel(): JSX.Element {
             </div>
             <Show when={errors() > 0}>
               <button type="button" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-blue-300 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm" onClick={() => ask(fixVerificationPrompt(report().issues))} data-testid="verify-ask-ai">
-                <Sparkles size={16} />Ask the assistant to fix it
+                <Sparkles size={16} />{t("cam.verify.askAssistant")}
               </button>
             </Show>
             <Show when={stale()}><p class="text-xs text-yellow-700" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>

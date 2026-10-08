@@ -1,4 +1,4 @@
-import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiBackground, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -28,6 +28,7 @@ const aiError = (e: { _tag: string; message?: string }) =>
 export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(handlers) {
   const ai = yield* AiService
   const credentials = yield* AiCredentials
+  const background = yield* Effect.serviceOption(AiBackground)
   const host = yield* Effect.serviceOption(AiHost)
   const { query } = yield* Database
   const kv = yield* KvStore
@@ -137,6 +138,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("removeSession", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
       yield* ai.abort(payload.sessionId)
+      // Stop any background workers owned by this parent session; the wake
+      // path will then see the host session is gone and fail to deliver.
+      if (Option.isSome(background)) {
+        yield* background.value.cancelForParent(payload.sessionId).pipe(Effect.orElseSucceed(() => 0))
+      }
       if (!Option.isSome(host)) return { removed: false }
       const removed = yield* Effect.promise(async () => {
         try {
@@ -174,6 +180,10 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatAbort", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
       yield* ai.abort(payload.sessionId)
+      // Abort the current chat turn but leave background workers running: the
+      // user may just have wanted to stop a long streaming reply, not every
+      // delegated investigation. They can cancel tasks individually with the
+      // `agent_task_cancel` tool or wait for them to finish.
       return { message: "Aborted" }
     }))
     .handle("permissionReply", ({ payload }) => Effect.gen(function*() {

@@ -38,7 +38,29 @@ import {
 } from "./prompts/workflows.ts"
 
 /** The embedded nikcli host, when the sidecar started it; chat falls back to `DirectModel` without it. */
-export class AiHost extends Context.Service<AiHost, { readonly runtime: NikCliRuntime }>()("cadcamfun/AiHost") {}
+export class AiHost extends Context.Service<AiHost, {
+  readonly runtime: NikCliRuntime
+  /**
+   * Runtime-wide scheduler the host instantiates up-front so every project
+   * advertises the `agent_task*` tools. `AiBackground` reads this off the host
+   * to build its worker runner without allocating a second one.
+   */
+  readonly scheduler: import("./nikcli/background-tasks.ts").BackgroundTaskManager
+}>()("cadcamfun/AiHost") {}
+
+/**
+ * The runtime-wide background-task scheduler. One instance per host runtime;
+ * the sidecar owns it because it has to be disposed on shutdown, and the HTTP
+ * `removeSession` handler must call `cancelForParent` to stop the workers
+ * associated with an aborted parent session.
+ */
+export class AiBackground extends Context.Service<AiBackground, {
+  readonly runner: import("./nikcli/background-tools-runner.ts").BackgroundToolsRunner
+  /** Cancel every active/queued worker owned by the parent session. */
+  readonly cancelForParent: (parentSessionId: string) => Effect.Effect<number>
+  /** Cancel every active/queued worker and refuse future enqueues. */
+  readonly dispose: () => Effect.Effect<void>
+}>()("cadcamfun/AiBackground") {}
 
 export interface ChatInput {
   readonly sessionId?: string

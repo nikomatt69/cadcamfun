@@ -12,6 +12,10 @@
  */
 import { Motion } from "solid-motionone"
 import { type JSX, type ParentProps, splitProps } from "solid-js"
+import { prefersReducedMotion } from "./animated-section.tsx"
+
+/** Reduced-motion users get the fade only; hover lift/press scale are dropped. */
+const reduced = prefersReducedMotion
 
 export type CardVariant = "default" | "heavy" | "light" | "gradient" | "holographic"
 
@@ -38,11 +42,11 @@ export function Card(props: CardProps): JSX.Element {
   return (
     <Motion.div
       class={[variantClass(variant()), own.class ?? ""].filter(Boolean).join(" ")}
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+      animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4, easing: [0.22, 1, 0.36, 1], delay: own.delay ?? 0 }}
-      hover={interactive() ? { y: -4, scale: 1.015 } : undefined}
-      press={interactive() ? { scale: 0.98 } : undefined}
+      hover={interactive() && !reduced() ? { y: -4, scale: 1.015 } : undefined}
+      press={interactive() && !reduced() ? { scale: 0.98 } : undefined}
       {...rest}
     >
       {own.children}
@@ -60,11 +64,11 @@ export function InteractiveCard(
     <Motion.a
       href={own.href ?? "#"}
       class={["ui-card", variantClass(variant()), "ui-card-interactive", own.class ?? ""].filter(Boolean).join(" ")}
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.97 }}
+      animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.45, easing: [0.22, 1, 0.36, 1], delay: own.delay ?? 0 }}
-      hover={{ y: -6, scale: 1.02 }}
-      press={{ scale: 0.97 }}
+      hover={reduced() ? undefined : { y: -6, scale: 1.02 }}
+      press={reduced() ? undefined : { scale: 0.97 }}
       {...rest}
     >
       {own.children}

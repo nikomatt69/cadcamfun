@@ -1,10 +1,12 @@
 import {
-  AiConfig, AiCredentials, AiHost, AiService, DirectModel, defaultModelFactory, ToolHandlers, buildTools, defaultProviderSpecs,
+  AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
+  ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
   makeNikCliRuntime, systemPrompt, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted } from "effect"
 import { AppConfigService } from "../config.ts"
+import { announced } from "../startup.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -239,34 +241,57 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const config = yield* AppConfigService
   const handlers = yield* ToolHandlers
   const credentials = yield* AiCredentials
+  // Runtime-wide scheduler: instantiated before the host so `toolsFor` can
+  // hand its four `agent_task*` tool specs to every project's host. The same
+  // instance is passed to `AiBackgroundLive` below so the worker runner owns
+  // it (no second scheduler, no second scheduler across projects).
+  const scheduler = new BackgroundTaskManager({})
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
     providers: defaultProviderSpecs(),
     systemPrompt: systemPrompt(),
+    // Import the (large) host bundle once the sidecar has announced itself, not while the API is still starting.
+    warmAfter: announced,
     // One request to models.dev, only while `<cache>/models.json` is missing: that file is
     // what turns "the four providers we declare" into the whole catalogue. Offline tests
     // set the flag and the seed answers "skipped" without touching the network.
     catalogue: { network: process.env.CADCAMFUN_AI_OFFLINE !== "1" },
-    toolsFor: (projectId) => buildTools(handlers, projectId)
+    toolsFor: (projectId) => [
+      ...buildTools(handlers, projectId),
+      ...backgroundToolSpecs(scheduler)
+    ]
   })
   yield* credentials.attach({
     apply: (change) => change._tag === "set"
       ? runtime.setProviderKey(change.provider, Redacted.value(change.credential.key))
       : runtime.clearProviderKey(change.provider)
   })
-  return AiHost.of({ runtime })
+  return AiHost.of({ runtime, scheduler })
 }))
+
+const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {
+  const host = yield* AiHost
+  return makeAiBackgroundLayer.pipe(Layer.provide(Layer.succeed(AiHost, host)))
+})).pipe(Layer.provide(AiHostLive), Layer.orDie)
 
 const AiConfigLive = Layer.unwrap(AppConfigService.useSync((c) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false })))
 
 /** Credentials, config, direct model and the service; needs the repos and `AppConfigService`. */
 export const AiLive = Layer.unwrap(Effect.gen(function*() {
   const config = yield* AppConfigService
-  const base = Layer.mergeAll(AiCredentials.layer, AiConfigLive)
+  // Keys are kept in <data dir>/ai/credentials.json (owner-only), so they are not asked for again after a restart.
+  const base = Layer.mergeAll(AiCredentials.layerPersisted(jsonFileCredentials(`${config.dataDir}/ai/credentials.json`)), AiConfigLive)
   const withDirect = DirectModel.layerWith(config.aiModelFactory ?? defaultModelFactory).pipe(Layer.provideMerge(base))
   const withHandlers = ToolHandlersLive.pipe(Layer.provideMerge(withDirect))
   const withHost = config.aiHost === "direct" ? withHandlers : AiHostLive.pipe(Layer.provideMerge(withHandlers))
-  return AiService.layer.pipe(Layer.provideMerge(withHost))
+  // Build the background runner from the live host once the host is in scope,
+  // so the worker's `runner` always closes over the same scheduler the host
+  // advertised. Without the host (the `direct` path) we provide a stub that
+  // simply refuses to enqueue — the four `agent_task*` tools won't be wired.
+  const withBackground = config.aiHost === "direct"
+    ? withHost
+    : AiBackgroundLive.pipe(Layer.provideMerge(withHost))
+  return AiService.layer.pipe(Layer.provideMerge(withBackground))
 }))
 
 export type { ProviderId }

@@ -127,18 +127,24 @@ export class BackgroundToolsRunner {
     const manager =
       options?.manager ??
       new BackgroundTaskManager({
-        runner,
-        onCompletion: (task) => {
-          void this.deliver(task).catch(() => undefined)
-        }
+        runner
       })
     this.manager = manager
+    // Always layer the wake callback on the manager we end up with — whether
+    // the caller supplied it or we just built it — so completion deliveries
+    // happen regardless of who owns the manager.
+    this.manager.setOnCompletion((task) => {
+      void this.deliver(task).catch(() => undefined)
+    })
+    // If the manager we were given has no runner yet (lazy wiring), install ours.
+    this.manager.setRunner(runner)
   }
 
-  async cancelForParent(parentSessionId: string): Promise<void> {
-    this.manager.cancelParent({ projectId: this.projectId, parentSessionId })
+  async cancelForParent(parentSessionId: string): Promise<number> {
+    const cancelled = this.manager.cancelParent({ projectId: this.projectId, parentSessionId })
     const runner = this.runners.get(parentSessionId)
     await runner?.abort()
+    return cancelled
   }
 
   async dispose(): Promise<void> {

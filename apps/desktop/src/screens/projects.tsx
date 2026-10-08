@@ -131,7 +131,7 @@ export function ProjectsScreen(): JSX.Element {
         title={t("projects.title")}
         subtitle={t("projects.subtitle")}
         actions={
-          <button type="button" class="btn btn-primary" onClick={() => setName("")}>
+          <button type="button" class="btn btn-primary" onClick={() => { setEditing(undefined); setName("") }}>
             <Plus size={16} aria-hidden="true" />
             {t("projects.create")}
           </button>

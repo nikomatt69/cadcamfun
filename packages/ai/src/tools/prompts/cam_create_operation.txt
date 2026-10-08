@@ -17,10 +17,11 @@ Parameters
   depth mm below the stock top, positive (5), stepdown mm per pass (1), stepover percent of the diameter (40),
   feedrate mm/min (800), plungerate mm/min (300), rpm (10000), tolerance mm (0.01; path and arc-fit tolerance, 0.001 = 1 micron),
   offset inside|outside|center (outside), direction climb|conventional (climb), coolant true|false,
-  finishingPass true|false, finishingAllowance mm (0.2),
+  finishingPass true|false, finishingAllowance mm (0.2): for contour, profile and pocket the first pass leaves that much on the wall (needs offset inside or outside) and a second pass cuts it to size; for 3d_surface see below,
   material aluminum|steel|wood|plastic|brass|titanium|composite|other (aluminum).
   machineType mill|lathe|3dprinter (mill).
   Zeros: workOffset G54..G59 (mill; G54 is the control's default and is not written), originType workpiece-center|workpiece-corner|machine-zero|custom with originX, originY, originZ (mill), latheZero face|chuck (lathe), bedOrigin corner|center with bedWidth, bedDepth, centerOnBed (printer).
+  3d_surface (works on the solid elements as one 3D part, with a ball nose or end mill): surfaceStrategy roughing|parallel|waterline (roughing: Z levels around the part, then with finishingPass true a finishing pass of finishingStrategy contour = waterline, or parallel = raster that leaves finishingAllowance in the roughing), scallop mm cusp height for a ball nose raster (0 = use stepover), rasterAngle degrees (0), rasterOneWay true|false. depth is how far below the stock top the cut goes; use a ball nose for a curved surface.
   Lathe: stockDiameter, stockLength, spindleDirection cw|ccw, turningOperation external|internal|face. Printer: layerHeight, nozzleDiameter, filamentDiameter, extrusionWidth, printSpeed, printTemperature, bedTemperature.
   Probing (type probing, toolType probe or toolsetter): probeCycle zSurface|edgeX|edgeY|corner|bore|boss|toolLength, probeFeed mm/min, probeSearch mm, probeStylus tip diameter mm, probeFeatureSize mm for bore and boss, probeDialect linuxcnc|fanuc, toolNumber.
 - Use lib_lookup_tool and lib_lookup_material first when the user names a tool or material, and cam_suggest_parameters when you are unsure of the numbers.

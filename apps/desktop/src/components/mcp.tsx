@@ -18,12 +18,18 @@ export type McpServerCard = McpServerEntry & { readonly defaultWorkingDirectory?
 /**
  * Turns `GET /api/mcp/config` into the list the legacy pages rendered.
  *
- * Legacy bug, kept: `MCPApiClient.getServers()` returns the *envelope*
- * (`{ success, source, servers, count }`), so `Array.isArray(...)` is false and every
- * screen using it renders its empty state.
+ * The v6 endpoint answers the envelope `{ success, source, servers, count }`; the legacy
+ * client pushed that envelope straight through `Array.isArray`, so every screen using it
+ * rendered its empty state. Both shapes are accepted: the envelope and a plain array.
  */
-export const serversFrom = (response: unknown): McpServerCard[] =>
-  Array.isArray(response) ? (response as McpServerCard[]) : []
+export const serversFrom = (response: unknown): McpServerCard[] => {
+  if (Array.isArray(response)) return response as McpServerCard[]
+  if (typeof response === "object" && response !== null) {
+    const servers = (response as { servers?: unknown }).servers
+    if (Array.isArray(servers)) return servers as McpServerCard[]
+  }
+  return []
+}
 
 /** The `response` getter on a failed typed-client call, with its `text` body effect. */
 const bodyOf = (cause: unknown): { readonly text: Effect.Effect<string, unknown> } | undefined => {

@@ -16,6 +16,7 @@ import {
   type GeometryInput,
   type ToolpathSettings
 } from "../../src/cam/generator/index.ts"
+import { verifyRequestFor, verifyToolpath } from "../../src/cam/verify/index.ts"
 
 const cam = { testing: { interpretGcode } }
 const settings = (patch: Partial<ToolpathSettings> = {}): ToolpathSettings => ({ ...DEFAULT_SETTINGS, ...patch })
@@ -187,9 +188,24 @@ describe("mill program", () => {
     expect(run(settings({ useToolCompensation: true, operationType: "pocket" }), geometry()).gcode).not.toContain("G40")
   })
 
-  test("finishing pass block", () => {
-    const { gcode } = gen(settings({ finishingPass: true, finishingStrategy: "spiral" }), geometry())
-    expect(gcode).toContain("; Finishing pass\n; Finishing allowance: 0.2mm\n; Spiral finishing strategy")
+  test("a finishing pass leaves the allowance on the wall first and then cuts the wall to size", () => {
+    const g = geometry({ geometryType: "circle", circleRadius: 25 })
+    const radii = (gcode: string) => [...gcode.matchAll(/^G[23] .*I(-?\d+\.\d+)/gm)].map((m) => Math.abs(Number(m[1])))
+    const plain = gen(settings({ offset: "outside", depth: 1, stepdown: 1 }), g).gcode
+    expect(new Set(radii(plain))).toEqual(new Set([28]))
+    const finished = gen(settings({ offset: "outside", depth: 1, stepdown: 1, finishingPass: true, finishingAllowance: 0.2 }), g).gcode
+    expect(finished).toContain("; Pass 1: 0.200mm of material left on the wall")
+    expect(finished).toContain("; Pass 2: finishing the wall to size")
+    expect([...new Set(radii(finished))].sort()).toEqual([28, 28.2])
+    // The roughing pass comes first and stays further out; the last arc of the program is the finished wall.
+    const all = radii(finished)
+    expect(all[0]).toBeCloseTo(28.2, 6)
+    expect(all[all.length - 1]).toBeCloseTo(28, 6)
+  })
+
+  test("a finishing pass without a side to leave material on says so instead of pretending", () => {
+    const { gcode } = gen(settings({ offset: "center", finishingPass: true }), geometry({ geometryType: "circle", circleRadius: 25 }))
+    expect(gcode).toContain("; Finishing pass skipped")
   })
 })
 
@@ -371,5 +387,65 @@ describe("post passes", () => {
   test("generateGCode applies the enabled post passes and finds fixed cycles", () => {
     const withCycle = run(settings({ optimizePath: true, useArcFitting: true }), geometry({ geometryType: "custom", customPath: "G83 X1 Y1 Z-5 R2 Q1 F100" }))
     expect(withCycle.cycles).toEqual([{ gcode: "G83 X1 Y1 Z-5 R2 Q1 F100" }])
+  })
+})
+
+describe("3d_surface runs the surface engine over the selected solids", () => {
+  const sphere = { id: "s", type: "sphere", radius: 10, x: 0, y: 0, z: -10 }
+  const stock = { width: 30, height: 30, depth: 12, radius: 0, x: 0, y: 0, topZ: 0, allowance: 1 }
+  const surface = (patch: Partial<ToolpathSettings>) => gen(
+    settings({ operationType: "3d_surface", toolType: "ballnose", toolDiameter: 4, depth: 9, stepdown: 3, stepover: 50, tolerance: 0.02, ...patch }),
+    geometry({ geometryType: "selected", selectedElements: [sphere], stock })
+  )
+  const feedPoints = (gcode: string) => {
+    const pts: Array<{ x: number; y: number; z: number }> = []
+    let x = 0, y = 0, z = 0
+    for (const line of gcode.split("\n")) {
+      const m = /^(G0|G1)\b/.exec(line)
+      if (!m) continue
+      const word = (l: string) => { const w = new RegExp(`${l}(-?\\d+\\.\\d+)`).exec(line); return w ? Number(w[1]) : undefined }
+      x = word("X") ?? x; y = word("Y") ?? y; z = word("Z") ?? z
+      if (m[1] === "G1") pts.push({ x, y, z })
+    }
+    return pts
+  }
+
+  test("a raster finish follows the sphere and never goes below the ball's resting height", () => {
+    const { gcode, warnings } = surface({ surfaceStrategy: "parallel" })
+    expect(gcode).toContain("; 3D surface: 1 element(s) as one part model, parallel")
+    const pts = feedPoints(gcode).filter((p) => Math.hypot(p.x, p.y) < 9)
+    expect(pts.length).toBeGreaterThan(100)
+    // Ball centre at distance R + r = 12 from the sphere's centre (0, 0, -10): tip z = sqrt(144 - rho^2) - 12.
+    for (const p of pts) expect(p.z).toBeGreaterThanOrEqual(Math.sqrt(144 - Math.hypot(p.x, p.y) ** 2) - 12 - 0.03)
+    expect(warnings.filter((w) => w.includes("cannot machine"))).toEqual([])
+  })
+
+  test("roughing with a finishing pass is a roughing program, then a waterline finish, both real moves", () => {
+    const { gcode } = surface({ surfaceStrategy: "roughing", finishingPass: true, finishingAllowance: 0.3, finishingStrategy: "contour" })
+    expect(gcode).toContain("; Finishing pass (waterline), 0.300 mm left by the roughing")
+    const [rough, finish] = gcode.split("; Finishing pass (waterline)")
+    // Roughing keeps 0.3 away from the sphere (plus the tool): no feed point inside the offset sphere of radius 10 + 2 + 0.3.
+    for (const p of feedPoints(rough!)) {
+      if (p.z > -12) expect(Math.hypot(p.x, p.y, p.z + 10)).toBeGreaterThanOrEqual(10.3 - 0.05)
+    }
+    expect(feedPoints(finish!).length).toBeGreaterThan(30)
+  })
+
+  test("the verifier finds no gouge, shank or below-stock collision in the program the generator wrote (roughing + waterline finish)", () => {
+    const request = {
+      settings: settings({ operationType: "3d_surface", toolType: "ballnose", toolDiameter: 4, depth: 9, stepdown: 3, stepover: 50, tolerance: 0.02, surfaceStrategy: "roughing", finishingPass: true, finishingAllowance: 0.3, finishingStrategy: "contour" }),
+      geometry: geometry({ geometryType: "selected", selectedElements: [sphere], stock }),
+      printer: DEFAULT_PRINTER_EXTRAS
+    }
+    const { gcode } = generateToolpath(request).response
+    const built = verifyRequestFor(request, gcode, { target: { solids: [{ _tag: "Sphere", center: { x: 0, y: 0, z: -10 }, radius: 10, rings: 64 }] }, resolution: 0.25, tolerance: 0.1 })
+    if (!built.ok) throw new Error(built.error)
+    const report = verifyToolpath(built.request)
+    expect(report.issues.filter((i) => ["Gouge", "ShankCollision", "BelowStock", "HolderCollision", "FixtureCollision"].includes(i.code))).toEqual([])
+  })
+
+  test("a tool that cannot cut a surface is said so and replaced by an end mill of the same diameter", () => {
+    const { gcode } = surface({ surfaceStrategy: "parallel", toolType: "vbit" })
+    expect(gcode).toContain("; Warning: A vbit tool cannot machine a surface")
   })
 })

@@ -4,6 +4,7 @@ import { cam } from "@cadcamfun/core"
 import { panelCycles, type PanelCycle } from "../../lib/cyclePanel.ts"
 import { useJob } from "../../lib/useJob.ts"
 import { useGeneratorStore } from "../../store/generatorStore.ts"
+import { t } from "../../../i18n/index.ts"
 import { Section } from "./ui.tsx"
 
 const g = cam.generator
@@ -113,9 +114,9 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
   // "Generate Fixed Cycle from Selected Elements": one G81 per drilling point of the selection.
   const fromSelection = (): void => {
     const selection = job.selection()
-    if (selection.length === 0) { gen.flashError("Seleziona almeno un elemento per generare un ciclo fisso"); return }
+    if (selection.length === 0) { gen.flashError(t("cam.cycles.selectElement")); return }
     const points = selection.flatMap((element) => g.getDrillingPoints(element))
-    if (points.length === 0) { gen.flashError("Nessun punto di foratura trovato negli elementi selezionati"); return }
+    if (points.length === 0) { gen.flashError(t("cam.cycles.noDrillingPoints")); return }
     const lines = points.map((p) => g.generateFixedCycleGCode(g.FixedCycleType.DRILLING, { x: p.x, y: p.y, z: -10, r: 2, f: 100 }))
     setGenerated(lines[0] ?? "")
     props.onGCode(lines.join("\n"))
@@ -168,7 +169,7 @@ export function FixedCyclesSection(props: { readonly onGCode: (gcode: string) =>
           class="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           onClick={() => {
             const element = job.element()
-            if (!element) { gen.flashError("Seleziona un elemento prima di creare un ciclo fisso"); return }
+            if (!element) { gen.flashError(t("cam.cycles.selectFirst")); return }
             apply(g.drillingCycleAt(Number(element["x"]) || 0, Number(element["y"]) || 0, gen.settings.depth, gen.settings.feedrate))
           }}
         >

@@ -11,6 +11,7 @@ import { useNavigate } from "@solidjs/router"
 import { AlertTriangle, Check, Code, Cpu, CircleHelp, Maximize2, Minimize2, Save, Settings, Upload } from "lucide-solid"
 import { Motion } from "solid-motionone"
 import { toast } from "../../components/ui/toast.tsx"
+import { t } from "../../i18n/index.ts"
 import { useApp } from "../../state/context.ts"
 import { makeToolpathGenerator, type GenerateResponse } from "../api/generator.ts"
 import { geometryOf } from "../lib/job.ts"
@@ -57,12 +58,12 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       camStore.setGcode(response.gcode)
       camStore.setProgram(response.program)
       for (const warning of response.warnings) toast(warning)
-      gen.flash("G-code generated successfully!", 5000)
+      gen.flash(t("cam.generator.success"), 5000)
       props.onGCodeGenerated(response.gcode)
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
       if (gen.settings.machineType === "3dprinter") toast.error(message)
-      gen.setError(gen.settings.machineType === "3dprinter" ? message : message || "Error generating G-code. Check your settings.")
+      gen.setError(gen.settings.machineType === "3dprinter" ? message : message || t("cam.generator.error"))
     } finally {
       gen.setGenerating(false)
     }
@@ -75,14 +76,14 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   }
 
   const saveAsToolpath = (): void => {
-    if (!gen.currentGCode) { toast.error("No G-code generated yet!"); return }
+    if (!gen.currentGCode) { toast.error(t("cam.generator.noGcode")); return }
     // The toolpaths page picks these up to create a toolpath (same hand-off as the legacy app).
     try {
       localStorage.setItem("gcodeFromToolpathGenerator", gen.currentGCode)
       localStorage.setItem("settingsFromToolpathGenerator", JSON.stringify(gen.settings))
     } catch { /* storage blocked: the toolpaths page opens empty */ }
     navigate("/toolpaths?fromGenerator=true")
-    toast.success("G-code ready to save as toolpath")
+    toast.success(t("cam.generator.readyToast"))
   }
 
   return (
@@ -97,8 +98,8 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
         <div class="flex items-center space-x-3">
           <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg"><Settings size={24} class="text-blue-600 dark:text-blue-400" /></div>
           <div>
-            <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Toolpath Generator</h2>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Configure cutting parameters and generate G-code</p>
+            <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">{t("cam.generator")}</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{t("cam.generator.subtitle")}</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -108,7 +109,8 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             type="button"
             onClick={() => gen.setShowFullscreen(!gen.showFullscreen)}
             class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
-            title={gen.showFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            title={t(gen.showFullscreen ? "cam.exitFullscreen" : "cam.fullscreen")}
+            aria-label={t(gen.showFullscreen ? "cam.exitFullscreen" : "cam.fullscreen")}
           >
             <Show when={gen.showFullscreen} fallback={<Maximize2 size={20} />}><Minimize2 size={20} /></Show>
           </Motion.button>
@@ -117,8 +119,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             press={{ scale: 0.95 }}
             type="button"
             class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
-            title="Help"
-            onClick={() => toast("This is the toolpath generator. To start, choose an operation and configure the cutting parameters.")}
+            title={t("cam.generator.helpTitle")}
+            aria-label={t("cam.generator.helpTitle")}
+            onClick={() => toast(t("cam.generator.help"))}
           >
             <CircleHelp size={20} />
           </Motion.button>
@@ -138,47 +141,49 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       <AiSection />
 
       <Show when={gen.error}>
-        <div class="mb-4 p-3 bg-red-50 rounded-md flex items-start" role="alert">
-          <AlertTriangle class="text-red-500 mr-2 flex-shrink-0 mt-0.5" size={18} />
-          <p class="text-sm text-red-800">{gen.error}</p>
+        <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md flex items-start" role="alert">
+          <AlertTriangle class="text-red-500 dark:text-red-400 mr-2 flex-shrink-0 mt-0.5" size={18} />
+          <p class="text-sm text-red-800 dark:text-red-200">{gen.error}</p>
         </div>
       </Show>
 
       <Show when={gen.success}>
-        <div class="mb-4 p-3 bg-green-50 rounded-md flex items-start" role="status">
-          <Check class="text-green-500 mr-2 flex-shrink-0 mt-0.5" size={18} />
-          <p class="text-sm text-green-800">{gen.success}</p>
+        <div class="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-md flex items-start" role="status">
+          <Check class="text-green-500 dark:text-green-400 mr-2 flex-shrink-0 mt-0.5" size={18} />
+          <p class="text-sm text-green-800 dark:text-green-200">{gen.success}</p>
         </div>
       </Show>
 
       <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} class="space-y-3 mt-8">
         <Motion.button
+          type="button"
           hover={{ scale: 1.02 }}
           press={{ scale: 0.98 }}
           onClick={() => void generate()}
           disabled={gen.isGenerating}
           class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          <Show when={gen.isGenerating} fallback={<><Code size={20} class="mr-2" />Generate G-Code</>}>
+          <Show when={gen.isGenerating} fallback={<><Code size={20} class="mr-2" />{t("cam.generator.generate")}</>}>
             <Motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, easing: "linear" }} class="mr-2"><Cpu size={20} /></Motion.div>
-            Generating G-Code...
+            {t("cam.generator.generating")}
           </Show>
         </Motion.button>
 
         <Motion.button
+          type="button"
           hover={{ scale: 1.02 }}
           press={{ scale: 0.98 }}
           onClick={saveAsToolpath}
           class="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-6 rounded-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center justify-center shadow-lg transition-all"
         >
           <Save size={20} class="mr-2" />
-          Save as Toolpath
+          {t("cam.generator.saveAsToolpath")}
         </Motion.button>
       </Motion.div>
 
       <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
         <div class="flex justify-between items-center mb-3">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Configuration Management</span>
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{t("cam.generator.configTitle")}</span>
         </div>
         <div class="flex space-x-3">
           <Motion.button
@@ -186,10 +191,10 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             press={{ scale: 0.95 }}
             type="button"
             class="flex-1 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center"
-            onClick={() => { if (saveConfig(gen.settings)) gen.flash("Configuration saved!") }}
+            onClick={() => { if (saveConfig(gen.settings)) gen.flash(t("cam.generator.configSaved")) }}
           >
             <Save size={16} class="mr-2" />
-            Save Config
+            {t("cam.generator.saveConfig")}
           </Motion.button>
           <Motion.button
             hover={{ scale: 1.05 }}
@@ -198,12 +203,12 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
             class="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
             onClick={() => {
               const saved = loadConfig()
-              if (saved) { gen.replaceSettings(saved); gen.flash("Configuration loaded!") }
-              else gen.flashError("No saved configuration found")
+              if (saved) { gen.replaceSettings(saved); gen.flash(t("cam.generator.configLoaded")) }
+              else gen.flashError(t("cam.generator.configMissing"))
             }}
           >
             <Upload size={16} class="mr-2" />
-            Load Config
+            {t("cam.generator.loadConfig")}
           </Motion.button>
         </div>
       </Motion.div>

@@ -7,7 +7,7 @@
  * defines (`file.new`, `view.zoom_in`, …). The item list comes from that file's
  * contract, so the fallback can never invent an id the shell does not know.
  */
-import { createSignal, For, Show, type JSX } from "solid-js"
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import Search from "lucide-solid/icons/search"
 import { t, type Key } from "../i18n/index.ts"
@@ -97,6 +97,35 @@ export const needsMenuFallback = (force?: boolean): boolean =>
 export function TitleBar(props: TitleBarProps): JSX.Element {
   const [open, setOpen] = createSignal<MenuId | undefined>(undefined)
   const withMenus = (): boolean => needsMenuFallback(props.forceMenus)
+  let nav: HTMLElement | undefined
+  let openTrigger: HTMLButtonElement | undefined
+
+  // One dismissal contract for the open menu: Escape closes it and returns
+  // focus to its button; a pointer-down outside the menu bar closes it too
+  // (a dropdown that only closes on its own button is a classic dead end).
+  createEffect(() => {
+    if (open() === undefined) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      setOpen(undefined)
+      openTrigger?.focus()
+      openTrigger = undefined
+    }
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Node && nav !== undefined && !nav.contains(target)) {
+        setOpen(undefined)
+        openTrigger = undefined
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("pointerdown", onPointerDown)
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("pointerdown", onPointerDown)
+    })
+  })
 
   return (
     <header
@@ -108,53 +137,85 @@ export function TitleBar(props: TitleBarProps): JSX.Element {
           {t("app.name")}
         </span>
       }>
-        <nav aria-label={t("titlebar.menu")} class="flex items-center gap-1">
+        <nav ref={(element) => { nav = element }} aria-label={t("titlebar.menu")} class="flex items-center gap-1">
           <For each={MENUS.filter((menu) => menu.items.length > 0)}>
-            {(menu) => (
-              <div class="relative">
-                <button
-                  type="button"
-                  class="flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700"
-                  aria-haspopup="menu"
-                  aria-expanded={open() === menu.id}
-                  onClick={() => setOpen(open() === menu.id ? undefined : menu.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") setOpen(undefined)
-                  }}
-                >
-                  {t(menu.labelKey)}
-                  <ChevronDown size={14} aria-hidden="true" />
-                </button>
-                <Show when={open() === menu.id}>
-                  <ul
-                    class="absolute left-0 top-full z-50 mt-1 min-w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-                    role="menu"
-                    aria-label={t(menu.labelKey)}
+            {(menu) => {
+              let trigger: HTMLButtonElement | undefined
+              return (
+                <div class="relative">
+                  <button
+                    type="button"
+                    ref={(element) => { trigger = element }}
+                    class="flex items-center gap-1 rounded px-2 py-1 text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700"
+                    aria-haspopup="menu"
+                    aria-expanded={open() === menu.id}
+                    onClick={() => {
+                      if (open() === menu.id) {
+                        setOpen(undefined)
+                        openTrigger = undefined
+                      } else {
+                        openTrigger = trigger
+                        setOpen(menu.id)
+                      }
+                    }}
                   >
-                    <For each={menu.items}>
-                      {(item) => (
-                        <li role="none">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            class="flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-gray-700"
-                            onClick={() => {
-                              setOpen(undefined)
-                              props.onMenu(item.id)
-                            }}
-                          >
-                            <span>{t(item.labelKey)}</span>
-                            <Show when={item.accelerator !== undefined}>
-                              <kbd class="text-xs text-gray-500">{item.accelerator}</kbd>
-                            </Show>
-                          </button>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-              </div>
-            )}
+                    {t(menu.labelKey)}
+                    <ChevronDown size={14} aria-hidden="true" />
+                  </button>
+                  <Show when={open() === menu.id}>
+                    <ul
+                      // Opening moves focus to the first item so the arrow keys
+                      // work immediately, whichever way the menu was opened.
+                      ref={(element) => queueMicrotask(() => element.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus())}
+                      class="absolute left-0 top-full z-50 mt-1 min-w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                      role="menu"
+                      aria-label={t(menu.labelKey)}
+                      onKeyDown={(event) => {
+                        const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+                        const current = items.findIndex((element) => element === document.activeElement)
+                        if (event.key === "ArrowDown") {
+                          event.preventDefault()
+                          items[(current + 1 + items.length) % items.length]?.focus()
+                        } else if (event.key === "ArrowUp") {
+                          event.preventDefault()
+                          items[(current - 1 + items.length) % items.length]?.focus()
+                        } else if (event.key === "Home") {
+                          event.preventDefault()
+                          items[0]?.focus()
+                        } else if (event.key === "End") {
+                          event.preventDefault()
+                          items.at(-1)?.focus()
+                        }
+                      }}
+                    >
+                      <For each={menu.items}>
+                        {(item) => (
+                          <li role="none">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class="flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-gray-700"
+                              onClick={() => {
+                                setOpen(undefined)
+                                openTrigger = undefined
+                                // The menu is gone; keep focus where it was.
+                                trigger?.focus()
+                                props.onMenu(item.id)
+                              }}
+                            >
+                              <span>{t(item.labelKey)}</span>
+                              <Show when={item.accelerator !== undefined}>
+                                <kbd class="text-xs text-gray-500">{item.accelerator}</kbd>
+                              </Show>
+                            </button>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </Show>
+                </div>
+              )
+            }}
           </For>
         </nav>
       </Show>

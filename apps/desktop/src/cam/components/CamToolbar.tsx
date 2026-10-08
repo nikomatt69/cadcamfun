@@ -12,6 +12,7 @@ import {
   Brain, Code, DollarSign, Eye, Folder, Grid3x3, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, Save, Settings, Sun, Upload, Wrench, Zap
 } from "lucide-solid"
 import { useCamStore, type ActiveTab } from "../store/camStore.ts"
+import { t } from "../../i18n/index.ts"
 
 export interface CamToolbarProps {
   /** Whether there is G-code to save (the save button is disabled otherwise). */
@@ -33,11 +34,12 @@ const OUTLINE = "btn btn-sm btn-outline dark:border-gray-600 dark:text-gray-300 
 const TOGGLE_ON = "bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300"
 const TOGGLE_OFF = "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
 
-const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: string; readonly icon: (size: number) => JSX.Element }> = [
-  { id: "preview", label: "Preview", icon: (size) => <Eye size={size} class="mr-1" /> },
-  { id: "editor", label: "Editor G-Code", icon: (size) => <Code size={size} class="mr-1" /> },
-  { id: "toolpath", label: "Toolpath", icon: (size) => <Wrench size={size} class="mr-1" /> },
-  { id: "post", label: "Post-Processor", icon: (size) => <Settings size={size} class="mr-1" /> }
+/** Labels are i18n keys so the tab strip follows the locale (resolved through `t()` at render). */
+const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.preview" | "cam.editor" | "cam.toolpath" | "cam.postTab"; readonly icon: (size: number) => JSX.Element }> = [
+  { id: "preview", label: "cam.preview", icon: (size) => <Eye size={size} class="mr-1" /> },
+  { id: "editor", label: "cam.editor", icon: (size) => <Code size={size} class="mr-1" /> },
+  { id: "toolpath", label: "cam.toolpath", icon: (size) => <Wrench size={size} class="mr-1" /> },
+  { id: "post", label: "cam.postTab", icon: (size) => <Settings size={size} class="mr-1" /> }
 ]
 
 const readInitialDark = (): boolean =>
@@ -72,21 +74,22 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           onClick={() => cam.toggleSidebar()}
           hover={{ scale: 1.05 }}
           press={{ scale: 0.95 }}
-          aria-label="Toggle sidebar"
+          aria-label={t("cam.toggleSidebar")}
         >
           <Menu size={20} class="text-gray-600 dark:text-gray-400" />
         </Motion.button>
 
         <div class="ml-6 flex items-center space-x-2">
-          <button onClick={() => props.onSave()} class={`${OUTLINE} cursor-pointer`} title="Salva G-Code" disabled={!props.canSave}>
+          <button onClick={() => props.onSave()} class={`${OUTLINE} cursor-pointer`} title={t("cam.saveGcode")} aria-label={t("cam.saveGcode")} disabled={!props.canSave}>
             <Save size={16} class="mr-1" />
           </button>
-          <label class="btn btn-sm btn-outline flex items-center cursor-pointer" title="Importa G-Code">
+          <label class="btn btn-sm btn-outline flex items-center cursor-pointer" title={t("cam.import")} aria-label={t("cam.import")}>
             <Upload size={16} class="mr-1 dark:text-gray-300" />
             <input
               type="file"
               class="hidden"
               accept=".nc,.gcode,.cnc,.txt"
+              aria-label={t("cam.import")}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0]
                 if (file) props.onImport(file)
@@ -97,34 +100,33 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           <button
             onClick={() => props.onToggleSimulation()}
             class={`btn btn-sm ${props.isSimulating ? "btn-danger dark:bg-red-600 dark:hover:bg-red-700" : "btn-success dark:bg-green-600 dark:hover:bg-green-700"} flex items-center`}
-            title={props.isSimulating ? "Arresta Simulazione" : "Avvia Simulazione"}
+            title={t(props.isSimulating ? "cam.simStop" : "cam.simStart")}
           >
             <Show when={props.isSimulating} fallback={<Play size={16} />}><Pause size={16} /></Show>
-            <span class="ml-1">{props.isSimulating ? "Stop" : "Play"}</span>
+            <span class="ml-1">{t(props.isSimulating ? "cam.stop" : "cam.play")}</span>
           </button>
-          <A href="/cad">
-            <button
-              class="btn btn-sm flex items-center bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 border-0 shadow-md"
-              title="Switch to CAD Editor"
-            >
-              <Grid3x3 size={16} class="mr-1" />
-              <span>CAD Editor</span>
-            </button>
+          <A
+            href="/cad"
+            class="btn btn-sm flex items-center bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white hover:from-blue-600 hover:via-indigo-600 hover:to-purple-600 border-0 shadow-md"
+            title={t("cam.switchCad")}
+          >
+            <Grid3x3 size={16} class="mr-1" />
+            <span>{t("cam.cadEditor")}</span>
           </A>
-          <button onClick={() => props.onOpenLibrary()} class={OUTLINE} title="Unified Library">
+          <button onClick={() => props.onOpenLibrary()} class={OUTLINE} title={t("cam.libraryTitle")}>
             <Folder size={16} class="mr-1" />
-            Library
+            {t("activity.library")}
           </button>
-          <button onClick={() => props.onOpenCosts()} class={OUTLINE} title="Gestione Costi di Produzione">
+          <button onClick={() => props.onOpenCosts()} class={OUTLINE} title={t("costs.title")}>
             <DollarSign size={16} class="mr-1" />
-            Costi
+            {t("costs.title")}
           </button>
           <button
             onClick={() => props.onToggleAi()}
             class={`p-1.5 border shadow-sm rounded-md flex items-center mr-2 ${props.aiEnhanced ? TOGGLE_ON : TOGGLE_OFF}`}
-            aria-label="Toggle AI Copilot"
+            aria-label={t("cam.toggleAi")}
             aria-pressed={props.aiEnhanced}
-            title={props.aiEnhanced ? "Disable AI Copilot" : "Enable AI Copilot"}
+            title={t(props.aiEnhanced ? "cam.aiDisable" : "cam.aiEnable")}
           >
             <Show when={props.aiEnhanced} fallback={<Zap class="h-3 w-3 sm:h-4 sm:w-4" />}>
               <Brain class="h-3 w-3 sm:h-4 sm:w-4" />
@@ -133,7 +135,8 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           <button
             onClick={toggleDarkMode}
             class={`p-1.5 border shadow-sm rounded-md flex items-center ${dark() ? TOGGLE_ON : TOGGLE_OFF}`}
-            aria-label="Toggle dark mode"
+            aria-label={t("cam.toggleTheme")}
+            aria-pressed={dark()}
           >
             <Show when={dark()} fallback={<Moon class="h-3 w-3 sm:h-4 sm:w-4" />}>
               <Sun class="h-3 w-3 sm:h-4 sm:w-4" />
@@ -152,6 +155,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
           {(tab) => (
             <Motion.button
               onClick={() => cam.setActiveTab(tab.id)}
+              aria-pressed={cam.activeTab === tab.id}
               class={`flex items-center px-4 py-2 rounded-xl text-sm font-medium backdrop-blur-sm transition-all duration-200 ${
                 cam.activeTab === tab.id
                   ? "bg-blue-600 text-white shadow-md"
@@ -161,14 +165,14 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
               press={{ scale: 0.98 }}
             >
               {tab.icon(16)}
-              {tab.label}
+              {t(tab.label)}
             </Motion.button>
           )}
         </For>
         <Motion.button
           onClick={() => props.onToggleChat()}
           class="flex items-center px-3 py-2 text-sm font-medium bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-200"
-          aria-label={props.showChat ? "Close Chat Panel" : "Open Chat Panel"}
+          aria-label={t(props.showChat ? "cam.chatClose" : "cam.chatOpen")}
           hover={{ scale: 1.05 }}
           press={{ scale: 0.95 }}
         >

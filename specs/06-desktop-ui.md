@@ -12,7 +12,7 @@ Legacy reference (behaviour/layout inspiration only): `.reference/src/components
 
 ## 1. App shell (WP6)
 
-- Boot sequence: Tauri command `get_sidecar_endpoint` → `{ baseUrl, token }` → build `ApiClient.layer` → `GET /health` → render. Show a splash with error and "Retry"/"View logs" if the sidecar isn't ready within 15 s.
+- Boot sequence: Tauri command `get_sidecar_endpoint` → `{ baseUrl, token }` → build `ApiClient.layer` → `GET /health` → render. Show a splash with error and "Retry"/"View logs" only after the sidecar has stayed unreachable for 150 s: until then the splash keeps re-resolving the endpoint and retrying (the shell waits up to 60 s for each start, and the host's SDK is loaded lazily so the API answers first), showing the seconds waited and a readable reason.
 - Layout: title bar (native menus from the shell, in-window fallback on Windows/Linux), left activity bar (Projects, CAD, CAM, Library, Costs, AI, Plugins, Settings), main area, bottom status bar (units, snap state, cursor coords, sidecar status).
 - Screens: **Projects** (list/create/open/rename/delete, recent), **CAD editor** (WP7 canvas + tool palette, layers panel, properties panel), **CAM workspace** (operation list, parameters form generated from WP2 Schemas, toolpath preview, G-code view with export), **Library** (materials, tools, machine configs, components), **Costs** (estimate form + breakdown), **AI panel** (docked chat, streaming), **Plugins**, **Settings** (units, theme, locale, post-processor defaults).
 - Forms are generated from the Effect Schemas where possible (one small `SchemaForm` component) so parameters never drift from the core definitions.
@@ -84,3 +84,10 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
   - Units and tolerance: the display unit (mm, µm, cm, m, inch, thou; everything stays millimetres inside) and the drawing tolerance are selected in the "Document & Origin" block of both sidebars and shown in the strip. `state/document-settings.ts` is the one place that changes them: settings, the 3D view (curves are meshed to the tolerance), the CAM generator and the verification default, and the stored drawing carry the same values.
   - Generator panel by machine: the origin section shows the mill's work offset and origin, the lathe's Z zero, or the printer's plate origin and size; mills can pick a touch probe or tool setter and the probing operation with its cycle settings.
   - Request bodies built from editor elements go through `state/json-safe.ts`, so an element holding `undefined`, NaN, typed arrays or cycles can no longer stop the generator ("Expected JSON value at ...").
+
+## Folder roles (`src/pages`, `src/screens`, `src/cad`, `src/cam`)
+
+- `src/pages/` holds one-line route adapters, one file per legacy Next.js page path (66 routes; `test/app-mount.test.ts` checks the route table against these files). A page only re-exports a screen or a feature page; it contains no logic.
+- `src/screens/` holds the implemented screens of the app shell (projects, library, costs, plugins, auth, ...), all through the typed `ApiClient`.
+- `src/cad/` and `src/cam/` are feature folders (editor and CAM workspace with their own stores, components and viewport code); their entry points are re-exported by `pages/cad.tsx` and `pages/cam.tsx`.
+- New logic goes in a screen or a feature folder, never in `pages/`.

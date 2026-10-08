@@ -9,9 +9,10 @@
  */
 import { Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
-import { Pause, Play, RotateCcw } from "lucide-solid"
+import { RotateCcw } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { View3D, type RenderMode, type ViewPreset } from "../../viewport/view3d/index.ts"
+import { t } from "../../i18n/index.ts"
 import type { Workpiece } from "../store/camStore.ts"
 
 export interface ToolpathVisualizerProps {
@@ -59,8 +60,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           when={hasProgram()}
           fallback={
             <div class="absolute inset-0 flex flex-col items-center justify-center text-white/70 text-sm">
-              <p class="font-medium">No toolpath loaded</p>
-              <p class="mt-1 text-xs text-white/50">{props.program.toolpaths.length === 0 ? "Generate or import a toolpath to preview it here." : "Pick an operation from the sidebar to preview it."}</p>
+              <p class="font-medium">{t("cam.preview.noToolpath")}</p>
+              <p class="mt-1 text-xs text-white/50">{props.program.toolpaths.length === 0 ? t("cam.preview.hint") : t("cam.preview.pick")}</p>
             </div>
           }
         >
@@ -85,32 +86,34 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             <button
               onClick={resetView}
               class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur text-white text-xs flex items-center gap-1.5"
-              title="Reset view"
+              title={t("cam.resetView")}
+              aria-label={t("cam.resetView")}
             >
-              <RotateCcw size={14} /> Reset
+              <RotateCcw size={14} /> {t("cam.reset")}
             </button>
             <button
               onClick={() => setGridVisible(!gridVisible())}
+              aria-pressed={gridVisible()}
               class={`px-3 py-1.5 rounded-lg text-xs backdrop-blur ${gridVisible() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
             >
-              Grid
+              {t("cam.grid")}
             </button>
             <button
               onClick={() => setAxesVisible(!axesVisible())}
+              aria-pressed={axesVisible()}
               class={`px-3 py-1.5 rounded-lg text-xs backdrop-blur ${axesVisible() ? "bg-blue-600 text-white" : "bg-black/40 hover:bg-black/60 text-white"}`}
             >
-              Axes
+              {t("cam.axes")}
             </button>
           </div>
           <div class="pointer-events-auto">
             <button
               onClick={() => props.onPlaybackTimeChange(0)}
               class="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 backdrop-blur text-white text-xs flex items-center gap-1.5"
+              aria-label={t("cam.rewind")}
             >
-              <Show when={!props.playing} fallback={<Pause size={14} />}>
-                <Play size={14} />
-              </Show>
-              Rewind
+              <RotateCcw size={14} />
+              {t("cam.rewind")}
             </button>
           </div>
         </div>

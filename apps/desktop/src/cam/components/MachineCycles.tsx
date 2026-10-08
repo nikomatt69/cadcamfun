@@ -59,7 +59,7 @@ export default function MachineCycles(props: MachineCyclesProps): JSX.Element {
         <p class="text-sm text-gray-500 dark:text-gray-400">Select and configure predefined cycles for {controllerName()}</p>
       </div>
 
-      <div class="list md:grid-cols-2 gap-4 p-4">
+      <div class="grid md:grid-cols-2 gap-4 p-4">
         {/* Cycle selection panel */}
         <div class="border rounded-md overflow-hidden dark:border-gray-600">
           <div class="bg-gray-50 px-4 py-2 border-b dark:bg-gray-700 dark:border-gray-600">

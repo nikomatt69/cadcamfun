@@ -9,7 +9,7 @@
 import { createSignal, type Accessor } from "solid-js"
 import { Effect } from "effect"
 import { invalidatePrefix, queryKey, type QueryCache, type QueryState } from "./query-cache.ts"
-import type { ApiClient, Client } from "./client.ts"
+import { ApiClient, type Client } from "./client.ts"
 
 /** An effect that needs the app's typed API client. */
 export type ClientEffect<A> = Effect.Effect<A, unknown, ApiClient>
@@ -71,8 +71,11 @@ export const useQuery = <T,>(
       return
     }
     setState({ _tag: "loading" })
+    // A screen hands over `(client) => Effect`; bind the client through the
+    // `ApiClient` service so `runtime.run` always receives a concrete effect —
+    // passing the raw function makes Effect reject with "Not a valid effect".
     void runtime
-      .run(effect as unknown as ClientEffect<unknown>)
+      .run(Effect.flatMap(Effect.service(ApiClient), (client) => effect(client)))
       .then((value: unknown) => {
         setState({ _tag: "success", value: value as T })
         // A resolved promise stores the value under the key and marks the key in-flight
@@ -120,9 +123,12 @@ export const useMutation = <Args extends ReadonlyArray<unknown>, A>(
   const mutate = async (...args: Args): Promise<A> => {
     setPending(true)
     setError(undefined)
-    const invoke = effect as unknown as (...rest: Args) => ClientEffect<unknown>
+    // Same binding as `useQuery`: the client comes from the service, not from
+    // the call site, so the write runs as a concrete effect.
     try {
-      const value = (await runtime.run(invoke(...args))) as A
+      const value = (await runtime.run(
+        Effect.flatMap(Effect.service(ApiClient), (client) => effect(client, ...args))
+      )) as A
       if (cache !== undefined) for (const prefix of invalidates) invalidatePrefix(cache, prefix)
       return value
     } catch (cause: unknown) {

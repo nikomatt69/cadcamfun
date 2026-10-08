@@ -3,6 +3,7 @@ import { Upload, Wrench } from "lucide-solid"
 import { predefinedTools } from "../../../cad/lib/predefinedLibraries.ts"
 import { useRead } from "../../../app/queries.ts"
 import { useGeneratorStore, type LibraryTool, type ToolpathSettings } from "../../store/generatorStore.ts"
+import { t } from "../../../i18n/index.ts"
 import { CHECKBOX, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
 
 const MILL_TYPES = ["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"]
@@ -59,7 +60,7 @@ export function ToolSection(): JSX.Element {
     if (machine() === "mill") gen.patchSettings({ toolType: "endmill", toolDiameter: 6, flutes: 4, rpm: 12000 })
     else if (machine() === "lathe") gen.patchSettings({ toolType: "turning", toolDiameter: 12, rpm: 1500 })
     else gen.patchSettings({ toolType: "standard", nozzleDiameter: 0.4 })
-    gen.flash("Utensile caricato dalla libreria!")
+    gen.flash(t("cam.tool.applied"))
   }
   return (
     <Section id="tool" delay={0.35} tone="indigo" icon={Wrench} title="Tool" testId="tool-section">
@@ -141,11 +142,11 @@ export function ToolSection(): JSX.Element {
         <label class={LABEL}>Select from Library</label>
         <select class={INPUT} value={gen.selectedLibraryTool?.id || gen.selectedLibraryTool?.name || ""} onChange={(event) => pick(event.currentTarget.value)}>
           <option value="">Select a tool</option>
-          <optgroup label="Utensili Predefiniti">
+          <optgroup label={t("cam.tool.predefined")}>
             <For each={predefinedTools.filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.name}>{tool.name} - {tool.type} {tool.diameter}mm</option>}</For>
           </optgroup>
           <Show when={userTools().length > 0}>
-            <optgroup label="Utensili Locali">
+            <optgroup label={t("cam.tool.local")}>
               <For each={userTools().filter((tool) => fits(tool.type))}>{(tool) => <option value={tool.id}>{tool.name} - {tool.type} {tool.diameter}mm</option>}</For>
             </optgroup>
           </Show>
@@ -153,8 +154,8 @@ export function ToolSection(): JSX.Element {
       </div>
 
       <div class="mt-2 flex justify-between items-center pt-2 border-t border-gray-200">
-        <span class="text-sm text-gray-600">Upload from library</span>
-        <button type="button" class="text-xs text-blue-600 hover:text-blue-800 flex items-center" onClick={upload}><Upload size={14} class="mr-1" /> Upload</button>
+        <span class="text-sm text-gray-600">{t("cam.tool.defaultLabel")}</span>
+        <button type="button" class="text-xs text-blue-600 hover:text-blue-800 flex items-center" onClick={upload}><Upload size={14} class="mr-1" /> {t("cam.tool.apply")}</button>
       </div>
     </Section>
   )

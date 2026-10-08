@@ -1,0 +1,104 @@
+/* ========================================================================
+   Liquid Glass (spec 06-desktop-ui.md §1): active only with <html data-glass="liquid|vibrancy">, which `app/glass.ts` sets
+   inside the Tauri window on macOS once the native material is behind the transparent webview. Without the attribute none of
+   this applies. Surfaces become translucent layers with a blur, a bright rim and a soft specular edge; text keeps its contrast
+   through the existing tokens. Reduced transparency / increased contrast turn it back into opaque surfaces.
+   ======================================================================== */
+:root[data-glass] {
+  --glass-fill: rgba(255, 255, 255, 0.5);
+  --glass-fill-strong: rgba(255, 255, 255, 0.72);
+  --glass-rim: rgba(255, 255, 255, 0.55);
+  --glass-edge: rgba(15, 23, 42, 0.08);
+  --glass-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.28);
+  --glass-specular: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --glass-blur: blur(22px) saturate(150%);
+}
+:root[data-glass].dark {
+  --glass-fill: rgba(30, 36, 48, 0.46);
+  --glass-fill-strong: rgba(30, 36, 48, 0.7);
+  --glass-rim: rgba(255, 255, 255, 0.16);
+  --glass-edge: rgba(0, 0, 0, 0.35);
+  --glass-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.55);
+  --glass-specular: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --glass-blur: blur(24px) saturate(140%);
+}
+
+/* The window itself shows the system material: nothing opaque behind the app. */
+:root[data-glass],
+:root[data-glass] body,
+:root[data-glass] #root,
+:root[data-glass] .reference-shell {
+  background: transparent !important;
+}
+
+/* Chrome: title bar, navigation bar, sidebar, status bar, activity bar, docked assistant. */
+:root[data-glass] .reference-native-titlebar,
+:root[data-glass] .reference-navbar,
+:root[data-glass] .reference-sidebar,
+:root[data-glass] .reference-native-statusbar,
+:root[data-glass] .assistant-dock {
+  background: var(--glass-fill) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-edge) !important;
+  box-shadow: var(--glass-specular);
+}
+
+/* Surfaces that float over content: cards, modals, popovers, toasts, the command palette. */
+:root[data-glass] .card,
+:root[data-glass] .ui-card,
+:root[data-glass] .ui-modal,
+:root[data-glass] .ui-popover,
+:root[data-glass] .reference-popover,
+:root[data-glass] .ui-toast,
+:root[data-glass] .ui-palette-panel {
+  background: var(--glass-fill-strong) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-rim) !important;
+  box-shadow: var(--glass-shadow), var(--glass-specular);
+}
+:root[data-glass] .ui-modal-scrim,
+:root[data-glass] .ui-palette-scrim {
+  background: rgba(15, 23, 42, 0.22) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Controls: a light translucent field with a hairline; the primary action keeps its solid colour. */
+:root[data-glass] .ui-btn-secondary,
+:root[data-glass] .ui-btn-ghost,
+:root[data-glass] .ui-icon-btn,
+:root[data-glass] .ui-input,
+:root[data-glass] .ui-select,
+:root[data-glass] .ui-textarea {
+  background: var(--glass-fill) !important;
+  border: 1px solid var(--glass-rim) !important;
+  box-shadow: var(--glass-specular);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* The CAD and CAM viewports keep their own opaque canvas: glass is for chrome, not for the drawing. */
+:root[data-glass] canvas { background-color: transparent; }
+:root[data-glass] .cad-workspace,
+:root[data-glass] .cam-workspace { background: transparent; }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root[data-glass] .reference-native-titlebar,
+  :root[data-glass] .reference-navbar,
+  :root[data-glass] .reference-sidebar,
+  :root[data-glass] .reference-native-statusbar,
+  :root[data-glass] .assistant-dock,
+  :root[data-glass] .card,
+  :root[data-glass] .ui-card,
+  :root[data-glass] .ui-modal,
+  :root[data-glass] .ui-popover,
+  :root[data-glass] .reference-popover,
+  :root[data-glass] .ui-toast,
+  :root[data-glass] .ui-palette-panel {
+    background: Canvas !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

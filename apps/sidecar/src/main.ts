@@ -4,6 +4,7 @@ import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { AppConfigService } from "./config.ts"
 import { ApiRoutes, DatabaseLive } from "./layers.ts"
 import { awaitShutdown } from "./shutdown.ts"
+import { markAnnounced } from "./startup.ts"
 
 /** Prints the one-line ready event the Tauri shell waits for (specs/05 §1). */
 const Ready = Layer.effectDiscard(Effect.gen(function*() {
@@ -18,6 +19,7 @@ const Ready = Layer.effectDiscard(Effect.gen(function*() {
   })
   yield* probe.pipe(Effect.retry({ schedule: Schedule.spaced("50 millis"), times: 400 }), Effect.orDie)
   console.log(JSON.stringify({ event: "ready", port: address.port }))
+  markAnnounced()
 }))
 
 const Server = Layer.mergeAll(HttpRouter.serve(ApiRoutes), Ready).pipe(

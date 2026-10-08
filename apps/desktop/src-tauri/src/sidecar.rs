@@ -24,7 +24,7 @@ use tokio::time::timeout;
 /// and target-triple suffix; the Tauri bundler strips the suffix).
 const SIDECAR_BIN: &str = "sidecar";
 /// How long the sidecar may take to print its ready line.
-pub const READY_TIMEOUT: Duration = Duration::from_secs(15);
+pub const READY_TIMEOUT: Duration = Duration::from_secs(60);
 /// The sidecar is restarted at most this many times after a failure.
 pub const MAX_RESTARTS: u32 = 1;
 /// Event name the webview listens to for sidecar state changes.
@@ -999,7 +999,7 @@ mod tests {
         let mut rx = channel(vec![ProcEvent::Stdout("still starting".into())]);
         assert_eq!(
             wait_for_ready(&mut rx, READY_TIMEOUT, "t").await,
-            Err(SidecarError::ReadyTimeout(15))
+            Err(SidecarError::ReadyTimeout(60))
         );
     }
 

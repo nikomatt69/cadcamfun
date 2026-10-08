@@ -36,10 +36,10 @@ export function AdvancedSection(): JSX.Element {
             <div>
               <label class={LABEL}>Finishing Strategy</label>
               <select class={INPUT} value={s().finishingStrategy || "contour"} onChange={(event) => gen.updateSettings("finishingStrategy", event.currentTarget.value as ToolpathSettings["finishingStrategy"])}>
-                <option value="contour">Contour</option>
-                <option value="parallel">Parallel</option>
-                <option value="spiral">Spiral</option>
-                <option value="radial">Radial</option>
+                <option value="contour">{s().operationType === "3d_surface" ? "Contour (waterline)" : "Contour"}</option>
+                <Show when={s().operationType === "3d_surface"}>
+                  <option value="parallel">Parallel (raster)</option>
+                </Show>
               </select>
             </div>
           </Show>

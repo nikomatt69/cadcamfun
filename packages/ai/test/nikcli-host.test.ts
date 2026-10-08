@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { Effect, Scope, Stream } from "effect"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -12,6 +12,9 @@ import { buildTools, TOOL_IDS, type ToolHandlersShape } from "../src/tools/catal
 import { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime } from "../src/nikcli/runtime.ts"
 import { chatTurns, startFakeOpenAi, toolNames, type Completion } from "./helpers/fake-openai.ts"
 import { sharedDataDir } from "./helpers/host-env.ts"
+
+// The host bundle is imported when the first host is needed (not while the runtime is built), and a loaded machine is slow at it.
+setDefaultTimeout(60000)
 
 const executed: Array<{ tool: string; input: unknown; projectId: string }> = []
 

@@ -46,7 +46,7 @@ describe("the agent's work is shown", () => {
     try {
       const { dispose } = app.visit("/cad")
       try {
-        ;(await w('open-button', () => q('button[title="Show CAD Assistant"]'))).click()
+        ;(await w('open-button', () => q<HTMLButtonElement>('button[title="Show CAD Assistant"]'))).click()
         await flush(50)
         await w('panel', () => q('[data-testid="ai-panel"]'))
         const input = await w("prompt", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))

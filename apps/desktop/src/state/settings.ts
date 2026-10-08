@@ -29,6 +29,8 @@ export interface Settings {
   readonly snapEnabled: boolean
   /** Drawing tolerance in millimetres: how closely curves are drawn and the default of the toolpath and its verification. */
   readonly tolerance: number
+  /** Liquid Glass window material (macOS, inside the desktop app); everywhere else it has no effect. */
+  readonly glass: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -38,7 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   decimals: 3,
   postProcessor: "grbl",
   snapEnabled: true,
-  tolerance: DEFAULT_TOLERANCE
+  tolerance: DEFAULT_TOLERANCE,
+  glass: true
 }
 
 const STORAGE_KEY = "cadcamfun.settings"
@@ -64,7 +67,8 @@ export const decodeSettings = (raw: unknown): Settings => {
       : DEFAULT_SETTINGS.postProcessor,
     snapEnabled:
       typeof record["snapEnabled"] === "boolean" ? record["snapEnabled"] : DEFAULT_SETTINGS.snapEnabled,
-    tolerance: isTolerance(record["tolerance"]) ? record["tolerance"] : DEFAULT_SETTINGS.tolerance
+    tolerance: isTolerance(record["tolerance"]) ? record["tolerance"] : DEFAULT_SETTINGS.tolerance,
+    glass: typeof record["glass"] === "boolean" ? record["glass"] : DEFAULT_SETTINGS.glass
   }
 }
 

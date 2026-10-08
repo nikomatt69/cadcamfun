@@ -2,7 +2,7 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, 
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Puzzle, Settings, Wrench } from "lucide-solid"
-import { Toaster, toast } from "../components/ui/toast.tsx"
+import { toast } from "../components/ui/toast.tsx"
 import { useApp } from "../state/context.ts"
 import { useCADStore } from "./store/cadStore.ts"
 import { useDocumentStore } from "./store/documentStore.ts"
@@ -300,7 +300,6 @@ export default function CadPage(): JSX.Element {
 
       <ImportExportDialog isOpen={showImportExport()} mode={dialogMode()} onClose={() => setShowImportExport(false)} canvas={canvas()} />
       <UnifiedLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)}><LibraryBrowser onSelectComponent={pickComponent} /></UnifiedLibraryModal>
-      <Toaster />
     </Motion.div>
   )
 }

@@ -11,7 +11,7 @@ import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, t
 import { useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-solid"
-import { Toaster, toast } from "../components/ui/toast.tsx"
+import { toast } from "../components/ui/toast.tsx"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { syncDocumentSettings } from "../state/document-settings.ts"
@@ -344,7 +344,6 @@ export default function CamPage(): JSX.Element {
 
       <ToolLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)} />
       <CostsModal isOpen={showCosts()} onClose={() => setShowCosts(false)} />
-      <Toaster />
     </Motion.div>
   )
 }

@@ -6,6 +6,7 @@ import { geometryOf } from "../../lib/job.ts"
 import { useJob } from "../../lib/useJob.ts"
 import { makeToolpathGenerator } from "../../api/generator.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
+import { t } from "../../../i18n/index.ts"
 import { CheckRow, INPUT, LABEL, Section } from "./ui.tsx"
 
 /** The assistant is optional here (the panel also mounts without the AI provider, e.g. in tests). */
@@ -50,7 +51,7 @@ export function AiSection(): JSX.Element {
   ))
 
   const ask = (question: string): void => {
-    if (!ai) { gen.addAiSuggestion(`Posso aiutarti con consigli sulla lavorazione del ${gen.settings.material}.`); return }
+    if (!ai) { gen.addAiSuggestion(t("cam.ai.replyNoAI", { material: gen.settings.material })); return }
     app.setPanelOpen(true)
     void ai.send(`Toolpath generator (${gen.settings.machineType}, ${gen.settings.operationType}, ${gen.settings.material}, tool Ø${gen.settings.toolDiameter}mm, depth ${gen.settings.depth}mm): ${question}`)
     gen.addAiSuggestion(`Question sent to the assistant: "${question}"`)
@@ -71,7 +72,7 @@ export function AiSection(): JSX.Element {
         </div>
 
         <div>
-          <label class={LABEL}>Ottimizza Per</label>
+          <label class={LABEL}>{t("cam.ai.optimizeFor")}</label>
           <select class={INPUT} value={gen.settings.aiOptimize} onChange={(event) => gen.updateSettings("aiOptimize", event.currentTarget.value as ToolpathSettings["aiOptimize"])}>
             <option value="speed">Speed</option>
             <option value="quality">Quality</option>
@@ -103,7 +104,7 @@ export function AiSection(): JSX.Element {
             <input
               type="text"
               class="w-full p-2 pr-10 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Fai una domanda sulla lavorazione..."
+              placeholder={t("cam.ai.askPlaceholder")}
               onKeyDown={(event) => {
                 const input = event.currentTarget
                 if (event.key === "Enter" && input.value) { ask(input.value); input.value = "" }
@@ -112,7 +113,8 @@ export function AiSection(): JSX.Element {
             <button
               type="button"
               class="absolute right-2 top-2 text-blue-600"
-              onClick={() => gen.addAiSuggestion(`Posso aiutarti con consigli sulla lavorazione del ${gen.settings.material}. Prova a chiedermi riguardo le velocità ottimali o le profondità di passata.`)}
+              aria-label={t("cam.ai.send")}
+              onClick={() => gen.addAiSuggestion(t("cam.ai.replyNoAI", { material: gen.settings.material }) + t("cam.ai.replyTry"))}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />

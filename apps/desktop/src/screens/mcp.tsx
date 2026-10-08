@@ -46,8 +46,10 @@ export function McpSettingsScreen(): JSX.Element {
     setSubmitting(true)
     try {
       const created = await app.runtime.run(app.client.mcp.createConfig({ query: {}, payload: values }))
-      // Legacy pushed the raw response object (the envelope) into the list as a server.
-      setServers([...servers(), created as unknown as McpServerCard])
+      // The endpoint answers the `McpConfigCreated` envelope; the legacy code pushed the
+      // whole envelope into the list, so the new card rendered with an empty name and no id.
+      const server = (created as { server?: McpServerCard }).server
+      if (server !== undefined) setServers([...servers(), server])
       setShowAddForm(false)
     } catch (cause) {
       setError(await legacyFailure(cause, t("mcp.settings.addError")))

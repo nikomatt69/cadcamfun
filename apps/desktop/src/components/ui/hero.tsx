@@ -7,7 +7,10 @@
  */
 import { Motion } from "solid-motionone"
 import { type JSX, type ParentProps } from "solid-js"
-import { FloatingOrbs } from "./animated-section.tsx"
+import { FloatingOrbs, prefersReducedMotion } from "./animated-section.tsx"
+
+/** Reduced-motion users get the fade only — no y-slides on the hero copy. */
+const reduced = prefersReducedMotion
 
 export interface HeroProps extends ParentProps {
   readonly eyebrow?: string
@@ -33,8 +36,8 @@ export function Hero(props: HeroProps): JSX.Element {
         {props.eyebrow !== undefined ? (
           <Motion.span
             class="ui-hero-eyebrow"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 8 }}
+            animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
             {props.eyebrow}
@@ -42,8 +45,8 @@ export function Hero(props: HeroProps): JSX.Element {
         ) : null}
         <Motion.h1
           class="ui-hero-title"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0 }}
           transition={{ duration: 0.5, easing: [0.22, 1, 0.36, 1], delay: 0.1 }}
         >
           {props.title}
@@ -51,8 +54,8 @@ export function Hero(props: HeroProps): JSX.Element {
         {props.subtitle !== undefined ? (
           <Motion.p
             class="ui-hero-subtitle"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.5, easing: [0.22, 1, 0.36, 1], delay: 0.18 }}
           >
             {props.subtitle}
@@ -61,8 +64,8 @@ export function Hero(props: HeroProps): JSX.Element {
         {props.children !== undefined ? (
           <Motion.div
             class="ui-hero-actions"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={reduced() ? { opacity: 1 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.5, easing: [0.22, 1, 0.36, 1], delay: 0.26 }}
           >
             {props.children}

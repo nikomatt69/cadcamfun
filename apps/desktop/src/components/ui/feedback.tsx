@@ -11,6 +11,10 @@ import Check from "lucide-solid/icons/check"
 import TriangleAlert from "lucide-solid/icons/triangle-alert"
 import X from "lucide-solid/icons/x"
 import Info from "lucide-solid/icons/info"
+import { prefersReducedMotion } from "./animated-section.tsx"
+
+/** Reduced-motion users get the fade only — no slide-in from the edge. */
+const reduced = prefersReducedMotion
 
 export type ToastTone = "success" | "warning" | "error" | "info"
 
@@ -68,9 +72,9 @@ export function ToastViewport(): JSX.Element {
         <For each={items()}>{(item) => (
           <Motion.div
             class={toneClass(item.tone)}
-            initial={{ opacity: 0, x: 24, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 24, scale: 0.95 }}
+            initial={reduced() ? { opacity: 0 } : { opacity: 0, x: 24, scale: 0.95 }}
+            animate={reduced() ? { opacity: 1 } : { opacity: 1, x: 0, scale: 1 }}
+            exit={reduced() ? { opacity: 0 } : { opacity: 0, x: 24, scale: 0.95 }}
             transition={{ duration: 0.35, easing: [0.22, 1, 0.36, 1] }}
           >
             <span class="ui-toast-icon">{toneIcon(item.tone)}</span>

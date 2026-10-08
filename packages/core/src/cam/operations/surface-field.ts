@@ -50,34 +50,24 @@ export const cutterOf = (tool: Tool, allowance = 0): Cutter => {
   }
 }
 
-interface Footprint {
-  readonly di: Int32Array
-  readonly dj: Int32Array
-  readonly h: Float64Array
-}
-
 export class Surface {
-  private readonly cache = new Map<Cutter, Footprint>()
   constructor(readonly grid: Grid, /** Top of the part per column, -Infinity where there is none. */ readonly height: Float64Array) {}
 
-  private footprint(cutter: Cutter): Footprint {
-    const hit = this.cache.get(cutter)
-    if (hit !== undefined) return hit
-    const { cellX, cellY } = this.grid
-    const pad = 0.5 * Math.hypot(cellX, cellY)
-    const reach = cutter.radius + pad
-    const ri = Math.ceil(reach / cellX), rj = Math.ceil(reach / cellY)
-    const di: number[] = [], dj: number[] = [], h: number[] = []
-    for (let j = -rj; j <= rj; j++) for (let i = -ri; i <= ri; i++) {
-      const d = Math.hypot(i * cellX, j * cellY)
-      if (d > reach) continue
-      di.push(i); dj.push(j)
-      // Beyond the cutter's own radius the nearest point of the cutter is its rim.
-      h.push(cutter.profile(Math.min(d, cutter.radius)))
+  private box: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } | undefined
+  /** Extent in XY of the columns that hold material (undefined when there is none). */
+  materialBox(): { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number } | undefined {
+    if (this.box !== undefined) return this.box
+    const { nx, ny, minX, minY, cellX, cellY } = this.grid
+    let i0 = nx, i1 = -1, j0 = ny, j1 = -1
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) if (this.height[j * nx + i]! !== -Infinity) {
+      if (i < i0) i0 = i
+      if (i > i1) i1 = i
+      if (j < j0) j0 = j
+      if (j > j1) j1 = j
     }
-    const fp = { di: Int32Array.from(di), dj: Int32Array.from(dj), h: Float64Array.from(h) }
-    this.cache.set(cutter, fp)
-    return fp
+    if (i1 < 0) return undefined
+    this.box = { x0: minX + i0 * cellX, y0: minY + j0 * cellY, x1: minX + (i1 + 1) * cellX, y1: minY + (j1 + 1) * cellY }
+    return this.box
   }
 
   /** Column holding (x, y), or -1 outside the grid. */
@@ -92,23 +82,79 @@ export class Surface {
     return k < 0 ? -Infinity : this.height[k]!
   }
 
-  /** Lowest tip height of `cutter` at (x, y) that does not cut into the part; -Infinity when no part is under the cutter. */
+  /**
+   * Lowest tip height of `cutter` at (x, y) that does not cut into the part; -Infinity when no part is under the cutter.
+   *
+   * Each column is a square of material of its own height. Its distance to the axis is measured from the exact (x, y), and
+   * reduced by half a cell (the nearest point of the column), so the answer errs on the safe side by at most the slope times
+   * half a cell, never on the gouging side.
+   */
   tip(cutter: Cutter, x: number, y: number): number {
     const { nx, ny, minX, minY, cellX, cellY } = this.grid
-    const ci = Math.floor((x - minX) / cellX), cj = Math.floor((y - minY) / cellY)
-    const fp = this.footprint(cutter)
+    // Nothing of the part within reach of this position: no need to look at a single column.
+    const box = this.materialBox()
+    const reach = cutter.radius + Math.hypot(cellX, cellY)
+    if (box === undefined || x < box.x0 - reach || x > box.x1 + reach || y < box.y0 - reach || y > box.y1 + reach) return -Infinity
+    const gx = (x - minX) / cellX, gy = (y - minY) / cellY
+    const half = 0.5 * Math.min(cellX, cellY)
+    const R = cutter.radius
+    const rx = Math.ceil(reach / cellX), ry = Math.ceil(reach / cellY)
+    const ci = Math.floor(gx), cj = Math.floor(gy)
+    const i0 = Math.max(0, ci - rx), i1 = Math.min(nx - 1, ci + rx)
+    const j0 = Math.max(0, cj - ry), j1 = Math.min(ny - 1, cj + ry)
+    const bmax = this.blockMax()
+    const bnx = Math.ceil(nx / BLOCK)
     let best = -Infinity
-    for (let k = 0; k < fp.h.length; k++) {
-      const i = ci + fp.di[k]!, j = cj + fp.dj[k]!
-      if (i < 0 || j < 0 || i >= nx || j >= ny) continue
-      const v = this.height[j * nx + i]!
-      if (v === -Infinity) continue
-      const t = v - fp.h[k]!
-      if (t > best) best = t
+    for (let bj = Math.floor(j0 / BLOCK); bj <= Math.floor(j1 / BLOCK); bj++) {
+      // Nearest the block's rows come to the axis along y (distance between cell centres, 0 when the axis is inside).
+      const ja = Math.max(j0, bj * BLOCK), jb = Math.min(j1, bj * BLOCK + BLOCK - 1)
+      const dyMin = gy < ja + 0.5 ? (ja + 0.5 - gy) * cellY : gy > jb + 0.5 ? (gy - jb - 0.5) * cellY : 0
+      for (let bi = Math.floor(i0 / BLOCK); bi <= Math.floor(i1 / BLOCK); bi++) {
+        const top = bmax[bj * bnx + bi]!
+        // The profile never falls with the distance, so nothing in this block can beat `top - profile(nearest distance)`.
+        if (top <= best) continue
+        const ia = Math.max(i0, bi * BLOCK), ib = Math.min(i1, bi * BLOCK + BLOCK - 1)
+        const dxMin = gx < ia + 0.5 ? (ia + 0.5 - gx) * cellX : gx > ib + 0.5 ? (gx - ib - 0.5) * cellX : 0
+        const dBlock = Math.sqrt(dxMin * dxMin + dyMin * dyMin) - half
+        if (dBlock > R) continue
+        if (top - cutter.profile(dBlock > 0 ? dBlock : 0) <= best) continue
+        for (let j = ja; j <= jb; j++) {
+          const oy = (j + 0.5 - gy) * cellY
+          const row = j * nx
+          for (let i = ia; i <= ib; i++) {
+            const v = this.height[row + i]!
+            // The profile is never negative, so a column no higher than the best tip so far cannot raise it.
+            if (v <= best) continue
+            const ox = (i + 0.5 - gx) * cellX
+            const d = Math.sqrt(ox * ox + oy * oy) - half
+            if (d > R) continue
+            const t = v - cutter.profile(d > 0 ? d : 0)
+            if (t > best) best = t
+          }
+        }
+      }
     }
     return best === -Infinity ? best : best + cutter.lift
   }
+
+  private blocks: Float64Array | undefined
+  /** Highest column of every BLOCK x BLOCK group of columns (-Infinity where empty), for rejecting whole groups in `tip`. */
+  private blockMax(): Float64Array {
+    if (this.blocks !== undefined) return this.blocks
+    const { nx, ny } = this.grid
+    const bnx = Math.ceil(nx / BLOCK), bny = Math.ceil(ny / BLOCK)
+    const out = new Float64Array(bnx * bny).fill(-Infinity)
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const v = this.height[j * nx + i]!
+      const k = Math.floor(j / BLOCK) * bnx + Math.floor(i / BLOCK)
+      if (v > out[k]!) out[k] = v
+    }
+    this.blocks = out
+    return out
+  }
 }
+
+const BLOCK = 8
 
 // ---------------------------------------------------------------- contour lines
 

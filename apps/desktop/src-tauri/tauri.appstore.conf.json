@@ -1,0 +1,35 @@
+{
+  "app": {
+    "macOSPrivateApi": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "CADCAM FUN",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true,
+        "center": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 18
+        },
+        "transparent": false,
+        "backgroundColor": [
+          15,
+          23,
+          42,
+          255
+        ]
+      }
+    ],
+    "security": {
+      "capabilities": [
+        "main"
+      ]
+    }
+  }
+}

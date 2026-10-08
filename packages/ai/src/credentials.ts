@@ -1,3 +1,5 @@
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { Context, Effect, Layer, Option, Redacted, Scope } from "effect"
 import { AiConfigError } from "./errors.ts"
 import { BUILTIN_PROVIDER_IDS, isProviderId, type ProviderId } from "./models.ts"
@@ -18,6 +20,46 @@ export interface CredentialSink {
 
 export type CredentialStatus = "configured" | "missing"
 
+/** Where the credentials survive a restart: read once when the service starts, rewritten after every change. */
+export interface CredentialPersistence {
+  readonly load: () => ReadonlyArray<readonly [ProviderId, StoredCredential]>
+  readonly save: (entries: ReadonlyArray<readonly [ProviderId, StoredCredential]>) => void
+}
+
+/**
+ * A JSON file (`{ "version": 1, "providers": { "<id>": { "key", "baseUrl"? } } }`) the user does not have to re-enter keys
+ * from. The keys are stored as written, so the file is created readable by its owner only (mode 0600). A missing or damaged
+ * file reads as empty, and a failed write never fails the change in memory.
+ */
+export const jsonFileCredentials = (file: string): CredentialPersistence => ({
+  load: () => {
+    try {
+      if (!existsSync(file)) return []
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as { providers?: Record<string, { key?: unknown; baseUrl?: unknown }> }
+      const out: Array<readonly [ProviderId, StoredCredential]> = []
+      for (const [id, entry] of Object.entries(parsed.providers ?? {})) {
+        if (!isProviderId(id) || typeof entry?.key !== "string" || entry.key.trim().length === 0) continue
+        out.push([id, { key: Redacted.make(entry.key), ...(typeof entry.baseUrl === "string" && entry.baseUrl.length > 0 ? { baseUrl: entry.baseUrl } : {}) }])
+      }
+      return out
+    } catch {
+      return []
+    }
+  },
+  save: (entries) => {
+    try {
+      mkdirSync(dirname(file), { recursive: true })
+      const providers = Object.fromEntries(entries.map(([id, c]) => [id, { key: Redacted.value(c.key), ...(c.baseUrl ? { baseUrl: c.baseUrl } : {}) }]))
+      const tmp = `${file}.${process.pid}.tmp`
+      writeFileSync(tmp, JSON.stringify({ version: 1, providers }, null, 2), { mode: 0o600 })
+      chmodSync(tmp, 0o600)
+      renameSync(tmp, file)
+    } catch {
+      // The key stays usable for this run; the next change tries to write again.
+    }
+  }
+})
+
 export class AiCredentials extends Context.Service<
   AiCredentials,
   {
@@ -33,9 +75,15 @@ export class AiCredentials extends Context.Service<
     attach(sink: CredentialSink): Effect.Effect<void, AiConfigError, Scope.Scope>
   }
 >()("cadcamfun/AiCredentials") {
-  /** Keys live in memory only; nothing is persisted by this service. */
-  static layer: Layer.Layer<AiCredentials> = Layer.sync(AiCredentials, () => {
-    const store = new Map<ProviderId, StoredCredential>()
+  /** Keys live in memory only; nothing is persisted by this layer (tests, `direct` experiments). */
+  static layer: Layer.Layer<AiCredentials> = AiCredentials.build()
+
+  /** Like `layer`, but the keys are loaded from and saved to `persistence` (see `jsonFileCredentials`). */
+  static layerPersisted = (persistence: CredentialPersistence): Layer.Layer<AiCredentials> => AiCredentials.build(persistence)
+
+  private static build(persistence?: CredentialPersistence): Layer.Layer<AiCredentials> { return Layer.sync(AiCredentials, () => {
+    const store = new Map<ProviderId, StoredCredential>(persistence?.load() ?? [])
+    const persist = () => persistence?.save([...store])
     const sinks = new Set<CredentialSink>()
 
     const broadcast = (change: CredentialChange) =>
@@ -67,11 +115,13 @@ export class AiCredentials extends Context.Service<
             ...(opts?.baseUrl ? { baseUrl: opts.baseUrl.replace(/\/+$/, "") } : {})
           }
           store.set(provider, credential)
+          persist()
           yield* broadcast({ _tag: "set", provider, credential })
         }),
       clear: (provider) =>
         Effect.gen(function* () {
           store.delete(provider)
+          persist()
           yield* broadcast({ _tag: "clear", provider }).pipe(Effect.ignore)
         }),
       status: Effect.sync(() => {
@@ -96,5 +146,5 @@ export class AiCredentials extends Context.Service<
           for (const [provider, credential] of store) yield* sink.apply({ _tag: "set", provider, credential })
         })
     })
-  })
+  }) }
 }

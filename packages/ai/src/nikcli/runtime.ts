@@ -38,6 +38,8 @@ export interface NikCliRuntimeOptions {
   readonly hostLogs?: HostLogSink
   /** Automatic compaction can spend model calls; omission preserves host defaults. */
   readonly compaction?: HostCompactionSettings
+  /** When this settles the host bundle is imported ahead of the first request. Omitted: it is imported on first use only. */
+  readonly warmAfter?: Promise<unknown>
 }
 
 export interface ProjectHost {
@@ -48,6 +50,15 @@ export interface ProjectHost {
 
 export interface NikCliRuntime {
   readonly paths: IsolatedPaths
+  /**
+   * The runtime is the application's *long-lived* connection to nikcli: every
+   * project host is created lazily on first use and cached for the rest of
+   * the app's lifetime. `dispose()` runs **only** when the sidecar's owning
+   * `Scope` closes (app quit, `SIGTERM`, stdin close). No code path may call
+   * `client["top-level"].dispose()` per chat turn, per session, or per
+   * project switch — that would break the continuous-agent contract by
+   * killing the in-process host every parent session depends on.
+   */
   /**
    * Resolves when the models.dev catalogue seed finished. Every catalogue read
    * awaits it; boot never does (the download must not delay the first frame).
@@ -128,10 +139,17 @@ export const makeNikCliRuntime = (
     )
     yield* Effect.addFinalizer(() => Effect.sync(uninstall))
 
-    const sdk = yield* Effect.tryPromise({
-      try: () => loadSdk(paths, options.isolation),
-      catch: toConfigError("Failed to load the embedded nikcli host")
+    // The host bundle is large and evaluating it blocks the event loop, which is what kept the sidecar from answering its
+    // health check (and the shell from connecting) for ten seconds and more on a busy machine. It is loaded when the first
+    // host is needed, or warmed once `warmAfter` settles (the sidecar passes the moment it has announced itself) so the first chat does not pay for it.
+    let sdkReady: Promise<Sdk> | undefined
+    const getSdk = (): Promise<Sdk> => (sdkReady ??= loadSdk(paths, options.isolation))
+    let warm: ReturnType<typeof setTimeout> | undefined
+    void options.warmAfter?.then(() => {
+      warm = setTimeout(() => { getSdk().catch(() => undefined) }, 250)
+      warm.unref?.()
     })
+    yield* Effect.addFinalizer(() => Effect.sync(() => { if (warm !== undefined) clearTimeout(warm) }))
 
     // Started here, never awaited at boot: writing `<cache>/models.json` once is what
     // gives `provider.list()` the whole models.dev catalogue instead of the four
@@ -168,6 +186,7 @@ export const makeNikCliRuntime = (
       mkdirSync(scratch, { recursive: true })
       const directory = realpathSync(scratch)
       await writeConfig(projectId)
+      const sdk = await getSdk().catch((cause) => { throw new Error(toConfigError("Failed to load the embedded nikcli host")(cause).message) })
       const client = await Effect.runPromise(sdk.NikCli.create({ directory }))
       const specs = options.toolsFor(projectId)
       const defined = specs.map((spec) =>

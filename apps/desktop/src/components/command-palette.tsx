@@ -5,7 +5,7 @@
  * `app/shortcuts.ts`, and the shell decides what running one means. Keyboard-first:
  * arrow keys move, Enter runs, Escape closes, and the input is auto-focused.
  */
-import { createEffect, createSignal, For, Show, type JSX } from "solid-js"
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createUniqueId } from "solid-js"
 import Search from "lucide-solid/icons/search"
 import X from "lucide-solid/icons/x"
@@ -32,12 +32,35 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
   const [query, setQuery] = createSignal("")
   const [highlight, setHighlight] = createSignal(0)
 
+  // The palette mounts when it opens, so the element focused right here is the
+  // trigger; return focus to it when it unmounts (same contract as Modal).
+  const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+  let dialog: HTMLDivElement | undefined
+  onCleanup(() => {
+    if (previousFocus !== undefined && previousFocus.isConnected) previousFocus.focus()
+  })
+
   const results = (): ReadonlyArray<PaletteCommand> => filterCommands(props.commands, query())
+
+  // Combobox pattern: the input announces which option is active.
+  const activeId = (): string | undefined =>
+    results().length > 0 ? `${inputId}-opt-${highlight()}` : undefined
 
   // Keep the highlight inside the filtered list as the query narrows it.
   createEffect(() => {
     const count = results().length
     if (highlight() >= count) setHighlight(Math.max(0, count - 1))
+  })
+
+  // Keep the highlighted option visible while arrowing through a scrolling list.
+  createEffect(() => {
+    highlight()
+    queueMicrotask(() => {
+      const option = dialog?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')
+      if (option != null && typeof option.scrollIntoView === "function") {
+        option.scrollIntoView({ block: "nearest" })
+      }
+    })
   })
 
   const move = (delta: number): void => {
@@ -51,6 +74,33 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
     if (command === undefined) return
     props.onClose()
     command.run()
+  }
+
+  // Dialog-level keys: Escape closes and Tab stays inside the palette, no matter
+  // which control (input or close button) has focus.
+  const onDialogKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      props.onClose()
+      return
+    }
+    if (event.key === "Tab" && dialog !== undefined) {
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>('input, button:not(:disabled), a[href], [tabindex="0"]')
+      ).filter((element) => !element.hidden)
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (first === undefined || last === undefined) {
+        event.preventDefault()
+        dialog.focus()
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
   }
 
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -75,10 +125,6 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
         event.preventDefault()
         runAt(highlight())
         return
-      case "Escape":
-        event.preventDefault()
-        props.onClose()
-        return
       default:
         return
     }
@@ -86,17 +132,20 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
 
   return (
     <div
-      class="fixed inset-0 z-[1060] flex items-start justify-center bg-black/40 pt-24"
+      class="ui-palette-scrim fixed inset-0 z-[1060] flex items-start justify-center bg-black/40 pt-24"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) props.onClose()
       }}
     >
       <div
-        class="card w-full max-w-xl"
+        ref={(element) => { dialog = element }}
+        class="ui-palette-panel card w-full max-w-xl"
         role="dialog"
         aria-modal="true"
         aria-label={t("palette.title")}
+        tabIndex={-1}
+        onKeyDown={onDialogKeyDown}
       >
         <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
           <Search size={16} aria-hidden="true" class="text-gray-500" />
@@ -105,9 +154,10 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
             class="w-full bg-transparent text-sm outline-none"
             type="text"
             role="combobox"
-            aria-expanded="true"
-            aria-controls={`${inputId}-list`}
+            aria-expanded={results().length > 0}
+            aria-controls={results().length > 0 ? `${inputId}-list` : undefined}
             aria-autocomplete="list"
+            aria-activedescendant={activeId()}
             placeholder={t("palette.placeholder")}
             // eslint-disable-next-line solid/refs -- autofocus is the point of a palette
             ref={(element) => queueMicrotask(() => element.focus())}
@@ -138,6 +188,7 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
                 <li role="none">
                   <button
                     type="button"
+                    id={`${inputId}-opt-${index()}`}
                     role="option"
                     aria-selected={index() === highlight()}
                     class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm"

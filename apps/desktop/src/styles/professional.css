@@ -1,0 +1,59 @@
+/* ========================================================================
+   Calmer finish (loaded after every other stylesheet, before glass.css). It does not restyle the app: layout, type, colours of
+   the brand and structure stay as they are. It only takes the playful effects off: the purple tint of the dark shell, shimmer
+   sweeps, holographic cards, glows, hover lifts, press scaling and spring overshoot, and it tightens radii and shadows a notch.
+   ======================================================================== */
+
+
+:root {
+  --ui-radius-sm: 0.375rem;
+  --ui-radius-md: 0.5rem;
+  --ui-radius-lg: 0.75rem;
+  --ui-radius-xl: 1rem;
+  --ui-radius-2xl: 1.25rem;
+  --ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --ui-shadow-md: 0 2px 6px rgba(15, 23, 42, 0.08);
+  --ui-shadow-lg: 0 8px 20px rgba(15, 23, 42, 0.12);
+  --ui-ring: 0 0 0 2px rgba(37, 99, 235, 0.35);
+  /* No overshoot: every curve decelerates and settles. */
+  --ui-spring: cubic-bezier(0.2, 0, 0, 1);
+  --ui-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ui-press-duration: 60ms;
+  --ui-release-duration: 120ms;
+}
+
+/* ---- Dark shell: slate, not purple ---- */
+.dark .reference-shell {
+  --shell-chrome: #181c22;
+  --shell-border: #2a303a;
+  --shell-button: #1e232b;
+  --shell-hover: #232933;
+  --shell-active: #1c2a44;
+  --shell-active-border: #2c4270;
+  --shell-popover: #1e232b;
+  --shell-page: #111418;
+  background: #111418;
+}
+.dark .reference-avatar { background: #1e293b; }
+html.dark body { background-image: none !important; background-color: #111418; }
+
+/* ---- Chrome ---- */
+.reference-navbar { box-shadow: 0 1px 0 var(--shell-border); }
+.reference-icon-button { box-shadow: none; }
+.reference-popover { box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14); }
+.reference-shell :is(button, a):active { transform: none; }
+
+/* ---- Cards and controls: no shimmer, holographic tint, glow, lift or pulse ---- */
+.ui-card::before { display: none; }
+.ui-card-holographic, .ui-card-gradient { background-image: none !important; }
+.ui-card-interactive:hover, .ui-card:hover, .ui-btn:hover, .ui-icon-btn:hover { transform: none !important; }
+.ui-glow, .ui-dots { display: none; }
+.ui-status-dot-pulse { animation: none; }
+.ui-btn-primary { background-image: none !important; }
+
+/* ---- Dashboard hero: the glow behind the card is dropped, the rest stays ---- */
+.dashboard-hero-glow { display: none !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-hero-in, .ui-panel-in { animation-duration: 180ms; animation-timing-function: var(--ui-ease-out); }
+}

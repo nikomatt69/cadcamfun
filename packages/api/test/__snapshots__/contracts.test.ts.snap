@@ -37143,8 +37143,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
+                      "rasterAngle": {
+                        "type": "number",
+                      },
+                      "rasterOneWay": {
+                        "type": "boolean",
+                      },
                       "rpm": {
                         "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "scallop": {
+                        "minimum": 0,
                         "type": "number",
                       },
                       "spindleDirection": {
@@ -37170,6 +37180,14 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "stockLength": {
                         "exclusiveMinimum": 0,
                         "type": "number",
+                      },
+                      "surfaceStrategy": {
+                        "enum": [
+                          "roughing",
+                          "parallel",
+                          "waterline",
+                        ],
+                        "type": "string",
                       },
                       "tolerance": {
                         "minimum": 0,
@@ -38607,8 +38625,18 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "exclusiveMinimum": 0,
                         "type": "number",
                       },
+                      "rasterAngle": {
+                        "type": "number",
+                      },
+                      "rasterOneWay": {
+                        "type": "boolean",
+                      },
                       "rpm": {
                         "exclusiveMinimum": 0,
+                        "type": "number",
+                      },
+                      "scallop": {
+                        "minimum": 0,
                         "type": "number",
                       },
                       "spindleDirection": {
@@ -38634,6 +38662,14 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "stockLength": {
                         "exclusiveMinimum": 0,
                         "type": "number",
+                      },
+                      "surfaceStrategy": {
+                        "enum": [
+                          "roughing",
+                          "parallel",
+                          "waterline",
+                        ],
+                        "type": "string",
                       },
                       "tolerance": {
                         "minimum": 0,

@@ -38,14 +38,14 @@ describe("CAM page", () => {
       // Legacy default tab: the G-code editor.
       await app.wait(() => editor())
       for (const label of ["Preview", "Editor G-Code", "Toolpath", "Post-Processor"]) expect(byText("button", label)).toBeDefined()
-      for (const title of ["Salva G-Code", "Importa G-Code", "Unified Library", "Gestione Costi di Produzione", "Switch to CAD Editor"]) {
+      for (const title of ["Save G-Code", "Import G-Code", "Unified Library", "Costs", "Switch to CAD"]) {
         expect(document.querySelector(`[title="${title}"]`)).not.toBeNull()
       }
 
       // Save stays disabled until there is code.
-      expect((document.querySelector('button[title="Salva G-Code"]') as HTMLButtonElement).disabled).toBe(true)
+      expect((document.querySelector('button[title="Save G-Code"]') as HTMLButtonElement).disabled).toBe(true)
       await type(editor()!, "G21\nG90\nG0 X0 Y0\nG1 X10 Y0 F200\nG1 X10 Y10\nM30")
-      expect((document.querySelector('button[title="Salva G-Code"]') as HTMLButtonElement).disabled).toBe(false)
+      expect((document.querySelector('button[title="Save G-Code"]') as HTMLButtonElement).disabled).toBe(false)
 
       // Save downloads `toolpath-<date>.nc`.
       const downloads: string[] = []
@@ -54,7 +54,7 @@ describe("CAM page", () => {
       ;(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:test"
       ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined
       proto.click = function (this: HTMLAnchorElement) { downloads.push(this.download) }
-      await click('button[title="Salva G-Code"]')
+      await click('button[title="Save G-Code"]')
       proto.click = nativeClick
       expect(downloads[0]).toMatch(/^toolpath-\d{4}-\d{2}-\d{2}\.nc$/)
 
@@ -89,7 +89,7 @@ describe("CAM page", () => {
       await click('button[aria-label="Close library"]')
       await settle(400)
 
-      await click('button[title="Gestione Costi di Produzione"]')
+      await click('button[title="Costs"]')
       await find('[role="dialog"][aria-label="Production Costs Manager"]')
       await click('[role="dialog"] button[aria-label="Close"]')
       expect(document.querySelector('[role="dialog"]')).toBeNull()

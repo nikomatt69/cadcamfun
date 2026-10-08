@@ -101,28 +101,25 @@ export function StatusBar(props: StatusBarProps): JSX.Element {
   return (
     <footer
       class="reference-native-statusbar flex h-7 shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-      aria-label={t("status.units")}
+      aria-label={t("status.label")}
     >
       <span>
+        {/* Value only ("mm"), so the label is announced via sr-only. */}
         <span class="sr-only">{t("status.units")}: </span>
         {props.units}
       </span>
       <span>
-        <span class="sr-only">{t("status.snap")}: </span>
         {t("status.snap")}: {props.snapEnabled ? t("shell.snapOn") : t("status.snapOff")}
       </span>
       <Show when={props.toolLabel !== undefined}>
         <span>
-          <span class="sr-only">{t("status.tool")}: </span>
           {t("status.tool")}: {props.toolLabel}
         </span>
       </Show>
       <span class="ml-auto font-mono">
-        <span class="sr-only">{t("status.cursor")}: </span>
         {t("status.cursor")}: {cursor()}
       </span>
       <span aria-live="polite">
-        <span class="sr-only">{t("status.sidecar")}: </span>
         {t("status.sidecar")}: {t(sidecarKey(props.sidecar))}
       </span>
     </footer>

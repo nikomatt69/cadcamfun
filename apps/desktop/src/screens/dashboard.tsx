@@ -379,7 +379,8 @@ function QuickAccess(): JSX.Element {
   const tiles = (): ReadonlyArray<{ href: string; label: string; detail: string; icon: typeof Layers; tone: "yellow" | "green" | "blue" | "purple" }> => [
     { href: "/materials", label: t("dashboard.quick.materials"), detail: t("dashboard.quick.materialsDetail"), icon: Layers, tone: "yellow" },
     { href: "/components", label: t("dashboard.quick.components"), detail: t("dashboard.quick.componentsDetail"), icon: Box, tone: "green" },
-    { href: "/drawings", label: t("dashboard.quick.drawings"), detail: t("dashboard.quick.drawingsDetail"), icon: Settings, tone: "blue" },
+    // Drawings live inside a project in v6 (there is no `/drawings` index route).
+    { href: "/projects", label: t("dashboard.quick.drawings"), detail: t("dashboard.quick.drawingsDetail"), icon: Settings, tone: "blue" },
     { href: "/toolpaths", label: t("dashboard.quick.toolpaths"), detail: t("dashboard.quick.toolpathsDetail"), icon: Cpu, tone: "purple" }
   ]
   return (

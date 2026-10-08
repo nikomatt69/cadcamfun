@@ -6,6 +6,7 @@ import { type JSX } from "solid-js"
 import { Eye, EyeOff, Grid } from "lucide-solid"
 import { useCADStore } from "../../../cad/store/cadStore.ts"
 import SnapSettings from "../../../cad/components/SnapSettings.tsx"
+import { t } from "../../../i18n/index.ts"
 
 const MODE = (active: boolean): string =>
   `px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${active ? "bg-blue-600 text-white shadow-lg border border-blue-500/50" : "bg-white/60 dark:bg-gray-700/60 text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-gray-700/80 border border-white/40 dark:border-gray-600/40"}`
@@ -31,20 +32,20 @@ export default function ViewSettings(): JSX.Element {
   const cad = useCADStore()
   return (
     <div class="backdrop-blur-md bg-white/80 dark:bg-gray-800/80 shadow-xl rounded-2xl p-6 max-h-[calc(100vh-100px)] overflow-y-auto text-center w-full border border-white/30 dark:border-gray-600/30">
-      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-6">View Settings</h3>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-6">{t("cam.viewSettingsTitle")}</h3>
       <div class="space-y-6">
         <div>
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">View Mode</label>
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">{t("cam.view.mode")}</label>
           <div class="flex space-x-3 justify-center">
-            <button class={MODE(cad.viewMode === "2d")} onClick={() => cad.setViewMode("2d")}>2D View</button>
-            <button class={MODE(cad.viewMode === "3d")} onClick={() => cad.setViewMode("3d")}>3D View</button>
+            <button class={MODE(cad.viewMode === "2d")} aria-pressed={cad.viewMode === "2d"} onClick={() => cad.setViewMode("2d")}>{t("cam.view.2d")}</button>
+            <button class={MODE(cad.viewMode === "3d")} aria-pressed={cad.viewMode === "3d"} onClick={() => cad.setViewMode("3d")}>{t("cam.view.3d")}</button>
           </div>
         </div>
         <div>
-          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Display Options</label>
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">{t("cam.view.options")}</label>
           <div class="space-y-3">
-            <Toggle label="Show Grid" on={cad.gridVisible} onToggle={() => cad.toggleGrid()} icon={<Grid size={16} />} />
-            <Toggle label="Show Axis" on={cad.axisVisible} onToggle={() => cad.toggleAxis()} icon={cad.axisVisible ? <Eye size={16} /> : <EyeOff size={16} />} />
+            <Toggle label={t("cam.view.showGrid")} on={cad.gridVisible} onToggle={() => cad.toggleGrid()} icon={<Grid size={16} />} />
+            <Toggle label={t("cam.view.showAxis")} on={cad.axisVisible} onToggle={() => cad.toggleAxis()} icon={cad.axisVisible ? <Eye size={16} /> : <EyeOff size={16} />} />
           </div>
         </div>
         <SnapSettings />

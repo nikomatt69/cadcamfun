@@ -23,6 +23,7 @@ import { useMultiToolpathStore } from "../../store/multiToolpathStore.ts"
 import ToolpathGenerator from "../ToolpathGenerator.tsx"
 import { assignmentOf, materialOf, toolOf } from "./assignments.ts"
 import ElementSelector from "./ElementSelector.tsx"
+import { t } from "../../../i18n/index.ts"
 
 export interface MultiToolpathGeneratorProps {
   /** Receives the program text sent to the viewport (the combined program, or a configured element's). */
@@ -122,7 +123,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    toast.success("G-code combinato scaricato")
+    toast.success(t("cam.multi.downloaded"))
   }
 
   // The combined program replaces the viewport's: G-code text for the editor, the parsed IR for the simulation.
@@ -160,7 +161,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
               class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Zap size={16} />
-              Genera Tutti
+              {t("cam.multi.generateAll")}
             </button>
 
             <button
@@ -228,8 +229,8 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
               <div class="flex items-center justify-center h-full">
                 <div class="text-center">
                   <Layers size={64} class="text-gray-600 mx-auto mb-4" />
-                  <p class="text-gray-400 text-lg">Seleziona un elemento per configurare il toolpath</p>
-                  <p class="text-gray-500 text-sm mt-2">Usa il pannello laterale per selezionare gli elementi CAD</p>
+                  <p class="text-gray-400 text-lg">{t("cam.multi.selectElement")}</p>
+                  <p class="text-gray-500 text-sm mt-2">{t("cam.multi.useSidebar")}</p>
                 </div>
               </div>
             }

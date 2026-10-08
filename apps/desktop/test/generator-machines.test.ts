@@ -77,6 +77,23 @@ describe("generator panel by machine", () => {
     } finally { dispose() }
   }, 120000)
 
+  test("the 3D surface operation brings its strategies, and a raster shows its angle and cusp height", async () => {
+    const { dispose } = app.visit("/cam")
+    try {
+      await find('[data-testid="toolpath-generator"]')
+      await open("operation-section")
+      expect(document.querySelector('[data-testid="surface-settings"]')).toBeNull()
+      await choose(document.querySelector<HTMLSelectElement>('[data-testid="operation-section"] select')!, "3d_surface")
+      const strategy = await find<HTMLSelectElement>('[data-testid="surface-settings"] select[aria-label="Surface strategy"]')
+      expect([...strategy.options].map((o) => o.value)).toEqual(["roughing", "parallel", "waterline"])
+      expect(document.querySelector('[data-testid="surface-settings"]')!.textContent).not.toContain("Raster angle")
+      await choose(strategy, "parallel")
+      expect(useGeneratorStore.getState().settings.surfaceStrategy).toBe("parallel")
+      expect(document.querySelector('[data-testid="surface-settings"]')!.textContent).toContain("Raster angle")
+      expect(document.querySelector('[data-testid="surface-settings"]')!.textContent).toContain("Cusp height")
+    } finally { dispose() }
+  }, 120000)
+
   test("generating with the probe settings gives a probing program, spindle off", async () => {
     useGeneratorStore.getState().patchSettings({ operationType: "probing", toolType: "probe", probeCycle: "edgeX", workOffset: "G55" })
     const { dispose } = app.visit("/cam")

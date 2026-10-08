@@ -7,7 +7,9 @@ import type { ClientEffect, QueryOptions, QueryRuntime } from "../state/queries.
 import type { QueryCache } from "../state/query-cache.ts"
 
 export const useQuery = <T,>(endpoint: string, params: Readonly<Record<string, unknown>> | undefined, read: (client: Client) => ClientEffect<T>, runtime: QueryRuntime, options?: QueryOptions) =>
-  stateQuery(endpoint, params, () => Effect.flatMap(Effect.service(ApiClient), read), runtime, options)
+  // `state/queries` binds the client through the ApiClient service itself, so the
+  // read flows through unchanged (a thunk here made Effect reject the query).
+  stateQuery(endpoint, params, read, runtime, options)
 
 export const useMutation = <Args extends ReadonlyArray<unknown>, A>(write: (client: Client, ...args: Args) => ClientEffect<A>, runtime: QueryRuntime, invalidates: ReadonlyArray<string>, cache: QueryCache | undefined) => {
   const [pending, setPending] = createSignal(false)

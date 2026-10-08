@@ -111,8 +111,17 @@ export interface ConnectOptions {
   readonly fallbackToFake?: boolean
 }
 
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : typeof error === "string" ? error : String(error)
+/** A readable reason from whatever a failed call rejects with (the Tauri shell rejects with plain objects, not Errors). */
+export const messageOf = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (typeof error === "string") return error
+  if (error !== null && typeof error === "object") {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === "string") return message
+    try { return JSON.stringify(error) } catch { return "unknown error" }
+  }
+  return String(error)
+}
 
 /** Rejects with `reason` if `promise` has not settled within `ms`. */
 export const withTimeout = async <A,>(promise: Promise<A>, ms: number, reason: string): Promise<A> => {

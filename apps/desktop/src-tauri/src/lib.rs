@@ -79,6 +79,13 @@ pub fn run() {
             focus_main_window(app);
             forward_open_files(app, openable_paths(args));
         }));
+        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+    }
+
+    // Liquid Glass window material (macOS 26+, vibrancy before it); the webview asks for it once the UI has loaded.
+    #[cfg(feature = "liquid-glass")]
+    {
+        builder = builder.plugin(tauri_plugin_liquid_glass::init());
     }
 
     let app = builder
@@ -91,6 +98,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         // Auto-update: the shell owns the policy, the plugin owns download and
         // signature verification. See updater.rs.
         .plugin(tauri_plugin_updater::Builder::new().build())

@@ -35,9 +35,67 @@ afterAll(async () => {
 
 const drain = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+/** Stub a nikcli host so tests do not actually open the embedded client. */
+const stubHost = (overrides?: {
+  promptAsync?: (input: unknown) => Promise<unknown>
+}): NikCliRuntime => {
+  const calls: Array<{ method: string; args: unknown[] }> = []
+  const promptAsync = overrides?.promptAsync ?? (async () => undefined)
+  const host = {
+    host: () =>
+      Effect.tryPromise({
+        try: async () => ({
+          projectId: "p",
+          directory: "/tmp",
+          client: {
+            session: {
+              create: async (input: unknown) => {
+                calls.push({ method: "session.create", args: [input] })
+                return { id: "child" }
+              },
+              remove: async () => true
+            },
+            "session-prompt": {
+              prompt: async (input: unknown) => {
+                calls.push({ method: "prompt", args: [input] })
+                return { parts: [{ type: "text", text: "ok" }] }
+              },
+              promptAsync: (async (input: unknown) => {
+                calls.push({ method: "promptAsync", args: [input] })
+                return await promptAsync(input)
+              }) as never
+            }
+          }
+        }),
+        catch: () => new Error("host")
+      })
+  }
+  return host as unknown as NikCliRuntime
+}
+
+/** A controllable runner: returns a promise per task that the test can settle. */
+const controllableRunner = () => {
+  const resolvers: Array<(text: string) => void> = []
+  return {
+    runner: () => new Promise<string>((resolve) => resolvers.push(resolve)),
+    resolveAll: (text: string) => resolvers.forEach((resolve) => resolve(text)),
+    /** Resolves once the runner has been invoked at least once (or timeout). */
+    awaitInvoked: (timeoutMs = 1000) =>
+      new Promise<void>((resolve) => {
+        const start = Date.now()
+        const tick = () => {
+          if (resolvers.length > 0 || Date.now() - start > timeoutMs) return resolve()
+          setTimeout(tick, 5)
+        }
+        tick()
+      })
+  }
+}
+
 describe("BackgroundToolsRunner", () => {
   test("scoped list / read: cross-project and cross-parent isolation", async () => {
-    const runner = new BackgroundToolsRunner(runtime, "project-a")
+    const stub = controllableRunner()
+    const runner = new BackgroundToolsRunner(stubHost(), "project-a", { runner: stub.runner })
     const a = runner.manager.enqueue({
       description: "scan",
       prompt: "look",
@@ -57,12 +115,15 @@ describe("BackgroundToolsRunner", () => {
     expect(() => runner.manager.read({ projectId: "project-a", parentSessionId: "session-b" }, a.id)).toThrow()
     runner.manager.cancel({ projectId: "project-a", parentSessionId: "session-a" }, b.id)
     expect(runner.manager.read({ projectId: "project-a", parentSessionId: "session-a" }, b.id).status).toBe("cancelled")
+    await stub.awaitInvoked()
+    stub.resolveAll("done")
     await runner.dispose()
   })
 
   test("cancelled worker does not produce a wake to the parent", async () => {
     let resolveRunner: (text: string) => void = () => {}
-    const runner = new BackgroundToolsRunner(runtime, "project-cancel", {
+    const stub = stubHost()
+    const runner = new BackgroundToolsRunner(stub, "project-cancel", {
       runner: () => new Promise<string>((resolve) => (resolveRunner = resolve))
     })
     const parentId = "parent-cancel"
@@ -73,10 +134,10 @@ describe("BackgroundToolsRunner", () => {
       projectId: "project-cancel",
       parentSessionId: parentId
     })
-    await new Promise<void>((r) => setImmediate(r))
+    await drain(50)
     runner.manager.cancel({ projectId: "project-cancel", parentSessionId: parentId }, task.id)
     await runner.cancelForParent(parentId)
-    await drain(400)
+    await drain(100)
     expect(runner.manager.read({ projectId: "project-cancel", parentSessionId: parentId }, task.id).status).toBe("cancelled")
     resolveRunner("late text")
     await runner.dispose()
@@ -84,29 +145,28 @@ describe("BackgroundToolsRunner", () => {
 
   test("completed worker delivers findings to the parent via promptAsync", async () => {
     const seen: Array<{ sessionID: string; agent: string; text: string }> = []
-    const host = await Effect.runPromise(runtime.host("project-wake"))
-    const parentId = "parent-wake"
-    const originalPromptAsync = host.client["session-prompt"].promptAsync.bind(host.client["session-prompt"])
-    host.client["session-prompt"].promptAsync = (async (input: unknown) => {
-      const next = input as { sessionID: string; agent?: string; parts: Array<{ type: string; text: string }> }
-      seen.push({
-        sessionID: next.sessionID,
-        agent: next.agent ?? "",
-        text: next.parts.find((p) => p.type === "text")?.text ?? ""
-      })
-      return await originalPromptAsync(input as never)
-    }) as never
-
-    const runner = new BackgroundToolsRunner(runtime, "project-wake", {
+    const stub = stubHost({
+      promptAsync: async (input: unknown) => {
+        const next = input as { sessionID: string; agent?: string; parts: Array<{ type: string; text: string }> }
+        seen.push({
+          sessionID: next.sessionID,
+          agent: next.agent ?? "",
+          text: next.parts.find((p) => p.type === "text")?.text ?? ""
+        })
+        return undefined
+      }
+    })
+    const runner = new BackgroundToolsRunner(stub, "project-wake", {
       runner: async () => "verify toolpath notes"
     })
+    const parentId = "parent-wake"
     const task = runner.manager.enqueue({
       description: "probe",
       prompt: "tell me",
       projectId: "project-wake",
       parentSessionId: parentId
     })
-    await drain(200)
+    await drain(80)
     expect(runner.manager.read({ projectId: "project-wake", parentSessionId: parentId }, task.id).status).toBe("completed")
     await runner.dispose()
     expect(seen.some((entry) => entry.sessionID === parentId && entry.agent === "cadcam" && entry.text.startsWith("[CADCAM_AGENT background findings]"))).toBe(true)
