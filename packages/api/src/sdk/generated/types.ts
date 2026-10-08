@@ -1162,7 +1162,7 @@ export type AuthVerifyEmailOutput = {
 
 export type AuthSignoutOutput = {
   readonly body: { success: true; message: string }
-  readonly headers: { readonly "set-cookie": ReadonlyArray<string> }
+  readonly headers: { readonly "set-cookie"?: ReadonlyArray<string> | string | undefined }
 }
 
 export type AuthGetSessionOutput = {
@@ -1192,7 +1192,7 @@ export type AuthSigninDirectOutput = {
     user: { id: string; email: string | null; name: string | null; emailVerified: string | null; createdAt: string }
     token: string
   }
-  readonly headers: { readonly "set-cookie": ReadonlyArray<string> }
+  readonly headers: { readonly "set-cookie"?: ReadonlyArray<string> | string | undefined }
 }
 
 export type AuthSignupInput = {
@@ -1223,8 +1223,13 @@ export type AuthTestDirectCreateOutput = {
 export type AuthVerifyMagicLinkInput = { readonly token?: AuthVerifyMagicLinkPayload["token"] }
 
 export type AuthVerifyMagicLinkOutput = {
-  readonly body: { success: true; message: string; user: { id: string; email: string | null; name: string | null } }
-  readonly headers: { readonly "set-cookie": ReadonlyArray<string> }
+  readonly body: {
+    success: true
+    message: string
+    user: { id: string; email: string | null; name: string | null }
+    token?: string | undefined
+  }
+  readonly headers: { readonly "set-cookie"?: ReadonlyArray<string> | string | undefined }
 }
 
 export type AuthRegisterPasskeyOutput = never

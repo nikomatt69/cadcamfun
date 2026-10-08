@@ -8,6 +8,7 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { AppConfigService } from "../config.ts"
 import { BillingRepo, PLANS, TRIAL_DAYS, type SubscriptionRow } from "../repos/billing-repo.ts"
+import { PaymentProvider, type PaymentError } from "../services/payments.ts"
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null)
 const fail = (message: string) => (e: unknown) =>
@@ -48,6 +49,11 @@ const verifySignature = (payload: Uint8Array, header: string, secret: string): s
 export const BillingHandlers = HttpApiBuilder.group(Api, "billing", Effect.fn(function*(handlers) {
   const repo = yield* BillingRepo
   const config = yield* AppConfigService
+  const payments = yield* PaymentProvider
+  const base = config.appUrl ?? "http://localhost:3001"
+  /** A payment failure is logged and reported with the legacy message of the route that asked. */
+  const paymentFailed = <F>(message: string, toError: () => F) => <A>(self: Effect.Effect<A, PaymentError>): Effect.Effect<A, F> =>
+    self.pipe(Effect.tapError((e) => Effect.logWarning(`${message}: ${e.message}`)), Effect.mapError(toError))
 
   const current = Effect.fn("billing.current")(function*(userId: string) {
     const sub = yield* repo.ensureFree(userId)
@@ -98,15 +104,20 @@ export const BillingHandlers = HttpApiBuilder.group(Api, "billing", Effect.fn(fu
         yield* repo.startTrial(user.id, "PRO", TRIAL_DAYS)
         return { success: true, message: "Trial started successfully", redirectUrl: "/settings/subscription" }
       }
-      // No payment provider is configured in the desktop app: a paid checkout cannot be created.
-      return yield* new InternalError({ message: "Failed to create checkout session" })
+      const session = yield* payments.checkout({
+        userId: user.id, email: user.email, plan: payload.priceId,
+        successUrl: `${base}/settings/subscription?success=true`, cancelUrl: `${base}/pricing?canceled=true`
+      }).pipe(paymentFailed("Checkout", () => new InternalError({ message: "Failed to create checkout session" })))
+      return { url: session.url }
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to start trial"))))
     .handle("portal", ({ payload }) => Effect.gen(function*() {
       const user = yield* CurrentUser
       if (!payload.returnUrl) return yield* new BadRequest({ message: "Return URL is required" })
       const sub = yield* repo.find(user.id)
       if (!sub || !sub.stripeCustomerId) return yield* new NotFound({ message: "No subscription found or no Stripe customer ID" })
-      return yield* new InternalError({ message: "Failed to create billing portal session" })
+      const session = yield* payments.portal({ customerId: sub.stripeCustomerId, returnUrl: payload.returnUrl })
+        .pipe(paymentFailed("Portal", () => new InternalError({ message: "Failed to create billing portal session" })))
+      return { url: session.url }
     }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create billing portal session"))))
     .handle("baGet", () => Effect.gen(function*() {
       const info = yield* infoOf((yield* CurrentUser).id)
@@ -116,7 +127,10 @@ export const BillingHandlers = HttpApiBuilder.group(Api, "billing", Effect.fn(fu
     .handle("baCheckout", ({ payload }) => Effect.gen(function*() {
       if (!payload.plan || !payload.successUrl || !payload.cancelUrl) return yield* new BillingBadRequest({ error: "Missing required fields: plan, successUrl, cancelUrl" })
       if (!PLANS.includes(payload.plan as never)) return yield* new BillingBadRequest({ error: "Invalid plan" })
-      return yield* new BillingFailure({ error: "Failed to create checkout session" })
+      const user = yield* CurrentUser
+      const session = yield* payments.checkout({ userId: user.id, email: user.email, plan: payload.plan, successUrl: payload.successUrl, cancelUrl: payload.cancelUrl })
+        .pipe(paymentFailed("Checkout", () => new BillingFailure({ error: "Failed to create checkout session" })))
+      return { url: session.url, source: "better-auth" as const }
     }))
     .handle("baUpdate", ({ payload }) => Effect.gen(function*() {
       const user = yield* CurrentUser
@@ -130,8 +144,12 @@ export const BillingHandlers = HttpApiBuilder.group(Api, "billing", Effect.fn(fu
     }).pipe(Effect.catchTag("DatabaseError", keyed("Failed to cancel subscription"))))
     .handle("baPortal", ({ payload }) => Effect.gen(function*() {
       if (!payload.returnUrl) return yield* new BillingBadRequest({ error: "returnUrl is required" })
-      return yield* new BillingFailure({ error: "Failed to create billing portal session" })
-    }))
+      const sub = yield* repo.find((yield* CurrentUser).id)
+      if (!sub?.stripeCustomerId) return yield* new BillingFailure({ error: "Failed to create billing portal session" })
+      const session = yield* payments.portal({ customerId: sub.stripeCustomerId, returnUrl: payload.returnUrl })
+        .pipe(paymentFailed("Portal", () => new BillingFailure({ error: "Failed to create billing portal session" })))
+      return { url: session.url, source: "better-auth" as const }
+    }).pipe(Effect.catchTag("DatabaseError", keyed("Failed to create billing portal session"))))
     .handle("baFeature", ({ payload }) => Effect.gen(function*() {
       const user = yield* CurrentUser
       if (!payload.feature && !payload.features) return yield* new BillingBadRequest({ error: "feature or features array is required" })
@@ -177,7 +195,15 @@ export const BillingHandlers = HttpApiBuilder.group(Api, "billing", Effect.fn(fu
           { ...(typeof object["id"] === "string" ? { subscriptionId: object["id"] } : {}), ...(metadata["userId"] ? { userId: metadata["userId"] } : {}) },
           deleted
             ? { plan: "FREE", status: "active", stripeSubscriptionId: null }
-            : { status: String(object["status"] ?? "active"), cancelAtPeriodEnd: object["cancel_at_period_end"] === true, ...(end ? { stripeCurrentPeriodEnd: end } : {}) }
+            : {
+              status: String(object["status"] ?? "active"),
+              cancelAtPeriodEnd: object["cancel_at_period_end"] === true,
+              ...(end ? { stripeCurrentPeriodEnd: end } : {}),
+              // Checkout stamps the plan and the user on the subscription; the ids tie later events to this row.
+              ...(PLANS.includes(metadata["plan"] as never) ? { plan: metadata["plan"]! } : {}),
+              ...(typeof object["customer"] === "string" ? { stripeCustomerId: object["customer"] } : {}),
+              ...(typeof object["id"] === "string" ? { stripeSubscriptionId: object["id"] } : {})
+            }
         ).pipe(Effect.ignore)
       }
       yield* Effect.logInfo(`stripe webhook ${event.type ?? "unknown"} processed`)

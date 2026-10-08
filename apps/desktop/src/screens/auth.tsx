@@ -8,6 +8,7 @@ import { A, useNavigate, useSearchParams } from "@solidjs/router"
 import { CircleCheck, CircleX } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { startSession } from "../state/session.ts"
 import { ErrorState, ScreenHeader, Toast } from "./screen-parts.tsx"
 
 /** Auth failures carry `{ error, details }`; show both, else `fallback`. */
@@ -129,7 +130,8 @@ export function MagicLinkVerifyScreen(): JSX.Element {
     if (!token) { setStatus("error"); setMessage(t("magicverify.noToken")); return }
     void (async () => {
       try {
-        await app.runtime.run(app.client.auth.verifyMagicLink({ payload: { token } }))
+        const result = await app.runtime.run(app.client.auth.verifyMagicLink({ payload: { token } }))
+        if (result.body.token !== undefined) startSession(app.cache, result.body.token)
         setStatus("success")
         setMessage(t("magicverify.successBody"))
         setTimeout(() => { if (alive) navigate("/") }, 2000)

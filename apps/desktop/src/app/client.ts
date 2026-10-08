@@ -3,13 +3,14 @@ import { FetchHttpClient, HttpClientRequest } from "effect/unstable/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { Api, Authorization } from "@cadcamfun/api"
 import { ApiClient, type AppRuntime, type Client } from "../state/client.ts"
+import { withSessionToken } from "../state/session.ts"
 import type { Endpoint } from "./sidecar.ts"
 
 export { ApiClient }
 
 export const clientLayer = (endpoint: Endpoint, transport: typeof fetch = globalThis.fetch) => {
   const auth = HttpApiMiddleware.layerClient(Authorization, ({ next, request }) =>
-    next(HttpClientRequest.bearerToken(request, endpoint.token)))
+    Effect.flatMap(withSessionToken(HttpClientRequest.bearerToken(request, endpoint.token)), next))
   return Layer.effect(ApiClient, HttpApiClient.make(Api, { baseUrl: endpoint.baseUrl })).pipe(
     Layer.provide(auth),
     Layer.provide(FetchHttpClient.layer),

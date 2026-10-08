@@ -13,6 +13,7 @@ import { Show, createSignal, type JSX } from "solid-js"
 import { A, useNavigate } from "@solidjs/router"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
+import { startSession } from "../state/session.ts"
 import { describe } from "./auth.tsx"
 
 type LoadingType = "email" | "github" | "google" | "passkey" | "magic-link"
@@ -47,9 +48,10 @@ export function SignInScreen(): JSX.Element {
     const form = event.currentTarget as HTMLFormElement
     const data = new FormData(form)
     void run("email", async () => {
-      await app.runtime.run(app.client.auth.signinDirect({
+      const result = await app.runtime.run(app.client.auth.signinDirect({
         payload: { email: String(data.get("email") ?? ""), password: String(data.get("password") ?? "") }
       }))
+      startSession(app.cache, result.body.token)
       navigate("/")
     })
   }

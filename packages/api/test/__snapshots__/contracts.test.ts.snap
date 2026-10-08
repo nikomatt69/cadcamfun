@@ -6914,12 +6914,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             "description": "Success",
             "headers": {
               "set-cookie": {
-                "required": true,
+                "required": false,
                 "schema": {
-                  "items": {
-                    "type": "string",
-                  },
-                  "type": "array",
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
                 },
               },
             },
@@ -7014,12 +7028,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             "description": "Success",
             "headers": {
               "set-cookie": {
-                "required": true,
+                "required": false,
                 "schema": {
-                  "items": {
-                    "type": "string",
-                  },
-                  "type": "array",
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
                 },
               },
             },
@@ -7565,6 +7593,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       ],
                       "type": "boolean",
                     },
+                    "token": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                     "user": {
                       "additionalProperties": false,
                       "properties": {
@@ -7612,12 +7650,26 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             "description": "Success",
             "headers": {
               "set-cookie": {
-                "required": true,
+                "required": false,
                 "schema": {
-                  "items": {
-                    "type": "string",
-                  },
-                  "type": "array",
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "string",
+                        },
+                      ],
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
                 },
               },
             },
