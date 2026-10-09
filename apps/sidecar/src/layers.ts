@@ -67,15 +67,17 @@ import { ProjectVcsRepo } from "./repos/project-vcs-repo.ts"
 import { GitHubTransports, ProjectVcs } from "./services/project-vcs.ts"
 import { WorkflowRunner } from "./services/workflow-runner.ts"
 import { AnalyticsRepo } from "./repos/analytics-repo.ts"
+import { EventsHandlers } from "./http/events.ts"
+import { LiveEvents } from "./services/live-events.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
-export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, CompanionHandlers)
+export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers)
 
 /** Git-style history, pull requests and workflow runs (spec 13). */
 const VcsServices = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(GitHubTransports.layer))
 
 /** Repositories + services the handlers depend on (needs `Database`). */
-const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, NotificationService.layer, MachineConfigRepo.layer, StorageService.layer, LocalProfile.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, Companion.layer.pipe(Layer.provide(KvStore.layer)))
+const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, NotificationService.layer, MachineConfigRepo.layer, StorageService.layer, LocalProfile.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
 export const Services = AiLive.pipe(Layer.provideMerge(RepoServices))
@@ -86,7 +88,7 @@ export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
   Api.groups.drawings, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.projectToolpaths, Api.groups.library,
-  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.companion
+  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion
 ) {}
 
 /**

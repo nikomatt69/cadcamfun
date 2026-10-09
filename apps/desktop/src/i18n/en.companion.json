@@ -15,7 +15,11 @@
   "companion.pair.name": "Device name",
   "companion.pair.host": "Address of this computer",
   "companion.pair.create": "Show QR code",
-  "companion.pair.hint": "Open CADCAM FUN on your phone, choose Scan QR code and point the camera here. The code contains a one-time token and is shown only now.",
+  "companion.pair.hint": "Open CADCAM FUN on your phone, choose Scan QR code and point the camera here, or paste the link below. The code contains a one-time token and is shown only now.",
+  "companion.pair.link": "Pairing link",
+  "companion.pair.copy": "Copy",
+  "companion.pair.copied": "Copied",
+  "companion.pair.copyFailed": "Could not copy the link: {message}",
   "companion.error.load": "Could not load the companion settings",
   "companion.error.action": "The action failed: {message}"
 }

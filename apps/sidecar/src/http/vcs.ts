@@ -4,11 +4,18 @@ import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { ProjectVcs, VcsFailure, type Actor } from "../services/project-vcs.ts"
-import { WorkflowRunner } from "../services/workflow-runner.ts"
+import { WorkflowRunner, type RunRow } from "../services/workflow-runner.ts"
+import { LiveEvents, type LiveEvent } from "../services/live-events.ts"
+import { NotificationService } from "../services/notifications.ts"
+import type { NotificationType } from "@cadcamfun/db/schema"
 import type { LogEntry } from "@cadcamfun/vcs"
+
+/** The notification types this file can raise; the rest of the legacy set comes from collaboration. */
+type ActivityNotificationType = Extract<NotificationType, "PR_OPENED" | "PR_MERGED" | "PR_REVIEWED" | "AI_COMMITTED" | "WORKFLOW_FAILED">
 
 const commitRow = (c: LogEntry) => ({ oid: c.oid, parents: c.parents, message: c.message, author: { name: c.author.name, email: c.author.email, time: c.author.time } })
 const iso = (d: Date) => d.toISOString()
+const now = () => new Date().toISOString()
 const prRow = <T extends { createdAt: Date; updatedAt: Date }>(r: T) => ({ ...r, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt) })
 const runRow = <T extends { events: unknown; startedAt: Date; finishedAt: Date | null }>(r: T) => ({ ...r, events: r.events as unknown[], startedAt: iso(r.startedAt), finishedAt: r.finishedAt ? iso(r.finishedAt) : null })
 
@@ -35,6 +42,41 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
   const vcs = yield* ProjectVcs
   const runner = yield* WorkflowRunner
   const projects = yield* ProjectRepo
+  const events = yield* LiveEvents
+  const notifier = yield* NotificationService
+
+  // Centralised broadcaster so every mutation triggers exactly one `events.publish` and, where
+  // appropriate, one `notifier.create`. Nothing here may fail a user's request: the bus and the
+  // notification row are both best-effort side channels, so the whole effect swallows errors.
+  const broadcast = (projectId: string, userId: string, event: LiveEvent): Effect.Effect<void> =>
+    Effect.gen(function*() {
+      yield* events.publish(event)
+      const history = `/projects/${projectId}/history`
+      const make = (type: ActivityNotificationType, title: string, content: string) =>
+        notifier.create({ type, title, content, userId, projectId, linkUrl: history }).pipe(Effect.ignore)
+      switch (event.type) {
+        case "pr.opened":
+          yield* make("PR_OPENED", `PR #${event.number} opened`, event.title)
+          break
+        case "pr.merged":
+          yield* make("PR_MERGED", `PR #${event.number} merged`, event.title)
+          break
+        case "pr.reviewed":
+          yield* make("PR_REVIEWED", `PR #${event.number} reviewed`, event.verdict)
+          break
+        case "workflow.finished":
+          // Only a failure is worth interrupting someone for; a green run shows up in Actions.
+          if (event.status === "failure") yield* make("WORKFLOW_FAILED", `Workflow ${event.workflow} failed`, event.runId)
+          break
+        case "commit":
+          // A person's own commits need no notification; the assistant's do, because a person has
+          // to review them.
+          if (event.authorKind === "ai") yield* make("AI_COMMITTED", `Assistant committed to ${event.branch}`, event.message)
+          break
+        default:
+          break
+      }
+    }).pipe(Effect.ignore)
 
   /** Reading, committing, branching, opening PRs and reviewing need project access; moving shared branches needs maintainer rights. */
   const access = Effect.fn("vcs.access")(function*(projectId: string, level: "member" | "maintainer") {
@@ -55,9 +97,27 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
       return { branch: current, head: log[0]?.oid ?? null, dirty: yield* vcs.status(projectId) }
     })
 
-  /** Like GitHub Actions on `push`: workflows stored in the pushed commit run right away. Failures never fail the push. */
-  const onPush = (projectId: string, branch: string) =>
-    runner.trigger(projectId, branch, { type: "push", branch, changedPaths: [] }).pipe(Effect.ignore)
+  /**
+   * Announces each finished run on the live bus. `runner.trigger` is synchronous per workflow, so
+   * a run is already settled when it comes back and both the `started` and the `finished` frame are
+   * emitted together — which is what lets a paired phone show a run and its result without polling.
+   */
+  const announce = (projectId: string, userId: string, runs: ReadonlyArray<RunRow>, label: "push" | "pull-request" | "manual") =>
+    Effect.forEach(runs, (run) => Effect.gen(function*() {
+      yield* broadcast(projectId, userId, { type: "workflow.started", projectId, runId: run.id, workflow: run.workflow, event: label, at: now() })
+      yield* broadcast(projectId, userId, {
+        type: "workflow.finished", projectId, runId: run.id, workflow: run.workflow,
+        // A run that never left `running` (the process was interrupted) is reported as cancelled.
+        status: run.status === "success" || run.status === "failure" ? run.status : "cancelled", at: now(),
+      })
+    })).pipe(Effect.ignore)
+
+  /** Like GitHub Actions on `push`: workflows stored in the pushed commit run right away. */
+  const onPush = (projectId: string, userId: string, branch: string) =>
+    runner.trigger(projectId, branch, { type: "push", branch, changedPaths: [] }).pipe(
+      Effect.flatMap((runs) => announce(projectId, userId, runs, "push")),
+      Effect.ignore,
+    )
 
   return handlers
     .handle("status", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(statusOf(params.id)))))
@@ -69,9 +129,11 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         // Besides the model, only workflow files can be written through the API (an AI or phone can edit CI, never arbitrary paths).
         const files = payload.files ?? {}
         if (Object.keys(files).some((p) => !/^\.cadcamfun\/workflows\/[A-Za-z0-9_-]+\.ya?ml$/.test(p))) return yield* new BadRequest({ message: "Only .cadcamfun/workflows/*.yml can be committed as files" })
-        const oid = yield* wire(vcs.commit(params.id, { message: payload.message }, { ...actor, kind: payload.authorKind ?? "user" }, files))
+        const authorKind = payload.authorKind ?? "user"
+        const oid = yield* wire(vcs.commit(params.id, { message: payload.message }, { ...actor, kind: authorKind }, files))
         const { current } = yield* wire(vcs.branches(params.id))
-        yield* onPush(params.id, current)
+        yield* broadcast(params.id, actor.userId, { type: "commit", projectId: params.id, oid, branch: current, authorKind, message: payload.message, at: now() })
+        yield* onPush(params.id, actor.userId, current)
         const [entry] = yield* wire(vcs.log(params.id, oid, 1))
         return commitRow(entry!)
       }))
@@ -93,6 +155,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const actor = yield* access(params.id, "maintainer")
         const oid = yield* wire(vcs.restore(params.id, payload.rev, actor, payload.paths))
         const [entry] = yield* wire(vcs.log(params.id, oid, 1))
+        yield* broadcast(params.id, actor.userId, { type: "commit", projectId: params.id, oid, branch: payload.rev, authorKind: "user", message: `Restored ${payload.paths?.length ?? 1} file(s) from ${payload.rev.slice(0, 7)}`, at: now() })
         return commitRow(entry!)
       }))
     .handle("diff", ({ params, query }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.diff(params.id, query.from, query.to).pipe(Effect.map((c) => c.map((x) => ({ ...x, changes: x.changes.map((p) => ({ ...p })) }))))))))
@@ -102,7 +165,11 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const actor = yield* access(params.id, "member")
         if (!payload.title.trim()) return yield* new BadRequest({ message: "Pull request title is required" })
         const row = yield* wire(vcs.openPullRequest(params.id, payload, { ...actor, kind: payload.authorKind ?? "user" }))
-        yield* runner.trigger(params.id, row.head, { type: "pull-request", base: row.base }).pipe(Effect.ignore)
+        yield* broadcast(params.id, actor.userId, { type: "pr.opened", projectId: params.id, number: row.number, title: row.title, authorKind: payload.authorKind ?? "user", head: row.head, base: row.base, at: now() })
+        yield* runner.trigger(params.id, row.head, { type: "pull-request", base: row.base }).pipe(
+          Effect.flatMap((runs) => announce(params.id, actor.userId, runs, "pull-request")),
+          Effect.ignore,
+        )
         return prRow(row)
       }))
     .handle("pullRequest", ({ params }) =>
@@ -113,16 +180,24 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
       Effect.gen(function*() {
         const actor = yield* access(params.id, "member")
         const r = yield* wire(vcs.review(params.id, params.number, payload, actor))
+        yield* broadcast(params.id, actor.userId, { type: "pr.reviewed", projectId: params.id, number: params.number, verdict: payload.verdict, at: now() })
         return { ...r, createdAt: iso(r.createdAt) }
       }))
     .handle("mergePullRequest", ({ params }) =>
       Effect.gen(function*() {
         const actor = yield* access(params.id, "maintainer")
         const row = yield* wire(vcs.mergePullRequest(params.id, params.number, actor))
-        yield* onPush(params.id, row.base)
+        yield* broadcast(params.id, actor.userId, { type: "pr.merged", projectId: params.id, number: row.number, title: row.title, at: now() })
+        yield* onPush(params.id, actor.userId, row.base)
         return prRow(row)
       }))
-    .handle("closePullRequest", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.closePullRequest(params.id, params.number).pipe(Effect.map(prRow))))))
+    .handle("closePullRequest", ({ params }) =>
+      Effect.gen(function*() {
+        const actor = yield* access(params.id, "member")
+        const row = yield* wire(vcs.closePullRequest(params.id, params.number))
+        yield* broadcast(params.id, actor.userId, { type: "pr.closed", projectId: params.id, number: row.number, at: now() })
+        return prRow(row)
+      }))
     .handle("remote", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(vcs.remote(params.id).pipe(Effect.map((remote) => ({ remote })))))))
     .handle("setRemote", ({ params, payload }) =>
       Effect.gen(function*() {
@@ -139,14 +214,16 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const actor = yield* access(params.id, "maintainer")
         const result = yield* wire(vcs.pull(params.id, headers["x-github-token"], actor, payload.branch))
         const { current } = yield* wire(vcs.branches(params.id))
-        yield* onPush(params.id, current)
+        yield* onPush(params.id, actor.userId, current)
         return result
       }))
     .handle("runs", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(runner.runs(params.id).pipe(Effect.map((l) => l.map(runRow)))))))
     .handle("dispatch", ({ params, payload }) =>
       Effect.gen(function*() {
-        yield* access(params.id, "member")
+        const actor = yield* access(params.id, "member")
         const ref = payload.ref ?? (yield* wire(vcs.branches(params.id))).current
-        return (yield* wire(runner.trigger(params.id, ref, { type: "manual" }))).map(runRow)
+        const runs = yield* wire(runner.trigger(params.id, ref, { type: "manual" }))
+        yield* announce(params.id, actor.userId, runs, "manual")
+        return runs.map(runRow)
       }))
 }))

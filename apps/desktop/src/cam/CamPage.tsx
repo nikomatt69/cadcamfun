@@ -29,6 +29,7 @@ import GCodeEditor from "./components/GCodeEditor.tsx"
 import MachineCycles from "./components/MachineCycles.tsx"
 import PostProcessorTab, { type PostProcessorType } from "./components/PostProcessorTab.tsx"
 import { CostsModal, ToolLibraryModal } from "./components/CamModals.tsx"
+import CamRibbon from "./components/CamRibbon.tsx"
 import { FixedCycleEditor } from "./components/generator/FixedCyclesSection.tsx"
 import "../components/workstation.css"
 
@@ -54,6 +55,7 @@ export default function CamPage(): JSX.Element {
   const [sidebarTab, setSidebarTab] = createSignal<SidebarTab>("machine")
   const [showLibrary, setShowLibrary] = createSignal(false)
   const [showCosts, setShowCosts] = createSignal(false)
+  let ribbonFilePicker: HTMLInputElement | undefined
 
   const setGcode = (next: string): void => {
     setGcodeSignal(next)
@@ -239,6 +241,32 @@ export default function CamPage(): JSX.Element {
           onOpenCosts={() => setShowCosts(true)}
           onToggleAi={toggleAi}
           onToggleChat={() => app.setPanelOpen(!app.panelOpen())}
+        />
+
+        <CamRibbon
+          onSave={saveGCode}
+          onImport={() => ribbonFilePicker?.click()}
+          onOpenLibrary={() => setShowLibrary(true)}
+          onOpenCosts={() => setShowCosts(true)}
+          onSelectActiveTab={(next) => camStore.setActiveTab(next)}
+          onSelectRightTab={(next) => camStore.setRightTab(next)}
+          onSelectPostProcessor={(next) => {
+            setSelectedPostProcessor(next === "heidenhain" ? "heidenhain" : next === "gcode" ? "generic" : "fanuc")
+          }}
+          postProcessor={selectedPostProcessor() === "heidenhain" ? "heidenhain" : selectedPostProcessor() === "fanuc" ? "fanuc" : "gcode"}
+        />
+
+        <input
+          ref={ribbonFilePicker}
+          type="file"
+          class="hidden"
+          accept=".nc,.gcode,.cnc,.txt"
+          aria-label="Import G-Code"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0]
+            if (file) importGCode(file)
+            event.currentTarget.value = ""
+          }}
         />
 
         <Motion.div

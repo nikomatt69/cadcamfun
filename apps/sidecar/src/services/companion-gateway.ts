@@ -43,11 +43,21 @@ interface Rule {
 /** Everything a phone may call. Anything else (credentials, plugins, files, billing, /api/companion itself…) is refused. */
 export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/health$/ },
+  // Project list + single-project read so the phone can show a richer header (description, owner, org).
   { methods: ["GET"], path: /^\/api\/projects$/ },
+  { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },
   // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.
   { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs\/(?!remote$|push$|pull$)[^/]+|pulls|actions)(\/.*)?$/ },
+  // Live SSE stream of vcs / workflow / AI activity; the only push channel the phone has.
+  { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/events$/ },
+  // Notifications (read + mark-read). The phone sees its user's activity across the desktop.
+  { methods: ["GET"], path: /^\/api\/notifications(\?.*)?$/ },
+  { methods: ["POST"], path: /^\/api\/notifications\/mark-all-read$/ },
+  { methods: ["PUT"], path: /^\/api\/notifications\/[^/]+$/ },
+  { methods: ["DELETE"], path: /^\/api\/notifications\/[^/]+$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
-  { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|permission\/reply)$/ },
+  { methods: ["GET"], path: /^\/api\/ai\/models$/ },
+  { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply)$/ },
 ]
 
 export const isCompanionRoute = (method: string, pathname: string): boolean =>

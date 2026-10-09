@@ -2,9 +2,16 @@
  * Version control of one project: the CADCAMFUN counterpart of `git` + GitHub's pull requests and Actions.
  * Changes (commit), History (commit list with property-level diffs and restore), Branches, Pull requests (review, merge),
  * Actions (workflow runs) and the GitHub mirror (push / pull). Everything goes through the sidecar's `vcs` API group.
+ *
+ * Reads use `useQuery` (so the cache and refresh signal follow the rest of the desktop), writes use `useMutation`
+ * and invalidate the prefixes they affect. The path-filtered log re-keys on `path` and the tabs swap without
+ * re-fetching what they don't need.
  */
-import { For, Show, createMemo, createSignal, onMount, type JSX } from "solid-js"
-import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
+import { For, Show, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js"
+import { useParams, useSearchParams } from "@solidjs/router"
+import { Effect } from "effect"
+import { invalidatePrefix } from "../state/query-cache.ts"
+import { useMutation, useQuery } from "../app/screen-queries.ts"
 import { useApp } from "../state/context.ts"
 import { t } from "../i18n/index.ts"
 import { readGithubToken, saveGithubToken } from "../app/github-token.ts"
@@ -22,6 +29,10 @@ interface Pull { readonly number: number; readonly title: string; readonly body:
 interface Review { readonly id: string; readonly verdict: string; readonly body: string }
 interface Run { readonly id: string; readonly workflow: string; readonly event: string; readonly sha: string; readonly status: string; readonly startedAt: string }
 
+interface VcsStatus { readonly branch: string; readonly head: string | null; readonly dirty: ReadonlyArray<string> }
+interface VcsBranches { readonly current: string; readonly branches: Readonly<Record<string, string>> }
+interface PullDetail { readonly pullRequest: Pull; readonly reviews: ReadonlyArray<Review>; readonly changes: ReadonlyArray<Change> }
+
 const BTN = "px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
 const PRIMARY = "px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
 const CARD = "rounded-xl border border-white/40 bg-white/70 p-4 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
@@ -30,6 +41,13 @@ const PILL = (state: string): string => `ml-2 rounded-full border px-2 py-0.5 te
 
 const short = (oid: string): string => oid.slice(0, 7)
 const show = (v: unknown): string => (typeof v === "string" ? v : JSON.stringify(v))
+const describeError = (cause: unknown): string => {
+  if (typeof cause === "object" && cause !== null && "message" in cause) {
+    const m = (cause as { message: unknown }).message
+    if (typeof m === "string") return m
+  }
+  return String(cause)
+}
 
 function ChangeList(props: { readonly changes: ReadonlyArray<Change> }): JSX.Element {
   return (
@@ -50,126 +68,173 @@ function ChangeList(props: { readonly changes: ReadonlyArray<Change> }): JSX.Ele
   )
 }
 
+const VCS = "vcs"
+
 export function ProjectHistoryScreen(): JSX.Element {
   const app = useApp()
   const params = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const [search, setSearch] = useSearchParams<{ path?: string }>()
   /** When set, History shows only the commits that touched this file (a drawing, component, toolpath, material…). */
   const path = () => (typeof search.path === "string" && search.path !== "" ? search.path : undefined)
   const id = () => params.id
   const [tab, setTab] = createSignal<Tab>(typeof new URLSearchParams(window.location.search).get("path") === "string" ? "history" : "changes")
-  const [branch, setBranch] = createSignal("main")
-  const [head, setHead] = createSignal<string | null>(null)
-  const [dirty, setDirty] = createSignal<ReadonlyArray<string>>([])
-  const [commits, setCommits] = createSignal<ReadonlyArray<Commit>>([])
-  const [branches, setBranches] = createSignal<Readonly<Record<string, string>>>({})
-  const [pulls, setPulls] = createSignal<ReadonlyArray<Pull>>([])
-  const [runs, setRuns] = createSignal<ReadonlyArray<Run>>([])
-  const [remote, setRemote] = createSignal("")
   const [token, setToken] = createSignal("")
+  const [remoteValue, setRemote] = createSignal("")
   const [message, setMessage] = createSignal("")
   const [newBranch, setNewBranch] = createSignal("")
   const [prTitle, setPrTitle] = createSignal("")
   const [prHead, setPrHead] = createSignal("")
   const [prBase, setPrBase] = createSignal("main")
   const [selected, setSelected] = createSignal<Commit>()
-  const [selectedChanges, setSelectedChanges] = createSignal<ReadonlyArray<Change>>([])
   const [openPull, setOpenPull] = createSignal<{ pull: Pull; reviews: ReadonlyArray<Review>; changes: ReadonlyArray<Change> }>()
   const [reviewNote, setReviewNote] = createSignal("")
   const [notice, setNotice] = createSignal("")
   const [problem, setProblem] = createSignal("")
 
-  const run = app.runtime.run as <A>(effect: unknown) => Promise<A>
+  const runtime = { run: app.runtime.run, cache: app.cache }
+  const projectId = (): string => id()
+  const projectKey = (): { id: string } => ({ id: projectId() })
+  const logKey = (): { id: string; path?: string } => ({ id: projectId(), ...(path() ? { path: path()! } : {}) })
+
+  // ── reads ────────────────────────────────────────────────────────────────
+  const statusQ = useQuery<VcsStatus>(`${VCS}/status`, projectKey(), (client) => client.vcs.status({ params: projectKey() }), runtime, { cache: app.cache })
+  const branchesQ = useQuery<VcsBranches>(`${VCS}/branches`, projectKey(), (client) => client.vcs.branches({ params: projectKey() }), runtime, { cache: app.cache })
+  const logQ = useQuery<ReadonlyArray<Commit>>(
+    `${VCS}/log`,
+    logKey(),
+    (client) => client.vcs.log({ params: { id: projectId() }, query: { limit: 100, ...(path() ? { path: path()! } : {}) } }),
+    runtime,
+    { cache: app.cache }
+  )
+  const pullsQ = useQuery<ReadonlyArray<Pull>>(`${VCS}/pulls`, projectKey(), (client) => client.vcs.listPullRequests({ params: projectKey(), query: {} }), runtime, { cache: app.cache })
+  const runsQ = useQuery<ReadonlyArray<Run>>(`${VCS}/runs`, projectKey(), (client) => client.vcs.runs({ params: projectKey() }), runtime, { cache: app.cache })
+  const remoteQ = useQuery<{ readonly remote: string | null }>(`${VCS}/remote`, projectKey(), (client) => client.vcs.remote({ params: projectKey() }), runtime, { cache: app.cache })
+  const diffQ = useQuery<ReadonlyArray<Change>>(
+    `${VCS}/diff`,
+    selected() ? { oid: selected()!.oid } : undefined,
+    (client) => {
+      const c = selected()
+      if (!c) return Effect.succeed([] as ReadonlyArray<Change>)
+      return client.vcs.diff({ params: { id: projectId() }, query: { ...(c.parents[0] ? { from: c.parents[0] } : {}), to: c.oid } })
+    },
+    runtime,
+    { cache: app.cache, enabled: selected() !== undefined }
+  )
+  const pullQ = useQuery<PullDetail>(
+    `${VCS}/pull`,
+    openPull() ? { number: openPull()!.pull.number } : undefined,
+    (client) => {
+      const current = openPull()
+      if (!current) return Effect.succeed({ pullRequest: {} as Pull, reviews: [], changes: [] })
+      return client.vcs.pullRequest({ params: { id: projectId(), number: current.pull.number } })
+    },
+    runtime,
+    { cache: app.cache, enabled: openPull() !== undefined }
+  )
+
+  // ── writes ───────────────────────────────────────────────────────────────
+  const invalidatesAll = [`${VCS}/status`, `${VCS}/branches`, `${VCS}/log`, `${VCS}/runs`, `${VCS}/pulls`]
+  const commitM = useMutation((client, m: string) => client.vcs.commit({ params: { id: id() }, payload: { message: m } }), runtime, invalidatesAll, app.cache)
+  const restoreM = useMutation((client, rev: string, restorePath: string | undefined) => client.vcs.restore({ params: { id: id() }, payload: { rev, ...(restorePath ? { paths: [restorePath] } : {}) } }), runtime, invalidatesAll, app.cache)
+  const createBranchM = useMutation((client, name: string) => client.vcs.createBranch({ params: { id: id() }, payload: { name } }), runtime, [`${VCS}/branches`, `${VCS}/status`], app.cache)
+  const checkoutM = useMutation((client, branch: string) => client.vcs.checkout({ params: { id: id() }, payload: { branch } }), runtime, [`${VCS}/status`, `${VCS}/branches`, `${VCS}/log`], app.cache)
+  const openPullRequestM = useMutation((client, title: string, head: string, base: string) => client.vcs.openPullRequest({ params: { id: id() }, payload: { title, head, base } }), runtime, [`${VCS}/pulls`], app.cache)
+  const reviewM = useMutation((client, number: number, verdict: "approve" | "request-changes", body: string | undefined) => client.vcs.review({ params: { id: id(), number }, payload: { verdict, ...(body ? { body } : {}) } }), runtime, [`${VCS}/pull`], app.cache)
+  const mergePullM = useMutation((client, number: number) => client.vcs.mergePullRequest({ params: { id: id(), number } }), runtime, [`${VCS}/pulls`, ...invalidatesAll.filter((p) => p !== `${VCS}/pulls`)], app.cache)
+  const closePullM = useMutation((client, number: number) => client.vcs.closePullRequest({ params: { id: id(), number } }), runtime, [`${VCS}/pulls`], app.cache)
+  const dispatchM = useMutation((client) => client.vcs.dispatch({ params: { id: id() }, payload: {} }), runtime, [`${VCS}/runs`], app.cache)
+  const setRemoteM = useMutation((client, remote: string | null) => client.vcs.setRemote({ params: { id: id() }, payload: { remote } }), runtime, [`${VCS}/remote`], app.cache)
+  const syncM = useMutation((client, kind: "push" | "pull", githubToken: string, branch: string | undefined): Effect.Effect<{ readonly oid: string }, unknown, never> => {
+    const args = { params: { id: projectId() }, headers: { "x-github-token": githubToken }, payload: branch ? { branch } : {} }
+    if (kind === "push") {
+      return client.vcs.push(args) as unknown as Effect.Effect<{ readonly oid: string }, unknown, never>
+    }
+    return client.vcs.pull(args) as unknown as Effect.Effect<{ readonly oid: string }, unknown, never>
+  }, runtime, [`${VCS}/status`, `${VCS}/branches`, `${VCS}/log`], app.cache)
+
+  // Default PR head to a non-main branch when we first see the branch list.
+  createEffect(() => {
+    if (prHead() !== "") return
+    const first = Object.keys(branchesQ.data()?.branches ?? {}).find((b) => b !== "main")
+    if (first !== undefined) setPrHead(first)
+  })
+  // The diff and pull-detail reads are event-driven: re-fetch when the selection changes.
+  createEffect(() => { selected(); diffQ.refetch() })
+  createEffect(() => { openPull(); pullQ.refetch() })
+
+  // The notice/clear on a fresh write.
+  const flashProblem = (cause: unknown): void => setProblem(t("vcs.error", { message: describeError(cause) }))
+  const flashNotice = (text: string): void => { setNotice(text); setProblem("") }
+
+  const branch = (): string => statusQ.data()?.branch ?? "main"
+  const head = (): string | null => statusQ.data()?.head ?? null
+  const dirty = (): ReadonlyArray<string> => statusQ.data()?.dirty ?? []
+  const branches = (): Readonly<Record<string, string>> => branchesQ.data()?.branches ?? {}
+  const commits = (): ReadonlyArray<Commit> => logQ.data() ?? []
+  const pulls = (): ReadonlyArray<Pull> => pullsQ.data() ?? []
+  const runs = (): ReadonlyArray<Run> => runsQ.data() ?? []
+  const remote = (): string => remoteValue() || remoteQ.data()?.remote ?? ""
+  const selectedChanges = (): ReadonlyArray<Change> => diffQ.data() ?? []
+  const loadedPull = (): { pullRequest: Pull; reviews: ReadonlyArray<Review>; changes: ReadonlyArray<Change> } | undefined => pullQ.data()
+
   const labels = createMemo(() => {
     const map = new Map<string, string[]>()
     for (const [name, oid] of Object.entries(branches())) map.set(oid, [...(map.get(oid) ?? []), name])
     return map
   })
 
-  const attempt = async (work: () => Promise<unknown>): Promise<void> => {
-    setProblem(""); setNotice("")
-    try { await work() } catch (cause) {
-      const text = typeof cause === "object" && cause !== null && "message" in cause ? String((cause as { message: unknown }).message) : String(cause)
-      setProblem(t("vcs.error", { message: text }))
-    }
+  const firstError = (): unknown => [commitM.error(), restoreM.error(), createBranchM.error(), checkoutM.error(), openPullRequestM.error(), reviewM.error(), mergePullM.error(), closePullM.error(), dispatchM.error(), setRemoteM.error(), syncM.error()].find((e) => e !== undefined) ?? statusQ.error() ?? branchesQ.error() ?? logQ.error() ?? pullsQ.error() ?? runsQ.error() ?? remoteQ.error()
+  const busy = (): boolean => commitM.pending() || restoreM.pending() || createBranchM.pending() || checkoutM.pending() || openPullRequestM.pending() || reviewM.pending() || mergePullM.pending() || closePullM.pending() || dispatchM.pending() || setRemoteM.pending() || syncM.pending()
+
+  const refresh = (): void => { for (const p of invalidatesAll) invalidatePrefix(app.cache, p) }
+  // The diff and pull-detail reads are event-driven; refresh them with the rest.
+  const refreshDetail = (): void => { invalidatePrefix(app.cache, `${VCS}/diff`); invalidatePrefix(app.cache, `${VCS}/pull`) }
+
+  onMount(() => { void readGithubToken().then((saved) => saved && setToken(saved)).catch(() => undefined) })
+
+  const act = async (work: () => Promise<unknown>, okNotice?: string): Promise<void> => {
+    try {
+      await work()
+      if (okNotice) flashNotice(okNotice)
+      else refresh()
+    } catch (cause) { flashProblem(cause) }
   }
 
-  const refresh = async (): Promise<void> => {
-    const pid = { params: { id: id() } }
-    const [status, brs, log, prs, rs, rm] = await Promise.all([
-      run<{ branch: string; head: string | null; dirty: ReadonlyArray<string> }>(app.client.vcs.status(pid)),
-      run<{ current: string; branches: Record<string, string> }>(app.client.vcs.branches(pid)),
-      run<ReadonlyArray<Commit>>(app.client.vcs.log({ ...pid, query: { limit: 100, ...(path() ? { path: path()! } : {}) } })).catch(() => []),
-      run<ReadonlyArray<Pull>>(app.client.vcs.listPullRequests({ ...pid, query: {} })),
-      run<ReadonlyArray<Run>>(app.client.vcs.runs(pid)),
-      run<{ remote: string | null }>(app.client.vcs.remote(pid)),
-    ])
-    setBranch(status.branch); setHead(status.head); setDirty(status.dirty); setBranches(brs.branches); setCommits(log)
-    setPulls(prs); setRuns(rs); setRemote(rm.remote ?? "")
-    if (!prHead()) setPrHead(Object.keys(brs.branches).find((b) => b !== "main") ?? "")
-  }
-  onMount(() => {
-    void attempt(refresh)
-    void readGithubToken().then((saved) => saved && setToken(saved)).catch(() => undefined)
-  })
-
-  const act = (work: () => Promise<unknown>) => attempt(async () => { await work(); await refresh() })
-
-  const commit = () => act(async () => {
-    await run(app.client.vcs.commit({ params: { id: id() }, payload: { message: message().trim() } }))
-    setMessage("")
-  })
-  const selectCommit = (c: Commit) => attempt(async () => {
-    setSelected(c)
-    setSelectedChanges(await run<ReadonlyArray<Change>>(app.client.vcs.diff({ params: { id: id() }, query: { ...(c.parents[0] ? { from: c.parents[0] } : {}), to: c.oid } })))
-  })
-  const restore = (c: Commit) => {
+  const commit = (): void => { void act(async () => { await commitM.mutate(message().trim()); setMessage("") }, undefined).then(() => refresh()) }
+  const selectCommit = (c: Commit): void => { setSelected(c); diffQ.refetch() }
+  const restore = (c: Commit): void => {
     if (!window.confirm(t("vcs.history.restoreConfirm", { id: short(c.oid) }))) return
-    void act(() => run(app.client.vcs.restore({ params: { id: id() }, payload: { rev: c.oid, ...(path() ? { paths: [path()!] } : {}) } })))
+    void act(async () => { await restoreM.mutate(c.oid, path()) }).then(() => { refresh(); refreshDetail() })
   }
-  const createBranch = () => act(async () => {
-    await run(app.client.vcs.createBranch({ params: { id: id() }, payload: { name: newBranch().trim() } }))
-    setNewBranch("")
-  })
-  const checkout = (name: string) => act(() => run(app.client.vcs.checkout({ params: { id: id() }, payload: { branch: name } })))
-  const openPullRequest = () => act(async () => {
-    await run(app.client.vcs.openPullRequest({ params: { id: id() }, payload: { title: prTitle().trim(), head: prHead(), base: prBase() } }))
-    setPrTitle("")
-  })
-  const loadPull = (p: Pull) => attempt(async () => {
-    const d = await run<{ pullRequest: Pull; reviews: ReadonlyArray<Review>; changes: ReadonlyArray<Change> }>(app.client.vcs.pullRequest({ params: { id: id(), number: p.number } }))
-    setOpenPull({ pull: d.pullRequest, reviews: d.reviews, changes: d.changes })
-  })
-  const review = (verdict: "approve" | "request-changes") => {
+  const createBranch = (): void => { const n = newBranch().trim(); if (!n) return; void act(async () => { await createBranchM.mutate(n); setNewBranch("") }) }
+  const checkout = (name: string): void => { void act(async () => { await checkoutM.mutate(name) }).then(() => { refresh(); refreshDetail() }) }
+  const openPullRequest = (): void => { const t1 = prTitle().trim(); if (!t1) return; void act(async () => { await openPullRequestM.mutate(t1, prHead(), prBase()); setPrTitle("") }) }
+  const loadPull = (p: Pull): void => { setOpenPull({ pull: p, reviews: [], changes: [] }); pullQ.refetch() }
+  const review = (verdict: "approve" | "request-changes"): void => {
     const current = openPull()
     if (!current) return
-    void attempt(async () => {
-      await run(app.client.vcs.review({ params: { id: id(), number: current.pull.number }, payload: { verdict, ...(reviewNote().trim() ? { body: reviewNote().trim() } : {}) } }))
-      setReviewNote("")
-      await loadPull(current.pull)
-    })
+    const body = reviewNote().trim() || undefined
+    void act(async () => { await reviewM.mutate(current.pull.number, verdict, body); setReviewNote("") }).then(refreshDetail)
   }
-  const settle = (kind: "merge" | "close") => {
+  const settle = (kind: "merge" | "close"): void => {
     const current = openPull()
     if (!current) return
     void act(async () => {
-      const args = { params: { id: id(), number: current.pull.number } }
-      await run(kind === "merge" ? app.client.vcs.mergePullRequest(args) : app.client.vcs.closePullRequest(args))
+      if (kind === "merge") await mergePullM.mutate(current.pull.number)
+      else await closePullM.mutate(current.pull.number)
       setOpenPull(undefined)
+    }).then(() => { refresh(); refreshDetail() })
+  }
+  const dispatch = (): void => { void act(async () => { await dispatchM.mutate() }) }
+  const saveRemote = (): void => { void act(async () => { await setRemoteM.mutate(remote().trim() || null); const t1 = token().trim(); if (t1) await saveGithubToken(t1) }) }
+  const sync = (kind: "push" | "pull"): void => {
+    const t1 = token().trim()
+    if (t1) void saveGithubToken(t1)
+    void act(async () => {
+      const result = (await syncM.mutate(kind, t1, undefined)) as { readonly oid: string }
+      flashNotice(t("vcs.github.done", { detail: short(result.oid) }))
     })
   }
-  const dispatch = () => act(() => run(app.client.vcs.dispatch({ params: { id: id() }, payload: {} })))
-  const saveRemote = () => act(async () => {
-    await run(app.client.vcs.setRemote({ params: { id: id() }, payload: { remote: remote().trim() || null } }))
-    if (token().trim()) await saveGithubToken(token().trim())
-  })
-  const sync = (kind: "push" | "pull") => act(async () => {
-    if (token().trim()) await saveGithubToken(token().trim())
-    const args = { params: { id: id() }, headers: { "x-github-token": token().trim() }, payload: {} }
-    const result = await run<{ oid: string }>(kind === "push" ? app.client.vcs.push(args) : app.client.vcs.pull(args))
-    setNotice(t("vcs.github.done", { detail: short(result.oid) }))
-  })
 
   return (
     <WorkspaceDetail
@@ -180,7 +245,9 @@ export function ProjectHistoryScreen(): JSX.Element {
       backLabel={t("vcs.back")}
     >
     <div class="mx-auto w-full max-w-5xl space-y-4">
-      <Show when={problem()}><p role="alert" class="text-red-600">{problem()}</p></Show>
+      <Show when={firstError()}>
+        <p role="alert" class="text-red-600">{t("vcs.error", { message: describeError(firstError()) })}</p>
+      </Show>
       <Show when={notice()}><p role="status" class="text-green-600">{notice()}</p></Show>
 
       <nav class="flex gap-2 border-b border-gray-200 dark:border-gray-700" role="tablist">
@@ -196,20 +263,20 @@ export function ProjectHistoryScreen(): JSX.Element {
           <p>{dirty().length === 0 ? t("vcs.changes.clean") : t("vcs.changes.dirty", { count: String(dirty().length) })}</p>
           <ul class="font-mono text-xs"><For each={dirty()}>{(p) => <li>{p}</li>}</For></ul>
           <input class={INPUT} placeholder={t("vcs.changes.message")} value={message()} onInput={(e) => setMessage(e.currentTarget.value)} />
-          <button class={PRIMARY} disabled={!message().trim() || (dirty().length === 0 && head() !== null)} onClick={commit}>{t("vcs.changes.commit")}</button>
+          <button class={PRIMARY} disabled={busy() || !message().trim() || (dirty().length === 0 && head() !== null)} onClick={commit}>{t("vcs.changes.commit")}</button>
         </section>
       </Show>
 
       <Show when={tab() === "history"}>
         <Show when={path()}>
-          <p class="flex items-center gap-2 text-sm">{t("vcs.history.file")}: <code>{path()}</code><button class={BTN} onClick={() => { setSearch({ path: undefined }); void attempt(refresh) }}>{t("vcs.history.all")}</button></p>
+          <p class="flex items-center gap-2 text-sm">{t("vcs.history.file")}: <code>{path()}</code><button class={BTN} onClick={() => { setSearch({ path: undefined }); logQ.refetch() }}>{t("vcs.history.all")}</button></p>
         </Show>
         <section class="grid gap-4 md:grid-cols-2">
           <ul class={`${CARD} space-y-2`}>
             <Show when={commits().length === 0}><li class="text-sm text-gray-500">{t("vcs.history.empty")}</li></Show>
             <For each={commits()}>
               {(c) => (
-                <li class="cursor-pointer text-sm" onClick={() => void selectCommit(c)}>
+                <li class="cursor-pointer text-sm" onClick={() => selectCommit(c)}>
                   <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
                   <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1 text-xs text-blue-700">{b}</span>}</For>
                   <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-gray-500">{t("vcs.history.merge")}</span></Show>
@@ -237,14 +304,14 @@ export function ProjectHistoryScreen(): JSX.Element {
               {([name, oid]) => (
                 <li class="flex items-center justify-between text-sm">
                   <span><strong>{name}</strong> <code class="text-gray-500">{short(oid)}</code><Show when={name === branch()}><span class={PILL("open")}>{t("vcs.branches.current")}</span></Show></span>
-                  <Show when={name !== branch()}><button class={BTN} onClick={() => void checkout(name)}>{t("vcs.branches.checkout")}</button></Show>
+                  <Show when={name !== branch()}><button class={BTN} onClick={() => checkout(name)}>{t("vcs.branches.checkout")}</button></Show>
                 </li>
               )}
             </For>
           </ul>
           <div class="flex gap-2">
             <input class={INPUT} placeholder={t("vcs.branches.name")} value={newBranch()} onInput={(e) => setNewBranch(e.currentTarget.value)} />
-            <button class={PRIMARY} disabled={!newBranch().trim() || head() === null} onClick={createBranch}>{t("vcs.branches.create")}</button>
+            <button class={PRIMARY} disabled={busy() || !newBranch().trim() || head() === null} onClick={createBranch}>{t("vcs.branches.create")}</button>
           </div>
         </section>
       </Show>
@@ -254,14 +321,14 @@ export function ProjectHistoryScreen(): JSX.Element {
           <Show when={!openPull()} fallback={
             <div class={`${CARD} space-y-3`}>
               <button class={BTN} onClick={() => setOpenPull(undefined)}>←</button>
-              <h2 class="text-lg font-medium">#{openPull()!.pull.number} {openPull()!.pull.title}<span class={PILL(openPull()!.pull.state)}>{openPull()!.pull.state}</span><Show when={openPull()!.pull.authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
-              <p class="text-sm text-gray-500">{openPull()!.pull.head} → {openPull()!.pull.base}</p>
-              <Show when={openPull()!.pull.body}><p class="text-sm">{openPull()!.pull.body}</p></Show>
+              <h2 class="text-lg font-medium">#{(loadedPull()?.pullRequest ?? openPull()!.pull).number} {(loadedPull()?.pullRequest ?? openPull()!.pull).title}<span class={PILL((loadedPull()?.pullRequest ?? openPull()!.pull).state)}>{(loadedPull()?.pullRequest ?? openPull()!.pull).state}</span><Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
+              <p class="text-sm text-gray-500">{(loadedPull()?.pullRequest ?? openPull()!.pull).head} → {(loadedPull()?.pullRequest ?? openPull()!.pull).base}</p>
+              <Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).body}><p class="text-sm">{(loadedPull()?.pullRequest ?? openPull()!.pull).body}</p></Show>
               <h3 class="font-medium">{t("vcs.pulls.files")}</h3>
-              <ChangeList changes={openPull()!.changes} />
+              <ChangeList changes={loadedPull()?.changes ?? []} />
               <h3 class="font-medium">{t("vcs.pulls.reviews")}</h3>
-              <ul class="text-sm"><For each={openPull()!.reviews}>{(r) => <li><span class={PILL(r.verdict)}>{r.verdict}</span> {r.body}</li>}</For></ul>
-              <Show when={openPull()!.pull.state === "open"}>
+              <ul class="text-sm"><For each={loadedPull()?.reviews ?? []}>{(r) => <li><span class={PILL(r.verdict)}>{r.verdict}</span> {r.body}</li>}</For></ul>
+              <Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).state === "open"}>
                 <input class={INPUT} placeholder={t("vcs.pulls.reviewNote")} value={reviewNote()} onInput={(e) => setReviewNote(e.currentTarget.value)} />
                 <div class="flex flex-wrap gap-2">
                   <button class={BTN} onClick={() => review("request-changes")}>{t("vcs.pulls.requestChanges")}</button>
@@ -275,7 +342,7 @@ export function ProjectHistoryScreen(): JSX.Element {
             <ul class={`${CARD} space-y-2`}>
               <Show when={pulls().length === 0}><li class="text-sm text-gray-500">{t("vcs.pulls.empty")}</li></Show>
               <For each={pulls()}>
-                {(p) => <li class="cursor-pointer text-sm" onClick={() => void loadPull(p)}>#{p.number} {p.title}<span class={PILL(p.state)}>{p.state}</span><Show when={p.authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show><div class="text-xs text-gray-500">{p.head} → {p.base}</div></li>}
+                {(p) => <li class="cursor-pointer text-sm" onClick={() => loadPull(p)}>#{p.number} {p.title}<span class={PILL(p.state)}>{p.state}</span><Show when={p.authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show><div class="text-xs text-gray-500">{p.head} → {p.base}</div></li>}
               </For>
             </ul>
             <div class={`${CARD} space-y-2`}>
@@ -285,7 +352,7 @@ export function ProjectHistoryScreen(): JSX.Element {
                 <select class={INPUT} aria-label={t("vcs.pulls.head")} value={prHead()} onChange={(e) => setPrHead(e.currentTarget.value)}><For each={Object.keys(branches())}>{(b) => <option value={b}>{b}</option>}</For></select>
                 <select class={INPUT} aria-label={t("vcs.pulls.base")} value={prBase()} onChange={(e) => setPrBase(e.currentTarget.value)}><For each={Object.keys(branches())}>{(b) => <option value={b}>{b}</option>}</For></select>
               </div>
-              <button class={PRIMARY} disabled={!prTitle().trim() || !prHead()} onClick={openPullRequest}>{t("vcs.pulls.open")}</button>
+              <button class={PRIMARY} disabled={busy() || !prTitle().trim() || !prHead()} onClick={openPullRequest}>{t("vcs.pulls.open")}</button>
             </div>
           </Show>
         </section>
@@ -293,7 +360,7 @@ export function ProjectHistoryScreen(): JSX.Element {
 
       <Show when={tab() === "actions"}>
         <section class={`${CARD} space-y-3`}>
-          <button class={PRIMARY} onClick={dispatch}>{t("vcs.actions.run")}</button>
+          <button class={PRIMARY} disabled={busy()} onClick={dispatch}>{t("vcs.actions.run")}</button>
           <ul class="space-y-2 text-sm">
             <Show when={runs().length === 0}><li class="text-gray-500">{t("vcs.actions.empty")}</li></Show>
             <For each={runs()}>{(r) => <li>{r.workflow}<span class={PILL(r.status)}>{r.status}</span><div class="text-xs text-gray-500">{r.event} · <code>{short(r.sha)}</code> · {new Date(r.startedAt).toLocaleString()}</div></li>}</For>
@@ -307,9 +374,9 @@ export function ProjectHistoryScreen(): JSX.Element {
           <label class="block text-sm">{t("vcs.github.token")}<input type="password" autocomplete="off" class={`${INPUT} mt-1`} value={token()} onInput={(e) => setToken(e.currentTarget.value)} /></label>
           <p class="text-xs text-gray-500">{t("vcs.github.tokenHint")}</p>
           <div class="flex gap-2">
-            <button class={BTN} onClick={saveRemote}>{t("vcs.github.save")}</button>
-            <button class={PRIMARY} disabled={!remote().trim() || !token().trim()} onClick={() => sync("push")}>{t("vcs.github.push")}</button>
-            <button class={BTN} disabled={!remote().trim() || !token().trim()} onClick={() => sync("pull")}>{t("vcs.github.pull")}</button>
+            <button class={BTN} disabled={busy()} onClick={saveRemote}>{t("vcs.github.save")}</button>
+            <button class={PRIMARY} disabled={busy() || !remote().trim() || !token().trim()} onClick={() => sync("push")}>{t("vcs.github.push")}</button>
+            <button class={BTN} disabled={busy() || !remote().trim() || !token().trim()} onClick={() => sync("pull")}>{t("vcs.github.pull")}</button>
           </div>
         </section>
       </Show>

@@ -2,9 +2,10 @@
  * Settings → Mobile companion: turn the phone gateway on or off, pair a phone with a QR code, revoke devices.
  *
  * The pairing link carries a one-time device token, so it is held in memory only while the QR code is on screen.
+ * The user can either scan the QR code with the phone, or copy/paste the URL into CADCAM FUN manually.
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { Smartphone } from "lucide-solid"
+import { Check, Copy, Smartphone } from "lucide-solid"
 import qrcode from "qrcode-generator"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
@@ -33,7 +34,24 @@ export function CompanionPanel(): JSX.Element {
   const [name, setName] = createSignal("iPhone")
   const [host, setHost] = createSignal("")
   const [link, setLink] = createSignal<string>()
+  const [copied, setCopied] = createSignal(false)
   const qr = createMemo(() => { const l = link(); return l ? qrSvg(l) : undefined })
+
+  // The pairing link carries a one-time token, so the user can either scan the QR code
+  // or copy/paste the URL into CADCAM FUN on their phone. The clipboard write can fail
+  // (no permission, no document focus): show the error in a toast and leave the link
+  // on screen so the user can still select it manually.
+  const copyLink = async (): Promise<void> => {
+    const value = link()
+    if (value === undefined) return
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (cause) {
+      toast.error(t("companion.pair.copyFailed", { message: String(cause) }))
+    }
+  }
 
   const act = async (run: () => Promise<unknown>) => {
     try {
@@ -94,10 +112,40 @@ export function CompanionPanel(): JSX.Element {
                   const paired = await app.runtime.run(app.client.companion.pair({ payload: { name: name(), ...(host().trim() ? { host: host().trim() } : {}) } }))
                   setLink(paired.link)
                 })}>{t("companion.pair.create")}</button>
-                <Show when={qr()}>
-                  {/* eslint-disable-next-line solid/no-innerhtml -- generated locally from the pairing link, no user HTML */}
-                  <div class="mx-auto w-64 rounded-lg bg-white p-2 shadow-sm" innerHTML={qr()} />
-                  <p class="text-center text-xs text-gray-500 dark:text-gray-400">{t("companion.pair.hint")}</p>
+                <Show when={link()}>
+                  {(current) => (
+                    <>
+                      {/* eslint-disable-next-line solid/no-innerhtml -- generated locally from the pairing link, no user HTML */}
+                      <Show when={qr()}>
+                        <div class="mx-auto w-64 rounded-lg bg-white p-2 shadow-sm" innerHTML={qr()} />
+                      </Show>
+                      <p class="text-center text-xs text-gray-500 dark:text-gray-400">{t("companion.pair.hint")}</p>
+                      <div class="space-y-1">
+                        <label class={LABEL}>{t("companion.pair.link")}</label>
+                        <div class="flex items-stretch gap-2">
+                          <input
+                            class={`${FIELD} font-mono text-xs`}
+                            value={current()}
+                            readonly
+                            aria-label={t("companion.pair.link")}
+                            onFocus={(e) => e.currentTarget.select()}
+                            onClick={(e) => e.currentTarget.select()}
+                          />
+                          <button
+                            type="button"
+                            class={copied() ? `${SECONDARY} flex items-center gap-1` : `${PRIMARY} flex items-center gap-1`}
+                            onClick={() => void copyLink()}
+                            aria-label={t("companion.pair.copy")}
+                          >
+                            <Show when={copied()} fallback={<Copy size={14} aria-hidden="true" />}>
+                              <Check size={14} aria-hidden="true" />
+                            </Show>
+                            {copied() ? t("companion.pair.copied") : t("companion.pair.copy")}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </Show>
               </section>
             </Show>

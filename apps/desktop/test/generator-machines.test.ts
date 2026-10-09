@@ -63,10 +63,14 @@ describe("generator panel by machine", () => {
     try {
       await find('[data-testid="toolpath-generator"]')
       await open("operation-section")
-      const operation = document.querySelector<HTMLSelectElement>('[data-testid="operation-section"] select')!
-      expect([...operation.options].map((o) => o.value)).toContain("probing")
+      // The strategy palette exposes every strategy as a button; pick the probe cell.
+      const probeCell = document.querySelector<HTMLButtonElement>('[data-testid="operation-section"] [data-palette-id="probing"]')!
+      const allCells = [...document.querySelectorAll<HTMLButtonElement>('[data-testid="operation-section"] [data-palette-id]')]
+        .map((button) => button.dataset["paletteId"] ?? "")
+      expect(allCells).toContain("probing")
       expect(document.querySelector('[data-testid="probe-settings"]')).toBeNull()
-      await choose(operation, "probing")
+      probeCell.click()
+      await settle()
       const cycle = await find<HTMLSelectElement>('[data-testid="probe-settings"] select[aria-label="Probe cycle"]')
       expect([...cycle.options].map((o) => o.value)).toEqual(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"])
       await choose(cycle, "bore")
@@ -83,7 +87,10 @@ describe("generator panel by machine", () => {
       await find('[data-testid="toolpath-generator"]')
       await open("operation-section")
       expect(document.querySelector('[data-testid="surface-settings"]')).toBeNull()
-      await choose(document.querySelector<HTMLSelectElement>('[data-testid="operation-section"] select')!, "3d_surface")
+      // Pick the Z-level rough cell — it maps to the 3d_surface core op and brings the panel.
+      const surfaceCell = document.querySelector<HTMLButtonElement>('[data-testid="operation-section"] [data-palette-id="3d_surface"]')!
+      surfaceCell.click()
+      await settle()
       const strategy = await find<HTMLSelectElement>('[data-testid="surface-settings"] select[aria-label="Surface strategy"]')
       expect([...strategy.options].map((o) => o.value)).toEqual(["roughing", "parallel", "waterline"])
       expect(document.querySelector('[data-testid="surface-settings"]')!.textContent).not.toContain("Raster angle")

@@ -6,10 +6,16 @@
 import { clientLayer, readClient, runtimeForLayer } from "../../src/app/client.ts"
 import { makeApp } from "../../../sidecar/test/helpers.ts"
 import { installDom } from "./dom.ts"
+import { resetStores } from "./reset-stores.ts"
 
 export async function bootLiveApp() {
   const sidecar = await makeApp()
   installDom("http://localhost/")
+  // The Zustand stores are module-level singletons that survive a new DOM window, so wipe
+  // them here: a previous test file in this process may have left elements, projects or a
+  // remembered document in `useElementsStore` / `useDocumentStore`, and the next file's first
+  // `prepareWorkspace` would otherwise see that stale state.
+  resetStores()
   const { render } = await import("solid-js/web")
   const { AppRoutes } = await import("../../src/app/App.tsx")
   const { createAppState } = await import("../../src/state/context.ts")

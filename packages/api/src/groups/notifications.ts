@@ -4,7 +4,7 @@ import { BadRequest, InternalError, NotFound } from "../errors.ts"
 
 const nullable = Schema.NullOr(Schema.String)
 export const NotificationRow = Schema.Struct({
-  id: Schema.String, type: Schema.Literals(["NEW_MESSAGE", "PROJECT_CREATED", "COMPONENT_CREATED", "MEMBER_JOINED", "ORGANIZATION_INVITATION"]),
+  id: Schema.String, type: Schema.Literals(["NEW_MESSAGE", "PROJECT_CREATED", "COMPONENT_CREATED", "MEMBER_JOINED", "ORGANIZATION_INVITATION", "PR_OPENED", "PR_MERGED", "PR_REVIEWED", "AI_COMMITTED", "WORKFLOW_FAILED", "WORKFLOW_PASSED"]),
   title: Schema.String, content: Schema.String, isRead: Schema.Boolean, createdAt: Schema.String,
   userId: Schema.String, organizationId: nullable, projectId: nullable, componentId: nullable, messageId: nullable, linkUrl: nullable
 })

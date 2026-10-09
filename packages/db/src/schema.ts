@@ -7,7 +7,7 @@ export const newId = () => crypto.randomUUID()
 export const UserRoleValues = ["ADMIN", "MANAGER", "MEMBER"] as const
 export type UserRole = (typeof UserRoleValues)[number]
 
-export const NotificationTypeValues = ["NEW_MESSAGE", "PROJECT_CREATED", "COMPONENT_CREATED", "MEMBER_JOINED", "ORGANIZATION_INVITATION"] as const
+export const NotificationTypeValues = ["NEW_MESSAGE", "PROJECT_CREATED", "COMPONENT_CREATED", "MEMBER_JOINED", "ORGANIZATION_INVITATION", "PR_OPENED", "PR_MERGED", "PR_REVIEWED", "AI_COMMITTED", "WORKFLOW_FAILED", "WORKFLOW_PASSED"] as const
 export type NotificationType = (typeof NotificationTypeValues)[number]
 
 export const MarketplaceItemTypeValues = ["COMPONENT", "DRAWING", "PROJECT", "GCODE", "TOOLPATH", "ASSEMBLY"] as const

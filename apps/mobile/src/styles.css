@@ -1,20 +1,1455 @@
-:root { --bg: #f7f8fa; --fg: #1f2937; --muted: #6b7280; --card: #fff; --line: #e5e7eb; --accent: #2563eb; --ok: #16a34a; --bad: #dc2626; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --fg: #e5e7eb; --muted: #9ca3af; --card: #181b22; --line: #2a2f3a; --accent: #60a5fa; } }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 -apple-system, system-ui, sans-serif; }
-.screen { padding: max(16px, env(safe-area-inset-top)) 16px calc(72px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
-h1 { font-size: 1.4rem; margin: 0 0 12px; } h2 { font-size: 1.15rem; } h3 { font-size: 1rem; margin: 16px 0 6px; }
-header { display: flex; align-items: center; gap: 8px; }
-.muted { color: var(--muted); font-size: .85rem; }
-.error { color: var(--bad); }
-.list { list-style: none; padding: 0; margin: 8px 0; } .list > li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
-.change ul { padding-left: 16px; font-size: .85rem; } ins { color: var(--ok); text-decoration: none; } del { color: var(--bad); }
-button { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); min-height: 44px; }
-button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-textarea, input { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.pill { font-size: .7rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); margin-left: 4px; }
-.pill.open, .pill.running { color: var(--accent); } .pill.merged, .pill.success, .pill.approve { color: var(--ok); } .pill.failure, .pill.request-changes, .pill.closed { color: var(--bad); }
-.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
-.tabs button { flex: 1; border: 0; border-radius: 0; background: none; font-size: .8rem; } .tabs .active { color: var(--accent); font-weight: 600; }
-.chat form { display: flex; gap: 8px; margin-top: 12px; } .bubble.me { background: var(--accent); color: #fff; padding: 8px 12px; border-radius: 12px; display: inline-block; } .tool { color: var(--muted); font-size: .8rem; margin: 2px 0; }
+/* ============================================================================
+   CADCAM FUN — iOS 27 Liquid Glass design system
+
+   Design sources
+   - Apple Design skill: spring physics, Liquid Glass materials, dynamic type,
+     interruptibility, reduced motion, blur-as-material.
+   - Emil Kowalski Design Engineering: press feedback (scale 0.97), origin-aware
+     popovers, hardware-accelerated properties only, asymmetric enter/exit,
+     strong cubic-bézier easings, prefers-reduced-motion respect.
+
+   Foundations
+   - Colours are HSL-flavoured system tokens (Apple HIG).
+   - Glass surfaces use `backdrop-filter: blur() saturate(180%)` with a tinted
+     alpha layer; bigger surfaces blur more (§12, Apple).
+   - All spring/press animations only animate `transform` and `opacity` (Emil
+     perf rule: compositor only).
+   - Press feedback is on `:active` (instant) — never on release (Apple §1).
+   ========================================================================== */
+
+:root {
+  /* Apple system colours (light) ------------------------------------------------- */
+  --bg: #f2f2f7;
+  --bg-elevated: #ffffff;
+  --bg-grouped: #f2f2f7;
+  --fg: #000000;
+  --fg-secondary: rgba(60, 60, 67, 0.78);
+  --fg-tertiary: rgba(60, 60, 67, 0.6);
+  --fg-quaternary: rgba(60, 60, 67, 0.3);
+  --separator: rgba(60, 60, 67, 0.18);
+  --separator-opaque: #c6c6c8;
+  --fill-1: rgba(120, 120, 128, 0.08);
+  --fill-2: rgba(120, 120, 128, 0.12);
+  --fill-3: rgba(118, 118, 128, 0.16);
+  --fill-4: rgba(116, 116, 128, 0.22);
+  --accent: #007aff;
+  --accent-pressed: #0062cc;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --purple: #af52de;
+  --pink: #ff2d55;
+  --teal: #5ac8fa;
+  --indigo: #5856d6;
+  --gray: #8e8e93;
+
+  /* Liquid Glass materials ------------------------------------------------------- */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-thick: rgba(255, 255, 255, 0.78);
+  --glass-bg-thin: rgba(255, 255, 255, 0.42);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --glass-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.12);
+  --glass-blur: saturate(180%) blur(20px);
+  --glass-blur-strong: saturate(180%) blur(30px);
+  --glass-blur-soft: saturate(180%) blur(12px);
+
+  /* Motion — Apple-flavoured cubic-béziers -------------------------------------- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Durations ------------------------------------------------------------------- */
+  --d-press: 160ms;
+  --d-pop: 200ms;
+  --d-modal: 320ms;
+  --d-sheet: 380ms;
+  --d-skeleton: 1200ms;
+
+  /* Spacing scale (4px base) ----------------------------------------------------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+
+  /* Typography ------------------------------------------------------------------ */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --tracking-tight: -0.022em;
+  --tracking-snug: -0.012em;
+  --tracking-normal: -0.003em;
+  --tracking-wide: 0.012em;
+
+  /* Geometry -------------------------------------------------------------------- */
+  --radius-card: 14px;
+  --radius-chip: 999px;
+  --radius-sheet: 22px;
+  --radius-pill: 999px;
+
+  /* Safe-area (consumed by App and tabs) ---------------------------------------- */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --bg-elevated: #1c1c1e;
+    --bg-grouped: #000000;
+    --fg: #ffffff;
+    --fg-secondary: rgba(235, 235, 245, 0.78);
+    --fg-tertiary: rgba(235, 235, 245, 0.6);
+    --fg-quaternary: rgba(235, 235, 245, 0.3);
+    --separator: rgba(84, 84, 88, 0.65);
+    --separator-opaque: #38383a;
+    --fill-1: rgba(118, 118, 128, 0.16);
+    --fill-2: rgba(118, 118, 128, 0.24);
+    --fill-3: rgba(118, 118, 128, 0.32);
+    --fill-4: rgba(118, 118, 128, 0.42);
+    --accent: #0a84ff;
+    --accent-pressed: #409cff;
+    --accent-soft: rgba(10, 132, 255, 0.18);
+    --green: #30d158;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --yellow: #ffd60a;
+    --purple: #bf5af2;
+    --pink: #ff375f;
+    --teal: #64d2ff;
+    --indigo: #5e5ce6;
+    --gray: #8e8e93;
+
+    --glass-bg: rgba(28, 28, 30, 0.6);
+    --glass-bg-thick: rgba(28, 28, 30, 0.82);
+    --glass-bg-thin: rgba(28, 28, 30, 0.42);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-highlight: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --glass-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ============================================================================
+   Reset + base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.4;
+  letter-spacing: var(--tracking-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+  font-feature-settings: "ss01", "cv11";
+  /* Spring back on iOS edges (Apple §9) */
+  overscroll-behavior: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Prevent pull-to-refresh when sheets are open (handled at sheet level) */
+  overflow: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+/* ============================================================================
+   Typography utilities
+   ========================================================================== */
+
+.t-display {
+  font-size: 34px;
+  line-height: 1.07;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+}
+.t-title {
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: var(--tracking-snug);
+}
+.t-title-2 {
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: var(--tracking-snug);
+}
+.t-headline {
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: var(--tracking-normal);
+}
+.t-body {
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: var(--tracking-normal);
+}
+.t-callout {
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 500;
+  letter-spacing: var(--tracking-normal);
+}
+.t-subhead {
+  font-size: 15px;
+  line-height: 1.33;
+  font-weight: 400;
+  letter-spacing: var(--tracking-normal);
+}
+.t-footnote {
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wide);
+}
+.t-caption {
+  font-size: 12px;
+  line-height: 1.33;
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.t-secondary {
+  color: var(--fg-secondary);
+}
+.t-tertiary {
+  color: var(--fg-tertiary);
+}
+.t-quaternary {
+  color: var(--fg-quaternary);
+}
+
+/* ============================================================================
+   Glass surface — backdrop-filter with material hierarchy
+   ========================================================================== */
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  /* Light-catching top edge (Apple §12) */
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+}
+.glass-thick {
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+}
+.glass-thin {
+  background: var(--glass-bg-thin);
+  backdrop-filter: var(--glass-blur-soft);
+  -webkit-backdrop-filter: var(--glass-blur-soft);
+}
+
+/* Glass variant on dark surfaces — replace rgba borders so they read against dark bg */
+.glass-dark {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================================
+   App scaffold
+   ========================================================================== */
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  background: var(--bg);
+}
+
+.screen {
+  /* Safe-area top, scrollable middle, tab-bar bottom. */
+  padding: var(--safe-top) var(--safe-left) 0 var(--safe-right);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.screen-pad {
+  padding: var(--s-4);
+  padding-bottom: calc(var(--s-9) + var(--safe-bottom));
+}
+
+.screen-pad-tight {
+  padding: var(--s-4);
+  padding-bottom: calc(var(--s-6) + var(--safe-bottom));
+}
+
+/* Container that adds extra bottom space when a tab bar is present. */
+.has-tabs {
+  padding-bottom: calc(82px + var(--safe-bottom));
+}
+
+/* Scroll edge fade (Apple §12 — scroll-edge effect, not hard divider) */
+.screen-edge-fade {
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 18px;
+  margin-top: -18px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--bg) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  z-index: 1;
+}
+
+/* ============================================================================
+   Nav bar (large title) — Apple §16 wayfinding
+   ========================================================================== */
+
+.nav {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) var(--s-3);
+  padding-top: calc(var(--s-3) + var(--safe-top));
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.nav-edge {
+  /* bright edge on the bottom — light reflecting off the glass */
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
+.nav-large {
+  padding-bottom: var(--s-2);
+  flex-direction: column;
+  align-items: stretch;
+}
+.nav-large .nav-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+.nav-large .nav-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--s-2);
+}
+.nav-title-large {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+  color: var(--fg);
+}
+.nav-title-compact {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-normal);
+  color: var(--fg);
+  flex: 1;
+  text-align: center;
+}
+.nav-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 var(--s-2);
+  border-radius: 10px;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  /* Apple §1 — feedback on pointer-down */
+  transition: transform var(--d-press) var(--ease-out), background-color var(--d-press) var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.nav-back:active {
+  transform: scale(0.97);
+  background: var(--fill-2);
+}
+.nav-back svg {
+  margin-right: -2px;
+}
+
+/* ============================================================================
+   Tab bar — iOS 27 floating liquid glass
+   ========================================================================== */
+
+.tabs {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--s-2) + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--s-1);
+  padding: 6px;
+  border-radius: 28px;
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  z-index: 30;
+  /* Apple §11 — hint to compositor for floating motion */
+  will-change: transform;
+}
+.tabs button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 64px;
+  height: 50px;
+  padding: 0 var(--s-3);
+  border-radius: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  position: relative;
+  /* Apple §1 — feedback is on :active (instant), plus a smooth colour transition */
+  transition:
+    transform var(--d-press) var(--ease-out),
+    color 200ms var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tabs button svg {
+  width: 22px;
+  height: 22px;
+}
+.tabs button:active {
+  transform: scale(0.92);
+}
+.tabs button.active {
+  color: var(--fg);
+}
+.tabs button.active::before {
+  content: "";
+  position: absolute;
+  inset: 6px 8px;
+  border-radius: 18px;
+  background: var(--fill-2);
+  z-index: -1;
+  /* Clip-path morph from the active button — Apple materialisation */
+  animation: tabGlow 320ms var(--ease-out) both;
+}
+@keyframes tabGlow {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================
+   Buttons — press feedback on :active, instant
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 50px;
+  padding: 0 var(--s-5);
+  border-radius: 14px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-normal);
+  cursor: pointer;
+  /* Apple §1 — feedback on press. Emil: scale 0.97 (subtle, not 0.95). */
+  transition:
+    transform var(--d-press) var(--ease-out),
+    background-color var(--d-press) var(--ease-out),
+    opacity var(--d-press) var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+.btn:active {
+  transform: scale(0.97);
+  background: var(--accent-pressed);
+}
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-secondary {
+  background: var(--fill-2);
+  color: var(--fg);
+}
+.btn-secondary:active {
+  background: var(--fill-3);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 500;
+}
+.btn-ghost:active {
+  background: var(--fill-2);
+}
+.btn-danger {
+  background: var(--red);
+}
+.btn-danger:active {
+  background: color-mix(in srgb, var(--red) 80%, black);
+}
+.btn-row {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.btn-row .btn {
+  flex: 1 1 0;
+}
+
+/* Full-bleed prominent button (e.g. "Connect", "Send") */
+.btn-pill {
+  width: 100%;
+  border-radius: var(--radius-pill);
+  height: 54px;
+}
+
+/* Icon-only chip button (toolbar / leading nav button) */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--fill-1);
+  color: var(--fg);
+  cursor: pointer;
+  /* Apple §1 */
+  transition:
+    transform var(--d-press) var(--ease-out),
+    background-color var(--d-press) var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.btn-icon:active {
+  transform: scale(0.94);
+  background: var(--fill-3);
+}
+
+/* ============================================================================
+   Text field — iOS rounded style with floating focus ring
+   ========================================================================== */
+
+.field {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  padding: 14px var(--s-4);
+  border-radius: 12px;
+  border: 1px solid var(--separator);
+  color: var(--fg);
+  background: var(--bg-elevated);
+  font-family: inherit;
+  font-size: 17px;
+  letter-spacing: var(--tracking-normal);
+  outline: none;
+  /* Smooth focus — Emil: only animate properties that benefit from it */
+  transition:
+    border-color 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out),
+    background-color 200ms var(--ease-out);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  background: var(--bg-elevated);
+}
+.field::placeholder {
+  color: var(--fg-tertiary);
+}
+.field-multi {
+  resize: none;
+  min-height: 110px;
+  line-height: 1.4;
+}
+
+/* Inline editor (chat composer) — flush, glass, no border */
+.field-inline {
+  background: var(--fill-1);
+  border-color: transparent;
+}
+.field-inline:focus {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+
+/* ============================================================================
+   Glass card
+   ========================================================================== */
+
+.card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  padding: var(--s-4);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+}
+.card-tight {
+  padding: var(--s-3);
+}
+.card-elevated {
+  /* Heavier material for top-level content (Apple §12) */
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow-strong);
+}
+
+/* ============================================================================
+   List rows — grouped iOS list with chevron / icon / trailing
+   ========================================================================== */
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.list-grouped {
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  min-height: 56px;
+  cursor: pointer;
+  position: relative;
+  /* Apple §1 — feedback on press. Emil: only the colour, not transform, so the
+     group container doesn't reflow when a row scales (Emil perf rule: avoid
+     touching layout/paint on the parent). */
+  transition: background-color var(--d-press) var(--ease-out);
+  /* Staggered enter (Emil — 30–80ms between items, capped). */
+  animation: rowIn 320ms var(--ease-out) both;
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row::after {
+  content: "";
+  position: absolute;
+  left: var(--s-4);
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--separator);
+}
+.list-grouped .row:last-child::after {
+  display: none;
+}
+.row:active {
+  background: var(--fill-1);
+}
+.row-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--fill-2);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.row-icon.ai {
+  background: linear-gradient(135deg, var(--purple), var(--pink));
+  color: #fff;
+}
+.row-icon.success {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}
+.row-icon.danger {
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  color: var(--red);
+}
+.row-icon.warning {
+  background: color-mix(in srgb, var(--orange) 18%, transparent);
+  color: var(--orange);
+}
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-title.bold {
+  font-weight: 600;
+}
+.row-sub {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-shrink: 0;
+  color: var(--fg-tertiary);
+  font-size: 15px;
+}
+.row-trailing .chev {
+  color: var(--fg-quaternary);
+}
+
+/* ============================================================================
+   Section header (in iOS grouped lists)
+   ========================================================================== */
+
+.section-header {
+  padding: var(--s-6) var(--s-4) var(--s-2);
+  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--fg-secondary);
+}
+.section-header:first-child {
+  padding-top: var(--s-3);
+}
+
+/* ============================================================================
+   Pills, status dots, badges
+   ========================================================================== */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: var(--fill-2);
+  color: var(--fg-secondary);
+  border: 0;
+  white-space: nowrap;
+}
+.pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pill.success {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+}
+.pill.danger {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+}
+.pill.warning {
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+}
+.pill.accent {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.pill.ai {
+  /* Apple "AI" pill — gradient backdrop to read as different from human labels */
+  color: #fff;
+  background: linear-gradient(135deg, var(--purple), var(--pink));
+  border: 0;
+}
+.pill.neutral {
+  color: var(--fg-secondary);
+  background: var(--fill-2);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gray);
+}
+.dot.success { background: var(--green); }
+.dot.danger { background: var(--red); }
+.dot.warning { background: var(--orange); }
+.dot.accent { background: var(--accent); }
+
+/* ============================================================================
+   Sheet — modal panel that rises from the bottom
+   ========================================================================== */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 50;
+  /* Apple: dim to focus (§12) */
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 92dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border-top-left-radius: var(--radius-sheet);
+  border-top-right-radius: var(--radius-sheet);
+  border-top: 1px solid var(--glass-border);
+  /* Light catching the top edge (Apple §12) */
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 -8px 32px rgba(0, 0, 0, 0.18);
+  z-index: 51;
+  /* Modals stay centered in transform-origin (§popover rule exemption, Emil) */
+  transform-origin: center bottom;
+  padding-bottom: var(--safe-bottom);
+  /* Apple §3 — interruptible; animated by WAAPI */
+  will-change: transform, opacity;
+}
+.sheet-grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--fg-quaternary);
+  margin: 8px auto 4px;
+  flex-shrink: 0;
+}
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-2) var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+.sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--s-4);
+  overscroll-behavior: contain;
+}
+
+/* ============================================================================
+   Hero — top of the Pair screen
+   ========================================================================== */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--s-8) var(--s-4) var(--s-5);
+  gap: var(--s-4);
+}
+.hero-mark {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--indigo));
+  color: #fff;
+  font-weight: 700;
+  font-size: 32px;
+  letter-spacing: -0.04em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 12px 30px rgba(0, 122, 255, 0.28);
+}
+.hero h1 {
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: var(--tracking-snug);
+  margin: 0;
+}
+.hero p {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--fg-secondary);
+  margin: 0;
+  max-width: 36ch;
+}
+
+/* ============================================================================
+   Pairing screen specific
+   ========================================================================== */
+
+.pair-input {
+  margin: 0 var(--s-4) var(--s-3);
+}
+.pair-input .field {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+.pair-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0 var(--s-4) var(--s-4);
+}
+.pair-actions .btn {
+  width: 100%;
+}
+.pair-error {
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-3);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--red);
+  font-size: 14px;
+  line-height: 1.4;
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-start;
+}
+.pair-help {
+  margin: 0 var(--s-4) var(--s-6);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-tertiary);
+  text-align: center;
+}
+.pair-help code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--fill-2);
+  color: var(--fg-secondary);
+}
+
+/* Status panel shown while we connect (Apple §13 — feedback during work) */
+.connect-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0 var(--s-4) var(--s-3);
+  padding: var(--s-3);
+  border-radius: 12px;
+  background: var(--fill-1);
+  font-size: 14px;
+  color: var(--fg-secondary);
+}
+
+/* ============================================================================
+   Pull-to-refresh indicator (Apple §13 — progress feedback)
+   ========================================================================== */
+
+/* Segmented filter row — used above lists (PR state, run status, etc.). */
+.filter-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 var(--s-1);
+  margin: 0 var(--s-4) var(--s-3);
+  background: var(--fill-1);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+}
+.filter-row button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--fg-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-normal);
+  padding: 8px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  /* Emil: transitions are interruptible; press scale is instant. */
+  transition:
+    transform var(--d-press) var(--ease-out),
+    background-color var(--d-press) var(--ease-out),
+    color 200ms var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.filter-row button:active {
+  transform: scale(0.96);
+}
+.filter-row button.active {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.refresh-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-2);
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* ============================================================================
+   Empty state
+   ========================================================================== */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-4);
+  color: var(--fg-secondary);
+}
+.empty-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--fill-2);
+  color: var(--fg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--fg);
+}
+.empty p {
+  font-size: 14px;
+  margin: 0;
+  max-width: 36ch;
+  line-height: 1.45;
+}
+
+/* ============================================================================
+   Spinner (Apple HIG § progressive indicator)
+   ========================================================================== */
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 720ms linear infinite;
+}
+.spinner.lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+.spinner-on-accent {
+  border-color: rgba(255, 255, 255, 0.32);
+  border-top-color: #fff;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Chat (assistant)
+   ========================================================================== */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.bubble-row {
+  display: flex;
+  gap: var(--s-2);
+  max-width: 86%;
+}
+.bubble-row.me {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+.bubble {
+  padding: 10px 14px;
+  border-radius: 20px;
+  background: var(--fill-1);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1.4;
+  /* Apple: vibrancy on top of glass means use slightly heavier weight */
+  font-weight: 420;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.bubble-row.me .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+.bubble-row.them .bubble {
+  border-bottom-left-radius: 6px;
+}
+.bubble.tool {
+  background: transparent;
+  color: var(--fg-tertiary);
+  font-size: 13px;
+  font-style: italic;
+  border: 1px dashed var(--separator);
+}
+.bubble.delta {
+  padding: 0;
+  background: transparent;
+}
+.chat-error {
+  color: var(--red);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+}
+.chat-form {
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-end;
+  margin-top: var(--s-3);
+}
+.chat-form .field {
+  flex: 1;
+}
+.chat-form .btn {
+  flex-shrink: 0;
+  height: 50px;
+  width: 50px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================================================================
+   Diff list (entity / property changes)
+   ========================================================================== */
+
+.changes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.change {
+  padding: var(--s-3) var(--s-4);
+  border-radius: 12px;
+  background: var(--fill-1);
+  margin-bottom: var(--s-2);
+}
+.change h4 {
+  margin: 0 0 var(--s-2);
+  font-size: 15px;
+  font-weight: 600;
+}
+.change ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.change li {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  line-height: 1.4;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.change code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-secondary);
+  background: var(--fill-2);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.change ins {
+  color: var(--green);
+  text-decoration: none;
+  font-weight: 500;
+}
+.change del {
+  color: var(--red);
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* ============================================================================
+   Review verdict pill / actions row
+   ========================================================================== */
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.actions-row {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+  flex-wrap: wrap;
+}
+.actions-row .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ============================================================================
+   Toasts (a single transient banner)
+   ========================================================================== */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--s-7) + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--glass-bg-thick);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 80;
+  box-shadow: var(--glass-shadow);
+  /* Apple §12 — materialise on entry */
+  animation: toastIn 280ms var(--ease-out) both;
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* ============================================================================
+   Utilities
+   ========================================================================== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-2);
+}
+.text-secondary { color: var(--fg-secondary); }
+.text-tertiary { color: var(--fg-tertiary); }
+.mt-2 { margin-top: var(--s-2); }
+.mt-3 { margin-top: var(--s-3); }
+.mt-4 { margin-top: var(--s-4); }
+.mb-2 { margin-bottom: var(--s-2); }
+.mb-3 { margin-bottom: var(--s-3); }
+.mb-4 { margin-bottom: var(--s-4); }
+.gap-2 { gap: var(--s-2); }
+.gap-3 { gap: var(--s-3); }
+.gap-4 { gap: var(--s-4); }
+.flex-1 { flex: 1; }
+
+/* ============================================================================
+   Reduced motion & transparency & contrast (Apple §14)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .spinner {
+    animation-duration: 720ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-bg-thick: rgba(255, 255, 255, 0.97);
+    --glass-bg-thin: rgba(255, 255, 255, 0.85);
+    --glass-blur: none;
+    --glass-blur-strong: none;
+    --glass-blur-soft: none;
+  }
+  .nav,
+  .tabs,
+  .card,
+  .list-grouped,
+  .toast {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .field,
+  .btn,
+  .pill,
+  .row-icon {
+    border: 1px solid currentColor;
+  }
+}
