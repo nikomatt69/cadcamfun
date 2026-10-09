@@ -62,6 +62,14 @@ describe("vcs HTTP", () => {
     const commit = await app.call(v("/vcs/commit"), { method: "POST", json: { message: "Add CI", files: { ".cadcamfun/workflows/ci.yml": CI } } })
     expect(commit.status).toBe(201)
     // Triggered by that very push:
+    // The workflow files of the branch, so CI can be read and authored in the app.
+    const files = (await app.call(v("/actions/workflows"))).body
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatchObject({ name: "ci.yml", path: ".cadcamfun/workflows/ci.yml" })
+    expect((await app.call(v("/actions/workflows/ci"))).body.content).toContain("project/validate")
+    expect((await app.call(v("/actions/workflows/ci.yml"))).body.name).toBe("ci.yml")
+    expect((await app.call(v("/actions/workflows/nope"))).status).toBe(404)
+
     const runs = (await app.call(v("/actions/runs"))).body
     expect(runs).toHaveLength(1)
     expect(runs[0]).toMatchObject({ workflow: "ci.yml", event: "push", status: "success", ref: "main" })

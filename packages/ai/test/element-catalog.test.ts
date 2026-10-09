@@ -121,17 +121,17 @@ describe("parametric elements", () => {
   test("a history that builds nothing is refused with the reasons, so the model can fix it", () => {
     const r = normalizeElement({ type: "parametric", history: { parameters: { w: 10 }, features: [{ id: "e", type: "extrude", sketch: "nowhere", depth: "ghost", operation: "new" }] } })
     expect(r).toMatchObject({ ok: false })
-    expect((r as { error: string }).error).toContain("builds no solid")
+    expect((r as { error: string }).error).toContain("must precede")
     expect((r as { error: string }).error).toContain("nowhere")
     expect(normalizeElement({ type: "parametric", history: { parameters: {}, features: [] } })).toMatchObject({ ok: false })
   })
 
-  test("a history that builds with problems is accepted with the problems as a warning", () => {
+  test("a history with failed parameters is refused even when another body builds", () => {
     const h = history()
     const broken = { ...h, parameters: { ...h.parameters, unused: "1 +" } }
     const r = normalizeElement({ type: "parametric", history: broken })
-    expect(r).toMatchObject({ ok: true })
-    expect((r as { warning: string }).warning).toContain("parameter unused")
+    expect(r).toMatchObject({ ok: false })
+    expect((r as { error: string }).error).toContain("parameter unused")
   })
 
   test("it is in the catalogue the prompt is made from", () => {
@@ -156,4 +156,12 @@ describe("components and groups", () => {
     expect(normalizeElement({ type: "group", elements: [{ type: "cube", width: -1 }] })).toMatchObject({ ok: false, error: expect.stringContaining("elements[0]") })
     expect(normalizeElement({ type: "group", elements: [{ type: "boolean-union", operands: [0, 1] }] })).toMatchObject({ ok: false, error: expect.stringContaining("boolean-union") })
   })
+})
+
+test("mesh topology and gizmo scales are validated before persistence", () => {
+  const mesh = { type: "mesh", vertices: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }], faces: [[0, 1, 2]], sourceMetadata: { format: "stl" } }
+  expect(normalizeElement(mesh).ok).toBe(true)
+  expect(normalizeElement({ ...mesh, faces: [[0, 1, 9]] }).ok).toBe(false)
+  expect(normalizeElement({ ...mesh, scale: { x: 0 } }).ok).toBe(false)
+  expect(normalizeElement({ ...mesh, scale: { x: -1 } }).ok).toBe(true)
 })

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi"
-import { Unauthorized, InternalError } from "../errors.ts"
+import { Unauthorized, NotFound, InternalError } from "../errors.ts"
 
 /**
  * Live cross-cutting event stream (vcs, pull requests, workflow runs, AI sessions). One channel
@@ -91,6 +91,8 @@ export class EventsGroup extends HttpApiGroup.make("events").add(
   HttpApiEndpoint.get("subscribe", "/api/projects/:id/events", {
     params: project,
     success: HttpApiSchema.StreamSse({ data: LiveEvent }),
-    error: [Unauthorized, InternalError]
+    // The route is authenticated by the group middleware; these are the errors the handler itself
+    // raises when the project is not visible to the caller or the bus cannot be read.
+    error: [Unauthorized, NotFound, InternalError]
   })
 ) {}

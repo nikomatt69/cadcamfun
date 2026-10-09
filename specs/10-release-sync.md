@@ -1,5 +1,10 @@
 # WP10 — Updates, packaging, CI, (deferred) sync
 
+## Rust updater lifecycle alignment (2026-10-09)
+
+WP10 follow-up: register and retrieve the same updater state type, bound/coalesce check requests, run checks serially in an async task, stop the task on application exit, check unsaved work before consuming pending updates, bound the network recheck and enforce the announced version before install. Installation errors retain the pending announcement for retry.
+
+
 Status: packaging scripts and workflow validation implemented; signed cross-platform release acceptance remains unverified and blocked by owner-supplied signing configuration. This follow-up owns only `.github/workflows/`, `scripts/`, and the Tauri resources mapping. Updater runtime and database backup behaviour remain owned by their existing agents and are not verified here.
 
 Legacy reference: `.reference/.github/workflows/desktop-build.yml`, `.reference/scripts/{build-desktop.sh,build-macos.sh,build-windows.bat,build-linux.sh}`, README "Auto-Updates" and "Distribution" sections.

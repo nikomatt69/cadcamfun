@@ -66,6 +66,8 @@ export class AiCredentials extends Context.Service<
     set(provider: ProviderId, key: Redacted.Redacted<string>, opts?: { baseUrl?: string }): Effect.Effect<void, AiConfigError>
     clear(provider: ProviderId): Effect.Effect<void>
     status: Effect.Effect<Record<ProviderId, CredentialStatus>>
+    /** Changes whenever the effective provider credentials change; used to invalidate cached AI workflows. */
+    revision: Effect.Effect<number>
     /** In-memory lookup used by `DirectModel`. */
     get(provider: ProviderId): Effect.Effect<Option.Option<StoredCredential>>
     /**
@@ -83,6 +85,7 @@ export class AiCredentials extends Context.Service<
 
   private static build(persistence?: CredentialPersistence): Layer.Layer<AiCredentials> { return Layer.sync(AiCredentials, () => {
     const store = new Map<ProviderId, StoredCredential>(persistence?.load() ?? [])
+    let revision = 0
     const persist = () => persistence?.save([...store])
     const sinks = new Set<CredentialSink>()
 
@@ -114,13 +117,15 @@ export class AiCredentials extends Context.Service<
             key,
             ...(opts?.baseUrl ? { baseUrl: opts.baseUrl.replace(/\/+$/, "") } : {})
           }
+          const previous = store.get(provider)
+          if (previous === undefined || Redacted.value(previous.key) !== Redacted.value(key) || previous.baseUrl !== credential.baseUrl) revision++
           store.set(provider, credential)
           persist()
           yield* broadcast({ _tag: "set", provider, credential })
         }),
       clear: (provider) =>
         Effect.gen(function* () {
-          store.delete(provider)
+          if (store.delete(provider)) revision++
           persist()
           yield* broadcast({ _tag: "clear", provider }).pipe(Effect.ignore)
         }),
@@ -133,6 +138,7 @@ export class AiCredentials extends Context.Service<
           CredentialStatus
         >
       }),
+      revision: Effect.sync(() => revision),
       get: (provider) => Effect.sync(() => Option.fromNullishOr(store.get(provider))),
       attach: (sink) =>
         Effect.gen(function* () {

@@ -32,6 +32,7 @@ pub const STATUS_EVENT: &str = "sidecar-status";
 const REDACTED: &str = "[redacted: line may contain credentials]";
 pub const SHUTDOWN_COMMAND: &[u8] = b"{\"event\":\"shutdown\"}\n";
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+const REAP_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 16 * 1024;
 /// Number of random bytes behind [`generate_token`].
 pub const TOKEN_LEN: usize = 32;
@@ -64,6 +65,8 @@ pub enum SidecarError {
     Failed(String),
     #[error("the sidecar is shutting down")]
     ShuttingDown,
+    #[error("the sidecar could not be stopped: {0}")]
+    ShutdownFailed(String),
 }
 
 /// Connection details handed to the webview.
@@ -437,7 +440,10 @@ async fn supervise(app: AppHandle, handle: Arc<SidecarHandle>, config: SidecarCo
             return;
         }
         log::error!(target: "sidecar", "sidecar stopped: {failure}");
-        if let Some(remaining) = restart_after_failure(&handle, &mut restarts) {
+        if !matches!(failure, SidecarError::ShutdownFailed(_))
+            && restart_after_failure(&handle, &mut restarts).is_some()
+        {
+            let remaining = MAX_RESTARTS - restarts;
             log::warn!(target: "sidecar", "restarting the sidecar ({remaining} restart(s) left)");
             handle.set_status(Some(&app), SidecarStatus::Restarting);
         } else {
@@ -529,8 +535,10 @@ async fn run_once(
         } => SidecarError::ShuttingDown,
     };
 
-    stop_child(child, &mut rx, &mut reaped_rx, &handle.token).await;
-    outcome
+    match stop_child(child, &mut rx, &mut reaped_rx, &handle.token).await {
+        Ok(()) => outcome,
+        Err(error) => error,
+    }
 }
 
 trait ChildControl {
@@ -553,9 +561,9 @@ async fn stop_child(
     rx: &mut mpsc::Receiver<ProcEvent>,
     reaped: &mut watch::Receiver<bool>,
     token: &str,
-) {
+) -> Result<(), SidecarError> {
     if *reaped.borrow() {
-        return;
+        return Ok(());
     }
     if let Err(err) = child.write(SHUTDOWN_COMMAND) {
         log::warn!(
@@ -566,16 +574,34 @@ async fn stop_child(
     if timeout(SHUTDOWN_TIMEOUT, wait_reaped(rx, reaped))
         .await
         .is_err()
+        || !*reaped.borrow()
     {
-        if let Err(err) = child.kill() {
+        let kill_error = child.kill().err();
+        if let Some(err) = &kill_error {
             log::error!(
                 "sidecar fallback kill failed: {}",
                 redact_line(&err.to_string(), token)
             );
         }
-        // The plugin owns SharedChild::wait; don't exit or restart before it reaps.
-        wait_reaped(rx, reaped).await;
+        // A dead plugin event channel must never trap the shell in an infinite wait.
+        if timeout(REAP_TIMEOUT, wait_reaped(rx, reaped))
+            .await
+            .is_err()
+            || !*reaped.borrow()
+        {
+            return Err(SidecarError::ShutdownFailed(
+                kill_error
+                    .map(|error| redact_line(&error, token).into_owned())
+                    .unwrap_or_else(|| "process exit was not confirmed after force-kill".into()),
+            ));
+        }
     }
+    if !*reaped.borrow() {
+        return Err(SidecarError::ShutdownFailed(
+            "process wait channel closed without confirming exit".into(),
+        ));
+    }
+    Ok(())
 }
 
 async fn wait_reaped(rx: &mut mpsc::Receiver<ProcEvent>, reaped: &mut watch::Receiver<bool>) {
@@ -662,13 +688,46 @@ mod tests {
         let writes = Arc::clone(&child.writes);
         let killed = Arc::clone(&child.killed);
         let (_tx, mut rx) = mpsc::channel(1);
-        stop_child(child, &mut rx, &mut reaped, "tok").await;
+        stop_child(child, &mut rx, &mut reaped, "tok")
+            .await
+            .expect("stopped");
         assert_eq!(
             *writes.lock().expect("writes"),
             vec![b"{\"event\":\"shutdown\"}\n".to_vec()]
         );
         assert!(!killed.load(Ordering::SeqCst));
         assert!(*reaped.borrow());
+    }
+
+    struct UnresponsiveChild {
+        _keep_wait_open: watch::Sender<bool>,
+    }
+
+    impl ChildControl for UnresponsiveChild {
+        fn write(&mut self, _: &[u8]) -> Result<(), String> {
+            Ok(())
+        }
+        fn kill(self) -> Result<(), String> {
+            // A failed kill leaves the process wait channel alive with no exit event.
+            std::mem::forget(self);
+            Err("kill refused".into())
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failed_kill_and_missing_exit_notification_are_bounded() {
+        let (tx, mut rx) = mpsc::channel(1);
+        drop(tx);
+        let (reaped_tx, mut reaped) = watch::channel(false);
+        let child = UnresponsiveChild {
+            _keep_wait_open: reaped_tx,
+        };
+        let started = tokio::time::Instant::now();
+        assert!(matches!(
+            stop_child(child, &mut rx, &mut reaped, "tok").await,
+            Err(SidecarError::ShutdownFailed(_))
+        ));
+        assert_eq!(started.elapsed(), SHUTDOWN_TIMEOUT + REAP_TIMEOUT);
     }
 
     #[tokio::test(start_paused = true)]
@@ -679,7 +738,9 @@ mod tests {
             let (tx, mut rx) = mpsc::channel(1);
             drop(tx);
             let started = tokio::time::Instant::now();
-            stop_child(child, &mut rx, &mut reaped, "tok").await;
+            stop_child(child, &mut rx, &mut reaped, "tok")
+                .await
+                .expect("stopped");
             assert_eq!(started.elapsed(), Duration::from_secs(2));
             assert!(killed.load(Ordering::SeqCst));
             assert!(*reaped.borrow());
@@ -693,7 +754,9 @@ mod tests {
         let writes = Arc::clone(&child.writes);
         let killed = Arc::clone(&child.killed);
         let (_tx, mut rx) = mpsc::channel(1);
-        stop_child(child, &mut rx, &mut reaped, "tok").await;
+        stop_child(child, &mut rx, &mut reaped, "tok")
+            .await
+            .expect("stopped");
         assert!(writes.lock().expect("writes").is_empty());
         assert!(!killed.load(Ordering::SeqCst));
     }

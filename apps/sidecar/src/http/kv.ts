@@ -11,12 +11,14 @@ const VALID = /^[A-Za-z0-9_.:-]{1,200}$/
 export const KvHandlers = HttpApiBuilder.group(Api, "kv", Effect.fn(function*(handlers) {
   const kv = yield* KvStore
   return handlers
-    .handle("list", ({ query }) => kv.list(query.prefix).pipe(Effect.map((entries) => ({ entries: [...entries] }))))
+    .handle("list", ({ query }) => kv.list(query.prefix).pipe(
+      Effect.map((entries) => ({ entries: [...entries] })), Effect.catchTag("KvError", fail("Failed to list key-value entries"))
+    ))
     .handle("get", ({ params }) => Effect.gen(function*() {
       const entry = yield* kv.get(params.key)
       if (!entry) return yield* new NotFound({ message: "Key not found" })
       return entry
-    }))
+    }).pipe(Effect.catchTag("KvError", fail("Failed to read the value"))))
     .handle("set", ({ params, payload }) => Effect.gen(function*() {
       if (!VALID.test(params.key)) return yield* new BadRequest({ message: "Invalid key" })
       return yield* kv.set(params.key, payload.value)

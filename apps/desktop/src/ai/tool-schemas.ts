@@ -34,12 +34,14 @@ const bounds = Schema.Struct({
   maxZ: Schema.Number.check(Schema.isFinite())
 })
 
+const positive = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))
+const nonNegative = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
 const verifyTool = Schema.Struct({
-  cuttingLength: Schema.optional(intPositive),
-  shankDiameter: Schema.optional(intPositive),
-  stickout: Schema.optional(intPositive),
-  holderDiameter: Schema.optional(intPositive),
-  holderLength: Schema.optional(intPositive)
+  cuttingLength: Schema.optional(positive),
+  shankDiameter: Schema.optional(positive),
+  stickout: Schema.optional(positive),
+  holderDiameter: Schema.optional(positive),
+  holderLength: Schema.optional(positive)
 })
 
 const verifyFixture = Schema.Struct({
@@ -61,8 +63,26 @@ const memoryKey = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]{1,80}$/)
  * `as const satisfies` union TS can't narrow).
  */
 export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
+  cam_stock: Schema.Union([Schema.Struct({ action: Schema.Literal("inspect") }), Schema.Struct({ action: Schema.Literal("set"), stock: record })]),
+  cad_inspect: Schema.Union([
+    Schema.Struct({ action: Schema.Literal("layers") }),
+    Schema.Struct({ action: Schema.Literal("elements"), ids: Schema.optional(Schema.Array(nonEmptyString)), layerId: Schema.optional(nonEmptyString), offset: Schema.optional(intNonNegative), limit: Schema.optional(intPositive) }),
+    Schema.Struct({ action: Schema.Literal("property"), elementId: nonEmptyString, path: Schema.Array(nonEmptyString), offset: Schema.optional(intNonNegative), maxChars: Schema.optional(intPositive) })
+  ]),
+  cad_component_relations: Schema.Struct({ firstId: nonEmptyString, secondId: nonEmptyString }),
+  web_search: Schema.Struct({ query: nonEmptyString, numResults: Schema.optional(intPositive.check(Schema.isLessThanOrEqualTo(8))) }),
+  attachment_read: Schema.Struct({ attachment: nonEmptyString, offset: Schema.optional(intNonNegative), maxChars: Schema.optional(intPositive.check(Schema.isLessThanOrEqualTo(20000))) }),
+  cad_parametric: Schema.Union([
+    Schema.Struct({ action: Schema.Literal("inspect"), elementId: nonEmptyString }),
+    Schema.Struct({ action: Schema.Literal("validate"), history: record }),
+    Schema.Struct({ action: Schema.Literal("create"), history: record, name: nonEmptyString, x: Schema.optional(Schema.Number), y: Schema.optional(Schema.Number), z: Schema.optional(Schema.Number), layer: Schema.optional(nonEmptyString) }),
+    Schema.Struct({ action: Schema.Literal("update"), elementId: nonEmptyString, parameters: record, expectedRevision: nonEmptyString }),
+    Schema.Struct({ action: Schema.Literal("test"), elementId: nonEmptyString, cases: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(12)) })
+  ]),
+  cad_vision: Schema.Struct({ focus: Schema.optional(Schema.String) }),
+  cam_vision: Schema.Struct({ focus: Schema.optional(Schema.String) }),
   cad_add_elements: Schema.Struct({
-    elements: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(200))
+    elements: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(40))
   }),
   cad_add_entities: Schema.Struct({
     entities: Schema.Array(Schema.Unknown).check(Schema.isMinLength(1), Schema.isMaxLength(500))
@@ -99,7 +119,7 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
   }),
   cad_check_design: empty,
   cad_import_drawing: Schema.Struct({
-    format: Schema.optional(Schema.Union([Schema.Literal("dxf"), Schema.Literal("svg"), Schema.Literal("step")])),
+    format: Schema.optional(Schema.Union([Schema.Literal("dxf"), Schema.Literal("svg"), Schema.Literal("step"), Schema.Literal("mesh")])),
     content: Schema.optional(nonEmptyString),
     attachment: Schema.optional(nonEmptyString),
     depth: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))),
@@ -123,7 +143,8 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
     params: record
   }),
   cam_suggest_parameters: Schema.Struct({
-    params: Schema.optional(record)
+    params: Schema.optional(record),
+    candidates: Schema.optional(Schema.Array(Schema.Struct({ name: nonEmptyString, params: record, toolId: Schema.optional(nonEmptyString), materialId: Schema.optional(nonEmptyString) })).check(Schema.isMinLength(1), Schema.isMaxLength(4)))
   }),
   cam_generate_gcode: Schema.Struct({
     operationId: Schema.optional(nonEmptyString),
@@ -139,8 +160,8 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
     fixtures: Schema.optional(Schema.Array(verifyFixture).check(Schema.isMaxLength(50))),
     targetSolids: Schema.optional(Schema.Array(record).check(Schema.isMaxLength(20))),
     stock: Schema.optional(bounds),
-    resolution: Schema.optional(intPositive),
-    tolerance: Schema.optional(intNonNegative)
+    resolution: Schema.optional(positive),
+    tolerance: Schema.optional(nonNegative)
   }),
   lib_lookup_material: Schema.Struct({ query: Schema.String }),
   lib_lookup_tool: Schema.Struct({ query: Schema.String }),

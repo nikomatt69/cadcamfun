@@ -1,6 +1,4 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 import { makeApp } from "./helpers.ts"
 
 let app: Awaited<ReturnType<typeof makeApp>>
@@ -13,7 +11,7 @@ describe("/api/kv", () => {
     expect((await app.call("/api/kv", { auth: false })).status).toBe(401)
   })
 
-  test("set, get, list by prefix and delete, persisted in kv.json", async () => {
+  test("set, get, list by prefix and delete through the SQLite-backed repository", async () => {
     expect((await call("/api/kv/ai.settings.model")).status).toBe(404)
     const set = await call("/api/kv/ai.settings.model", "PUT", { value: { provider: "anthropic", tier: "best" } })
     expect(set.status).toBe(200)
@@ -24,9 +22,6 @@ describe("/api/kv", () => {
     const ai = await call("/api/kv?prefix=ai.")
     expect(ai.body.entries.map((e: { key: string }) => e.key)).toEqual(["ai.memory.units", "ai.settings.model"])
     expect((await call("/api/kv")).body.entries).toHaveLength(3)
-    const file = join(app.dataDir, "kv.json")
-    expect(existsSync(file)).toBe(true)
-    expect(JSON.parse(readFileSync(file, "utf8"))["ui.theme"].value).toBe("dark")
     expect((await call("/api/kv/ui.theme", "DELETE")).body.message).toBe("Deleted")
     expect((await call("/api/kv/ui.theme", "DELETE")).status).toBe(404)
   })

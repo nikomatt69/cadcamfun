@@ -48,12 +48,18 @@ describe("AI SSE event decoder", () => {
 
 describe("AI tool catalogue (spec 08-ai.md §3)", () => {
   test("contains every locked-down tool id", () => {
-    expect(TOOL_IDS.length).toBe(22)
+    // The list below is the source of truth for duplicates: a tool that is added without being
+    // listed here fails, which is the point — the catalogue is a contract, not a growing pile.
     expect(new Set(TOOL_IDS)).toEqual(new Set([
+      "cad_parametric", "cad_vision", "cam_vision", "web_search", "attachment_read", "cad_inspect", "cad_component_relations", "cam_stock",
       "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor", "cad_delete_entities", "cad_describe_drawing", "cad_check_design", "cad_import_drawing",
       "cam_describe_machine", "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
       "lib_lookup_material", "lib_lookup_tool", "memory_remember", "memory_recall"
     ]))
+    // No tool is registered twice under the same id. (Spread first: the source list is a literal
+    // tuple, and comparing its literal length against `Set.size` would only restate the type.)
+    const ids = [...TOOL_IDS]
+    expect(ids.length).toBe(new Set(ids).size)
   })
   test("contains no nikcli shell/file/web tools (locked-down agent rule)", () => {
     expect(TOOL_IDS).not.toContain("bash")

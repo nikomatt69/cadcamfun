@@ -20,6 +20,7 @@ declare module "@nikcli-ai/sdk-next" {
     readonly title: string
     readonly output: string
     readonly metadata: Record<string, unknown>
+    readonly attachments?: ReadonlyArray<{ readonly id: string; readonly sessionID: string; readonly messageID: string; readonly type: "file"; readonly mime: string; readonly filename?: string; readonly url: string }>
   }
 
   export interface ToolDefinition {

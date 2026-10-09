@@ -66,3 +66,5 @@ export * from "./element-transform.ts"
 // Surface helpers add their own `Mesh` interface (already exported through
 // `solid.ts`); only the runtime-shaped types it owns are re-exported.
 export { chamferBox, chamferCylinderTop, chamferCylinderBottom, sweepMesh, loftMesh, shellMesh, surfaceBounds, surfaceVolume } from "./surface.ts"
+
+export * from "./scene-evidence.ts"

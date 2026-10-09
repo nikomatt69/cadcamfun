@@ -495,6 +495,17 @@ import { useElementsStore } from "../store/elementsStore.ts"
     return controlPoints;
   };
 
+/**
+ * Starts / ends a control-point drag.
+ *
+ * `applyControlPointDrag` runs on every pointer move and calls `updateElement`, so without these the
+ * canvas would push a full snapshot of the drawing into history several dozen times per drag. With
+ * them the dragging element stays live, and one step is recorded when the pointer is released.
+ */
+export const beginControlPointDrag = (): void => { useElementsStore.getState().beginEdit() }
+
+export const endControlPointDrag = (): void => { useElementsStore.getState().endEdit() }
+
 /** Applies a handle drag to the element it belongs to (`controlPoints` is the current set of handles in the scene). */
 export const applyControlPointDrag = (
   controlPoints: ReadonlyArray<THREE.Object3D>,

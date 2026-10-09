@@ -4,7 +4,7 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js"
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js"
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js"
 import { useCADStore } from "../store/cadStore.ts"
-import { useElementsStore, type Element } from "../store/elementsStore.ts"
+import { HISTORY_LIMIT, useElementsStore, type Element } from "../store/elementsStore.ts"
 import { createThreeObject } from "./createThreeObject.ts"
 
 export const HOVER_COLOR = 0x4a90e2
@@ -112,6 +112,10 @@ export interface ElementTransformFields {
   readonly translateX?: number
   readonly translateY?: number
   readonly translateZ?: number
+  /** Where the element sits; the factory bakes these into `object.position`. */
+  readonly x?: number
+  readonly y?: number
+  readonly z?: number
 }
 
 export const premultiplyObject = (object: THREE.Object3D, matrix: THREE.Matrix4): void => {
@@ -121,22 +125,59 @@ export const premultiplyObject = (object: THREE.Object3D, matrix: THREE.Matrix4)
   object.updateMatrixWorld(true)
 }
 
+const IDENTITY_QUATERNION = new THREE.Quaternion()
+
 const rotationOf = (element: ElementTransformFields) => new THREE.Quaternion().setFromEuler(new THREE.Euler(
   THREE.MathUtils.degToRad(element.rotation?.x ?? 0), THREE.MathUtils.degToRad(element.rotation?.y ?? 0), THREE.MathUtils.degToRad(element.rotation?.z ?? 0)
 ))
 
-/** Builds the Three object of an element, with the gizmo transform applied; `userData.pivot` is its centre in world space. */
-export function buildElementObject(element: Element): THREE.Object3D | null {
-  const object = createThreeObject(element)
-  if (!object) return null
-  object.updateMatrixWorld(true)
-  const box = new THREE.Box3().setFromObject(object)
-  const pivot = box.isEmpty() ? object.position.clone() : box.getCenter(new THREE.Vector3())
-  const fields = element as ElementTransformFields
-  const translate = new THREE.Vector3(fields.translateX ?? 0, fields.translateY ?? 0, fields.translateZ ?? 0)
-  const scale = new THREE.Vector3(fields.scale?.x ?? 1, fields.scale?.y ?? 1, fields.scale?.z ?? 1)
-  const rotation = rotationOf(fields)
-  if (translate.lengthSq() || scale.x !== 1 || scale.y !== 1 || scale.z !== 1 || !rotation.equals(new THREE.Quaternion())) {
+/** The element x / y / z a factory object was built at, kept so a move can be applied as a delta. */
+interface Placement {
+  readonly x: number
+  readonly y: number
+  readonly z: number
+}
+
+const placementOf = (element: ElementTransformFields): Placement => ({
+  x: Number(element.x) || 0,
+  y: Number(element.y) || 0,
+  z: Number(element.z) || 0,
+})
+
+/**
+ * Re-applies an element's placement and gizmo transform to an object whose geometry is unchanged.
+ *
+ * The factory bakes `x` / `y` / `z` into `object.position` and leaves the rest to the gizmo matrix,
+ * so both are replayed here from the pose the factory produced: the x / y / z delta as a
+ * translation, the gizmo fields as a matrix about the centre. Without this the canvas would have to
+ * rebuild the geometry to move a part, which on a large assembly means rebuilding all of it.
+ *
+ * `userData.pivot` ends up holding the centre in world space, which is what the gizmo attaches to.
+ */
+export function applyElementTransform(object: THREE.Object3D, element: ElementTransformFields): void {
+  const base = object.userData.baseMatrix as THREE.Matrix4 | undefined
+  const localPivot = object.userData.localPivot as THREE.Vector3 | undefined
+  const placedAt = object.userData.placedAt as Placement | undefined
+  if (!base || !localPivot || !placedAt) return
+
+  // Back to the factory pose first, so the transform below is applied from scratch and never compounds.
+  object.matrix.copy(base)
+  object.matrix.decompose(object.position, object.quaternion, object.scale)
+
+  const at = placementOf(element)
+  object.position.set(
+    object.position.x + at.x - placedAt.x,
+    object.position.y + at.y - placedAt.y,
+    object.position.z + at.z - placedAt.z
+  )
+
+  const translate = new THREE.Vector3(element.translateX ?? 0, element.translateY ?? 0, element.translateZ ?? 0)
+  const scale = new THREE.Vector3(element.scale?.x ?? 1, element.scale?.y ?? 1, element.scale?.z ?? 1)
+  const rotation = rotationOf(element)
+  const moved = translate.lengthSq() > 0 || scale.x !== 1 || scale.y !== 1 || scale.z !== 1 || !rotation.equals(IDENTITY_QUATERNION)
+
+  const pivot = localPivot.clone()
+  if (moved) {
     const matrix = new THREE.Matrix4()
       .makeTranslation(pivot.x + translate.x, pivot.y + translate.y, pivot.z + translate.z)
       .multiply(new THREE.Matrix4().makeRotationFromQuaternion(rotation))
@@ -144,10 +185,27 @@ export function buildElementObject(element: Element): THREE.Object3D | null {
       .multiply(new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z))
     premultiplyObject(object, matrix)
     pivot.add(translate)
+  } else {
+    object.updateMatrix()
+    object.updateMatrixWorld(true)
   }
+  object.userData.pivot = pivot
+}
+
+/** Builds the Three object of an element; `userData.pivot` is its centre in world space. */
+export function buildElementObject(element: Element): THREE.Object3D | null {
+  const object = createThreeObject(element)
+  if (!object) return null
+  object.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(object)
+  object.updateMatrix()
+  // The pose the factory produced: the baseline every later placement update is measured from.
+  object.userData.baseMatrix = object.matrix.clone()
+  object.userData.localPivot = box.isEmpty() ? object.position.clone() : box.getCenter(new THREE.Vector3())
+  object.userData.placedAt = placementOf(element as ElementTransformFields)
   object.userData.isCADElement = true
   object.userData.elementId = element.id
-  object.userData.pivot = pivot
+  applyElementTransform(object, element as ElementTransformFields)
   object.traverse((child) => {
     if (child !== object) {
       child.userData.isCADElement = true
@@ -156,6 +214,39 @@ export function buildElementObject(element: Element): THREE.Object3D | null {
     }
   })
   return object
+}
+
+/**
+ * Frees the GPU memory of an object and of everything under it, and detaches it from its parent.
+ *
+ * A factory object owns its geometry *and* its material (one `MeshStandardMaterial` per element), so
+ * dropping only the geometry leaks a shader object per element per rebuild — which is what makes a
+ * long editing session get slower and slower rather than merely slower.
+ */
+export function disposeObject(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  const textures = new Set<THREE.Texture>()
+  root.traverse((object) => {
+    const mesh = object as THREE.Mesh
+    if (mesh.geometry) geometries.add(mesh.geometry)
+    const material = mesh.material as THREE.Material | THREE.Material[] | undefined
+    for (const entry of Array.isArray(material) ? material : material ? [material] : []) materials.add(entry)
+  })
+  for (const material of materials) {
+    // Texture slots (including sprite maps) are independent WebGL allocations.
+    for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value)
+    if (material instanceof THREE.ShaderMaterial) {
+      for (const uniform of Object.values(material.uniforms)) {
+        if (uniform.value instanceof THREE.Texture) textures.add(uniform.value)
+        else if (Array.isArray(uniform.value)) for (const value of uniform.value) if (value instanceof THREE.Texture) textures.add(value)
+      }
+    }
+  }
+  for (const texture of textures) texture.dispose()
+  for (const geometry of geometries) geometry.dispose()
+  for (const material of materials) material.dispose()
+  root.removeFromParent()
 }
 
 export interface DragStart {
@@ -218,12 +309,16 @@ export function commitDrag(start: DragStart, delta: THREE.Matrix4): void {
     changes.set(item.id, { ...update, ...(rotation ? { rotation } : {}), ...(scale ? { scale } : {}) } as Partial<Element>)
   }
   if (changes.size === 0) return
+  // A finished gizmo drag is one history step (the same rule `updateElement` follows while `isEditing`).
+  useElementsStore.getState().endEdit()
   useElementsStore.setState((state) => {
     const elements = state.elements.map((element) => (changes.has(element.id) ? { ...element, ...changes.get(element.id)! } : element))
     const history = state.history.slice(0, state.currentHistoryIndex + 1)
     history.push(elements)
+    // Keep the bounded length of the undo stack: a drawing can be edited for hours.
+    const kept = history.length > HISTORY_LIMIT ? history.slice(history.length - HISTORY_LIMIT) : history
     const selected = state.selectedElement ? elements.find((element) => element.id === state.selectedElement!.id) ?? null : null
-    return { elements, selectedElement: selected, history, currentHistoryIndex: state.currentHistoryIndex + 1 }
+    return { elements, selectedElement: selected, history: kept, currentHistoryIndex: kept.length - 1 }
   })
 }
 

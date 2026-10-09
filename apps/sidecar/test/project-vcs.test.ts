@@ -5,12 +5,15 @@ import { eq } from "drizzle-orm"
 import { Effect, Layer } from "effect"
 import { ProjectVcsRepo } from "../src/repos/project-vcs-repo.ts"
 import { GitHubTransports, ProjectVcs, VcsFailure, type Actor } from "../src/services/project-vcs.ts"
+import { LocalProfile } from "../src/services/local-profile.ts"
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname
 /** The "GitHub" of these tests is a second repository; every project's remote resolves to it. */
 export const github = new Repository(memoryBackend())
 const FakeGitHub = Layer.succeed(GitHubTransports, GitHubTransports.of({ make: () => repositoryTransport(github) }))
 const Live = ProjectVcs.layer.pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(FakeGitHub), Layer.provideMerge(Database.layer({ path: ":memory:", migrationsFolder })))
+/** The runner falls back to the local profile when a run is dispatched without an explicit actor. */
+const WithLocal = LocalProfile.layer.pipe(Layer.provideMerge(Live))
 
 /** The expected VcsFailure of an effect (a DatabaseError would fail the test). */
 const failure = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -194,13 +197,13 @@ describe("WorkflowRunner", () => {
         yield* vcs.commit(project.id, { message: "init" }, actor, { ".cadcamfun/workflows/ci.yml": CI })
         expect(yield* vcs.status(project.id)).toEqual([]) // workflow files do not make the working copy dirty
         const events: string[] = []
-        const [run] = yield* runner.trigger(project.id, "main", { type: "push", branch: "main", changedPaths: [] }, (w, e) => events.push(`${w}:${e.type}`))
+        const [run] = yield* runner.trigger(project.id, "main", { type: "push", branch: "main", changedPaths: [] }, { onEvent: (w, e) => events.push(`${w}:${e.type}`), actor })
         expect(run).toMatchObject({ workflow: "ci.yml", status: "failure", event: "push" })
         expect(JSON.stringify(run!.events)).toContain("Toolpaths without G-code: t1")
         expect(events.length).toBeGreaterThan(0)
         expect(yield* runner.trigger(project.id, "main", { type: "push", branch: "dev", changedPaths: [] })).toEqual([])
         expect((yield* runner.runs(project.id)).length).toBe(1)
-      }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(Live))), Effect.scoped),
+      }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(WithLocal))), Effect.scoped),
     ))
 })
 
@@ -238,7 +241,7 @@ describe("assistant VCS tools", () => {
         const list = (yield* call("vcs_list_pull_requests", {})).value
         expect(list).toEqual([{ number: 1, title: "Widen plate", head: "ai/widen-the-plate", authorKind: "ai", reviews: [] }])
         expect((yield* vcs.pullRequest(project.id, 1)).pullRequest.state).toBe("open")
-      }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(ProjectRepo.layer), Layer.provideMerge(Live))), Effect.scoped),
+      }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(ProjectRepo.layer), Layer.provideMerge(WithLocal))), Effect.scoped),
     ))
 })
 

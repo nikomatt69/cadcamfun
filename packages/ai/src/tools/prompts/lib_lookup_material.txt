@@ -6,5 +6,7 @@ Use it
 Parameters
 - query: words from the name; an empty or very general query returns the first entries.
 
-Result (JSON): up to 10 of {id, name}, public library entries included.
+Result (JSON): up to 10 of {id, name, description, properties, updatedAt}, public library entries included.
 - No match: say so and state which material you assumed (aluminum, steel, wood, plastic, brass, titanium, composite, other are the generator's own groups).
+
+Read actual properties for the intended use (strength, hardness, density, corrosion/temperature requirements and machinability where provided). Missing properties are unknown; consult manufacturer sources with web_search, cite them and distinguish sourced values from assumptions. Never invent a material grade.

@@ -61,7 +61,7 @@ export async function makeApp(extra: Partial<AppConfig> = {}) {
       ...rest,
       headers,
       ...(json !== undefined ? { body: JSON.stringify(json) } : {})
-    }))
+    }), Context.empty())
     const buf = new Uint8Array(await res.arrayBuffer())
     const text = new TextDecoder().decode(buf)
     const isJson = (res.headers.get("content-type") ?? "").includes("json")
@@ -70,7 +70,7 @@ export async function makeApp(extra: Partial<AppConfig> = {}) {
   const cleanup = async () => { await dispose(); await Effect.runPromise(Scope.close(scope, Exit.void)); rmSync(dataDir, { recursive: true, force: true }) }
   /** `fetch` for the generated typed client: requests go straight to the in-process handler. */
   const transport = Object.assign(
-    (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => handler(new Request(input, init)),
+    (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => handler(new Request(input, init), Context.empty()),
     { preconnect: globalThis.fetch.preconnect }
   )
   return { call, dispose: cleanup, schema, Effect, dataDir, transport, toolHandlers }

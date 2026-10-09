@@ -8,13 +8,20 @@ import type { SessionUser } from "@cadcamfun/api"
 import { Context, Layer } from "effect"
 
 export class ActingUser extends Context.Service<ActingUser, {
-  /** Records the account of the chat turn that is starting. */
-  readonly set: (user: SessionUser) => void
+  /** Records the account of the chat turn that is starting, and the message that opened it. */
+  readonly set: (user: SessionUser, prompt?: string) => void
   /** The account of the last chat turn, or `fallback` (the local profile) before any. */
   readonly get: (fallback: SessionUser) => SessionUser
+  /** The message that opened the last chat turn, for the citation an AI commit carries. */
+  readonly lastPrompt: () => string | undefined
 }>()("cadcamfun/ActingUser") {
   static readonly layer = Layer.sync(ActingUser, () => {
     let current: SessionUser | undefined
-    return ActingUser.of({ set: (user) => { current = user }, get: (fallback) => current ?? fallback })
+    let prompt: string | undefined
+    return ActingUser.of({
+      set: (user, message) => { current = user; prompt = message },
+      get: (fallback) => current ?? fallback,
+      lastPrompt: () => prompt
+    })
   })
 }

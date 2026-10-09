@@ -47,11 +47,14 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/projects$/ },
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },
   // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.
+  // Reference rule for future hardening: `vcs/restore`, `vcs/commit` and `vcs/checkout` are destructive enough
+  // that a phone session should be refused them (403) and only a desktop-initiated session allowed; today the
+  // route below still matches them, so this note documents the intended next step rather than an active gate.
   { methods: ["GET", "POST"], path: /^\/api\/projects\/[^/]+\/(vcs\/(?!remote$|push$|pull$)[^/]+|pulls|actions)(\/.*)?$/ },
   // Live SSE stream of vcs / workflow / AI activity; the only push channel the phone has.
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/events$/ },
-  // Notifications (read + mark-read). The phone sees its user's activity across the desktop.
-  { methods: ["GET"], path: /^\/api\/notifications(\?.*)?$/ },
+  // Notifications (read + mark-read + delete). The phone sees its user's activity across the desktop.
+  { methods: ["GET"], path: /^\/api\/notifications\/?$/ },
   { methods: ["POST"], path: /^\/api\/notifications\/mark-all-read$/ },
   { methods: ["PUT"], path: /^\/api\/notifications\/[^/]+$/ },
   { methods: ["DELETE"], path: /^\/api\/notifications\/[^/]+$/ },

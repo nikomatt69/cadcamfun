@@ -1,4 +1,4 @@
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js"
 import { useApp } from "../state/context.ts"
 import type { Client } from "../state/client.ts"
 import type { Effect } from "effect"
@@ -9,11 +9,18 @@ export function useRead<A>(read: (client: Client) => Effect.Effect<A, unknown>) 
   const [error, setError] = createSignal<string>()
   const [loading, setLoading] = createSignal(true)
   let generation = 0
+  let closed = false
+  let controller: AbortController | undefined
+  onCleanup(() => { closed = true; generation++; controller?.abort() })
   const refetch = async () => {
+    if (closed) return
+    controller?.abort()
+    const request = new AbortController()
+    controller = request
     const current = ++generation
     setLoading(true); setError(undefined)
     try {
-      const value = await app.runtime.run(read(app.client))
+      const value = await app.runtime.run(untrack(() => read(app.client)), { signal: request.signal })
       if (current === generation) setData(() => value)
     } catch (cause) { if (current === generation) setError(String(cause)) }
     finally { if (current === generation) setLoading(false) }
@@ -38,17 +45,25 @@ export function useKeyedRead<K, A>(
   const [error, setError] = createSignal<string>()
   const [loading, setLoading] = createSignal(true)
   let generation = 0
+  let closed = false
+  let controller: AbortController | undefined
+  onCleanup(() => { closed = true; generation++; controller?.abort() })
   const refetch = async () => {
     const k = key()
     if (k === undefined || k === false) {
+      controller?.abort()
       generation += 1
       setData(undefined); setError(undefined); setLoading(false)
       return
     }
+    if (closed) return
+    controller?.abort()
+    const request = new AbortController()
+    controller = request
     const current = ++generation
     setLoading(true); setError(undefined)
     try {
-      const value = await app.runtime.run(read(app.client, k))
+      const value = await app.runtime.run(untrack(() => read(app.client, k)), { signal: request.signal })
       if (current === generation) setData(() => value)
     } catch (cause) { if (current === generation) setError(String(cause)) }
     finally { if (current === generation) setLoading(false) }

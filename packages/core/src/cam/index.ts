@@ -6,6 +6,7 @@
  * dialect-specific text; nothing in between knows about G-code words.
  */
 export * from "./ir.ts"
+export * from "./program-evidence.ts"
 export * from "./tool.ts"
 export * from "./setup.ts"
 export * from "./indexing.ts"

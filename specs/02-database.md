@@ -1,10 +1,10 @@
 # WP0 — Database (`packages/db`)
 
-Status: **done** (upgrade safety verified: 12 tests and strict package typecheck pass). Owner dir: `packages/db`.
+Status: **in progress** (adding the native `LocalKeyValue` table for persistent AI context, memory and preferences). Owner dir: `packages/db`.
 
 ## 1. What exists
 
-- `src/schema.ts` — 51 tables and 6 enums, generated once from the legacy Prisma schema by a converter (Prisma is removed from the project). Table and column names are unchanged. Mapping:
+- `src/schema.ts` — legacy application tables plus WP-owned native tables. Legacy table and column names remain unchanged. Mapping:
 
 | Prisma | Drizzle (`sqlite-core`) |
 | --- | --- |
@@ -58,9 +58,15 @@ const projects = yield* query("projects.list", (db) => db.select().from(schema.p
 
 See `01-conventions.md` §3. Every schema change ships with: updated `schema.ts`, generated migration, and a test in `database.test.ts` (or a new `*.test.ts`) covering the new constraint or default.
 
+### Native key-value persistence
+
+`LocalKeyValue` stores JSON-compatible local state (`ai.context.*`, `ai.memory.*`, UI preferences). It is accessed only through the sidecar `KvStore` repository using the shared `Database` Effect service and Drizzle. AI provider credentials remain in the owner-only credentials file and must never be stored in this table.
+
 ## 5. Change log
 
 - v1: initial import from Prisma, migration `20261004223029_careful_monster_badoon`, service + tests.
 - v2: WP0 upgrade-safety contract documented before implementation: optional backup directory, WAL-consistent last-five snapshots, atomic migration/journal rollback, and scoped shutdown; no sidecar changes required.
 - v3: finishing prior agent edits; clarify deterministic snapshot retention and busy-checkpoint cleanup before implementation and verification.
 - v3 verified: inspected installed Drizzle beta.22 reader, pending-name semantics, journal upgrade, and SQLite migrator; journal changes precede its migration transaction, requiring the atomic WP0 runner. Fixed unfinished test typing and WAL-removal assumptions. `bun test src` passes (12 tests, 56 assertions) and `bun run typecheck` passes from `packages/db`; all checks ran through monitors. No root configuration, environment files, sidecar code, or generated migrations changed.
+- AI persistence: add `LocalKeyValue` for workspace context, assistant memory and preferences; provider credentials stay outside KV storage.
+- Local KV implementation: Drizzle migration generated; the sidecar `KvStore` validates JSON-compatible writes, uses one shared SQLite connection and has memory-backed repository tests for reads, upserts, prefix listing and deletion.

@@ -48,7 +48,7 @@ const fetchStatus = Effect.fn("AiCatalog.status")(function* (client: Client) {
 })
 
 const fetchModels = Effect.fn("AiCatalog.models")(function* (client: Client) {
-  const raw = yield* client.ai.models().pipe(Effect.mapError(invalid))
+  const raw = yield* client.ai.models({ query: { configuredOnly: "true" } }).pipe(Effect.mapError(invalid))
   return raw.map((m) => ({
     id: m.id,
     provider: m.provider,

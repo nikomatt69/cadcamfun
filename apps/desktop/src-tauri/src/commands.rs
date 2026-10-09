@@ -115,8 +115,11 @@ pub fn validate_open_path(path: &str, roots: &[PathBuf]) -> Result<PathBuf, Comm
 }
 
 #[tauri::command]
-pub fn open_path(app: AppHandle, path: String) -> Result<(), CommandError> {
-    let validated = validate_open_path(&path, &open_roots(&app))?;
+pub async fn open_path(app: AppHandle, path: String) -> Result<(), CommandError> {
+    let roots = open_roots(&app);
+    let validated = tauri::async_runtime::spawn_blocking(move || validate_open_path(&path, &roots))
+        .await
+        .map_err(|e| CommandError::Io(e.to_string()))??;
     app.opener()
         .open_path(validated.to_string_lossy(), None::<&str>)
         .map_err(|e| CommandError::Io(e.to_string()))
@@ -124,17 +127,23 @@ pub fn open_path(app: AppHandle, path: String) -> Result<(), CommandError> {
 
 #[tauri::command]
 pub async fn secret_get(key: String) -> Result<Option<String>, SecretError> {
-    secrets::get(&key)
+    tauri::async_runtime::spawn_blocking(move || secrets::get(&key))
+        .await
+        .map_err(|e| SecretError::Storage(e.to_string()))?
 }
 
 #[tauri::command]
 pub async fn secret_set(key: String, value: String) -> Result<(), SecretError> {
-    secrets::set(&key, &value)
+    tauri::async_runtime::spawn_blocking(move || secrets::set(&key, &value))
+        .await
+        .map_err(|e| SecretError::Storage(e.to_string()))?
 }
 
 #[tauri::command]
 pub async fn secret_delete(key: String) -> Result<(), SecretError> {
-    secrets::delete(&key)
+    tauri::async_runtime::spawn_blocking(move || secrets::delete(&key))
+        .await
+        .map_err(|e| SecretError::Storage(e.to_string()))?
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -236,7 +245,10 @@ pub async fn save_file(
     let Some(chosen) = chosen else {
         return Ok(None);
     };
-    let path = validate_save_path(&into_path(chosen)?)?;
+    let chosen_path = into_path(chosen)?;
+    let path = tauri::async_runtime::spawn_blocking(move || validate_save_path(&chosen_path))
+        .await
+        .map_err(|e| CommandError::Io(e.to_string()))??;
     let target = path.clone();
     tauri::async_runtime::spawn_blocking(move || std::fs::write(&target, contents))
         .await

@@ -107,6 +107,21 @@ describe("companion gateway", () => {
     expect(isCompanionRoute("POST", "/api/projects/x/vcs/commit")).toBe(true)
   })
 
+  test("the live event stream and the notification feed are reachable", () => {
+    // The SSE stream is the phone's only push channel; without it the app can only be right after
+    // a manual refresh.
+    expect(isCompanionRoute("GET", "/api/projects/x/events")).toBe(true)
+    // Notifications are the user's activity feed, shared with the desktop.
+    expect(isCompanionRoute("GET", "/api/notifications")).toBe(true)
+    expect(isCompanionRoute("POST", "/api/notifications/mark-all-read")).toBe(true)
+    expect(isCompanionRoute("PUT", "/api/notifications/n1")).toBe(true)
+    expect(isCompanionRoute("DELETE", "/api/notifications/n1")).toBe(true)
+    // Creating a notification is the desktop's job, never the phone's.
+    expect(isCompanionRoute("POST", "/api/notifications")).toBe(false)
+    // The gateway's own admin surface stays unreachable.
+    expect(isCompanionRoute("GET", "/api/companion/devices")).toBe(false)
+  })
+
   test("repeated failures are rate limited", async () => {
     const g = startGateway({ certificate: cert, port: 0, upstream: () => ({ port: upstream.port!, token: "t" }), tokens: async () => [] })
     try {

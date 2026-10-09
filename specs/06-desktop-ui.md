@@ -1,5 +1,10 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Bootstrap and graphics performance alignment (2026-10-09)
+
+WP6/WP7 follow-up from `23-ai-runtime-architecture.md`: each bootstrap attempt owns late-acquired resources and cancellable network work; credentials belong to a client instance. Meshing jobs are bounded, errors/timeouts close pending work, superseded scene work is terminated, and static views avoid redundant GPU rendering. Preserve existing controls, editor behavior and display appearance. CADCanvas owns a demand-driven frame scheduler: idle scenes schedule no frames, hidden documents suspend rendering, and orbit damping wakes only until settled. Scene teardown releases owned geometries, materials and textures once and cancels pointer/fullscreen callbacks.
+
+
 Status: core flows implemented and tested (83 desktop tests). Boot/runtime with the generated typed client and the browser fake, the app shell, and the Projects, CAD, CAM, Library and Settings screens are working end to end against the contract; the 3D viewport plays back toolpaths, and the 2D editor drives the tool state machines. Remaining work is the long tail of legacy pages, which are still generated stubs rather than implemented screens.
 
 Visual status (2026-10-08): compact CAD/CAM workstation chrome implemented in WP6-owned components; geometry, state and viewport rendering remain unchanged.
@@ -102,3 +107,5 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - `src/cad/` and `src/cam/` are feature folders (editor and CAM workspace with their own stores, components and viewport code); their entry points are re-exported by `pages/cad.tsx` and `pages/cam.tsx`.
 - New logic goes in a screen or a feature folder, never in `pages/`.
 - Sessions and billing: `state/session.ts` keeps the session token (a `Ref` read per request by the client middleware, mirrored to `localStorage`) and `startSession` / `endSession` switch accounts and drop the query cache. Sign-in, sign-up (signs in right after creating the account), magic-link verification and sign-out use them; the navbar shows the acting account with Sign in / Sign out. The pricing page renders the same plan catalogue as the subscription card (`screens/plans.ts`), marks the current plan, starts the Pro trial through `POST /api/subscriptions` and says plainly when paid checkout is unavailable.
+
+Secondary resources follow nikcli ownership: queries accept cancellation through the app Effect runtime, superseded requests and unmounted views interrupt their fibers, and hidden CAD plugin panels do not fetch a registry. AI catalogue resources are loaded when their accessor is first used; connected models are preferred, and providers are sorted by configured status.

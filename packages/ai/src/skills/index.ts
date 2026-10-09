@@ -210,6 +210,140 @@ When the user wants the app to do something new (a parametric generator, a custo
 - Give a short test: the SDK has a test host, so show how to activate the plugin with it and assert what it registered.
 - If the need is a one-off model or operation, do it with the tools instead; a plugin is for something the user will repeat.`
 
+const PARAMETRIC = `# Parametric parts in cadcamfun
+
+A part the user will iterate on ("in three sizes", "depending on the part family", "we'll tune this with the customer") is one parametric element, not loose solids.
+
+## Anatomy
+
+A parametric element holds \`history: { parameters, features }\`.
+
+- \`parameters\`: named dimensions, numbers or expressions of each other (\`"half": "width / 2"\`). Cycles are rejected.
+- \`features\` run in order: \`sketch\`, \`extrude\`, \`revolve\`, \`hole\`, \`pattern\` (linear or circular). A dimension is a parameter name or an expression.
+
+## Workflow
+
+1. If the user names a quantity that will change (count, diameter, thickness, hole spacing), make it a parameter.
+2. Sketch on plane \`XY\` by default, with named lengths tied to parameters.
+3. Extrude with \`operation: "new"\`, \`direction: "up"\`, \`depth\` set to a parameter name.
+4. Add features that reference parameter names.
+5. End with \`cad_check_design\`. On \`RebuildFailed\`, read the cause, fix it, repeat.
+6. Save on an \`ai/<topic>\` branch with \`vcs_commit\` (see the version-control-cadcam skill).
+
+## Editing later
+
+- Resize: \`cad_modify_entities\` with \`changes: { parameters: { width: 70 } }\`. Features stay.
+- Add a feature: append it to the same parametric's history.
+- Rewrite the whole history only when the user asks. It is destructive.
+
+## When not to use parametric
+
+- One-off solids the user will not dimension-drive.
+- Expressions that chain beyond about ten steps. Split the part.
+
+## Limitations
+
+- No fillet, shell or pattern-along-path features yet. Use mesh chamfers (\`cad_add_elements\`, \`chamferBox\`) separately.`
+
+const COMPOSED_CAM = `# Composing CAM programs
+
+A real part has many operations. Plan them in this order and do not skip ahead.
+
+1. Probe the work offset (\`cam_create_operation\` with \`type: "probing"\`). Use the result as the zero.
+2. Face the top (\`face\`) to establish a reference plane.
+3. Rough (\`roughing\` or \`adaptive\`), leaving a small allowance (0.1 to 0.3 mm).
+4. Rest-machine what the big tool could not reach (\`rest\`) with a smaller tool.
+5. Finish (\`parallel\`, \`waterline\` or \`scallop\`), climb milling, stepover 5 to 15 percent of the diameter.
+6. Drill before tapping or thread milling (\`drill\`, peck cycle for deep holes).
+7. Chamfer or engrave last.
+8. Indexing (3+2) only after the bulk is removed.
+
+## Picking an operation
+
+- Closed outline, outside a part: \`profile\`.
+- Closed outline, inside a recess: \`pocket\`.
+- Hole pattern: \`drill\` (peck when depth is at least 3 times the diameter; pilot above 12 mm).
+- Curved face: \`parallel\` for a uniform zig-zag, \`waterline\` for constant Z, \`scallop\` for constant cusp, \`pencil\` to blend.
+- Deep pockets: \`adaptive\` then \`rest\`.
+- Lathe body: \`facing\`, then \`turning_od\`, then \`parting\`; \`threading_od\` if needed.
+
+## Picking a tool
+
+Use \`lib_lookup_tool\`. Confirm the cutter radius fits the smallest inside radius, the cutting length covers the depth, and RPM stays under both the tool and machine maximum.
+
+## Setups
+
+A flip is a new setup with its own stock, origin, work offset, fixtures and tools. Never reuse the first setup's depths.
+
+## Verifying each operation
+
+For every operation: \`cam_generate_gcode\`, then \`cam_analyze_gcode\`, then \`cam_verify_toolpath\`. Fix by cause, regenerate, verify again. After three rounds on the same finding, report the blocker. Report what was modelled; never write "safe".`
+
+const VERSION_CONTROL = `# Version control for the agent
+
+The cadcam agent edits on an \`ai/<topic>\` branch and opens a pull request. A person reviews and merges.
+
+## Order of operations
+
+1. \`vcs_status\`: branch, dirty files, open pull requests.
+2. Start a change on an \`ai/<topic>\` branch. Do not edit on a dirty working copy.
+3. Make the CAD and CAM edits.
+4. Commit with a short imperative message saying what and why.
+5. Open the pull request with a title and body. This triggers the \`pullRequest\` workflows.
+
+## Refused actions
+
+- Commit, restore or merge on \`main\` for an AI actor.
+- Merging a pull request whose latest verdict is \`request-changes\`.
+- Pushing to GitHub: a person does that.
+
+## Diff
+
+\`vcs_diff\` returns entity-level changes (property path, before, after). Read it before writing the pull request body.
+
+## Restore
+
+\`vcs_restore_paths\` rolls named ids back to an earlier commit on the current \`ai/*\` branch. Use it when a \`RebuildFailed\` is faster to revert than to repair. Not available on \`main\`.`
+
+const WORKFLOWS_CAM = `# Workflows in cadcamfun
+
+A \`.cadcamfun/workflows/*.yml\` file defines one workflow. Triggers (\`on:\`) are \`push\`, \`pullRequest\` or \`manual\`. Jobs run steps in order; a step may read an earlier step's outputs with \`\${{ steps.<id>.outputs.<key> }}\`.
+
+## Registered steps
+
+- \`project/validate\`: every entity JSON parses, its id matches the file name, and it has a name.
+- \`project/require-gcode\`: every toolpath has committed G-code.
+- \`cam/verify\`: replays each program through the verifier; fails on errors.
+- \`cam/gcode\`: regenerates each program from its stored request and compares with the committed G-code; fails when stale.
+
+An unknown \`uses:\` fails the workflow before any step runs.
+
+## Dispatching
+
+- \`actions_run\` runs the manual workflows on the checked-out branch and returns their run ids.
+- \`pullRequest\` workflows fire when a pull request is opened.
+- \`push\` workflows fire on commit.
+
+## Example
+
+\`\`\`yaml
+name: validate-and-cut
+on:
+  push: { branches: [main, "ai/**"], paths: ["toolpaths/**"] }
+  pullRequest: { branches: [main] }
+jobs:
+  qa:
+    steps:
+      - id: v  uses: project/validate
+      - id: rg uses: cam/gcode
+      - id: vf uses: cam/verify
+      - id: m  uses: project/require-gcode
+\`\`\`
+
+## Reading a run
+
+Each run reports job-start, step and job-end events. A step has \`uses\`, a status (\`success\`, \`failure\` or \`skipped\`), and an optional message and outputs. A failing step never hides the verdict of the steps before it.`
+
 export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cad-3d-modeling", description: `Model 3D and 2D geometry in the open editor (${Object.keys(ELEMENT_SPECS).length} element types): conventions, recipes for common parts, how to build complex objects.`, category: "cad", tags: ["cad", "3d", "modeling"], body: MODELING },
   { name: "cam-operation-workflow", description: "The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.", category: "cam", tags: ["cam", "workflow", "gcode"], body: WORKFLOW },
@@ -220,6 +354,10 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "machines-and-axes", description: "Mill, lathe and 3D printer: what turns, the sense of every axis, zeros and work offsets, touch probes and tool setters, and how to check a program against its machine.", category: "cam", tags: ["machines", "axes", "origin", "probing"], body: MACHINES },
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: DRAWINGS },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: PLUGINS },
+  { name: "parametric-design", description: "When and how to build a parametric element: named dimensions, expressions, when to choose parametric over loose solids, how to edit later.", category: "cad", tags: ["cad", "parametric", "dimensions"], body: PARAMETRIC },
+  { name: "composed-cam-programs", description: "Compose CAM programs with several operations: sequencing, stock carry-over, multi-setup, lathe plus mill, verification per operation.", category: "cam", tags: ["cam", "workflow", "milling", "lathe"], body: COMPOSED_CAM },
+  { name: "version-control-cadcam", description: "How the agent uses the git-style version control: branches, commits, pull requests and the rules that keep AI writes safe.", category: "vcs", tags: ["vcs", "branches", "pr"], body: VERSION_CONTROL },
+  { name: "workflows-cadcam", description: "How the agent uses the Actions-style workflows: YAML shape, registered uses steps, interpolation, and when to dispatch manually.", category: "workflows", tags: ["workflows", "actions", "automation"], body: WORKFLOWS_CAM },
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: SETUP }
 ]
 

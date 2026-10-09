@@ -27,7 +27,9 @@ export function getEndpoint(): Promise<Endpoint> {
     if (!baseUrl || !token) throw new Error("Set VITE_SIDECAR_URL and VITE_SIDECAR_TOKEN to run outside Tauri")
     return { baseUrl, token }
   })()
-  return cached
+  const pending = cached
+  void pending.catch(() => { if (cached === pending) cached = undefined })
+  return pending
 }
 
 /** Re-resolve the endpoint (the shell restarts the sidecar on a new port after a crash). */

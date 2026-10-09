@@ -8,6 +8,14 @@
  * types `cad_add_elements` accepts.
  */
 import { elementCatalogueLines } from "../../element-catalog.ts"
+import cad_inspect from "./cad_inspect.txt" with { type: "text" }
+import cam_stock from "./cam_stock.txt" with { type: "text" }
+import cad_component_relations from "./cad_component_relations.txt" with { type: "text" }
+import web_search from "./web_search.txt" with { type: "text" }
+import attachment_read from "./attachment_read.txt" with { type: "text" }
+import cad_vision from "./cad_vision.txt" with { type: "text" }
+import cam_vision from "./cam_vision.txt" with { type: "text" }
+import cad_parametric from "./cad_parametric.txt" with { type: "text" }
 import cad_add_elements from "./cad_add_elements.txt" with { type: "text" }
 import cad_add_entities from "./cad_add_entities.txt" with { type: "text" }
 import cad_check_design from "./cad_check_design.txt" with { type: "text" }
@@ -32,6 +40,9 @@ import memory_recall from "./memory_recall.txt" with { type: "text" }
 import memory_remember from "./memory_remember.txt" with { type: "text" }
 
 const PROMPTS = {
+  cam_stock,
+  cad_component_relations,
+  cad_inspect, web_search, attachment_read, cad_vision, cam_vision, cad_parametric,
   cad_add_elements,
   cad_add_entities,
   cad_check_design,

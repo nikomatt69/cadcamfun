@@ -8,6 +8,7 @@ export const NotificationRow = Schema.Struct({
   title: Schema.String, content: Schema.String, isRead: Schema.Boolean, createdAt: Schema.String,
   userId: Schema.String, organizationId: nullable, projectId: nullable, componentId: nullable, messageId: nullable, linkUrl: nullable
 })
+export type NotificationRow = typeof NotificationRow.Type
 export const NotificationUpdate = Schema.Struct({ isRead: Schema.Boolean })
 const id = { id: Schema.String }
 export class NotificationsGroup extends HttpApiGroup.make("notifications")

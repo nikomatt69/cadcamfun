@@ -1,5 +1,10 @@
 # WP9 — Plugin system (`packages/plugin-sdk`, `apps/sidecar/src/plugins`)
 
+## Worker RPC lifecycle alignment (2026-10-09)
+
+WP9 follow-up: correlate requests and replies, clean timeout/listener resources on interruption, settle all pending calls when a worker closes, guard admission after disposal, and scope Worker termination to the host layer. A post failure is a typed error. Real Worker bootstrap must announce readiness before host sends activation, because top-level asynchronous plugin loading can otherwise drop messages.
+
+
 Status: in progress. **SDK done** (`packages/plugin-sdk`: capabilities, manifest Schema, context, `definePlugin`, `createTestHost`, `examples/hello-gear`, 26 tests). Host (`apps/sidecar/src/plugins/`) not started — needs WP3 contract and WP4 skeleton.
 
 Legacy reference (behaviour only): `.reference/src/plugins/sdk/` (types, validation, templates, CLI), `.reference/src/plugins/core/{host,registry,api,messaging}/`, `.reference/src/server/storage/DatabasePluginStorage.ts`.
@@ -80,3 +85,7 @@ Public, versioned, dependency-light package that plugin authors import.
     `Program` into text). The "installed through the sidecar HTTP API" part of §6
     still needs the WP4 host.
 - HTTP group (`/api/plugins/*`) implemented in `apps/sidecar/src/http/plugins.ts`. It serves the **legacy browser-side plugin system** (legacy manifest with `main`/`permissions`, zip install, `bootstrap.js`, `serve`) over `PluginRegistryRepo`, with files under `<dataDir>/storage/plugins/<id>/`. It is independent of the worker host above: both use the `PluginRegistryEntry` table and each skips rows whose manifest it cannot decode. Deviations from legacy: unknown plugin → 404 (legacy answered 500 because it never set the error code), duplicate install → 409, invalid manifest → 400, `PUT/PATCH /update` applies `{ manifest, config }` (legacy passed the raw body to a lifecycle that required a package path), and the registry folder is `<dataDir>/plugins-registry`. Still open: exposing the SDK host (`PluginHost`) over HTTP for §6 (`hello-gear` end to end).
+
+Plugin lifecycle failures preserve the typed `reason` and expose the same text as `Error.message`, so rejected promises and UI error boundaries report the closed-host cause rather than an empty error. This changes no plugin capabilities or lifecycle permission checks.
+
+Worker RPC admission is bounded to 64 in-flight requests per plugin. Host disposal settles all outstanding requests immediately, including injected worker implementations that do not emit a crash on termination.

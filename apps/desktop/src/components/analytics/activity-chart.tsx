@@ -60,7 +60,7 @@ const formatDate = (date: string, groupBy: string): string => {
 export function ActivityChart(props: ActivityChartProps): JSX.Element {
   const groupBy = props.groupBy ?? "day"
   const metric: ChartMetric = props.metric ?? "activityCount"
-  const chartType = props.chartType ?? "line"
+  const chartType = () => props.chartType ?? "line"
 
   const reply = useRead((client) => client.analytics.userMetrics({
     query: {
@@ -150,7 +150,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
                   }}
                 </For>
 
-                <Show when={chartType === "bar"} fallback={
+                <Show when={chartType() === "bar"} fallback={
                   <polyline
                     fill="none"
                     stroke={color}
@@ -172,7 +172,7 @@ export function ActivityChart(props: ActivityChartProps): JSX.Element {
                   </For>
                 </Show>
 
-                <Show when={chartType === "line"}>
+                <Show when={chartType() === "line"}>
                   <For each={plot().rows}>
                     {(_, index) => (
                       <circle cx={plot().x(index())} cy={plot().y(plot().values[index()] ?? 0)} r="3" fill={color} />

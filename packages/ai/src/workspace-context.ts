@@ -62,6 +62,12 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
     `Units: tool calls in mm; the user reads ${unitLabel(str(s["displayUnits"]))}. Drawing tolerance ${tolerance === undefined ? "not set" : `${n(tolerance)} mm (${n(tolerance * 1000)} µm)`}, ${n(s["decimals"])} decimals shown. View: ${str(s["viewMode"]) ?? "?"}.`
   )
 
+  const coordinates = rec(s["coordinateSystem"])
+  if (Object.keys(coordinates).length > 0) {
+    const origin = rec(coordinates["originOffset"])
+    lines.push(`Coordinates: ${str(coordinates["axes"]) ?? "right-handed XYZ; Z up"}; CAD origin offset (${n(origin["x"])}, ${n(origin["y"])}, ${n(origin["z"])}) mm. Element positions are drawing coordinates; inspect full transforms with cad_inspect. Rotation properties use ${str(coordinates["elementRotationUnit"]) ?? "degrees"}.`)
+  }
+
   // 2. Selection.
   const selectedIds = arr(s["selectedIds"]).map(String)
   const total = num(s["totalElementCount"]) ?? arr(s["elements"]).length
@@ -70,7 +76,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   if (layers.length > 0) lines.push(`Layers: ${layers.map((l) => `${String(l["name"])}${l["visible"] === false ? " (hidden)" : ""}${l["locked"] === true ? " (locked)" : ""}`).join(", ")}; active ${str(s["activeLayer"]) ?? "?"}.`)
   const stock = rec(s["workpiece"])
   if (Object.keys(stock).length > 0 && num(stock["width"]) !== undefined) {
-    lines.push(`Stock: ${n(stock["width"])}×${n(stock["height"])}×${n(stock["depth"] ?? stock["thickness"])} mm.`)
+    lines.push(`Stock: ${n(stock["width"])}×${n(stock["height"])}×${n(stock["depth"] ?? stock["thickness"])} mm; XY centre (${n(stock["x"])}, ${n(stock["y"])}), top Z ${n(stock["topZ"])} mm${str(stock["material"]) ? `; material ${String(stock["material"])}` : ""}. Missing coordinates require cam_stock inspection.`)
   }
 
   // 3. Machining.

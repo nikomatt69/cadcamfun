@@ -6069,6 +6069,8 @@ var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
 // packages/core/src/cad/element-transform.ts
 var DEG = Math.PI / 180;
+// packages/core/src/cad/scene-evidence.ts
+var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible", "locked", "selected", "color", "opacity", "wireframe", "linewidth", "originalData"]);
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));

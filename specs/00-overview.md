@@ -48,7 +48,7 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 
 | WP | Name | Owns | Spec | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| WP0 | Database | `packages/db` | `02-database.md` | — | **done** (schema generated from Prisma, migration, `Database` layer, tests) |
+| WP0 | Database | `packages/db` | `02-database.md` | — | **in progress** (adding `LocalKeyValue` for persistent AI context and preferences) |
 | WP1 | CAD geometry core | `packages/core/src/cad` | `03-core-cad.md` | — | **done** (288 core tests incl. WP2) |
 | WP2 | CAM + G-code core | `packages/core/src/cam` | `04-core-cam.md` | WP1 (types only) | **done** (3 posts, goldens, regression tests for all legacy bugs) |
 | WP3 | Shared API contract | `packages/api` | `05-api-sidecar.md` | WP1, WP2 schemas | **in progress** — 67/195 legacy route files in the contract (`bun run --filter @cadcamfun/api coverage`) |

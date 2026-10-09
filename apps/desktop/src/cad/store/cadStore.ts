@@ -28,6 +28,8 @@ interface MachineConfig {
 }
 
 interface Workpiece {
+  configured?: boolean;
+  x?: number; y?: number; topZ?: number; allowance?: number;
   width: number;
   height: number;
   depth: number;
@@ -142,6 +144,7 @@ export const useCADStore = create<CADState>((set, get) => ({
     set((state) => ({
       workpiece: {
         ...state.workpiece,
+        configured: false,
         width: element.width || state.workpiece.width,
         height: element.height || state.workpiece.height,
         depth: element.depth || state.workpiece.depth,

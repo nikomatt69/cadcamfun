@@ -1,9 +1,17 @@
+import { camStock } from "./cam_stock.ts"
+import { cadComponentRelations } from "./cad_component_relations.ts"
+import { cadInspect } from "./cad_inspect.ts"
 /**
  * The tool registry: every tool the `cadcam` agent may call, in the order the model sees them. A tool is added by writing
  * its `tools/<id>.ts` and `tools/prompts/<id>.txt` and listing it here; extension tools (`ToolDefinition`s from outside
  * this package) are passed to `buildTools` and registered next to these.
  */
 import type { HostToolSpec } from "../nikcli/runtime.ts"
+import { attachmentRead } from "./attachment_read.ts"
+import { webSearch } from "./web_search.ts"
+import { cadVision } from "./cad_vision.ts"
+import { camVision } from "./cam_vision.ts"
+import { cadParametric } from "./cad_parametric.ts"
 import { cadAddElements } from "./cad_add_elements.ts"
 import { cadAddEntities } from "./cad_add_entities.ts"
 import { cadCheckDesign } from "./cad_check_design.ts"
@@ -30,7 +38,7 @@ import { memoryRecall } from "./memory_recall.ts"
 import { memoryRemember } from "./memory_remember.ts"
 
 export const BUILT_IN_TOOLS = [
-  cadAddEntities, cadAddElements, cadImportDrawing, cadModifyEntities, cadTransformEntities, cadGroupEntities, cadEditor, cadDeleteEntities, cadDescribeDrawing, cadCheckDesign,
+  camStock, cadComponentRelations, cadInspect, webSearch, attachmentRead, cadVision, camVision, cadParametric, cadAddEntities, cadAddElements, cadImportDrawing, cadModifyEntities, cadTransformEntities, cadGroupEntities, cadEditor, cadDeleteEntities, cadDescribeDrawing, cadCheckDesign,
   camDescribeMachine, camCreateOperation, camListOperations, camUpdateOperation, camSuggestParameters, camGenerateGcode, camAnalyzeGcode, camVerifyToolpath,
   libLookupMaterial, libLookupTool, memoryRemember, memoryRecall
 ] as const

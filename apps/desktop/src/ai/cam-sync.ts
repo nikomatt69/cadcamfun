@@ -6,6 +6,9 @@
  * (and the program in the preview), and its verification report in the Verify tab, so the user sees the same thing
  * the assistant is talking about.
  */
+import { cam as coreCam } from "@cadcamfun/core"
+import { Schema } from "effect"
+import { useCADStore } from "../cad/store/cadStore.ts"
 import type { AppState } from "../state/context.ts"
 import { makeToolpathGenerator, type VerifyResponse } from "../cam/api/generator.ts"
 import { useCamStore } from "../cam/store/camStore.ts"
@@ -40,6 +43,20 @@ interface OperationRow {
 
 /** Reads the operation back and mirrors it into the CAM stores. Best effort: a failure leaves the page as it was. */
 export async function mirrorCamResult(app: AppState, tool: string, input: unknown, output: string): Promise<boolean> {
+  if (tool.endsWith("cam_stock")) {
+    const result = parse(output)
+    if (result["ok"] !== true || result["action"] !== "set") return false
+    const stock = Schema.decodeUnknownSync(coreCam.generator.StockSchema)(result["stock"])
+    useCADStore.getState().setWorkpiece({ ...useCADStore.getState().workpiece, ...stock, configured: true, material: stock.material ?? "", elementId: stock.elementId })
+    useCamStore.getState().setWorkpiece({ x: stock.width, y: stock.height, z: stock.depth })
+    useCamStore.getState().setStockAllowance(stock.allowance)
+    useCamStore.getState().setSelectedWorkpieceElementId(stock.elementId ?? null)
+    useCamStore.getState().setGcode("")
+    useGeneratorStore.getState().setResult("", [])
+    useCamStore.getState().setProgram(coreCam.makeProgram("untitled", [], {}))
+    useVerifyStore.getState().reset()
+    return true
+  }
   const kind = toolOf(tool)
   if (kind === undefined) return false
   const id = operationIdOf(tool, input, output)
@@ -49,10 +66,17 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
     const settings = row.data?.request?.settings
     // Set directly: the panel's own `replaceSettings` would re-apply material presets over the assistant's values.
     if (settings !== undefined) useGeneratorStore.setState({ settings })
-    if (kind === "cam_create_operation" || kind === "cam_update_operation") return settings !== undefined
+    const cam = useCamStore.getState()
+    cam.setSelectedOperationId(id)
+    if (kind === "cam_create_operation" || kind === "cam_update_operation") {
+      cam.setGcode("")
+      cam.setProgram(coreCam.makeProgram("untitled", [], {}))
+      useGeneratorStore.getState().setResult("", [])
+      useVerifyStore.getState().reset()
+      return settings !== undefined
+    }
     const gcode = row.gcode ?? ""
     if (gcode.trim() === "") return settings !== undefined
-    const cam = useCamStore.getState()
     cam.setGcode(gcode)
     useGeneratorStore.getState().setResult(gcode, [])
     const parsed = await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode))

@@ -1,0 +1,9 @@
+Inspect or set the real raw stock for the current drawing and machining operations. Stock is separate from finished part geometry. Do not estimate removed material by subtracting unrelated element bounding boxes.
+
+Parameters
+- action: inspect | set.
+- stock: set requires width (X), height (Y), depth (Z thickness), all positive mm; x and y are stock centre in CAD coordinates (default 0), topZ is the top face (default 0). Stock occupies Z from topZ-depth to topZ.
+- radius: optional cylindrical-stock hint (default 0); allowance: nominal allowance mm, default 1; material: material name; elementId: optional existing element used as a reference.
+
+Result
+inspect returns configured stock, origin conventions and volume in mm³ or an explicit missing-stock result. set updates the drawing stock, preserves all finished elements, invalidates G-code/verification of affected operations and mirrors dimensions and placement into the UI. Re-generate and run cam_verify_toolpath before claiming a program is valid. The verifier returns stockVolume, removedVolume and remainingVolume at its actual resolution; holders, fixtures and target must be provided for their checks. A cylindrical hint is not a cylindrical-stock simulation (the verifier uses a box heightfield).

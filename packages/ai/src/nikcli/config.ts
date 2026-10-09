@@ -29,7 +29,7 @@ export interface HostProviderSpec {
   readonly name: string
   readonly protocol: HostProtocol
   readonly baseURL: string
-  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string; readonly context: number; readonly output: number }>
+  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string; readonly context: number; readonly output: number; readonly vision?: boolean; readonly pdf?: boolean }>
 }
 
 const PROTOCOLS: Readonly<Record<BuiltinProviderId, { name: string; protocol: HostProtocol; baseURL: string }>> = {
@@ -49,7 +49,7 @@ export const defaultProviderSpecs = (baseUrls: Partial<Record<BuiltinProviderId,
       protocol: p.protocol,
       baseURL: baseUrls[id] ?? p.baseURL,
       // nikcli asks a model for min(its output limit, 32 000) tokens: a long cad_add_elements call needs room to be written.
-      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, context: m.contextWindow, output: 32_000 }))
+      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, context: m.contextWindow, output: 32_000, vision: m.vision, pdf: id === "anthropic" || m.id.startsWith("anthropic/") }))
     }
   })
 
@@ -83,6 +83,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   const permission: Record<string, "allow" | "deny" | "ask"> = { "*": "deny" }
   for (const id of input.toolIds) permission[id] = "allow"
   permission["invalid"] = "allow"
+  permission["search_tools"] = "allow"
   // The playbooks in `skills/index.ts`: loading one only reads text this package wrote.
   permission["skill"] = "allow"
   // The plan the agent keeps while it works (nikcli's own todo list): data only, nothing it can run.
@@ -114,7 +115,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
       models: Object.fromEntries(
         p.models.map((m) => [
           m.id,
-          { name: m.name, tool_call: true, limit: { context: m.context, output: m.output } }
+          { name: m.name, tool_call: true, ...(m.vision !== undefined || m.pdf !== undefined ? { attachment: m.vision === true || m.pdf === true, modalities: { input: ["text", ...(m.vision ? ["image"] : []), ...(m.pdf ? ["pdf"] : [])], output: ["text"] } } : {}), limit: { context: m.context, output: m.output } }
         ])
       )
     }

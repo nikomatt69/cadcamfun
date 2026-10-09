@@ -1,4 +1,4 @@
-import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiBackground, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -30,7 +30,6 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const ai = yield* AiService
   const credentials = yield* AiCredentials
   const actingUser = yield* ActingUser
-  const background = yield* Effect.serviceOption(AiBackground)
   const host = yield* Effect.serviceOption(AiHost)
   const { query } = yield* Database
   const kv = yield* KvStore
@@ -50,7 +49,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
 
   const status = Effect.gen(function*() {
     const providers = yield* credentials.status
-    return { providers, configured: Object.values(providers).includes("configured"), host: Option.isSome(host) ? "nikcli" as const : "direct" as const }
+    return { providers, configured: Object.values(providers).includes("configured"), host: Option.isSome(host) ? "nikcli" as const : "direct" as const, ...(Option.isSome(host) ? { tools: host.value.runtime.toolCatalogue() } : {}) }
   })
   /**
    * The provider catalogue: it gates what may be saved as a key and feeds the settings
@@ -66,10 +65,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     const parts: string[] = []
     if (payload.context?.trim()) parts.push(payload.context.trim())
     if (payload.projectId) {
-      const stored = yield* kv.get(`ai.context.${payload.projectId}`)
+      const stored = yield* kv.get(`ai.context.${payload.projectId}`).pipe(
+        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI context", error).pipe(Effect.as(undefined)))
+      )
       if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
     }
-    const memory = yield* kv.list("ai.memory.")
+    const memory = yield* kv.list("ai.memory.").pipe(
+      Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI notes", error).pipe(Effect.as([])))
+    )
     const notes = renderNotes(memory.map((m) => ({ key: m.key.slice("ai.memory.".length), value: m.value })).reverse())
     if (notes !== "") parts.push(notes)
     return parts.join("\n\n")
@@ -84,20 +87,67 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (!knownProvider(payload.provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
       if (!payload.key || !payload.key.trim()) return yield* new BadRequest({ message: "API key is required" })
       yield* credentials.set(payload.provider, Redacted.make(payload.key), payload.baseUrl ? { baseUrl: payload.baseUrl } : undefined)
+      yield* ai.invalidateCatalogue
       return yield* status
     }).pipe(Effect.catchTag("AiConfigError", (e) => Effect.fail(new BadRequest({ message: e.message })))))
     .handle("clearCredentials", ({ params }) => Effect.gen(function*() {
       const known = yield* catalogue
       if (!knownProvider(params.provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
       yield* credentials.clear(params.provider)
+      yield* ai.invalidateCatalogue
       return yield* status
     }))
     .handle("status", () => status)
-    .handle("models", () => ai.models.pipe(
-      Effect.map((m) => [...m]),
+    .handle("models", ({ query }) => (query.configuredOnly === "true" ? ai.availableModels : ai.models).pipe(
+      Effect.map((models) => [...models]),
       Effect.mapError((e) => new InternalError({ message: e.message }))
     ))
     .handle("providers", () => catalogue.pipe(Effect.map((list) => [...list])))
+    .handle("prompts", ({ query }) => Effect.succeed({ prompts: ai.suggestedFor(query.mode ?? "general") }))
+    .handle("title", ({ payload }) => Effect.gen(function*() {
+      if (!payload.excerpt?.trim()) return yield* new BadRequest({ message: "Conversation excerpt is required" })
+      const result = yield* ai.suggestTitle({ excerpt: payload.excerpt, ...(payload.model ? { model: payload.model } : {}) })
+        .pipe(Effect.mapError(() => new InternalError({ message: "Unable to generate a title" })))
+      return result
+    }))
+    .handle("designAnalysis", ({ payload }) => Effect.gen(function*() {
+      if (!payload.description?.trim()) return yield* new BadRequest({ message: "Design description is required" })
+      return yield* ai.analyzeDesign({
+        description: payload.description,
+        ...(payload.layer !== undefined ? { layer: payload.layer } : {}),
+        ...(payload.machine !== undefined ? { machine: payload.machine } : {}),
+        ...(payload.model ? { model: payload.model } : {})
+      }).pipe(Effect.mapError(() => new InternalError({ message: "Unable to analyze the design" })))
+    }))
+    .handle("machiningParameters", ({ payload }) => Effect.gen(function*() {
+      if (!payload.material?.trim() || !payload.tool?.trim() || !payload.operation?.trim()) {
+        return yield* new BadRequest({ message: "Material, tool, and operation are required" })
+      }
+      return yield* ai.recommendMachiningParameters({
+        material: payload.material, tool: payload.tool, operation: payload.operation,
+        ...(payload.machine !== undefined ? { machine: payload.machine } : {}),
+        ...(payload.model ? { model: payload.model } : {})
+      }).pipe(Effect.mapError(() => new InternalError({ message: "Unable to recommend machining parameters" })))
+    }))
+    .handle("gcodeOptimization", ({ payload }) => Effect.gen(function*() {
+      if (!payload.gcode?.trim()) return yield* new BadRequest({ message: "G-code is required" })
+      return yield* ai.optimizeGcode({
+        gcode: payload.gcode,
+        ...(payload.material !== undefined ? { material: payload.material } : {}),
+        ...(payload.machineType !== undefined ? { machineType: payload.machineType } : {}),
+        ...(payload.constraints !== undefined ? { constraints: payload.constraints } : {}),
+        ...(payload.model ? { model: payload.model } : {})
+      }).pipe(Effect.mapError(() => new InternalError({ message: "Unable to optimize G-code" })))
+    }))
+    .handle("designSuggestions", ({ payload }) => Effect.gen(function*() {
+      if (!payload.elements?.trim()) return yield* new BadRequest({ message: "Design elements are required" })
+      return yield* ai.summarizeDesignSuggestions({
+        elements: payload.elements,
+        ...(payload.currentOperation !== undefined ? { currentOperation: payload.currentOperation } : {}),
+        ...(payload.currentTool !== undefined ? { currentTool: payload.currentTool } : {}),
+        ...(payload.model ? { model: payload.model } : {})
+      }).pipe(Effect.mapError(() => new InternalError({ message: "Unable to generate design suggestions" })))
+    }))
     .handle("chat", ({ payload }) => Effect.gen(function*() {
       if (!payload.messages || !Array.isArray(payload.messages)) return yield* new AiBadRequest({ error: "Messages are required and must be an array" })
       let mcpData: string | undefined
@@ -118,7 +168,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
       // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
-      actingUser.set(yield* CurrentUser)
+      actingUser.set(yield* CurrentUser, payload.message)
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
@@ -141,19 +191,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }))
     .handle("removeSession", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
-      yield* ai.abort(payload.sessionId)
-      // Stop any background workers owned by this parent session; the wake
-      // path will then see the host session is gone and fail to deliver.
-      if (Option.isSome(background)) {
-        yield* background.value.cancelForParent(payload.sessionId).pipe(Effect.orElseSucceed(() => 0))
-      }
-      if (!Option.isSome(host)) return { removed: false }
-      const removed = yield* Effect.promise(async () => {
-        try {
-          const projectHost = await Effect.runPromise(host.value.runtime.host(payload.projectId ?? "default"))
-          return await projectHost.client.session.remove({ sessionID: payload.sessionId })
-        } catch { return false }
-      })
+      const removed = yield* ai.removeSession(payload.sessionId, payload.projectId)
       return { removed }
     }))
     .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))

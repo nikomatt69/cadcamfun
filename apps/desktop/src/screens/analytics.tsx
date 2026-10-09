@@ -121,7 +121,7 @@ export function AnalyticsScreen(): JSX.Element {
   }
 
   const rangeKey = (): string => `${dayInput(dateRange().startDate)}|${dayInput(dateRange().endDate)}`
-  const chartsKey = (): string => `${rangeKey()}|${selectedMetric()}|${chartType()}`
+  const chartsKey = (): string => `${rangeKey()}|${selectedMetric()}`
 
   return (
     <WorkspacePage

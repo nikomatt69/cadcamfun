@@ -1,5 +1,10 @@
 # WP5 — Tauri shell (`apps/desktop/src-tauri`)
 
+## IPC alignment (2026-10-09)
+
+WP5 hardening follows `23-ai-runtime-architecture.md`: bound forced-kill reaping, report unreaped children and suppress restart in that state; move synchronous keychain/path work off async/UI threads; remove blocking waits from the final native exit callback. Keep the 60-second readiness consistent with current code. WP10 updater changes are specified in `10-release-sync.md` before implementation.
+
+
 Status: **M1 done, most of M2 done; lifecycle hardening implemented and unit-tested** (see section 7; the real-binary graceful-shutdown test stays ignored until it can run in CI). Owner dir: `apps/desktop/src-tauri`. Updater wiring is shared with WP10 (WP10 edits only `tauri.conf.json` updater section and `src/updater.rs`).
 
 Tauri v2, Rust 1.96 (installed). Use the Bun-installed CLI: `bunx tauri …` from `apps/desktop` (`@tauri-apps/cli`, `@tauri-apps/api`). No `cargo install tauri-cli`.

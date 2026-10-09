@@ -1,37 +1,7 @@
-import { afterAll, describe, expect, test } from "bun:test"
-import { Effect, Scope } from "effect"
-import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
+import { describe, expect, test } from "bun:test"
+import { Effect } from "effect"
 import { BackgroundToolsRunner } from "../src/nikcli/background-tools-runner.ts"
-import { makeNikCliRuntime, type NikCliRuntime } from "../src/nikcli/runtime.ts"
-import { startFakeOpenAi } from "./helpers/fake-openai.ts"
-import { sharedDataDir } from "./helpers/host-env.ts"
-
-const fake = startFakeOpenAi(() => ({ text: "ok" }))
-void fake
-const fakeProvider: HostProviderSpec = {
-  id: "fake",
-  name: "Fake",
-  protocol: "openai-compatible",
-  baseURL: fake.baseUrl,
-  models: [{ id: "fake-model", name: "Fake", context: 100_000, output: 4096 }]
-}
-
-const scope = Effect.runSync(Scope.make())
-const runtime: NikCliRuntime = await Effect.runPromise(
-  makeNikCliRuntime({
-    dataDir: sharedDataDir,
-    providers: [...defaultProviderSpecs(), fakeProvider],
-    systemPrompt: "You are the parent.",
-    toolsFor: () => [],
-    hostLogs: (level, line) => { if (level === "warn" || level === "error") console.log("HOSTLOG", line.slice(0, 300)) }
-  }).pipe(Scope.provide(scope))
-)
-await Effect.runPromise(runtime.setProviderKey("fake", "sk-fake-test-key"))
-
-afterAll(async () => {
-  await Effect.runPromise(Scope.close(scope, { _tag: "Success", value: undefined } as never))
-  fake.stop()
-})
+import type { NikCliRuntime } from "../src/nikcli/runtime.ts"
 
 const drain = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
@@ -93,9 +63,50 @@ const controllableRunner = () => {
 }
 
 describe("BackgroundToolsRunner", () => {
+  test("shared runner cancels and joins only the actual project/parent owner", async () => {
+    const runs: Array<{ signal: AbortSignal; finish: (text: string) => void }> = []
+    const runner = new BackgroundToolsRunner(stubHost(), { runner: (input) => new Promise((finish) => runs.push({ signal: input.signal, finish })) })
+    const owner = { projectId: "real-project", parentSessionId: "real-parent" }
+    const other = { projectId: "other-project", parentSessionId: "real-parent" }
+    const task = runner.manager.enqueue({ ...owner, prompt: "p", description: "a" })
+    runner.manager.enqueue({ ...other, prompt: "p", description: "b" })
+    await drain(10)
+    let joined = false
+    const cancellation = runner.cancelForParent(owner).then((count) => { joined = true; return count })
+    await drain(10)
+    expect(joined).toBe(false)
+    expect(runs[0]?.signal.aborted).toBe(true)
+    expect(runs[1]?.signal.aborted).toBe(false)
+    runs[0]?.finish("late")
+    expect(await cancellation).toBe(1)
+    expect(runner.manager.read(owner, task.id).status).toBe("cancelled")
+    const disposal = runner.dispose()
+    runs[1]?.finish("stopped")
+    await disposal
+  })
+
+  test("removing a parent while its completion acquires a host suppresses wake", async () => {
+    let acquired!: () => void
+    let release!: () => void
+    let wakes = 0
+    const entering = new Promise<void>((r) => { acquired = r })
+    const blocked = new Promise<void>((r) => { release = r })
+    const stub = stubHost({ promptAsync: async () => { wakes++ } })
+    const original = stub.host
+    const runtime = { ...stub, host: (id: string) => Effect.promise(async () => { acquired(); await blocked; return await Effect.runPromise(original(id)) }) } as NikCliRuntime
+    const runner = new BackgroundToolsRunner(runtime, { runner: async () => "findings" })
+    const owner = { projectId: "p", parentSessionId: "s" }
+    runner.manager.enqueue({ ...owner, prompt: "p", description: "d" })
+    await entering
+    await runner.cancelForParent(owner)
+    release()
+    await runner.dispose()
+    expect(wakes).toBe(0)
+  })
+
   test("scoped list / read: cross-project and cross-parent isolation", async () => {
     const stub = controllableRunner()
-    const runner = new BackgroundToolsRunner(stubHost(), "project-a", { runner: stub.runner })
+    const runner = new BackgroundToolsRunner(stubHost(), { runner: stub.runner })
     const a = runner.manager.enqueue({
       description: "scan",
       prompt: "look",
@@ -123,7 +134,7 @@ describe("BackgroundToolsRunner", () => {
   test("cancelled worker does not produce a wake to the parent", async () => {
     let resolveRunner: (text: string) => void = () => {}
     const stub = stubHost()
-    const runner = new BackgroundToolsRunner(stub, "project-cancel", {
+    const runner = new BackgroundToolsRunner(stub, {
       runner: () => new Promise<string>((resolve) => (resolveRunner = resolve))
     })
     const parentId = "parent-cancel"
@@ -136,10 +147,11 @@ describe("BackgroundToolsRunner", () => {
     })
     await drain(50)
     runner.manager.cancel({ projectId: "project-cancel", parentSessionId: parentId }, task.id)
-    await runner.cancelForParent(parentId)
+    const cancellation = runner.cancelForParent({ projectId: "project-cancel", parentSessionId: parentId })
     await drain(100)
     expect(runner.manager.read({ projectId: "project-cancel", parentSessionId: parentId }, task.id).status).toBe("cancelled")
     resolveRunner("late text")
+    await cancellation
     await runner.dispose()
   })
 
@@ -156,7 +168,7 @@ describe("BackgroundToolsRunner", () => {
         return undefined
       }
     })
-    const runner = new BackgroundToolsRunner(stub, "project-wake", {
+    const runner = new BackgroundToolsRunner(stub, {
       runner: async () => "verify toolpath notes"
     })
     const parentId = "parent-wake"

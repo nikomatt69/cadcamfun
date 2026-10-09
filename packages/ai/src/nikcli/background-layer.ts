@@ -20,13 +20,13 @@ export const makeAiBackgroundLayer = Layer.effect(
   Effect.gen(function*() {
     const host = yield* AiHost
     const manager = host.scheduler
-    const runner = new BackgroundToolsRunner(host.runtime, "__shared__", { manager })
+    const runner = new BackgroundToolsRunner(host.runtime, { manager })
     void backgroundTools(runner.manager)
     yield* Effect.addFinalizer(() => Effect.promise(() => runner.dispose()))
     return AiBackground.of({
       runner,
-      cancelForParent: (parentSessionId) =>
-        Effect.promise(async () => runner.cancelForParent(parentSessionId)),
+      cancelForParent: (owner) =>
+        Effect.promise(async () => runner.cancelForParent(owner)),
       dispose: () => Effect.promise(() => runner.dispose())
     })
   })

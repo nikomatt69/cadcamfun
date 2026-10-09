@@ -10,7 +10,7 @@ const MAX_DRAWING_CHARS = 2_000_000
 export const cadImportDrawing = defineTool("cad_import_drawing", {
   parameters: z.object({
     /** Defaults to the attachment's extension. */
-    format: z.enum(["dxf", "svg", "step"]).optional(),
+    format: z.enum(["dxf", "svg", "step", "mesh"]).optional(),
     /** The file text, or ... */
     content: z.string().min(1).max(MAX_DRAWING_CHARS).optional(),
     /** ... the name of a file the user attached to the chat (preferred: no need to repeat the file). */
@@ -38,6 +38,27 @@ export const cadImportDrawing = defineTool("cad_import_drawing", {
       }
     }
     const name = a.attachment?.toLowerCase() ?? ""
+    if (a.format === "mesh" || name.endsWith(".mesh.json")) {
+      let raw: unknown
+      try { raw = JSON.parse(content) } catch { return { ok: false, error: "The mesh attachment is not valid JSON." } }
+      const mesh = z.object({ format: z.literal("cadcamfun-mesh"), elements: z.array(z.record(z.string(), z.unknown())).min(1).max(40) }).safeParse(raw)
+      if (!mesh.success) return { ok: false, error: "Expected a parsed cadcamfun-mesh attachment." }
+      const elements: Record<string, unknown>[] = []
+      for (const element of mesh.data.elements) {
+        if (element["type"] !== "mesh") return { ok: false, error: "Mesh attachments can only contain mesh elements." }
+        const checked = normalizeElement(element)
+        if (!checked.ok) return { ok: false, error: checked.error }
+        const scale = a.scale ?? 1
+        checked.element["vertices"] = (checked.element["vertices"] as Array<{ x: number; y: number; z: number }>).map((v) => ({ x: v.x * scale, y: v.y * scale, z: v.z * scale }))
+        checked.element["sourceMetadata"] = { ...(checked.element["sourceMetadata"] as Record<string, unknown> | undefined), sourceToMmScale: scale, importedUnits: "mm" }
+        // Scaling can overflow even when each input was finite.
+        const scaled = normalizeElement(checked.element)
+        if (!scaled.ok) return { ok: false, error: scaled.error }
+        elements.push({ ...scaled.element, ...(a.name ? { name: a.name } : {}), ...(a.layer ? { layer: a.layer } : {}), ...(a.color ? { color: a.color } : {}) })
+      }
+      const stored = await handlers.addElements(projectId, elements)
+      return stored !== null && typeof stored === "object" ? { ...stored, warnings: ["Imported triangles preserve source geometry; no parametric history was recovered. Mesh units use the explicit import scale (default 1 mm per source unit)."], stats: { meshes: elements.length } } : stored
+    }
     const guessed = /\.(step|stp)$/.test(name) || /^\s*ISO-10303-21/.test(content) ? "step" : name.endsWith(".svg") || /<svg[\s>]/i.test(content) ? "svg" : "dxf"
     const format = a.format ?? guessed
     let depth = a.depth

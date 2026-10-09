@@ -5,6 +5,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { Output, generateText, jsonSchema, streamText, type LanguageModel, type ModelMessage } from "ai"
 import { Context, Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { AiConfig } from "./ai-config.ts"
+import type { FilePart } from "./attachments.ts"
 import { AiCredentials, type StoredCredential } from "./credentials.ts"
 import { AiAborted, AiConfigError, AiProviderError, type AiError } from "./errors.ts"
 import {
@@ -22,6 +23,7 @@ import { prepareCall, schema as transformSchema, transformModelFor, type Prepare
 export interface DirectCallBase {
   readonly system?: string
   readonly model?: ModelSelector
+  readonly files?: ReadonlyArray<FilePart>
 }
 
 export interface TextResult {
@@ -69,7 +71,12 @@ export const defaultModelFactory: LanguageModelFactory = (resolved, credential) 
 export const prepareDirectCall = (resolved: ResolvedModel, input: DirectCallBase & { readonly prompt: string }): PreparedCall => {
   const messages: ModelMessage[] = [
     ...(input.system ? [{ role: "system", content: input.system } as const] : []),
-    { role: "user", content: input.prompt }
+    { role: "user", content: input.files?.length ? [
+      { type: "text", text: input.prompt },
+      ...input.files.map((file) => file.mime.startsWith("image/")
+        ? { type: "image" as const, image: file.url, mediaType: file.mime }
+        : { type: "file" as const, data: file.url, mediaType: file.mime, filename: file.filename })
+    ] : input.prompt }
   ]
   return prepareCall({ model: transformModelFor(resolved), messages, sessionID: "cadcamfun-direct" })
 }

@@ -4,7 +4,7 @@
  * The dispatch button is a primary CTA; success is reported by both the haptic and a brief
  * refresh (Apple §13 — multimodal feedback on the same frame).
  */
-import { For, Match, Show, Switch, createResource, createSignal, type Component } from "solid-js"
+import { For, Match, Show, Switch, createResource, createSignal, type Accessor, type Component } from "solid-js"
 import type { WorkflowRunRow } from "@cadcamfun/api"
 import type { CompanionClient } from "../companion/client.ts"
 import { Play, Refresh } from "../components/Icon.tsx"
@@ -17,6 +17,8 @@ import { errorMessage } from "../lib/error.ts"
 export interface ActionsScreenProps {
   readonly client: CompanionClient
   readonly projectId: string
+  /** Bumped by the project screen when a live workflow frame arrives; refetches the runs. */
+  readonly refreshKey: Accessor<number>
 }
 
 const tone = (status: WorkflowRunRow["status"]): "accent" | "success" | "danger" | "warning" | "neutral" => {
@@ -28,7 +30,7 @@ const tone = (status: WorkflowRunRow["status"]): "accent" | "success" | "danger"
 }
 
 export const ActionsScreen: Component<ActionsScreenProps> = (props) => {
-  const [runs, { refetch }] = createResource<WorkflowRunRow[]>(() => props.client.runs(props.projectId))
+  const [runs, { refetch }] = createResource<WorkflowRunRow[], number>(props.refreshKey, () => props.client.runs(props.projectId))
   const [dispatching, setDispatching] = createSignal(false)
   const [message, setMessage] = createSignal("")
 
@@ -72,6 +74,14 @@ export const ActionsScreen: Component<ActionsScreenProps> = (props) => {
       <Switch>
         <Match when={runs.loading}>
           <div class="empty mt-4"><Spinner size="lg" /><p class="t-subhead text-secondary">Loading runs…</p></div>
+        </Match>
+        <Match when={runs.error}>
+          {/* Without this a failed fetch falls through to the empty state and a broken sidecar
+              looks exactly like a project that has never run anything. */}
+          <div class="card card-elevated mt-4">
+            <p class="t-headline">Couldn't load runs</p>
+            <p class="t-footnote text-secondary mt-2">{errorMessage(runs.error)}</p>
+          </div>
         </Match>
         <Match when={runs()}>
           {(list) => (

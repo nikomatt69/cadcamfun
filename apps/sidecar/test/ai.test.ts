@@ -33,6 +33,19 @@ const post = (path: string, json: unknown) => app.call(path, { method: "POST", j
 const configure = () => app.call("/api/ai/credentials", { method: "PUT", json: { provider: "anthropic", key: "sk-ant-sentinel-123456" } })
 
 describe("/api/ai credentials, status and models", () => {
+  test("configured-only models skip unavailable providers and reject invalid filters", async () => {
+    const empty = await app.call("/api/ai/models?configuredOnly=true")
+    expect(empty.status).toBe(200)
+    expect(empty.body).toEqual([])
+    expect((await app.call("/api/ai/models?configuredOnly=invalid")).status).toBe(400)
+    await app.call("/api/ai/credentials", { method: "PUT", json: { provider: "anthropic", key: "sk-test-filter-1234" } })
+    try {
+      const connected = await app.call("/api/ai/models?configuredOnly=true")
+      expect(connected.body.length).toBeGreaterThan(0)
+      expect(connected.body.every((model: { configured: boolean; provider: string }) => model.configured && model.provider === "anthropic")).toBe(true)
+    } finally { await app.call("/api/ai/credentials/anthropic", { method: "DELETE" }) }
+  })
+
   test("requires the launch token", async () => {
     expect((await app.call("/api/ai/status", { auth: false })).status).toBe(401)
   })

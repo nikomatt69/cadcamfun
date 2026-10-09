@@ -1,3 +1,4 @@
+import { Effect } from "effect"
 import { Route, Router } from "@solidjs/router"
 import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js"
 import { createAppState, AppProvider, type AppState } from "../state/context.ts"
@@ -29,7 +30,9 @@ export default function App() {
   const [elapsed, setElapsed] = createSignal(0)
   let attempt = 0
   let disposed = false
+  let connecting: AbortController | undefined
   const start = async () => {
+    connecting?.abort()
     const current = ++attempt
     const began = Date.now()
     setElapsed(0)
@@ -41,13 +44,23 @@ export default function App() {
       // The connection is made, not given up on: while the sidecar is still starting (or restarting on a new port) every
       // failed try re-resolves the endpoint and tries again, until the budget runs out.
       for (;;) {
+        const controller = new AbortController()
+        connecting = controller
         let active = fake ? runtimeForClient(createFakeApi()) : undefined
+        const release = () => { void active?.dispose() }
+        controller.signal.addEventListener("abort", release, { once: true })
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
           const connect = async () => {
-            active ??= runtimeForLayer(clientLayer(await getEndpoint()))
+            if (!active) {
+              const endpoint = await getEndpoint()
+              controller.signal.throwIfAborted()
+              active = runtimeForLayer(clientLayer(endpoint))
+            }
             const client = await readClient(active)
-            await active.run(client.health.check())
+            controller.signal.throwIfAborted()
+            await active.run(client.health.check().pipe(Effect.timeout("30 seconds")))
+            controller.signal.throwIfAborted()
             return createAppState({ client, runtime: active, sidecar: fake ? "fake" : "ready" })
           }
           const app = await Promise.race([connect(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("The sidecar did not answer in time")), 30_000) })])
@@ -55,13 +68,14 @@ export default function App() {
           setState(app)
           return
         } catch (cause) {
+          controller.abort()
           active?.dispose()
           if (!live()) return
           if (Date.now() - began >= CONNECT_BUDGET_MS) { setBoot({ _tag: "failed", reason: messageOf(cause), timedOut: true }); return }
           resetEndpoint()
           await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS))
           if (!live()) return
-        } finally { clearTimeout(timer) }
+        } finally { controller.signal.removeEventListener("abort", release); clearTimeout(timer); if (connecting === controller) connecting = undefined }
       }
     } finally { clearInterval(tick) }
   }
@@ -81,7 +95,7 @@ export default function App() {
     void start()
     if (isTauri()) void tauriGlassHost().then(setGlassHost).catch(() => undefined)
   })
-  onCleanup(() => { disposed = true; attempt++; state()?.dispose(); theme.dispose() })
+  onCleanup(() => { disposed = true; connecting?.abort(); attempt++; state()?.dispose(); theme.dispose() })
   return (
     <Show when={state()} fallback={<BootScreen state={boot()} elapsedSeconds={elapsed()} onRetry={() => { resetEndpoint(); void start() }} />}>
       {(app) => <AppRoutes state={app()} />}

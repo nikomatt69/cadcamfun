@@ -80,6 +80,19 @@ const project = { id: Schema.String }
 const errors = [BadRequest, Forbidden, NotFound, Conflict, InternalError] as const
 const Created = <A extends Schema.Top>(a: A) => a.pipe(Schema.annotate({ httpApiStatus: 201 }))
 
+/**
+ * One workflow file as it is stored in the repository. `content` is the YAML itself; `name` is the
+ * file name without the directory, so it round-trips straight back into a commit.
+ */
+export const WorkflowFile = Schema.Struct({
+  name: Schema.String,
+  path: Schema.String,
+  content: Schema.String,
+  /** Why the file does not parse, when it does not. An invalid workflow is still worth showing. */
+  problem: Schema.optional(Schema.String),
+})
+export type WorkflowFile = typeof WorkflowFile.Type
+
 export class VcsGroup extends HttpApiGroup.make("vcs")
   .add(
     HttpApiEndpoint.get("status", "/api/projects/:id/vcs/status", { params: project, success: VcsStatus, error: errors }),
@@ -113,5 +126,19 @@ export class VcsGroup extends HttpApiGroup.make("vcs")
     HttpApiEndpoint.post("pull", "/api/projects/:id/vcs/pull", { params: project, headers: { "x-github-token": Schema.String }, payload: Schema.Struct({ branch: Schema.optional(Schema.String) }), success: Schema.Struct({ kind: Schema.String, oid: Oid }), error: errors }),
     HttpApiEndpoint.get("runs", "/api/projects/:id/actions/runs", { params: project, success: Schema.Array(WorkflowRunRow), error: errors }),
     HttpApiEndpoint.post("dispatch", "/api/projects/:id/actions/dispatch", { params: project, payload: Schema.Struct({ ref: Schema.optional(Schema.String) }), success: Schema.Array(WorkflowRunRow), error: errors }),
+    // The workflow files of a ref, so CI can be read and authored in the app instead of only by
+    // hand-committing YAML. Editing one is a commit like any other, so it goes through `commit`.
+    HttpApiEndpoint.get("listWorkflows", "/api/projects/:id/actions/workflows", {
+      params: project,
+      query: { ref: Schema.optional(Schema.String) },
+      success: Schema.Array(WorkflowFile),
+      error: errors,
+    }),
+    HttpApiEndpoint.get("workflow", "/api/projects/:id/actions/workflows/:name", {
+      params: { id: Schema.String, name: Schema.String },
+      query: { ref: Schema.optional(Schema.String) },
+      success: WorkflowFile,
+      error: errors,
+    }),
   )
 {}

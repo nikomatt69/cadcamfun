@@ -1,9 +1,12 @@
+import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
+import { MeshWorkerQueue } from "./mesh-jobs.ts"
+import { registerViewportCapture } from "../../ai/viewport-capture.ts"
 import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { TransformControls } from "three/addons/controls/TransformControls.js"
 import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
-import { isClosedShape, meshOf, tessellate, type Drawing, type Solid, type cam } from "@cadcamfun/core"
+import { isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, type Playback } from "./playback.ts"
@@ -40,6 +43,7 @@ export interface ViewportSection {
   readonly inverted: boolean
 }
 export interface View3DProps {
+  readonly visionMode?: "cad" | "cam"
   readonly drawing?: Drawing
   readonly solids?: readonly Solid[]
   readonly extrusionHeight?: number
@@ -78,6 +82,8 @@ export function View3D(props: View3DProps) {
   let host: HTMLDivElement | undefined
   // A webview (or a test DOM) without WebGL must not take the whole screen down with it.
   const [noWebGl, setNoWebGl] = createSignal(false)
+  const [meshError, setMeshError] = createSignal<string>()
+  let invalidate = () => {}
   const [preset, updatePreset] = createSignal<ViewPreset>(props.preset ?? "perspective")
   const [mode, updateMode] = createSignal<RenderMode>(props.renderMode ?? "shaded-edges")
   const [gridVisible, setGridVisible] = createSignal(props.gridVisible ?? true)
@@ -96,7 +102,7 @@ export function View3D(props: View3DProps) {
   createEffect(() => { if (props.axesVisible !== undefined) setAxesVisible(props.axesVisible) })
   createEffect(() => { mode(); gridVisible(); axesVisible(); props.origin; untrack(appearance) })
   createEffect(() => { transformMode(); selected(); untrack(transform) })
-  createEffect(() => { seconds = props.playbackTime ?? 0 })
+  createEffect(() => { seconds = props.playbackTime ?? 0; props.playing; invalidate() })
   createEffect(() => { props.lighting; untrack(applyLighting) })
   createEffect(() => { props.material; untrack(applyMaterial) })
   createEffect(() => { props.section; untrack(applySection) })
@@ -112,6 +118,9 @@ export function View3D(props: View3DProps) {
     catch { setNoWebGl(true); return }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     host.append(renderer.domElement)
+    let dirty = true
+    let frames: FrameScheduler | undefined
+    invalidate = () => { dirty = true; frames?.invalidate() }
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.minDistance = .01; controls.maxDistance = 50000; controls.zoomSpeed = 1.5
@@ -128,6 +137,7 @@ export function View3D(props: View3DProps) {
     gizmo.addEventListener("dragging-changed", dragging)
     gizmo.addEventListener("mouseUp", commit)
     transform = () => {
+      invalidate()
       gizmo.detach()
       if (selectedMesh && transformMode() !== "none" && props.onTransformCommit && preset() !== "four-view") { gizmo.setMode(transformMode() as "translate" | "rotate" | "scale"); gizmo.attach(selectedMesh) }
     }
@@ -146,6 +156,7 @@ export function View3D(props: View3DProps) {
     const directional = new THREE.DirectionalLight(0xffffff, props.lighting?.directional ?? 1.5); directional.position.set(100, 100, 200)
     scene.add(ambient, hemisphere, directional)
     applyLighting = () => {
+      invalidate()
       const l = props.lighting
       if (l === undefined) return
       ambient.intensity = l.ambient
@@ -153,6 +164,7 @@ export function View3D(props: View3DProps) {
       directional.intensity = l.directional
     }
     applyMaterial = () => {
+      invalidate()
       const m = props.material
       if (m === undefined) return
       const tint = new THREE.Color(m.color)
@@ -178,6 +190,7 @@ export function View3D(props: View3DProps) {
     const clipPlanes: THREE.Plane[] = []
     renderer.localClippingEnabled = true
     applySection = () => {
+      invalidate()
       clipPlanes.length = 0
       const s = props.section
       if (s === undefined || !s.enabled) {
@@ -204,9 +217,10 @@ export function View3D(props: View3DProps) {
     const marker = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf59e0b }))
     scene.add(marker)
     let radius = 100
-    let meshWorker: Worker | undefined
-    let revision = 0, requestId = 0
-    const pending = new Map<number, { revision: number; index?: number }>()
+    const meshJobs = new MeshWorkerQueue({
+      create: () => new Worker(new URL("./mesh-worker.ts", import.meta.url), { type: "module" }),
+      onError: (message) => { setMeshError(message); invalidate() }
+    })
     const directions: Record<ViewPreset, readonly [number, number, number]> = { perspective: [1, -1, .8], isometric: [1, -1, 1], top: [0, 0, 1], bottom: [0, 0, -1], front: [0, -1, 0], back: [0, 1, 0], right: [1, 0, 0], left: [-1, 0, 0], "four-view": [1, -1, 1] }
     const orient = (view: ViewPreset, targetCamera: THREE.PerspectiveCamera | THREE.OrthographicCamera) => {
       targetCamera.position.copy(controls.target).add(new THREE.Vector3(...directions[view]).normalize().multiplyScalar(radius * 3))
@@ -214,6 +228,7 @@ export function View3D(props: View3DProps) {
       targetCamera.lookAt(controls.target)
     }
     setPreset = () => {
+      invalidate()
       activeCamera = preset() === "perspective" || preset() === "four-view" ? camera : orthographic
       controls.object = activeCamera; gizmo.camera = activeCamera
       controls.enabled = preset() !== "four-view"
@@ -224,6 +239,7 @@ export function View3D(props: View3DProps) {
       transform()
     }
     appearance = () => {
+      invalidate()
       grid.visible = gridVisible(); axes.visible = axesVisible(); origin.visible = axesVisible()
       origin.position.set(props.origin?.x ?? 0, props.origin?.y ?? 0, props.origin?.z ?? 0)
       content.traverse(object => {
@@ -247,18 +263,10 @@ export function View3D(props: View3DProps) {
     const addSolid = (solid: Solid, index?: number) => {
       const estimate = solid._tag === "Sphere" ? solid.rings * solid.rings * 2 : solid._tag === "Cylinder" ? solid.segments * 6 : solid._tag === "Revolve" ? solid.profile.length * (solid.segments ?? 64) * 6 : solid._tag === "Extrude" ? solid.profile.length * 6 : 24
       if (estimate > 50000 && typeof Worker !== "undefined") {
-        if (!meshWorker) {
-          meshWorker = new Worker(new URL("./mesh-worker.ts", import.meta.url), { type: "module" })
-          meshWorker.onmessage = (event: MessageEvent<{ id: number; positions?: Float32Array; indices?: Uint32Array; error?: string }>) => {
-            const job = pending.get(event.data.id); pending.delete(event.data.id)
-            if (!job || job.revision !== revision) return
-            if (event.data.positions && event.data.indices) {
-              installMesh({ positions: event.data.positions, indices: event.data.indices }, job.index)
-              if (!pending.size) fit()
-            }
-          }
-        }
-        const id = ++requestId; pending.set(id, { revision, index }); meshWorker.postMessage({ id, solid })
+        meshJobs.submit(solid, (mesh) => {
+          installMesh(mesh, index)
+          if (meshJobs.pending === 0) fit()
+        })
       } else installMesh(meshOf(solid, .1), index)
     }
     const addLines = (positions: number[], rapid: boolean) => {
@@ -268,7 +276,8 @@ export function View3D(props: View3DProps) {
       line.computeLineDistances(); content.add(line)
     }
     rebuild = () => {
-      revision++; pending.clear()
+      invalidate()
+      meshJobs.reset(); setMeshError(undefined)
       gizmo.detach(); selectedMesh = undefined; setSelected(undefined)
       disposeGroup(content)
       for (const [index, solid] of (props.solids ?? []).entries()) addSolid(solid, index)
@@ -304,6 +313,7 @@ export function View3D(props: View3DProps) {
       setPreset()
     }
     const resize = () => {
+      invalidate()
       if (!host) return
       const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight)
       renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix()
@@ -330,19 +340,14 @@ export function View3D(props: View3DProps) {
     const key = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return
       if (event.key.toLowerCase() === "f") { event.preventDefault(); fit() }
-      if (event.key === "Escape") { setTransformMode("none"); gizmo.detach() }
+      if (event.key === "Escape") { setTransformMode("none"); gizmo.detach(); invalidate() }
     }
     renderer.domElement.addEventListener("pointerdown", down); renderer.domElement.addEventListener("pointerup", pick)
     host.addEventListener("keydown", key)
-    let previous = performance.now(), frame = 0
-    const animate = (now: number) => {
-      if (props.playing) {
-        seconds = Math.min(playback.duration, seconds + (now - previous) / 1000 * Math.max(0, props.playbackRate ?? 1))
-        props.onPlaybackTimeChange?.(seconds)
-      }
-      previous = now
-      const p = positionAt(playback, seconds); marker.position.set(p.x, p.y, p.z); marker.visible = playback.segments.length > 0
-      controls.update()
+    let previous: number | undefined
+    controls.addEventListener("change", invalidate)
+    gizmo.addEventListener("change", invalidate)
+    const renderFrame = () => {
       if (preset() === "four-view") {
         renderer.setScissorTest(true)
         const width = host?.clientWidth ?? 1, height = host?.clientHeight ?? 1
@@ -354,15 +359,40 @@ export function View3D(props: View3DProps) {
         }
         renderer.setScissorTest(false)
       } else { renderer.setViewport(0, 0, host?.clientWidth ?? 1, host?.clientHeight ?? 1); renderer.render(scene, activeCamera) }
-      frame = requestAnimationFrame(animate)
     }
-    frame = requestAnimationFrame(animate)
-    onCleanup(() => { cancelAnimationFrame(frame); observer.disconnect(); meshWorker?.terminate(); pending.clear(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {} })
+    const animate = () => {
+      const now = performance.now()
+      if (props.playing) {
+        seconds = Math.min(playback.duration, seconds + Math.min(now - (previous ?? now), 100) / 1000 * Math.max(0, props.playbackRate ?? 1))
+        props.onPlaybackTimeChange?.(seconds)
+      }
+      previous = now
+      const p = positionAt(playback, seconds)
+      const moved = marker.position.x !== p.x || marker.position.y !== p.y || marker.position.z !== p.z
+      const visible = playback.segments.length > 0
+      if (moved || marker.visible !== visible) { marker.position.set(p.x, p.y, p.z); marker.visible = visible; invalidate() }
+      const cameraMoved = controls.update()
+      if (!document.hidden && (dirty || cameraMoved || props.playing)) { dirty = false; renderFrame() }
+      const playing = !!props.playing && seconds < playback.duration && (props.playbackRate ?? 1) > 0
+      if (!playing && !cameraMoved) previous = undefined
+      return playing || cameraMoved
+    }
+    frames = new FrameScheduler(animate, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
+    const visibility = () => { previous = undefined; frames?.suspend(document.hidden) }
+    document.addEventListener("visibilitychange", visibility)
+    visibility()
+    const unregisterCapture = registerViewportCapture(props.visionMode ?? "cad", () => {
+      if (meshJobs.pending > 0 || meshError() || !renderer.domElement.isConnected || renderer.domElement.clientWidth === 0 || renderer.domElement.clientHeight === 0) return undefined
+      renderFrame()
+      return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}) }
+    })
+    onCleanup(() => { unregisterCapture(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />
     <Show when={props.showControls !== false}><ViewportControls preset={preset()} mode={mode()} grid={gridVisible()} axes={axesVisible()} enabled={!noWebGl()} transform={transformMode()} canTransform={selected() !== undefined && !!props.onTransformCommit && preset() !== "four-view"} onPreset={value => { updatePreset(value); props.onPresetChange?.(value) }} onMode={value => { updateMode(value); props.onRenderModeChange?.(value) }} onGrid={() => setGridVisible(v => !v)} onAxes={() => setAxesVisible(v => !v)} onFit={() => fit()} onTransform={setTransformMode} onFullscreen={() => { const root = host?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else if (root?.requestFullscreen) void root.requestFullscreen() }} /></Show>
     <Show when={preset() === "four-view"}><div class="vp3-quadrants"><span>{viewportLabels.top}</span><span>{viewportLabels.front}</span><span>{viewportLabels.right}</span><span>{viewportLabels.perspective}</span></div></Show>
+    <Show when={meshError()}>{message => <p role="alert" class="vp3-alert">{message()}</p>}</Show>
     <Show when={noWebGl()}><p role="alert" class="vp3-alert">{t("viewport.noWebgl")}</p></Show>
   </div>
 }

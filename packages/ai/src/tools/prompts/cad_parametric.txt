@@ -1,0 +1,13 @@
+Inspect, validate, create, update and test dimension-driven 3D parts using the editor's existing parametric feature history and Three.js rendering. Do not use it to replace an existing part with unrelated geometry.
+
+Parameters
+- action: inspect | validate | create | update | test.
+- elementId: existing parametric element id (inspect/update/test).
+- history: parameters and ordered features (validate/create). Features form a discriminated union: sketch, extrude, revolve, hole, pattern. Referenced sketches and tools must precede their users. IDs are unique. Plane XY/YZ/ZX. Lengths mm; sketch angle constraints radians; revolve/pattern angles degrees. Linear patterns need step [dx,dy,dz].
+- name: part name (create); x, y, z: placement in mm; layer: optional existing or named layer.
+- parameters: names mapped to finite numbers or expressions (update). Only existing names may change; derived parameters remain expressions unless explicitly changed.
+- expectedRevision: revision returned by inspect; stale revisions are refused without writing.
+- cases: up to 12 non-mutating cases. Each has name, parameters (existing names), optional expectedBodies, minVolumeMm3 and maxVolumeMm3. Bounds/volume use the history's local coordinates.
+
+Result
+inspect returns history, revision, dependencies and rebuild metrics. validate returns ok, resolved parameters, bodyCount, volumeMm3, bounds, issues and sketch solver statuses. create/update return existing editor-sync elements and ids. Failed validation changes nothing. test returns per-case pass/fail and metrics; it never changes the drawing. A test does not establish machine accuracy or manufacturability. Read back the revision after updates, use cad_check_design and cad_vision, then re-generate and verify any affected CAM operations.

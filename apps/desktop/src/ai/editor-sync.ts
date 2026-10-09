@@ -43,6 +43,7 @@ export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
   if (result === null || typeof result !== "object" || result.ok !== true) return []
   const elements = Array.isArray(result.elements) ? result.elements.filter(isElement) : []
   if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements") || tool.endsWith("cad_import_drawing")) return elements.length > 0 ? [{ kind: "add", elements }] : []
+  if (tool.endsWith("cad_parametric")) return elements.length > 0 ? [{ kind: (result as { mutation?: unknown }).mutation === "add" ? "add" : "update", elements }] : []
   if (tool.endsWith("cad_modify_entities")) return elements.length > 0 ? [{ kind: "update", elements }] : []
   if (tool.endsWith("cad_transform_entities")) {
     if (elements.length === 0) return []

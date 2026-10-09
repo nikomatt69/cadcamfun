@@ -5,6 +5,7 @@
  * render the "Available tools" disclosure in the EnhancedAssistant panel.
  */
 export const TOOL_IDS = [
+  "cam_stock", "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cad_parametric", "cad_vision", "cam_vision",
   "cad_add_entities",
   "cad_add_elements",
   "cad_modify_entities",
@@ -38,12 +39,20 @@ export const VCS_TOOL_IDS = ["vcs_status", "vcs_start_change", "vcs_commit", "vc
 
 export interface ToolSummary {
   readonly id: ToolId
-  readonly category: "cad" | "cam" | "library" | "memory"
+  readonly category: "cad" | "cam" | "library" | "memory" | "research"
   readonly title: string
   readonly description: string
 }
 
 export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
+  { id: "cam_stock", category: "cam", title: "Manage raw stock", description: "Inspect or set the actual stock, invalidate affected programs and verify removed/remaining volumes." },
+  { id: "cad_inspect", category: "cad", title: "Inspect elements and layers", description: "Read complete element, feature-history and layer properties in bounded pages." },
+  { id: "cad_component_relations", category: "cad", title: "Component relationships", description: "Inspect nominal distances, bounds, parameter definitions and dependencies between two components." },
+  { id: "web_search", category: "research", title: "Web search", description: "Search live technical sources and return URLs and bounded excerpts." },
+  { id: "attachment_read", category: "research", title: "Read attached code and drawings", description: "Read real project attachments in bounded pages." },
+  { id: "cad_parametric", category: "cad", title: "Parametric model and tests", description: "Inspect feature dependencies, update dimensions in place and test variants without changing the drawing." },
+  { id: "cad_vision", category: "cad", title: "CAD Vision", description: "Capture the actual CAD viewport and add the image and scene evidence to model context." },
+  { id: "cam_vision", category: "cam", title: "CAM Vision", description: "Capture the actual CAM preview with operation and verification context." },
   { id: "cad_add_entities", category: "cad", title: "Add entities", description: "Append 2D entities (mm, radians) to the active drawing." },
   { id: "cad_add_elements", category: "cad", title: "Add 3D elements", description: "Model solids, revolved / extruded profiles, lofts, sweeps, booleans, curves and parts in the open editor." },
   { id: "cad_modify_entities", category: "cad", title: "Modify entities", description: "Change fields of existing entities by id." },
@@ -51,7 +60,7 @@ export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
   { id: "cad_group_entities", category: "cad", title: "Group entities", description: "Gather elements into one component, or open a component into its parts." },
   { id: "cad_editor", category: "cad", title: "Control the editor", description: "Create, rename, colour, hide and lock layers; switch 3D / 2D, fit the view, select, hide, isolate, undo." },
   { id: "cad_delete_entities", category: "cad", title: "Delete entities", description: "Delete entities by id (requires confirm: true)." },
-  { id: "cad_import_drawing", category: "cad", title: "Import drawing", description: "Read a DXF, SVG or prismatic STEP file and build it in 3D: outlines become solids, circles and inner loops holes." },
+  { id: "cad_import_drawing", category: "cad", title: "Import drawing", description: "Import DXF/SVG outlines, STEP/IGES/BREP surfaces and STL/OBJ/PLY meshes through the existing CAD model." },
   { id: "cad_check_design", category: "cad", title: "Check design", description: "Find what is illogical in the 3D model: sizes, rotation units, booleans, duplicates, floating parts." },
   { id: "cad_describe_drawing", category: "cad", title: "Describe drawing", description: "Counts, bounds and layers of the active drawing." },
   { id: "cam_describe_machine", category: "cam", title: "Describe machine", description: "Axes, rotation, zeros and operations of a mill, a lathe or a 3D printer." },

@@ -72,9 +72,14 @@ export const chamferBox = (box: BoxSolid, distance: number): Mesh => {
 
   const positions: number[] = []
   const indices: number[] = []
+  const welded = new Map<string, number>()
   const v = (x: number, y: number, z: number): number => {
+    const key = `${x}:${y}:${z}`
+    const existing = welded.get(key)
+    if (existing !== undefined) return existing
     const i = positions.length / 3
     positions.push(x, y, z)
+    welded.set(key, i)
     return i
   }
   const tri = (a: number, b: number, c: number): void => {
@@ -228,17 +233,16 @@ export const chamferBox = (box: BoxSolid, distance: number): Mesh => {
     }
   }
   // Inset point on a face (X | Y | Z constant) at a corner of the
-  // chamfered cube. The inset moves the constant axis toward the cube
-  // interior by `d`.
+  // chamfered cube. Keep the face's plane and inset its two in-plane axes.
   const inset = (corner: readonly [0 | 1, 0 | 1, 0 | 1], face: "x" | "y" | "z"): Vec3 => {
     const bx = corner[0]; const by = corner[1]; const bz = corner[2]
     if (face === "x") {
-      return { x: (bx === 0 ? x0 : x1) + (bx === 0 ? d : -d), y: by === 0 ? y0 : y1, z: bz === 0 ? z0 : z1 }
+      return { x: bx === 0 ? x0 : x1, y: (by === 0 ? y0 + d : y1 - d), z: (bz === 0 ? z0 + d : z1 - d) }
     }
     if (face === "y") {
-      return { x: bx === 0 ? x0 : x1, y: (by === 0 ? y0 : y1) + (by === 0 ? d : -d), z: bz === 0 ? z0 : z1 }
+      return { x: (bx === 0 ? x0 + d : x1 - d), y: by === 0 ? y0 : y1, z: (bz === 0 ? z0 + d : z1 - d) }
     }
-    return { x: bx === 0 ? x0 : x1, y: by === 0 ? y0 : y1, z: (bz === 0 ? z0 : z1) + (bz === 0 ? d : -d) }
+    return { x: (bx === 0 ? x0 + d : x1 - d), y: (by === 0 ? y0 + d : y1 - d), z: bz === 0 ? z0 : z1 }
   }
   const edgeInset = (
     corner: readonly [0 | 1, 0 | 1, 0 | 1],
@@ -397,7 +401,7 @@ const taperedCylinder = (cyl: CylinderSolid, rBottom: number, rTop: number): Mes
 
 /**
  * Inward offset of every vertex along its vertex normal (averaged face
- * normals, equal weights). Returns a `Mesh` with the same triangle indices
+ * normals, weighted by triangle corner angles). Returns a `Mesh` with the same triangle indices
  * but new positions. Shared helper for `shellMesh`.
  *
  * Meshes from `meshOf` are welded per face, not per corner: a box carries the
@@ -429,7 +433,7 @@ const offsetMeshInward = (mesh: Mesh, distance: number): Mesh => {
   }
   for (let i = 0; i < positions.length; i += 3) cornerIndex(i)
   // Accumulate face normals per corner, then keep the average.
-  const cornerNormals = new Float32Array(cornerOf.size * 3)
+  const cornerNormals = new Float64Array(cornerOf.size * 3)
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const ai = indices[i]! * 3
     const bi = indices[i + 1]! * 3
@@ -442,9 +446,14 @@ const offsetMeshInward = (mesh: Mesh, distance: number): Mesh => {
     const nx = e1y * e2z - e1z * e2y
     const ny = e1z * e2x - e1x * e2z
     const nz = e1x * e2y - e1y * e2x
-    for (const base of [ai, bi, ci]) {
+    const normalLength = Math.hypot(nx, ny, nz)
+    if (normalLength === 0) continue
+    for (const [base, left, right] of [[ai, bi, ci], [bi, ci, ai], [ci, ai, bi]] as const) {
+      const ux = positions[left]! - positions[base]!, uy = positions[left + 1]! - positions[base + 1]!, uz = positions[left + 2]! - positions[base + 2]!
+      const vx = positions[right]! - positions[base]!, vy = positions[right + 1]! - positions[base + 1]!, vz = positions[right + 2]! - positions[base + 2]!
+      const angle = Math.atan2(Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx), ux * vx + uy * vy + uz * vz)
       const c = cornerIndex(base) * 3
-      cornerNormals[c]! += nx; cornerNormals[c + 1]! += ny; cornerNormals[c + 2]! += nz
+      cornerNormals[c]! += nx / normalLength * angle; cornerNormals[c + 1]! += ny / normalLength * angle; cornerNormals[c + 2]! += nz / normalLength * angle
     }
   }
   const normals = new Float32Array(cornerOf.size * 3)

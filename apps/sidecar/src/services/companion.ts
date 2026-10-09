@@ -28,7 +28,7 @@ const DEFAULT_PORT = 8443
 export class Companion extends Context.Service<Companion, {
   status: Effect.Effect<CompanionState>
   enable(port?: number): Effect.Effect<CompanionState, CompanionError>
-  disable: Effect.Effect<CompanionState>
+  disable: Effect.Effect<CompanionState, CompanionError>
   /** Creates a device token (shown once, inside the link) and returns the pairing link for the QR code. */
   pair(name: string, host?: string): Effect.Effect<{ id: string; link: string }, CompanionError>
   revoke(id: string): Effect.Effect<CompanionState, CompanionError>
@@ -44,11 +44,11 @@ export class Companion extends Context.Service<Companion, {
     const settings = Effect.gen(function*() {
       const v = (yield* kv.get(SETTINGS))?.value as { enabled?: boolean; port?: number } | undefined
       return { enabled: v?.enabled === true, port: typeof v?.port === "number" ? v.port : DEFAULT_PORT }
-    })
+    }).pipe(Effect.catchTag("KvError", (e) => Effect.logWarning("Unable to load companion settings", e).pipe(Effect.as({ enabled: false, port: DEFAULT_PORT }))))
     const tokens = Effect.gen(function*() {
       const records = (yield* kv.list(TOKEN_PREFIX)).map((e) => e.value as TokenRecord)
       return records.map((r) => ({ ...r, lastSeen: touches.get(r.id) ?? r.lastSeen }))
-    })
+    }).pipe(Effect.catchTag("KvError", (e) => Effect.logWarning("Unable to load companion devices", e).pipe(Effect.as([]))))
     const loadCertificate = Effect.tryPromise({
       try: async () => {
         if (certificate) return certificate
@@ -96,7 +96,11 @@ export class Companion extends Context.Service<Companion, {
           }),
           catch: (e) => new CompanionError({ code: "unavailable", message: `Could not start the gateway on port ${port}: ${String(e)}` }),
         })
-        yield* kv.set(SETTINGS, { enabled: true, port }).pipe(Effect.orDie)
+        yield* kv.set(SETTINGS, { enabled: true, port }).pipe(Effect.catchTag("KvError", (e) =>
+          Effect.sync(() => { gateway?.stop(); gateway = undefined }).pipe(
+            Effect.andThen(Effect.fail(new CompanionError({ code: "unavailable", message: `Could not save gateway settings: ${e.operation}` })))
+          )
+        ))
       })
 
     yield* Effect.addFinalizer(() => Effect.sync(() => { gateway?.stop(); gateway = undefined }))
@@ -116,9 +120,9 @@ export class Companion extends Context.Service<Companion, {
         return yield* state
       }),
       disable: Effect.gen(function*() {
+        yield* kv.set(SETTINGS, { ...(yield* settings), enabled: false }).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save gateway settings: ${e.operation}` })))
         gateway?.stop()
         gateway = undefined
-        yield* kv.set(SETTINGS, { ...(yield* settings), enabled: false }).pipe(Effect.orDie)
         return yield* state
       }),
       pair: (name, host) => Effect.gen(function*() {
@@ -127,12 +131,12 @@ export class Companion extends Context.Service<Companion, {
         const cert = yield* loadCertificate
         const { id, token } = newToken()
         const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null }
-        yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.orDie)
+        yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save the device token: ${e.operation}` })))
         const s = yield* settings
         return { id, link: pairingLink({ host: host?.trim() || defaultHost(), port: gateway?.port ?? s.port, token, fingerprint: cert.fingerprint, name: label }) }
       }),
       revoke: (id) => Effect.gen(function*() {
-        if (!(yield* kv.delete(`${TOKEN_PREFIX}${id}`).pipe(Effect.orDie))) return yield* new CompanionError({ code: "not-found", message: "Device not found" })
+        if (!(yield* kv.delete(`${TOKEN_PREFIX}${id}`).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not revoke the device token: ${e.operation}` }))))) return yield* new CompanionError({ code: "not-found", message: "Device not found" })
         touches.delete(id)
         return yield* state
       }),

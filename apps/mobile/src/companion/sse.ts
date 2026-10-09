@@ -8,12 +8,17 @@ export type ChatEvent =
   | { type: "error"; sessionId: string; code: string; message: string }
   | { type: string; [key: string]: unknown }
 
-/** Incremental Server-Sent-Events parser: feed chunks, get complete `data:` payloads decoded as JSON. */
-export const sseParser = (): ((chunk: string) => ChatEvent[]) => {
+/**
+ * Incremental Server-Sent-Events parser: feed chunks, get complete `data:` payloads decoded as JSON.
+ *
+ * Generic over the frame type because the same wire format carries both the assistant's reply
+ * (`ChatEvent`) and the live activity stream (`LiveEvent`); the parser itself is identical.
+ */
+export const sseParser = <T>(): ((chunk: string) => T[]) => {
   let buffer = ""
   return (chunk) => {
     buffer += chunk.replaceAll("\r\n", "\n")
-    const events: ChatEvent[] = []
+    const events: T[] = []
     let end: number
     while ((end = buffer.indexOf("\n\n")) >= 0) {
       const block = buffer.slice(0, end)
@@ -21,7 +26,7 @@ export const sseParser = (): ((chunk: string) => ChatEvent[]) => {
       const data = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).replace(/^ /, "")).join("\n")
       if (!data) continue
       try {
-        events.push(JSON.parse(data) as ChatEvent)
+        events.push(JSON.parse(data) as T)
       } catch {
         // A malformed frame is skipped rather than ending the conversation.
       }

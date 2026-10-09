@@ -50,3 +50,10 @@ export {
   type BackgroundTaskStatus
 } from "./nikcli/background-tasks.ts"
 export { backgroundToolSpecs, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
+
+export * from "./parametric.ts"
+export type { ParametricInput } from "./tools/cad_parametric.ts"
+export * from "./vision.ts"
+export * from "./web-search.ts"
+export type { cadInspectInput } from "./tools/cad_inspect.ts"
+export type { cadComponentRelationsInput } from "./tools/cad_component_relations.ts"

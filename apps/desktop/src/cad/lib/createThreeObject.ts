@@ -21,7 +21,7 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
   return new THREE.Mesh(geometry, material);
 };
 
-/** The elements a Boolean depends on, itself included, so a cached result is invalidated when any operand changes. */
+/** The elements a Boolean depends on, itself included. */
 const dependencies = (element: any, all: ReadonlyArray<any>, seen = new Set<string>()): any[] => {
   if (seen.has(element.id)) return [];
   seen.add(element.id);
@@ -33,18 +33,34 @@ const dependencies = (element: any, all: ReadonlyArray<any>, seen = new Set<stri
   return out;
 };
 
-const booleanCache = new Map<string, SolidMesh | null>();
+interface BooleanEntry {
+  /** The exact elements the cached mesh was built from, by identity. */
+  readonly operands: ReadonlyArray<any>
+  readonly mesh: SolidMesh | null
+}
+
+/**
+ * The solid a Boolean element stands for, cached on its operands.
+ *
+ * The store replaces an element object on every write, so operand *identity* is already a perfect
+ * validity test — no need to stringify the operands to find out whether anything changed, which on a
+ * mesh result meant materialising megabytes of `{x,y,z}` objects into a string on every rebuild. The
+ * cache is keyed on the Boolean element itself and revalidated against the operands it was built
+ * from, so it also holds no reference that would outlive the drawing.
+ */
+const booleanCache = new WeakMap<object, BooleanEntry>()
 
 /** The solid a Boolean element stands for (cached on its operands), or null when it cannot be formed. */
 const booleanSolid = (element: any): SolidMesh | null => {
   const all = useElementsStore.getState().elements;
-  const key = JSON.stringify(dependencies(element, all));
-  const hit = booleanCache.get(key);
-  if (hit !== undefined) return hit;
+  const operands = dependencies(element, all)
+  const hit = booleanCache.get(element)
+  if (hit !== undefined && hit.operands.length === operands.length && operands.every((operand, index) => operand === hit.operands[index])) {
+    return hit.mesh
+  }
   let result: SolidMesh | null = null;
   try { result = cam.model.booleanElementMesh(all as any, element)?.mesh ?? null; } catch { result = null; }
-  if (booleanCache.size >= 32) booleanCache.delete(booleanCache.keys().next().value as string);
-  booleanCache.set(key, result);
+  booleanCache.set(element, { operands, mesh: result })
   return result;
 };
 

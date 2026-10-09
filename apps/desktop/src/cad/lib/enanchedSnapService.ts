@@ -104,6 +104,9 @@ export function snapPoint(point: Point, elements: Element[], settings: SnapSetti
 
 /**
  * Find the closest snap point, considering both distance and priority
+ *
+ * Works on squared distances throughout: the comparison against the tolerance is order-preserving, so
+ * no square root is taken on the pointer-move path.
  */
 function findClosestSnapPoint(point: Point, snapPoints: SnapPoint[], tolerance: number): SnapPoint | null {
   if (snapPoints.length === 0) {
@@ -111,20 +114,20 @@ function findClosestSnapPoint(point: Point, snapPoints: SnapPoint[], tolerance: 
   }
 
   let closestPoint: SnapPoint | null = null;
-  let minDistance = Infinity;
+  let minDistanceSq = Infinity;
   let highestPriority = 0;
+  const toleranceSq = tolerance * tolerance;
 
   snapPoints.forEach(snapPoint => {
-    const distance = Math.sqrt(
-      Math.pow(snapPoint.x - point.x, 2) + Math.pow(snapPoint.y - point.y, 2) + Math.pow(snapPoint.z - point.z, 2)
-    );
+    const dx = snapPoint.x - point.x, dy = snapPoint.y - point.y, dz = snapPoint.z - point.z;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
 
     const priority = snapPoint.priority || 0;
 
     // Distance is within tolerance and either closer than current closest
     // or same distance but higher priority
-    if (distance <= tolerance && (distance < minDistance || (distance === minDistance && priority > highestPriority))) {
-      minDistance = distance;
+    if (distanceSq <= toleranceSq && (distanceSq < minDistanceSq || (distanceSq === minDistanceSq && priority > highestPriority))) {
+      minDistanceSq = distanceSq;
       highestPriority = priority;
       closestPoint = snapPoint;
     }
@@ -603,19 +606,60 @@ function getElementSnapPoints(element: Element, settings: SnapSettings): SnapPoi
 }
 
 /**
+ * The planar extent of the elements that can cross: the ones without a 2D footprint (a solid, a
+ * dimension, a piece of text) have no snap crossings to offer, so they are never paired.
+ */
+interface Bounds {
+  minX: number; maxX: number; minY: number; maxY: number
+}
+
+const boundsOf = (element: Element): Bounds | null => {
+  switch (element.type) {
+    case "line":
+      return {
+        minX: Math.min(element.x1, element.x2), maxX: Math.max(element.x1, element.x2),
+        minY: Math.min(element.y1, element.y2), maxY: Math.max(element.y1, element.y2),
+      };
+    case "circle":
+      return {
+        minX: element.x - element.radius, maxX: element.x + element.radius,
+        minY: element.y - element.radius, maxY: element.y + element.radius,
+      };
+    case "rectangle":
+      return {
+        minX: element.x - element.width / 2, maxX: element.x + element.width / 2,
+        minY: element.y - element.height / 2, maxY: element.y + element.height / 2,
+      };
+    default:
+      return null;
+  }
+};
+
+/**
  * Find the intersection points between elements
+ *
+ * Every pair is tested, which is quadratic in the drawing size and was paid in full on every
+ * pointer move. Two elements can only cross inside their shared extent, so the bounding boxes reject
+ * the vast majority of pairs for the price of four comparisons instead of an algebraic solve.
  */
 function findIntersectionPoints(elements: Element[], settings: SnapSettings): SnapPoint[] {
   const snapPoints: SnapPoint[] = [];
 
   // Check all pairs of elements for intersection
-  for (let i = 0; i < elements.length; i++) {
-    for (let j = i + 1; j < elements.length; j++) {
-      const elementA = elements[i];
-      const elementB = elements[j];
+  const boxes: Array<{ element: Element; bounds: Bounds | null }> = elements.map((element) => ({ element, bounds: boundsOf(element) }));
+
+  for (let i = 0; i < boxes.length; i++) {
+    const a = boxes[i]!;
+    if (!a.bounds) continue;
+    for (let j = i + 1; j < boxes.length; j++) {
+      const b = boxes[j]!;
+      if (!b.bounds) continue;
+      // Disjoint extents: no crossing is possible, skip the solve entirely.
+      if (a.bounds.maxX < b.bounds.minX || b.bounds.maxX < a.bounds.minX ||
+          a.bounds.maxY < b.bounds.minY || b.bounds.maxY < a.bounds.minY) continue;
 
       // Find intersections based on element types
-      const intersections = findIntersectionPointsBetweenElements(elementA!, elementB!);
+      const intersections = findIntersectionPointsBetweenElements(a.element, b.element);
 
       // Add to snap points with high priority
       intersections.forEach(point => {
@@ -1268,6 +1312,10 @@ function findTangentPointsToCircle(
 
 /**
  * Find equidistant points between elements
+ *
+ * Quadratic in the number of significant points, and the only thing worth reporting is a midpoint
+ * within `smartTolerance` of the cursor — which forces the two source points to be within twice that
+ * distance of each other. Tested on squared distances, so no square root is taken to reject a pair.
  */
 function findEquidistantPoints(point: Point, elements: Element[], settings: SnapSettings): SnapPoint[] {
   const snapPoints: SnapPoint[] = [];
@@ -1293,11 +1341,18 @@ function findEquidistantPoints(point: Point, elements: Element[], settings: Snap
     }
   });
 
+  const spanLimit = (2 * settings.smartTolerance) ** 2;
+  const toleranceSq = settings.smartTolerance ** 2;
+
   // Check for equidistant points between pairs of points
   for (let i = 0; i < significantPoints.length; i++) {
     for (let j = i + 1; j < significantPoints.length; j++) {
       const p1 = significantPoints[i]!;
       const p2 = significantPoints[j]!;
+
+      // Their midpoint can only land near the cursor if the two are near each other.
+      const ex = p2.x - p1.x, ey = p2.y - p1.y;
+      if (ex * ex + ey * ey > spanLimit) continue;
 
       // Calculate midpoint
       const midpoint = {
@@ -1307,9 +1362,8 @@ function findEquidistantPoints(point: Point, elements: Element[], settings: Snap
       };
 
       // Check if mouse is near the midpoint
-      const distToMidpoint = Math.sqrt(Math.pow(midpoint.x - point.x, 2) + Math.pow(midpoint.y - point.y, 2));
-
-      if (distToMidpoint <= settings.smartTolerance) {
+      const dx = midpoint.x - point.x, dy = midpoint.y - point.y;
+      if (dx * dx + dy * dy <= toleranceSq) {
         snapPoints.push({
           ...midpoint,
           type: SnapType.EQUIDISTANT,
@@ -1329,16 +1383,18 @@ export const defaultSnapSettings: SnapSettings = {
     [SnapType.GRID]: true,
     [SnapType.ENDPOINT]: true,
     [SnapType.MIDPOINT]: true,
-    [SnapType.INTERSECTION]: true,
+    // Pairwise snaps are O(n²) in the size of the drawing and are paid on every pointer move, so
+    // they are opt-in: the five that only need one element at a time stay on by default.
+    [SnapType.INTERSECTION]: false,
     [SnapType.CENTER]: true,
     [SnapType.QUADRANT]: true,
     [SnapType.NEAREST]: true,
-    [SnapType.TANGENT]: true,
-    [SnapType.PERPENDICULAR]: true,
-    [SnapType.PARALLEL]: true,
-    [SnapType.EQUIDISTANT]: true,
-    [SnapType.HORIZONTAL]: true,
-    [SnapType.VERTICAL]: true
+    [SnapType.TANGENT]: false,
+    [SnapType.PERPENDICULAR]: false,
+    [SnapType.PARALLEL]: false,
+    [SnapType.EQUIDISTANT]: false,
+    [SnapType.HORIZONTAL]: false,
+    [SnapType.VERTICAL]: false
   },
   gridSize: 10,
   tolerance: 10,

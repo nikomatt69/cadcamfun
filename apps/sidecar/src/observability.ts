@@ -1,11 +1,4 @@
-import { NodeSdk } from "@effect/opentelemetry"
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http"
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http"
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http"
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs"
-import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics"
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base"
-import { Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { AppConfigService } from "./config.ts"
 
 /** `http://host:4318` and `http://host:4318/` both become `http://host:4318/v1/<signal>`. */
@@ -20,16 +13,20 @@ export const otlpUrl = (endpoint: string, signal: "traces" | "metrics" | "logs")
  * `OTEL_RESOURCE_ATTRIBUTES` variables.
  */
 export const ObservabilityLive = Layer.unwrap(
-  AppConfigService.useSync((c) => {
+  Effect.gen(function*() {
+    const c = yield* AppConfigService
     const endpoint = c.otlpEndpoint
     if (!endpoint) return Layer.empty
-    return NodeSdk.layer(() => ({
+    const [effectOtel, logsExporter, metricsExporter, tracesExporter, logsSdk, metricsSdk, tracesSdk] = yield* Effect.promise(() => Promise.all([
+      import("@effect/opentelemetry"), import("@opentelemetry/exporter-logs-otlp-http"),
+      import("@opentelemetry/exporter-metrics-otlp-http"), import("@opentelemetry/exporter-trace-otlp-http"),
+      import("@opentelemetry/sdk-logs"), import("@opentelemetry/sdk-metrics"), import("@opentelemetry/sdk-trace-base")
+    ]))
+    return effectOtel.NodeSdk.layer(() => ({
       resource: { serviceName: "cadcamfun-sidecar", serviceVersion: c.version },
-      spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter({ url: otlpUrl(endpoint, "traces") })),
-      metricReader: new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({ url: otlpUrl(endpoint, "metrics") })
-      }),
-      logRecordProcessor: new BatchLogRecordProcessor({ exporter: new OTLPLogExporter({ url: otlpUrl(endpoint, "logs") }) })
+      spanProcessor: new tracesSdk.BatchSpanProcessor(new tracesExporter.OTLPTraceExporter({ url: otlpUrl(endpoint, "traces") })),
+      metricReader: new metricsSdk.PeriodicExportingMetricReader({ exporter: new metricsExporter.OTLPMetricExporter({ url: otlpUrl(endpoint, "metrics") }) }),
+      logRecordProcessor: new logsSdk.BatchLogRecordProcessor({ exporter: new logsExporter.OTLPLogExporter({ url: otlpUrl(endpoint, "logs") }) })
     }))
   })
 )

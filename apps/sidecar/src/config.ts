@@ -23,6 +23,7 @@ export interface AppConfig {
   readonly cronSecret?: string
   /** E-mail of the administrator (legacy `ADMIN_EMAIL`); the local profile is the admin of its own installation by default. */
   readonly adminEmail?: string
+  readonly aiOffline?: boolean
   readonly aiHost?: "nikcli" | "direct"
   /** Replaces MiniMax's default endpoint for the embedded host (a regional endpoint, a corporate proxy, or a fake model in tests). */
   readonly aiMinimaxBaseUrl?: string
@@ -42,6 +43,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
       const migrationsDir = yield* Config.option(Config.string("CADCAMFUN_MIGRATIONS_DIR"))
       const appUrl = yield* Config.option(Config.string("CADCAMFUN_APP_URL"))
       const debugLinks = yield* Config.withDefault(Config.boolean("CADCAMFUN_DEBUG_LINKS"), false)
+      const aiOffline = yield* Config.withDefault(Config.boolean("CADCAMFUN_AI_OFFLINE"), false)
       const aiHost = yield* Config.withDefault(Config.literals(["nikcli", "direct"], "CADCAMFUN_AI_HOST"), "nikcli" as const)
       const aiMinimaxBaseUrl = yield* Config.option(Config.string("CADCAMFUN_AI_MINIMAX_BASE_URL"))
       const stripeWebhookSecret = yield* Config.option(Config.string("STRIPE_WEBHOOK_SECRET"))
@@ -61,6 +63,7 @@ export class AppConfigService extends Context.Service<AppConfigService, AppConfi
         stripePrices,
         ...(cronSecret._tag === "Some" ? { cronSecret: cronSecret.value } : {}),
         aiHost,
+        aiOffline,
         ...(aiMinimaxBaseUrl._tag === "Some" && aiMinimaxBaseUrl.value.trim() ? { aiMinimaxBaseUrl: aiMinimaxBaseUrl.value.trim() } : {}),
         ...(otlpEndpoint._tag === "Some" && otlpEndpoint.value.trim() ? { otlpEndpoint: otlpEndpoint.value.trim() } : {}),
         ...(appUrl._tag === "Some" ? { appUrl: appUrl.value } : {}),

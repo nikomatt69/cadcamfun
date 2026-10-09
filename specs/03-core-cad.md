@@ -168,3 +168,13 @@ Added after v6.0, each with tests; all pure, in `cad/`:
   - snap priority keeps the legacy order (endpoint, midpoint, center,
     intersection, …), so the intersection test now crosses where the entities do
     not share a midpoint, and a new test pins the priority itself.
+
+### 2026-10-09 — Shared scene evidence contract
+
+`sceneGeometryText(elements)` provides deterministic geometry serialization shared by the desktop and sidecar for SHA-256 capture correlation. IDs, geometry, transforms and feature histories participate; presentation/layer labels do not (the capture carries actual layer/view state separately). This accommodates the existing editor's layer-id mapping without accepting changed geometry. It does not prove the renderer finished loading; viewport capture checks renderer readiness separately.
+
+Neutral-file interoperability uses the existing editor mesh representation. A desktop-local OpenCascade decoder can expose STEP/IGES/BREP triangulation and source B-rep face metadata through the existing attachment import; the core's parametric histories and analytic solids remain unchanged. An imported tessellation never claims recovered feature history or exact machining certification.
+
+### Surfacing validation found during agent integration
+
+The full geometry suite verifies chamfer/shell meshes because AI measurements and CAM depend on real mesh volumes. Chamfer edge/corner vertices must meet the inset face corners and share welded indexes; every closed edge has opposite directed incidence. Inward vertex normals must account for triangle corner angles, so subdividing a planar face does not change its offset. The analytic chamfered-box reference decomposes each retained corner as a tetrahedron of volume d³/6, not d³/3.

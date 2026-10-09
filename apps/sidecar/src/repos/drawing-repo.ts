@@ -12,6 +12,7 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
   listByProject(projectId: string): Effect.Effect<DrawingRow[], DatabaseError>
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<DrawingRow, DatabaseError>
   update(id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }): Effect.Effect<DrawingRow, DatabaseError>
+  configureStock(id: string, stock: unknown): Effect.Effect<string[], DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/DrawingRepo") {
   static readonly layer = Layer.effect(
@@ -52,6 +53,25 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             }).where(eq(T.id, id)).returning()
             return toDrawingRow(row!)
           }),
+        configureStock: (id, stock) => query("drawings.configureStock", (db) => db.transaction((tx) => {
+          const drawing = tx.select().from(T).where(eq(T.id, id)).get()
+          if (!drawing) throw new Error("Drawing disappeared before stock update.")
+          const data = drawing.data !== null && typeof drawing.data === "object" ? drawing.data as Record<string, unknown> : {}
+          const invalidated: string[] = []
+          const paths = tx.select().from(schema.toolpathTable).where(eq(schema.toolpathTable.drawingId, id)).all()
+          for (const path of paths) {
+            const stored = path.data !== null && typeof path.data === "object" ? path.data as Record<string, unknown> : {}
+            const request = stored["request"] !== null && typeof stored["request"] === "object" ? stored["request"] as Record<string, unknown> : undefined
+            const geometry = request?.["geometry"] !== null && typeof request?.["geometry"] === "object" ? request["geometry"] as Record<string, unknown> : {}
+            const fresh = { ...stored }
+            delete fresh["response"]; delete fresh["verification"]
+            if (request) fresh["request"] = { ...request, geometry: { ...geometry, stock } }
+            tx.update(schema.toolpathTable).set({ data: fresh, gcode: null, updatedAt: new Date() }).where(eq(schema.toolpathTable.id, path.id)).run()
+            invalidated.push(path.id)
+          }
+          tx.update(T).set({ data: { ...data, stock }, updatedAt: new Date() }).where(eq(T.id, id)).run()
+          return invalidated
+        })),
         remove: (id) => query("drawings.remove", async (db) => void (await db.delete(T).where(eq(T.id, id))))
       })
     })

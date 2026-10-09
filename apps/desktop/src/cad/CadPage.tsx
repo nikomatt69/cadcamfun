@@ -1,3 +1,4 @@
+import { Effect } from "effect"
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
@@ -143,16 +144,20 @@ export default function CadPage(): JSX.Element {
     }
   })
 
-  // Enabled plugins that contribute a sidebar.
+  // The registry belongs to the plugin panel; a closed panel performs no plugin HTTP work.
   createEffect(() => {
-    app.runtime.run(app.client.plugins.list()).then((installed) => {
+    if (rightPanel() !== "constraints") return
+    const controller = new AbortController()
+    onCleanup(() => controller.abort())
+    app.runtime.run(app.client.plugins.list().pipe(Effect.timeout("15 seconds")), { signal: controller.signal }).then((installed) => {
+      if (controller.signal.aborted) return
       const list = installed.filter((plugin) => plugin.enabled && plugin.manifest.contributes?.sidebar).map((plugin) => ({
         id: plugin.id, title: plugin.manifest.contributes?.sidebar?.title || plugin.manifest.name, description: plugin.manifest.description
       }))
       setSidebarPlugins(list)
       if (list.length > 0 && !list.some((plugin) => plugin.id === pluginId())) setPluginId(list[0]!.id)
       else if (list.length === 0) setPluginId(null)
-    }, () => setSidebarPlugins([]))
+    }, () => { if (!controller.signal.aborted) setSidebarPlugins([]) })
   })
 
   createEffect(() => { if (!showLibrary() && !sidebarOpen()) setLibraryComponent(null) })

@@ -7,6 +7,7 @@
  * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
+import { historySchema } from "./parametric.ts"
 import { MAX_CURVE_SEGMENTS, MIN_GEAR_TEETH, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
 
 type Fields = Readonly<Record<string, unknown>>
@@ -24,6 +25,7 @@ const at = { x: 0, y: 0, z: 0 }
 const pts2 = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 25, y: 30 }, { x: 10, y: 50 }]
 
 export const ELEMENT_SPECS = {
+  mesh: { defaults: { ...at, vertices: [], faces: [], sourceMetadata: {} }, required: ["vertices", "faces"], doc: "actual triangular mesh: vertices [{x,y,z}] in drawing mm; faces [[i,j,k]] indexes. Imported geometry has no recovered parametric history; optional sourceMetadata preserves source face ranges and assembly names" },
   // ---- 3D primitives
   cube: { defaults: { ...at, width: 100, height: 100, depth: 100 }, doc: "box: width (X), height (Y), depth (Z)" },
   sphere: { defaults: { ...at, radius: 50 }, doc: "sphere: radius" },
@@ -192,6 +194,10 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
       return { ok: false, error: `${type}.rotation must be {x, y, z} in degrees` }
     }
   }
+  if (input["scale"] !== undefined) {
+    const scale = input["scale"] as Record<string, unknown> | null
+    if (scale === null || typeof scale !== "object" || Array.isArray(scale) || !Object.keys(scale).length || !Object.entries(scale).every(([axis, value]) => ["x", "y", "z"].includes(axis) && typeof value === "number" && Number.isFinite(value) && value !== 0)) return { ok: false, error: `${type}.scale must contain finite nonzero x,y,z factors (negative factors mirror geometry)` }
+  }
   for (const key of TESSELLATION) {
     const given = input[key]
     if (given === undefined) continue
@@ -199,16 +205,25 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     element[key] = given
   }
   let warning: string | undefined
+  if (type === "mesh") {
+    if (JSON.stringify(element["sourceMetadata"]).length > 100_000) return { ok: false, error: "mesh sourceMetadata exceeds the size limit" }
+    const vertices = element["vertices"] as unknown[]
+    const faces = element["faces"] as unknown[]
+    if (vertices.length < 3 || vertices.length > 90_000 || faces.length === 0 || faces.length > 30_000) return { ok: false, error: "mesh requires 3..90000 vertices and 1..30000 triangular faces" }
+    if (!vertices.every((v) => v !== null && typeof v === "object" && ["x", "y", "z"].every((axis) => typeof (v as Record<string, unknown>)[axis] === "number" && Number.isFinite((v as Record<string, unknown>)[axis])))) return { ok: false, error: "mesh vertices require finite x,y,z coordinates" }
+    if (!faces.every((f) => Array.isArray(f) && f.length === 3 && new Set(f).size === 3 && f.every((i) => Number.isInteger(i) && i >= 0 && i < vertices.length))) return { ok: false, error: "mesh faces require three distinct valid vertex indexes" }
+  }
   if (type === "parametric") {
-    const history = element["history"] as History
-    if (!Array.isArray((history as { features?: unknown }).features) || typeof (history as { parameters?: unknown }).parameters !== "object") {
-      return { ok: false, error: "parametric.history needs {parameters: {...}, features: [...]}" }
-    }
+    const decoded = historySchema.safeParse(element["history"])
+    if (!decoded.success) return { ok: false, error: `parametric.history: ${decoded.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` }
+    const history: History = decoded.data
+    element["history"] = history
     // Build it now: a history that makes nothing is the model's mistake to hear about, not the user's to find on screen.
     const built = rebuild(history)
     const issues = built.issues.map((i) => `${i.feature}: ${i.message}`)
     if (built.bodies.length === 0) return { ok: false, error: `The history builds no solid. ${issues.length > 0 ? issues.join("; ") : "It has no extrude or revolve."}` }
-    if (issues.length > 0) warning = `The history builds ${built.bodies.length} solid(s) with problems: ${issues.join("; ")}`
+    if (built.issues.some((i) => i.severity === "error")) return { ok: false, error: `The history has errors: ${issues.join("; ")}` }
+    if (issues.length > 0) warning = `The history builds ${built.bodies.length} solid(s) with warnings: ${issues.join("; ")}`
   }
   if (type === "component" || type === "group") {
     const children = element["elements"] as unknown[]

@@ -1216,3 +1216,13 @@ export const cadOperationLogTable = sqliteTable(
 export type CadOperationLog = typeof cadOperationLogTable.$inferSelect
 export type NewCadOperationLog = typeof cadOperationLogTable.$inferInsert
 
+/** Local application KV state. Provider credentials belong in the protected credential store, never here. */
+export const localKeyValueTable = sqliteTable("LocalKeyValue", {
+  key: text("key").primaryKey(),
+  value: text("value", { mode: "json" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()).$onUpdateFn(() => new Date())
+})
+
+export type LocalKeyValue = typeof localKeyValueTable.$inferSelect
+export type NewLocalKeyValue = typeof localKeyValueTable.$inferInsert
+

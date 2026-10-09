@@ -34,6 +34,9 @@ function ProviderRow(props: {
   const [key, setKey] = createSignal("")
   const [baseUrl, setBaseUrl] = createSignal("")
   const [busy, setBusy] = createSignal(false)
+  const [modelSearch, setModelSearch] = createSignal("")
+  const [modelLimit, setModelLimit] = createSignal(50)
+  const matchingModels = createMemo(() => props.provider.models.filter((model) => `${model.id} ${model.name}`.toLowerCase().includes(modelSearch().trim().toLowerCase())))
   /** The catalogue is the source of truth; the status call backs it up while it loads. */
   const configured = (): boolean =>
     props.provider.configured || ai.aiStatus()?.providers[props.provider.id] === "configured"
@@ -127,13 +130,15 @@ function ProviderRow(props: {
           >
             <div class="space-y-1">
               <div class="text-[10px] uppercase tracking-wide text-gray-400">{t("ai.catalogue.modelsLabel")}</div>
+              <input type="search" class={FIELD} aria-label="Search provider models" placeholder="Search provider models" value={modelSearch()} onInput={(event) => { setModelSearch(event.currentTarget.value); setModelLimit(50) }} />
               <ul class="max-h-48 space-y-0.5 overflow-y-auto">
-                <For each={props.provider.models}>
+                <For each={matchingModels().slice(0, modelLimit())}>
                   {(model) => (
                     <li>
                       <button
                         type="button"
                         data-testid="ai-model-option"
+                        disabled={!configured()}
                         class="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11px] hover:bg-blue-50 dark:hover:bg-blue-950/30"
                         onClick={() => ai.setModel({ provider: props.provider.id, model: model.id })}
                       >
@@ -146,6 +151,7 @@ function ProviderRow(props: {
                   )}
                 </For>
               </ul>
+              <Show when={matchingModels().length > modelLimit()}><button type="button" class="text-xs text-blue-600" onClick={() => setModelLimit((value) => value + 50)}>Show more ({matchingModels().length - modelLimit()})</button></Show>
             </div>
           </Show>
         </div>
@@ -162,7 +168,10 @@ export function ProviderSettings(): JSX.Element {
   const filtered = createMemo(() => {
     const q = search().trim().toLowerCase()
     const all = ai.providers()
-    return q.length === 0 ? all : all.filter((p) => haystack(p).includes(q))
+    const matching = q.length === 0 ? all : all.filter((p) => haystack(p).includes(q))
+    const status = ai.aiStatus()?.providers
+    const connected = (provider: ProviderInfo) => provider.configured || status?.[provider.id] === "configured"
+    return [...matching].sort((a, b) => Number(connected(b)) - Number(connected(a)) || a.name.localeCompare(b.name))
   })
   const totalModels = (): number => ai.providers().reduce((sum, p) => sum + p.models.length, 0)
 

@@ -11,7 +11,7 @@
  *  3. `connect` — endpoint → client → `GET /health`, with the spec's 15 s deadline and
  *     the data the splash needs to offer Retry and "View logs".
  */
-import { Context, Effect, Layer, ManagedRuntime, Ref } from "effect"
+import { Context, Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { Api, Authorization } from "@cadcamfun/api"
@@ -25,41 +25,16 @@ import { createFakeApi, type ApiClient as FakeApiClient } from "../testing/fake-
  */
 export type Client = HttpApiClient.ForApi<typeof Api>
 
-/**
- * The bearer token, in a `Ref`.
- *
- * A plain module variable would be wrong: `Layer.effect` bodies are *built* lazily, so a
- * mutable global read at request time can be read after the next connection has already
- * overwritten it, and the sidecar would answer 401. The `Ref` is set as part of building
- * the layer, so the value is in place before any request can run.
- */
-const bearerTokenRef = Effect.runSync(Ref.make<string | undefined>(undefined))
-
-const withBearerToken: HttpApiMiddleware.HttpApiMiddlewareClient<never, never, never> = ({ next, request }) =>
-  Effect.flatMap(Ref.get(bearerTokenRef), (token) =>
-    Effect.flatMap(withSessionToken(token === undefined ? request : HttpClientRequest.bearerToken(request, token)), next)
-  )
-
-/**
- * The `Authorization` client middleware. `Authorization` is `requiredForClient`, so the
- * generated client refuses to build without it — which is exactly why the token is added
- * here instead of being bolted onto `fetch` at the call site.
- */
-const AuthorizationClient = HttpApiMiddleware.layerClient(Authorization, withBearerToken)
-
-/** The client service; screens `yield* ApiClient` inside a runtime built from this. */
+/** Each client layer owns its launch token; reconnects cannot overwrite another runtime's authorization. */
 export class ApiClient extends Context.Service<ApiClient, HttpApiClient.ForApi<typeof Api>>()("cadcamfun/ApiClient") {
-  static readonly layer = (options: ApiClientOptions) =>
-    Layer.effect(
-      ApiClient,
-      Effect.gen(function*() {
-        yield* Ref.set(bearerTokenRef, options.token)
-        return yield* HttpApiClient.make(Api, {
-          baseUrl: options.baseUrl,
-          transformClient: (client) => client.pipe(HttpClient.filterStatusOk)
-        })
-      })
-    ).pipe(Layer.provide(AuthorizationClient), Layer.provide(FetchHttpClient.layer))
+  static readonly layer = (options: ApiClientOptions) => {
+    const authorization = HttpApiMiddleware.layerClient(Authorization, ({ next, request }) =>
+      Effect.flatMap(withSessionToken(HttpClientRequest.bearerToken(request, options.token)), next))
+    return Layer.effect(ApiClient, HttpApiClient.make(Api, {
+      baseUrl: options.baseUrl,
+      transformClient: (client) => client.pipe(HttpClient.filterStatusOk)
+    })).pipe(Layer.provide(authorization), Layer.provide(FetchHttpClient.layer))
+  }
 }
 
 export interface ApiClientOptions {
@@ -69,7 +44,7 @@ export interface ApiClientOptions {
 
 export interface AppRuntime {
   /** Runs an effect with the app's services; rejects with the Effect's error. */
-  readonly run: <A>(effect: Effect.Effect<A, unknown, ApiClient>) => Promise<A>
+  readonly run: <A>(effect: Effect.Effect<A, unknown, ApiClient>, options?: { readonly signal?: AbortSignal }) => Promise<A>
   /** Fire-and-forget for writes whose failure the screen already reports locally. */
   readonly runVoid: (effect: Effect.Effect<unknown, unknown, ApiClient>) => void
   dispose(): void
@@ -82,7 +57,7 @@ export interface AppRuntime {
 export const createRuntime = (options: ApiClientOptions): AppRuntime => {
   const runtime = ManagedRuntime.make(ApiClient.layer(options))
   return {
-    run: (effect) => runtime.runPromise(effect),
+    run: (effect, options) => runtime.runPromise(effect, options),
     runVoid: (effect) => {
       void runtime.runPromise(effect).catch(() => undefined)
     },
@@ -171,8 +146,14 @@ export const connect = async (options: ConnectOptions = {}): Promise<Connection>
   }
 
   const runtime = createRuntime(endpoint)
-  const client = await clientOf(runtime)
-  if (await healthCheck(runtime, client, timeoutMs)) {
+  let client: Client
+  const remaining = () => Math.max(1, timeoutMs - (Date.now() - started))
+  try { client = await runtime.run(Effect.service(ApiClient).pipe(Effect.timeout(remaining()))) }
+  catch (error) {
+    runtime.dispose()
+    return { state: { _tag: "failed", reason: messageOf(error), timedOut: true }, client: undefined, logsDir: undefined, elapsedMs: Date.now() - started }
+  }
+  if (await healthCheck(runtime, client, remaining())) {
     return {
       state: { _tag: "ready", client, mode: "live" },
       client,
@@ -181,7 +162,6 @@ export const connect = async (options: ConnectOptions = {}): Promise<Connection>
     }
   }
   runtime.dispose()
-  await Effect.runPromise(Ref.set(bearerTokenRef, undefined))
   if (options.fallbackToFake === true) return fakeConnection(started)
   return {
     state: { _tag: "failed", reason: "the sidecar did not answer the health check", timedOut: true },
@@ -191,20 +171,10 @@ export const connect = async (options: ConnectOptions = {}): Promise<Connection>
   }
 }
 
-/**
- * `createRuntime` alone cannot hand back the client (it is built inside a Layer), so
- * the boot sequence resolves it through this: reading it out of the runtime's own
- * context is the only way to get the *same* instance the screens will use.
- */
-const clientOf = async (runtime: AppRuntime): Promise<Client> => {
-  const effect = Effect.map(Effect.service(ApiClient), (client) => client)
-  return runtime.run(effect)
-}
-
 const readLogsDir = async (options: ConnectOptions): Promise<string | undefined> => {
   if (options.logsDir === undefined || !isTauri()) return undefined
   try {
-    return await options.logsDir()
+    return await withTimeout(options.logsDir(), 1000, "logs directory lookup timed out")
   } catch {
     return undefined
   }
@@ -214,7 +184,7 @@ const readLogsDir = async (options: ConnectOptions): Promise<string | undefined>
 const healthCheck = async (runtime: AppRuntime, client: Client, timeoutMs: number): Promise<boolean> => {
   try {
     const health = await withTimeout(
-      runtime.run(client.health.check()),
+      runtime.run(client.health.check().pipe(Effect.timeout(timeoutMs))),
       timeoutMs,
       "the health check timed out"
     )
@@ -254,6 +224,5 @@ export const fakeRuntime = (fake?: FakeApiClient): { runtime: AppRuntime; client
 /** Re-resolves the endpoint and tries again; the splash's Retry button calls this. */
 export const retryConnect = async (options: ConnectOptions = {}): Promise<Connection> => {
   resetEndpoint()
-  await Effect.runPromise(Ref.set(bearerTokenRef, undefined))
   return connect(options)
 }

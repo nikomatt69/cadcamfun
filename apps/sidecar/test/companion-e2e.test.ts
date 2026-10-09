@@ -76,4 +76,61 @@ describe("companion end to end", () => {
       rmSync(dataDir, { recursive: true, force: true })
     }
   }, 60_000)
+
+  test("a paired phone receives live frames as the desktop writes, over the forwarded SSE stream", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "cadcamfun-companion-"))
+    const sidecar = await boot(dataDir)
+    try {
+      const gatewayPort = 20_000 + Math.floor(Math.random() * 20_000)
+      await sidecar.local("/api/companion/enable", { method: "POST", body: JSON.stringify({ port: gatewayPort }) })
+      const paired = await (await sidecar.local("/api/companion/pair", { method: "POST", body: JSON.stringify({ name: "Test iPhone", host: "127.0.0.1" }) })).json()
+      const pairing = parsePairingLink(paired.link)
+      const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
+      const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
+      const phone = new CompanionClient(pairing, pinned)
+
+      const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
+      const draw = await (await sidecar.local(`/api/projects/${project.id}/drawings`, { method: "POST", body: JSON.stringify({ name: "Plate", data: { w: 100 } }) })).json()
+
+      // Tail the stream *before* writing, exactly like the app does when a project screen opens.
+      const ac = new AbortController()
+      const seen: Array<Record<string, unknown>> = []
+      const tail = (async () => {
+        for await (const frame of phone.events(project.id, ac.signal)) seen.push(frame as Record<string, unknown>)
+      })().catch(() => {})
+      await sleep(250)
+
+      await sidecar.local(`/api/projects/${project.id}/vcs/commit`, { method: "POST", body: JSON.stringify({ message: "Initial import" }) })
+      await waitFor(() => seen.some((f) => f.type === "commit"), 10_000)
+
+      // A pull request the phone has to review arrives on the same channel.
+      await sidecar.local(`/api/projects/${project.id}/vcs/branches`, { method: "POST", body: JSON.stringify({ name: "ai/widen" }) })
+      await sidecar.local(`/api/projects/${project.id}/vcs/checkout`, { method: "POST", body: JSON.stringify({ branch: "ai/widen" }) })
+      await sidecar.local(`/api/drawings/${draw.id}`, { method: "PUT", body: JSON.stringify({ data: { w: 140 } }) })
+      await sidecar.local(`/api/projects/${project.id}/vcs/commit`, { method: "POST", body: JSON.stringify({ message: "Widen", authorKind: "ai" }) })
+      await sidecar.local(`/api/projects/${project.id}/pulls`, { method: "POST", body: JSON.stringify({ title: "Widen plate", head: "ai/widen", authorKind: "ai" }) })
+      await waitFor(() => seen.some((f) => f.type === "pr.opened"), 10_000)
+
+      ac.abort()
+      await tail
+
+      expect(seen.find((f) => f.type === "commit")).toMatchObject({ projectId: project.id, branch: "main", authorKind: "user" })
+      expect(seen.find((f) => f.type === "pr.opened")).toMatchObject({ number: 1, authorKind: "ai", head: "ai/widen", base: "main" })
+    } finally {
+      sidecar.child.kill("SIGTERM")
+      await sidecar.child.exited
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  }, 90_000)
 })
+
+/** Polls `probe` until it holds, so a test never sleeps for the worst case. */
+const waitFor = async (probe: () => boolean, timeoutMs: number): Promise<void> => {
+  const deadline = Date.now() + timeoutMs
+  while (!probe()) {
+    if (Date.now() > deadline) throw new Error("condition not met in time")
+    await sleep(25)
+  }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))

@@ -1,4 +1,5 @@
 /// <reference path="./sdk-next.d.ts" />
+import type { FilePart } from "../attachments.ts"
 import { Effect, Scope } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
@@ -22,6 +23,7 @@ export interface HostToolSpec {
     input: unknown,
     ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }
   ) => Promise<string>
+  readonly executeWithFiles?: (input: unknown, ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }) => Promise<{ readonly output: string; readonly files?: ReadonlyArray<FilePart> }>
 }
 
 export interface NikCliRuntimeOptions {
@@ -49,6 +51,8 @@ export interface ProjectHost {
 }
 
 export interface NikCliRuntime {
+  /** Actual host registrations plus permitted native discovery/control tools; no executor is invoked. */
+  readonly toolCatalogue: () => ReadonlyArray<{ id: string; description: string }>
   readonly paths: IsolatedPaths
   /**
    * The runtime is the application's *long-lived* connection to nikcli: every
@@ -130,6 +134,8 @@ export const makeNikCliRuntime = (
 ): Effect.Effect<NikCliRuntime, AiConfigError, Scope.Scope> =>
   Effect.gen(function* () {
     const paths = isolatedPaths(options.dataDir)
+    let closed = false
+    const assertOpen = () => { if (closed) throw new Error("The embedded nikcli runtime is closed") }
 
     const uninstall = installHostLogFilter(
       options.hostLogs ??
@@ -143,19 +149,21 @@ export const makeNikCliRuntime = (
     // health check (and the shell from connecting) for ten seconds and more on a busy machine. It is loaded when the first
     // host is needed, or warmed once `warmAfter` settles (the sidecar passes the moment it has announced itself) so the first chat does not pay for it.
     let sdkReady: Promise<Sdk> | undefined
-    const getSdk = (): Promise<Sdk> => (sdkReady ??= loadSdk(paths, options.isolation))
+    const getSdk = (): Promise<Sdk> => {
+      assertOpen()
+      return sdkReady ??= loadSdk(paths, options.isolation)
+    }
     let warm: ReturnType<typeof setTimeout> | undefined
     void options.warmAfter?.then(() => {
-      warm = setTimeout(() => { getSdk().catch(() => undefined) }, 250)
+      if (closed) return
+      warm = setTimeout(() => { if (!closed) getSdk().catch(() => undefined) }, 250)
       warm.unref?.()
-    })
+    }).catch(() => undefined)
     yield* Effect.addFinalizer(() => Effect.sync(() => { if (warm !== undefined) clearTimeout(warm) }))
 
-    // Started here, never awaited at boot: writing `<cache>/models.json` once is what
-    // gives `provider.list()` the whole models.dev catalogue instead of the four
-    // providers declared in nikcli.json. It cannot reject (`seedModelsCache` answers
-    // "unavailable"), so nothing surfaces as an unhandled rejection.
-    const catalogueReady = seedModelsCache(paths, options.catalogue)
+    // The metadata seed shares the first catalogue reader's lifecycle, not application startup.
+    const catalogueController = new AbortController()
+    let catalogueReady: Promise<CatalogueSeed> | undefined
 
     let providers = options.providers
     const hosts = new Map<string, Promise<ProjectHost>>()
@@ -182,6 +190,7 @@ export const makeNikCliRuntime = (
     }
 
     const createHost = async (projectId: string): Promise<ProjectHost> => {
+      assertOpen()
       const scratch = projectScratchDir(paths, projectId)
       mkdirSync(scratch, { recursive: true })
       const directory = realpathSync(scratch)
@@ -194,8 +203,9 @@ export const makeNikCliRuntime = (
           description: spec.description,
           parameters: spec.parameters,
           execute: async (args: never, ctx: ToolExecuteContext) => {
-            const output = await spec.execute(args, { sessionId: ctx.sessionID, projectId, signal: ctx.abort })
-            return { title: spec.id, output, metadata: {} }
+            const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
+            const result = spec.executeWithFiles ? await spec.executeWithFiles(args, call) : { output: await spec.execute(args, call) }
+            return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
           }
         }))
       )
@@ -206,11 +216,29 @@ export const makeNikCliRuntime = (
     }
 
     const runtime: NikCliRuntime = {
+      toolCatalogue: () => {
+        const specs = options.toolsFor("default")
+        const seen = new Set<string>()
+        for (const spec of specs) {
+          if (seen.has(spec.id)) throw new Error(`Duplicate host tool id: ${spec.id}`)
+          seen.add(spec.id)
+        }
+        return [...specs.map(({ id, description }) => ({ id, description })),
+          { id: "search_tools", description: "Find and load permitted deferred tools by exact name or capability through the native session registry." },
+          { id: "invalid", description: "Report invalid tool calls so the assistant can correct the tool name or arguments." },
+          { id: "code_mode", description: "Execute confined JavaScript using the permitted registered tools, with correlated nested-call progress." },
+          { id: "skill", description: "Read a registered CAD/CAM playbook." },
+          ...["todowrite", "todoread", "create_goal", "get_goal", "update_goal"].map((id) => ({ id, description: "Native agent planning and goal control." }))]
+      },
       paths,
-      catalogueReady,
+      get catalogueReady() {
+        assertOpen()
+        return catalogueReady ??= seedModelsCache(paths, { ...options.catalogue, signal: catalogueController.signal })
+      },
       host: (projectId) =>
         Effect.tryPromise({
           try: () => {
+            assertOpen()
             let existing = hosts.get(projectId)
             if (existing === undefined) {
               existing = createHost(projectId)
@@ -224,6 +252,7 @@ export const makeNikCliRuntime = (
       setProviderKey: (providerId, key) =>
         Effect.tryPromise({
           try: async () => {
+            assertOpen()
             pendingKeys.set(providerId, key)
             liveKeys.add(providerId)
             for (const promise of hosts.values()) {
@@ -235,6 +264,7 @@ export const makeNikCliRuntime = (
         }),
       clearProviderKey: (providerId) =>
         Effect.promise(async () => {
+          if (closed) return
           pendingKeys.delete(providerId)
           liveKeys.delete(providerId)
           for (const promise of hosts.values()) {
@@ -245,6 +275,7 @@ export const makeNikCliRuntime = (
       reloadSkills: () =>
         Effect.tryPromise({
           try: async () => {
+            assertOpen()
             for (const [projectId, promise] of hosts) {
               const host = await promise
               await writeConfig(projectId)
@@ -257,6 +288,7 @@ export const makeNikCliRuntime = (
       updateProviders: (next) =>
         Effect.tryPromise({
           try: async () => {
+            assertOpen()
             providers = next
             for (const [projectId, promise] of hosts) {
               const host = await promise
@@ -271,6 +303,7 @@ export const makeNikCliRuntime = (
         Effect.gen(function* () {
           const projectHost = yield* Effect.tryPromise({
             try: () => {
+              assertOpen()
               let existing = hosts.get(projectId)
               if (existing === undefined) {
                 existing = createHost(projectId)
@@ -296,6 +329,10 @@ export const makeNikCliRuntime = (
     // Teardown: drop every key the host holds (it persists them in plaintext) and dispose instances.
     yield* Effect.addFinalizer(() =>
       Effect.promise(async () => {
+        closed = true
+        catalogueController.abort()
+        await catalogueReady?.catch(() => undefined)
+        if (warm !== undefined) clearTimeout(warm)
         for (const promise of hosts.values()) {
           const host = await promise.catch(() => undefined)
           if (host === undefined) continue

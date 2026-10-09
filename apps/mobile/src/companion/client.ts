@@ -1,4 +1,4 @@
-import type { EntityChange, PullRequestRow, ReviewRow, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow } from "@cadcamfun/api"
+import type { EntityChange, LiveEvent, NotificationRow, PullRequestRow, ReviewRow, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow } from "@cadcamfun/api"
 import type { Pairing } from "./pairing.ts"
 import { sseParser, type ChatEvent } from "./sse.ts"
 
@@ -76,7 +76,64 @@ export class CompanionClient {
       signal,
     })
     if (!res.ok || !res.body) throw new CompanionError(res.status, `Assistant unavailable (HTTP ${res.status})`)
-    const parse = sseParser()
+    const parse = sseParser<ChatEvent>()
+    const decoder = new TextDecoder()
+    const reader = res.body.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      yield* parse(decoder.decode(value, { stream: true }))
+    }
+  }
+
+  // ---- Driving the assistant: is it available, stop it, answer it ----
+
+  /**
+   * Whether the paired desktop has a model key at all. Checked before the user types, so the phone can
+   * say "add a key on the desktop" instead of letting them write a message that will fail.
+   */
+  aiStatus = () => this.request<{ providers: Readonly<Record<string, string>>; configured: boolean; host: "nikcli" | "direct" }>("GET", "/api/ai/status")
+
+  /** Stops the turn the given session is running. `sessionId` may be omitted to stop whatever is running. */
+  abortChat = (sessionId?: string) =>
+    this.request<{ message: string }>("POST", "/api/ai/chat/abort", sessionId ? { sessionId } : {})
+
+  /**
+   * Answers a `permission_request` frame. Without this the assistant's tool call stalls until the model
+   * gives up, because nothing ever tells it the person said yes.
+   */
+  permissionReply = (sessionId: string, requestId: string, decision: "once" | "always" | "reject") =>
+    this.request<{ message: string }>("POST", "/api/ai/permission/reply", { sessionId, requestId, decision })
+
+  // ---- Notifications: the user's activity feed, shared with the desktop ----
+
+  notifications = (options: { readonly limit?: number; readonly onlyUnread?: boolean } = {}) => {
+    const query = new URLSearchParams()
+    if (options.limit !== undefined) query.set("limit", String(options.limit))
+    if (options.onlyUnread) query.set("onlyUnread", "true")
+    const suffix = query.size > 0 ? `?${query.toString()}` : ""
+    return this.request<{ notifications: ReadonlyArray<NotificationRow>; unreadCount: number }>("GET", `/api/notifications${suffix}`)
+  }
+  markNotificationRead = (id: string, isRead = true) =>
+    this.request<NotificationRow>("PUT", `/api/notifications/${encodeURIComponent(id)}`, { isRead })
+  markAllNotificationsRead = () =>
+    this.request<{ message: string; count: number }>("POST", "/api/notifications/mark-all-read")
+  removeNotification = (id: string) =>
+    this.request<{ message: string }>("DELETE", `/api/notifications/${encodeURIComponent(id)}`)
+
+  /**
+   * Tails the project's live activity stream (SSE). This is what lets the phone show a PR or a
+   * workflow run the moment it happens instead of only on the next pull-to-refresh. The caller owns
+   * the `AbortSignal`: aborting closes the subscription.
+   */
+  async *events(projectId: string, signal?: AbortSignal): AsyncGenerator<LiveEvent> {
+    const res = await this.fetcher(`${this.pairing.baseUrl}${this.project(projectId)}/events`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${this.pairing.token}`, accept: "text/event-stream" },
+      signal,
+    })
+    if (!res.ok || !res.body) throw new CompanionError(res.status, `Live events unavailable (HTTP ${res.status})`)
+    const parse = sseParser<LiveEvent>()
     const decoder = new TextDecoder()
     const reader = res.body.getReader()
     for (;;) {

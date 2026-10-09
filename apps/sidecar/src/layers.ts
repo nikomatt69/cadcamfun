@@ -66,6 +66,7 @@ import { Companion } from "./services/companion.ts"
 import { ProjectVcsRepo } from "./repos/project-vcs-repo.ts"
 import { GitHubTransports, ProjectVcs } from "./services/project-vcs.ts"
 import { WorkflowRunner } from "./services/workflow-runner.ts"
+import { WorkflowServiceStepsLive } from "./services/workflow-service-steps-live.ts"
 import { AnalyticsRepo } from "./repos/analytics-repo.ts"
 import { EventsHandlers } from "./http/events.ts"
 import { LiveEvents } from "./services/live-events.ts"
@@ -73,11 +74,37 @@ import { LiveEvents } from "./services/live-events.ts"
 /** Every group handler; add new route families here as they are implemented. */
 export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers)
 
-/** Git-style history, pull requests and workflow runs (spec 13). */
-const VcsServices = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(Layer.provideMerge(ProjectVcsRepo.layer), Layer.provideMerge(GitHubTransports.layer))
+/**
+ * The version-control services themselves. `LocalProfile` is provided here (not in `RepoServices`)
+ * because `WorkflowRunner` resolves the acting user of a run dispatched without one; a service
+ * provided in both places would be built twice.
+ */
+const VcsCore = Layer.mergeAll(ProjectVcs.layer, WorkflowRunner.layer()).pipe(
+  Layer.provideMerge(ProjectVcsRepo.layer),
+  Layer.provideMerge(GitHubTransports.layer),
+  Layer.provideMerge(LocalProfile.layer),
+)
 
-/** Repositories + services the handlers depend on (needs `Database`). */
-const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, NotificationService.layer, MachineConfigRepo.layer, StorageService.layer, LocalProfile.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
+/**
+ * Git-style history, pull requests and workflow runs (spec 13).
+ *
+ * The runner is built with the pure steps only. Steps that need a service are registered in a second
+ * layer, because a registration layer has to *see* the runner it registers into, which `Layer.mergeAll`
+ * cannot express — siblings do not satisfy each other. `vcs/commit` and `notify/push` live here;
+ * `ai/prompt` is registered by the AI layer instead, since the assistant is built on top of the runner
+ * and that dependency can only go the other way.
+ */
+const VcsServices = WorkflowServiceStepsLive.pipe(
+  Layer.provideMerge(VcsCore),
+  Layer.provideMerge(NotificationService.layer),
+)
+
+/**
+ * Repositories + services the handlers depend on (needs `Database`). `NotificationService` and
+ * `LocalProfile` are absent on purpose: `VcsServices` provides them, because `WorkflowRunner` and the
+ * steps it registers need them, and a service provided twice would be built twice.
+ */
+const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
 export const Services = AiLive.pipe(Layer.provideMerge(RepoServices))

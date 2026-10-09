@@ -179,9 +179,9 @@ describe("chamferBox", () => {
   test("the volume is the chamfered cube, not an arbitrary bound", () => {
     // L³ minus the twelve edge wedges, plus back the eight corner tetrahedra
     // that the wedges remove three times over:
-    //   centre (L−2d)³ + 6 slabs d(L−2d)² + 12 half-wedges ½d²(L−2d) + 8×(d³/3)
+    //   centre (L−2d)³ + 6 slabs d(L−2d)² + 12 half-wedges ½d²(L−2d) + 8×(d³/6)
     const L = 10, d = 1
-    const analytic = (L - 2 * d) ** 3 + 6 * d * (L - 2 * d) ** 2 + 6 * d * d * (L - 2 * d) + (8 * d ** 3) / 3
+    const analytic = (L - 2 * d) ** 3 + 6 * d * (L - 2 * d) ** 2 + 6 * d * d * (L - 2 * d) + (8 * d ** 3) / 6
     const mesh = (() => {
       // chamferBox lives in the same module; import it directly.
       return chamferBoxOf(make(L, d), d)

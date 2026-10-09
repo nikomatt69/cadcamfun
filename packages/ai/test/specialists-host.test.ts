@@ -4,7 +4,11 @@
  * report comes back as the `agent_task` result.
  */
 import { afterAll, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { Effect, Scope, Stream } from "effect"
+import { Effect, Layer, Redacted, Scope, Stream } from "effect"
+import { AiConfig } from "../src/ai-config.ts"
+import { AiCredentials } from "../src/credentials.ts"
+import { DirectModel } from "../src/direct-model.ts"
+import { AiBackground, AiHost, AiService } from "../src/service.ts"
 import type { AiEvent } from "../src/events.ts"
 import { SUBAGENTS } from "../src/nikcli/agents.ts"
 import { createHostSession, hostChatStream } from "../src/nikcli/chat.ts"
@@ -57,7 +61,7 @@ const runtime: NikCliRuntime = await Effect.runPromise(
     toolsFor: (projectId) => [...buildTools(handlers, projectId), ...backgroundTools(manager)]
   }).pipe(Scope.provide(scope))
 )
-const runner = new BackgroundToolsRunner(runtime, "__shared__", { manager })
+const runner = new BackgroundToolsRunner(runtime, { manager })
 await Effect.runPromise(runtime.setProviderKey("fake", "sk-fake-test-key"))
 const model = { providerID: "fake", modelID: "fake-model" } as const
 
@@ -70,6 +74,34 @@ afterAll(async () => {
 const collect = (stream: Stream.Stream<AiEvent, unknown>): Promise<ReadonlyArray<AiEvent>> => Effect.runPromise(Stream.runCollect(stream)).then((chunk) => [...chunk])
 
 describe("an editing specialist inside a real host turn", () => {
+  test("removing a client alias joins its real host children and removes the resolved parent", async () => {
+    const projectId = "project-alias-removal"
+    const alias = "ui-conversation-alias"
+    const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: sharedDataDir, forceGateway: false }))
+    const service = AiService.layer.pipe(Layer.provideMerge(Layer.mergeAll(
+      DirectModel.layer.pipe(Layer.provideMerge(base)),
+      Layer.succeed(AiHost, { runtime, scheduler: manager }),
+      Layer.succeed(AiBackground, {
+        runner, cancelForParent: (owner) => Effect.promise(() => runner.cancelForParent(owner)),
+        dispose: () => Effect.promise(() => runner.dispose())
+      })
+    )))
+    await Effect.runPromise(Effect.gen(function* () {
+      yield* (yield* AiCredentials).set("fake", Redacted.make("sk-fake-test-key"))
+      const ai = yield* AiService
+      const events = yield* Stream.runCollect(ai.chat({ projectId, sessionId: alias, message: "make hole-1 8 mm", model: { provider: "fake", model: "fake-model" } }))
+      const parentId = events.find((event) => event.type === "done")?.sessionId
+      if (!parentId) throw new Error("Missing resolved parent")
+      expect(parentId).not.toBe(alias)
+      const owner = { projectId, parentSessionId: parentId }
+      const task = manager.enqueue({ ...owner, description: "cancel with parent", prompt: "inspect", background: true })
+      expect(yield* ai.removeSession(alias, "untrusted-project-hint")).toBe(true)
+      expect(manager.read(owner, task.id).status).toBe("cancelled")
+      const host = yield* runtime.host(projectId)
+      expect((yield* Effect.promise(() => host.client.session.list({}))).some((session) => session.id === parentId)).toBe(false)
+    }).pipe(Effect.provide(service)))
+  })
+
   test("it runs with only its tools in the parent's project, streams its tool calls to the parent and returns its report", async () => {
     editorRequests = []
     handlerCalls.length = 0

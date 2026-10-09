@@ -21,7 +21,7 @@ export const clientLayer = (endpoint: Endpoint, transport: typeof fetch = global
 export const runtimeForLayer = (layer: ReturnType<typeof clientLayer>): AppRuntime => {
   const managed = ManagedRuntime.make(layer)
   return {
-    run: (effect) => managed.runPromise(effect),
+    run: (effect, options) => managed.runPromise(effect, options),
     runVoid: (effect) => { void managed.runPromise(effect).catch(() => undefined) },
     dispose: () => { void managed.dispose() }
   }
@@ -30,7 +30,7 @@ export const runtimeForLayer = (layer: ReturnType<typeof clientLayer>): AppRunti
 export const runtimeForClient = (client: Client): AppRuntime => {
   const managed = ManagedRuntime.make(Layer.succeed(ApiClient, client))
   return {
-    run: (effect) => managed.runPromise(effect),
+    run: (effect, options) => managed.runPromise(effect, options),
     runVoid: (effect) => { void managed.runPromise(effect).catch(() => undefined) },
     dispose: () => { void managed.dispose() }
   }

@@ -2,6 +2,7 @@ import { Context, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 import { AiConfig } from "./ai-config.ts"
 import { AiCredentials } from "./credentials.ts"
 import { DirectModel } from "./direct-model.ts"
+import { AiCache } from "./cache.ts"
 import { AiAborted, AiConfigError, AiProviderError, type AiError } from "./errors.ts"
 import type { AiEvent } from "./events.ts"
 import { analyzeGcode, type GcodeReport, type MachineProfile } from "./gcode-analysis.ts"
@@ -57,7 +58,7 @@ export class AiHost extends Context.Service<AiHost, {
 export class AiBackground extends Context.Service<AiBackground, {
   readonly runner: import("./nikcli/background-tools-runner.ts").BackgroundToolsRunner
   /** Cancel every active/queued worker owned by the parent session. */
-  readonly cancelForParent: (parentSessionId: string) => Effect.Effect<number>
+  readonly cancelForParent: (owner: import("./nikcli/background-tasks.ts").BackgroundTaskOwner) => Effect.Effect<number>
   /** Cancel every active/queued worker and refuse future enqueues. */
   readonly dispose: () => Effect.Effect<void>
 }>()("cadcamfun/AiBackground") {}
@@ -88,6 +89,8 @@ export class AiService extends Context.Service<AiService, {
   readonly models: Effect.Effect<ReadonlyArray<ModelEntry>, AiConfigError>
   /** Every provider with its models, auth methods and key state. Fails only when the catalogue cannot be read. */
   readonly providers: Effect.Effect<ReadonlyArray<ProviderEntry>, AiConfigError>
+  readonly availableModels: Effect.Effect<ReadonlyArray<ModelEntry>, AiConfigError>
+  readonly invalidateCatalogue: Effect.Effect<void>
   readonly chat: (input: ChatInput) => Stream.Stream<AiEvent, AiError>
   readonly complete: (input: { prompt: string; system?: string; model?: ModelSelector }) => Effect.Effect<{ text: string; model: string }, AiError>
   readonly generate: <A>(input: { prompt: string; schema: Schema.Decoder<A>; system?: string; model?: ModelSelector }) => Effect.Effect<A, AiError>
@@ -101,6 +104,8 @@ export class AiService extends Context.Service<AiService, {
   readonly summarizeDesignSuggestions: (input: { elements: string; currentOperation?: string; currentTool?: string; model?: ModelSelector }) => Effect.Effect<DesignSuggestionsSummary, AiError>
   readonly analyzeGcode: (input: { gcode: string; machine?: MachineProfile }) => Effect.Effect<GcodeReport>
   readonly abort: (sessionId: string) => Effect.Effect<void>
+  /** Resolve client identity, stop and join children, then remove the host session. */
+  readonly removeSession: (sessionId: string, projectId?: string) => Effect.Effect<boolean>
   /** Where a conversation stands, for a client that lost its connection mid-turn (`busy: false` when there is no host session). */
   readonly sessionState: (sessionId: string, projectId?: string) => Effect.Effect<HostSessionState, AiError>
   /** A message written while the agent works: admitted to the host's pending queue (or steered in) and answered by the running turn. */
@@ -112,7 +117,9 @@ export class AiService extends Context.Service<AiService, {
       const credentials = yield* AiCredentials
       const config = yield* AiConfig
       const direct = yield* DirectModel
+      const cache = yield* AiCache
       const host = yield* Effect.serviceOption(AiHost)
+      const background = yield* Effect.serviceOption(AiBackground)
       const controllers = yield* Ref.make(new Map<string, AbortController>())
       /** Client session id (owned by the UI) → the host session it actually talks to. */
       const sessionMap = yield* Ref.make(new Map<string, { host: ProjectHost; sessionId: string }>())
@@ -132,18 +139,11 @@ export class AiService extends Context.Service<AiService, {
        * The host catalogue, cached for a minute: it is the whole models.dev database
        * (~1.5 MB / ~8k models) and the settings screen reads it on every visit.
        */
-      const catalogCache = yield* Ref.make<Option.Option<{ readonly at: number; readonly value: ReadonlyArray<HostProviderInfo> }>>(
-        Option.none()
+      const [cachedCatalog, invalidateCatalog] = yield* Effect.cachedInvalidateWithTTL(
+        Option.isSome(host) ? hostCatalog(host.value.runtime) : Effect.succeed([] as ReadonlyArray<HostProviderInfo>),
+        "1 minute"
       )
-      const CATALOG_TTL_MS = 60_000
-      const catalogOf = (runtime: NikCliRuntime): Effect.Effect<ReadonlyArray<HostProviderInfo>, AiConfigError> =>
-        Effect.gen(function* () {
-          const cached = yield* Ref.get(catalogCache)
-          if (Option.isSome(cached) && Date.now() - cached.value.at < CATALOG_TTL_MS) return cached.value.value
-          const value = yield* hostCatalog(runtime)
-          yield* Ref.set(catalogCache, Option.some({ at: Date.now(), value }))
-          return value
-        })
+      const catalogOf = (_runtime: NikCliRuntime) => cachedCatalog.pipe(Effect.tapError(() => invalidateCatalog))
 
       /** The built-in tier defaults shaped as host models: direct mode has no catalogue to read. */
       const builtinModels = (provider: BuiltinProviderId): ReadonlyArray<HostModelInfo> =>
@@ -247,7 +247,16 @@ export class AiService extends Context.Service<AiService, {
         model?: ModelSelector
       ): Effect.Effect<A, AiError> => {
         const prompt = renderPrompt(template, variables)
-        return direct.generateObject({ prompt: prompt.user, system: prompt.system, schema, model })
+        return Effect.gen(function*() {
+          const credentialRevision = yield* credentials.revision
+          const payload = { template: { system: template.system, user: template.user }, variables, model: model ?? null, credentialRevision }
+          const key = cache.keyFor(payload)
+          const hit = yield* cache.get<A>(key)
+          if (hit !== undefined) return hit
+          const result = yield* direct.generateObject({ prompt: prompt.user, system: prompt.system, schema, model })
+          yield* cache.set(key, result)
+          return result
+        })
       }
 
       const chat = (input: ChatInput): Stream.Stream<AiEvent, AiError> =>
@@ -272,7 +281,7 @@ export class AiService extends Context.Service<AiService, {
             // No embedded host: a stateless one-shot stream through the AI SDK.
             const sessionId = input.sessionId ?? crypto.randomUUID()
             let text = ""
-            return direct.streamText({ prompt: message, system, model: input.model ?? { provider: resolved.provider, model: resolved.modelId } }).pipe(
+            return direct.streamText({ prompt: message, files: attached.parts, system, model: input.model ?? { provider: resolved.provider, model: resolved.modelId } }).pipe(
               Stream.flatMap((part): Stream.Stream<AiEvent> => {
                 if (part.type === "delta") { text += part.text; return Stream.succeed({ type: "delta", sessionId, text: part.text }) }
                 return Stream.succeed({ type: "done", sessionId, text, usage: part.usage })
@@ -289,7 +298,11 @@ export class AiService extends Context.Service<AiService, {
 
       return AiService.of({
         models,
+        availableModels: configured.pipe(Effect.flatMap((ids) => ids.size === 0
+          ? Effect.succeed([] as ReadonlyArray<ModelEntry>)
+          : models.pipe(Effect.map((entries) => entries.filter((entry) => entry.configured))))),
         providers,
+        invalidateCatalogue: invalidateCatalog,
         chat,
         complete: (input) => direct.generateText(input).pipe(Effect.map((r) => ({ text: r.text, model: r.model }))),
         generate: (input) => direct.generateObject(input),
@@ -359,6 +372,29 @@ export class AiService extends Context.Service<AiService, {
             if (mapped === undefined) return yield* new AiConfigError({ message: "There is no running conversation to add this message to." })
             yield* queueHostMessage(mapped.host, mapped.sessionId, message, delivery ?? "queue")
           }),
+        removeSession: Effect.fn("AiService.removeSession")(function* (sessionId: string, projectId?: string) {
+          (yield* Ref.get(controllers)).get(sessionId)?.abort()
+          if (Option.isNone(host)) return false
+          const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+          const target = mapped !== undefined
+            ? Option.some(mapped)
+            : yield* host.value.runtime.host(projectId ?? "default").pipe(
+              Effect.map((projectHost) => ({ host: projectHost, sessionId })), Effect.option)
+          if (Option.isNone(target)) return false
+          const resolved = target.value
+          if (Option.isSome(background)) {
+            yield* background.value.cancelForParent({ projectId: resolved.host.projectId, parentSessionId: resolved.sessionId })
+          }
+          yield* abortHostSession(resolved.host, resolved.sessionId)
+          const removed = yield* Effect.promise(() => resolved.host.client.session.remove({ sessionID: resolved.sessionId }).catch(() => false))
+          yield* Ref.update(sessionMap, (map) => {
+            for (const [clientId, binding] of map) {
+              if (binding.host === resolved.host && binding.sessionId === resolved.sessionId) map.delete(clientId)
+            }
+            return map
+          })
+          return removed
+        }),
         abort: (sessionId) =>
           Effect.gen(function* () {
             const map = yield* Ref.get(controllers)
@@ -376,7 +412,7 @@ export class AiService extends Context.Service<AiService, {
           })
       })
     })
-  )
+  ).pipe(Layer.provide(AiCache.layer()))
 }
 
 export type { ProviderId }

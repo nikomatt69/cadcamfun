@@ -63,7 +63,7 @@ export const vcsToolSpecs = (deps: VcsToolDeps): ReadonlyArray<HostToolSpec> => 
       Effect.gen(function*() {
         const { current } = yield* vcs.branches(id)
         const pr = yield* vcs.openPullRequest(id, { title, body, head: current }, actor)
-        yield* runner.trigger(id, current, { type: "pull-request", base: pr.base }).pipe(Effect.ignore)
+        yield* runner.trigger(id, current, { type: "pull-request", base: pr.base }, { actor }).pipe(Effect.ignore)
         return { number: pr.number, head: pr.head, base: pr.base }
       })),
     tool("vcs_list_pull_requests", "Pull requests of the project (default: open ones), with review verdicts.", z.object({ state: z.enum(["open", "merged", "closed"]).default("open") }), (id, { state }) =>
@@ -71,10 +71,17 @@ export const vcsToolSpecs = (deps: VcsToolDeps): ReadonlyArray<HostToolSpec> => 
         const list = yield* vcs.listPullRequests(id, state)
         return yield* Effect.forEach(list, (p) => vcs.pullRequest(id, p.number).pipe(Effect.map((d) => ({ number: p.number, title: p.title, head: p.head, authorKind: p.authorKind, reviews: d.reviews.map((r) => ({ verdict: r.verdict, body: r.body })) }))))
       })),
-    tool("actions_run", "Run the project's workflows (.cadcamfun/workflows/*.yml) that allow manual runs on the checked-out branch and report their status.", z.object({}), (id) =>
+    tool("vcs_restore_paths", "Roll the named ids back to an earlier commit on the checked-out ai/* branch. Destructive. Refused on main.", z.object({ paths: z.array(z.string().min(1)).min(1).max(200), from: z.string().min(1) }), (id, { paths, from }) =>
+      Effect.gen(function*() {
+        const oid = yield* vcs.restore(id, from, actor, paths)
+        const { current } = yield* vcs.branches(id)
+        return { commit: oid, branch: current, paths }
+      })),
+    tool("actions_run", "Run the project's workflows (.cadcamfun/workflows/*.yml) on the checked-out branch and report their status. Default trigger is manual; use pull-request or push to dispatch the workflows of that event.", z.object({ trigger: z.enum(["manual", "pull-request", "push"]).default("manual") }), (id, { trigger }) =>
       Effect.gen(function*() {
         const { current } = yield* vcs.branches(id)
-        return (yield* runner.trigger(id, current, { type: "manual" })).map((r) => ({ workflow: r.workflow, status: r.status }))
+        const event = trigger === "manual" ? { type: "manual" as const } : trigger === "push" ? { type: "push" as const, branch: current, changedPaths: [] as string[] } : { type: "pull-request" as const, base: "main" }
+        return (yield* runner.trigger(id, current, event)).map((r) => ({ workflow: r.workflow, status: r.status }))
       })),
   ]
 }

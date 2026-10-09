@@ -1,0 +1,8 @@
+Compare two real components/elements: parameter definitions, resolved values, feature dependencies and nominal spatial relationships. Do not use it to invent assembly mates or silently bind similarly named parameters.
+
+Parameters
+- firstId: first existing element/component id.
+- secondId: different second existing element/component id in the same drawing.
+
+Result
+Both components' parameter histories and dependencies, placement, world axis-aligned bounds, origin distance (mm), per-axis bounding gaps and explicit cross-element references. Bounds are enclosing boxes; overlap does not prove solid interference, and separation is a lower bound on clearance. Equal parameter names/values are not a shared binding. Missing bounds/parameters are reported. Inspect exact properties with cad_inspect, validate variants with cad_parametric, and verify collision/fit using the actual model rather than screenshots.

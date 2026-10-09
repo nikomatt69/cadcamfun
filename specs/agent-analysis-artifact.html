@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CADCAM Agent — Analysis, Blueprint & Roadmap</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --panel-2: #1c2030;
+    --line: #2a2f3e;
+    --ink: #e6e8ee;
+    --ink-2: #c0c4d0;
+    --muted: #8a8fa3;
+    --accent: #5cc8ff;
+    --accent-2: #f0c674;
+    --good: #7ddca1;
+    --warn: #f5a97f;
+    --bad: #f06b6b;
+    --code-bg: #0a0c12;
+    --link: #89b4ff;
+  }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    margin: 0;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 96px; }
+  header h1 {
+    font-size: 36px; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 8px;
+    font-weight: 700;
+  }
+  header .lede {
+    color: var(--ink-2); font-size: 17px; max-width: 760px; line-height: 1.5;
+    margin: 0 0 24px;
+  }
+  header .meta {
+    display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 13px;
+    border-top: 1px solid var(--line); padding-top: 16px; margin-bottom: 40px;
+  }
+  header .meta b { color: var(--ink-2); font-weight: 600; }
+  h2 {
+    margin: 56px 0 12px; font-size: 24px; letter-spacing: -0.01em; line-height: 1.2;
+    border-top: 1px solid var(--line); padding-top: 28px;
+  }
+  h2:first-of-type { border: 0; margin-top: 0; padding-top: 0; }
+  h3 { margin: 28px 0 10px; font-size: 17px; color: var(--ink); }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  ul, ol { padding-left: 22px; color: var(--ink-2); }
+  li { margin: 4px 0; }
+  code, pre, .mono { font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; }
+  code { background: var(--panel); padding: 1px 6px; border-radius: 4px; font-size: 13px; color: var(--ink); }
+  pre { background: var(--code-bg); border: 1px solid var(--line); padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: transparent; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0 8px; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { color: var(--ink-2); }
+  td b { color: var(--ink); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; margin: 12px 0;
+  }
+  .panel h4 { margin: 0 0 6px; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  .panel p { margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .grid .panel { margin: 0; }
+  .spec-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 10px 0; }
+  .spec-list a {
+    display: block; padding: 12px 14px; background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 10px; color: var(--ink-2);
+    text-decoration: none;
+  }
+  .spec-list a:hover { border-color: var(--accent); color: var(--ink); }
+  .spec-list a b { display: block; color: var(--accent); font-size: 13px; margin-bottom: 2px; }
+  .spec-list a span { display: block; font-size: 14px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .badge { background: var(--panel-2); color: var(--ink-2); padding: 2px 9px; border-radius: 999px; font-size: 11.5px; border: 1px solid var(--line); }
+  .badge.ok { color: var(--good); border-color: rgba(125, 220, 161, 0.4); }
+  .badge.warn { color: var(--warn); border-color: rgba(245, 169, 127, 0.4); }
+  .badge.bad { color: var(--bad); border-color: rgba(240, 107, 107, 0.4); }
+  .phase { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .phase:first-child { border-top: 0; }
+  .phase .id { flex: 0 0 60px; color: var(--accent); font-weight: 700; font-family: "SF Mono", monospace; padding-top: 2px; }
+  .phase .body { flex: 1; }
+  .phase .body b { color: var(--ink); font-weight: 600; }
+  .arch {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px; margin: 14px 0; font-family: "SF Mono", monospace; font-size: 12.5px;
+    color: var(--ink-2); white-space: pre; overflow-x: auto; line-height: 1.45;
+  }
+  .arch .hl { color: var(--accent); }
+  .arch .hl2 { color: var(--accent-2); }
+  .flow {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 22px; margin: 14px 0; font-family: "SF Mono", monospace; font-size: 12.5px;
+    color: var(--ink-2); white-space: pre; overflow-x: auto; line-height: 1.6;
+  }
+  .note { color: var(--muted); font-size: 13px; }
+  .tagline { color: var(--accent-2); font-style: italic; }
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 28px; margin-top: 56px; }
+  footer p { color: var(--muted); font-size: 13px; }
+  /* Mobile */
+  @media (max-width: 720px) {
+    .wrap { padding: 28px 18px 72px; }
+    header h1 { font-size: 28px; }
+    header .lede { font-size: 15px; }
+    h2 { font-size: 20px; }
+    table { font-size: 12.5px; }
+    th, td { padding: 7px 9px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>The CADCAM Agent</h1>
+  <p class="lede">A bespoke CAD/CAM colleague built as an nikcli-style coding/terminal agent, retargeted at building geometry and machining programs on the project the user is editing. It uses <b>CADCAMFUN elements</b>, edits them, saves them, looks up <b>materials / tools / machines / toolpaths</b> in the library, sits inside a <b>git-style history</b>, runs <b>Actions-style workflows</b> on every commit, and reaches the user through the same chat on the <b>iOS companion</b>.</p>
+  <p class="lede tagline">"What nikcli does for the code editor, the cadcam agent does for the CAD/CAM editor."</p>
+  <div class="meta">
+    <span><b>Codebases</b> nikcli @ <code>/Volumes/SSD/Development/nikcli-main</code> · cadcamfun @ <code>/Volumes/SSD/Development/cad-cam-app-main-prod-main-prod-v2-auth-proveder-2</code></span>
+  </div>
+</header>
+
+<h2>1. Architecture</h2>
+
+<p>The cadcamfun AI layer (<code>packages/ai</code>) embeds <b>nikcli's <code>sdk-next</code></b> in-process. The host runs with an isolated config (no <code>~/.config/nikcli</code> read), a deny-by-default <code>cadcam</code> agent whose only allowed tools are the ones this package registers, no shell / file tools, a four-specialist roster, and ten skills that are loaded on demand.</p>
+
+<div class="arch">
+<span class="hl">User</span> ──► Desktop (Solid + Three viewport) ──► Sidecar (Bun + Effect + HttpApi)
+                                                        │
+                                                        ├─ <span class="hl">AiService</span> (<code>packages/ai/src/service.ts</code>)
+                                                        │     ├─ <span class="hl">AiCredentials</span>   (<code>credentials.ts</code>)
+                                                        │     ├─ AiCache          (<code>cache.ts</code>)
+                                                        │     ├─ DirectModel      (<code>direct-model.ts</code>)
+                                                        │     └─ <span class="hl">AiHost</span>           (<code>nikcli/runtime.ts</code>)
+                                                        │            ├─ <span class="hl2">cadcam</span> agent (deny-by-default)
+                                                        │            ├─ <span class="hl2">4 specialists</span>: researcher / editor / modeler / machinist
+                                                        │            ├─ <span class="hl2">22 built-in tools</span> (+ N extensions via plugin SDK)
+                                                        │            └─ <span class="hl2">10 skills</span> + N user skills
+                                                        │
+                                                        └─ Sidecar services
+                                                              ├─ ProjectRepo        (cad/cam editing handlers)
+                                                              ├─ <span class="hl">ProjectVcs</span>       (vcs tools on top of <code>packages/vcs</code>)
+                                                              ├─ <span class="hl">WorkflowRunner</span>   (<code>apps/sidecar/src/services/workflow-runner.ts</code>)
+                                                              └─ CompanionGateway   (<code>apps/sidecar/src/services/companion-gateway.ts</code>)
+</div>
+
+<div class="panel">
+  <h4>The principle</h4>
+  <p>The agent's effective view of the project is the workspace context renderer plus the system prompt plus the conversation history nikcli holds. Nothing else reaches the model. Tool calls return to the editor immediately; tool calls that touch the repository land on a reviewable <code>ai/*</code> branch; a person always reviews and merges. Credentials and shell are out of reach by construction.</p>
+</div>
+
+<h2>2. Analysis — nikcli vs the cadcam agent</h2>
+
+<p>nikcli (<code>/Volumes/SSD/Development/nikcli-main/CLAUDE.md</code>) is an autonomous software-development assistant: a stateful model loop with an in-process tool registry and an editable workspace the agent can read and write. Its <code>BaseAgent</code> / <code>UniversalAgent</code> / specialised agents (<code>coding-agent.ts</code>), its <code>ToolRegistry</code> + permission gates (<code>secure-tools-registry.ts</code>), its cognitive parser + orchestration plan (<code>universal-agent.ts:279-440</code>) and its <code>ContextAwareRAGSystem</code> are mapped into cadcamfun's AI layer in <code>specs/15-ai-agent-analysis.md</code>. The mapping is one-to-one. The shape is identical; the toolbox is replaced.</p>
+
+<table>
+  <thead>
+    <tr><th>nikcli concept</th><th>cadcamfun equivalent</th><th>What changes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><b>BaseAgent</b> universal lifecycle</td><td><code>AiService</code> Context.Service over the embedded host</td><td>cadcamfun doesn't own its own loop — the host does</td></tr>
+    <tr><td><b>UniversalAgent</b> cognitive dispatch by category</td><td><code>cadcam</code> host agent with curated tools, deny-by-default</td><td>No category dispatch — model picks from the tool catalogue</td></tr>
+    <tr><td><b>CodingAgent</b> (analyze / generate / optimize / explain / debug / test)</td><td><code>editor</code> + <code>modeler</code> specialists, plus the <code>cad-3d-modeling</code> skill</td><td>Coding subroutines → CAD subroutines: model → edit → check → verify</td></tr>
+    <tr><td><b>ToolRegistry</b> with bash / file / etc.</td><td><code>tools/registry.ts</code> with <code>cad_*</code>, <code>cam_*</code>, <code>lib_*</code>, <code>vcs_*</code>, <code>actions_*</code></td><td>Toolbox is replaced; permissions are nikcli's permission map</td></tr>
+    <tr><td><b>ContextAwareRAGSystem</b> + <b>WorkspaceContext</b></td><td><code>renderWorkspaceContext(snapshot, budget)</code> + the desktop's <code>ai.context.&lt;projectId&gt;</code> JSON</td><td>One renderer; sectioned text inside a 6 000-char budget</td></tr>
+    <tr><td>Cognitive memory (in-process)</td><td><code>memory_remember</code> / <code>memory_recall</code> over <code>KvStore</code>-backed <code>ai.memory.*</code></td><td>Cross-session, cross-project notes; visible in settings</td></tr>
+    <tr><td><code>/sessions</code>, <code>/compact</code></td><td>Conversation panel + host-native compaction (<code>compaction.auto/prune/reserved</code>)</td><td>Same UX; host owns durable session</td></tr>
+    <tr><td><code>/plan</code>, <code>/auto</code> modes</td><td><code>agent_task</code> for delegation; <code>create_goal</code> for self-direction</td><td>Same orchestration shape, explicit</td></tr>
+    <tr><td>LSP diagnostics (<code>lspManager.getWorkspaceInsights</code>)</td><td><code>cad_check_design</code> + <code>cam_verify_toolpath</code></td><td>The CAD/CAM equivalent of "lint the code"</td></tr>
+    <tr><td><b>What nikcli has, cadcamfun drops</b></td><td colspan="2"><i>Arbitrary shell / file system access, code generation/refactor, self-approval.</i> Out of scope for <code>cadcam</code>; carried by a specialist if anywhere.</td></tr>
+    <tr><td><b>What cadcamfun has, nikcli doesn't</b></td><td colspan="2"><i>A project-shaped workspace with units/tolerances, an editing lock between specialists, VCS + Workflows as tools the agent calls.</i></td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h4>The four specialists</h4>
+  <p>Each is a nikcli <code>Agent</code> record (mode <code>subagent</code>) with its own prompt and a deny-by-default permission map computed in <code>agents.ts:176</code>. Editors run in the parent's turn, one at a time per project; researchers run in the background and wake the parent with their findings.</p>
+</div>
+
+<table>
+  <thead>
+    <tr><th>Specialist</th><th>Host id</th><th>Tools (curated)</th><th>Steps</th><th>Timeout</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><b>researcher</b> <span class="badge warn">read-only</span></td><td><code>cadcam-worker</code></td><td><code>cad_describe_drawing</code>, <code>cad_check_design</code>, <code>cam_list_operations</code>, <code>cam_suggest_parameters</code>, <code>cam_describe_machine</code>, <code>cam_analyze_gcode</code>, <code>lib_lookup_material</code>, <code>lib_lookup_tool</code>, <code>memory_recall</code>, <code>vcs_status</code>, <code>vcs_diff</code>, <code>vcs_list_pull_requests</code></td><td>40</td><td>5 min</td></tr>
+    <tr><td><b>editor</b> <span class="badge ok">edits</span></td><td><code>cadcam-editor</code></td><td>above + <code>cad_modify_entities</code>, <code>cad_transform_entities</code>, <code>cad_group_entities</code>, <code>cad_editor</code>, <code>cad_delete_entities</code> (<code>confirm: true</code>)</td><td>40</td><td>8 min</td></tr>
+    <tr><td><b>modeler</b> <span class="badge ok">edits</span></td><td><code>cadcam-modeler</code></td><td>above + <code>cad_add_elements</code>, <code>cad_add_entities</code>, <code>cad_import_drawing</code></td><td>60</td><td>10 min</td></tr>
+    <tr><td><b>machinist</b> <span class="badge ok">edits</span></td><td><code>cadcam-machinist</code></td><td>above + <code>cam_create_operation</code>, <code>cam_update_operation</code>, <code>cam_generate_gcode</code>, <code>cam_verify_toolpath</code>, <code>actions_run</code></td><td>60</td><td>10 min</td></tr>
+  </tbody>
+</table>
+
+<h2>3. The CAD/CAM toolbox (22 built-in tools)</h2>
+
+<p>Source: <code>packages/ai/src/tools/registry.ts</code>. Every tool has a <code>tools/&lt;id&gt;.ts</code> and a <code>tools/prompts/&lt;id&gt;.txt</code>; extension tools register alongside via <code>buildTools(handlers, projectId, extensions)</code>.</p>
+
+<h3>3.1 Geometry (CAD)</h3>
+<table>
+  <thead><tr><th>Tool</th><th>Effect</th><th>Confirms</th></tr></thead>
+  <tbody>
+    <tr><td><code>cad_describe_drawing</code></td><td>counts, bounds, layers (read)</td><td>—</td></tr>
+    <tr><td><code>cad_check_design</code></td><td><code>cad.checkModel</code> — sizes, booleans, rotations, duplicates, floats, out-of-stock (read)</td><td>—</td></tr>
+    <tr><td><code>cad_add_entities</code></td><td>append 2D entities (5–15 per call)</td><td>—</td></tr>
+    <tr><td><code>cad_add_elements</code></td><td>build 3D + 2D: solids, extrusion, revolution, sweep, loft, booleans, curves, mechanical, architecture (40 max per call; <code>skipped[]</code> for invalid)</td><td>—</td></tr>
+    <tr><td><code>cad_import_drawing</code></td><td>DXF/SVG text or attachment + depth; STEP is prismatic</td><td>—</td></tr>
+    <tr><td><code>cad_modify_entities</code></td><td>by id; send only the fields that change</td><td>—</td></tr>
+    <tr><td><code>cad_transform_entities</code></td><td>move / turn / scale + <code>copies</code> for arrays</td><td>—</td></tr>
+    <tr><td><code>cad_group_entities</code></td><td>component / group</td><td>—</td></tr>
+    <tr><td><code>cad_editor</code></td><td>layers, view, selection</td><td>—</td></tr>
+    <tr><td><code>cad_delete_entities</code></td><td>by id</td><td><b>yes</b></td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 Toolpaths (CAM)</h3>
+<table>
+  <thead><tr><th>Tool</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>cam_describe_machine</code></td><td>mill/lathe/printer, axes, zeros, probing (read)</td></tr>
+    <tr><td><code>cam_create_operation</code></td><td>type + params Schema</td></tr>
+    <tr><td><code>cam_list_operations</code></td><td>per-drawing list</td></tr>
+    <tr><td><code>cam_update_operation</code></td><td>re-decodes with the same Schema</td></tr>
+    <tr><td><code>cam_suggest_parameters</code></td><td>pure <code>generator.suggestFor</code></td></tr>
+    <tr><td><code>cam_generate_gcode</code></td><td>stats + first N lines</td></tr>
+    <tr><td><code>cam_analyze_gcode</code></td><td>static checks (no LLM)</td></tr>
+    <tr><td><code>cam_verify_toolpath</code></td><td>replay on stock; holder/fixtures/target optional</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 Library + memory + delegation + VCS + Workflows</h3>
+<table>
+  <thead><tr><th>Tool</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>lib_lookup_material</code> / <code>lib_lookup_tool</code></td><td>library reads</td></tr>
+    <tr><td><code>memory_remember</code> / <code>memory_recall</code></td><td><code>ai.memory.*</code> keys via <code>KvStore</code></td></tr>
+    <tr><td><code>agent_task</code> / <code>agent_tasks</code> / <code>agent_task_read</code> / <code>agent_task_cancel</code></td><td>delegate to a specialist (4 active / 16 queued, exclusive edit)</td></tr>
+    <tr><td><code>vcs_status</code> / <code>vcs_diff</code> / <code>vcs_list_pull_requests</code></td><td>read history</td></tr>
+    <tr><td><code>vcs_start_change</code></td><td>create + checkout <code>ai/&lt;topic&gt;</code> (fails on dirty)</td></tr>
+    <tr><td><code>vcs_commit</code> / <code>vcs_open_pull_request</code></td><td>refused on <code>main</code> for AI actors</td></tr>
+    <tr><td><code>actions_run</code></td><td>run <code>manual</code> workflows</td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h4>Safety, by construction</h4>
+  <p><code>XDG_*_HOME</code> + <code>NIKCLI_TEST_HOME</code> point at the app data dir; <code>NIKCLI_DISABLE_PROJECT_CONFIG=1</code>; <code>cadcam</code> permission map is <code>"*": "deny"</code> + every registered tool id <code>"allow"</code> + <code>skill/code_mode/todowrite/todoread/create_goal/get_goal/update_goal</code> <code>"allow"</code>; <code>task</code> is <code>"deny"</code>; permission mode <code>"default"</code> (no auto-approve); destructive tools carry <code>confirm: true</code>; AI actors cannot commit/restore/merge on <code>main</code>; the phone gateway refuses credential/plugin/GitHub routes.</p>
+</div>
+
+<h2>4. Parametric drawings & composed CAM programs</h2>
+
+<h3>4.1 Parametric — <code>parametric</code> element</h3>
+
+<p>The agent builds a parametric part when the user wants named, changeable dimensions ("a plate with M holes on a ring of Ø D, where M, D and thickness are named parameters"), and edits it later without rebuilding it from scratch.</p>
+
+<pre><code>{
+  history: {
+    parameters: { width: 60, depth: 40, thick: 8, hole: 5, count: 4, ringD: 40, finish_mm: 0.3 },
+    features: [
+      { id: "plate", type: "sketch", plane: "XY", sketch: { entities: [...], constraints: [...] } },
+      { id: "body",  type: "extrude", sketch: "plate", depth: "thick", operation: "new", direction: "up" },
+      { id: "h1",    type: "hole", plane: "XY", offset: "thick", at: ["width / 2", "depth / 2"], diameter: "hole", depth: "thick" },
+      { id: "ring",  type: "pattern", feature: "h1", kind: "circular", centre: ["width / 2", "depth / 2"], count: "count", step: { angle: 360 } }
+    ]
+  }
+}
+</code></pre>
+
+<p>Resize = <code>cad_modify_entities { parameters: { width: 70 } }</code> (features stay). Add a feature = <code>cad_add_elements</code> appended to the same history. Refactor features = overwrite the whole <code>history</code> (destructive, with tool-level confirmation in a future major).</p>
+
+<h3>4.2 Sophisticated composed CAM — operation catalogue</h3>
+
+<table>
+  <thead>
+    <tr><th>Kind</th><th>Operations</th><th>Tool hint</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>2.5D mill</td><td><code>profile</code>, <code>pocket</code>, <code>drill</code> (G81/G82/G83/G73), <code>face</code>, <code>engrave</code></td><td><code>lib_lookup_tool</code></td></tr>
+    <tr><td>Mill 3D</td><td><code>roughing</code>, <code>parallel</code>, <code>waterline</code>, <code>adaptive</code>, <code>rest</code>, <code>pencil</code>, <code>scallop</code>, <code>flowline</code></td><td>ball/bull-nose end-mill</td></tr>
+    <tr><td>Thread</td><td><code>thread-mill</code> (helical, ISO metric), <code>tap</code></td><td>tap holder, thread mill</td></tr>
+    <tr><td>Lathe</td><td><code>facing</code>, <code>turning-od</code>, <code>turning_id</code>, <code>parting</code>, <code>grooving</code>, <code>threading_od</code></td><td>per lathe kinematics</td></tr>
+    <tr><td>Indexing (3+2)</td><td>any 2.5D/3D inside an <code>Orient</code> (AC/BC trunnion)</td><td><code>cam.ir.Orient</code></td></tr>
+    <tr><td>Probing</td><td><code>z-surface</code>, <code>edge-x/y</code>, <code>corner</code>, <code>bore</code>, <code>boss</code>, <code>tool-length</code></td><td>touch probe + stylus radius</td></tr>
+    <tr><td>3D printer</td><td>single pass</td><td>slicer not built</td></tr>
+  </tbody>
+</table>
+
+<h3>4.3 Sequencing rules</h3>
+
+<ol>
+  <li><b>Probe first, machine after.</b> <code>probing</code> writes the work offset; milling uses the same <code>workOffset</code>.</li>
+  <li><b>Face / clear the top, before rough.</b> Reference plane comes first.</li>
+  <li><b>Rough, then finish.</b> Leave <code>0.1–0.3 mm</code> in <code>finish_mm</code>. Climb milling, stepover <code>5–15 % D</code>.</li>
+  <li><b>Drill before tap or thread-mill.</b> Peck <code>3 × D</code>; pilots for <code>Ø &gt; 12 mm</code>.</li>
+  <li><b>Engrave / chamfer last.</b> Touch a finished surface.</li>
+  <li><b>Indexing after the bulk is removed.</b> <code>Orient</code> is a move between operations.</li>
+</ol>
+
+<h3>4.4 Verifying per operation</h3>
+
+<p>The strict pattern the <code>machinist</code> specialist runs:</p>
+<pre><code>1. cad_describe_drawing       -- what is there
+2. lib_lookup_material/tool   -- never invent
+3. cam_suggest_parameters     -- depth/stepdown/cutting stats + warnings
+4. cam_create_operation       -- one at a time
+5. cam_generate_gcode         -- regenerates from data.request
+6. cam_analyze_gcode          -- static checks (no LLM)
+7. cam_verify_toolpath        -- simulate on stock
+8. cam_update_operation       -- by cause, not symptom
+9. repeat 5–8 until clean (max 3 rounds; report what blocks)
+</code></pre>
+
+<h3>4.5 Workflow composition</h3>
+
+<pre><code>name: validate-and-cut
+on:
+  push:        { branches: [main, "ai/**"], paths: ["toolpaths/**"] }
+  pullRequest: { branches: [main] }
+jobs:
+  qa:
+    steps:
+      - id: v  uses: project/validate
+      - id: rg uses: cam/gcode
+      - id: v  uses: cam/verify
+      - id: m  uses: project/require-gcode
+</code></pre>
+
+<h2>5. AI ⇄ VCS ⇄ Workflows</h2>
+
+<div class="flow">
+UI / phone ─► chat ─► cadcam agent ─► vcs_* / cad_* / cam_* / actions_run
+                                                          │
+                                            ┌─────────────┴─────────────┐
+                                            ▼                           ▼
+                                    per turn (live)              between turns (history)
+                                    - cadcam + 4 specialists     - vcs_commit / vcs_open_pull_request
+                                    - cad_* / cam_* / verifiers  - actions_run (manual / pull_request / push)
+                                    - WYSIWYG in editor + CAM page
+</div>
+
+<p>The contract:<br>
+- Oid compatibility with <code>git</code> (byte-for-byte) so a GitHub mirror needs no mapping (<code>packages/vcs/test/git.test.ts</code>).<br>
+- AI actor cannot <code>commit</code> / <code>restore</code> / <code>merge</code> on <code>main</code>.<br>
+- <code>request-changes</code> review (latest verdict per reviewer) blocks <code>merge</code>.<br>
+- A workflow naming an unregistered <code>uses</code> fails before any step runs.<br>
+- A step is a pure function of <code>ctx.files</code>, never of the live DB.<br>
+- Phone gateway refuses credential / plugin / GitHub routes by an allow-list (<code>COMPANION_ROUTES</code>).<br>
+- Trigger failures never fail the user's operation.</p>
+
+<table>
+  <thead><tr><th>Endpoint</th><th>Effect</th><th>Actor</th></tr></thead>
+  <tbody>
+    <tr><td><code>POST /api/projects/:id/vcs/commit</code></td><td>commit on current branch</td><td>person + AI on <code>ai/*</code></td></tr>
+    <tr><td><code>POST /api/projects/:id/vcs/start</code></td><td>checkout a branch</td><td>person only</td></tr>
+    <tr><td><code>POST /api/projects/:id/vcs/restore</code></td><td>restore paths</td><td>person only</td></tr>
+    <tr><td><code>POST /api/projects/:id/vcs/push|pull</code></td><td>sync with GitHub</td><td>person only</td></tr>
+    <tr><td><code>POST /api/projects/:id/pulls</code></td><td>open a PR</td><td>person + AI</td></tr>
+    <tr><td><code>POST /api/projects/:id/pulls/:n/merge</code></td><td>merge</td><td>person only</td></tr>
+    <tr><td><code>POST /api/projects/:id/actions/dispatch</code></td><td>manual workflow</td><td>person + AI</td></tr>
+    <tr><td><code>POST /api/ai/chat/stream</code> / <code>/abort</code> / <code>/permission/reply</code></td><td>agent turn</td><td>person + phone</td></tr>
+  </tbody>
+</table>
+
+<h2>6. Library as the agent's knowledge</h2>
+
+<table>
+  <thead>
+    <tr><th>Table / entity</th><th>Source</th><th>What the agent knows</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><b>Material</b> <code>lib_lookup_material</code></td><td><code>packages/db/src/schema.ts:277</code></td><td>name, density, Vc, fz, Kc, ISO class, cost</td></tr>
+    <tr><td><b>Tool</b> <code>lib_lookup_tool</code></td><td><code>packages/db/src/schema.ts:295</code></td><td>type, Ø, flutes, maxRPM, cuttingLength, shankDiameter, coolant</td></tr>
+    <tr><td><b>MachineConfig</b> <code>cam_describe_machine</code></td><td><code>packages/core/src/cam/machine.ts</code></td><td>axes, maxRPM/feed, work offsets, post, probes, tool changer</td></tr>
+    <tr><td><b>Component</b> <code>cad_component_*</code></td><td><code>packages/ai/src/element-catalog.ts</code></td><td>saved reusable parts; parametric; per-project catalogue</td></tr>
+    <tr><td><b>Toolpath</b> <code>cam_list_operations</code></td><td><code>packages/db/src/schema.ts:321</code></td><td>operation request + G-code + verification report</td></tr>
+    <tr><td><b>Memory</b> <code>memory_recall</code></td><td><code>ai.memory.*</code></td><td>typed notes: preference, lesson, spec; bounded</td></tr>
+  </tbody>
+</table>
+
+<h2>7. Context awareness</h2>
+
+<p>The agent's effective context = the workspace renderer (<code>packages/ai/src/workspace-context.ts</code>) + the system prompt (<code>packages/ai/src/prompts/system.ts</code>) + the conversation history.</p>
+
+<h3>7.1 Sections in priority order</h3>
+<ol>
+  <li>Document + units ("Workspace: CAD editor, drawing "...". Units: tool calls in mm; the user reads mm. Drawing tolerance X mm. View: 3D.")</li>
+  <li>Selection (model counts, breakdown, selected ids)</li>
+  <li>Layers (visibility, locks, active)</li>
+  <li>Stock (W × H × D mm)</li>
+  <li>Machining (machine / controller / post / material / operation / tool / offset)</li>
+  <li>Toolpaths (first 8 with move counts)</li>
+  <li>Verification (state: <code>not-run | stale | ok | errors</code>; first 4 issues)</li>
+  <li>G-code size + attached files</li>
+  <li>Elements (starred selection; remainder says "N not shown — call cad_describe_drawing")</li>
+  <li>G-code preview (first 12 lines)</li>
+</ol>
+
+<h3>7.2 Honesty contract</h3>
+<p>Every numeric value in tool calls is in mm or rad. <code>rotation</code> in degrees; arc / revolution in radians. No unit symbols inside numbers (<code>50</code>, not <code>50mm</code>). The renderer never invents a field; the agent reports what a tool result confirmed; the agent says "no errors found in what was modelled", never "safe".</p>
+
+<h2>8. Integral roadmap</h2>
+
+<div class="panel">
+  <h4>Phase 0 — already shipped (Wave 0)</h4>
+  <p>Host in-process · 22 tools · 4 specialists · 10 skills · sessions with recovery · credentials isolation · workspace renderer · VCS core + sidecar + API · Workflows core + sidecar + 4 steps · Mobile companion (iOS simulator green).</p>
+  <p>Source: WP8, WP11, WP12, WP13.</p>
+</div>
+
+<div class="phase">
+  <div class="id">P1</div>
+  <div class="body">
+    <b>Integrate the agent with VCS + Workflows</b> <span class="badge ok">WP11 / WP12 / WP8</span><br>
+    <span style="color:var(--muted);font-size:13px;">no cross-package edits; integration at the sidecar services layer</span>
+    <ul>
+      <li><b>1.1</b> <code>vcs_restore_paths</code> — read-only on <code>ai/*</code>, refuses on <code>main</code></li>
+      <li><b>1.2</b> <code>actions_run</code> — single workflow entry: <code>manual</code>, <code>pull-request</code>, <code>push</code></li>
+      <li><b>1.3</b> <code>cam/sequence</code> step — validate <code>restFrom</code> / <code>prevTool</code> chain</li>
+      <li><b>1.4</b> Companion gateway exposes new routes only to desktop-initiated sessions</li>
+      <li><b>1.5</b> <code>ActivityLog</code> rows for AI commits cite prompt (≤ 200 chars)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P2</div>
+  <div class="body">
+    <b>Parametric + composed CAM</b> <span class="badge ok">WP8 / WP3</span><br>
+    <span style="color:var(--muted);font-size:13px;">core already parametric-capable; work is to teach the agent the patterns</span>
+    <ul>
+      <li><b>2.1</b> New skill <code>parametric-design</code> — when to use <code>parametric</code>, expressions, edits</li>
+      <li><b>2.2</b> New skill <code>composed-cam-programs</code> — sequencing, stock carry-over, multi-setup, lathe + mill</li>
+      <li><b>2.3</b> <code>cam_operations_suggest_chain</code> tool — propose next op + params</li>
+      <li><b>2.4</b> <code>cam_chain_status(operationId)</code> — <code>restFrom</code>, <code>prevTool</code>, warnings</li>
+      <li><b>2.5</b> Tool prompts updated for the workflow shape; <code>tool-prompts.test.ts</code> green</li>
+      <li><b>2.6</b> Specialist prompts add the new skills</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P3</div>
+  <div class="body">
+    <b>Context + library awareness</b> <span class="badge ok">WP8 / WP0 / WP6</span><br>
+    <ul>
+      <li><b>3.1</b> Snapshot graph augmentation — <code>lastGcodeChangedAt</code>, <code>lastVerifiedAt</code>, etc.</li>
+      <li><b>3.2</b> Renderer adds a "next machining decision" hint per <code>verification.state</code></li>
+      <li><b>3.3</b> Library in the snapshot — first material/tool/machine referenced by the active toolpath</li>
+      <li><b>3.4</b> <code>memory_recall</code> returns typed notes (<code>preference | lesson | spec</code>)</li>
+      <li><b>3.5</b> System prompt has a one-line summary of the last 3 commits</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P4</div>
+  <div class="body">
+    <b>Library write tools + GitHub mirror of items</b> <span class="badge warn">Wave 2</span><br>
+    <ul>
+      <li><b>4.1</b> DB migration — <code>Material</code> / <code>Tool</code> / <code>MachineConfig</code> gain <code>version</code>, <code>previousVersionId</code>, <code>libraryProjectId</code></li>
+      <li><b>4.2</b> API group <code>/api/library/...</code> — AI can upsert via the host (a new tool), <code>confirm: true</code> for delete</li>
+      <li><b>4.3</b> <code>lib_upsert_material</code>, <code>lib_upsert_tool</code>, <code>lib_upsert_machine_config</code>, <code>lib_set_default</code></li>
+      <li><b>4.4</b> GitHub mirror of library items — push/pull through <code>packages/vcs/src/github.ts</code>; AI cannot push</li>
+      <li><b>4.5</b> Library screens in the UI (WP6) — same surface the agent calls</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P5</div>
+  <div class="body">
+    <b>Phone as a co-driver</b> <span class="badge warn">Wave 2</span><br>
+    <ul>
+      <li><b>5.1</b> Streaming chat from phone keeps the model working when the connection drops</li>
+      <li><b>5.2</b> Phone shows the agent's tool calls as they happen in the child's session</li>
+      <li><b>5.3</b> "Review on phone" — comment, <code>request-changes</code>, merge when the workflow is green</li>
+      <li><b>5.4</b> Push notifications for PR + Actions events (APNs, opt-in)</li>
+      <li><b>5.5</b> Streaming assistant on iOS — same Activity surface as desktop</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P6</div>
+  <div class="body">
+    <b>Parity-class depth</b> <span class="badge warn">Wave 3</span><br>
+    <span style="color:var(--muted);font-size:13px;">closes the gap in <code>specs/14-cad-cam-parity-roadmap.md</code></span>
+    <ul>
+      <li><b>6.1</b> Mesh chamfer / fillet / shell / sweep / loft are first-class element types</li>
+      <li><b>6.2</b> Lathe operations wire into the generator; <code>cam_describe_machine</code> distinguishes mill / lathe / printer</li>
+      <li><b>6.3</b> 3D-surface finishing — pencil / scallop / flowline named operations</li>
+      <li><b>6.4</b> Swept-cutter collision — verify engine uses the cutter's swept volume</li>
+      <li><b>6.5</b> 3+2 indexing — <code>pocket</code> carries an <code>Orient</code></li>
+      <li><b>6.6</b> Parametric features — fillet, shell, pattern-along-path</li>
+    </ul>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="id">P7</div>
+  <div class="body">
+    <b>Observability + cost</b> <span class="badge warn">Wave 3</span><br>
+    <ul>
+      <li><b>7.1</b> Per-call token usage surfaced as <code>done.usage</code>; settings screen</li>
+      <li><b>7.2</b> <code>ai/compact</code> user action — explicit compaction with readback</li>
+      <li><b>7.3</b> "Compact now" survives a denial — UI shows the outcome honestly</li>
+      <li><b>7.4</b> Streaming recovery — dropped stream surfaces <code>done.recovered: true</code></li>
+    </ul>
+  </div>
+</div>
+
+<h2>9. Cross-phase invariants (enforced by tests)</h2>
+
+<table>
+  <thead><tr><th>Invariant</th><th>Test</th></tr></thead>
+  <tbody>
+    <tr><td>AI actor cannot commit / restore / merge on <code>main</code></td><td><code>apps/sidecar/test/ai-vcs-actor.test.ts</code></td></tr>
+    <tr><td>Phone gateway refuses credential / plugin / GitHub routes</td><td><code>apps/sidecar/test/companion-gateway.test.ts</code></td></tr>
+    <tr><td>Unknown <code>uses:</code> fails the workflow before any step runs</td><td><code>packages/workflow/test/missing-steps.test.ts</code></td></tr>
+    <tr><td>A workflow run is a function of <code>ctx.files</code>, not the live DB</td><td><code>apps/sidecar/test/workflow-purity.test.ts</code></td></tr>
+    <tr><td>No API key in logs / errors / serialised state</td><td><code>packages/ai/test/credential-isolation.test.ts</code></td></tr>
+    <tr><td>Oid compatibility with <code>git</code></td><td><code>packages/vcs/test/git.test.ts</code></td></tr>
+    <tr><td><code>cadcam</code> agent has no shell / file tools</td><td><code>packages/ai/test/nikcli-host.test.ts</code></td></tr>
+  </tbody>
+</table>
+
+<h2>10. The specs this analysis produced</h2>
+
+<div class="spec-list">
+  <a href="specs/15-ai-agent-analysis.md"><b>15</b><span>AI Agent Architecture Analysis</span><span class="note">nikcli ↔ cadcamfun side-by-side; the mapping table.</span></a>
+  <a href="specs/16-cadcam-agent-blueprint.md"><b>16</b><span>CADCAM Agent Blueprint</span><span class="note">Identity, specialists, skills, sessions, parametric, composed CAM.</span></a>
+  <a href="specs/17-integration-vcs-workflows.md"><b>17</b><span>AI ⇄ VCS ⇄ Workflows Integration</span><span class="note">The contract surface and the rules.</span></a>
+  <a href="specs/18-library-and-knowledge.md"><b>18</b><span>Library as the Agent's Knowledge</span><span class="note">Materials, tools, machines, components.</span></a>
+  <a href="specs/19-context-awareness.md"><b>19</b><span>Context Awareness Contract</span><span class="note">Snapshot, units, honesty, recovery.</span></a>
+  <a href="specs/20-integral-roadmap.md"><b>20</b><span>Integral Roadmap</span><span class="note">Phases, dependencies, acceptance gates.</span></a>
+  <a href="specs/21-integration-master-plan.md"><b>21</b><span>Integration Master Plan <span class="badge warn">checklist</span></span><span class="note">Every step flagged with status, source, verify — 154 rows.</span></a>
+  <a href="specs/22-gaps-and-fixes.md"><b>22</b><span>Gaps & Fixes <span class="badge warn">gap-fill</span></span><span class="note">Concrete source for the gap rows: 4 skills, 11 tools, 4 workflow steps, 1 specialist, 2 LSP fixes.</span></a>
+</div>
+
+<h2>11. Integration Master Plan — status by category</h2>
+
+<p>The single source of truth for everything still flagged as partial or pending. Numbers reference spec 21's row ids.</p>
+
+<table>
+  <thead><tr><th>Category</th><th style="width:60px;">Done</th><th style="width:60px;">Partial</th><th style="width:60px;">Pending</th><th style="width:60px;">Gap</th></tr></thead>
+  <tbody>
+    <tr><td>Agent host (WP8)</td><td>6</td><td>0</td><td>0</td><td>1</td></tr>
+    <tr><td>Specialists (WP8)</td><td>8</td><td>1</td><td>1</td><td>0</td></tr>
+    <tr><td>Skills (WP8)</td><td>10</td><td>0</td><td>4</td><td>0</td></tr>
+    <tr><td>Built-in tools (WP8)</td><td>22</td><td>0</td><td>0</td><td>12</td></tr>
+    <tr><td>Background delegation</td><td>5</td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><td>Sessions</td><td>9</td><td>0</td><td>1</td><td>0</td></tr>
+    <tr><td>Provider + credentials</td><td>7</td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><td>Workspace context</td><td>5</td><td>0</td><td>3</td><td>0</td></tr>
+    <tr><td>VCS core (WP11)</td><td>8</td><td>0</td><td>0</td><td>0</td></tr>
+    <tr><td>VCS sidecar (WP11)</td><td>3</td><td>1</td><td>0</td><td>1</td></tr>
+    <tr><td>Workflows engine (WP12)</td><td>5</td><td>2</td><td>0</td><td>0</td></tr>
+    <tr><td>Workflows sidecar (WP12)</td><td>6</td><td>0</td><td>0</td><td>4</td></tr>
+    <tr><td>AI ⇄ VCS wiring</td><td>6</td><td>0</td><td>0</td><td>1</td></tr>
+    <tr><td>AI ⇄ Workflows wiring</td><td>3</td><td>1</td><td>0</td><td>0</td></tr>
+    <tr><td>Mobile companion (WP13)</td><td>7</td><td>3</td><td>0</td><td>2</td></tr>
+    <tr><td>Library / DB (WP0)</td><td>7</td><td>0</td><td>2</td><td>0</td></tr>
+    <tr><td>CAM core (WP2 / WP4)</td><td>9</td><td>1</td><td>3</td><td>0</td></tr>
+    <tr><td>Observability + cost (WP8 / WP10)</td><td>1</td><td>1</td><td>3</td><td>0</td></tr>
+    <tr style="background: var(--panel-2);"><td><b>Total</b></td><td><b>127</b></td><td><b>10</b></td><td><b>17</b></td><td><b>21</b></td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h4>What the flags mean</h4>
+  <p><b>done</b> — the source file is in the repo and the cited test is green.<br>
+  <b>partial</b> — the surface exists but the contract is incomplete (e.g. <code>StepContext</code> re-export, <code>bytes: unknown</code> widening).<br>
+  <b>pending</b> — planned in a spec (15–20), no source yet.<br>
+  <b>gap</b> — not in 15–20 at all; assigned in spec 22 with concrete source.</p>
+</div>
+
+<h2>12. Gaps to fix — spec 22 in one read</h2>
+
+<p>Spec 22 is the fix-it queue. Every <code>gap</code> row in spec 21 has a section here with concrete file content.</p>
+
+<table>
+  <thead><tr><th>#</th><th>Item</th><th>WP</th><th>Type</th></tr></thead>
+  <tbody>
+    <tr><td>1.1</td><td><code>code_mode</code> granted to <code>researcher</code> specialist</td><td>WP8</td><td><span class="badge warn">refine</span></td></tr>
+    <tr><td>1.2</td><td><code>reviewer</code> specialist added</td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>2.1</td><td>Skill: <code>parametric-design</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>2.2</td><td>Skill: <code>composed-cam-programs</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>2.3</td><td>Skill: <code>version-control-cadcam</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>2.4</td><td>Skill: <code>workflows-cadcam</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>3.1</td><td>4× <code>cad_component_*</code> tools (<code>list</code>, <code>save</code>, <code>insert</code>, <code>delete</code>)</td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>3.2</td><td>5× library write tools (<code>lib_upsert_material/tool/machine_config</code>, <code>lib_set_default</code>)</td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>3.3</td><td><code>cam_operations_suggest_chain</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>3.4</td><td><code>cam_chain_status</code></td><td>WP8</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>4.1</td><td><code>vcs_restore_paths</code> sidecar function</td><td>WP11</td><td><span class="badge warn">refine</span></td></tr>
+    <tr><td>4.2</td><td><code>COMPANION_ROUTES</code> phone-gate log note</td><td>WP13</td><td><span class="badge warn">refine</span></td></tr>
+    <tr><td>4.3</td><td><code>ActivityLog</code> AI-commit citation (≤ 200 chars)</td><td>WP11</td><td><span class="badge warn">refine</span></td></tr>
+    <tr><td>4.4</td><td><code>cam/sequence</code> workflow step</td><td>WP12</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>4.5</td><td><code>vcs/commit</code> workflow step</td><td>WP12</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>4.6</td><td><code>notify/push</code> workflow step</td><td>WP12</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>4.7</td><td><code>ai/prompt</code> workflow step</td><td>WP12</td><td><span class="badge warn">add</span></td></tr>
+    <tr><td>5.1</td><td><code>StepContext</code> export from <code>@cadcamfun/workflow</code> <span class="note">(real LSP error)</span></td><td>WP12</td><td><span class="badge warn">fix</span></td></tr>
+    <tr><td>5.2</td><td><code>bytes: unknown</code> → <code>Uint8Array&lt;ArrayBufferLike&gt;</code> <span class="note">(real LSP error)</span></td><td>WP12</td><td><span class="badge warn">fix</span></td></tr>
+    <tr><td>6.1</td><td><code>actions_run</code> unifies <code>manual | pull-request | push</code></td><td>WP8 + WP12</td><td><span class="badge warn">refine</span></td></tr>
+    <tr><td>7.1</td><td><code>PR.remoteNumber</code> reserved; companion gateway log note</td><td>WP11</td><td><span class="badge warn">document</span></td></tr>
+  </tbody>
+</table>
+
+<div class="panel">
+  <h4>Order to land them</h4>
+  <p><b>Same PR — one commit</b>:<br>
+  §5.1 + §5.2 (LSP fixes; ≤ 4 lines), §6.1 (<code>actions_run</code> trigger parameter, ≤ 10 lines), §4.2 (companion log note, ≤ 5 lines), §4.3 (ActivityLog citation, ≤ 8 lines). These clear all the partial rows in spec 21 §11, §14.2 and unlock a green typecheck on <code>workflow-steps.ts</code>.<br>
+  <b>One WP, multiple PRs</b>:<br>
+  WP8 — §2.1–2.4 (4 skills), §3.1–3.4 (11 tools), §1.1–1.2 (specialist, code_mode grant). Each tool ships with its <code>tools/prompts/&lt;id&gt;.txt</code> in the same commit.<br>
+  <b>WP12 follow-up</b>:<br>
+  §4.4–4.7 (4 workflow steps) registered in <code>builtinSteps</code> and tested via <code>missing-steps.test.ts</code> + a new <code>builtin-steps.test.ts</code>.<br>
+  <b>WP11 follow-up</b>:<br>
+  §4.1 (<code>vcs_restore_paths</code>) + §7.1 (companion log note + future GitHub mirror).</p>
+</div>
+
+<footer>
+  <p>Specs 15–22 are new in this pass, written from the source of both codebases.</p>
+  <p>Every section in every spec cites a real file. The roadmap gates match the test files at the bottom of the package. The agent already runs on a pinned nikcli host with a deny-by-default permission map, and the architecture maps one-to-one onto nikcli's design.</p>
+  <p style="margin-top:14px;"><b>Spec 21 is the single source of truth for "what's done, partial, pending, or missing". Spec 22 is the fix-it-queue with concrete file content. Editing either is the way to make a future change visible.</b></p>
+</footer>
+
+</div>
+</body>
+</html>

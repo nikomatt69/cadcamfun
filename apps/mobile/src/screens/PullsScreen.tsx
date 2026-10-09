@@ -5,7 +5,7 @@
  * The AI pill is reserved for assistant-authored PRs so a person can tell at a glance which
  * branches are waiting for human review (Apple §16 — direct, specific labels beat generic ones).
  */
-import { For, Match, Show, Switch, createResource, createSignal, type Component } from "solid-js"
+import { For, Match, Show, Switch, createResource, createSignal, type Accessor, type Component } from "solid-js"
 import type { PullRequestRow } from "@cadcamfun/api"
 import type { CompanionClient } from "../companion/client.ts"
 import { ChevronRight } from "../components/Icon.tsx"
@@ -17,25 +17,27 @@ import { haptic } from "../lib/haptic.ts"
 export interface PullsScreenProps {
   readonly client: CompanionClient
   readonly projectId: string
+  /** Bumped by the project screen when a live pull-request or commit frame arrives. */
+  readonly refreshKey: Accessor<number>
   readonly onOpen: (number: number) => void
 }
 
 type StateFilter = "open" | "all" | "merged" | "closed"
+
+/** The API accepts no filter for "everything"; `undefined` means exactly that. */
+const serverState = (filter: StateFilter): PullRequestRow["state"] | undefined =>
+  filter === "all" ? undefined : filter
 
 const tone = (state: PullRequestRow["state"]): "accent" | "success" | "danger" | "neutral" =>
   state === "open" ? "accent" : state === "merged" ? "success" : state === "closed" ? "danger" : "neutral"
 
 export const PullsScreen: Component<PullsScreenProps> = (props) => {
   const [filter, setFilter] = createSignal<StateFilter>("open")
-  // The server only accepts "open" | "merged" | "closed", so we always ask for the current filter's
-  // primary state and do any "all"-style filtering locally after the response.
-  const [pulls, { refetch }] = createResource<ReadonlyArray<PullRequestRow>, StateFilter>(
-    () => props.client.pullRequests(props.projectId, filter() === "all" ? "open" : filter()),
-    (all: ReadonlyArray<PullRequestRow>, f: StateFilter): ReadonlyArray<PullRequestRow> => {
-      if (f === "all") return all
-      const wanted: PullRequestRow["state"] = f
-      return all.filter((p) => p.state === wanted)
-    },
+  // The filter and the live refresh key are the resource's *sources*, so either changing refetches
+  // with the right state while the previous list stays on screen (no spinner flash).
+  const [pulls, { refetch }] = createResource<ReadonlyArray<PullRequestRow>, readonly [StateFilter, number]>(
+    () => [filter(), props.refreshKey()] as const,
+    ([f]) => props.client.pullRequests(props.projectId, serverState(f)),
   )
 
   return (

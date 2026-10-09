@@ -12,9 +12,9 @@
 //!   - never interrupt unsaved editor work, so an install is refused while the
 //!     webview reports unsaved changes and the UI defers it.
 
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::Duration;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -131,26 +131,35 @@ pub struct UpdaterService {
     tx: Sender<CheckTrigger>,
     /// Moved into the polling thread on first use; kept here to document ownership.
     rx: Mutex<Option<Receiver<CheckTrigger>>>,
+    task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl UpdaterService {
     pub fn new() -> Self {
-        let (tx, rx) = channel();
+        let (tx, rx) = channel(1);
         Self {
             tx,
             rx: Mutex::new(Some(rx)),
+            task: Mutex::new(None),
         }
     }
 
     /// Queues a check. Never blocks and never fails: a closed receiver only means
     /// the shell is shutting down.
     pub fn request(&self, trigger: CheckTrigger) {
-        let _ = self.tx.send(trigger);
+        let _ = self.tx.try_send(trigger);
     }
 
     /// Hands the receiver to the polling thread exactly once.
     pub fn take_receiver(&self) -> Option<Receiver<CheckTrigger>> {
         self.rx.lock().ok().and_then(|mut guard| guard.take())
+    }
+    pub fn shutdown(&self) {
+        if let Ok(mut task) = self.task.lock() {
+            if let Some(task) = task.take() {
+                task.abort();
+            }
+        }
     }
 }
 
@@ -179,10 +188,11 @@ pub fn record_pending(pending: &PendingUpdate, info: PendingUpdateInfo) {
 }
 
 /// Takes the pending update, so a second install is refused.
-pub fn consume_pending(pending: &PendingUpdate) -> Result<PendingUpdateInfo, UpdateError> {
+pub fn consume_pending(pending: &PendingUpdate, unsaved_work: bool) -> Result<PendingUpdateInfo, UpdateError> {
     let mut guard = pending.0.lock().map_err(|_| UpdateError::Failed {
         message: "updater state is poisoned".to_string(),
     })?;
+    may_install(unsaved_work, guard.as_ref())?;
     guard.take().ok_or(UpdateError::NoneAvailable)
 }
 
@@ -289,81 +299,92 @@ pub async fn install(
     pending: tauri::State<'_, PendingUpdate>,
     unsaved_work: bool,
 ) -> Result<String, UpdateError> {
-    let info = consume_pending(&pending)?;
-    may_install(unsaved_work, Some(&info))?;
-
-    let updater = app.updater().map_err(|e| UpdateError::Failed {
-        message: e.to_string(),
-    })?;
-    let update = updater.check().await.map_err(|e| UpdateError::Failed {
-        message: e.to_string(),
-    })?;
-    let Some(update) = update else {
-        return Err(UpdateError::NoneAvailable);
-    };
-
-    let mut downloaded = 0u64;
-    update
-        .download_and_install(
-            |chunk, total| {
-                downloaded += chunk as u64;
-                emit(&app, UpdateStatus::Downloading { downloaded, total });
-            },
-            || {},
-        )
-        .await
-        .map_err(|e| UpdateError::Failed {
+    let info = consume_pending(&pending, unsaved_work)?;
+    let outcome = async {
+        let updater = app.updater().map_err(|e| UpdateError::Failed {
             message: e.to_string(),
         })?;
+        let update = tokio::time::timeout(CHECK_TIMEOUT, updater.check())
+            .await
+            .map_err(|_| UpdateError::Failed {
+                message: "update recheck timed out".into(),
+            })?
+            .map_err(|e| UpdateError::Failed {
+                message: e.to_string(),
+            })?;
+        let Some(update) = update else {
+            return Err(UpdateError::NoneAvailable);
+        };
 
-    log::info!(
-        "update {} installed (critical: {})",
-        info.version,
-        info.critical
-    );
-    let version = info.version;
-    emit(
-        &app,
-        UpdateStatus::Ready {
-            version: version.clone(),
-        },
-    );
-    Ok(version)
+        if update.version != info.version {
+            return Err(UpdateError::Failed {
+                message: "the available update changed; check for updates again".into(),
+            });
+        }
+        let mut downloaded = 0u64;
+        update
+            .download_and_install(
+                |chunk, total| {
+                    downloaded += chunk as u64;
+                    emit(&app, UpdateStatus::Downloading { downloaded, total });
+                },
+                || {},
+            )
+            .await
+            .map_err(|e| UpdateError::Failed {
+                message: e.to_string(),
+            })?;
+
+        log::info!(
+            "update {} installed (critical: {})",
+            info.version,
+            info.critical
+        );
+        let version = info.version.clone();
+        emit(
+            &app,
+            UpdateStatus::Ready {
+                version: version.clone(),
+            },
+        );
+        Ok(version)
+    }
+    .await;
+    if outcome.is_err() {
+        if let Ok(mut current) = pending.0.lock() {
+            if current.is_none() {
+                *current = Some(info);
+            }
+        }
+    }
+    outcome
 }
 
 /// Starts the periodic check loop and the launch check.
 pub fn spawn(app: AppHandle) {
-    let Some(service) = app.try_state::<Arc<UpdaterService>>() else {
+    let Some(service) = app.try_state::<UpdaterService>() else {
         return;
     };
-    let Some(rx) = service.take_receiver() else {
+    let Some(mut rx) = service.take_receiver() else {
         return;
     };
-    let loop_handle = app.clone();
-    std::thread::spawn(move || loop {
-        match rx.recv_timeout(CHECK_INTERVAL) {
-            Ok(trigger) => run_check(&loop_handle, trigger),
-            Err(RecvTimeoutError::Timeout) => run_check(&loop_handle, CheckTrigger::Scheduled),
-            // The shell is shutting down.
-            Err(RecvTimeoutError::Disconnected) => break,
+    let check_app = app.clone();
+    let task = tauri::async_runtime::spawn(async move {
+        let mut trigger = CheckTrigger::Scheduled;
+        loop {
+            if let Err(err) = check(check_app.clone(), trigger).await {
+                log::warn!("update check failed: {err}");
+            }
+            trigger = match tokio::time::timeout(CHECK_INTERVAL, rx.recv()).await {
+                Ok(Some(trigger)) => trigger,
+                Ok(None) => break,
+                Err(_) => CheckTrigger::Scheduled,
+            };
         }
     });
-
-    // Launch check, as required by spec 10 §3.
-    tauri::async_runtime::spawn(async move {
-        if let Err(err) = check(app, CheckTrigger::Scheduled).await {
-            log::warn!("launch update check failed: {err}");
-        }
-    });
-}
-
-fn run_check(app: &AppHandle, trigger: CheckTrigger) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Err(err) = check(app, trigger).await {
-            log::warn!("update check failed: {err}");
-        }
-    });
+    if let Ok(mut owned) = service.task.lock() {
+        *owned = Some(task);
+    };
 }
 
 #[cfg(test)]
@@ -440,22 +461,36 @@ mod tests {
                 critical: false,
             },
         );
-        let consumed = consume_pending(&pending);
+        let consumed = consume_pending(&pending, false);
         assert_eq!(consumed.map(|i| i.version), Ok("6.1.0".to_string()));
-        assert_eq!(consume_pending(&pending), Err(UpdateError::NoneAvailable));
+        assert_eq!(consume_pending(&pending, false), Err(UpdateError::NoneAvailable));
+    }
+
+    #[tokio::test]
+    async fn requests_are_delivered_to_the_polling_thread() {
+        let service = UpdaterService::new();
+        let mut rx = service.take_receiver().expect("receiver is available once");
+        service.request(CheckTrigger::Manual);
+        assert_eq!(rx.recv().await, Some(CheckTrigger::Manual));
+        // A second call must not hand out another receiver.
+        assert!(service.take_receiver().is_none());
     }
 
     #[test]
-    fn requests_are_delivered_to_the_polling_thread() {
+    fn refusing_unsaved_work_preserves_the_pending_update() {
+        let pending = PendingUpdate::default();
+        record_pending(&pending, PendingUpdateInfo { version: "6.1.0".into(), critical: false });
+        assert_eq!(consume_pending(&pending, true), Err(UpdateError::UnsavedWork));
+        assert_eq!(consume_pending(&pending, false).expect("pending update").version, "6.1.0");
+    }
+
+    #[tokio::test]
+    async fn repeated_requests_are_coalesced_into_one_pending_check() {
         let service = UpdaterService::new();
-        let rx = service.take_receiver().expect("receiver is available once");
-        service.request(CheckTrigger::Manual);
-        assert_eq!(
-            rx.recv_timeout(Duration::from_millis(200)),
-            Ok(CheckTrigger::Manual)
-        );
-        // A second call must not hand out another receiver.
-        assert!(service.take_receiver().is_none());
+        let mut rx = service.take_receiver().expect("receiver");
+        for _ in 0..1000 { service.request(CheckTrigger::Manual); }
+        assert_eq!(rx.recv().await, Some(CheckTrigger::Manual));
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]

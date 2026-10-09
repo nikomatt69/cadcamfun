@@ -28,9 +28,12 @@ const probeTool: HostToolSpec = {
   }
 }
 
+const viewportPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg=="
+
 const added: Array<{ projectId: string; elements: ReadonlyArray<Record<string, unknown>> }> = []
 const stubHandlers = new Proxy({} as ToolHandlersShape, {
   get: (_target, name: string) => async (projectId: string, elements: ReadonlyArray<Record<string, unknown>>) => {
+    if (name === "vision") return { ok: true, capture: { data: viewportPng, mime: "image/png", width: 1, height: 1 }, evidence: { ok: true, sceneRevision: "fixture-revision", image: { width: 1, height: 1 } } }
     if (name === "addElements") { added.push({ projectId, elements }); return { ok: true, ids: elements.map((_, i) => `id-${i}`), elements } }
     return { ok: true }
   }
@@ -47,7 +50,7 @@ const fakeProvider: HostProviderSpec = {
   name: "Fake",
   protocol: "openai-compatible",
   baseURL: fake.baseUrl,
-  models: [{ id: "fake-model", name: "Fake", context: 100_000, output: 4096 }]
+  models: [{ id: "fake-model", name: "Fake", context: 100_000, output: 4096, vision: true }]
 }
 
 const scope = Effect.runSync(Scope.make())
@@ -96,6 +99,25 @@ describe("embedded nikcli host", () => {
     expect(modeling.location.startsWith(runtime.paths.config)).toBe(true)
     expect(await host.client.experimental.toolIDs()).toContain("skill")
   })
+
+  test("vision tool output reaches the real host provider as an image part", async () => {
+    const host = await Effect.runPromise(runtime.host("project-vision-transport"))
+    const before = fake.requests.length
+    let requested = false
+    script = () => {
+      if (requested) return { text: "Inspected." }
+      requested = true
+      return { toolCalls: [{ name: "cad_vision", args: {} }] }
+    }
+    const sessionId = await Effect.runPromise(createHostSession(host, "vision transport"))
+    const events = await collect(hostChatStream({ host, sessionId, message: "Inspect the viewport", model }))
+    const turns = chatTurns(fake.requests.slice(before))
+    expect(turns.length).toBeGreaterThanOrEqual(2)
+    expect(JSON.stringify(turns.slice(1))).toContain(`data:image/png;base64,${viewportPng}`)
+    const result = events.find((e) => e.type === "tool_result" && e.tool === "cad_vision")
+    expect(result?.type === "tool_result" && result.ok).toBe(true)
+    expect(result?.type === "tool_result" && result.output).not.toContain(viewportPng)
+  }, 180_000)
 
   test("session create, list and abort", async () => {
     const host = await Effect.runPromise(runtime.host("project-a"))

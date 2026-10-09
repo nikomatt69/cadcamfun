@@ -1,14 +1,20 @@
+import { inspectProperties, readProperty, componentParameters } from "./ai-inspection.ts"
+import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  makeNikCliRuntime, systemPrompt, type ProviderId, type ToolHandlersShape
+  searchWeb, makeNikCliRuntime, systemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
-import { DESIGN_SPACE, cam, checkModel } from "@cadcamfun/core"
+import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted, Schema } from "effect"
+import { z } from "zod"
 import { AppConfigService } from "../config.ts"
-import { announced } from "../startup.ts"
+import { captureViewport } from "./ai-vision.ts"
+import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser } from "./acting-user.ts"
+import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
+import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
@@ -21,11 +27,23 @@ import { LocalProfile } from "./local-profile.ts"
 import { ProjectVcs } from "./project-vcs.ts"
 import { WorkflowRunner } from "./workflow-runner.ts"
 import { vcsToolSpecs } from "./ai-vcs-tools.ts"
+import { aiPromptStep } from "./workflow-service-steps.ts"
 import { ProjectRepo as ProjectsForVcs } from "../repos/project-repo.ts"
 
 /** The bounding box of an element in drawing coordinates, or undefined when it cannot be worked out. */
-const elementBounds = (element: Record<string, unknown>) => {
+const elementBounds = (element: Record<string, unknown>, all?: ReadonlyArray<Element>) => {
   try {
+    const mesh = element["type"] === "mesh" && Array.isArray(element["vertices"]) && Array.isArray(element["faces"])
+      ? cam.model.placeElementMesh(element, { positions: Float64Array.from((element["vertices"] as Array<{ x: number; y: number; z: number }>).flatMap((v) => [v.x, v.y, v.z])), indices: Uint32Array.from((element["faces"] as number[][]).flat()) })
+      : element["type"] && String(element["type"]).startsWith("boolean-") && all
+      ? cam.model.booleanElementMesh(all, element)?.mesh
+      : cam.model.elementMesh(element)
+    if (mesh) {
+      const bounds = cam.model.meshBounds({ positions: Float64Array.from(mesh.positions), indices: mesh.indices })
+      if ([...bounds.min, ...bounds.max].every(Number.isFinite)) return { min: { x: bounds.min[0]!, y: bounds.min[1]!, z: bounds.min[2]! }, max: { x: bounds.max[0]!, y: bounds.max[1]!, z: bounds.max[2]! } }
+    }
+    // Legacy 2D bounds do not apply arbitrary gizmo transforms; never label those as transformed world bounds.
+    if (element["rotation"] !== undefined || element["scale"] !== undefined || element["translateX"] !== undefined || element["translateY"] !== undefined || element["translateZ"] !== undefined) return undefined
     const b = cam.generator.elementBounds(element as never)
     return Number.isFinite(b.min.x) && Number.isFinite(b.max.z) ? { min: b.min, max: b.max } : undefined
   } catch { return undefined }
@@ -33,11 +51,14 @@ const elementBounds = (element: Record<string, unknown>) => {
 
 /** The tool handlers the model can call, over the active project's newest drawing and the libraries. */
 const toolHandlers = Effect.gen(function*() {
+  const appConfig = yield* AppConfigService
   const drawings = yield* DrawingRepo
   const materials = yield* MaterialRepo
   const tools = yield* ToolRepo
   const projects = yield* ProjectRepo
   const toolpaths = yield* ToolpathRepo
+  const components = yield* ComponentRepo
+  const machines = yield* MachineConfigRepo
   const { user: local } = yield* LocalProfile
   const kv = yield* KvStore
   const actingCell = yield* ActingUser
@@ -53,11 +74,15 @@ const toolHandlers = Effect.gen(function*() {
     let project: { id: string } | undefined = (await Effect.runPromise(projects.find(acting().id, projectId)))?.project
     let created = false
     if (!project) {
+      if (projectId !== "default") throw new Error("Project not found or not accessible; no other workspace was modified.")
       const own = (await Effect.runPromise(projects.list(acting().id))).find((candidate) => candidate.ownerId === acting().id)
       project = own ?? await Effect.runPromise(projects.create(acting().id, { name: "Untitled project" }))
       created = own === undefined
     }
-    let row = (await Effect.runPromise(drawings.listByProject(project.id)))[0]
+    const rows = await Effect.runPromise(drawings.listByProject(project.id))
+    const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
+    // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project.
+    let row = (snapshot?.projectId === project.id && typeof snapshot.drawingId === "string" ? rows.find((drawing) => drawing.id === snapshot.drawingId) : undefined) ?? rows[0]
     if (!row) {
       row = await Effect.runPromise(drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } }))
       created = true
@@ -73,14 +98,14 @@ const toolHandlers = Effect.gen(function*() {
 
   /** A stored operation of the active drawing with its request rebuilt over the drawing's current elements. */
   const operation = async (drawingId: string, operationId: string | undefined): Promise<{ id: string; request: Record<string, unknown> } | { error: string }> => {
-    const { id, projectId, elements } = await load(drawingId)
+    const { id, projectId, elements, data } = await load(drawingId)
     if (!operationId) return { error: "operationId is required" }
     const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
     if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { error: "Operation not found in the active drawing" }
     const stored = found.row.data as { request?: { settings?: unknown; geometry?: unknown; printer?: unknown } } | null
     if (!stored?.request) return { error: "Operation has no generation settings" }
     const savedGeometry = stored.request.geometry !== null && typeof stored.request.geometry === "object" ? stored.request.geometry : {}
-    return { id: operationId, request: { ...stored.request, geometry: { ...savedGeometry, selectedElements: elements } } }
+    return { id: operationId, request: { ...stored.request, geometry: { ...savedGeometry, selectedElements: elements.filter((e) => e.type !== "workpiece"), ...(data["stock"] !== undefined ? { stock: data["stock"] } : {}) } } }
   }
 
   /** The 3D-printer choices (infill, supports, walls) are stored beside the settings, not in them. */
@@ -94,6 +119,85 @@ const toolHandlers = Effect.gen(function*() {
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
   const handlers: ToolHandlersShape = {
+    stock: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      if (input.action === "inspect") {
+        const stock = loaded.data["stock"]
+        if (stock === undefined) return { ok: false, error: "No explicit stock configured. Set stock before quantitative removal verification.", ...where(loaded) }
+        const decoded = Schema.decodeUnknownSync(cam.generator.StockSchema)(stock)
+        return { ok: true, stock: decoded, volumeMm3: decoded.width * decoded.height * decoded.depth, coordinateFrame: "CAD drawing coordinates; XY centre, Z top face", ...where(loaded) }
+      }
+      const stock = Schema.decodeUnknownSync(cam.generator.StockSchema)(input.stock)
+      if (stock.elementId && !loaded.elements.some((e) => e.id === stock.elementId)) return { ok: false, error: "Stock reference element does not exist in the active drawing." }
+      const invalidated = await Effect.runPromise(drawings.configureStock(loaded.id, stock))
+      return { ok: true, action: "set", stock, volumeMm3: stock.width * stock.height * stock.depth, invalidatedOperations: invalidated, note: "Stock changed. Generate and verify affected operations again.", ...where(loaded) }
+    },
+    cadInspect: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      if (input.action === "layers") {
+        const snapshot = await Effect.runPromise(kv.get(`ai.context.${projectId}`))
+        const value = snapshot?.value as { layers?: unknown; activeLayer?: unknown; projectId?: unknown } | undefined
+        return { ok: true, layers: Array.isArray(value?.layers) ? value.layers : [], activeLayer: value?.activeLayer ?? null, source: "desktop workspace snapshot", capturedAt: snapshot?.updatedAt ?? null, available: Array.isArray(value?.layers), ...where(loaded) }
+      }
+      if (input.action === "property") {
+        const element = loaded.elements.find((e) => e.id === input.elementId)
+        return element ? { ...readProperty(element, input.path, input.offset, input.maxChars), ...where(loaded) } : { ok: false, error: "Element not found in the active drawing." }
+      }
+      const matched = loaded.elements.filter((e) => (input.ids === undefined || input.ids.includes(e.id)) && (input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId))
+      const page = matched.slice(input.offset, input.offset + input.limit)
+      return { ok: true, total: matched.length, offset: input.offset, nextOffset: input.offset + page.length < matched.length ? input.offset + page.length : null, elements: page.map((e) => ({ properties: inspectProperties(e), bounds: elementBounds(e, loaded.elements) ?? null })), missingIds: input.ids?.filter((id) => !loaded.elements.some((e) => e.id === id)) ?? [], ...where(loaded) }
+    },
+    cadComponentRelations: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      const first = loaded.elements.find((e) => e.id === input.firstId), second = loaded.elements.find((e) => e.id === input.secondId)
+      if (!first || !second || first.id === second.id) return { ok: false, error: "Choose two different existing element/component ids." }
+      const a = elementBounds(first, loaded.elements), b = elementBounds(second, loaded.elements)
+      const origin = (e: Element) => ({ x: typeof e["x"] === "number" ? e["x"] : 0, y: typeof e["y"] === "number" ? e["y"] : 0, z: typeof e["z"] === "number" ? e["z"] : 0 })
+      const p = origin(first), q = origin(second)
+      const gaps = a && b ? Object.fromEntries((["x", "y", "z"] as const).map((axis) => [axis, Math.max(0, a.min[axis] - b.max[axis], b.min[axis] - a.max[axis])])) : null
+      return { ok: true, first: { id: first.id, placement: p, bounds: a ?? null, parametric: componentParameters(first) }, second: { id: second.id, placement: q, bounds: b ?? null, parametric: componentParameters(second) }, originDistanceMm: Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z), originConvention: "Nominal x,y,z placement fields; actual renderer origins and pivots are available in cad_vision spatial evidence", boundingGapsMm: gaps, explicitReferences: [first, second].flatMap((e) => Array.isArray(e["operands"]) ? e["operands"].filter((id) => id === first.id || id === second.id).map((id) => ({ from: e.id, to: id, kind: "boolean operand" })) : []), note: "Nominal bounding measurements only. Equal parameter names are not shared bindings; bounding overlap does not prove interference.", ...where(loaded) }
+    },
+    webSearch: async (input, signal) => appConfig.aiOffline ? { ok: false, error: "Web search is disabled in offline mode." } : searchWeb(input, signal),
+    vision: async (projectId, mode, focus, signal) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      return captureViewport({
+        set: (key, value) => Effect.runPromise(kv.set(key, value)),
+        get: async (key) => (await Effect.runPromise(kv.get(key)))?.value,
+        delete: (key) => Effect.runPromise(kv.delete(key))
+      }, { projectId, mode, ...(focus !== undefined ? { focus } : {}), ...(signal !== undefined ? { signal } : {}) }, async (capture) => {
+        const loaded = await load(projectId)
+        const camContext = capture.context["cam"] as { selectedOperationId?: unknown } | undefined
+        const selected = mode === "cam" && typeof camContext?.selectedOperationId === "string" ? await Effect.runPromise(toolpaths.find(acting().id, camContext.selectedOperationId)) : undefined
+        const programError = camContext?.selectedOperationId && mode === "cam" && (!selected || selected.row.drawingId !== loaded.id || !selected.row.gcode) ? "The selected CAM operation has no saved program in the active drawing." : undefined
+        const programRevision = selected?.row.gcode && selected.row.drawingId === loaded.id ? createHash("sha256").update(cam.programGeometryText(cam.generator.analyseGcode(selected.row.gcode).program)).digest("hex") : undefined
+        return { elements: loaded.elements, drawing: { ...describeElements(loaded.elements, 100, elementBounds), ...where(loaded) }, operations: mode === "cam" ? await handlers.listOperations(projectId) : null, ...(programRevision ? { programRevision } : {}), ...(programError ? { programError } : {}) }
+      })
+    },
+    parametric: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      if (input.action === "validate") return inspectParametric(input.history)
+      if (input.action === "create") {
+        const report = inspectParametric(input.history)
+        if (!report.ok) return report
+        return { ...(await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }])) as Record<string, unknown>, mutation: "add" }
+      }
+      const loaded = await load(projectId)
+      const element = loaded.elements.find((e) => e.id === input.elementId && e.type === "parametric")
+      if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }
+      const history = element["history"]
+      if (input.action === "inspect") return { ...inspectParametric(history), elementId: element.id, ...where(loaded) }
+      if (input.action === "test") return { ...testParametric(history, input), elementId: element.id, ...where(loaded) }
+      if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
+      const changed = changeParameters(history, input.parameters)
+      if (!changed.ok) return changed
+      if (!changed.report.ok) return { ...changed.report, error: "Parameters were not changed because the variant failed validation.", ...where(loaded) }
+      const updated = { ...element, history: changed.history }
+      await save(loaded.id, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
+      return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), report: changed.report, ...where(loaded) }
+    },
     addEntities: async (projectId, entities) => {
       const loaded = await load(projectId)
       const created = newElements(entities as Array<Record<string, unknown> & { type: string }>, "default", () => crypto.randomUUID())
@@ -199,7 +303,8 @@ const toolHandlers = Effect.gen(function*() {
       if (needsElements && elements.length === 0) return { ok: false, error: "The drawing has no elements yet: add shapes with cad_add_elements first." }
       const geometry = {
         geometryType: "selected" as const,
-        selectedElements: elements
+        selectedElements: elements.filter((e) => e.type !== "workpiece"),
+        ...(data["stock"] !== undefined ? { stock: data["stock"] } : {})
       }
       const request = { settings, geometry, printer }
       const row = await Effect.runPromise(toolpaths.create(acting().id, {
@@ -234,10 +339,36 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, operationId, settings: { operationType: settings.operationType, toolDiameter: settings.toolDiameter, depth: settings.depth, stepdown: settings.stepdown, feedrate: settings.feedrate }, note: "Generate G-code again, then verify it." }
     },
     suggestParameters: async (drawingId, params) => {
-      const { elements } = await load(drawingId)
+      const { elements, data } = await load(drawingId)
       const settings = cam.generator.decodeSettings(params)
-      const geometry = cam.generator.GeometrySchema.make({ geometryType: "selected", selectedElements: elements } as never)
+      const geometry = cam.generator.GeometrySchema.make({ geometryType: "selected", selectedElements: elements.filter((e) => e.type !== "workpiece"), ...(data["stock"] !== undefined ? { stock: data["stock"] } : {}) } as never)
       return cam.generator.suggestFor(settings, geometry as never)
+    },
+    compareSetups: async (projectId, candidates) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      if (loaded.data["stock"] === undefined) return { ok: false, error: "Configure explicit stock with cam_stock before comparing removal and cutter setups." }
+      const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: loaded.elements.filter((e) => e.type !== "workpiece"), stock: loaded.data["stock"] })
+      const results: unknown[] = []
+      for (const candidate of candidates) {
+        try {
+          const tool = candidate.toolId ? (await Effect.runPromise(tools.find(acting().id, candidate.toolId)))?.detail : undefined
+          const material = candidate.materialId ? (await Effect.runPromise(materials.find(acting().id, candidate.materialId)))?.material : undefined
+          if ((candidate.toolId && !tool) || (candidate.materialId && !material)) { results.push({ name: candidate.name, ok: false, error: "Library tool or material is missing or inaccessible." }); continue }
+          const settings = cam.generator.decodeSettings({ ...candidate.params, ...(tool ? { toolType: tool.type, toolDiameter: tool.diameter, ...(tool.numberOfFlutes ? { flutes: tool.numberOfFlutes } : {}) } : {}) })
+          if (tool?.maxRPM && settings.rpm > tool.maxRPM) { results.push({ name: candidate.name, ok: false, error: `Requested RPM ${settings.rpm} exceeds the cutter limit ${tool.maxRPM}.` }); continue }
+          if (material && candidate.params["material"] === undefined) { results.push({ name: candidate.name, ok: false, error: "Specify params.material as the verified generator cutting family for this library material; the name alone is not a physical mapping." }); continue }
+          const request = { settings, geometry }
+          const generated = cam.generator.generateToolpath(request as never)
+          if (generated.error) { results.push({ name: candidate.name, ok: false, error: generated.error }); continue }
+          const built = cam.verify.verifyRequestFor(request as never, generated.response.gcode, { tool: { ...(tool?.cuttingLength ? { cuttingLength: tool.cuttingLength } : {}), ...(tool?.shankDiameter ? { shankDiameter: tool.shankDiameter } : {}) } })
+          if (!built.ok) { results.push({ name: candidate.name, ok: false, error: built.error }); continue }
+          const report = cam.verify.verifyToolpath(built.request)
+          const suggestions = cam.generator.suggestFor(settings, geometry)
+          results.push({ name: candidate.name, ok: report.ok, settings, sources: { tool: tool ? { id: tool.id, name: tool.name, diameter: tool.diameter, type: tool.type, material: tool.material, flutes: tool.numberOfFlutes, maxRPM: tool.maxRPM, cuttingLength: tool.cuttingLength, shankDiameter: tool.shankDiameter } : null, material: material ? { id: material.id, name: material.name, properties: material.properties } : null }, suggestions, generation: generated.response.stats, verification: { ok: report.ok, stats: report.stats, issues: report.issues.slice(0, 20) } })
+        } catch { results.push({ name: candidate.name, ok: false, error: "Candidate settings could not be validated or calculated." }) }
+      }
+      return { ok: true, mutated: false, candidates: results, note: "Real generated-path and stock-heightfield comparisons. Material physical properties are source evidence; cutting family remains explicit in settings. No cutting-force or material-suitability certification.", ...where(loaded) }
     },
     generateGcode: async (drawingId, operationId) => {
       const found = await operation(drawingId, operationId)
@@ -270,6 +401,7 @@ const toolHandlers = Effect.gen(function*() {
       return {
         ok: report.ok, issues: report.issues.slice(0, 20), stats: report.stats,
         stock: built.request.stock, tool: built.request.tool,
+        stockSource: options.stock !== undefined ? "verification override" : (found.request.geometry as Record<string, unknown>)["stock"] !== undefined ? "configured drawing stock" : "inferred from geometry/toolpath",
         modelled: {
           holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined,
           fixtures: built.request.fixtures.length, target: built.request.target !== undefined
@@ -279,13 +411,163 @@ const toolHandlers = Effect.gen(function*() {
     },
     remember: async (key, value) => { await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
-    lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name })),
-    lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type }))
+    lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
+    lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, notes: t.notes })),
+    listComponents: async (projectId, _scope) => {
+      const loaded = await load(projectId)
+      const rows = await Effect.runPromise(components.listByProject(loaded.projectId))
+      return rows.map((c) => ({ id: c.id, name: c.name, type: c.type, updatedAt: c.updatedAt }))
+    },
+    saveComponent: async (projectId, ids, name) => {
+      const loaded = await load(projectId)
+      const chosen = loaded.elements.filter((e) => ids.includes(e.id))
+      const missing = ids.filter((id) => !loaded.elements.some((e) => e.id === id))
+      if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}.` }
+      if (chosen.length === 0) return { ok: false, error: "Nothing to save: no elements selected." }
+      const first = chosen[0]!
+      const originX = typeof first["x"] === "number" ? first["x"] : 0
+      const originY = typeof first["y"] === "number" ? first["y"] : 0
+      const children = chosen.map((e) => { const { id: _id, layerId: _layerId, layer: _layer, ...child } = e as Record<string, unknown>; return cad.shiftElement(child, { x: -originX, y: -originY, z: 0 }) })
+      const component = { id: crypto.randomUUID(), type: "component", name, x: originX, y: originY, z: typeof first["z"] === "number" ? first["z"] : 0, elements: children, layerId: first.layerId } as Element
+      const data = { name, type: "custom", version: "1.0", elements: [component], geometry: { type: "custom", elements: [component] }, metadata: { createdAt: new Date().toISOString() }, properties: {} }
+      const created = await Effect.runPromise(components.create(loaded.projectId, { name, data }))
+      return { ok: true, componentId: created.id, name: created.name, children: chosen.length, ...where(loaded) }
+    },
+    insertComponent: async (projectId, componentId, transform) => {
+      const loaded = await load(projectId)
+      const found = await Effect.runPromise(components.find(acting().id, componentId))
+      if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
+      const data = found.data as { elements?: ReadonlyArray<Record<string, unknown>> } | null
+      const stored = Array.isArray(data?.elements) ? data.elements : []
+      if (stored.length === 0) return { ok: false, error: `Component ${componentId} has no elements.` }
+      const base = stored[0]!
+      const instances = stored.map((e) => ({ ...e, id: crypto.randomUUID(), layerId: typeof e["layerId"] === "string" ? e["layerId"] : base["layerId"] ?? "default" })) as Element[]
+      let placed = instances
+      if (transform !== undefined) {
+        const moved = transformElements(instances, { ids: instances.map((e) => e.id), transform, copies: 0 }, () => crypto.randomUUID())
+        if (!moved.ok) return { ok: false, error: moved.error }
+        placed = moved.elements as Element[]
+      }
+      await save(loaded.id, loaded.data, [...loaded.elements, ...placed])
+      return { ok: true, ids: placed.map((e) => e.id), component: { id: found.id, name: found.name }, elements: placed, ...where(loaded) }
+    },
+    deleteComponent: async (componentId) => {
+      const found = await Effect.runPromise(components.find(acting().id, componentId))
+      if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
+      await Effect.runPromise(components.remove(componentId))
+      return { ok: true, deleted: componentId }
+    },
+    upsertMaterial: async (input) => {
+      const id = typeof input["id"] === "string" ? input["id"] : undefined
+      const name = String(input["name"])
+      const properties = (input["properties"] !== null && typeof input["properties"] === "object" ? input["properties"] : {}) as Record<string, unknown>
+      if (id !== undefined) {
+        const existing = await Effect.runPromise(materials.find(acting().id, id))
+        if (existing) {
+          const row = await Effect.runPromise(materials.update(id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
+          return { ok: true, id: row.id, created: false }
+        }
+      }
+      const row = await Effect.runPromise(materials.create(acting().id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
+      return { ok: true, id: row.id, created: true }
+    },
+    upsertTool: async (input) => {
+      const id = typeof input["id"] === "string" ? input["id"] : undefined
+      const fields = { name: String(input["name"]), type: String(input["type"]), diameter: Number(input["diameter"]), material: String(input["material"]),
+        numberOfFlutes: typeof input["numberOfFlutes"] === "number" ? input["numberOfFlutes"] : null, maxRPM: typeof input["maxRPM"] === "number" ? input["maxRPM"] : null,
+        coolantType: typeof input["coolantType"] === "string" ? input["coolantType"] : null, cuttingLength: typeof input["cuttingLength"] === "number" ? input["cuttingLength"] : null,
+        totalLength: typeof input["totalLength"] === "number" ? input["totalLength"] : null, shankDiameter: typeof input["shankDiameter"] === "number" ? input["shankDiameter"] : null,
+        notes: typeof input["notes"] === "string" ? input["notes"] : null, ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }
+      if (id !== undefined) {
+        const existing = await Effect.runPromise(tools.find(acting().id, id))
+        if (existing) {
+          const row = await Effect.runPromise(tools.update(id, fields))
+          return { ok: true, id: row.id, created: false }
+        }
+      }
+      const row = await Effect.runPromise(tools.create(acting().id, fields))
+      return { ok: true, id: row.id, created: true }
+    },
+    upsertMachineConfig: async (input) => {
+      const id = typeof input["id"] === "string" ? input["id"] : undefined
+      const config = { kinematics: input["kinematics"] ?? {}, postProcessor: input["postProcessor"], workOffsets: input["workOffsets"] ?? ["G54", "G55", "G56", "G57", "G58", "G59"],
+        ...(input["probing"] !== undefined ? { probing: input["probing"] } : {}), ...(typeof input["maxRPM"] === "number" ? { maxRPM: input["maxRPM"] } : {}), ...(typeof input["maxFeed"] === "number" ? { maxFeed: input["maxFeed"] } : {}) }
+      const type = String(input["kind"])
+      if (id !== undefined) {
+        const existing = await Effect.runPromise(machines.find(acting().id, id))
+        if (existing) {
+          const res = await Effect.runPromise(machines.update(id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
+          return { ok: true, id: res.view.id, created: false }
+        }
+      }
+      const view = await Effect.runPromise(machines.create(acting().id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
+      return { ok: true, id: view.id, created: true }
+    },
+    setProjectDefault: async (input) => {
+      // Defaults are project-scoped notes, like the memory keys; resolved from the open project, or the newest one.
+      const loaded = await load(input.projectId ?? "default")
+      const { projectId: _ignored, ...defaults } = input
+      await Effect.runPromise(kv.set(`ai.defaults.${loaded.projectId}`, defaults))
+      return { ok: true, projectId: loaded.projectId, defaults }
+    },
+    suggestChain: async (input) => {
+      const loaded = await load(input.projectId)
+      const rows = await Effect.runPromise(toolpaths.listForDrawing(loaded.id))
+      const rowsById = new Map(rows.map((r) => [r.id, r]))
+      const from = input.fromOperationId ? rowsById.get(input.fromOperationId) : rows[rows.length - 1]
+      const settingsOf = (row: typeof rows[number] | undefined): Record<string, unknown> => ((row?.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {})
+      const settings = settingsOf(from)
+      const depth = typeof settings["depth"] === "number" ? settings["depth"] : 0
+      const stepdown = typeof settings["stepdown"] === "number" ? settings["stepdown"] : 1
+      const remaining = Math.max(0, depth - stepdown)
+      const operationType = remaining > 0.05 ? "pocket" : depth > 0 ? "contour" : "face"
+      const reason = remaining > 0.05 ? `Roughing left about ${remaining.toFixed(2)} mm of depth: continue clearing.` : depth > 0 ? "The stock is roughed to depth: profile or finish the outline." : "No operation yet: face the stock to establish a reference plane."
+      return { ok: true, recommendation: { type: "operation" as const, operationType, params: { toolDiameter: typeof settings["toolDiameter"] === "number" ? settings["toolDiameter"] : 6, depth, stepdown, feedrate: typeof settings["feedrate"] === "number" ? settings["feedrate"] : 800 }, reason }, after: from?.id ?? null }
+    },
+    chainStatus: async (input) => {
+      const loaded = await load(input.projectId)
+      const rows = await Effect.runPromise(toolpaths.listForDrawing(loaded.id))
+      const row = rows.find((r) => r.id === input.operationId)
+      if (!row) return { ok: false, error: `Unknown operation id: ${input.operationId}.` }
+      const settings = (row.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {}
+      const index = rows.findIndex((r) => r.id === row.id)
+      const previous = index > 0 ? rows[index - 1] : undefined
+      const warnings: string[] = []
+      if (settings["useRestMachining"] === true) {
+        const rest = typeof settings["restToolDiameter"] === "number" ? settings["restToolDiameter"] : undefined
+        const diameter = typeof settings["toolDiameter"] === "number" ? settings["toolDiameter"] : undefined
+        if (rest === undefined || diameter === undefined || rest <= diameter) warnings.push("OrphanRef: rest machining names no larger previous tool")
+      }
+      return { ok: true, operationId: row.id, restFrom: previous?.id ?? null, prevTool: settings["restToolDiameter"] ?? null, generated: Boolean(row.gcode), warnings }
+    }
   }
   return handlers
 })
 
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
+
+/**
+ * The library and CAM-chain tools that are not in the `packages/ai` registry (spec 22 §3). They are host specs, not
+ * package tools, so they carry their description here and need no `tools/<id>.txt`; the host derives the permitted ids
+ * from `toolsFor`, so the `cadcam` agent and the specialists that name them get them without any config edit.
+ */
+const libraryToolSpecs = (handlers: ToolHandlersShape): ReadonlyArray<HostToolSpec> => {
+  const run = <A>(self: Promise<A>): Promise<string> => self.then((value) => JSON.stringify(value)).catch((e) => JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }))
+  const point3 = z.object({ x: z.number(), y: z.number(), z: z.number() })
+  const transform = z.object({ move: point3.optional(), rotate: z.object({ axis: z.enum(["x", "y", "z"]), degrees: z.number(), about: point3.optional() }).optional(), scale: z.object({ factor: z.number(), about: point3.optional() }).optional() }).optional()
+  return [
+    { id: "cad_component_list", description: "List reusable components of this project (id, name, type). Read-only. Use before cad_component_insert to get a real componentId.", parameters: z.object({ scope: z.enum(["project", "library"]).default("project") }), execute: async (input, ctx) => run(handlers.listComponents(ctx.projectId, (input as { scope: "project" | "library" }).scope)) },
+    { id: "cad_component_save", description: "Gather elements by id into a named, reusable component of this project. Children are stored relative to the group's origin.", parameters: z.object({ ids: z.array(z.string()).min(1), name: z.string().min(1) }), execute: async (input, ctx) => { const i = input as { ids: string[]; name: string }; return run(handlers.saveComponent(ctx.projectId, i.ids, i.name)) } },
+    { id: "cad_component_insert", description: "Insert a stored component into the active drawing by id, with an optional transform (move/rotate/scale). Returns the new element ids.", parameters: z.object({ componentId: z.string().min(1), transform }), execute: async (input, ctx) => { const i = input as { componentId: string; transform?: cad.ElementTransform }; return run(handlers.insertComponent(ctx.projectId, i.componentId, i.transform)) } },
+    { id: "cad_component_delete", description: "Delete a reusable component by id. Destructive; require confirm: true.", parameters: z.object({ componentId: z.string().min(1), confirm: z.literal(true) }), execute: async (input) => run(handlers.deleteComponent((input as { componentId: string }).componentId)) },
+    { id: "lib_upsert_material", description: "Create or replace a Material row (properties: name, numbers, strings). Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), description: z.string().optional(), properties: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMaterial(input as Record<string, unknown>)) },
+    { id: "lib_upsert_tool", description: "Create or replace a Tool row: name, type, diameter (mm), material. Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), type: z.string(), diameter: z.number().positive(), material: z.string(), numberOfFlutes: z.number().int().positive().optional(), maxRPM: z.number().int().positive().optional(), coolantType: z.string().optional(), cuttingLength: z.number().positive().optional(), totalLength: z.number().positive().optional(), shankDiameter: z.number().positive().optional(), notes: z.string().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertTool(input as Record<string, unknown>)) },
+    { id: "lib_upsert_machine_config", description: "Create or replace a MachineConfig row: name, kind (mill/lathe/3Dprinter), kinematics, postProcessor, workOffsets. Destructive replace when id names an existing row.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), kind: z.enum(["mill", "lathe", "3Dprinter"]), kinematics: z.record(z.string(), z.object({ min: z.number(), max: z.number() })).default({}), postProcessor: z.string(), workOffsets: z.array(z.string()).default(["G54", "G55", "G56", "G57", "G58", "G59"]), probing: z.record(z.string(), z.unknown()).optional(), maxRPM: z.number().int().positive().optional(), maxFeed: z.number().positive().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMachineConfig(input as Record<string, unknown>)) },
+    { id: "lib_set_default", description: "Set the project's default material, tool and/or machine config, used to seed new operations.", parameters: z.object({ materialId: z.string().optional(), toolId: z.string().optional(), machineConfigId: z.string().optional() }), execute: async (input, ctx) => run(handlers.setProjectDefault({ ...(input as { materialId?: string; toolId?: string; machineConfigId?: string }), projectId: ctx.projectId })) },
+    { id: "cam_operations_suggest_chain", description: "Given the current operations and the chosen one, recommend the next operation as JSON suitable for cam_create_operation. Read-only.", parameters: z.object({ fromOperationId: z.string().optional(), materialHint: z.string().optional(), toolHint: z.string().optional() }), execute: async (input, ctx) => { const i = input as { fromOperationId?: string; materialHint?: string; toolHint?: string }; return run(handlers.suggestChain({ ...i, projectId: ctx.projectId })) } },
+    { id: "cam_chain_status", description: "Read one operation's chain state: previous operation, rest-tool reference, whether G-code is generated, and warnings (OrphanRef). Read-only.", parameters: z.object({ operationId: z.string().min(1) }), execute: async (input, ctx) => run(handlers.chainStatus({ projectId: ctx.projectId, operationId: (input as { operationId: string }).operationId })) }
+  ]
+}
 
 /** The embedded nikcli host (the primary path); skipped with `CADCAMFUN_AI_HOST=direct`. */
 const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
@@ -301,7 +583,9 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const actor = {
     get userId() { return actingCell.get(local).id },
     get name() { return actingCell.get(local).name ?? "User" },
-    get email() { return actingCell.get(local).email ?? "unknown@cadcamfun.local" }
+    get email() { return actingCell.get(local).email ?? "unknown@cadcamfun.local" },
+    // The message that opened the current turn, cited on an AI commit (see `project-vcs.ts`).
+    get lastPrompt() { return actingCell.lastPrompt() }
   }
   // Runtime-wide scheduler: instantiated before the host so `toolsFor` can
   // hand its four `agent_task*` tool specs to every project's host. The same
@@ -312,14 +596,14 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     dataDir: config.dataDir,
     providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
     systemPrompt: systemPrompt(),
-    // Import the (large) host bundle once the sidecar has announced itself, not while the API is still starting.
-    warmAfter: announced,
+    // Host imports and model metadata start on demand, after the editor is usable.
     // One request to models.dev, only while `<cache>/models.json` is missing: that file is
     // what turns "the four providers we declare" into the whole catalogue. Offline tests
     // set the flag and the seed answers "skipped" without touching the network.
-    catalogue: { network: process.env.CADCAMFUN_AI_OFFLINE !== "1" },
+    catalogue: { network: !config.aiOffline },
     toolsFor: (projectId) => [
       ...buildTools(handlers, projectId),
+      ...libraryToolSpecs(handlers),
       ...vcsToolSpecs({ vcs, runner, projects: projectsRepo, actor }),
       ...backgroundToolSpecs(scheduler)
     ]
@@ -339,6 +623,15 @@ const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {
 
 const AiConfigLive = Layer.unwrap(AppConfigService.useSync((c) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false })))
 
+/** Publishes the assistant's one workflow step (`ai/prompt`) to the runner that is already in scope. */
+const AiPromptStepLive = Layer.effectDiscard(
+  Effect.gen(function*() {
+    const ai = yield* AiService
+    const runner = yield* WorkflowRunner
+    yield* runner.register({ "ai/prompt": aiPromptStep({ ai }) })
+  }),
+)
+
 /** Credentials, config, direct model and the service; needs the repos and `AppConfigService`. */
 export const AiLive = Layer.unwrap(Effect.gen(function*() {
   const config = yield* AppConfigService
@@ -354,7 +647,12 @@ export const AiLive = Layer.unwrap(Effect.gen(function*() {
   const withBackground = config.aiHost === "direct"
     ? withHost
     : AiBackgroundLive.pipe(Layer.provideMerge(withHost))
-  return AiService.layer.pipe(Layer.provideMerge(withBackground))
+  // `ai/prompt` is the one step that needs the assistant, and the assistant is built on top of the
+  // workflow runner (its own git tools use it), so the registration can only happen here — once the
+  // service exists. Until this layer runs, a workflow naming `ai/prompt` fails as an unknown step
+  // rather than quietly doing nothing. The registration consumes the service it publishes, so the
+  // exported services are the very same instances (Effect memoises by layer reference).
+  return AiPromptStepLive.pipe(Layer.provideMerge(AiService.layer.pipe(Layer.provideMerge(withBackground))))
 }))
 
 export type { ProviderId }

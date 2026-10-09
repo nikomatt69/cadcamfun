@@ -99,7 +99,8 @@ const memoryStorage = (): PluginStorageBackend => {
  * worker "crash", which is how the timeout and crash-loop tests are driven.
  */
 interface FakeWorker extends PluginWorkerHandle {
-  readonly posted: Array<HostRequest>
+  readonly posted: Array<HostRequest & { readonly rpcId?: string }>
+  reply(response: RpcResponse): void
   crashOn: Set<HostRequest["_tag"]>
   hangOn: Set<HostRequest["_tag"]>
   readonly terminated: { count: number }
@@ -108,11 +109,12 @@ interface FakeWorker extends PluginWorkerHandle {
 const fakeWorker = (
   respond: (request: HostRequest) => RpcResponse | "crash" | "hang"
 ): FakeWorker => {
-  const posted: Array<HostRequest> = []
-  let messageListener: ((response: RpcResponse) => void) | undefined
-  let crashListener: ((message: string) => void) | undefined
+  const posted: Array<HostRequest & { readonly rpcId?: string }> = []
+  const messageListeners = new Set<(response: RpcResponse) => void>()
+  const crashListeners = new Set<(message: string) => void>()
   const worker: FakeWorker = {
     posted,
+    reply: (response) => { for (const listener of [...messageListeners]) listener(response) },
     crashOn: new Set(),
     hangOn: new Set(),
     terminated: { count: 0 },
@@ -120,23 +122,19 @@ const fakeWorker = (
       posted.push(request)
       const outcome = respond(request)
       if (outcome === "crash") {
-        crashListener?.("scripted crash")
+        for (const listener of [...crashListeners]) listener("scripted crash")
         return
       }
       if (outcome === "hang") return
-      queueMicrotask(() => messageListener?.(outcome))
+      queueMicrotask(() => worker.reply({ ...outcome, rpcId: request.rpcId }))
     },
     onMessage: (listener) => {
-      messageListener = listener
-      return () => {
-        messageListener = undefined
-      }
+      messageListeners.add(listener)
+      return () => { messageListeners.delete(listener) }
     },
     onCrash: (listener) => {
-      crashListener = listener
-      return () => {
-        crashListener = undefined
-      }
+      crashListeners.add(listener)
+      return () => { crashListeners.delete(listener) }
     },
     terminate: () => {
       worker.terminated.count += 1
@@ -190,6 +188,49 @@ const activate = async (h: Harness, manifest: PluginManifest): Promise<void> => 
 // ---------------------------------------------------------------- lifecycle
 
 describe("plugin lifecycle", () => {
+  test("concurrent replies resolve only the correlated request", async () => {
+    const h = harness((request) => request._tag === "activate" ? { ok: true } : "hang")
+    const manifest = await manifestOf({ contributes: { commands: [{ id: "a", title: "A" }, { id: "b", title: "B" }] } })
+    await activate(h, manifest)
+    const a = run(h.host.call(manifest.id, "a"))
+    const b = run(h.host.call(manifest.id, "b"))
+    await new Promise((r) => setTimeout(r, 10))
+    const requests = h.worker.posted.filter((request) => request._tag === "ui.command")
+    h.worker.reply({ rpcId: requests[1]?.rpcId, ok: true, value: "B" })
+    h.worker.reply({ rpcId: requests[0]?.rpcId, ok: true, value: "A" })
+    expect(await a).toBe("A")
+    expect(await b).toBe("B")
+    await run(h.host.dispose)
+  })
+
+  test("RPC admission is bounded and disposal settles pending calls without a worker crash event", async () => {
+    const h = harness((request) => request._tag === "activate" ? { ok: true } : "hang", 5000)
+    const manifest = await manifestOf({ contributes: { commands: [{ id: "a", title: "A" }] } })
+    await activate(h, manifest)
+    const calls = Array.from({ length: 64 }, () => run(h.host.call(manifest.id, "a").pipe(Effect.exit)))
+    for (let i = 0; i < 100 && h.worker.posted.length < 65; i++) await new Promise((r) => setTimeout(r, 1))
+    expect(h.worker.posted).toHaveLength(65)
+    const rejected = await run(h.host.call(manifest.id, "a").pipe(Effect.catchTag("PluginError", (error) => Effect.succeed(error.reason))))
+    expect(rejected).toBe("plugin RPC queue is full")
+    expect(h.worker.posted).toHaveLength(65)
+    await run(h.host.dispose)
+    const exits = await Promise.all(calls)
+    expect(exits.every((exit) => exit._tag === "Failure")).toBe(true)
+  })
+
+  test("interrupt releases the RPC timer and scope closure prevents new workers", async () => {
+    const h = harness((request) => request._tag === "activate" ? { ok: true } : "hang", 60)
+    const manifest = await manifestOf({ contributes: { commands: [{ id: "a", title: "A" }] } })
+    await activate(h, manifest)
+    await run(h.host.call(manifest.id, "a").pipe(Effect.timeout("10 millis"), Effect.exit))
+    await new Promise((r) => setTimeout(r, 100))
+    expect(h.worker.terminated.count).toBe(0)
+    await run(h.host.dispose)
+    expect(h.worker.terminated.count).toBe(1)
+    await expect(run(h.host.enable(manifest.id))).rejects.toThrow()
+    expect(h.spawned).toHaveLength(1)
+  })
+
   test("install registers the manifest and enables the plugin", async () => {
     const h = harness(() => ({ ok: true, value: true }))
     const manifest = await manifestOf()

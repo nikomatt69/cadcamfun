@@ -373,6 +373,71 @@ export type AiSetCredentialsPayload = {
   readonly baseUrl?: string | undefined
 }
 
+export type AiTitlePayload = {
+  readonly excerpt?: string | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+      }
+    | undefined
+}
+
+export type AiDesignAnalysisPayload = {
+  readonly description?: string | undefined
+  readonly layer?: string | undefined
+  readonly machine?: string | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+      }
+    | undefined
+}
+
+export type AiMachiningParametersPayload = {
+  readonly material?: string | undefined
+  readonly tool?: string | undefined
+  readonly operation?: string | undefined
+  readonly machine?: string | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+      }
+    | undefined
+}
+
+export type AiGcodeOptimizationPayload = {
+  readonly gcode?: string | undefined
+  readonly material?: string | undefined
+  readonly machineType?: string | undefined
+  readonly constraints?: string | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+      }
+    | undefined
+}
+
+export type AiDesignSuggestionsPayload = {
+  readonly elements?: string | undefined
+  readonly currentOperation?: string | undefined
+  readonly currentTool?: string | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+      }
+    | undefined
+}
+
 export type AiChatPayload = {
   readonly messages?: unknown | undefined
   readonly mcpServerId?: string | undefined
@@ -1749,6 +1814,7 @@ export type AiSetCredentialsInput = {
 export type AiSetCredentialsOutput = {
   providers: { [x: string]: "configured" | "missing" }
   configured: boolean
+  tools?: Array<{ id: string; description: string }> | undefined
   host: "nikcli" | "direct"
 }
 
@@ -1757,13 +1823,19 @@ export type AiClearCredentialsInput = { readonly provider: { readonly provider: 
 export type AiClearCredentialsOutput = {
   providers: { [x: string]: "configured" | "missing" }
   configured: boolean
+  tools?: Array<{ id: string; description: string }> | undefined
   host: "nikcli" | "direct"
 }
 
 export type AiStatusOutput = {
   providers: { [x: string]: "configured" | "missing" }
   configured: boolean
+  tools?: Array<{ id: string; description: string }> | undefined
   host: "nikcli" | "direct"
+}
+
+export type AiModelsInput = {
+  readonly configuredOnly?: { readonly configuredOnly?: "true" | "false" | undefined }["configuredOnly"]
 }
 
 export type AiModelsOutput = Array<{
@@ -1794,6 +1866,73 @@ export type AiProvidersOutput = Array<{
     cost: { input: number; output: number }
   }>
 }>
+
+export type AiPromptsInput = { readonly mode?: { readonly mode?: string | undefined }["mode"] }
+
+export type AiPromptsOutput = { prompts: Array<string> }
+
+export type AiTitleInput = { readonly excerpt?: AiTitlePayload["excerpt"]; readonly model?: AiTitlePayload["model"] }
+
+export type AiTitleOutput = { title: string }
+
+export type AiDesignAnalysisInput = {
+  readonly description?: AiDesignAnalysisPayload["description"]
+  readonly layer?: AiDesignAnalysisPayload["layer"]
+  readonly machine?: AiDesignAnalysisPayload["machine"]
+  readonly model?: AiDesignAnalysisPayload["model"]
+}
+
+export type AiDesignAnalysisOutput = {
+  suggestions: Array<{
+    title: string
+    description: string
+    confidence: number
+    priority: "low" | "medium" | "high"
+    kind: "optimization" | "warning" | "critical"
+  }>
+}
+
+export type AiMachiningParametersInput = {
+  readonly material?: AiMachiningParametersPayload["material"]
+  readonly tool?: AiMachiningParametersPayload["tool"]
+  readonly operation?: AiMachiningParametersPayload["operation"]
+  readonly machine?: AiMachiningParametersPayload["machine"]
+  readonly model?: AiMachiningParametersPayload["model"]
+}
+
+export type AiMachiningParametersOutput = {
+  cuttingSpeedMPerMin: number
+  feedRateMmPerMin: number
+  depthOfCutMm: number
+  stepoverPct: number
+  coolant: "flood" | "mist" | "none"
+  engagement: "conventional" | "climb"
+  warnings: Array<string>
+}
+
+export type AiGcodeOptimizationInput = {
+  readonly gcode?: AiGcodeOptimizationPayload["gcode"]
+  readonly material?: AiGcodeOptimizationPayload["material"]
+  readonly machineType?: AiGcodeOptimizationPayload["machineType"]
+  readonly constraints?: AiGcodeOptimizationPayload["constraints"]
+  readonly model?: AiGcodeOptimizationPayload["model"]
+}
+
+export type AiGcodeOptimizationOutput = {
+  gcode: string
+  changes: Array<{ line: number; before: string; after: string; reason: string }>
+  estimatedSavings: { timePct: number; toolLifePct: number; qualityNote: string }
+  notes: string
+}
+
+export type AiDesignSuggestionsInput = {
+  readonly elements?: AiDesignSuggestionsPayload["elements"]
+  readonly currentOperation?: AiDesignSuggestionsPayload["currentOperation"]
+  readonly currentTool?: AiDesignSuggestionsPayload["currentTool"]
+  readonly model?: AiDesignSuggestionsPayload["model"]
+}
+
+export type AiDesignSuggestionsOutput = Array<{ title: string; rationale: string; nextStep: string }>
 
 export type AiChatInput = {
   readonly messages?: AiChatPayload["messages"]
@@ -3469,7 +3608,18 @@ export type NotificationsListInput = {
 export type NotificationsListOutput = {
   notifications: Array<{
     id: string
-    type: "NEW_MESSAGE" | "PROJECT_CREATED" | "COMPONENT_CREATED" | "MEMBER_JOINED" | "ORGANIZATION_INVITATION"
+    type:
+      | "NEW_MESSAGE"
+      | "PROJECT_CREATED"
+      | "COMPONENT_CREATED"
+      | "MEMBER_JOINED"
+      | "ORGANIZATION_INVITATION"
+      | "PR_OPENED"
+      | "PR_MERGED"
+      | "PR_REVIEWED"
+      | "AI_COMMITTED"
+      | "WORKFLOW_FAILED"
+      | "WORKFLOW_PASSED"
     title: string
     content: string
     isRead: boolean
@@ -3491,7 +3641,18 @@ export type NotificationsUpdateInput = {
 
 export type NotificationsUpdateOutput = {
   id: string
-  type: "NEW_MESSAGE" | "PROJECT_CREATED" | "COMPONENT_CREATED" | "MEMBER_JOINED" | "ORGANIZATION_INVITATION"
+  type:
+    | "NEW_MESSAGE"
+    | "PROJECT_CREATED"
+    | "COMPONENT_CREATED"
+    | "MEMBER_JOINED"
+    | "ORGANIZATION_INVITATION"
+    | "PR_OPENED"
+    | "PR_MERGED"
+    | "PR_REVIEWED"
+    | "AI_COMMITTED"
+    | "WORKFLOW_FAILED"
+    | "WORKFLOW_PASSED"
   title: string
   content: string
   isRead: boolean
@@ -5151,6 +5312,75 @@ export type VcsDispatchOutput = Array<{
   startedAt: string
   finishedAt: string | null
 }>
+
+export type VcsListWorkflowsInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly ref?: { readonly ref?: string | undefined }["ref"]
+}
+
+export type VcsListWorkflowsOutput = Array<{
+  name: string
+  path: string
+  content: string
+  problem?: string | undefined
+}>
+
+export type VcsWorkflowInput = {
+  readonly id: { readonly id: string; readonly name: string }["id"]
+  readonly name: { readonly id: string; readonly name: string }["name"]
+  readonly ref?: { readonly ref?: string | undefined }["ref"]
+}
+
+export type VcsWorkflowOutput = { name: string; path: string; content: string; problem?: string | undefined }
+
+export type EventsSubscribeInput = { readonly id: { readonly id: string }["id"] }
+
+export type EventsSubscribeOutput =
+  | {
+      type: "pr.opened"
+      at: string
+      projectId: string
+      number: number
+      title: string
+      authorKind: "user" | "ai"
+      head: string
+      base: string
+    }
+  | { type: "pr.merged"; at: string; projectId: string; number: number; title: string }
+  | { type: "pr.closed"; at: string; projectId: string; number: number }
+  | {
+      type: "pr.reviewed"
+      at: string
+      projectId: string
+      number: number
+      verdict: "comment" | "approve" | "request-changes"
+    }
+  | {
+      type: "commit"
+      at: string
+      projectId: string
+      oid: string
+      branch: string
+      authorKind: "user" | "ai"
+      message: string
+    }
+  | {
+      type: "workflow.started"
+      at: string
+      projectId: string
+      runId: string
+      workflow: string
+      event: "push" | "pull-request" | "manual"
+    }
+  | {
+      type: "workflow.finished"
+      at: string
+      projectId: string
+      runId: string
+      workflow: string
+      status: "success" | "failure" | "cancelled"
+    }
+  | { type: "ai.session"; at: string; projectId: string; sessionId: string; phase: "started" | "finished" | "aborted" }
 
 export type CompanionStatusOutput = {
   enabled: boolean

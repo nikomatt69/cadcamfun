@@ -7,7 +7,7 @@
  * and invalidate the prefixes they affect. The path-filtered log re-keys on `path` and the tabs swap without
  * re-fetching what they don't need.
  */
-import { For, Show, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js"
 import { useParams, useSearchParams } from "@solidjs/router"
 import { Effect } from "effect"
 import { invalidatePrefix } from "../state/query-cache.ts"
@@ -27,7 +27,13 @@ interface Commit { readonly oid: string; readonly parents: ReadonlyArray<string>
 interface Change { readonly path: string; readonly name?: string | undefined; readonly status: string; readonly changes: ReadonlyArray<{ readonly pointer: string; readonly before?: unknown; readonly after?: unknown }> }
 interface Pull { readonly number: number; readonly title: string; readonly body: string; readonly head: string; readonly base: string; readonly state: string; readonly authorKind: string; readonly createdAt: string }
 interface Review { readonly id: string; readonly verdict: string; readonly body: string }
-interface Run { readonly id: string; readonly workflow: string; readonly event: string; readonly sha: string; readonly status: string; readonly startedAt: string }
+interface Run { readonly id: string; readonly workflow: string; readonly event: string; readonly sha: string; readonly status: string; readonly startedAt: string; readonly events?: ReadonlyArray<RunEvent> }
+/** One frame of a run's progress, as `WorkflowRunner` streams it. */
+type RunEvent =
+  | { readonly type: "job-start"; readonly job: string }
+  | { readonly type: "step"; readonly job: string; readonly index: number; readonly uses: string; readonly status: "success" | "failure" | "skipped"; readonly message?: string }
+  | { readonly type: "job-end"; readonly job: string; readonly status: string }
+  | { readonly type: "invalid"; readonly message: string }
 
 interface VcsStatus { readonly branch: string; readonly head: string | null; readonly dirty: ReadonlyArray<string> }
 interface VcsBranches { readonly current: string; readonly branches: Readonly<Record<string, string>> }
@@ -70,6 +76,78 @@ function ChangeList(props: { readonly changes: ReadonlyArray<Change> }): JSX.Ele
 
 const VCS = "vcs"
 
+interface WorkflowFile { readonly name: string; readonly path: string; readonly content: string; readonly problem?: string }
+
+/** A workflow that verifies and replays the programs of a commit — the shape to start from. */
+const STARTER = `name: Validate
+on:
+  push:
+    branches: ["**"]
+    paths: ["toolpaths/**"]
+  pullRequest:
+    branches: ["main"]
+  manual: {}
+jobs:
+  check:
+    steps:
+      - id: validate
+        uses: project/validate
+      - uses: cam/gcode
+      - uses: cam/verify
+`
+
+/** Glyph + colour for one step's verdict, so a failed run is readable without reading its message. */
+const STEP_MARK: Record<"success" | "failure" | "skipped", string> = {
+  success: "text-green-600",
+  failure: "text-red-600",
+  skipped: "text-gray-400",
+}
+
+/**
+ * The step timeline of one run, straight from the event stream the runner persisted. A run's verdict is
+ * otherwise unexplainable: `status: failure` says nothing about *which* step refused, and that message
+ * is the whole point of running the workflow.
+ */
+function RunTimeline(props: { readonly run: Run }): JSX.Element {
+  const events = () => props.run.events ?? []
+  return (
+    <div class="mt-2 border-l-2 border-gray-200 pl-3 dark:border-gray-700">
+      <Show when={events().length > 0} fallback={<p class="text-xs text-gray-500">{t("vcs.actions.noEvents")}</p>}>
+        <ul class="space-y-1 text-xs">
+          <For each={events()}>
+            {(e) => (
+              <li>
+                <Switch fallback={<span class="text-gray-500">{(e as { type: string }).type}</span>}>
+                  <Match when={e.type === "invalid"}>
+                    <span class="text-red-600">{(e as { message: string }).message}</span>
+                  </Match>
+                  <Match when={e.type === "job-start"}>
+                    <span class="font-medium">{(e as { job: string }).job}</span>
+                  </Match>
+                  <Match when={e.type === "step"}>
+                    <span class={`font-mono ${STEP_MARK[(e as { status: "success" | "failure" | "skipped" }).status]}`}>
+                      {(e as { uses: string }).uses}
+                    </span>
+                    <Show when={(e as { message?: string }).message}>
+                      <span class="text-gray-500"> — {(e as { message: string }).message}</span>
+                    </Show>
+                    <Show when={(e as { status: string }).status === "skipped"}>
+                      <span class="text-gray-400"> ({t("vcs.actions.skipped")})</span>
+                    </Show>
+                  </Match>
+                  <Match when={e.type === "job-end"}>
+                    <span class="text-gray-500">{(e as { job: string }).job} · {(e as { status: string }).status}</span>
+                  </Match>
+                </Switch>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
+    </div>
+  )
+}
+
 export function ProjectHistoryScreen(): JSX.Element {
   const app = useApp()
   const params = useParams<{ id: string }>()
@@ -86,6 +164,8 @@ export function ProjectHistoryScreen(): JSX.Element {
   const [prHead, setPrHead] = createSignal("")
   const [prBase, setPrBase] = createSignal("main")
   const [selected, setSelected] = createSignal<Commit>()
+  /** Which run's step timeline is expanded in the Actions tab; one at a time keeps the list scannable. */
+  const [openRun, setOpenRun] = createSignal<string | undefined>(undefined)
   const [openPull, setOpenPull] = createSignal<{ pull: Pull; reviews: ReadonlyArray<Review>; changes: ReadonlyArray<Change> }>()
   const [reviewNote, setReviewNote] = createSignal("")
   const [notice, setNotice] = createSignal("")
@@ -107,7 +187,15 @@ export function ProjectHistoryScreen(): JSX.Element {
     { cache: app.cache }
   )
   const pullsQ = useQuery<ReadonlyArray<Pull>>(`${VCS}/pulls`, projectKey(), (client) => client.vcs.listPullRequests({ params: projectKey(), query: {} }), runtime, { cache: app.cache })
-  const runsQ = useQuery<ReadonlyArray<Run>>(`${VCS}/runs`, projectKey(), (client) => client.vcs.runs({ params: projectKey() }), runtime, { cache: app.cache })
+  // The wire contract types `events` as `unknown[]`; the runner is what defines the frame shape, so the
+// narrowing happens here rather than being pushed into every consumer.
+const runsQ = useQuery<ReadonlyArray<Run>>(
+    `${VCS}/runs`,
+    projectKey(),
+    (client) => client.vcs.runs({ params: projectKey() }).pipe(Effect.map((rows) => rows.map((r) => ({ ...r, events: (r.events ?? []) as ReadonlyArray<RunEvent> })))),
+    runtime,
+    { cache: app.cache }
+  )
   const remoteQ = useQuery<{ readonly remote: string | null }>(`${VCS}/remote`, projectKey(), (client) => client.vcs.remote({ params: projectKey() }), runtime, { cache: app.cache })
   const diffQ = useQuery<ReadonlyArray<Change>>(
     `${VCS}/diff`,
@@ -163,7 +251,7 @@ export function ProjectHistoryScreen(): JSX.Element {
   createEffect(() => { openPull(); pullQ.refetch() })
 
   // The notice/clear on a fresh write.
-  const flashProblem = (cause: unknown): void => setProblem(t("vcs.error", { message: describeError(cause) }))
+  const flashProblem = (cause: unknown): void => { setProblem(t("vcs.error", { message: describeError(cause) })) }
   const flashNotice = (text: string): void => { setNotice(text); setProblem("") }
 
   const branch = (): string => statusQ.data()?.branch ?? "main"
@@ -173,7 +261,11 @@ export function ProjectHistoryScreen(): JSX.Element {
   const commits = (): ReadonlyArray<Commit> => logQ.data() ?? []
   const pulls = (): ReadonlyArray<Pull> => pullsQ.data() ?? []
   const runs = (): ReadonlyArray<Run> => runsQ.data() ?? []
-  const remote = (): string => remoteValue() || remoteQ.data()?.remote ?? ""
+  const remote = (): string => {
+    const v = remoteValue()
+    if (v !== "") return v
+    return remoteQ.data()?.remote ?? ""
+  }
   const selectedChanges = (): ReadonlyArray<Change> => diffQ.data() ?? []
   const loadedPull = (): { pullRequest: Pull; reviews: ReadonlyArray<Review>; changes: ReadonlyArray<Change> } | undefined => pullQ.data()
 
@@ -234,6 +326,125 @@ export function ProjectHistoryScreen(): JSX.Element {
       const result = (await syncM.mutate(kind, t1, undefined)) as { readonly oid: string }
       flashNotice(t("vcs.github.done", { detail: short(result.oid) }))
     })
+  }
+
+  /**
+   * The workflow files of the checked-out branch, with a small YAML editor. Saving is a commit like any
+   * other, so CI changes travel through the same reviewable history as a change to the model — and the
+   * file shown is the one in the tree, so what you edit is what a run would execute.
+   */
+  function WorkflowEditor(): JSX.Element {
+    const [open, setOpen] = createSignal<string | undefined>(undefined)
+    const [draft, setDraft] = createSignal("")
+    const [newName, setNewName] = createSignal("build.yml")
+    const [editing, setEditing] = createSignal(false)
+    const [commitMessage, setCommitMessage] = createSignal("")
+
+    const filesQ = useQuery<ReadonlyArray<WorkflowFile>>(
+      `${VCS}/workflows`,
+      projectKey(),
+      (client) => client.vcs.listWorkflows({ params: projectKey(), query: {} }),
+      runtime,
+      { cache: app.cache }
+    )
+    const saveM = useMutation(
+      (client, path: string, content: string, message: string) =>
+        client.vcs.commit({ params: { id: projectId() }, payload: { message, files: { [path]: content } } }),
+      runtime,
+      [`${VCS}/workflows`, `${VCS}/log`],
+      app.cache
+    )
+
+    const files = (): ReadonlyArray<WorkflowFile> => filesQ.data() ?? []
+    const shown = (): WorkflowFile | undefined => files().find((f) => f.name === open())
+    const select = (name: string): void => {
+      setOpen(name)
+      setEditing(false)
+      setDraft(files().find((f) => f.name === name)?.content ?? "")
+    }
+    const startNew = (): void => {
+      const name = newName().trim()
+      if (!name) return
+      const file = name.endsWith(".yml") || name.endsWith(".yaml") ? name : `${name}.yml`
+      if (files().some((f) => f.name === file)) return select(file)
+      setOpen(file)
+      setEditing(true)
+      setDraft(STARTER)
+    }
+    const save = (): void => {
+      const file = shown()
+      if (!file) return
+      const message = commitMessage().trim()
+      if (!message) return
+      void act(async () => {
+        await saveM.mutate(file.path, draft(), message)
+        setCommitMessage("")
+        setEditing(false)
+        flashNotice(t("vcs.workflows.saved"))
+      })
+    }
+
+    return (
+      <section class={`${CARD} space-y-3`}>
+        <h3 class="font-medium">{t("vcs.workflows.title")}</h3>
+        <Show when={filesQ.error()}><p role="alert" class="text-sm text-red-600">{describeError(filesQ.error())}</p></Show>
+        <Show when={files().length === 0} fallback={
+          <ul class="space-y-1 text-sm">
+            <For each={files()}>
+              {(f) => (
+                <li>
+                  <button
+                    class={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-left ${open() === f.name ? "bg-blue-50 dark:bg-blue-950" : "hover:bg-gray-50 dark:hover:bg-gray-800"}`}
+                    aria-expanded={open() === f.name}
+                    onClick={() => select(f.name)}
+                  >
+                    <span class="font-mono">{f.name}</span>
+                    <Show when={f.problem}><span class="text-xs text-red-600">{t("vcs.workflows.invalid")}</span></Show>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        }>
+          <p class="text-sm text-gray-500">{t("vcs.workflows.empty")}</p>
+        </Show>
+
+        <div class="flex gap-2">
+          <input class={INPUT} placeholder={t("vcs.workflows.name")} value={newName()} onInput={(e) => setNewName(e.currentTarget.value)} />
+          <button class={BTN} onClick={startNew}>{t("vcs.workflows.create")}</button>
+        </div>
+
+        <Show when={shown()}>
+          {(file) => (
+            <div class="space-y-2">
+              <Show when={file().problem}>
+                {(problem) => <p class="rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950">{problem()}</p>}
+              </Show>
+              <Show
+                when={editing()}
+                fallback={<pre class="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-2 font-mono text-xs dark:bg-gray-900">{file().content}</pre>}
+              >
+                <textarea
+                  class={`${INPUT} min-h-48 font-mono text-xs`}
+                  aria-label={`${t("vcs.workflows.title")} ${file().name}`}
+                  value={draft()}
+                  onInput={(e) => setDraft(e.currentTarget.value)}
+                />
+                <p class="text-xs text-gray-500">{t("vcs.workflows.stepsHint")}</p>
+                <div class="flex gap-2">
+                  <input class={INPUT} placeholder={t("vcs.workflows.savePrompt")} value={commitMessage()} onInput={(e) => setCommitMessage(e.currentTarget.value)} />
+                  <button class={PRIMARY} disabled={busy() || !commitMessage().trim()} onClick={save}>{t("vcs.workflows.save")}</button>
+                  <button class={BTN} onClick={() => { setEditing(false); setDraft(file().content) }}>Cancel</button>
+                </div>
+              </Show>
+              <Show when={!editing()}>
+                <button class={BTN} onClick={() => { setDraft(file().content); setEditing(true) }}>Edit</button>
+              </Show>
+            </div>
+          )}
+        </Show>
+      </section>
+    )
   }
 
   return (
@@ -361,9 +572,24 @@ export function ProjectHistoryScreen(): JSX.Element {
       <Show when={tab() === "actions"}>
         <section class={`${CARD} space-y-3`}>
           <button class={PRIMARY} disabled={busy()} onClick={dispatch}>{t("vcs.actions.run")}</button>
+          <WorkflowEditor />
           <ul class="space-y-2 text-sm">
             <Show when={runs().length === 0}><li class="text-gray-500">{t("vcs.actions.empty")}</li></Show>
-            <For each={runs()}>{(r) => <li>{r.workflow}<span class={PILL(r.status)}>{r.status}</span><div class="text-xs text-gray-500">{r.event} · <code>{short(r.sha)}</code> · {new Date(r.startedAt).toLocaleString()}</div></li>}</For>
+            <For each={runs()}>
+              {(r) => (
+                <li>
+                  <button
+                    class="flex w-full items-center justify-between text-left"
+                    aria-expanded={openRun() === r.id}
+                    onClick={() => setOpenRun(openRun() === r.id ? undefined : r.id)}
+                  >
+                    <span>{r.workflow}<span class={PILL(r.status)}>{r.status}</span></span>
+                    <span class="text-xs text-gray-500">{r.event} · <code>{short(r.sha)}</code> · {new Date(r.startedAt).toLocaleString()}</span>
+                  </button>
+                  <Show when={openRun() === r.id}><RunTimeline run={r} /></Show>
+                </li>
+              )}
+            </For>
           </ul>
         </section>
       </Show>

@@ -33,6 +33,8 @@ interface ElementsState {
   history: Element[][];
   currentHistoryIndex: number;
   clipboard: Element | null;
+  /** Set while the user drags: control-point and gizmo edits update the live state without a history step. */
+  isEditing: boolean;
   // Actions
   addElement: (element: Omit<Element, "id" | "layerId"> | any) => string;
   addElements: (elements: (Omit<Element, "id" | "layerId"> | any)[]) => string[];
@@ -56,6 +58,8 @@ interface ElementsState {
   pasteElement: () => void;
   // History management
   saveHistoryState: () => void;
+  beginEdit: () => void;
+  endEdit: () => void;
   undo: () => void;
   redo: () => void;
   // Group operations
@@ -63,6 +67,26 @@ interface ElementsState {
   ungroupElement: (groupId: string) => void;
   // AI suggestions
   addAISuggestion: (elementId: string, suggestion: AIDesignSuggestion) => void;
+}
+
+/**
+ * How many snapshots of the drawing undo/redo keep.
+ *
+ * Each one holds a whole `elements` array, and an element can carry a very large `vertices`/`faces`
+ * pair (a Boolean result). Dragging a control point used to write one snapshot per pointer move, so
+ * a short drag could leave hundreds of mesh-sized arrays alive and nothing else able to run.
+ */
+const HISTORY_LIMIT = 50
+
+/** How many snapshots of the drawing undo/redo keep (bounded so a long session cannot grow without end). */
+export { HISTORY_LIMIT }
+
+/** Appends a snapshot, dropping the oldest ones beyond the limit. */
+const withHistory = (state: ElementsState, elements: Element[]): { history: Element[][]; currentHistoryIndex: number } => {
+  const history = state.history.slice(0, state.currentHistoryIndex + 1)
+  history.push(elements)
+  const kept = history.length > HISTORY_LIMIT ? history.slice(history.length - HISTORY_LIMIT) : history
+  return { history: kept, currentHistoryIndex: kept.length - 1 }
 }
 function normalizeElement(element: any, activeLayerId: string): Element {
   // If it's already a complete element, just ensure it has a layerId
@@ -105,6 +129,7 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
   history: [[]],
   currentHistoryIndex: 0,
   clipboard: null,
+  isEditing: false,
 
   addElement: element => {
     const layerState = useLayerStore.getState();
@@ -122,13 +147,9 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       const newElements = [...state.elements, newElement];
 
       // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(newElements);
-
       return {
         elements: newElements,
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, newElements)
       };
     });
 
@@ -151,14 +172,9 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
     set(state => {
       const updatedElements = [...state.elements, ...newElements];
 
-      // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(updatedElements);
-
       return {
         elements: updatedElements,
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1,
+        ...withHistory(state, updatedElements),
         // Optionally select the last element added
         selectedElement: newElements.length > 0 ? newElements[newElements.length - 1] : state.selectedElement
       };
@@ -178,16 +194,21 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
 
       const updatedElements = state.elements.map(element => (element.id === id ? { ...element, ...updates } : element));
 
-      // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(updatedElements);
+      // A drag is one action, not one action per pointer move: while it runs the element is only kept
+      // current, and the caller commits the single history step when it lets go.
+      if (state.isEditing) {
+        return {
+          elements: updatedElements,
+          selectedElement:
+            state.selectedElement?.id === id ? { ...state.selectedElement, ...updates } : state.selectedElement,
+        };
+      }
 
       return {
         elements: updatedElements,
         selectedElement:
           state.selectedElement?.id === id ? { ...state.selectedElement, ...updates } : state.selectedElement,
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, updatedElements)
       };
     });
   },
@@ -216,16 +237,11 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
 
       const filteredElements = state.elements.filter(element => element.id !== id);
 
-      // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(filteredElements);
-
       return {
         elements: filteredElements,
         selectedElement: state.selectedElement?.id === id ? null : state.selectedElement,
         selectedElements: state.selectedElements.filter(eid => eid !== id),
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, filteredElements)
       };
     });
   },
@@ -457,15 +473,16 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
   // Save the current state to history for undo/redo
   saveHistoryState: () => {
     set(state => {
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push([...state.elements]);
-
       return {
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, [...state.elements])
       };
     });
   },
+
+  /** Starts an editing gesture: the element stays live, but nothing is written to history. */
+  beginEdit: () => set({ isEditing: true }),
+  /** Ends the gesture and writes the single history step it represents. */
+  endEdit: () => set((state) => (state.isEditing ? { isEditing: false, ...withHistory(state, [...state.elements]) } : state)),
 
   // Undo the last action
   undo: () => {
@@ -576,16 +593,11 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       const newElements = state.elements.filter(el => !ids.includes(el.id));
       newElements.push(groupElement);
 
-      // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(newElements);
-
       return {
         elements: newElements,
         selectedElement: groupElement,
         selectedElements: [groupId],
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, newElements)
       };
     });
 
@@ -611,16 +623,11 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
       const newElements = state.elements.filter(el => el.id !== groupId);
       newElements.push(...ungroupedElements);
 
-      // Save state to history
-      const newHistory = state.history.slice(0, state.currentHistoryIndex + 1);
-      newHistory.push(newElements);
-
       return {
         elements: newElements,
         selectedElement: null,
         selectedElements: ungroupedElements.map((el: { id: any }) => el.id),
-        history: newHistory,
-        currentHistoryIndex: state.currentHistoryIndex + 1
+        ...withHistory(state, newElements)
       };
     });
   }

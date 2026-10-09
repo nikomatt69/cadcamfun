@@ -8,7 +8,7 @@
  * background and wakes the parent with its findings.
  */
 
-export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist"] as const
+export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer"] as const
 export type SubagentId = (typeof SUBAGENT_IDS)[number]
 
 export interface SubagentSpec {
@@ -31,7 +31,7 @@ export interface SubagentSpec {
 const BASICS = `You are a specialist agent of the CAD/CAM assistant built into CADCAMFUN. A main agent handed you one job in the prompt below; you do not see its conversation with the user, so work only from the prompt and from what your tools return. The user watches the editor while you work.
 
 Rules:
-- Millimetres everywhere. Angles are radians in tool calls except an element's \`rotation\`, which is in degrees.
+- Millimetres everywhere. Angles are radians in tool calls except an element's \`rotation\` and parametric revolve/pattern angles, which are in degrees.
 - Never invent an entity id, a value, a tool, a material or an operation type: read it with your tools first. If the prompt names an id that does not exist, say so and stop that part; do not guess a similar one.
 - Write tool calls as plain JSON (arrays are arrays, numbers are numbers). A refused or failed call is information: read the error, fix the named cause and resend; never repeat a failing call unchanged and never run probing "tests" in the drawing.
 - Do exactly the job, no more. If it cannot be done as stated, or needs a decision the prompt does not give, report that instead of choosing for the main agent.
@@ -75,7 +75,7 @@ Recommended next steps for the main agent (which tool, which values).
 Open questions: or "none".`,
     // Verification persists operation metadata, so it is not here.
     tools: [
-      "cad_describe_drawing", "cad_check_design", "cam_list_operations", "cam_suggest_parameters",
+      "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cad_vision", "cam_vision", "cad_describe_drawing", "cad_check_design", "cam_list_operations", "cam_suggest_parameters",
       "cam_describe_machine", "cam_analyze_gcode", "lib_lookup_material", "lib_lookup_tool", "memory_recall",
       ...VCS_READ
     ],
@@ -101,7 +101,7 @@ Method:
 
 ${REPORT}`,
     tools: [
-      "cad_describe_drawing", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor",
+      "cad_inspect", "cad_component_relations", "attachment_read", "cad_vision", "cad_parametric", "cad_describe_drawing", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor",
       "cad_delete_entities", "cad_check_design", "memory_recall", ...VCS_READ
     ],
     edits: true,
@@ -128,7 +128,7 @@ Method:
 
 ${REPORT}`,
     tools: [
-      "cad_describe_drawing", "cad_add_elements", "cad_add_entities", "cad_import_drawing", "cad_group_entities",
+      "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cad_vision", "cad_parametric", "cad_describe_drawing", "cad_add_elements", "cad_add_entities", "cad_import_drawing", "cad_group_entities",
       "cad_transform_entities", "cad_check_design", "memory_recall", ...VCS_READ
     ],
     edits: true,
@@ -156,7 +156,7 @@ Method:
 ${REPORT}
 Also give for each operation: id, type, tool, material, depth, stepdown, feed, rpm, and the verification summary (errors, warnings, what was modelled).`,
     tools: [
-      "cad_describe_drawing", "cad_check_design", "cam_describe_machine", "cam_create_operation", "cam_list_operations",
+      "cam_stock", "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cam_vision", "cad_describe_drawing", "cad_check_design", "cam_describe_machine", "cam_create_operation", "cam_list_operations",
       "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
       "lib_lookup_material", "lib_lookup_tool", "memory_recall", ...VCS_READ, "actions_run"
     ],
@@ -164,6 +164,35 @@ Also give for each operation: id, type, tool, material, depth, stepdown, feed, r
     background: false,
     steps: 60,
     timeoutMs: 10 * MINUTE
+  },
+  reviewer: {
+    id: "reviewer",
+    host: "cadcam-reviewer",
+    description: "Reviews a pull request: reads the diff, the workflow runs and the verification reports, then writes a verdict. Read-only.",
+    prompt: `${BASICS}
+
+Your job: review the change on this branch as a reviewer would. You are read-only; you do not edit, commit or merge.
+
+Method:
+1. \`vcs_status\` for the branch and open pull requests, then \`vcs_diff\` for what changed.
+2. For each changed toolpath or operation: \`cam_list_operations\`, \`cam_verify_toolpath\` or \`cam_analyze_gcode\` if G-code is involved. For changed drawings: \`cad_describe_drawing\` and \`cad_check_design\`.
+3. \`memory_recall\` for review notes the team left, and \`actions_run\` only when the job asks for the workflows.
+4. Write what changed, what you checked, what you did not check.
+
+Final message:
+Verdict: approve | request-changes | needs-discussion.
+Changed: bullets with entity or operation ids.
+Checked: bullets, each with the tool that showed it.
+Not checked: bullets, or "none".
+Blocking issues: bullets that justify request-changes, or "none".`,
+    tools: [
+      "vcs_status", "vcs_diff", "vcs_list_pull_requests", "cam_list_operations", "cam_verify_toolpath",
+      "cam_analyze_gcode", "cad_describe_drawing", "cad_check_design", "memory_recall", "actions_run"
+    ],
+    edits: false,
+    background: true,
+    steps: 40,
+    timeoutMs: 5 * MINUTE
   }
 }
 
@@ -177,6 +206,8 @@ export const subagentPermission = (spec: SubagentSpec, registeredToolIds: Readon
   const permission: Record<string, "allow" | "deny"> = { "*": "deny" }
   for (const id of spec.tools) if (registeredToolIds.includes(id)) permission[id] = "allow"
   permission["skill"] = "allow"
+  permission["search_tools"] = "allow"
+  permission["invalid"] = "allow"
   // The confined program runner sees only the tools allowed above.
   permission["code_mode"] = "allow"
   return permission

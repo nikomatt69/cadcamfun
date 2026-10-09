@@ -3,6 +3,7 @@ import { Effect } from "effect"
 import {
   BackgroundTaskManager,
   type BackgroundTask,
+  type BackgroundTaskOwner,
   type BackgroundTaskRunnerInput
 } from "./background-tasks.ts"
 import { adoptChildSession, subagentById, SUBAGENTS } from "./agents.ts"
@@ -35,21 +36,8 @@ const describePromptFailure = (result: { name?: string; data?: { message?: strin
 
 const runPromise = <A, E>(eff: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(eff as never)
 
-/**
- * One (projectId, parentSessionId) runner. Creates a child session via the
- * real pinned SDK, prompts it with the `cadcam-worker` agent (defined in
- * `config.ts`), and waits for the host's `prompt` stream to settle. The host
- * already enforces the read-only permission whitelist on the worker agent; this
- * class only handles the child-session lifecycle and the abort contract.
- *
- * The `parentID` argument is part of the pinned bundle's session.create schema
- * (we pass it when the host's generation allows it; otherwise the child still
- * works but is unlinked from the parent session lineage).
- */
+/** One task invocation owns one real child session, parent lineage and cancellation lifecycle. */
 class WorkerRunner {
-  private current?: Promise<string>
-  private aborted = false
-
   constructor(
     private readonly runtime: NikCliRuntime,
     private readonly projectId: string,
@@ -75,14 +63,16 @@ class WorkerRunner {
   }
 
   async run(input: BackgroundTaskRunnerInput): Promise<string> {
-    if (this.aborted) throw new Error("worker aborted")
+    input.signal.throwIfAborted()
     const spec = subagentById(input.agent)
     const work: Promise<string> = (async (): Promise<string> => {
       const host = await this.hostOf()
+      input.signal.throwIfAborted()
       const model = await this.parentModel(host)
+      input.signal.throwIfAborted()
       const session = await host.client.session
         .create({ title: input.description, parentID: this.parentSessionId })
-        .catch(async () => host.client.session.create({ title: input.description }))
+
       // The parent's stream carries this session's tool calls, so what the specialist edits shows up in the editor live.
       const release = adoptChildSession(this.parentSessionId, session.id, spec.id)
       try {
@@ -95,6 +85,7 @@ class WorkerRunner {
           let text = input.prompt
           for (let attempt = 0; ; attempt += 1) {
             try {
+              controller.signal.throwIfAborted()
               const result = await host.client["session-prompt"].prompt(
                 {
                   sessionID: session.id,
@@ -112,7 +103,12 @@ class WorkerRunner {
               const message = cause instanceof Error ? cause.message : String(cause)
               if (attempt >= WORKER_RESUMES || controller.signal.aborted || !isTransientFailure(message)) throw cause
               // The conversation of the child is intact: ask it to carry on after a pause.
-              await new Promise((r) => setTimeout(r, WORKER_BACKOFF_MS * 2 ** attempt))
+              await new Promise<void>((resolve, reject) => {
+                const abort = () => { clearTimeout(timer); reject(controller.signal.reason) }
+                const timer = setTimeout(() => { controller.signal.removeEventListener("abort", abort); resolve() }, WORKER_BACKOFF_MS * 2 ** attempt)
+                controller.signal.addEventListener("abort", abort, { once: true })
+                if (controller.signal.aborted) abort()
+              })
               text = "The connection to the model failed and has been restored. Continue from where you stopped: do not repeat steps that already completed (read the conversation and the tool results), and finish the job."
             }
           }
@@ -125,17 +121,7 @@ class WorkerRunner {
         await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
       }
     })() as Promise<string>
-    this.current = work
-    try {
-      return await work
-    } finally {
-      if (this.current === work) this.current = undefined
-    }
-  }
-
-  async abort(): Promise<void> {
-    this.aborted = true
-    await this.current?.catch(() => undefined)
+    return await work
   }
 }
 
@@ -146,13 +132,13 @@ class WorkerRunner {
  * singleton ensures the 4 / 16 limit is respected across the whole app.
  */
 export class BackgroundToolsRunner {
-  private readonly runners = new Map<string, WorkerRunner>()
+  private readonly retired = new Set<string>()
+  private disposed = false
 
   readonly manager: BackgroundTaskManager
 
   constructor(
     private readonly runtime: NikCliRuntime,
-    private readonly projectId: string,
     options?: { manager?: BackgroundTaskManager; runner?: (input: BackgroundTaskRunnerInput) => Promise<string> }
   ) {
     const runner = options?.runner ?? ((input) => this.invoke(input))
@@ -165,34 +151,30 @@ export class BackgroundToolsRunner {
     // Always layer the wake callback on the manager we end up with — whether
     // the caller supplied it or we just built it — so completion deliveries
     // happen regardless of who owns the manager.
-    this.manager.setOnCompletion((task) => {
-      void this.deliver(task).catch(() => undefined)
-    })
+    this.manager.setOnCompletion((task) => this.deliver(task))
     // If the manager we were given has no runner yet (lazy wiring), install ours.
     this.manager.setRunner(runner)
   }
 
-  async cancelForParent(parentSessionId: string): Promise<number> {
-    const cancelled = this.manager.cancelParent({ projectId: this.projectId, parentSessionId })
-    for (const [key, runner] of this.runners) if (key.endsWith(`\u0000${parentSessionId}`)) await runner.abort()
+  async cancelForParent(owner: BackgroundTaskOwner): Promise<number> {
+    this.retired.add(this.ownerKey(owner))
+    const cancelled = this.manager.cancelParent(owner)
+    await Promise.all(this.manager.list(owner).map((task) => this.manager.wait(owner, task.id)))
     return cancelled
   }
 
   async dispose(): Promise<void> {
+    this.disposed = true
     await this.manager.dispose()
-    await Promise.all([...this.runners.values()].map((runner) => runner.abort()))
-    this.runners.clear()
+  }
+
+  private ownerKey(owner: BackgroundTaskOwner): string {
+    return JSON.stringify([owner.projectId, owner.parentSessionId])
   }
 
   private async invoke(input: BackgroundTaskRunnerInput): Promise<string> {
-    // The specialist works in the host of the project that asked for it: its tools act on that project's drawing.
-    const key = `${input.projectId}\u0000${input.parentSessionId}`
-    let runner = this.runners.get(key)
-    if (runner === undefined) {
-      runner = new WorkerRunner(this.runtime, input.projectId, input.parentSessionId)
-      this.runners.set(key, runner)
-    }
-    return await runner.run(input)
+    if (this.disposed || this.retired.has(this.ownerKey(input))) throw new Error("Worker owner is closed")
+    return await new WorkerRunner(this.runtime, input.projectId, input.parentSessionId).run(input)
   }
 
   /**
@@ -202,10 +184,12 @@ export class BackgroundToolsRunner {
    * to be idle. Cancelled tasks do not wake the parent.
    */
   private async deliver(task: BackgroundTask): Promise<void> {
+    if (this.disposed || this.retired.has(this.ownerKey(task))) return
     if (task.status === "cancelled" || task.status === "running" || task.status === "queued") return
     // A caller that waited for the result already has it.
     if (task.background === false) return
     const host = await runPromise(this.runtime.host(task.projectId))
+    if (this.disposed || this.retired.has(this.ownerKey(task))) return
     const body =
       task.status === "completed"
         ? `${BACKGROUND_FINDINGS_PREFIX}agent=${task.agent ?? "researcher"}; task=${task.description}\n${task.text ?? ""}`

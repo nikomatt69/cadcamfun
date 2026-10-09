@@ -9,7 +9,7 @@
  * Consumers follow Solid's reactivity rule: every value is a getter that is
  * called inside JSX, never destructured.
  */
-import { createContext, createResource, useContext, type Accessor, type JSX } from "solid-js"
+import { createContext, createResource, createSignal, onCleanup, useContext, type Accessor, type JSX } from "solid-js"
 import { createAiStore, type AiStore } from "./store.ts"
 import { makeCatalog, type AiCatalogService } from "./models.ts"
 import type { AiStatus, ModelInfo, ProviderId, ProviderInfo } from "./types.ts"
@@ -35,23 +35,27 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
   const store = createAiStore()
   const catalog: AiCatalogService = makeCatalog(app.client)
 
+  const [statusEnabled, enableStatus] = createSignal(false)
+  const [modelsEnabled, enableModels] = createSignal(false)
+  const [providersEnabled, enableProviders] = createSignal(false)
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
   const [statusResource, statusActions] = createResource(
-    () => app.runtime,
-    (runtime) => runtime.run(catalog.status).catch(() => undefined)
+    () => statusEnabled() && app.runtime,
+    (runtime) => runtime.run(catalog.status, { signal: controller.signal }).catch(() => undefined)
   )
   const [modelsResource, modelsActions] = createResource(
-    () => app.runtime,
-    (runtime) => runtime.run(catalog.models).catch(() => [] as ReadonlyArray<ModelInfo>)
+    () => modelsEnabled() && app.runtime,
+    (runtime) => runtime.run(catalog.models, { signal: controller.signal }).catch(() => [] as ReadonlyArray<ModelInfo>)
   )
   const [providersResource, providersActions] = createResource(
-    () => app.runtime,
-    (runtime) => runtime.run(catalog.providers).catch(() => [] as ReadonlyArray<ProviderInfo>)
+    () => providersEnabled() && app.runtime,
+    (runtime) => runtime.run(catalog.providers, { signal: controller.signal }).catch(() => [] as ReadonlyArray<ProviderInfo>)
   )
   const refresh = (): void => {
-    void statusActions.refetch()
-    void modelsActions.refetch()
-    // The catalogue carries the key state, so the rows only flip to "Configured" when it is re-read.
-    void providersActions.refetch()
+    if (statusEnabled()) void statusActions.refetch()
+    if (modelsEnabled()) void modelsActions.refetch()
+    if (providersEnabled()) void providersActions.refetch()
   }
 
   const saveCredentials = async (provider: ProviderId, key: string, baseUrl?: string): Promise<void> => {
@@ -67,10 +71,10 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
     value: {
       store,
       app,
-      aiStatus: () => statusResource() as AiStatus | undefined,
-      models: () => (modelsResource() as ReadonlyArray<ModelInfo> | undefined) ?? [],
-      providers: () => (providersResource() as ReadonlyArray<ProviderInfo> | undefined) ?? [],
-      providersPending: () => providersResource.state === "pending",
+      aiStatus: () => { enableStatus(true); return statusResource() as AiStatus | undefined },
+      models: () => { enableModels(true); return (modelsResource() as ReadonlyArray<ModelInfo> | undefined) ?? [] },
+      providers: () => { enableProviders(true); return (providersResource() as ReadonlyArray<ProviderInfo> | undefined) ?? [] },
+      providersPending: () => { enableProviders(true); return providersResource.state === "pending" },
       refresh,
       saveCredentials,
       removeCredentials

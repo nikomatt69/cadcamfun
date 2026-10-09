@@ -26,6 +26,7 @@ export const CALL_TIMEOUT_MS = 5_000
 export const MEMORY_LIMIT_MB = 256
 /** Calls allowed per plugin per minute. */
 export const CALL_RATE_LIMIT = 2_000
+export const MAX_PENDING_CALLS = 64
 /** Window used to count crashes, milliseconds. */
 export const CRASH_WINDOW_MS = 10 * 60 * 1_000
 /** Crashes inside the window that trigger an automatic disable (spec §3). */
@@ -36,7 +37,12 @@ export const CRASH_LIMIT = 3
 export class PluginError extends Data.TaggedError("PluginError")<{
   readonly pluginId: string
   readonly reason: string
-}> {}
+}> {
+  constructor(props: { readonly pluginId: string; readonly reason: string }) {
+    super(props)
+    this.message = props.reason
+  }
+}
 
 export class PluginCapabilityError extends Data.TaggedError("PluginCapabilityError")<{
   readonly pluginId: string
@@ -147,6 +153,7 @@ export const REQUIRED_CAPABILITY: Partial<Record<HostRequest["_tag"], Capability
 }
 
 export interface RpcResponse {
+  readonly rpcId?: string
   readonly ok: boolean
   readonly value?: unknown
   readonly error?: { readonly _tag: string; readonly message: string }
@@ -216,7 +223,7 @@ export interface PluginStorageBackend {
 
 /** A worker as the host sees it: post a request, receive one response. */
 export interface PluginWorkerHandle {
-  post(request: HostRequest): void
+  post(request: HostRequest & { readonly rpcId?: string }): void
   onMessage(listener: (response: RpcResponse) => void): () => void
   onCrash(listener: (message: string) => void): () => void
   terminate(): void
@@ -240,12 +247,14 @@ export interface PluginHostService {
   readonly list: () => Effect.Effect<ReadonlyArray<PluginRecord>, never>
   readonly get: (id: string) => Effect.Effect<PluginRecord, PluginError>
   readonly call: (pluginId: string, commandId: string) => Effect.Effect<unknown, PluginFailure>
+  readonly dispose: Effect.Effect<void>
   readonly getConfig: (id: string) => Effect.Effect<Readonly<Record<string, unknown>>, PluginError>
   readonly putConfig: (id: string, config: Readonly<Record<string, unknown>>) => Effect.Effect<void, PluginError>
 }
 
 export class PluginHost extends Context.Service<PluginHost, PluginHostService>()("cadcamfun/PluginHost") {
-  static layer = (env: PluginHostEnv): Layer.Layer<PluginHost> => Layer.sync(PluginHost, () => makeHost(env))
+  static layer = (env: PluginHostEnv): Layer.Layer<PluginHost> => Layer.effect(PluginHost,
+    Effect.acquireRelease(Effect.sync(() => makeHost(env)), (host) => host.dispose))
 }
 
 // ---------------------------------------------------------------- host
@@ -255,6 +264,8 @@ export class PluginHost extends Context.Service<PluginHost, PluginHostService>()
  * exercise the whole lifecycle with a fake worker.
  */
 export const makeHost = (env: PluginHostEnv): PluginHostService => {
+  let disposed = false
+  const pendingCalls = new Map<string, Map<string, () => void>>()
   const registry = new Map<string, PluginRecord>()
   const running = new Map<string, RunningPlugin>()
   const configs = new Map<string, Record<string, unknown>>()
@@ -288,6 +299,7 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
     request: HostRequest
   ): Effect.Effect<unknown, PluginFailure> =>
     Effect.suspend(() => {
+      if (disposed) return Effect.fail(new PluginError({ pluginId: record.id, reason: "plugin host is closed" }))
       const needed = REQUIRED_CAPABILITY[request._tag]
       if (needed !== undefined && !record.capabilities.includes(needed)) {
         return Effect.fail(new PluginCapabilityError({ pluginId: record.id, capability: needed }))
@@ -306,46 +318,60 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
         return Effect.fail(new PluginError({ pluginId: record.id, reason: "plugin worker is gone" }))
       }
       return Effect.callback<unknown, PluginFailure>((resume: (effect: Effect.Effect<unknown, PluginFailure>) => void) => {
+        let pending = pendingCalls.get(record.id)
+        if (!pending) { pending = new Map(); pendingCalls.set(record.id, pending) }
+        if (pending.size >= MAX_PENDING_CALLS) {
+          resume(Effect.fail(new PluginError({ pluginId: record.id, reason: "plugin RPC queue is full" })))
+          return
+        }
+        const rpcId = crypto.randomUUID()
         let settled = false
+        let unsubscribeMessage = () => {}
+        let unsubscribeCrash = () => {}
+        const cleanup = () => { clearTimeout(timer); unsubscribeMessage(); unsubscribeCrash(); pending.delete(rpcId) }
         const finish = (effect: Effect.Effect<unknown, PluginFailure>): void => {
           if (settled) return
           settled = true
-          clearTimeout(timer)
-          unsubscribeMessage()
-          unsubscribeCrash()
+          cleanup()
           resume(effect)
         }
+        pending.set(rpcId, () => finish(Effect.fail(new PluginCrashedError({ pluginId: record.id, message: "plugin host closed" }))))
         const timer = setTimeout(() => {
-          // A call that overruns is a plugin fault: the worker is terminated.
+          // Settle this request before termination rejects the other in-flight calls.
+          finish(Effect.fail(new PluginTimeoutError({ pluginId: record.id, timeoutMs: env.timeoutMs })))
           worker.terminate()
           workers.delete(record.id)
           running.delete(record.id)
           markFaulted(record.id, "faulted")
           trackerOf(record.id).record()
-          finish(
-            Effect.fail(
-              new PluginTimeoutError({ pluginId: record.id, timeoutMs: env.timeoutMs })
-            )
-          )
         }, env.timeoutMs)
 
-        const unsubscribeMessage = worker.onMessage((response) => {
+        unsubscribeMessage = worker.onMessage((response) => {
+          if (response.rpcId !== rpcId) return
           if (response.ok) {
             finish(Effect.succeed(response.value))
           } else {
             finish(Effect.fail(responseError(record, response.error)))
           }
         })
-        const unsubscribeCrash = worker.onCrash((message) => {
+        unsubscribeCrash = worker.onCrash((message) => {
           const count = trackerOf(record.id).record()
+          finish(Effect.fail(new PluginCrashedError({ pluginId: record.id, message })))
           worker.terminate()
           workers.delete(record.id)
           running.delete(record.id)
           // Crash-looping plugins are disabled automatically (spec §3).
           markFaulted(record.id, count >= CRASH_LIMIT ? "faulted" : "faulted")
-          finish(Effect.fail(new PluginCrashedError({ pluginId: record.id, message })))
         })
-        worker.post(request)
+        try { worker.post({ ...request, rpcId }) }
+        catch (cause) {
+          finish(Effect.fail(new PluginCrashedError({ pluginId: record.id, message: cause instanceof Error ? cause.message : String(cause) })))
+          worker.terminate()
+          workers.delete(record.id)
+          running.delete(record.id)
+          markFaulted(record.id, "faulted")
+        }
+        return Effect.sync(() => { settled = true; cleanup() })
       })
     })
 
@@ -411,8 +437,18 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
     new PluginError({ pluginId: id, reason: "plugin is not installed" })
 
   return {
+    dispose: Effect.sync(() => {
+      if (disposed) return
+      disposed = true
+      for (const pending of pendingCalls.values()) for (const finish of [...pending.values()]) finish()
+      pendingCalls.clear()
+      for (const worker of workers.values()) worker.terminate()
+      workers.clear()
+      running.clear()
+    }),
     install: ({ manifest, directory }) =>
       Effect.suspend(() => {
+        if (disposed) return Effect.fail(new PluginError({ pluginId: manifest.id, reason: "plugin host is closed" }))
         const existing = registry.get(manifest.id)
         if (existing !== undefined && existing.state === "enabled") {
           return Effect.fail(
@@ -442,6 +478,7 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
 
     enable: (id) =>
       Effect.suspend(() => {
+        if (disposed) return Effect.fail(new PluginError({ pluginId: id, reason: "plugin host is closed" }))
         const record = registry.get(id)
         if (record === undefined) return Effect.fail(notInstalled(id))
         const existing = running.get(id)
@@ -635,13 +672,12 @@ const handlers = {
   "ui.panel"(req) { if (!granted.includes("ui:panel")) return deny("ui:panel"); return host.ui.panel({ id: req.panel.id }) }
 };
 
-// There is no greeting on start: the host's first request is the activate
-// handshake, and any extra message would be mistaken for its reply.
+// Replies carry the request id; readiness is handled by the transport.
 scope.addEventListener("message", (event) => {
   const req = event.data;
   const handler = handlers[req._tag];
   if (handler === undefined) {
-    scope.postMessage({ ok: false, error: { _tag: "NotRunning", message: "unknown request " + req._tag } });
+    scope.postMessage({ rpcId: req.rpcId, ok: false, error: { _tag: "NotRunning", message: "unknown request " + req._tag } });
     return;
   }
   try {
@@ -649,12 +685,12 @@ scope.addEventListener("message", (event) => {
     // A handler answers a refusal with an ok:false envelope; that has to reach the
     // host as a failure rather than as a successful value wrapping a denial.
     if (result !== null && typeof result === "object" && result.ok === false && result.error) {
-      scope.postMessage(result);
+      scope.postMessage({ ...result, rpcId: req.rpcId });
       return;
     }
-    scope.postMessage({ ok: true, value: result });
+    scope.postMessage({ rpcId: req.rpcId, ok: true, value: result });
   } catch (error) {
-    scope.postMessage({ ok: false, error: { _tag: "PluginThrew", message: error instanceof Error ? error.message : String(error) } });
+    scope.postMessage({ rpcId: req.rpcId, ok: false, error: { _tag: "PluginThrew", message: error instanceof Error ? error.message : String(error) } });
   }
 });
 `
@@ -665,7 +701,7 @@ export const spawnBunWorker = (record: PluginRecord): PluginWorkerHandle => {
   // The host is the only thing allowed to read the plugin's source: the worker has
   // no filesystem access at all, so the code arrives inline.
   const source = readFileSync(entryPath, "utf8")
-  const bundle = `${PLUGIN_BOOTSTRAP}\n${source}\n//# sourceURL=plugin-${record.id}.js`
+  const bundle = `${PLUGIN_BOOTSTRAP}\n${source}\nself.postMessage({ ready: true });\n//# sourceURL=plugin-${record.id}.js`
   // Bun resolves a string passed to `eval: true` as a module *path*, so the code is
   // handed over as a blob URL instead.
   const url = URL.createObjectURL(new Blob([bundle], { type: "text/javascript" }))
@@ -675,18 +711,51 @@ export const spawnBunWorker = (record: PluginRecord): PluginWorkerHandle => {
     // The plugin runs with an empty environment: no credentials, no host config.
     env: {} as Record<string, string>
   } as WorkerOptions)
+  let ready = false
+  let closed: string | undefined
+  const outbox: Array<HostRequest & { readonly rpcId?: string }> = []
+  const messages = new Set<(response: RpcResponse) => void>()
+  const crashes = new Set<(message: string) => void>()
+  const close = (message: string) => {
+    if (closed !== undefined) return
+    closed = message
+    outbox.length = 0
+    URL.revokeObjectURL(url)
+    for (const listener of [...crashes]) listener(message)
+    crashes.clear()
+    messages.clear()
+  }
+  worker.addEventListener("message", (event: MessageEvent<unknown>) => {
+    if (closed !== undefined || typeof event.data !== "object" || event.data === null) return
+    if ("ready" in event.data && event.data.ready === true) {
+      if (ready) return
+      ready = true
+      URL.revokeObjectURL(url)
+      try { for (const request of outbox.splice(0)) worker.postMessage(request) }
+      catch (cause) { close(String(cause)); worker.terminate() }
+      return
+    }
+    if (!("ok" in event.data) || typeof event.data.ok !== "boolean") return
+    const response = event.data as RpcResponse
+    for (const listener of [...messages]) listener(response)
+  })
+  worker.addEventListener("error", (event: ErrorEvent) => {
+    close(event.message || "worker crashed")
+    worker.terminate()
+  })
+  worker.addEventListener("messageerror", () => { close("plugin worker returned an unreadable response"); worker.terminate() })
   return {
-    post: (request) => worker.postMessage(request),
-    onMessage: (listener) => {
-      const handler = (event: MessageEvent): void => listener(event.data as RpcResponse)
-      worker.addEventListener("message", handler)
-      return () => worker.removeEventListener("message", handler)
+    post: (request) => {
+      if (closed !== undefined) throw new Error(closed)
+      if (ready) worker.postMessage(request)
+      else outbox.push(request)
     },
+    onMessage: (listener) => { messages.add(listener); return () => { messages.delete(listener) } },
     onCrash: (listener) => {
-      const handler = (event: ErrorEvent): void => listener(event.message || "worker crashed")
-      worker.addEventListener("error", handler)
-      return () => worker.removeEventListener("error", handler)
+      if (closed !== undefined) { listener(closed); return () => {} }
+      crashes.add(listener)
+      return () => { crashes.delete(listener) }
     },
-    terminate: () => worker.terminate()
+    terminate: () => { close("plugin worker closed"); worker.terminate() }
   }
 }

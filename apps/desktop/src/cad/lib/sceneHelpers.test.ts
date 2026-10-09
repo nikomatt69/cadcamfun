@@ -3,7 +3,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
-import { applyDragDelta, booleanElement, buildElementObject, commitDrag, fitCameraToObjects, type DragStart } from "./sceneHelpers.ts"
+import { applyDragDelta, disposeObject, booleanElement, buildElementObject, commitDrag, fitCameraToObjects, type DragStart } from "./sceneHelpers.ts"
 
 const layerId = () => useLayerStore.getState().activeLayer
 const reset = () => useElementsStore.setState({ elements: [], selectedElement: null, history: [[]], currentHistoryIndex: 0 })
@@ -188,4 +188,21 @@ describe("every element is drawn Z-up, the way the assistant and the toolpath se
     const stood = size({ type: "revolution", profile, axis: "y" })
     expect(stood.z).toBeCloseTo(20, 5)
   })
+})
+
+
+test("scene disposal releases shared geometry, materials and sprite textures once", () => {
+  const scene = new THREE.Scene()
+  const geometry = new THREE.BoxGeometry()
+  const texture = new THREE.Texture()
+  const material = new THREE.MeshBasicMaterial({ map: texture })
+  const spriteMaterial = new THREE.SpriteMaterial({ map: texture })
+  scene.add(new THREE.Mesh(geometry, material), new THREE.Mesh(geometry, material), new THREE.Sprite(spriteMaterial))
+  const disposed = { geometry: 0, material: 0, sprite: 0, texture: 0 }
+  geometry.addEventListener("dispose", () => disposed.geometry++)
+  material.addEventListener("dispose", () => disposed.material++)
+  spriteMaterial.addEventListener("dispose", () => disposed.sprite++)
+  texture.addEventListener("dispose", () => disposed.texture++)
+  disposeObject(scene)
+  expect(disposed).toEqual({ geometry: 1, material: 1, sprite: 1, texture: 1 })
 })

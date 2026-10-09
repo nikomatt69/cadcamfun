@@ -6,14 +6,17 @@
  */
 import { Schema } from "effect"
 import type { z } from "zod"
+import type { FilePart } from "../attachments.ts"
 import type { HostToolSpec } from "../nikcli/runtime.ts"
 import type { ToolHandlersShape } from "./handlers.ts"
-import { lenient } from "./lenient-arguments.ts"
+import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 
 export interface ToolContext {
   readonly handlers: ToolHandlersShape
   readonly projectId: string
+  readonly signal?: AbortSignal
+  readonly sessionId?: string
 }
 
 export interface ToolDefinition<S extends z.ZodType = z.ZodType> {
@@ -39,12 +42,45 @@ export const defineTool = <S extends z.ZodType>(id: string, config: ToolConfig<S
   return { id, description, parameters: config.parameters, execute: config.execute }
 }
 
-export const toSpec = (definition: ToolDefinition, context: ToolContext): HostToolSpec => ({
-  id: definition.id,
-  description: definition.description,
-  parameters: lenient(definition.parameters),
-  execute: async (input) => JSON.stringify(await definition.execute(input, context))
-})
+/** Images are host file parts, never base64 embedded in the text transcript. */
+export class ToolMediaResult {
+  constructor(readonly value: unknown, readonly files: ReadonlyArray<FilePart>) {}
+}
+
+export const toSpec = (definition: ToolDefinition, context: ToolContext): HostToolSpec => {
+  const run = async (input: unknown, call: { signal: AbortSignal; sessionId: string }) => {
+    try {
+      if (call.signal.aborted) return { output: json({ ok: false, error: "Tool execution cancelled." }) }
+      const parsed = definition.parameters.safeParse(sanitizeArguments(input))
+      if (!parsed.success) return { output: json({ ok: false, error: "Invalid tool arguments.", problems: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).slice(0, 12) }) }
+      const result = await definition.execute(parsed.data, { ...context, signal: call.signal, sessionId: call.sessionId })
+      return result instanceof ToolMediaResult ? { output: json(result.value), files: result.files } : { output: json(result) }
+    } catch (error) { return { output: json({ ok: false, error: safeToolError(error) }) } }
+  }
+  return {
+    id: definition.id, description: definition.description, parameters: lenient(definition.parameters),
+    execute: async (input, call) => (await run(input, call)).output,
+    executeWithFiles: run
+  }
+}
+
+const json = (value: unknown): string => {
+  try {
+    const encoded = JSON.stringify(value)
+    return encoded ?? JSON.stringify({ ok: false, error: "Tool returned an empty result." })
+  } catch {
+    return JSON.stringify({ ok: false, error: "Tool returned a value that cannot be serialized." })
+  }
+}
+
+const safeToolError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : "Tool execution failed."
+  return message
+    .replace(/\b(bearer\s+)\S+/gi, "$1[redacted]")
+    .replace(/\b(api[_ -]?key|token|secret)(\s*[:=]\s*)\S+/gi, "$1$2[redacted]")
+    .replace(/(?:\/Users\/|\/Volumes\/|[A-Z]:\\Users\\)[^\s"']+/g, "[local path]")
+    .slice(0, 500)
+}
 
 /** Handlers validate with the Effect Schema too, so zod and Effect cannot drift apart silently. */
 export const validated = <A>(schema: Schema.Decoder<A>, value: unknown): A => Schema.decodeUnknownSync(schema)(value)

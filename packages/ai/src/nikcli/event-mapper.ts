@@ -115,7 +115,7 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
     state.finishedCalls.add(callId)
     const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
     state.lastToolError = toolFailure(status, output)
-    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed", output })
+    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output })
   }
   return out
 }
@@ -221,7 +221,7 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
           }
           const finalOutput = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
           state.lastToolError = toolFailure(status, finalOutput)
-          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed", output: finalOutput })
+          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output: finalOutput })
           return out
         }
       }

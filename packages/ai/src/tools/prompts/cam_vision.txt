@@ -1,0 +1,7 @@
+Capture and inspect the actual open CAM viewport with the selected vision-capable model. The tool returns an image file part, scene evidence and capture provenance; it never fabricates an image or a visual verdict.
+
+Parameters
+- focus: optional inspection question, at most 1000 characters (e.g. hole placement, silhouette, clearance or displayed stock). This is an inspection, never permission to modify geometry.
+
+Result
+On success: ok, requestId, capturedAt, sceneRevision, camera, dimensions, workspace context and stored drawing/operation evidence; the viewport image is attached to the tool result and added to the model context. Capture is requested from the actual desktop renderer. It times out if no matching viewport is available. A changed drawing makes the capture stale and refuses the image. After inspecting, cite the captured view and entity/operation ids, distinguish observations from assumptions, and use cad_check_design or cam_verify_toolpath for numeric validation. Pixels cannot prove hidden geometry, dimensions, tolerances or collision freedom. If the selected model cannot read images, state that clearly; never claim to have seen them. Do not use it to import drawings (cad_import_drawing) or replace deterministic checks.

@@ -29,6 +29,7 @@ export const CredentialStatus = Schema.Record(Schema.String, Schema.Literals(["c
 export const AiStatus = Schema.Struct({
   providers: CredentialStatus,
   configured: Schema.Boolean,
+  tools: opt(Schema.Array(Schema.Struct({ id: Schema.String, description: Schema.String }))),
   host: Schema.Literals(["nikcli", "direct"])
 })
 export const AiModelEntry = Schema.Struct({
@@ -82,6 +83,32 @@ export const CompletionBody = Schema.Struct({
   prompt: opt(Schema.String), systemPrompt: opt(Schema.String), model: opt(Schema.String), temperature: opt(Schema.Number)
 })
 export const CompletionReply = Schema.Struct({ text: Schema.String, model: Schema.String })
+export const PromptSuggestionsReply = Schema.Struct({ prompts: Schema.Array(Schema.String) })
+export const AiTitleBody = Schema.Struct({ excerpt: opt(Schema.String), model: opt(AiModelSelector) })
+export const AiTitleReply = Schema.Struct({ title: Schema.String })
+export const AiDesignAnalysisBody = Schema.Struct({ description: opt(Schema.String), layer: opt(Schema.String), machine: opt(Schema.String), model: opt(AiModelSelector) })
+export const AiDesignAnalysisReply = Schema.Struct({ suggestions: Schema.Array(Schema.Struct({
+  title: Schema.String, description: Schema.String, confidence: Schema.Number,
+  priority: Schema.Literals(["low", "medium", "high"]), kind: Schema.Literals(["optimization", "warning", "critical"])
+})) })
+export const AiMachiningParametersBody = Schema.Struct({
+  material: opt(Schema.String), tool: opt(Schema.String), operation: opt(Schema.String), machine: opt(Schema.String), model: opt(AiModelSelector)
+})
+export const AiMachiningParametersReply = Schema.Struct({
+  cuttingSpeedMPerMin: Schema.Number, feedRateMmPerMin: Schema.Number, depthOfCutMm: Schema.Number, stepoverPct: Schema.Number,
+  coolant: Schema.Literals(["flood", "mist", "none"]), engagement: Schema.Literals(["conventional", "climb"]), warnings: Schema.Array(Schema.String)
+})
+export const AiGcodeOptimizationBody = Schema.Struct({
+  gcode: opt(Schema.String), material: opt(Schema.String), machineType: opt(Schema.String), constraints: opt(Schema.String), model: opt(AiModelSelector)
+})
+export const AiGcodeOptimizationReply = Schema.Struct({
+  gcode: Schema.String,
+  changes: Schema.Array(Schema.Struct({ line: Schema.Number, before: Schema.String, after: Schema.String, reason: Schema.String })),
+  estimatedSavings: Schema.Struct({ timePct: Schema.Number, toolLifePct: Schema.Number, qualityNote: Schema.String }),
+  notes: Schema.String
+})
+export const AiDesignSuggestionsBody = Schema.Struct({ elements: opt(Schema.String), currentOperation: opt(Schema.String), currentTool: opt(Schema.String), model: opt(AiModelSelector) })
+export const AiDesignSuggestionsReply = Schema.Array(Schema.Struct({ title: Schema.String, rationale: Schema.String, nextStep: Schema.String }))
 export const AnalyzeGcodeBody = Schema.Struct({ gcode: opt(Schema.String), model: opt(Schema.String) })
 export const GcodeIssue = Schema.Struct({
   severity: Schema.Literals(["error", "warning", "info"]), code: Schema.String, line: Schema.Number, message: Schema.String
@@ -154,8 +181,14 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.put("setCredentials", "/api/ai/credentials", { payload: CredentialBody, success: AiStatus, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.delete("clearCredentials", "/api/ai/credentials/:provider", { params: providerParam, success: AiStatus, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("status", "/api/ai/status", { success: AiStatus, error: InternalError }),
-    HttpApiEndpoint.get("models", "/api/ai/models", { success: Schema.Array(AiModelEntry), error: InternalError }),
+    HttpApiEndpoint.get("models", "/api/ai/models", { query: { configuredOnly: opt(Schema.Literals(["true", "false"])) }, success: Schema.Array(AiModelEntry), error: InternalError }),
     HttpApiEndpoint.get("providers", "/api/ai/providers", { success: Schema.Array(AiProviderEntry), error: InternalError }),
+    HttpApiEndpoint.get("prompts", "/api/ai/prompts", { query: { mode: opt(Schema.String) }, success: PromptSuggestionsReply, error: InternalError }),
+    HttpApiEndpoint.post("title", "/api/ai/title", { payload: AiTitleBody, success: AiTitleReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("designAnalysis", "/api/ai/design-analysis", { payload: AiDesignAnalysisBody, success: AiDesignAnalysisReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("machiningParameters", "/api/ai/machining-parameters", { payload: AiMachiningParametersBody, success: AiMachiningParametersReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("gcodeOptimization", "/api/ai/gcode-optimization", { payload: AiGcodeOptimizationBody, success: AiGcodeOptimizationReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("designSuggestions", "/api/ai/design-suggestions", { payload: AiDesignSuggestionsBody, success: AiDesignSuggestionsReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("chat", "/api/ai/chat", { payload: LegacyChatBody, success: LegacyChatReply, error: [AiBadRequest, AiNotFound, AiFailure] }),
     HttpApiEndpoint.post("chatStream", "/api/ai/chat/stream", {
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]

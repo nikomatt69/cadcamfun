@@ -6,13 +6,15 @@
  * make a docked chrome feel cramped; the floating shape leaves the edge of the screen free and
  * lets the glass materialisation read.
  */
-import { For, type JSX } from "solid-js"
+import { For, Show, type JSX } from "solid-js"
 import type { Component } from "solid-js"
 
 export interface TabItem<T extends string> {
   readonly id: T
   readonly label: string
   readonly icon: (props: { readonly size?: number }) => JSX.Element
+  /** Unread count shown as a badge on the tab; `0` or absent renders no badge. */
+  readonly badge?: number
 }
 
 export interface TabBarProps<T extends string> {
@@ -35,6 +37,11 @@ export function TabBar<T extends string>(props: TabBarProps<T>): JSX.Element {
         >
           <t.icon size={22} />
           <span>{t.label}</span>
+          <Show when={(t.badge ?? 0) > 0}>
+            <span class="tab-badge" aria-label={`${t.badge} unread`}>
+              {t.badge! > 99 ? "99+" : t.badge}
+            </span>
+          </Show>
         </button>
       )}</For>
     </nav>

@@ -77,8 +77,21 @@ import type {
   AiClearCredentialsInput,
   AiClearCredentialsOutput,
   AiStatusOutput,
+  AiModelsInput,
   AiModelsOutput,
   AiProvidersOutput,
+  AiPromptsInput,
+  AiPromptsOutput,
+  AiTitleInput,
+  AiTitleOutput,
+  AiDesignAnalysisInput,
+  AiDesignAnalysisOutput,
+  AiMachiningParametersInput,
+  AiMachiningParametersOutput,
+  AiGcodeOptimizationInput,
+  AiGcodeOptimizationOutput,
+  AiDesignSuggestionsInput,
+  AiDesignSuggestionsOutput,
   AiChatInput,
   AiChatOutput,
   AiChatStreamInput,
@@ -431,6 +444,12 @@ import type {
   VcsRunsOutput,
   VcsDispatchInput,
   VcsDispatchOutput,
+  VcsListWorkflowsInput,
+  VcsListWorkflowsOutput,
+  VcsWorkflowInput,
+  VcsWorkflowOutput,
+  EventsSubscribeInput,
+  EventsSubscribeOutput,
   CompanionStatusOutput,
   CompanionEnableInput,
   CompanionEnableOutput,
@@ -1158,14 +1177,115 @@ export function make(options: ClientOptions) {
           { method: "GET", path: `/api/ai/status`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
           requestOptions,
         ),
-      models: (requestOptions?: RequestOptions) =>
+      models: (input?: AiModelsInput, requestOptions?: RequestOptions) =>
         request<AiModelsOutput>(
-          { method: "GET", path: `/api/ai/models`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          {
+            method: "GET",
+            path: `/api/ai/models`,
+            query: { configuredOnly: input?.["configuredOnly"] },
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
           requestOptions,
         ),
       providers: (requestOptions?: RequestOptions) =>
         request<AiProvidersOutput>(
           { method: "GET", path: `/api/ai/providers`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      prompts: (input?: AiPromptsInput, requestOptions?: RequestOptions) =>
+        request<AiPromptsOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/prompts`,
+            query: { mode: input?.["mode"] },
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      title: (input?: AiTitleInput, requestOptions?: RequestOptions) =>
+        request<AiTitleOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/title`,
+            body: { excerpt: input?.["excerpt"], model: input?.["model"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      designAnalysis: (input?: AiDesignAnalysisInput, requestOptions?: RequestOptions) =>
+        request<AiDesignAnalysisOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/design-analysis`,
+            body: {
+              description: input?.["description"],
+              layer: input?.["layer"],
+              machine: input?.["machine"],
+              model: input?.["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      machiningParameters: (input?: AiMachiningParametersInput, requestOptions?: RequestOptions) =>
+        request<AiMachiningParametersOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/machining-parameters`,
+            body: {
+              material: input?.["material"],
+              tool: input?.["tool"],
+              operation: input?.["operation"],
+              machine: input?.["machine"],
+              model: input?.["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      gcodeOptimization: (input?: AiGcodeOptimizationInput, requestOptions?: RequestOptions) =>
+        request<AiGcodeOptimizationOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/gcode-optimization`,
+            body: {
+              gcode: input?.["gcode"],
+              material: input?.["material"],
+              machineType: input?.["machineType"],
+              constraints: input?.["constraints"],
+              model: input?.["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      designSuggestions: (input?: AiDesignSuggestionsInput, requestOptions?: RequestOptions) =>
+        request<AiDesignSuggestionsOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/design-suggestions`,
+            body: {
+              elements: input?.["elements"],
+              currentOperation: input?.["currentOperation"],
+              currentTool: input?.["currentTool"],
+              model: input?.["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
           requestOptions,
         ),
       chat: (input?: AiChatInput, requestOptions?: RequestOptions) =>
@@ -3617,6 +3737,43 @@ export function make(options: ClientOptions) {
             body: { ref: input["ref"] },
             successStatus: 200,
             declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      listWorkflows: (input: VcsListWorkflowsInput, requestOptions?: RequestOptions) =>
+        request<VcsListWorkflowsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/workflows`,
+            query: { ref: input["ref"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      workflow: (input: VcsWorkflowInput, requestOptions?: RequestOptions) =>
+        request<VcsWorkflowOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/actions/workflows/${encodeURIComponent(input.name)}`,
+            query: { ref: input["ref"] },
+            successStatus: 200,
+            declaredStatuses: [400, 403, 404, 409, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    events: {
+      subscribe: (input: EventsSubscribeInput, requestOptions?: RequestOptions): AsyncIterable<EventsSubscribeOutput> =>
+        sse<EventsSubscribeOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/events`,
+            successStatus: 200,
+            declaredStatuses: [401, 404, 500],
             empty: false,
           },
           requestOptions,

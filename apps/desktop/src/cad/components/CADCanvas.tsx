@@ -1,3 +1,5 @@
+import { registerViewportCapture } from "../../ai/viewport-capture.ts"
+import { spatialEvidence } from "../../ai/spatial-evidence.ts"
 import { For, Show, batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { cam } from "@cadcamfun/core"
 import * as THREE from "three"
@@ -13,15 +15,18 @@ import { useTransformControlsStore } from "../store/transformControlsStore.ts"
 import { createSnap } from "../hooks/createSnap.ts"
 import { createTransformControls } from "../hooks/createTransformControls.ts"
 import { createCadKeyboardShortcuts } from "../hooks/createCadKeyboardShortcuts.ts"
-import { applyControlPointDrag, createControlPointsForElement } from "../lib/controlPoints.ts"
+import { applyControlPointDrag, beginControlPointDrag, createControlPointsForElement, endControlPointDrag } from "../lib/controlPoints.ts"
 import { createComponentPreview, transformLibraryItemToCADElement } from "../lib/libraryTransform.ts"
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
 import { ALL_SHORTCUTS } from "../lib/shortcutsData.ts"
 import {
-  applyDragDelta, applyHighlight, booleanElement, buildElementObject, isDrawn, commitDrag, createCustomAxes, createOriginIndicator, deltaFrom,
-  exportGLTF, exportOBJ, exportSTL, fitCameraToObjects, type BooleanOperation, type DragStart
+  applyDragDelta, applyElementTransform, applyHighlight, booleanElement, buildElementObject, disposeObject, isDrawn, commitDrag,
+  createCustomAxes, createOriginIndicator, deltaFrom, exportGLTF, exportOBJ, exportSTL, fitCameraToObjects,
+  type BooleanOperation, type DragStart, type ElementTransformFields
 } from "../lib/sceneHelpers.ts"
 import { booleanFormed } from "../lib/createThreeObject.ts"
+import { FrameScheduler } from "../lib/frame-scheduler.ts"
+import { shapeFingerprint } from "../lib/fingerprint.ts"
 import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
 import { createSectionHelper } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
@@ -95,7 +100,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let renderer: THREE.WebGLRenderer | undefined
   let orbit: OrbitControls | undefined
   let gizmo: TransformControls | undefined
-  let animation = 0
+  let frames: FrameScheduler | undefined
+  let dirty = true
+  const invalidate = (): void => { dirty = true; frames?.invalidate() }
   const pivot = new THREE.Object3D()
   const raycaster = new THREE.Raycaster()
   raycaster.params.Line = { threshold: 0.4 }
@@ -105,6 +112,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   let dragStart: DragStart | undefined
   let activeDragPoint: { elementId: string; pointIndex: number } | undefined
   let pointerDown: { x: number; y: number; additive: boolean } | undefined
+  /** One Three object per drawn element, with the shape it was built for. The canvas owns this map. */
+  const objectsById = new Map<string, { object: THREE.Object3D; shape: number }>()
+  /** The drawn objects that pass the layer visibility test: the raycast candidate list, kept in step with the map. */
+  let visibleObjects: THREE.Object3D[] = []
 
   const [ready, setReady] = createSignal(false)
   const [webglFailed, setWebglFailed] = createSignal(false)
@@ -128,8 +139,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   const [frame, setFrame] = createSignal(0)
 
   const selectedIds = () => selection.selectedElementIds
-  const cadObjects = () => (scene ? scene.children.filter((child) => child.userData.isCADElement) : [])
-  const objectOf = (id: string) => cadObjects().find((object) => object.userData.elementId === id)
+  /** Every drawn object, in insertion order. */
+  const cadObjects = (): THREE.Object3D[] => Array.from(objectsById.values(), (entry) => entry.object)
+  const objectOf = (id: string) => objectsById.get(id)?.object
   const originOffset = () => cad.originOffset
 
   const worldToScreen = (position: Point3) => {
@@ -161,7 +173,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   const elementIdAt = (): string | null => {
-    const hits = raycaster.intersectObjects(cadObjects().filter((object) => object.visible), true)
+    if (visibleObjects.length === 0) return null
+    // `visibleObjects` is already filtered by layer visibility, and the first hit is the one that counts.
+    const hits = raycaster.intersectObjects(visibleObjects, true)
     for (const hit of hits) {
       for (let current: THREE.Object3D | null = hit.object; current; current = current.parent) {
         const id = current.userData.elementId as string | undefined
@@ -184,6 +198,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     camera.aspect = clientWidth / clientHeight
     camera.updateProjectionMatrix()
     renderer.setSize(clientWidth, clientHeight)
+    invalidate()
   }
 
   onMount(() => {
@@ -195,7 +210,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     nextCamera.up.set(0, 0, 1)
     nextCamera.position.copy(ISO_VIEW)
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true })
+      // MSAA only where it is cheap: at a 2x device pixel ratio the canvas is already 4x the pixels.
+      renderer = new THREE.WebGLRenderer({
+        antialias: (window.devicePixelRatio || 1) <= 1.5,
+        powerPreference: "high-performance",
+        stencil: false,
+      })
     } catch {
       setWebglFailed(true)
       return
@@ -203,7 +223,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     scene = nextScene
     camera = nextCamera
     renderer.setSize(container.clientWidth || 1, container.clientHeight || 1)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
     container.insertBefore(renderer.domElement, container.firstChild)
 
     orbit = new OrbitControls(camera, renderer.domElement)
@@ -233,42 +253,70 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     gizmo.addEventListener("mouseUp", endDrag)
     scene.add(gizmo.getHelper())
 
-    const loop = () => {
-      orbit?.update()
-      if (renderer && scene && camera) renderer.render(scene, camera)
-      animation = requestAnimationFrame(loop)
-    }
-    loop()
+    frames = new FrameScheduler(() => {
+      const moved = orbit?.update() === true
+      if ((moved || dirty) && renderer && scene && camera) {
+        dirty = false
+        renderer.render(scene, camera)
+      }
+      return moved
+    }, (callback) => window.requestAnimationFrame(callback), (id) => window.cancelAnimationFrame(id))
+    orbit.addEventListener("change", invalidate)
+    gizmo.addEventListener("change", invalidate)
+    const visibility = () => frames?.suspend(document.hidden)
+    document.addEventListener("visibilitychange", visibility)
+    visibility()
+    const unregisterCapture = registerViewportCapture("cad", () => {
+      if (!renderer || !scene || !camera || !orbit || !renderer.domElement.isConnected || renderer.domElement.clientWidth === 0 || renderer.domElement.clientHeight === 0) return undefined
+      renderer.render(scene, camera)
+      return { canvas: renderer.domElement, spatial: spatialEvidence(cadObjects(), selectedIds()), camera: { position: [camera.position.x, camera.position.y, camera.position.z], target: [orbit.target.x, orbit.target.y, orbit.target.z] } }
+    })
 
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(resize)
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => { resize(); invalidate() })
     observer?.observe(container)
     window.addEventListener("resize", resize)
-    const fullscreen = () => { setFullscreen(!!document.fullscreenElement); setTimeout(resize, 100) }
+    let fullscreenTimer: ReturnType<typeof setTimeout> | undefined
+    const fullscreen = () => {
+      setFullscreen(!!document.fullscreenElement)
+      clearTimeout(fullscreenTimer)
+      fullscreenTimer = setTimeout(() => { resize(); invalidate() }, 100)
+    }
     document.addEventListener("fullscreenchange", fullscreen)
     const release = () => finishInteraction()
     window.addEventListener("mouseup", release)
 
     onCleanup(() => {
-      cancelAnimationFrame(animation)
+      unregisterCapture()
+      frames?.dispose()
+      frames = undefined
+      cancelAnimationFrame(mouseFrame)
+      cancelAnimationFrame(hoverFrame)
+      clearTimeout(fullscreenTimer)
+      document.removeEventListener("visibilitychange", visibility)
       observer?.disconnect()
       window.removeEventListener("resize", resize)
       document.removeEventListener("fullscreenchange", fullscreen)
       window.removeEventListener("mouseup", release)
+      gizmo?.getHelper().removeFromParent()
       gizmo?.dispose()
       orbit?.dispose()
-      scene?.traverse((object) => {
-        const mesh = object as THREE.Mesh
-        mesh.geometry?.dispose?.()
-        const material = mesh.material as THREE.Material | THREE.Material[] | undefined
-        for (const entry of Array.isArray(material) ? material : material ? [material] : []) entry.dispose()
-      })
+      // Dispose the entire owned scene once, including helper textures.
+      if (scene) disposeObject(scene)
+      objectsById.clear()
+      visibleObjects = []
+      controlPoints = []
+      preview = undefined
       renderer?.domElement.parentElement?.removeChild(renderer.domElement)
       renderer?.dispose()
       scene = undefined
       renderer = undefined
+      camera = undefined
+      orbit = undefined
+      gizmo = undefined
     })
 
     setReady(true)
+    invalidate()
     props.onReady?.(api)
   })
 
@@ -326,6 +374,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (child.userData.isCustomAxes) { child.visible = visibleAxes; child.position.set(x, y, z) }
       if (child.userData.isOriginIndicator) child.position.set(x, y, z)
     }
+    invalidate()
   })
 
   // Section view: the renderer clips everything past the plane; a sheet shows where the cut is.
@@ -347,10 +396,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         material?.dispose?.()
       })
     }
-    if (!section.enabled) { renderer.clippingPlanes = []; return }
+    if (!section.enabled) { renderer.clippingPlanes = []; invalidate(); return }
     const { normal, constant } = clipPlaneFor(section)
     renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(...normal), constant)]
     scene.add(createSectionHelper(section.axis, section.position, section.inverted, modelBox()))
+    invalidate()
   })
   /** The extent of the model along the section axis: the slider's range. */
   const sectionRange = createMemo((): { min: number; max: number } => {
@@ -386,45 +436,86 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       axes?.children.forEach((child) => { child.visible = true })
     }
     orbit.update()
+    invalidate()
   }))
 
-  // Elements -> Three objects.
+  // Elements -> Three objects, reconciled rather than rebuilt.
+  //
+  // An edit must not cost the whole drawing: adding one part to an assembly of three hundred used to
+  // dispose and recreate every geometry. Each element keeps its object, and the geometry is rebuilt
+  // only when `shapeFingerprint` says the shape itself changed — a move or a turn is a matrix update.
   createEffect(() => {
     if (!ready() || !scene) return
     const all = elements.elements
     const known = layers.layers
     cad.originOffset
     cad.tolerance
-    for (const stale of cadObjects()) {
-      scene.remove(stale)
-      stale.traverse((object) => {
-        const mesh = object as THREE.Mesh
-        mesh.geometry?.dispose?.()
-      })
-    }
     // A Boolean draws its result; the operands it consumes are not drawn on their own. One that cannot be formed (an operand
     // that is not a solid, a missing one) consumes nothing, so the assistant's parts never vanish behind a wireframe marker.
     const isBoolean = (element: { type: string }) => element.type.startsWith("boolean-")
     const consumed = cam.model.consumedOperands(all.filter((element) => !isBoolean(element) || booleanFormed(element)) as never)
+
+    const live = new Set<string>()
+    const drawn: THREE.Object3D[] = []
     for (const element of all) {
       if (consumed.has(element.id)) continue
       if (!isDrawn(element, known)) continue
-      const object = buildElementObject(element)
-      if (object) scene.add(object)
+      live.add(element.id)
+      const shape = shapeFingerprint(element)
+      const cached = objectsById.get(element.id)
+      let object: THREE.Object3D | undefined
+      if (cached) {
+        if (cached.shape === shape) {
+          // Same geometry, new placement: replay the position and the gizmo transform.
+          applyElementTransform(cached.object, element as ElementTransformFields)
+          object = cached.object
+        } else {
+          disposeObject(cached.object)
+          objectsById.delete(element.id)
+        }
+      }
+      if (!object) {
+        const built = buildElementObject(element)
+        if (!built) continue
+        objectsById.set(element.id, { object: built, shape })
+        scene.add(built)
+        object = built
+      }
+      drawn.push(object)
     }
+    for (const [id, entry] of [...objectsById]) {
+      if (live.has(id)) continue
+      disposeObject(entry.object)
+      objectsById.delete(id)
+    }
+
+    // The raycast list is a view of the map, refreshed here instead of being rebuilt on every hover query.
+    visibleObjects = drawn
     setRebuilds((count) => count + 1)
+    invalidate()
     props.onElementsChange?.(all)
   })
 
-  // Hover / selection tint.
+  // Hover / selection tint, applied to the delta only: moving the cursor between two parts must not
+  // rewrite the material of every object in the drawing.
+  let lastHighlight: string | null = null
+  let lastSelected = new Set<string>()
   createEffect(() => {
     rebuilds()
     const hovered = hoveredId()
     const selected = new Set(selectedIds())
-    for (const object of cadObjects()) {
-      const id = object.userData.elementId as string
-      applyHighlight(object, selected.has(id) ? "selected" : id === hovered ? "hover" : "none")
+    const tint = (id: string, state: "none" | "hover" | "selected") => {
+      const object = objectsById.get(id)?.object
+      if (!object) return
+      applyHighlight(object, state)
+      invalidate()
     }
+    for (const id of lastSelected) if (!selected.has(id) && id !== hovered) tint(id, "none")
+    for (const id of selected) if (!lastSelected.has(id)) tint(id, "selected")
+    if (hovered && hovered !== lastHighlight && !selected.has(hovered)) tint(hovered, "hover")
+    if (lastHighlight && lastHighlight !== hovered && !selected.has(lastHighlight)) tint(lastHighlight, "none")
+    lastHighlight = hovered
+    lastSelected = selected
   })
 
   // Selection store -> elements store (the legacy panels read `selectedElement`).
@@ -470,9 +561,11 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     gizmo.attach(pivot)
     gizmo.setMode(mode)
     gizmo.getHelper().visible = true
+    invalidate()
   })
 
   function beginDrag(): void {
+    useElementsStore.getState().beginEdit()
     pivot.updateMatrix()
     dragStart = {
       pivotMatrix: pivot.matrix.clone(),
@@ -485,18 +578,21 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }
   }
   function updateDrag(): void {
-    if (dragStart) applyDragDelta(dragStart, deltaFrom(dragStart, pivot))
+    if (!dragStart) return
+    applyDragDelta(dragStart, deltaFrom(dragStart, pivot))
+    invalidate()
   }
   function endDrag(): void {
     if (!dragStart) return
     const start = dragStart
     dragStart = undefined
     commitDrag(start, deltaFrom(start, pivot))
+    useElementsStore.getState().endEdit()
   }
 
   // Control points for a single selected element.
   const clearControlPoints = () => {
-    for (const point of controlPoints) scene?.remove(point)
+    for (const point of controlPoints) disposeObject(point)
     controlPoints = []
   }
   const refreshControlPoints = () => {
@@ -508,6 +604,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (e.rotation || e.scale || e.translateX !== undefined) return
     controlPoints = createControlPointsForElement(element)
     for (const point of controlPoints) scene.add(point)
+    invalidate()
   }
   createEffect(() => {
     rebuilds()
@@ -519,9 +616,9 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   createEffect(() => {
     const name = props.previewComponent
     if (!ready() || !scene) return
-    if (preview) { scene.remove(preview); preview = undefined }
+    if (preview) { disposeObject(preview); preview = undefined }
     setPlacing(false)
-    if (!name) { if (orbit) orbit.enabled = true; return }
+    if (!name) { if (orbit) orbit.enabled = true; invalidate(); return }
     const component = predefinedComponents.find((candidate: any) => candidate.data === name || candidate.name === name)
     const object = component ? createComponentPreview(component) : null
     if (!object) return
@@ -538,20 +635,24 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     preview = object
     setPlacing(true)
     if (orbit) orbit.enabled = false
+    invalidate()
   })
   const untrackedPreviewPosition = () => previewPosition()
 
   const cancelPlacement = () => {
-    if (preview && scene) scene.remove(preview)
+    if (preview) disposeObject(preview)
     preview = undefined
     setPlacing(false)
     if (orbit) orbit.enabled = true
+    invalidate()
   }
 
   // ---------------------------------------------------------------------------------------------------- pointer
   const finishInteraction = (additive = pointerDown?.additive ?? false) => {
     if (activeDragPoint) {
       activeDragPoint = undefined
+      // One history step for the whole drag, not one per pointer move.
+      endControlPointDrag()
       if (orbit) orbit.enabled = true
     }
     if (selection.isBoxSelecting) {
@@ -576,24 +677,31 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const boxTop = Math.min(fromScreen.y, toScreen.y) + rect.top
     const boxBottom = Math.max(fromScreen.y, toScreen.y) + rect.top
     const bounds = new THREE.Box3()
-    const entities = cadObjects().filter((object) => object.visible && !isLocked(object.userData.elementId))
+    // One pass over the elements instead of a layer lookup per candidate object.
+    const lockedIds = new Set<string>()
+    for (const element of elements.elements) {
+      if (element.locked || layers.layers.find((layer) => layer.id === element.layerId)?.locked) lockedIds.add(element.id)
+    }
+    const entities = cadObjects().filter((object) => !lockedIds.has(object.userData.elementId as string))
+    const corner = new THREE.Vector3()
     return entities.filter((object) => {
       object.updateMatrixWorld(true)
       bounds.setFromObject(object)
       if (bounds.isEmpty()) return false
-      const projected = [
-        new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.min.z), new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.max.z),
-        new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.min.z), new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
-        new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.min.z), new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.max.z),
-        new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.min.z), new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z)
-      ].map((point) => {
-        point.project(activeCamera)
-        return { x: rect.left + (point.x + 1) * rect.width / 2, y: rect.top + (1 - point.y) * rect.height / 2 }
-      })
-      const left = Math.min(...projected.map((point) => point.x))
-      const right = Math.max(...projected.map((point) => point.x))
-      const top = Math.min(...projected.map((point) => point.y))
-      const bottom = Math.max(...projected.map((point) => point.y))
+      let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
+      for (let index = 0; index < 8; index++) {
+        corner.set(
+          index & 4 ? bounds.max.x : bounds.min.x,
+          index & 2 ? bounds.max.y : bounds.min.y,
+          index & 1 ? bounds.max.z : bounds.min.z
+        ).project(activeCamera)
+        const x = rect.left + (corner.x + 1) * rect.width / 2
+        const y = rect.top + (1 - corner.y) * rect.height / 2
+        if (x < left) left = x
+        if (x > right) right = x
+        if (y < top) top = y
+        if (y > bottom) bottom = y
+      }
       return leftToRight
         ? left >= boxLeft && right <= boxRight && top >= boxTop && bottom <= boxBottom
         : right >= boxLeft && left <= boxRight && bottom >= boxTop && top <= boxBottom
@@ -601,6 +709,50 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
   }
 
   const snapped = (point: Point3): Point3 => (snap.snapSettings().enabled ? snap.snapToPoint(point) ?? point : point)
+
+  /**
+   * The cursor readout the status bar shows. Published once per frame at most: a pointer can emit
+   * hundreds of moves a second and every publish walks the store (see `state/zustand.ts`), which no
+   * readout benefits from.
+   */
+  let mouseFrame = 0
+  let pendingMouse: { x: number; y: number; z: number } | undefined
+  const publishMousePosition = (position: { x: number; y: number; z: number }): void => {
+    pendingMouse = position
+    if (mouseFrame) return
+    mouseFrame = requestAnimationFrame(() => {
+      mouseFrame = 0
+      if (!pendingMouse) return
+      elements.setMousePosition(pendingMouse)
+      pendingMouse = undefined
+    })
+  }
+
+  /**
+   * Hover picking, once per frame. `elementIdAt` is a full raycast over the drawing, and a pointer
+   * reports far more moves than the display has frames.
+   */
+  let hoverFrame = 0
+  let pendingHover: MouseEvent | undefined
+  const scheduleHover = (event: MouseEvent): void => {
+    pendingHover = event
+    if (hoverFrame) return
+    hoverFrame = requestAnimationFrame(() => {
+      hoverFrame = 0
+      const move = pendingHover
+      pendingHover = undefined
+      if (!move || !container || !scene || !camera) return
+      setPointer(move)
+      if (raycaster.intersectObjects(controlPoints).length > 0) { container.style.cursor = "pointer"; return }
+      const id = gizmo?.axis ? null : elementIdAt()
+      if (id !== hoveredId()) {
+        setHoveredId(id)
+        container.style.cursor = id ? "pointer" : "default"
+      }
+      const hit = planePoint()
+      if (hit) publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
+    })
+  }
 
   const onMouseMove = (event: MouseEvent) => {
     if (!container || !scene || !camera) return
@@ -613,7 +765,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       const at = snapped({ x: hit.x, y: hit.y, z: hit.z })
       preview.position.set(at.x, at.y, at.z)
       setPreviewPosition(at)
-      elements.setMousePosition({ x: round2(at.x), y: round2(at.y), z: round2(at.z) })
+      publishMousePosition({ x: round2(at.x), y: round2(at.y), z: round2(at.z) })
+      invalidate()
       return
     }
     if (selection.isBoxSelecting) {
@@ -626,19 +779,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (hit) {
         applyControlPointDrag(controlPoints, activeDragPoint.elementId, activeDragPoint.pointIndex, hit.x, hit.y, hit.z)
         refreshControlPoints()
+        publishMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
       }
       return
     }
     if (event.buttons > 0) return
-
-    const pointHits = raycaster.intersectObjects(controlPoints)
-    if (pointHits.length > 0) { container.style.cursor = "pointer"; return }
-    const id = gizmo?.axis ? null : elementIdAt()
-    setHoveredId(id)
-    container.style.cursor = id ? "pointer" : "default"
-
-    const hit = planePoint() ?? new THREE.Vector3()
-    elements.setMousePosition({ x: round2(hit.x), y: round2(hit.y), z: round2(hit.z) })
+    scheduleHover(event)
   }
 
   const onMouseDown = (event: MouseEvent) => {
@@ -660,6 +806,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const pointHit = raycaster.intersectObjects(controlPoints)[0]
     if (pointHit?.object.userData.isControlPoint) {
       activeDragPoint = { elementId: pointHit.object.userData.elementId, pointIndex: pointHit.object.userData.pointIndex }
+      beginControlPointDrag()
       if (orbit) orbit.enabled = false
       return
     }
@@ -697,7 +844,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (!container || !camera || !scene) return
     setPointer(event)
     let target: Point3
-    const hits = raycaster.intersectObjects(cadObjects().filter((object) => object.visible), true)
+    const hits = visibleObjects.length > 0 ? raycaster.intersectObjects(visibleObjects, true) : []
     if (hits.length > 0) target = { x: hits[0]!.point.x, y: hits[0]!.point.y, z: hits[0]!.point.z }
     else {
       const hit = planePoint()

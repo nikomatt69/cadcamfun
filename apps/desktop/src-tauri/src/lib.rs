@@ -123,6 +123,9 @@ pub fn run() {
 
     app.run(|app, event| match event {
         RunEvent::ExitRequested { api, .. } => {
+            if let Some(updater) = app.try_state::<updater::UpdaterService>() {
+                updater.shutdown();
+            }
             if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {
                 if !handle.is_finished() {
                     api.prevent_exit();
@@ -140,7 +143,6 @@ pub fn run() {
         RunEvent::Exit => {
             if let Some(handle) = app.try_state::<Arc<SidecarHandle>>() {
                 handle.shutdown();
-                tauri::async_runtime::block_on(handle.wait_finished());
             }
         }
         #[cfg(any(target_os = "macos", target_os = "ios"))]

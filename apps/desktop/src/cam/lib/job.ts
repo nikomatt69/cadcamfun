@@ -15,6 +15,11 @@ export type CadElement = cam.generator.CadElement
 export type Stock = cam.generator.Stock
 
 export interface CadWorkpiece {
+  readonly configured?: boolean
+  readonly x?: number
+  readonly y?: number
+  readonly topZ?: number
+  readonly allowance?: number
   readonly width: number
   readonly height: number
   readonly depth: number
@@ -61,11 +66,18 @@ export const selectedElements = (sources: Pick<JobSources, "elements" | "selecte
  *  3. the CAD store's workpiece size, centred on the origin.
  */
 export const stockOf = (sources: JobSources): Stock => {
+  if (sources.workpiece.configured) return {
+    width: sources.workpiece.width, height: sources.workpiece.height, depth: sources.workpiece.depth,
+    radius: sources.workpiece.radius ?? 0, x: sources.workpiece.x ?? 0, y: sources.workpiece.y ?? 0,
+    topZ: sources.workpiece.topZ ?? 0, allowance: sources.workpiece.allowance ?? sources.stockAllowance,
+    ...(sources.workpiece.material ? { material: sources.workpiece.material } : {}),
+    ...(sources.workpiece.elementId ? { elementId: sources.workpiece.elementId } : {})
+  }
   const linked = sources.elements.find(element => element["id"] === (sources.workpiece.elementId ?? sources.workpieceElementId))
   if (linked !== undefined) return g.stockFromElement(linked, sources.stockAllowance, sources.workpiece.material)
   const drawn = sources.elements.find(element => STOCK_TYPES.has(String(element["type"])))
-  const x = drawn !== undefined ? Number(drawn["x"] ?? 0) : 0
-  const y = drawn !== undefined ? Number(drawn["y"] ?? 0) : 0
+  const x = drawn !== undefined ? Number(drawn["x"] ?? 0) : (sources.workpiece.x ?? 0)
+  const y = drawn !== undefined ? Number(drawn["y"] ?? 0) : (sources.workpiece.y ?? 0)
   const width = Number(drawn?.["width"] ?? sources.workpiece.width)
   const height = Number(drawn?.["height"] ?? sources.workpiece.height)
   const depth = Number(drawn?.["depth"] ?? sources.workpiece.depth)
@@ -76,8 +88,8 @@ export const stockOf = (sources: JobSources): Stock => {
     radius: Number(sources.workpiece.radius ?? 0),
     x,
     y,
-    topZ: 0,
-    allowance: sources.stockAllowance,
+    topZ: sources.workpiece.topZ ?? (drawn !== undefined ? Number(drawn["z"] ?? 0) + depth / 2 : 0),
+    allowance: sources.workpiece.allowance ?? sources.stockAllowance,
     ...(sources.workpiece.material ? { material: sources.workpiece.material } : {})
   }
 }

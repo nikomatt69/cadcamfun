@@ -201,3 +201,19 @@ export const Person = (p: IconProps) =>
   )
 export const Shield = (p: IconProps) =>
   wrap(<path d="M12 3 l8 3 v5 a9 9 0 0 1 -8 9 a9 9 0 0 1 -8 -9 V6 z" />, p.size ?? 20, p)
+
+/** The iOS bell: filled when there is something unread, stroked when the list is empty. */
+export const Bell = (p: IconProps & { readonly filled?: boolean }) => {
+  const { filled, ...rest } = p
+  return wrap(
+    <>
+      <path
+        d="M18 15 v-4 a6 6 0 0 0 -12 0 v4 l-1.6 2.2 a0.6 0.6 0 0 0 0.5 0.9 h14.2 a0.6 0.6 0 0 0 0.5 -0.9 Z"
+        {...(filled ? { fill: "currentColor", "fill-opacity": "0.18" } : {})}
+      />
+      <path d="M10 18.5 a2 2 0 0 0 4 0" />
+    </>,
+    p.size ?? 20,
+    rest,
+  )
+}

@@ -67,6 +67,8 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   private readonly entries = new Map<string, Entry>();
   private readonly queue: Entry[] = [];
   private readonly active = new Set<Promise<void>>();
+  private readonly occupied = new Set<Entry>();
+  private readonly deliveries = new Set<Promise<void>>();
   /** Tasks whose runner has stopped (what `wait` resolves on). */
   private readonly settled = new Set<string>();
   private readonly waiters = new Map<string, Array<(task: BackgroundTask) => void>>();
@@ -95,7 +97,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     if (this.disposed) {
       throw new BackgroundTaskManagerError("disposed", "Background task manager is disposed");
     }
-    if (this.active.size >= MAX_BACKGROUND_TASKS && this.queue.length >= MAX_QUEUED_BACKGROUND_TASKS) {
+    if (this.queue.length >= MAX_QUEUED_BACKGROUND_TASKS) {
       throw new BackgroundTaskManagerError("queue_full", "Background task queue is full");
     }
     const entry: Entry = {
@@ -137,9 +139,14 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     const entry = this.ownedEntry(owner, id);
     return new Promise<BackgroundTask>((resolve) => {
       if (this.settled.has(id)) return resolve({ ...entry.task });
-      this.waiters.set(id, [...(this.waiters.get(id) ?? []), resolve]);
+      const onAbort = () => this.cancelEntry(entry);
+      const finish = (task: BackgroundTask) => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve(task);
+      };
+      this.waiters.set(id, [...(this.waiters.get(id) ?? []), finish]);
       if (signal?.aborted) this.cancelEntry(entry);
-      else signal?.addEventListener("abort", () => this.cancelEntry(entry), { once: true });
+      else signal?.addEventListener("abort", onAbort, { once: true });
     });
   }
 
@@ -157,7 +164,10 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     if (this.disposal) return this.disposal;
     this.disposed = true;
     for (const entry of this.entries.values()) this.cancelEntry(entry);
-    this.disposal = Promise.all([...this.active]).then(() => undefined);
+    this.disposal = (async () => {
+      await Promise.all([...this.active]);
+      await Promise.all([...this.deliveries]);
+    })();
     return this.disposal;
   }
 
@@ -194,6 +204,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         break;
       }
       entry.task = { ...entry.task, status: "running" };
+      this.occupied.add(entry);
       // Cancelled before the runner got to start: there is nothing to run, and the abort event has already fired.
       const work = Promise.resolve().then(() => entry.controller.signal.aborted ? "" : runner({
         projectId: entry.task.projectId,
@@ -218,6 +229,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
       ).finally(() => {
         // Abort is only a request: release capacity after the actual runner settles.
         this.active.delete(work);
+        this.occupied.delete(entry);
         this.drain();
         this.notify(entry);
       });
@@ -228,8 +240,8 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   /** A task that changes the document waits while another one for the same project is changing it. */
   private runnable(entry: Entry): boolean {
     if (entry.task.edits !== true) return true;
-    for (const other of this.entries.values()) {
-      if (other !== entry && other.task.status === "running" && other.task.edits === true && other.task.projectId === entry.task.projectId) return false;
+    for (const other of this.occupied) {
+      if (other !== entry && other.task.edits === true && other.task.projectId === entry.task.projectId) return false;
     }
     return true;
   }
@@ -242,9 +254,11 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
       for (const resolve of waiting) resolve({ ...entry.task });
     }
     const callback = this.options.onCompletion;
-    if (!callback) return;
+    if (!callback || this.disposed) return;
     const snapshot = { ...entry.task };
     // Host wake failures must not strand scheduler slots or reject runner cleanup.
-    void Promise.resolve().then(() => callback(snapshot)).catch(() => undefined);
+    const delivery = Promise.resolve().then(() => this.disposed ? undefined : callback(snapshot))
+      .catch(() => undefined).finally(() => this.deliveries.delete(delivery));
+    this.deliveries.add(delivery);
   }
 }

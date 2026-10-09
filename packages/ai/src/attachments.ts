@@ -46,7 +46,7 @@ export interface PreparedAttachments {
 }
 
 const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
-const TEXT_EXTENSIONS = new Set(["dxf", "svg", "step", "stp", "csv", "txt", "nc", "gcode", "ngc", "tap", "json", "md", "xml", "obj"])
+const TEXT_EXTENSIONS = new Set(["dxf", "svg", "step", "stp", "csv", "txt", "nc", "gcode", "ngc", "tap", "json", "md", "xml", "obj", "ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rs", "c", "h", "cpp", "hpp", "cs", "java", "swift", "kt", "sh", "yaml", "yml", "toml", "sql"])
 
 const extensionOf = (name: string): string => name.slice(name.lastIndexOf(".") + 1).toLowerCase()
 
@@ -69,10 +69,15 @@ const bytesOf = (base64: string): number => Math.floor((base64.length * 3) / 4)
 
 const store = new Map<string, Map<string, string>>()
 
-export const putAttachment = (projectId: string, name: string, text: string): void => {
+export const putAttachment = (projectId: string, name: string, text: string): boolean => {
   const files = store.get(projectId) ?? new Map<string, string>()
+  if (text.length > MAX_TEXT_CHARS || (!store.has(projectId) && store.size >= 64) || (!files.has(name) && files.size >= 32)) return false
+  const projectChars = [...files.values()].reduce((sum, value) => sum + value.length, 0) - (files.get(name)?.length ?? 0) + text.length
+  const totalChars = [...store.values()].reduce((sum, entries) => sum + [...entries.values()].reduce((size, value) => size + value.length, 0), 0) - (files.get(name)?.length ?? 0) + text.length
+  if (projectChars > 8_000_000 || totalChars > 32_000_000) return false
   files.set(name, text)
   store.set(projectId, files)
+  return true
 }
 
 /** A text attachment of this project by name (case-insensitive), most recent upload wins. */
@@ -126,10 +131,15 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
         rejected.push({ name, reason: `text longer than ${MAX_TEXT_CHARS} characters` })
         continue
       }
-      putAttachment(projectId, name, attachment.data)
+      if (!putAttachment(projectId, name, attachment.data)) {
+        rejected.push({ name, reason: "Conversation attachment storage limit reached. Remove older attachments before uploading more." })
+        continue
+      }
       stored.push(name)
       const ext = extensionOf(name)
-      const hint = ext === "dxf" || ext === "svg" || ext === "step" || ext === "stp"
+      const hint = name.endsWith(".mesh.json")
+        ? `parsed mesh; use cad_import_drawing with format mesh and attachment "${name}"; specify source-unit scale to mm`
+        : ext === "dxf" || ext === "svg" || ext === "step" || ext === "stp"
         ? `use cad_import_drawing with attachment "${name}" (and a depth for DXF/SVG) to build it in 3D`
         : "kept for the tools"
       if (attachment.data.length <= INLINE_TEXT_CHARS && ext !== "dxf" && ext !== "svg" && ext !== "step" && ext !== "stp") {

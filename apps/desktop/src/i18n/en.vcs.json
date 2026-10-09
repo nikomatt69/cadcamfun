@@ -46,5 +46,20 @@
   "vcs.github.push": "Push",
   "vcs.github.pull": "Pull",
   "vcs.github.done": "Done: {detail}",
-  "vcs.error": "Something went wrong: {message}"
+  "vcs.error": "Something went wrong: {message}",
+  "vcs.actions.jobs": "Jobs",
+  "vcs.actions.steps": "Steps",
+  "vcs.actions.noEvents": "This run recorded no steps.",
+  "vcs.actions.skipped": "skipped",
+  "vcs.actions.expand": "Show the steps of this run",
+  "vcs.actions.trigger": "Trigger",
+  "vcs.workflows.title": "Workflow files",
+  "vcs.workflows.empty": "No workflow files in this branch. Create one to get CI on every commit.",
+  "vcs.workflows.create": "New workflow",
+  "vcs.workflows.name": "File name",
+  "vcs.workflows.save": "Save as a commit",
+  "vcs.workflows.savePrompt": "Commit message",
+  "vcs.workflows.invalid": "This file does not parse",
+  "vcs.workflows.saved": "Committed",
+  "vcs.workflows.stepsHint": "Steps must be registered names; an unknown one fails the run before it starts."
 }

@@ -13,7 +13,7 @@ export const CompanionHandlers = HttpApiBuilder.group(Api, "companion", Effect.f
   return handlers
     .handle("status", () => companion.status)
     .handle("enable", ({ payload }) => wire(companion.enable(payload.port)))
-    .handle("disable", () => companion.disable)
+    .handle("disable", () => companion.disable.pipe(Effect.mapError((e) => new InternalError({ message: e.message }))))
     .handle("pair", ({ payload }) => wire(companion.pair(payload.name, payload.host)))
     .handle("revoke", ({ params }) => wire(companion.revoke(params.id)))
 }))

@@ -15,6 +15,9 @@ import { toast } from "../components/ui/toast.tsx"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { syncDocumentSettings } from "../state/document-settings.ts"
+import { useCADStore } from "../cad/store/cadStore.ts"
+import { useElementsStore } from "../cad/store/elementsStore.ts"
+import { stockOf } from "./lib/job.ts"
 import CamStatusBar from "./components/CamStatusBar.tsx"
 import { buildPlayback } from "../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "./api/generator.ts"
@@ -46,6 +49,9 @@ export default function CamPage(): JSX.Element {
   const app = useApp()
   const camStore = useCamStore()
   const gen = useGeneratorStore()
+  const cadStore = useCADStore()
+  const elementStore = useElementsStore()
+  const previewStock = createMemo(() => stockOf({ elements: elementStore.elements, selectedElement: null, selectedIds: [], workpiece: cadStore.workpiece, workpieceElementId: camStore.selectedWorkpieceElementId, stockAllowance: camStore.stockAllowance }))
   const generator = makeToolpathGenerator(app.client)
   const [search, setSearch] = useSearchParams()
 
@@ -293,7 +299,7 @@ export default function CamPage(): JSX.Element {
           >
             <Show when={camStore.activeTab === "preview"}>
               <div class="h-full">
-                <ToolpathVisualizer program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "editor"}>
@@ -303,7 +309,7 @@ export default function CamPage(): JSX.Element {
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
-                <ToolpathVisualizer program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>

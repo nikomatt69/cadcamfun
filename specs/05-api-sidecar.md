@@ -1,5 +1,9 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## AI lifecycle alignment (2026-10-09)
+
+See `23-ai-runtime-architecture.md`. WP4's session-removal handler delegates to WP8's `AiService.removeSession(sessionId, projectId?)`, which resolves client/host identity and joins children before parent removal. The HTTP request/reply schemas remain unchanged. IPC auditing also covers bounded startup/shutdown and plugin RPC failure settlement.
+
 Status: partial. Projects, materials, tools, machine configs, drawings, components, toolpaths, library, the legacy public health probe and the native system routes are implemented end to end (contract, handler, persistence, HTTP tests, real-process lifecycle tests). Production costs, organizations, notifications, plugins (legacy browser-plugin routes), files, analytics (`system-metrics`, `track`), waitlist and the seven contract-covered auth routes are also served with HTTP tests. Contract coverage is measured by `bun run --filter @cadcamfun/api coverage`, which measures *contract* coverage only and never counts a declared route as implemented on its own, so handler parity needs its own HTTP tests. About 15% of the 195 legacy route files are served.
 
 - **WP3** owns `packages/api` (`@cadcamfun/api`): schema-first `HttpApi` definitions and shared domain Schemas. Contains **no server code and no DB code**, so the UI can import it for the typed client without pulling the server in.
@@ -49,6 +53,8 @@ Rules:
 - Optimistic concurrency: updates send `If-Match: <updatedAt ISO>`; mismatch → `Conflict`.
 - Drawing/toolpath content is stored as JSON validated by the **WP1/WP2 schemas**, with `schemaVersion` and write-through version snapshots (`DrawingVersion`, `ToolpathVersion`) capped at the 50 most recent per entity.
 - Streaming (`ai/chat`) is Server-Sent Events with typed events (`delta`, `tool_call`, `tool_result`, `done`, `error`).
+- The AI surface follows nikcli's agent/tool architecture for CAD/CAM work: `/ai/chat/stream` runs the project-scoped agent and its registered CAD/CAM tools; stateless workflow endpoints return advice and never mutate drawings, components or machining operations. Workflow contracts and handlers are grouped by domain so providers, sessions, skills, CAD and CAM can evolve independently.
+- `KvStore` is a sidecar repository over WP0's `LocalKeyValue` Drizzle table using `Database.query`. It persists AI context, assistant memory and local preferences across restarts. Credentials remain in the separate owner-only credentials file.
 
 Deliverable of WP3: the `Api` value, all request/response/error Schemas, plus `ApiClient` helper (`HttpApiClient.make(Api, …)` wrapped as a `Context.Service`) with `ApiClient.layer({ baseUrl, token })`. Tests: encode/decode round-trip for every Schema; a contract test that serialises `Api` to OpenAPI and snapshots it.
 
@@ -89,3 +95,13 @@ apps/sidecar/src/
 - Sessions: the per-launch Bearer token still authenticates the shell, but `Authorization` now also reads an optional `x-session-token` header (the `session` JWT returned by `signin-direct` and, new, by `verify-magic-link` as `token`). A valid token makes `CurrentUser` that account (so every user-scoped route, billing included, acts on it); a missing, expired, forged, wrong-type or orphaned token falls back to the local profile. `set-cookie` response headers of the auth group are now optional in the contract (`fetch` hides them from webviews, so a required header made the typed client fail to decode every sign-in).
 - Payments: `PaymentProvider` (`services/payments.ts`, Effect `Context.Service` over `HttpClient`) creates Stripe checkout and billing-portal sessions for `POST /api/subscriptions`, `/api/subscriptions/portal` and the `better-auth-stripe` checkout/portal routes. `AppConfig` gained `stripeSecretKey` (`STRIPE_SECRET_KEY`), `stripePrices` (`STRIPE_PRICE_BASIC|PRO|ENTERPRISE`) and the test hook `stripeApiBase`. Without a key every call fails with `PaymentError { reason: "unconfigured" }` and the routes keep their legacy 500 answers. Checkout stamps `userId` and `plan` on the subscription; `customer.subscription.*` webhooks store plan, customer and subscription ids, creating the row when the user paid before ever opening the subscription page. Open question 3 of spec 00 is decided: Stripe (optional, no license-key path).
 - Session lifetime: `AuthTokens.revoke` ends a token before its expiry. `POST /api/auth/signout` revokes the `x-session-token` it carries, and reset-password and verify-magic-link consume their link (a replay answers "Token non valido"). Revoked token ids and their expiry are kept in `<dataDir>/auth-revoked.json` and dropped once expired.
+- AI workflow endpoints expose assistant prompts, conversation titles, design analysis, machining parameter recommendations, G-code optimization proposals and contextual design suggestions. G-code optimization is advisory and never updates a stored operation.
+- AI persistence: `KvStore` uses Drizzle over the shared SQLite connection for JSON-compatible context, memory and preference values; secrets remain outside the KV table.
+
+### Atomic AI stock changes
+
+The existing drawing repository owns stock persistence. `configureStock` updates the latest drawing JSON and invalidates generated G-code, responses and verification on its operations inside one synchronous SQLite transaction. Unrelated drawing geometry, operation metadata and chain information survive. The AI handler checks project access and validates stock before invoking this method. No new storage or duplicate drawing model is introduced.
+
+Catalogue transport follow-up: `GET /api/ai/models` accepts optional `configuredOnly` query (`true`/`false`), preserving the existing full-list default. HTTP handlers filter the service result; provider/session ownership remains inside the AI service. Optional telemetry SDKs load only when an exporter is configured.
+
+Runtime startup performs no AI SDK prewarm or model metadata download. The first catalogue access owns its seed request, and scope shutdown aborts and joins it. Native IPC logs use one JSON line per Effect event; Rust preserves its level rather than treating all stderr output as a warning.

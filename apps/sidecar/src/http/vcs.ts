@@ -113,8 +113,8 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
     })).pipe(Effect.ignore)
 
   /** Like GitHub Actions on `push`: workflows stored in the pushed commit run right away. */
-  const onPush = (projectId: string, userId: string, branch: string) =>
-    runner.trigger(projectId, branch, { type: "push", branch, changedPaths: [] }).pipe(
+  const onPush = (projectId: string, userId: string, branch: string, actor: Actor) =>
+    runner.trigger(projectId, branch, { type: "push", branch, changedPaths: [] }, { actor }).pipe(
       Effect.flatMap((runs) => announce(projectId, userId, runs, "push")),
       Effect.ignore,
     )
@@ -133,7 +133,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const oid = yield* wire(vcs.commit(params.id, { message: payload.message }, { ...actor, kind: authorKind }, files))
         const { current } = yield* wire(vcs.branches(params.id))
         yield* broadcast(params.id, actor.userId, { type: "commit", projectId: params.id, oid, branch: current, authorKind, message: payload.message, at: now() })
-        yield* onPush(params.id, actor.userId, current)
+        yield* onPush(params.id, actor.userId, current, actor)
         const [entry] = yield* wire(vcs.log(params.id, oid, 1))
         return commitRow(entry!)
       }))
@@ -166,7 +166,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         if (!payload.title.trim()) return yield* new BadRequest({ message: "Pull request title is required" })
         const row = yield* wire(vcs.openPullRequest(params.id, payload, { ...actor, kind: payload.authorKind ?? "user" }))
         yield* broadcast(params.id, actor.userId, { type: "pr.opened", projectId: params.id, number: row.number, title: row.title, authorKind: payload.authorKind ?? "user", head: row.head, base: row.base, at: now() })
-        yield* runner.trigger(params.id, row.head, { type: "pull-request", base: row.base }).pipe(
+        yield* runner.trigger(params.id, row.head, { type: "pull-request", base: row.base }, { actor }).pipe(
           Effect.flatMap((runs) => announce(params.id, actor.userId, runs, "pull-request")),
           Effect.ignore,
         )
@@ -188,7 +188,7 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const actor = yield* access(params.id, "maintainer")
         const row = yield* wire(vcs.mergePullRequest(params.id, params.number, actor))
         yield* broadcast(params.id, actor.userId, { type: "pr.merged", projectId: params.id, number: row.number, title: row.title, at: now() })
-        yield* onPush(params.id, actor.userId, row.base)
+        yield* onPush(params.id, actor.userId, row.base, actor)
         return prRow(row)
       }))
     .handle("closePullRequest", ({ params }) =>
@@ -214,15 +214,25 @@ export const VcsHandlers = HttpApiBuilder.group(Api, "vcs", Effect.fn(function*(
         const actor = yield* access(params.id, "maintainer")
         const result = yield* wire(vcs.pull(params.id, headers["x-github-token"], actor, payload.branch))
         const { current } = yield* wire(vcs.branches(params.id))
-        yield* onPush(params.id, actor.userId, current)
+        yield* onPush(params.id, actor.userId, current, actor)
         return result
       }))
     .handle("runs", ({ params }) => access(params.id, "member").pipe(Effect.andThen(wire(runner.runs(params.id).pipe(Effect.map((l) => l.map(runRow)))))))
+    .handle("listWorkflows", ({ params, query }) =>
+      access(params.id, "member").pipe(
+        Effect.andThen(wire(vcs.branches(params.id).pipe(Effect.flatMap(({ current }) => runner.files(params.id, query.ref ?? current))))),
+      ))
+    .handle("workflow", ({ params, query }) =>
+      Effect.gen(function*() {
+        yield* access(params.id, "member")
+        const { current } = yield* wire(vcs.branches(params.id))
+        return yield* wire(runner.file(params.id, query.ref ?? current, params.name))
+      }))
     .handle("dispatch", ({ params, payload }) =>
       Effect.gen(function*() {
         const actor = yield* access(params.id, "member")
         const ref = payload.ref ?? (yield* wire(vcs.branches(params.id))).current
-        const runs = yield* wire(runner.trigger(params.id, ref, { type: "manual" }))
+        const runs = yield* wire(runner.trigger(params.id, ref, { type: "manual" }, { actor }))
         yield* announce(params.id, actor.userId, runs, "manual")
         return runs.map(runRow)
       }))

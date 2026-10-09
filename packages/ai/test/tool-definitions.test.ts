@@ -15,7 +15,7 @@ describe("one definition per tool (nikcli style)", () => {
       expect(existsSync(`${dir}${id}.ts`), `${id}.ts`).toBe(true)
       expect(existsSync(`${dir}prompts/${id}.txt`), `${id}.txt`).toBe(true)
     }
-    const files = readdirSync(dir).filter((f) => /^(cad|cam|lib|memory)_.*\.ts$/.test(f)).map((f) => f.slice(0, -3)).sort()
+    const files = readdirSync(dir).filter((f) => /^(cad|cam|lib|memory|attachment|web)_.*\.ts$/.test(f)).map((f) => f.slice(0, -3)).sort()
     expect(files).toEqual([...TOOL_IDS].sort())
   })
 
@@ -47,6 +47,28 @@ describe("one definition per tool (nikcli style)", () => {
 
   test("a tool without a prompt file and without a description cannot be defined", () => {
     expect(() => defineTool("ext_nothing", { parameters: z.object({}), execute: async () => ({}) })).toThrow("has no prompt")
+  })
+
+  test("runtime input validation rejects bad arguments and tool failures never escape the bridge", async () => {
+    let called = false
+    const invalid = defineTool("ext_validate", {
+      description: "Validate arguments.",
+      parameters: z.object({ count: z.number().int().positive() }),
+      execute: async () => { called = true; return { ok: true } }
+    })
+    const failure = defineTool("ext_failure", {
+      description: "A tool that fails.",
+      parameters: z.object({}),
+      execute: async () => { throw new Error("API_KEY=private /Users/hidden/design.step") }
+    })
+    const invalidReply = JSON.parse(await buildTools(handlers, "p", [invalid]).find((t) => t.id === "ext_validate")!.execute({ count: -1 }, { sessionId: "s", projectId: "p", signal: new AbortController().signal })) as { ok: boolean; problems: string[] }
+    expect(invalidReply.ok).toBe(false)
+    expect(invalidReply.problems.length).toBeGreaterThan(0)
+    expect(called).toBe(false)
+    const failureReply = await buildTools(handlers, "p", [failure]).find((t) => t.id === "ext_failure")!.execute({}, { sessionId: "s", projectId: "p", signal: new AbortController().signal })
+    expect(JSON.parse(failureReply)).toMatchObject({ ok: false })
+    expect(failureReply).not.toContain("private")
+    expect(failureReply).not.toContain("/Users/")
   })
 })
 

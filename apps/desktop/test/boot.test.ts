@@ -78,6 +78,20 @@ describe("connect against a live sidecar", () => {
     runtime.dispose()
   })
 
+  test("two live runtimes keep bearer credentials isolated", async () => {
+    const first = createRuntime(stub.endpoint)
+    const second = createRuntime({ ...stub.endpoint, token: "other-runtime-token" })
+    try {
+      await first.run(Effect.service(ApiClient))
+      await second.run(Effect.service(ApiClient))
+      const result = await first.run(projectsList)
+      expect(result).toHaveLength(2)
+      const rejected = await second.run(projectsList.pipe(Effect.exit))
+      expect(Exit.isFailure(rejected)).toBe(true)
+      expect((await first.run(projectsList)).length).toBe(2)
+    } finally { await first.dispose(); await second.dispose() }
+  })
+
   test("a wrong token fails the health check instead of rendering the shell", async () => {
     const connection = await connect({
       endpoint: async () => ({ baseUrl: stub.endpoint.baseUrl, token: "wrong" }),

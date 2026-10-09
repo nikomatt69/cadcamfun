@@ -1,7 +1,6 @@
+import { Database, DatabaseError, schema } from "@cadcamfun/db"
+import { eq } from "drizzle-orm"
 import { Context, Data, Effect, Layer } from "effect"
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
-import { dirname, join } from "node:path"
-import { AppConfigService } from "../config.ts"
 
 export class KvError extends Data.TaggedError("KvError")<{ readonly operation: string; readonly cause: unknown }> {}
 
@@ -11,54 +10,64 @@ export interface KvEntry {
   readonly updatedAt: string
 }
 
-/**
- * Persistent key-value state (the same idea as nikcli's `kv.json`): small JSON values under dotted keys
- * (`ai.settings.model`, `ai.memory.<id>`, `ai.context.<projectId>`...). One file in the data directory, loaded once,
- * written atomically (temp file + rename) after every change.
- */
+const toKvError = (operation: string) => (cause: DatabaseError) => new KvError({ operation, cause })
+
+const isJsonValue = (value: unknown, seen = new Set<object>()): boolean => {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true
+  if (typeof value === "number") return Number.isFinite(value)
+  if (typeof value !== "object" || seen.has(value)) return false
+  seen.add(value)
+  const valid = Array.isArray(value)
+    ? value.every((item) => isJsonValue(item, seen))
+    : Object.getPrototypeOf(value) === Object.prototype && Object.values(value).every((item) => isJsonValue(item, seen))
+  seen.delete(value)
+  return valid
+}
+
+/** SQLite-backed JSON key-value repository; all access goes through the shared Database Effect service. */
 export class KvStore extends Context.Service<KvStore, {
-  get(key: string): Effect.Effect<KvEntry | undefined>
+  get(key: string): Effect.Effect<KvEntry | undefined, KvError>
   set(key: string, value: unknown): Effect.Effect<KvEntry, KvError>
   delete(key: string): Effect.Effect<boolean, KvError>
-  list(prefix?: string): Effect.Effect<ReadonlyArray<KvEntry>>
+  list(prefix?: string): Effect.Effect<ReadonlyArray<KvEntry>, KvError>
 }>()("cadcamfun/KvStore") {
   static readonly layer = Layer.effect(KvStore, Effect.gen(function*() {
-    const { dataDir } = yield* AppConfigService
-    const file = join(dataDir, "kv.json")
-    const entries = new Map<string, KvEntry>()
-    const loaded = yield* Effect.promise(() => readFile(file, "utf8").then((t) => JSON.parse(t) as Record<string, KvEntry>).catch(() => ({} as Record<string, KvEntry>)))
-    for (const [key, entry] of Object.entries(loaded)) entries.set(key, entry)
+    const { query } = yield* Database
+    const table = schema.localKeyValueTable
 
-    // Writes are serialised so two quick `set` calls cannot interleave their rename.
-    let chain: Promise<void> = Promise.resolve()
-    const persist = (operation: string) => Effect.tryPromise({
-      try: () => {
-        chain = chain.then(async () => {
-          await mkdir(dirname(file), { recursive: true })
-          const tmp = `${file}.${process.pid}.tmp`
-          await writeFile(tmp, JSON.stringify(Object.fromEntries(entries), null, 2))
-          await rename(tmp, file)
-        })
-        return chain
-      },
-      catch: (cause) => new KvError({ operation, cause })
+    const get = (key: string) => query("kv.get", async (db) => {
+      const rows = await db.select().from(table).where(eq(table.key, key)).limit(1)
+      const row = rows[0]
+      return row ? { key: row.key, value: row.value, updatedAt: row.updatedAt.toISOString() } : undefined
+    }).pipe(Effect.mapError(toKvError("get")))
+
+    const set = (key: string, value: unknown) => Effect.gen(function*() {
+      if (key.trim() === "" || key.length > 512) {
+        return yield* Effect.fail(new KvError({ operation: "set", cause: "Key must contain 1 to 512 characters." }))
+      }
+      if (!isJsonValue(value)) {
+        return yield* Effect.fail(new KvError({ operation: "set", cause: "Value must be JSON-compatible." }))
+      }
+      const now = new Date()
+      const rows = yield* query("kv.set", (db) => db.insert(table).values({ key, value, updatedAt: now })
+        .onConflictDoUpdate({ target: table.key, set: { value, updatedAt: now } }).returning())
+        .pipe(Effect.mapError(toKvError("set")))
+      const row = rows[0]
+      if (!row) return yield* Effect.fail(new KvError({ operation: "set", cause: "SQLite returned no row after saving a key." }))
+      return { key: row.key, value: row.value, updatedAt: row.updatedAt.toISOString() }
     })
 
-    return KvStore.of({
-      get: (key) => Effect.sync(() => entries.get(key)),
-      set: (key, value) => Effect.gen(function*() {
-        const entry: KvEntry = { key, value, updatedAt: new Date().toISOString() }
-        entries.set(key, entry)
-        yield* persist("set")
-        return entry
-      }),
-      delete: (key) => Effect.gen(function*() {
-        const existed = entries.delete(key)
-        if (existed) yield* persist("delete")
-        return existed
-      }),
-      list: (prefix) => Effect.sync(() =>
-        [...entries.values()].filter((e) => !prefix || e.key.startsWith(prefix)).sort((a, b) => a.key.localeCompare(b.key)))
-    })
+    const remove = (key: string) => query("kv.delete", async (db) => {
+      const rows = await db.delete(table).where(eq(table.key, key)).returning({ key: table.key })
+      return rows.length > 0
+    }).pipe(Effect.mapError(toKvError("delete")))
+
+    const list = (prefix?: string) => query("kv.list", async (db) => {
+      const rows = await db.select().from(table).orderBy(table.key)
+      return rows.filter((row) => prefix === undefined || row.key.startsWith(prefix))
+        .map((row) => ({ key: row.key, value: row.value, updatedAt: row.updatedAt.toISOString() }))
+    }).pipe(Effect.mapError(toKvError("list")))
+
+    return KvStore.of({ get, set, delete: remove, list })
   }))
 }

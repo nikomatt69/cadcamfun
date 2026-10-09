@@ -8,7 +8,7 @@
  * Tap-on-haptic (Apple §13): every navigation action fires the selection haptic on the same
  * frame the visual change happens — causality + harmony.
  */
-import { For, Match, Show, Switch, createResource, type Component } from "solid-js"
+import { For, Match, Show, Switch, createResource, type Accessor, type Component } from "solid-js"
 import type { CompanionClient } from "../companion/client.ts"
 import type { VcsCommit } from "@cadcamfun/api"
 import { Spinner } from "../components/Spinner.tsx"
@@ -20,10 +20,13 @@ import { haptic } from "../lib/haptic.ts"
 export interface HistoryScreenProps {
   readonly client: CompanionClient
   readonly projectId: string
+  /** Bumped by the project screen when a live `commit` frame arrives; refetches the log. */
+  readonly refreshKey: Accessor<number>
 }
 
 export const HistoryScreen: Component<HistoryScreenProps> = (props) => {
-  const [commits, { refetch }] = createResource<VcsCommit[]>(
+  const [commits, { refetch }] = createResource<VcsCommit[], number>(
+    props.refreshKey,
     () => props.client.log(props.projectId),
   )
 
@@ -68,7 +71,9 @@ export const HistoryScreen: Component<HistoryScreenProps> = (props) => {
                     </div>
                     <div class="row-body">
                       <span class="row-title bold t-mono">{short(c.oid)} · {c.message.split("\n")[0]}</span>
-                      <span class="row-sub">{c.author.name} · {ago(new Date(c.author.time).toISOString())}</span>
+                      {/* `VcsAuthor.time` is Unix *seconds* (git's format); reading it as milliseconds
+                          would render every commit in 1970. */}
+                      <span class="row-sub">{c.author.name} · {ago(new Date(c.author.time * 1000).toISOString())}</span>
                     </div>
                   </li>
                 )}</For>

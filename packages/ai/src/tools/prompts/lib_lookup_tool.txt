@@ -6,6 +6,6 @@ Use it
 Parameters
 - query: words from the name or type ("6 mm end mill").
 
-Result (JSON): up to 10 of {id, name, diameter (mm), type}, public library entries included.
-- Use diameter and type as toolDiameter and toolType of the operation. The library does not give flute length or holder: ask, or leave those unmodelled in cam_verify_toolpath and say so.
+Result (JSON): up to 10 of {id, name, diameter (mm), type, material, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes}, public library entries included.
+- Use diameter and type as toolDiameter and toolType of the operation. Use cuttingLength and shankDiameter when present; stickout and holder dimensions remain unknown unless given. Missing lengths must be left unmodelled in cam_verify_toolpath and reported.
 - No match: say so and state the tool you assumed.

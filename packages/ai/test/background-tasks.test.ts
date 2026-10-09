@@ -37,6 +37,80 @@ function fixture(onCompletion?: (task: BackgroundTask) => void | Promise<void>) 
 }
 
 describe("BackgroundTaskManager", () => {
+  test("a cancelled editor holds project exclusion until the runner settles", async () => {
+    const { manager, runs } = fixture();
+    const first = manager.enqueue({ ...input(), edits: true });
+    await flush();
+    manager.cancel(owner, first.id);
+    const second = manager.enqueue({ ...input(), edits: true });
+    await flush();
+    expect(second.status).toBe("queued");
+    expect(runs).toHaveLength(1);
+    runs[0]?.resolve("Late edit finished");
+    await flush();
+    expect(runs).toHaveLength(2);
+    runs[1]?.resolve("Next edit");
+    await manager.wait(owner, second.id);
+    await manager.dispose();
+  });
+
+  test("queue remains bounded before wiring and behind a project editing lock", async () => {
+    const unwired = new BackgroundTaskManager({});
+    for (let i = 0; i < 16; i++) unwired.enqueue(input());
+    expect(() => unwired.enqueue(input())).toThrow(BackgroundTaskManagerError);
+    await unwired.dispose();
+    const { manager, runs } = fixture();
+    manager.enqueue({ ...input(), edits: true });
+    for (let i = 0; i < 16; i++) manager.enqueue({ ...input(), edits: true });
+    expect(() => manager.enqueue({ ...input(), edits: true })).toThrow(BackgroundTaskManagerError);
+    await flush();
+    expect(runs).toHaveLength(1);
+    const disposal = manager.dispose();
+    runs[0]?.resolve("stopped");
+    await disposal;
+  });
+
+  test("wait releases abort listeners on settlement", async () => {
+    const { manager, runs } = fixture();
+    const task = manager.enqueue(input());
+    const controller = new AbortController();
+    let released = 0;
+    const remove = controller.signal.removeEventListener.bind(controller.signal);
+    controller.signal.removeEventListener = (type: string, listener: EventListenerOrEventListenerObject, options?: EventListenerOptions | boolean) => {
+      released++
+      // `removeEventListener` rejects a null listener, so the spy only forwards real ones; a null is
+      // what the status quo does anyway (the spec is a no-op there).
+      if (listener) remove(type, listener, options)
+    }
+    const waiting = manager.wait(owner, task.id, controller.signal);
+    await flush();
+    runs[0]?.resolve("Done");
+    expect((await waiting).status).toBe("completed");
+    expect(released).toBe(1);
+    controller.abort();
+    expect(manager.read(owner, task.id).status).toBe("completed");
+    await manager.dispose();
+  });
+
+  test("shutdown joins an asynchronous completion already delivering", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const delivering = new Promise<void>((r) => { started = r; });
+    const manager = new BackgroundTaskManager({ runner: async () => "Done", onCompletion: () => {
+      started();
+      return new Promise<void>((r) => { release = r; });
+    } });
+    manager.enqueue(input());
+    await delivering;
+    let closed = false;
+    const disposal = manager.dispose().then(() => { closed = true; });
+    await flush();
+    expect(closed).toBe(false);
+    release();
+    await disposal;
+    expect(closed).toBe(true);
+  });
+
   test("shares four slots across owners, bounds FIFO queue at sixteen, and returns findings", async () => {
     const { manager, runs, peak } = fixture();
     expect(MAX_BACKGROUND_TASKS).toBe(4);

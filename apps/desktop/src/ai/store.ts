@@ -10,6 +10,7 @@
  */
 import { batch, createEffect, createMemo, createRoot, createSignal, onCleanup, type Accessor, type Setter } from "solid-js"
 import { useApp } from "../state/context.ts"
+import { startVisionBridge } from "./vision.ts"
 import { streamChat, type StreamHandle } from "./stream.ts"
 import { buildSuggestions, type Suggestion } from "./suggestions.ts"
 import { loadPersisted, savePersisted } from "./persisted.ts"
@@ -621,7 +622,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     setDismissedSuggestions((current) => current.includes(id) ? current : [...current, id])
   }
 
+  const stopVisionBridge = startVisionBridge(app)
   onCleanup(() => {
+    stopVisionBridge()
     handle?.abort()
     handle = undefined
     disposeRoot()

@@ -75,6 +75,7 @@ const formatTokens = (input: number, output: number): string => {
 
 export function EnhancedAssistant(props: Props): JSX.Element {
   const ai = useAiStore()
+  const registeredTools = createMemo(() => ai.aiStatus()?.tools ?? [])
   const app = useApp()
   const [draft, setDraft] = createSignal("")
   const [files, setFiles] = createSignal<ReadonlyArray<ChatAttachment>>([])
@@ -221,7 +222,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <button type="button" aria-expanded={showSessions()} aria-controls={`${promptId}-sessions`} data-testid="ai-sessions-toggle" onClick={() => setShowSessions(!showSessions())}>
               <History size={14} aria-hidden="true" />{t("ai.sessions.title")}<span>{sessionsCount()}</span>
             </button>
-            <button type="button" aria-expanded={showTools()} aria-controls={`${promptId}-tools`} onClick={() => setShowTools(!showTools())}><Wrench size={14} aria-hidden="true" />{t("ai.tool.tools")}<span>{TOOL_IDS.length}</span></button>
+            <button type="button" aria-expanded={showTools()} aria-controls={`${promptId}-tools`} onClick={() => setShowTools(!showTools())}><Wrench size={14} aria-hidden="true" />{t("ai.tool.tools")}<span>{registeredTools().length}</span></button>
             <button type="button" aria-expanded={showSkills()} aria-controls={`${promptId}-skills`} onClick={() => setShowSkills(!showSkills())}><BookOpen size={14} aria-hidden="true" />{t("ai.skills.title")}</button>
             <button type="button" aria-expanded={showStats()} aria-controls={`${promptId}-stats`} onClick={() => setShowStats(!showStats())}><BarChart3 size={14} aria-hidden="true" />{t("ai.stats.usage")}</button>
           </div>
@@ -391,10 +392,10 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       <Show when={showTools()}>
         <details id={`${promptId}-tools`} open class="assistant-disclosure assistant-settings">
-          <summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">{t("ai.tool.tools")} ({TOOL_IDS.length + EXTRA_TOOL_SUMMARIES.length})</summary>
+          <summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">{t("ai.tool.tools")} ({registeredTools().length})</summary>
           <p class="text-gray-500 mt-1">{t("ai.tool.toolsHint")}</p>
           <ul class="assistant-tool-catalogue">
-            <For each={[...TOOL_SUMMARIES, ...EXTRA_TOOL_SUMMARIES]}>{(tool) => <li><span>{tool.title}</span><p>{tool.description}</p></li>}</For>
+            <For each={registeredTools()}>{(tool) => <li><span>{toolTitle(tool.id)}</span><code>{tool.id}</code><p>{tool.description}</p></li>}</For>
           </ul>
         </details>
       </Show>
@@ -557,16 +558,32 @@ function ModelToolbar(props: ModelToolbarProps): JSX.Element {
 
 function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
   const ai = useAiStore()
+  const [search, setSearch] = createSignal("")
+  const [provider, setProvider] = createSignal("")
+  const [limit, setLimit] = createSignal(50)
+  const available = createMemo(() => ai.models().filter((model) => model.configured))
+  const providers = createMemo(() => [...new Set(available().map((model) => model.provider))].sort())
+  const filtered = createMemo(() => {
+    const query = search().trim().toLowerCase()
+    return available().filter((model) => (!provider() || model.provider === provider()) && (!query || `${model.provider} ${model.id}`.toLowerCase().includes(query)))
+  })
   return (
     <div class="assistant-popover" onKeyDown={(event) => { if (event.key === "Escape") props.onSelect() }}>
+      <div class="sticky top-0 z-10 space-y-1 bg-white p-2 dark:bg-gray-900">
+        <input type="search" aria-label="Search available models" placeholder="Search available models" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
+        <select aria-label="Connected provider" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
+          <option value="">All connected providers</option>
+          <For each={providers()}>{(id) => <option value={id}>{id}</option>}</For>
+        </select>
+      </div>
       <Show
-        when={ai.models().length > 0}
+        when={filtered().length > 0}
         fallback={
           <p class="px-3 py-2 text-xs text-gray-500">{t("ai.model.noModels")}</p>
         }
       >
         <ul class="divide-y divide-gray-100 dark:divide-gray-800">
-          <For each={ai.models()}>
+          <For each={filtered().slice(0, limit())}>
             {(model) => (
               <li>
                 <button
@@ -581,7 +598,7 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
                   <span class="flex-1 min-w-0">
                     <div class="truncate text-xs font-medium text-gray-900 dark:text-gray-100" title={model.id}>{model.id}</div>
                     <div class="text-[10px] text-gray-500">
-                      {ai.providers().find((p) => p.id === model.provider)?.name ?? t(`ai.model.provider.${model.provider}` as never)}
+                      {model.provider}
                       <Show when={model.tier !== undefined}> · {t(`ai.model.tier.${model.tier}` as never)}</Show>
                     </div>
                   </span>
@@ -593,6 +610,9 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
             )}
           </For>
         </ul>
+        <Show when={filtered().length > limit()}>
+          <button type="button" class="w-full px-3 py-2 text-xs text-blue-600" onClick={() => setLimit((value) => value + 50)}>Show more ({filtered().length - limit()})</button>
+        </Show>
       </Show>
     </div>
   )

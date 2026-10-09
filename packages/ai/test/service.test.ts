@@ -7,7 +7,9 @@ import { AiCredentials } from "../src/credentials.ts"
 import { DirectModel, type LanguageModelFactory } from "../src/direct-model.ts"
 import { analyzeGcode } from "../src/gcode-analysis.ts"
 import { render, systemPrompt } from "../src/prompts/system.ts"
-import { AiService } from "../src/service.ts"
+import { AiHost, AiService } from "../src/service.ts"
+import type { NikCliRuntime } from "../src/nikcli/runtime.ts"
+import { BackgroundTaskManager } from "../src/nikcli/background-tasks.ts"
 import { buildTools, TOOL_IDS, type ToolHandlersShape } from "../src/tools/catalogue.ts"
 
 const usage = {
@@ -28,6 +30,15 @@ const streamModel = (parts: string[]) =>
       })
     })
   })
+
+const objectModel = (title: string) => new MockLanguageModelV4({
+  doGenerate: async () => ({
+    content: [{ type: "text", text: JSON.stringify({ title }) }],
+    finishReason: { unified: "stop", raw: undefined },
+    usage,
+    warnings: []
+  })
+})
 
 const layer = (factory: LanguageModelFactory) => {
   const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }))
@@ -90,6 +101,28 @@ describe("AiService without the embedded host", () => {
     )
     expect(exit._tag).toBe("Failure")
   })
+
+  test("structured workflows cache successes and invalidate them when credentials change", async () => {
+    let calls = 0
+    const program = Effect.gen(function*() {
+      const credentials = yield* AiCredentials
+      const ai = yield* AiService
+      yield* credentials.set("openai", Redacted.make("sk-first"))
+      const first = yield* ai.suggestTitle({ excerpt: "A machined bracket" })
+      const second = yield* ai.suggestTitle({ excerpt: "A machined bracket" })
+      yield* credentials.set("openai", Redacted.make("sk-second"))
+      const third = yield* ai.suggestTitle({ excerpt: "A machined bracket" })
+      return { first, second, third }
+    })
+    const result = await Effect.runPromise(program.pipe(Effect.provide(layer(() => {
+      calls++
+      return objectModel(`Bracket ${calls}`)
+    }))))
+    expect(result.first).toEqual({ title: "Bracket 1" })
+    expect(result.second).toEqual({ title: "Bracket 1" })
+    expect(result.third).toEqual({ title: "Bracket 2" })
+    expect(calls).toBe(2)
+  })
 })
 
 describe("gcode analysis", () => {
@@ -134,6 +167,37 @@ describe("prompts and tools", () => {
     await del.execute({ ids: ["a"], confirm: true }, ctx)
     expect(calls).toEqual(["deleteEntities"])
     const add = tools.find((t) => t.id === "cad_add_entities")!
-    await expect(add.execute({ entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: -1 }] }, ctx)).rejects.toBeDefined()
+    const rejected = JSON.parse(await add.execute({ entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: -1 }] }, ctx)) as { ok: boolean }
+    expect(rejected.ok).toBe(false)
   })
+})
+
+
+test("catalogue reads share one acquisition and connected-only reads skip host startup without credentials", async () => {
+  let acquisitions = 0
+  const runtime = {
+    catalogueReady: Promise.resolve("present"),
+    host: () => Effect.succeed({ client: { provider: {
+      list: async () => {
+        acquisitions++
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return { all: [{ id: "openai", name: "OpenAI", models: { "test-model": { name: "Test", limit: { context: 100, output: 10 }, capabilities: { toolcall: true } } } }] }
+      },
+      auth: async () => ({ openai: [{ type: "api" }] })
+    } } })
+  } as unknown as NikCliRuntime
+  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }), Layer.succeed(AiHost, { runtime, scheduler: new BackgroundTaskManager() }))
+  const live = AiService.layer.pipe(Layer.provideMerge(DirectModel.layerWith(() => streamModel(["x"])).pipe(Layer.provideMerge(base))))
+  await Effect.runPromise(Effect.gen(function*() {
+    const ai = yield* AiService
+    expect(yield* ai.availableModels).toEqual([])
+    expect(acquisitions).toBe(0)
+    const [providers, models] = yield* Effect.all([ai.providers, ai.models], { concurrency: "unbounded" })
+    expect(providers).toHaveLength(1)
+    expect(models).toHaveLength(1)
+    expect(acquisitions).toBe(1)
+    yield* ai.invalidateCatalogue
+    yield* ai.providers
+    expect(acquisitions).toBe(2)
+  }).pipe(Effect.provide(live)))
 })

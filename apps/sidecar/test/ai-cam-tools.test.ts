@@ -60,7 +60,7 @@ describe("cad tools provision what is missing", () => {
   })
 
   test("modify and delete work on the ids the add returned, and unknown ids are explained", async () => {
-    const added = await run("cad_add_entities", { entities: [{ type: "cylinder", center: { x: 0, y: 0 }, radius: 4, height: 20 }] }) as { ids: string[] }
+    const added = await run("cad_add_elements", { elements: [{ type: "cylinder", x: 0, y: 0, radius: 4, height: 20 }] }) as { ids: string[] }
     const changed = await run("cad_modify_entities", { changes: [{ id: added.ids[0], changes: { radius: 6, center: { x: 9, y: 9 } } }] }) as { ok: boolean; elements: Array<{ radius: number; x: number }> }
     expect(changed.elements[0]).toMatchObject({ radius: 6, x: 9 })
     expect(await run("cad_modify_entities", { changes: [{ id: "nope", changes: { radius: 1 } }] })).toMatchObject({ ok: false })
@@ -287,10 +287,65 @@ describe("cam_verify_toolpath", () => {
     expect(out.modelled).toMatchObject({ fixtures: 1, target: true })
     expect(out.stats.gougeVolume).toBeDefined()
     // A malformed solid is rejected by the schema before the handler runs.
-    await expect(run("cam_verify_toolpath", { operationId, targetSolids: [{ _tag: "Nope" }] })).rejects.toThrow()
+    expect(await run("cam_verify_toolpath", { operationId, targetSolids: [{ _tag: "Nope" }] })).toMatchObject({ ok: false, error: expect.any(String) })
   })
 
   test("unknown operations and non-mill operations are explained, not thrown", async () => {
     expect(await run("cam_verify_toolpath", { operationId: "nope" })).toMatchObject({ ok: false, error: "Operation not found in the active drawing" })
+  })
+})
+
+describe("library and chain tools (spec 22 §3)", () => {
+  test("a component is saved from elements, listed, inserted and deleted", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Components" } })).body.id as string
+      const added = await h.addElements(project, [
+        { type: "cube", name: "A", width: 10, height: 10, depth: 10, x: 0, y: 0, z: 5 },
+        { type: "cylinder", name: "B", radius: 3, height: 10, x: 20, y: 0, z: 5 }
+      ]) as { ids: string[] }
+      const saved = await h.saveComponent(project, added.ids, "Bracket pair") as { ok: boolean; componentId: string; children: number }
+      expect(saved.ok).toBe(true)
+      expect(saved.children).toBe(2)
+      const list = await h.listComponents(project, "project") as Array<{ id: string; name: string }>
+      expect(list.some((c) => c.id === saved.componentId && c.name === "Bracket pair")).toBe(true)
+      const inserted = await h.insertComponent(project, saved.componentId, { move: { x: 5, y: 5, z: 0 } }) as { ok: boolean; ids: string[] }
+      expect(inserted.ok).toBe(true)
+      expect(inserted.ids.length).toBeGreaterThan(0)
+      expect((await h.deleteComponent(saved.componentId)) as { ok: boolean }).toMatchObject({ ok: true })
+      expect(await h.deleteComponent("nope")).toMatchObject({ ok: false })
+      expect(await h.insertComponent(project, "nope")).toMatchObject({ ok: false })
+    } finally { await fresh.dispose() }
+  })
+
+  test("lib_upsert_* writes materials, tools and machine configs, and defaults stick", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Library" } })).body.id as string
+      const mat = await h.upsertMaterial({ name: "Al 6061", properties: { density: 2.7 }, isPublic: false }) as { ok: boolean; id: string; created: boolean }
+      expect(mat).toMatchObject({ ok: true, created: true })
+      expect((await h.upsertMaterial({ id: mat.id, name: "Al 6061 T6", properties: { density: 2.7 } })) as { created: boolean }).toMatchObject({ created: false })
+      const tool = await h.upsertTool({ name: "6mm endmill", type: "endmill", diameter: 6, material: "carbide", numberOfFlutes: 3 }) as { ok: boolean; id: string; created: boolean }
+      expect(tool.created).toBe(true)
+      const machine = await h.upsertMachineConfig({ name: "Mill", kind: "mill", postProcessor: "linuxcnc", kinematics: { x: { min: -300, max: 300 } } }) as { ok: boolean; id: string; created: boolean }
+      expect(machine.created).toBe(true)
+      const defaults = await h.setProjectDefault({ projectId: project, materialId: mat.id, toolId: tool.id, machineConfigId: machine.id })
+      expect(defaults).toMatchObject({ ok: true, projectId: project })
+    } finally { await fresh.dispose() }
+  })
+
+  test("cam_chain_status reports the previous operation and cam_operations_suggest_chain recommends the next", async () => {
+    await run("cam_update_operation", { operationId, params: { depth: 4, stepdown: 1 } })
+    const status = await handlers.chainStatus({ projectId, operationId }) as { ok: boolean; operationId: string; generated: boolean; warnings: string[] }
+    expect(status.ok).toBe(true)
+    expect(status.operationId).toBe(operationId)
+    expect(Array.isArray(status.warnings)).toBe(true)
+    const next = await handlers.suggestChain({ projectId, fromOperationId: operationId }) as { ok: boolean; recommendation: { operationType: string; reason: string } }
+    expect(next.ok).toBe(true)
+    expect(next.recommendation.operationType).toBe("pocket")
+    expect(next.recommendation.reason).toContain("depth")
+    expect(await handlers.chainStatus({ projectId, operationId: "nope" })).toMatchObject({ ok: false })
   })
 })

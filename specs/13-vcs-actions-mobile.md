@@ -39,6 +39,29 @@ Canonical JSON (sorted keys, 2 spaces) keeps text diffs stable. Thumbnails are d
 | WP12 | `packages/workflow` | YAML → `Workflow` (Effect Schema), triggers (`push` with branch/path globs, `pullRequest`, `manual`), job DAG (`needs`, levels, cycle check), step registry, `${{ steps.<id>.outputs.<k> }}` interpolation, `if: success|failure|always`, `continueOnError`, event stream for live UIs. |
 | WP13 | `apps/mobile` | Solid + Vite, Tauri v2 iOS target. `companion/pairing.ts` (QR link, https + pinned certificate fingerprint), `client.ts` (fetch client of the sidecar API + assistant SSE stream), `store.ts` (secret store abstraction), screens: pair, projects, history, pull requests (diff, review, merge), Actions, assistant. |
 
+### Step registry
+
+A step is a pure function of the commit being checked (`ctx.files`) and its own `with:` parameters, never of the live database, so a run always reports on the tree that was pushed. `ctx` also carries `actor` — the account that dispatched the run — so a step that writes is attributed to whoever asked for it, not to the local profile.
+
+Steps split in two, because the runner cannot depend on a service built above it:
+
+- **Pure** (`apps/sidecar/src/services/workflow-steps.ts`, available to every layer that builds the runner): `project/validate`, `project/require-gcode`, `cam/verify`, `cam/gcode`.
+- **Service-backed** (added through `WorkflowRunner.register`): `vcs/commit` and `notify/push`, registered by `workflow-service-steps-live.ts`, which owns `ProjectVcs` and `NotificationService`; `ai/prompt`, registered by `AiLive`.
+
+| Step | `with:` | Fails on |
+| --- | --- | --- |
+| `project/validate` | — | an entity file that is not JSON, an `id` not matching the file name, a missing `name` |
+| `project/require-gcode` | — | a toolpath in the commit with no G-code |
+| `cam/verify` | `toolpath?`, `tolerance?`, `severity?` (`error` \| `warning`) | any `error` from the replay — rapid in material, gouge, uncut stock, shank/holder/fixture collision, below stock — plus warnings when `severity: warning` |
+| `cam/gcode` | `toolpath?` | the committed G-code differs from what its stored generation request produces (a stale export) |
+| `vcs/commit` | `message`, `files?` (`.cadcamfun/**` text files only) | a dirty working copy, a path outside `.cadcamfun/`, or an AI actor on `main` |
+| `notify/push` | `title?`, `body?`, `outcome?` (`success` \| `failure`) | never: best-effort, writes a `WORKFLOW_PASSED` / `WORKFLOW_FAILED` row |
+| `ai/prompt` | `prompt` (may embed `${{ files.<path> }}`), `system?`, `model?` | the model is unreachable or errors; the answer comes back as `outputs.text` |
+
+`cam/verify` and `cam/gcode` read the generator request stored on each toolpath, so a run that uses them needs the toolpaths to have been generated. A toolpath that *cannot* be verified — a lathe job, no stored request — is listed in `skipped` and never counted as verified: an unverifiable toolpath is not a verified one. A workflow naming an unregistered step fails before any step runs; `ai/prompt` stays unregistered until the AI layer is up, which is why the registry test asserts its absence.
+
+`WorkflowRunner.trigger(projectId, ref, event, { onEvent?, actor? })` takes the actor in an options object (it replaced a positional callback). `WorkflowRunner.steps()` lists what a workflow may name, for the workflow editor and for error messages.
+
 Workflow example:
 
 ```yaml
@@ -55,7 +78,7 @@ jobs:
       - uses: project/require-gcode
 ```
 
-Built-in steps today: `project/validate`, `project/require-gcode`. Planned registrations (the registry is the extension point, `WorkflowRunner.layer(registry)`): `cam/verify`, `cam/gcode`, `ai/prompt`, `vcs/commit`, `notify/push`.
+Registered steps (see §3): `project/validate`, `project/require-gcode`, `cam/verify`, `cam/gcode`, `vcs/commit`, `notify/push`, `ai/prompt`.
 
 ## 4. Backend integration (what exists)
 
@@ -111,7 +134,7 @@ The `.github/workflows/ios.yml` workflow runs `tauri ios init` and `tauri ios bu
 
 1. Run the iOS shell on a device (Mac), APNs push for PR/Actions events, remote access beyond the LAN.
 2. Desktop UI: `Version control` screen (`/projects/:id/history`: changes + commit, history with property-level diffs and restore, branches, pull requests with review/merge, Actions runs, GitHub push/pull) and per-item History buttons are built; a drawn commit-graph view and in-editor (CAD/CAM) history panels are not.
-3. Register `cam/verify`, `cam/gcode`, `ai/prompt` workflow steps; `needs`-scoped outputs if workflows grow.
+3. `needs`-scoped outputs if workflows grow (today step outputs are shared run-wide, keyed by step id).
 4. GitHub routes and PR mirroring (§7); `deletedAt`/sync interplay with `10-release-sync.md` §5 (git history supersedes the change-log idea there).
 5. Large binary assets (STL/DXF imports): store as blobs; packfile/delta compression is not implemented (object count per project stays small; revisit with real data).
 6. `log` is O(history) per call and `isAncestor` walks the graph; fine for thousands of commits, add commit-graph caching if projects grow beyond that.

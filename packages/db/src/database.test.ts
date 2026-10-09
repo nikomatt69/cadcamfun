@@ -46,4 +46,21 @@ describe("Database layer", () => {
       // Session.userId is onDelete: cascade.
       expect(yield* query("sessions", (db) => db.select().from(schema.sessionTable))).toHaveLength(0)
     })))
+
+  test("LocalKeyValue stores JSON-compatible state by key and updates timestamps on upsert", () =>
+    run(Effect.gen(function*() {
+      const { query } = yield* Database
+      const table = schema.localKeyValueTable
+      const value = { projectId: "p1", selectedIds: ["a", "b"] }
+      yield* query("kv insert", (db) => db.insert(table).values({ key: "ai.context.p1", value }))
+      const [before] = yield* query("kv read", (db) => db.select().from(table).where(eq(table.key, "ai.context.p1")))
+      expect(before?.value).toEqual(value)
+      expect(before?.updatedAt).toBeInstanceOf(Date)
+
+      yield* query("kv update", (db) => db.insert(table).values({ key: "ai.context.p1", value: { projectId: "p1" } })
+        .onConflictDoUpdate({ target: table.key, set: { value: { projectId: "p1" }, updatedAt: new Date() } }))
+      const [after] = yield* query("kv read updated", (db) => db.select().from(table).where(eq(table.key, "ai.context.p1")))
+      expect(after?.value).toEqual({ projectId: "p1" })
+      expect(after?.updatedAt.getTime()).toBeGreaterThanOrEqual(before!.updatedAt.getTime())
+    })))
 })

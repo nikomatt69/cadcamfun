@@ -18,6 +18,7 @@ import type { Workpiece } from "../store/camStore.ts"
 export interface ToolpathVisualizerProps {
   readonly program: cam.Program
   readonly workpiece: Workpiece
+  readonly stock?: cam.generator.Stock
   readonly playing: boolean
   readonly playbackTime: number
   readonly playbackRate: number
@@ -39,8 +40,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [axesVisible, setAxesVisible] = createSignal(true)
 
   const stock = createMemo(() => ({
-    origin: { x: -props.workpiece.x / 2, y: -props.workpiece.y / 2, z: 0 },
-    size: { x: props.workpiece.x, y: props.workpiece.y, z: props.workpiece.z }
+    origin: props.stock ? { x: props.stock.x - props.stock.width / 2, y: props.stock.y - props.stock.height / 2, z: props.stock.topZ - props.stock.depth } : { x: -props.workpiece.x / 2, y: -props.workpiece.y / 2, z: 0 },
+    size: props.stock ? { x: props.stock.width, y: props.stock.height, z: props.stock.depth } : { x: props.workpiece.x, y: props.workpiece.y, z: props.workpiece.z }
   }))
 
   const hasProgram = (): boolean => props.program.toolpaths.length > 0
@@ -66,6 +67,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           }
         >
           <View3D
+            visionMode="cam"
             program={props.program}
             preset={preset()}
             renderMode={mode()}

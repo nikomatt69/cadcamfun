@@ -81,6 +81,7 @@ describe("AI provider & model browser", () => {
         return openai?.textContent?.includes("Configured") ? openai : null
       }, 20000)
       expect(badge?.textContent ?? "").toContain("Configured")
+      expect(rows()[0]).toBe("ai-provider-openai")
 
       // The row re-renders when the key lands, so the model list is re-read from the DOM.
       const model = query<HTMLButtonElement>('[data-testid="ai-provider-detail"] [data-testid="ai-model-option"]')

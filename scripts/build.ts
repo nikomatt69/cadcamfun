@@ -216,18 +216,52 @@ function sidecarOutfile(triple: string): string {
   return join(SRC_TAURI, "binaries", `sidecar-${triple}${extension}`);
 }
 
+/**
+ * `true` when two files hold the same bytes, `false` when either is missing.
+ *
+ * Used by the two steps that write *into* `src-tauri/`. `tauri dev` watches that directory, so
+ * rewriting an identical file makes it tear the whole app down and rebuild — a dev restart on every
+ * build, even one where nothing changed. Comparing first turns a no-op build into a no-op write.
+ */
+async function sameBytes(left: string, right: string): Promise<boolean> {
+  if (!existsSync(left) || !existsSync(right)) return false;
+  const [a, b] = await Promise.all([readFile(left), readFile(right)]);
+  return a.length === b.length && createHash("sha256").update(a).digest("hex") === createHash("sha256").update(b).digest("hex");
+}
+
+/** `true` when two directories hold the same set of files with the same bytes. */
+async function sameTree(left: string, right: string): Promise<boolean> {
+  if (!existsSync(left) || !existsSync(right)) return false;
+  // `readdir` reports `parentPath` exactly as the directory was named, so strip that prefix to get a
+  // path relative to each root; otherwise the two sides are never comparable.
+  const names = async (dir: string) => {
+    const root = resolve(dir);
+    const prefix = `${root}/`;
+    return (await readdir(dir, { recursive: true, withFileTypes: true }))
+      .filter((e) => e.isFile() && !e.name.startsWith("."))
+      .map((e) => {
+        const parent = resolve(e.parentPath);
+        return parent === root ? e.name : `${parent.slice(prefix.length)}/${e.name}`;
+      })
+      .sort();
+  };
+  const [a, b] = await Promise.all([names(left), names(right)]);
+  if (a.length !== b.length || a.some((n, i) => n !== b[i])) return false;
+  return (await Promise.all(a.map((n) => sameBytes(join(left, n), join(right, n))))).every(Boolean);
+}
+
 async function stepCompile(): Promise<void> {
   const triple = await resolveTarget();
   const outfile = sidecarOutfile(triple);
   announce(3, "compile the sidecar for the target triple");
   say(`   triple ${triple} → ${rel(outfile)}`);
   await requirePath(SIDECAR_ENTRY, "sidecar entrypoint (WP4: apps/sidecar/src/main.ts)");
+  // Compile beside the real binary and swap it in only when the result differs, so an unchanged build
+  // leaves `src-tauri/binaries/` untouched and `tauri dev` keeps the window it already has open.
+  const candidate = `${outfile}.candidate`;
   if (!dryRun) {
     await mkdir(dirname(outfile), { recursive: true });
-    if (existsSync(outfile)) {
-      const stamp = `   replaced the previous binary (${new Date().toISOString()})`;
-      say(stamp);
-    }
+    await rm(candidate, { force: true });
   }
   await run([
     "bun",
@@ -237,8 +271,18 @@ async function stepCompile(): Promise<void> {
     "--target",
     targetInfo(triple).bunTarget,
     "--outfile",
-    outfile,
+    dryRun ? outfile : candidate,
   ]);
+  if (dryRun) return;
+  if (await sameBytes(candidate, outfile)) {
+    await rm(candidate, { force: true });
+    say("   unchanged — kept the previous binary (tauri dev does not restart)");
+    return;
+  }
+  say(`   replaced the previous binary (${new Date().toISOString()})`);
+  await rm(outfile, { force: true });
+  await cp(candidate, outfile);
+  await rm(candidate, { force: true });
 }
 
 async function stepResources(): Promise<void> {
@@ -250,12 +294,17 @@ async function stepResources(): Promise<void> {
     return;
   }
   // Replace instead of merge: a stale migration folder in the bundle is worse
-  // than none, and this keeps the step idempotent.
-  await rm(MIGRATIONS_TARGET, { recursive: true, force: true });
-  await mkdir(dirname(MIGRATIONS_TARGET), { recursive: true });
-  await cp(MIGRATIONS_SOURCE, MIGRATIONS_TARGET, { recursive: true });
+  // than none, and this keeps the step idempotent. Only when it actually differs —
+  // `src-tauri/` is watched by `tauri dev`, so an identical restage is a restart.
+  const changed = !(await sameTree(MIGRATIONS_SOURCE, MIGRATIONS_TARGET));
+  if (changed) {
+    await rm(MIGRATIONS_TARGET, { recursive: true, force: true });
+    await mkdir(dirname(MIGRATIONS_TARGET), { recursive: true });
+    await cp(MIGRATIONS_SOURCE, MIGRATIONS_TARGET, { recursive: true });
+  }
   const staged = (await readdir(MIGRATIONS_TARGET)).filter((name) => !name.startsWith("."));
-  say(`   ${staged.length} migration entr${staged.length === 1 ? "y" : "ies"} staged:`);
+  if (!changed) say("   unchanged — kept the staged migrations (tauri dev does not restart)");
+  else say(`   ${staged.length} migration entr${staged.length === 1 ? "y" : "ies"} staged:`);
   for (const name of staged) say(`     ${name}`);
 }
 
