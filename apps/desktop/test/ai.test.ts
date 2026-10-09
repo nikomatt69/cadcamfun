@@ -48,9 +48,9 @@ describe("AI SSE event decoder", () => {
 
 describe("AI tool catalogue (spec 08-ai.md §3)", () => {
   test("contains every locked-down tool id", () => {
-    expect(TOOL_IDS.length).toBe(19)
+    expect(TOOL_IDS.length).toBe(22)
     expect(new Set(TOOL_IDS)).toEqual(new Set([
-      "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_delete_entities", "cad_describe_drawing", "cad_check_design", "cad_import_drawing",
+      "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor", "cad_delete_entities", "cad_describe_drawing", "cad_check_design", "cad_import_drawing",
       "cam_describe_machine", "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
       "lib_lookup_material", "lib_lookup_tool", "memory_remember", "memory_recall"
     ]))

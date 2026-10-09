@@ -3,8 +3,9 @@ import { Effect, Queue, Stream } from "effect"
 import type { HostPromptResult } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import type { AiEvent } from "../events.ts"
+import { isContextOverflowError } from "../provider-error.ts"
 import { CADCAM_AGENT } from "./config.ts"
-import { mapHostEvent, newMapperState } from "./event-mapper.ts"
+import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
 import type { ProjectHost } from "./runtime.ts"
 
 export interface HostChatInput {
@@ -18,19 +19,79 @@ export interface HostChatInput {
   readonly model: { readonly providerID: string; readonly modelID: string }
   /**
    * How many times the turn is resumed on its own after the provider failed for a reason that passes (overload, rate limit,
-   * outage, a dropped provider connection). Each resume waits longer; `0` reports the first failure at once. Default 3.
+   * outage, a dropped provider connection). Each resume waits longer (nikcli's retry curve, capped); the count restarts whenever
+   * the turn made progress, so a long job outlasts any number of separate outages. `0` reports the first failure at once. Default 5.
    */
   readonly continues?: number
+  /**
+   * How many times the turn is continued on its own when the agent stopped with work left (see `continuationFor`). nikcli's host
+   * ends a turn as soon as the model answers without a tool call, so a plan announced in prose, a plan with items left or a
+   * failed call that was not retried would end the work there. Like nikcli's goal loop it runs up to 50 iterations, and it stops
+   * earlier whenever a nudge brings no tool call (see `MAX_STALLS`). `0` leaves the host's behaviour.
+   */
+  readonly autoContinues?: number
 }
+
+/** What the agent said it would do next, as the last sentence of its answer ("Let me build the wheels:", "Procedo con..."). */
+const ANNOUNCES = /^(?:ok(?:ay)?[,.:]?\s+)?(?:let me|let['’]s|i['’]ll|i will|i['’]m going to|i am going to|now i|next,? i|first,? i|then i|procedo|vado a|inizio(?: a| con)?|comincio|ora (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|adesso (?:creo|costruisco|procedo|inizio|passo|aggiungo|genero)|creo ora|costruisco ora|passo a)\b/i
+
+export const announcesWork = (text: string): boolean => {
+  const trimmed = text.trim()
+  if (trimmed === "") return false
+  if (/:\s*$/.test(trimmed)) return true
+  const sentences = trimmed.split(/(?<=[.!?\n])\s+/).map((s) => s.trim()).filter((s) => s !== "")
+  const last = sentences.at(-1) ?? ""
+  return !/\?$/.test(last) && ANNOUNCES.test(last)
+}
+
+/**
+ * Why the turn should go on after the agent stopped, or undefined when it is done: its own plan still has open items, its last
+ * tool call failed and it did not fix it, or it ended on an announcement of the next step without taking it. Each is a fact of
+ * the turn, not a guess about the request; the answer to a question or a finished job matches none of them.
+ */
+export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError">, text: string, finish?: string): string | undefined => {
+  // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
+  if (finish === "length") {
+    return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_add_elements call, one operation at a time, and keep going until the request is complete and checked."
+  }
+  const open = state.todos.filter((t) => t.status === "pending" || t.status === "in_progress")
+  if (open.length > 0) {
+    return `Your plan still has unfinished items:\n${open.map((t) => `- ${t.content}`).join("\n")}\nContinue with the next one now with the tools. Do not stop to report progress: finish every item, check the result, mark the items completed, and only then report.`
+  }
+  if (state.lastToolError !== undefined) {
+    return `Your last tool call failed: ${state.lastToolError.slice(0, 400)}\nRead the error, fix the cause and carry on until the request is done. If it truly cannot be done, say exactly what blocks it and what you tried.`
+  }
+  if (announcesWork(text)) return "You said what you would do next but did not do it. Do it now with the tools, and keep going until the request is complete and checked."
+  return undefined
+}
+
+const MAX_STALLS = 2
 
 /** What a failure message says about its cause: worth waiting out, or something only the user can fix. */
 export const isTransientFailure = (message: string): boolean => {
+  // A full context window is cured by a summary, never by waiting.
+  if (isContextOverflowError(message)) return false
   if (/auth|api key|unauthor|forbidden|credit|billing|quota|context.?(?:length|window)|too long|model not found|not found|invalid|bad request|content.?(?:filter|policy)/i.test(message)) return false
   return /overload|rate.?limit|too many|timed? ?out|timeout|temporar|unavailable|busy|\b5\d\d\b|network|fetch failed|econn|socket|terminated|connection|stream|decode|server error|try again/i.test(message)
 }
 
+/**
+ * The host rejects a prompt that waited on a session whose running turn then finished, or was torn down, with "Session interrupted".
+ * Nothing failed: the message was not answered, so it is sent again (or reported as an interruption, never as a provider error).
+ */
+export const isInterruption = (message: string): boolean => /session interrupted/i.test(message)
+const INTERRUPT_BACKOFF_MS = 1_000
+const INTERRUPTED_MESSAGE = "The assistant was interrupted before it could answer. Send the message again."
+
 const RESUME_PROMPT = "The connection to the model failed and has been restored. Continue from where you stopped: do not repeat steps that already completed (read the conversation and the tool results), and carry on until the request is done."
-const RESUME_BACKOFF_MS = 5_000
+/** nikcli's retry curve (`session/retry.ts`): 2 s, doubling, never longer than 30 s. */
+const RESUME_BACKOFF_MS = 2_000
+const RESUME_BACKOFF_MAX_MS = 30_000
+export const resumeDelay = (attempt: number): number => Math.min(RESUME_BACKOFF_MS * 2 ** (attempt - 1), RESUME_BACKOFF_MAX_MS)
+
+/** nikcli's `SessionGoal.MAX_ITERATIONS`: how many times one request is carried on after the agent stopped with work left. */
+export const DEFAULT_AUTO_CONTINUES = 50
+export const DEFAULT_RESUMES = 5
 
 const CONNECT_TIMEOUT_MS = 5_000
 const IDLE_GRACE_MS = 2_000
@@ -89,7 +150,38 @@ export interface HostSessionState {
   /** Text of the assistant's answer to the latest user message ("" while it has none). */
   readonly text: string
   readonly error?: string
+  /** The specialist tasks this conversation started (background ones keep running after the turn ended). */
+  readonly tasks?: ReadonlyArray<HostTaskInfo>
 }
+
+export interface HostTaskInfo {
+  readonly id: string
+  readonly agent: string
+  readonly description: string
+  readonly status: "queued" | "running" | "completed" | "error" | "cancelled"
+  /** The caller waited for it inside the turn (false: it reports back on its own). */
+  readonly background: boolean
+  /** The specialist's report, cut to a size a status poll can carry. */
+  readonly text?: string
+  readonly error?: string
+}
+
+const TASK_TEXT_LIMIT = 4_000
+
+/** The tasks of one conversation as plain data. */
+export const taskInfos = (
+  manager: { list(owner: { projectId: string; parentSessionId: string }): ReadonlyArray<{ id: string; agent?: string; description: string; status: HostTaskInfo["status"]; background?: boolean; text?: string; error?: string }> },
+  owner: { projectId: string; parentSessionId: string }
+): ReadonlyArray<HostTaskInfo> =>
+  manager.list(owner).map((task) => ({
+    id: task.id,
+    agent: task.agent ?? "researcher",
+    description: task.description,
+    status: task.status,
+    background: task.background !== false,
+    ...(task.text !== undefined ? { text: task.text.length > TASK_TEXT_LIMIT ? `${task.text.slice(0, TASK_TEXT_LIMIT)}…` : task.text } : {}),
+    ...(task.error !== undefined ? { error: task.error } : {})
+  }))
 
 /**
  * Where a conversation stands, from the host's own record: what a client that lost its connection needs to carry on. The turn
@@ -142,7 +234,7 @@ const failureOf = (result: HostPromptResult): { message: string; aborted: boolea
   if (error === undefined) return undefined
   return {
     message: error.data?.message ?? error.name ?? "The model request failed.",
-    aborted: error.name === "MessageAbortedError"
+    aborted: error.name === "MessageAbortedError" || isInterruption(error.data?.message ?? error.name ?? "")
   }
 }
 
@@ -165,6 +257,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       // explicit abort (`abortHostSession`) stops a turn; the client recovers the result with `readHostSessionState`.
 
       const state = newMapperState()
+      state.ownTexts.add(input.message.trim())
+      state.ownTexts.add(RESUME_PROMPT)
       let connected!: () => void
       const connectedPromise = new Promise<void>((resolve) => (connected = resolve))
       const offer = (event: AiEvent) => void Queue.offerUnsafe(queue, event)
@@ -192,11 +286,37 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         }
       })()
 
+      /**
+       * The host rejects the prompt that started a turn with "Session interrupted" when a message written meanwhile took the turn
+       * over (nikcli's clients read the session, not that promise). The work went on: wait for the session to go idle and hand
+       * over what it finished with.
+       */
+      const finishFromSession = async (answers: ReadonlyArray<string>): Promise<boolean> => {
+        const until = Date.now() + 15 * 60_000
+        while (!controller.signal.aborted && Date.now() < until) {
+          const current = await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined)
+          if (current !== undefined && !current.busy) {
+            finished = true
+            if (current.error !== undefined) offer({ type: "error", sessionId, code: "provider", message: current.error })
+            else offer({ type: "done", sessionId, text: [...answers, current.text].filter((t) => t.trim() !== "").join("\n\n") })
+            controller.abort()
+            return true
+          }
+          await new Promise((r) => setTimeout(r, 500))
+        }
+        return false
+      }
+
       const run = (async () => {
         await Promise.race([connectedPromise, new Promise((r) => setTimeout(r, CONNECT_TIMEOUT_MS))])
-        const resumes = input.continues ?? 3
+        const resumes = input.continues ?? DEFAULT_RESUMES
         let attempt = 0
-        let parts: Array<{ type: "text"; text: string } | { type: "file"; mime: string; filename: string; url: string }> = [
+        const maxContinues = input.autoContinues ?? DEFAULT_AUTO_CONTINUES
+        let continuations = 0
+        let callsAtNudge: number | undefined
+        let stalls = 0
+        const answers: string[] = []
+        let parts: Array<{ type: "text"; text: string; synthetic?: boolean } | { type: "file"; mime: string; filename: string; url: string }> = [
           { type: "text", text: input.message },
           ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url }))
         ]
@@ -209,11 +329,25 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             )
           } catch (cause) {
             const message = describeHostFailure(cause)
+            if (isInterruption(message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
+            if (isInterruption(message)) {
+              if (attempt < resumes && !controller.signal.aborted) {
+                // The turn that was running when this message arrived has just ended: ask again, same message.
+                attempt += 1
+                offer({ type: "retry", sessionId, attempt, message: `The previous answer was still finishing. Sending your message again (${attempt}/${resumes}).` })
+                await new Promise((r) => setTimeout(r, INTERRUPT_BACKOFF_MS * attempt))
+                continue
+              }
+              finished = true
+              controller.abort()
+              offer({ type: "error", sessionId, code: "aborted", message: INTERRUPTED_MESSAGE })
+              return
+            }
             if (attempt < resumes && !controller.signal.aborted && isTransientFailure(message)) {
               attempt += 1
               offer({ type: "retry", sessionId, attempt, message: `${message} Resuming automatically (${attempt}/${resumes}).` })
-              await new Promise((r) => setTimeout(r, RESUME_BACKOFF_MS * 2 ** (attempt - 1)))
-              parts = [{ type: "text", text: RESUME_PROMPT }]
+              await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
+              parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
               continue
             }
             finished = true
@@ -232,22 +366,41 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
             // The host gave up on this call; the conversation is intact, so ask it to carry on after a pause.
             attempt += 1
             offer({ type: "retry", sessionId, attempt, message: `${failure.message} Resuming automatically (${attempt}/${resumes}).` })
-            await new Promise((r) => setTimeout(r, RESUME_BACKOFF_MS * 2 ** (attempt - 1)))
+            await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
             giveUp = undefined
             state.retry = undefined
             state.sessionError = undefined
             state.idle = false
-            parts = [{ type: "text", text: RESUME_PROMPT }]
+            parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
             continue
+          }
+          // The call went through: the outage (if any) is over, so the next one gets its full set of resumes again.
+          if (!failure) attempt = 0
+          if (failure && isInterruption(failure.message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
+          const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
+          if (!failure && !controller.signal.aborted && continuations < maxContinues) {
+            const text = answerOf()
+            // A nudge that produced no tool call at all did not help: stop nudging rather than loop on words.
+            stalls = callsAtNudge !== undefined && state.toolCalls === callsAtNudge ? stalls + 1 : 0
+            const nudge = stalls < MAX_STALLS ? continuationFor(state, text, result.info?.finish) : undefined
+            if (nudge !== undefined) {
+              if (text.trim() !== "") answers.push(text)
+              continuations += 1
+              callsAtNudge = state.toolCalls
+              state.idle = false
+              state.retry = undefined
+              state.sessionError = undefined
+              parts = [{ type: "text", text: nudge, synthetic: true }]
+              continue
+            }
           }
           finished = true
           if (failure) {
-            offer({ type: "error", sessionId, code: failure.aborted ? "aborted" : "provider", message: failure.message })
+            // The host's "Session interrupted" (another message took over the session) is a cancellation, not a provider failure.
+            const interrupted = failure.aborted || isInterruption(failure.message)
+            offer({ type: "error", sessionId, code: interrupted ? "aborted" : "provider", message: isInterruption(failure.message) ? INTERRUPTED_MESSAGE : failure.message })
           } else {
-            const text = (result.parts ?? [])
-              .filter((p) => p.type === "text")
-              .map((p) => p.text ?? "")
-              .join("")
+            const text = [...answers, answerOf()].filter((t) => t.trim() !== "").join("\n\n")
             const tokens = result.info?.tokens
             offer({
               type: "done",
@@ -275,3 +428,18 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       )
     })
   )
+
+export type PendingDelivery = "queue" | "steer"
+
+/**
+ * A message the user writes while the agent works (nikcli's prompt box does the same): the host admits it to the session's own
+ * pending queue and takes it into the conversation at the next safe step (`queue`) or at once (`steer`). The running turn's
+ * stream carries on and reports it as a `user_message` when it is taken in.
+ */
+export const queueHostMessage = (host: ProjectHost, sessionId: string, message: string, delivery: PendingDelivery): Effect.Effect<void, AiProviderError> =>
+  Effect.tryPromise({
+    try: async () => {
+      await host.client["session-prompt"].promptAsync({ sessionID: sessionId, agent: CADCAM_AGENT, delivery, parts: [{ type: "text", text: message }] })
+    },
+    catch: (cause) => new AiProviderError({ message: describeHostFailure(cause) })
+  })

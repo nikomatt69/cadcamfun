@@ -5,13 +5,13 @@
  * Conventions mirrored from the scene (Z up): a cube is `width` (X) x `height` (Y) x `depth` (Z) centred on x,y,z; cylinder, cone,
  * prism, pyramid and hemisphere stand along Z (the cone and pyramid point to +Z, a hemisphere's dome to +Z, or -Z when `direction`
  * is "down"); a capsule lies along its `direction` (x|y|z, default y); a torus lies flat in XY; an extrusion grows from its z to
- * z + depth; a revolution turns its profile (x = radius, y = height) about Z (axis "y") or about Y (axis "x" or none), exactly as
+ * z + depth; a revolution turns its profile (x = radius, y = height) about Z (axis "y"), about X (axis "x") or about Y (none), exactly as
  * the scene's lathe is rotated. The gizmo transform (`translateX/Y/Z`, `rotation` in degrees, XYZ order, `scale`) acts about the
  * centre of the element's bounding box.
  *
  * Meshes are closed (a hemisphere gets its flat disc, an open lathe profile is closed against its axis) so a ray through
  * them enters and leaves in pairs, which is what the dexel model needs. Doubles throughout: float32 positions would lose
- * microns on a large part. Shapes that are not a plain solid (gear, spring, thread, text, sweep, loft, architecture) return
+ * microns on a large part. Shapes that are not a plain solid (spring, thread, text, sweep, loft, architecture) return
  * `undefined` and the caller reports them: a block of the bounding box would be a lie.
  *
  * Two kinds of element carry their own geometry instead of parameters: `mesh` (vertices and faces, what the editor's Boolean command
@@ -19,6 +19,7 @@
  * scene coordinates as every other element.
  */
 import { booleanAll } from "../../cad/csg.ts"
+import { gearOutline } from "../../cad/gear.ts"
 import { rebuild, type History } from "../../cad/history.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { segmentsFor } from "../../cad/tolerance.ts"
@@ -282,6 +283,23 @@ const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: read
       const R = positive(e["radius"], 1), r = positive(e["tubeRadius"], R / 4)
       return { mesh: torus(R, r, typeof e["tubularSegments"] === "number" ? e["tubularSegments"] : seg(R + r, 32), typeof e["radialSegments"] === "number" ? e["radialSegments"] : seg(r, 16)) }
     }
+    case "gear": {
+      // The involute spur gear the editor draws, centred on its thickness, with its bore cut through.
+      const moduleValue = positive(e["moduleValue"], 1), teeth = Math.floor(positive(e["teeth"], 20)), thickness = positive(e["thickness"], 5)
+      let ring: Vec2[]
+      try { ring = [...gearOutline({ moduleValue, teeth, pressureAngle: positive(e["pressureAngle"], 20) })] } catch { return undefined }
+      const body = prism(ring, -thickness / 2, thickness / 2)
+      const bore = num(e["holeDiameter"]) / 2
+      if (!(bore > 0)) return { mesh: body }
+      const root = (moduleValue * teeth) / 2 - 1.25 * moduleValue
+      if (bore >= root) return undefined
+      try {
+        // The CSG works in single precision (about 1e-5 mm on a gear this size), the same as a parametric part's.
+        const single = (m: Mesh64) => ({ positions: Float32Array.from(m.positions), indices: m.indices })
+        const cut = booleanAll([single(body), single(cone(bore, bore, thickness + 2, seg(bore)))], "subtract")
+        return { mesh: { positions: Float64Array.from(cut.positions), indices: Uint32Array.from(cut.indices) } }
+      } catch { return undefined }
+    }
     case "extrusion": {
       const depth = positive(e["depth"], 10)
       let ring: Vec2[] = []
@@ -298,14 +316,14 @@ const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: read
       const radius = Math.max(...pts.map((p) => p.x))
       const angle = positive(e["angle"], TAU)
       const m = turned(pts.map((p) => ({ r: p.x, z: p.y })), typeof e["segments"] === "number" ? e["segments"] : seg(radius), angle, num(e["phiStart"]))
-      // axis "y" stands the lathe on Z; "x" (and none) leaves its axis along Y: the scene's own rotations.
+      // axis "y" stands the lathe on Z, "x" lays it along X, none leaves its axis along Y: the scene's own rotations.
       if (e["axis"] === "y") return { mesh: m }
       const out = Float64Array.from(m.positions)
       for (let k = 0; k < out.length; k += 3) {
         const x = out[k]!, y = out[k + 1]!, z = out[k + 2]!
-        // From Z-up lathe coordinates (x, y, h) back to the scene's Y-up lathe (x, h, -y); axis "x" then turns it by 90 degrees about Y.
+        // From Z-up lathe coordinates (x, y, h) back to the scene's Y-up lathe (x, h, -y); axis "x" then lays it along X (a turn of -90 degrees about Z).
         const sx = x, sy = z, sz = -y
-        if (e["axis"] === "x") { out[k] = sz; out[k + 1] = sy; out[k + 2] = -sx } else { out[k] = sx; out[k + 1] = sy; out[k + 2] = sz }
+        if (e["axis"] === "x") { out[k] = sy; out[k + 1] = -sx; out[k + 2] = sz } else { out[k] = sx; out[k + 1] = sy; out[k + 2] = sz }
       }
       return { mesh: { positions: out, indices: m.indices } }
     }

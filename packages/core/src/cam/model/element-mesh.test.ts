@@ -49,7 +49,8 @@ describe("element meshes are closed, outward and the right size", () => {
     const stood = meshBounds(elementMesh(lathe)!)
     expect(stood.min[2]).toBeCloseTo(0, 9); expect(stood.max[2]).toBeCloseTo(20, 9)
     const lying = meshBounds(elementMesh({ ...lathe, axis: "x" })!)
-    expect(lying.min[1]).toBeCloseTo(0, 9); expect(lying.max[1]).toBeCloseTo(20, 9)
+    expect(lying.min[0]).toBeCloseTo(0, 9); expect(lying.max[0]).toBeCloseTo(20, 9)
+    expect(lying.max[1]).toBeCloseTo(10, 2); expect(lying.max[2]).toBeCloseTo(10, 2)
   })
 
   test("the gizmo transform turns about the bounding-box centre; scale and translate act too", () => {
@@ -66,7 +67,31 @@ describe("element meshes are closed, outward and the right size", () => {
     const coarse = vol({ type: "cylinder", radius: 50, height: 1 }, 0.5)
     const fine = vol({ type: "cylinder", radius: 50, height: 1 }, 0.001)
     expect(Math.abs(fine - Math.PI * 2500)).toBeLessThan(Math.abs(coarse - Math.PI * 2500))
-    for (const type of ["gear", "spring", "bolt", "text3d", "sweep", "loft", "wall"]) expect(elementMesh({ type })).toBeUndefined()
+    for (const type of ["spring", "bolt", "text3d", "sweep", "loft", "wall"]) expect(elementMesh({ type })).toBeUndefined()
     expect(elementMesh({ type: "revolution", profile: [{ x: -3, y: 0 }, { x: 3, y: 4 }] })).toBeUndefined()
+  })
+})
+
+describe("a spur gear is a real solid", () => {
+  test("it is meshed from its involute outline with its bore cut through, standing on Z and centred on its thickness", () => {
+    const gear = { type: "gear", moduleValue: 2, teeth: 20, thickness: 10, pressureAngle: 20, holeDiameter: 10 }
+    const mesh = elementMesh(gear)!
+    expect(mesh).toBeDefined()
+    const b = meshBounds(mesh)
+    expect(b.min[2]).toBeCloseTo(-5, 9); expect(b.max[2]).toBeCloseTo(5, 9)
+    expect(b.max[0]).toBeCloseTo(22, 1); expect(b.min[0]).toBeCloseTo(-22, 1)
+    const solid = elementMesh({ ...gear, holeDiameter: 0 })!
+    // The bore removes about pi r^2 t of material (the cylinder is a polygon, so a little less).
+    const removed = volumeOf(solid) - volumeOf(mesh)
+    expect(removed).toBeGreaterThan(Math.PI * 25 * 10 * 0.97)
+    expect(removed).toBeLessThan(Math.PI * 25 * 10 * 1.01)
+    // Between the root and the tip disc.
+    expect(volumeOf(solid)).toBeGreaterThan(Math.PI * 17.5 * 17.5 * 10)
+    expect(volumeOf(solid)).toBeLessThan(Math.PI * 22 * 22 * 10)
+  })
+
+  test("a bore wider than the root circle, or too few teeth, is no gear", () => {
+    expect(elementMesh({ type: "gear", moduleValue: 2, teeth: 20, holeDiameter: 40 })).toBeUndefined()
+    expect(elementMesh({ type: "gear", moduleValue: 2, teeth: 3 })).toBeUndefined()
   })
 })

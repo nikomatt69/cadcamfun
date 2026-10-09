@@ -1,4 +1,5 @@
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
+import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
 
 /**
  * Builds the host's global `nikcli.json`. It contains no secrets: keys are
@@ -13,16 +14,13 @@ import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type Builtin
  * below only override base URL / protocol for the ones we care about.
  */
 export const CADCAM_AGENT = "cadcam"
-export const CADCAM_WORKER = "cadcam-worker"
+export const CADCAM_WORKER = SUBAGENTS.researcher.host
 export const BACKGROUND_TOOL_IDS = ["agent_task", "agent_tasks", "agent_task_read", "agent_task_cancel"] as const
 
-// Verification currently persists operation metadata, so it is not a worker tool.
-export const WORKER_TOOL_IDS = [
-  "cad_describe_drawing", "cad_check_design", "cam_list_operations", "cam_suggest_parameters",
-  "cam_describe_machine", "cam_analyze_gcode", "lib_lookup_material", "lib_lookup_tool", "memory_recall"
-] as const
+/** What the read-only researcher may call (verification persists operation metadata, so it is not a worker tool). */
+export const WORKER_TOOL_IDS = SUBAGENTS.researcher.tools
 
-export const workerToolAllowed = (id: string): boolean => (WORKER_TOOL_IDS as ReadonlyArray<string>).includes(id)
+export const workerToolAllowed = (id: string): boolean => WORKER_TOOL_IDS.includes(id)
 
 export type HostProtocol = "openai-compatible" | "openai-responses" | "anthropic"
 
@@ -50,7 +48,8 @@ export const defaultProviderSpecs = (baseUrls: Partial<Record<BuiltinProviderId,
       name: p.name,
       protocol: p.protocol,
       baseURL: baseUrls[id] ?? p.baseURL,
-      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, context: m.contextWindow, output: 16_000 }))
+      // nikcli asks a model for min(its output limit, 32 000) tokens: a long cad_add_elements call needs room to be written.
+      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, context: m.contextWindow, output: 32_000 }))
     }
   })
 
@@ -94,9 +93,17 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   permission["get_goal"] = "allow"
   permission["update_goal"] = "allow"
   permission["task"] = "deny"
-  const workerPermission: Record<string, "allow" | "deny"> = { "*": "deny" }
-  for (const id of input.toolIds) if (workerToolAllowed(id)) workerPermission[id] = "allow"
-  workerPermission["skill"] = "allow"
+  // nikcli's confined program runner: a restricted JavaScript subset (no import, fetch, process, files or timers) whose only
+  // tools are the ones this agent may call, so a loop of `cad_add_elements` or `cam_create_operation` is one call and only the
+  // final value comes back.
+  permission["code_mode"] = "allow"
+  // One agent per specialist of the roster (`agents.ts`), each with only its own tools.
+  const specialists = Object.fromEntries(
+    SUBAGENT_IDS.map((id) => {
+      const spec = SUBAGENTS[id]
+      return [spec.host, { mode: "subagent", description: spec.description, steps: spec.steps, prompt: spec.prompt, permission: subagentPermission(spec, input.toolIds) }]
+    })
+  )
 
   const provider: Record<string, unknown> = {}
   for (const p of input.providers) {
@@ -125,18 +132,12 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
       [CADCAM_AGENT]: {
         mode: "primary",
         description: "CAD/CAM assistant",
-        // Many steps, so one request can run from the model through the machining to the check; the host stops a doom loop itself.
-        steps: 200,
+        // No step cap, as in nikcli (`agent.steps ?? Infinity`): one request runs from the model through the machining to the
+        // check for as long as it takes. What ends it is the host's doom-loop guard, the goal budget, or the user's abort.
         prompt: input.systemPrompt,
         permission
       },
-      [CADCAM_WORKER]: {
-        mode: "subagent",
-        description: "Read-only CAD/CAM background researcher",
-        steps: 40,
-        prompt: "Research the assigned CAD/CAM question using read-only tools. Return concise findings, evidence, warnings and recommended next steps to the parent. Never modify a document, delegate work, create or update goals, or claim a change was applied. Verification that stores results must be performed by the parent.",
-        permission: workerPermission
-      },
+      ...specialists,
       // Background helpers would spend extra model calls on titles and summaries.
       title: { disable: true },
       summary: { disable: true }

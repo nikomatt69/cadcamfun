@@ -17,7 +17,7 @@ import {
 } from "./models.ts"
 import { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 import { prepareAttachments, type Attachment } from "./attachments.ts"
-import { abortHostSession, createHostSession, hostChatStream, readHostSessionState, sessionExists, type HostSessionState } from "./nikcli/chat.ts"
+import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
 import { systemPrompt } from "./prompts/system.ts"
@@ -103,6 +103,8 @@ export class AiService extends Context.Service<AiService, {
   readonly abort: (sessionId: string) => Effect.Effect<void>
   /** Where a conversation stands, for a client that lost its connection mid-turn (`busy: false` when there is no host session). */
   readonly sessionState: (sessionId: string, projectId?: string) => Effect.Effect<HostSessionState, AiError>
+  /** A message written while the agent works: admitted to the host's pending queue (or steered in) and answered by the running turn. */
+  readonly queue: (input: { sessionId: string; message: string; delivery?: PendingDelivery }) => Effect.Effect<void, AiError>
 }>()("cadcamfun/AiService") {
   static readonly layer: Layer.Layer<AiService, never, AiCredentials | AiConfig | DirectModel> = Layer.effect(
     AiService,
@@ -254,7 +256,7 @@ export class AiService extends Context.Service<AiService, {
             const ok = yield* configured
             const resolved = resolveModel(input.model, { configured: ok, forceGateway: config.forceGateway })
             if (resolved instanceof AiConfigError) return yield* resolved
-            const system = systemPrompt(input.context)
+            const system = systemPrompt(input.context, undefined, resolved.modelId)
             const attached = prepareAttachments(input.projectId ?? "default", input.attachments)
             const message = input.message + attached.note
 
@@ -339,11 +341,23 @@ export class AiService extends Context.Service<AiService, {
         sessionState: (sessionId, projectId) =>
           Effect.gen(function* () {
             if (Option.isNone(host)) return { busy: false, text: "" } satisfies HostSessionState
+            const withTasks = (state: HostSessionState, owner: { projectId: string; parentSessionId: string }): HostSessionState => {
+              const tasks = taskInfos(host.value.scheduler, owner)
+              return tasks.length > 0 ? { ...state, tasks } : state
+            }
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
-            if (mapped !== undefined) return yield* readHostSessionState(mapped.host, mapped.sessionId)
+            if (mapped !== undefined) {
+              return withTasks(yield* readHostSessionState(mapped.host, mapped.sessionId), { projectId: mapped.host.projectId, parentSessionId: mapped.sessionId })
+            }
             const projectHost = yield* host.value.runtime.host(projectId ?? "default")
             if (!(yield* sessionExists(projectHost, sessionId))) return { busy: false, text: "" } satisfies HostSessionState
-            return yield* readHostSessionState(projectHost, sessionId)
+            return withTasks(yield* readHostSessionState(projectHost, sessionId), { projectId: projectHost.projectId, parentSessionId: sessionId })
+          }),
+        queue: ({ sessionId, message, delivery }) =>
+          Effect.gen(function* () {
+            const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+            if (mapped === undefined) return yield* new AiConfigError({ message: "There is no running conversation to add this message to." })
+            yield* queueHostMessage(mapped.host, mapped.sessionId, message, delivery ?? "queue")
           }),
         abort: (sessionId) =>
           Effect.gen(function* () {

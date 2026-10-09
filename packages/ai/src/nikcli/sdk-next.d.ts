@@ -63,6 +63,8 @@ declare module "@nikcli-ai/sdk-next" {
     readonly finish?: string
     readonly summary?: boolean
     readonly agent?: string
+    /** On a user message: the model the turn was sent with. */
+    readonly model?: { readonly providerID?: string; readonly modelID?: string }
   }
 
   export interface HostPart {

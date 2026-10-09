@@ -78,17 +78,23 @@ export interface AiMessage {
   readonly attachments?: ReadonlyArray<string>
   /** The model's reasoning for this answer, as it was written. */
   readonly thinking?: string
+  /** The model that answered (provider/model), for the turn footer. */
+  readonly model?: string
+  readonly finishedAt?: string
+  /** The user stopped the turn. */
+  readonly interrupted?: boolean
 }
 
 export type AiEvent =
+  | { readonly type: "user_message"; readonly sessionId: string; readonly text: string }
   | { readonly type: "delta"; readonly sessionId: string; readonly text: string }
-  | { readonly type: "tool_call"; readonly sessionId: string; readonly callId: string; readonly tool: string; readonly input: unknown }
-  | { readonly type: "tool_result"; readonly sessionId: string; readonly callId: string; readonly tool: string; readonly ok: boolean; readonly output: string }
+  | { readonly type: "tool_call"; readonly sessionId: string; /** The specialist running the tool; absent for the main agent. */ readonly agent?: string; readonly callId: string; readonly tool: string; readonly input: unknown }
+  | { readonly type: "tool_result"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly ok: boolean; readonly output: string }
   | { readonly type: "permission_request"; readonly sessionId: string; readonly requestId: string; readonly permission: string; readonly patterns: ReadonlyArray<string> }
   | { readonly type: "done"; readonly sessionId: string; readonly text: string; readonly usage?: AiUsage; /** The connection dropped and the finished answer was read back from the host. */ readonly recovered?: boolean }
   | { readonly type: "error"; readonly sessionId: string; readonly code: "provider" | "config" | "aborted" | "internal"; readonly message: string }
   | { readonly type: "reasoning"; readonly sessionId: string; readonly text: string }
-  | { readonly type: "tool_progress"; readonly sessionId: string; readonly callId: string; readonly tool: string; readonly chars: number }
+  | { readonly type: "tool_progress"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly chars: number }
   | { readonly type: "step"; readonly sessionId: string; readonly phase: "start" | "finish"; readonly index: number; readonly reason?: string; readonly usage?: AiUsage }
   | { readonly type: "todo"; readonly sessionId: string; readonly todos: ReadonlyArray<AiTodo> }
   | { readonly type: "retry"; readonly sessionId: string; readonly attempt: number; readonly message: string }
@@ -112,7 +118,21 @@ export interface AiActivity {
   readonly compacted: boolean
 }
 
+/** A job handed to a specialist agent (`agent_task`), as the host reports it. */
+export interface AiTask {
+  readonly id: string
+  readonly agent: string
+  readonly description: string
+  readonly status: "queued" | "running" | "completed" | "error" | "cancelled"
+  /** false: the main agent waited for it inside the turn. */
+  readonly background: boolean
+  readonly text?: string
+  readonly error?: string
+}
+
 export interface AiToolCall {
+  /** The specialist running it; absent when the main agent does. */
+  readonly agent?: string
   readonly tool: string
   readonly input: unknown
   readonly status: "preparing" | "running" | "ok" | "error"

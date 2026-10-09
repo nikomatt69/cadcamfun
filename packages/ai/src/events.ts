@@ -14,6 +14,8 @@ export const DeltaEvent = Schema.Struct({
 export const ToolCallEvent = Schema.Struct({
   type: Schema.Literal("tool_call"),
   sessionId: Schema.String,
+  /** The specialist running the tool (`agents.ts`); absent when the main agent does. */
+  agent: Schema.optionalKey(Schema.String),
   callId: Schema.String,
   tool: Schema.String,
   input: Schema.Unknown
@@ -22,6 +24,8 @@ export const ToolCallEvent = Schema.Struct({
 export const ToolResultEvent = Schema.Struct({
   type: Schema.Literal("tool_result"),
   sessionId: Schema.String,
+  /** The specialist running the tool (`agents.ts`); absent when the main agent does. */
+  agent: Schema.optionalKey(Schema.String),
   callId: Schema.String,
   tool: Schema.String,
   ok: Schema.Boolean,
@@ -66,6 +70,8 @@ export const ReasoningEvent = Schema.Struct({
 export const ToolProgressEvent = Schema.Struct({
   type: Schema.Literal("tool_progress"),
   sessionId: Schema.String,
+  /** The specialist running the tool (`agents.ts`); absent when the main agent does. */
+  agent: Schema.optionalKey(Schema.String),
   callId: Schema.String,
   tool: Schema.String,
   /** Characters of arguments written so far. */
@@ -127,7 +133,18 @@ export const GoalEvent = Schema.Struct({
   }))
 })
 
+/**
+ * A message the user sent while the agent was working has been taken into the conversation (nikcli promotes a queued message at
+ * the next safe step, a steered one at once). What the agent writes from here on answers it.
+ */
+export const UserMessageEvent = Schema.Struct({
+  type: Schema.Literal("user_message"),
+  sessionId: Schema.String,
+  text: Schema.String
+})
+
 export const AiEventSchema = Schema.Union([
+  UserMessageEvent,
   GoalEvent,
   DeltaEvent,
   ReasoningEvent,

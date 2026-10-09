@@ -18,9 +18,12 @@ import { createComponentPreview, transformLibraryItemToCADElement } from "../lib
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
 import { ALL_SHORTCUTS } from "../lib/shortcutsData.ts"
 import {
-  applyDragDelta, applyHighlight, booleanElement, buildElementObject, commitDrag, createCustomAxes, createOriginIndicator, deltaFrom,
+  applyDragDelta, applyHighlight, booleanElement, buildElementObject, isDrawn, commitDrag, createCustomAxes, createOriginIndicator, deltaFrom,
   exportGLTF, exportOBJ, exportSTL, fitCameraToObjects, type BooleanOperation, type DragStart
 } from "../lib/sceneHelpers.ts"
+import { booleanFormed } from "../lib/createThreeObject.ts"
+import { SECTION_AXES, clipPlaneFor } from "../lib/section.ts"
+import { createSectionHelper } from "../lib/sectionHelper.ts"
 import SnapIndicator from "./SnapIndicator.tsx"
 import DragDropIndicator from "./DragDropIndicator.tsx"
 import SelectionControls from "./SelectionControls.tsx"
@@ -65,6 +68,8 @@ export interface CADCanvasProps {
 const size = (value: string | number) => (typeof value === "number" ? `${value}px` : value)
 const round2 = (value: number) => Math.round(value * 100) / 100
 const BG = "#2A2A2A"
+/** Front-right-above, in millimetres: the default 3D view of a Z-up scene (fit-to-view keeps this direction). */
+const ISO_VIEW = new THREE.Vector3(300, -300, 240)
 const QUICK_BUTTON = "padding:6px 8px;background-color:#374151;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px"
 const modeButton = (active: boolean) =>
   `padding:6px 12px;background-color:${active ? "#3b82f6" : "#374151"};color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:4px`
@@ -185,7 +190,10 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const nextScene = new THREE.Scene()
     nextScene.background = new THREE.Color(BG)
     const nextCamera = new THREE.PerspectiveCamera(75, (container.clientWidth || 1) / (container.clientHeight || 1), 0.01, 5000)
-    nextCamera.position.set(5, 5, 5)
+    // The scene is Z-up (the grid lies on XY, cylinders stand along Z, the assistant and the toolpath work that way), and
+    // OrbitControls reads `up` once at construction: set it first or the solids lie on their side and orbit turns about Y.
+    nextCamera.up.set(0, 0, 1)
+    nextCamera.position.copy(ISO_VIEW)
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true })
     } catch {
@@ -207,7 +215,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.5))
     const sun = new THREE.DirectionalLight(0xffffff, 0.8)
-    sun.position.set(5, 10, 7.5)
+    sun.position.set(-5, -7.5, 10)
     scene.add(sun)
     const grid = new THREE.GridHelper(500, 500)
     grid.rotation.x = Math.PI / 2
@@ -320,6 +328,39 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     }
   })
 
+  // Section view: the renderer clips everything past the plane; a sheet shows where the cut is.
+  const modelBox = (): THREE.Box3 => {
+    const box = new THREE.Box3()
+    for (const object of cadObjects()) box.expandByObject(object)
+    return box
+  }
+  createEffect(() => {
+    const section = cad.section
+    rebuilds()
+    if (!ready() || !scene || !renderer) return
+    for (const old of scene.children.filter((child) => child.userData.isSectionHelper)) {
+      scene.remove(old)
+      old.traverse((object) => {
+        const part = object as THREE.Mesh
+        part.geometry?.dispose?.()
+        const material = part.material as THREE.Material | undefined
+        material?.dispose?.()
+      })
+    }
+    if (!section.enabled) { renderer.clippingPlanes = []; return }
+    const { normal, constant } = clipPlaneFor(section)
+    renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(...normal), constant)]
+    scene.add(createSectionHelper(section.axis, section.position, section.inverted, modelBox()))
+  })
+  /** The extent of the model along the section axis: the slider's range. */
+  const sectionRange = createMemo((): { min: number; max: number } => {
+    rebuilds(); elements.elements
+    const box = scene ? modelBox() : new THREE.Box3()
+    const axis = cad.section.axis
+    if (box.isEmpty()) return { min: -500, max: 500 }
+    return { min: Math.floor(box.min[axis]) - 1, max: Math.ceil(box.max[axis]) + 1 }
+  })
+
   // 2D / 3D view mode.
   createEffect(on([ready, () => cad.viewMode], ([isReady, mode]) => {
     if (!isReady || !camera || !orbit || !scene) return
@@ -336,8 +377,8 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
       if (grid) { (grid.material as THREE.Material).opacity = 0.2; (grid.material as THREE.Material).transparent = true }
       axes?.children.forEach((child, index) => { child.visible = index !== 2 })
     } else {
-      camera.position.set(5, 5, 5)
-      camera.up.set(0, 1, 0)
+      camera.up.set(0, 0, 1)
+      camera.position.copy(ISO_VIEW)
       camera.lookAt(0, 0, 0)
       orbit.target.set(0, 0, 0)
       orbit.enableRotate = true
@@ -361,12 +402,13 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
         mesh.geometry?.dispose?.()
       })
     }
-    // A Boolean draws its result; the operands it consumes are not drawn on their own.
-    const consumed = cam.model.consumedOperands(all as never)
+    // A Boolean draws its result; the operands it consumes are not drawn on their own. One that cannot be formed (an operand
+    // that is not a solid, a missing one) consumes nothing, so the assistant's parts never vanish behind a wireframe marker.
+    const isBoolean = (element: { type: string }) => element.type.startsWith("boolean-")
+    const consumed = cam.model.consumedOperands(all.filter((element) => !isBoolean(element) || booleanFormed(element)) as never)
     for (const element of all) {
       if (consumed.has(element.id)) continue
-      const layer = known.find((candidate) => candidate.id === element.layerId)
-      if (!layer || !layer.visible || element.visible === false) continue
+      if (!isDrawn(element, known)) continue
       const object = buildElementObject(element)
       if (object) scene.add(object)
     }
@@ -774,6 +816,35 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
           <div style="font-size:10px;margin-top:4px;color:#9ca3af">Press ENTER to confirm, ESC to cancel</div>
         </div>
       </Show>
+
+      <div class="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-1" data-testid="section-control">
+        <button
+          type="button"
+          class="rounded-md px-2 py-1 text-[11px] text-white"
+          style={{ "background-color": cad.section.enabled ? "#f57c00" : "rgba(0,0,0,0.7)" }}
+          aria-pressed={cad.section.enabled}
+          title={t("cad.section")}
+          onClick={() => {
+            const range = sectionRange()
+            const inside = cad.section.position >= range.min && cad.section.position <= range.max
+            cad.setSection({ enabled: !cad.section.enabled, ...(inside ? {} : { position: Math.round((range.min + range.max) / 2) }) })
+          }}
+        >{t("cad.section")}</button>
+        <Show when={cad.section.enabled}>
+          <div class="flex items-center gap-2 rounded-md bg-black/80 px-2 py-1.5 text-[11px] text-white">
+            <For each={SECTION_AXES}>{(axis) => (
+              <button type="button" aria-pressed={cad.section.axis === axis} aria-label={`${t("cad.section.axis")} ${axis.toUpperCase()}`}
+                class="rounded px-1.5 py-0.5 uppercase" style={{ "background-color": cad.section.axis === axis ? "#f57c00" : "#374151" }}
+                onClick={() => cad.setSection({ axis })}>{axis}</button>
+            )}</For>
+            <input type="range" aria-label={t("cad.section.constant")} min={sectionRange().min} max={sectionRange().max} step="0.5" value={cad.section.position}
+              onInput={(event) => cad.setSection({ position: Number(event.currentTarget.value) })} />
+            <input type="number" aria-label={t("cad.section.constant")} class="w-16 rounded bg-gray-700 px-1 text-right" step="0.5" value={cad.section.position}
+              onInput={(event) => { const next = Number(event.currentTarget.value); if (Number.isFinite(next)) cad.setSection({ position: next }) }} />
+            <label class="flex items-center gap-1"><input type="checkbox" checked={cad.section.inverted} onChange={(event) => cad.setSection({ inverted: event.currentTarget.checked })} />{t("cad.section.invert")}</label>
+          </div>
+        </Show>
+      </div>
 
       <SnapIndicator x={snapScreen().x} y={snapScreen().y} type={snapScreen().type} visible={snapScreen().visible} />
 

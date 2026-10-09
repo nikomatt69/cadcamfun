@@ -13,8 +13,11 @@ import cad_add_entities from "./cad_add_entities.txt" with { type: "text" }
 import cad_check_design from "./cad_check_design.txt" with { type: "text" }
 import cad_delete_entities from "./cad_delete_entities.txt" with { type: "text" }
 import cad_describe_drawing from "./cad_describe_drawing.txt" with { type: "text" }
+import cad_editor from "./cad_editor.txt" with { type: "text" }
+import cad_group_entities from "./cad_group_entities.txt" with { type: "text" }
 import cad_import_drawing from "./cad_import_drawing.txt" with { type: "text" }
 import cad_modify_entities from "./cad_modify_entities.txt" with { type: "text" }
+import cad_transform_entities from "./cad_transform_entities.txt" with { type: "text" }
 import cam_analyze_gcode from "./cam_analyze_gcode.txt" with { type: "text" }
 import cam_create_operation from "./cam_create_operation.txt" with { type: "text" }
 import cam_describe_machine from "./cam_describe_machine.txt" with { type: "text" }
@@ -34,8 +37,11 @@ const PROMPTS = {
   cad_check_design,
   cad_delete_entities,
   cad_describe_drawing,
+  cad_editor,
+  cad_group_entities,
   cad_import_drawing,
   cad_modify_entities,
+  cad_transform_entities,
   cam_analyze_gcode,
   cam_create_operation,
   cam_describe_machine,

@@ -121,13 +121,9 @@ export const premultiplyObject = (object: THREE.Object3D, matrix: THREE.Matrix4)
   object.updateMatrixWorld(true)
 }
 
-/** These factories already apply `element.rotation` themselves. */
-const ROTATES_ITSELF = new Set(["screw", "bolt", "nut"])
-
-const rotationOf = (element: ElementTransformFields, type?: string) =>
-  ROTATES_ITSELF.has(type ?? "") ? new THREE.Quaternion() : new THREE.Quaternion().setFromEuler(new THREE.Euler(
-    THREE.MathUtils.degToRad(element.rotation?.x ?? 0), THREE.MathUtils.degToRad(element.rotation?.y ?? 0), THREE.MathUtils.degToRad(element.rotation?.z ?? 0)
-  ))
+const rotationOf = (element: ElementTransformFields) => new THREE.Quaternion().setFromEuler(new THREE.Euler(
+  THREE.MathUtils.degToRad(element.rotation?.x ?? 0), THREE.MathUtils.degToRad(element.rotation?.y ?? 0), THREE.MathUtils.degToRad(element.rotation?.z ?? 0)
+))
 
 /** Builds the Three object of an element, with the gizmo transform applied; `userData.pivot` is its centre in world space. */
 export function buildElementObject(element: Element): THREE.Object3D | null {
@@ -139,7 +135,7 @@ export function buildElementObject(element: Element): THREE.Object3D | null {
   const fields = element as ElementTransformFields
   const translate = new THREE.Vector3(fields.translateX ?? 0, fields.translateY ?? 0, fields.translateZ ?? 0)
   const scale = new THREE.Vector3(fields.scale?.x ?? 1, fields.scale?.y ?? 1, fields.scale?.z ?? 1)
-  const rotation = rotationOf(fields, element.type)
+  const rotation = rotationOf(fields)
   if (translate.lengthSq() || scale.x !== 1 || scale.y !== 1 || scale.z !== 1 || !rotation.equals(new THREE.Quaternion())) {
     const matrix = new THREE.Matrix4()
       .makeTranslation(pivot.x + translate.x, pivot.y + translate.y, pivot.z + translate.z)
@@ -212,7 +208,7 @@ export function commitDrag(start: DragStart, delta: THREE.Matrix4): void {
       update.translateZ = (fields.translateZ ?? 0) + move.z
     }
     if (Math.abs(deltaQuaternion.w) < 0.999999) {
-      const accumulated = deltaQuaternion.clone().multiply(rotationOf(fields, element.type))
+      const accumulated = deltaQuaternion.clone().multiply(rotationOf(fields))
       const euler = new THREE.Euler().setFromQuaternion(accumulated, "XYZ")
       rotation = { x: THREE.MathUtils.radToDeg(euler.x), y: THREE.MathUtils.radToDeg(euler.y), z: THREE.MathUtils.radToDeg(euler.z) }
     }
@@ -305,3 +301,13 @@ export const exportGLTF = (scene: THREE.Scene): Promise<void> =>
       { binary: true }
     )
   })
+
+/**
+ * Whether the canvas draws an element: it is hidden by its own `visible: false`, or by a layer that exists and is hidden. An
+ * element whose layer is not in the list (a drawing saved elsewhere, a layer name the assistant gave) is drawn, never lost.
+ */
+export const isDrawn = (element: { readonly layerId: string; readonly visible?: boolean | undefined }, layers: ReadonlyArray<{ readonly id: string; readonly visible: boolean }>): boolean => {
+  if (element.visible === false) return false
+  const layer = layers.find((candidate) => candidate.id === element.layerId)
+  return layer === undefined || layer.visible
+}

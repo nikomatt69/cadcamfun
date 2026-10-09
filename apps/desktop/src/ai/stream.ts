@@ -14,7 +14,7 @@ import { Effect, Queue, Schema, Stream } from "effect"
 import type { Client, AppRuntime } from "../state/client.ts"
 import type { AiEvent, AiTodo, ProviderId, Tier } from "./types.ts"
 import type { ChatAttachment } from "./attachments.ts"
-import { TOOL_IDS, type ToolId } from "./tools.ts"
+import { AGENT_TOOL_IDS, TOOL_IDS, VCS_TOOL_IDS, type ToolId } from "./tools.ts"
 import { ToolInputSchemas } from "./tool-schemas.ts"
 import { sanitizeError } from "./errors.ts"
 
@@ -34,6 +34,7 @@ const AiEventSchema = Schema.fromJsonString(
     type: Schema.String,
     sessionId: Schema.String,
     text: Schema.optional(Schema.String),
+    agent: Schema.optional(Schema.String),
     callId: Schema.optional(Schema.String),
     tool: Schema.optional(Schema.String),
     input: Schema.optional(Schema.Unknown),
@@ -56,14 +57,16 @@ const decodeEvent = (json: string): AiEvent => {
   const type = raw["type"]
   const sessionId = typeof raw["sessionId"] === "string" ? (raw["sessionId"] as string) : ""
   if (type === "delta") return { type: "delta", sessionId, text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "" }
+  if (type === "user_message") return { type: "user_message", sessionId, text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "" }
+  const agent = typeof raw["agent"] === "string" && raw["agent"] !== "" ? { agent: raw["agent"] as string } : {}
   if (type === "tool_call") return {
-    type: "tool_call", sessionId,
+    type: "tool_call", sessionId, ...agent,
     callId: typeof raw["callId"] === "string" ? (raw["callId"] as string) : "",
     tool: typeof raw["tool"] === "string" ? (raw["tool"] as string) : "",
     input: raw["input"]
   }
   if (type === "tool_result") return {
-    type: "tool_result", sessionId,
+    type: "tool_result", sessionId, ...agent,
     callId: typeof raw["callId"] === "string" ? (raw["callId"] as string) : "",
     tool: typeof raw["tool"] === "string" ? (raw["tool"] as string) : "",
     ok: raw["ok"] === true,
@@ -225,7 +228,7 @@ const decodeAgentEvent = (raw: unknown): AiEvent | undefined => {
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0)
   switch (r["type"]) {
     case "reasoning": return typeof r["text"] === "string" && r["text"] !== "" ? { type: "reasoning", sessionId, text: cap(r["text"], MAX_TEXT_BYTES, "<truncated>") } : undefined
-    case "tool_progress": return { type: "tool_progress", sessionId, callId: String(r["callId"] ?? ""), tool: String(r["tool"] ?? ""), chars: num(r["chars"]) }
+    case "tool_progress": return { type: "tool_progress", sessionId, ...(typeof r["agent"] === "string" && r["agent"] !== "" ? { agent: r["agent"] } : {}), callId: String(r["callId"] ?? ""), tool: String(r["tool"] ?? ""), chars: num(r["chars"]) }
     case "step": {
       const u = r["usage"] as { inputTokens?: unknown; outputTokens?: unknown } | undefined
       return {
@@ -285,10 +288,12 @@ const decodeEventSafely = (raw: unknown): Effect.Effect<AiEvent, AiStreamError> 
     catch: (e) => new AiStreamError({ message: e instanceof Error ? e.message : "Failed to parse AI event." })
   })
 
-const decodeEventFromUnknown = (raw: { type: string; sessionId: string; text?: string; callId?: string; tool?: string; input?: unknown; ok?: boolean; output?: string; requestId?: string; permission?: string; patterns?: ReadonlyArray<string>; code?: string; message?: string; usage?: { inputTokens: number; outputTokens: number } }): AiEvent => {
+const decodeEventFromUnknown = (raw: { type: string; sessionId: string; agent?: string; text?: string; callId?: string; tool?: string; input?: unknown; ok?: boolean; output?: string; requestId?: string; permission?: string; patterns?: ReadonlyArray<string>; code?: string; message?: string; usage?: { inputTokens: number; outputTokens: number } }): AiEvent => {
   if (raw.type === "delta") return { type: "delta", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
-  if (raw.type === "tool_call") return { type: "tool_call", sessionId: raw.sessionId, callId: raw.callId ?? "", tool: raw.tool ?? "", input: raw.input }
-  if (raw.type === "tool_result") return { type: "tool_result", sessionId: raw.sessionId, callId: raw.callId ?? "", tool: raw.tool ?? "", ok: raw.ok === true, output: cap(raw.output ?? "", MAX_OUTPUT_BYTES, "<truncated>") }
+  if (raw.type === "user_message") return { type: "user_message", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
+  const agent = raw.agent !== undefined && raw.agent !== "" ? { agent: raw.agent } : {}
+  if (raw.type === "tool_call") return { type: "tool_call", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", input: raw.input }
+  if (raw.type === "tool_result") return { type: "tool_result", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", ok: raw.ok === true, output: cap(raw.output ?? "", MAX_OUTPUT_BYTES, "<truncated>") }
   if (raw.type === "permission_request") return { type: "permission_request", sessionId: raw.sessionId, requestId: raw.requestId ?? "", permission: raw.permission ?? "", patterns: raw.patterns ?? [] }
   if (raw.type === "done") return {
     type: "done", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>"),
@@ -350,13 +355,21 @@ const rejectToolCall = (
  * same on both sides.
  */
 /** Tools the host itself offers the agent (its skill loader, plan and goal): no schema of ours, never rejected. */
-export const HOST_TOOLS: ReadonlyArray<string> = ["skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal"]
+export const HOST_TOOLS: ReadonlyArray<string> = [
+  "skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal", "code_mode",
+  // Added by the sidecar beside the CAD/CAM tools: delegation, version control, workflows. The host validated their arguments.
+  ...AGENT_TOOL_IDS, ...VCS_TOOL_IDS
+]
 
 export const validateToolCall = (
   event: Extract<AiEvent, { type: "tool_call" }>,
   state: CallState
 ): ReadonlyArray<AiEvent> => {
-  if (HOST_TOOLS.includes(event.tool)) return [event]
+  if (HOST_TOOLS.includes(event.tool)) {
+    // Started, so its result does not make the transcript invent a second call with an empty input.
+    state.started.add(event.callId)
+    return [event]
+  }
   if (!isToolId(event.tool)) {
     return [
       event,
@@ -405,7 +418,7 @@ const reconcileToolResult = (
   const events: AiEvent[] = []
   if (!state.started.has(event.callId)) {
     state.started.add(event.callId)
-    events.push({ type: "tool_call", sessionId: event.sessionId, callId: event.callId, tool: event.tool, input: {} })
+    events.push({ type: "tool_call", sessionId: event.sessionId, ...(event.agent !== undefined ? { agent: event.agent } : {}), callId: event.callId, tool: event.tool, input: {} })
   }
   state.finished.add(event.callId)
   events.push(event)

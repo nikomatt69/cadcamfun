@@ -401,6 +401,13 @@ export type AiChatStreamPayload = {
     | undefined
 }
 
+export type AiChatQueuePayload = {
+  readonly sessionId: string
+  readonly message: string
+  readonly projectId?: string | undefined
+  readonly delivery?: "queue" | "steer" | undefined
+}
+
 export type AiChatAbortPayload = { readonly sessionId?: string | undefined }
 
 export type AiPermissionReplyPayload = {
@@ -1684,7 +1691,22 @@ export type AiSessionStateInput = {
   readonly projectId?: AiSessionStatePayload["projectId"]
 }
 
-export type AiSessionStateOutput = { busy: boolean; text: string; error?: string | undefined }
+export type AiSessionStateOutput = {
+  busy: boolean
+  text: string
+  error?: string | undefined
+  tasks?:
+    | Array<{
+        id: string
+        agent: string
+        description: string
+        status: "queued" | "running" | "completed" | "error" | "cancelled"
+        background: boolean
+        text?: string | undefined
+        error?: string | undefined
+      }>
+    | undefined
+}
 
 export type AiRemoveSessionInput = {
   readonly sessionId: AiRemoveSessionPayload["sessionId"]
@@ -1791,6 +1813,15 @@ export type AiChatStreamInput = {
 }
 
 export type AiChatStreamOutput = unknown
+
+export type AiChatQueueInput = {
+  readonly sessionId: AiChatQueuePayload["sessionId"]
+  readonly message: AiChatQueuePayload["message"]
+  readonly projectId?: AiChatQueuePayload["projectId"]
+  readonly delivery?: AiChatQueuePayload["delivery"]
+}
+
+export type AiChatQueueOutput = { message: string }
 
 export type AiChatAbortInput = { readonly sessionId?: AiChatAbortPayload["sessionId"] }
 

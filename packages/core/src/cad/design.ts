@@ -62,7 +62,7 @@ export interface CheckOptions {
 }
 
 const SIZE_KEYS = ["width", "height", "depth", "radius", "radiusX", "radiusY", "radiusZ", "length", "thickness", "tubeRadius", "baseWidth", "baseDepth"] as const
-const SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"])
+const SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "parametric", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"])
 const BOOLEANS = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"])
 /** Angles that look like radians typed into a field that holds degrees. */
 const RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4, Math.PI, (3 * Math.PI) / 2, 2 * Math.PI]

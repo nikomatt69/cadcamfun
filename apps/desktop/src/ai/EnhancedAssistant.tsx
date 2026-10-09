@@ -33,6 +33,7 @@ import Paperclip from "lucide-solid/icons/paperclip"
 import { t } from "../i18n/index.ts"
 import { ACCEPT, MAX_ATTACHMENTS, readAttachment, type ChatAttachment } from "./attachments.ts"
 import { useAiStore } from "./context.tsx"
+import { ContextGauge } from "./ContextGauge.tsx"
 import { useApp } from "../state/context.ts"
 import { AgentActivity } from "./AgentActivity.tsx"
 import { SessionsPanel } from "./SessionsPanel.tsx"
@@ -40,7 +41,9 @@ import { ProviderBadge } from "./ProviderBadge.tsx"
 import { ProviderSettings } from "./ProviderSettings.tsx"
 import { SkillsSettings } from "./SkillsSettings.tsx"
 import "./assistant.css"
-import { TOOL_IDS, TOOL_SUMMARIES } from "./tools.ts"
+import { EXTRA_TOOL_SUMMARIES, TOOL_IDS, TOOL_SUMMARIES, toolTitle } from "./tools.ts"
+import { ToolRow } from "./ToolRow.tsx"
+import { groupExploration, timelineOf } from "./timeline.ts"
 import type { AiEvent as StreamEvent, AiMessage } from "./types.ts"
 
 interface Props {
@@ -119,15 +122,19 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     }
   }
 
-  const handleSend = async (): Promise<void> => {
+  const handleSend = async (delivery: "queue" | "steer" = "queue"): Promise<void> => {
     const text = draft().trim()
-    if (text.length === 0 || text.length > MAX_PROMPT || running()) return
+    if (text.length === 0 || text.length > MAX_PROMPT) return
     setFollowLatest(true)
-    const attachments = files()
+    // While the agent works the message joins the running turn; files only go with a message that starts one.
+    const busy = running()
+    const attachments = busy ? [] : files()
     setDraft("")
-    setFiles([])
-    setFileProblems([])
-    await ai.send(text, attachments)
+    if (!busy) {
+      setFiles([])
+      setFileProblems([])
+    }
+    await ai.send(text, attachments, delivery)
   }
 
   const addFiles = async (list: FileList | null): Promise<void> => {
@@ -152,7 +159,8 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   const handleKeyDown = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }): void => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
       event.preventDefault()
-      void handleSend()
+      // Enter queues while the agent works; Ctrl/Cmd+Enter sends at once (nikcli: queue, or steer to interrupt and send now).
+      void handleSend(running() && (event.metaKey || event.ctrlKey) ? "steer" : "queue")
     }
   }
 
@@ -222,6 +230,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <span role="status" class="assistant-runtime-status" data-status={ai.status()}>
               <span aria-hidden="true" />{t(`ai.runtime.${ai.status()}`)}
             </span>
+            <ContextGauge />
           </div>
         </div>
       </header>
@@ -321,6 +330,14 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <For each={ai.messages()}>
               {(message) => <MessageBubble message={message} onCopy={handleCopy} copiedId={copiedId()} />}
             </For>
+            <For each={ai.pending()}>
+              {(item) => (
+                <article class="assistant-message ml-auto max-w-[90%] rounded border border-dashed border-blue-300 px-2 py-1.5 text-sm dark:border-blue-700" data-testid="ai-pending" data-delivery={item.delivery}>
+                  <p class="mb-0.5 text-[10px] font-semibold uppercase text-blue-700 dark:text-blue-300">{item.delivery === "steer" ? t("ai.pending.steer") : t("ai.pending.queue")}</p>
+                  <p class="whitespace-pre-wrap break-words">{item.text}</p>
+                </article>
+              )}
+            </For>
           </div>
           <Show when={running()}>
             {/* --- Bouncing-dots processing card (Apple-spring feel: blue →
@@ -374,10 +391,10 @@ export function EnhancedAssistant(props: Props): JSX.Element {
 
       <Show when={showTools()}>
         <details id={`${promptId}-tools`} open class="assistant-disclosure assistant-settings">
-          <summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">{t("ai.tool.tools")} ({TOOL_IDS.length})</summary>
+          <summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">{t("ai.tool.tools")} ({TOOL_IDS.length + EXTRA_TOOL_SUMMARIES.length})</summary>
           <p class="text-gray-500 mt-1">{t("ai.tool.toolsHint")}</p>
           <ul class="assistant-tool-catalogue">
-            <For each={TOOL_SUMMARIES}>{(tool) => <li><span>{tool.title}</span><p>{tool.description}</p></li>}</For>
+            <For each={[...TOOL_SUMMARIES, ...EXTRA_TOOL_SUMMARIES]}>{(tool) => <li><span>{tool.title}</span><p>{tool.description}</p></li>}</For>
           </ul>
         </details>
       </Show>
@@ -442,20 +459,19 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <button type="button" class="assistant-icon-button" title={t("ai.attach.title")} aria-label={t("ai.attach.title")} disabled={running() || files().length >= MAX_ATTACHMENTS} onClick={() => picker?.click()}><Paperclip size={17} aria-hidden="true" /></button>
           <button type="button" class="assistant-context-chip" aria-pressed={ai.includeContext()} onClick={() => ai.setIncludeContext((current) => !current)} data-enabled={ai.includeContext()}><Layers size={13} aria-hidden="true" />{t(ai.includeContext() ? "ai.context.included" : "ai.context.excluded")}</button>
             <span class="assistant-character-count">{t("ai.input.charCount", { count: draft().length })}</span>
-        <Show
-          when={!running()}
-          fallback={
-            <button type="button" class="assistant-send assistant-stop" onClick={() => ai.abort()}>
-              <Square size={13} aria-hidden="true" />
-              {t("ai.stop")}
-            </button>
-          }
-        >
-          <button type="submit" class="assistant-send" disabled={draft().trim().length === 0 || draft().length > MAX_PROMPT}>
-            <Send size={14} aria-hidden="true" />
-            {t("ai.send")}
+        <Show when={running()}>
+          <button type="button" class="assistant-send assistant-stop" onClick={() => ai.abort()} data-testid="ai-stop">
+            <Square size={13} aria-hidden="true" />
+            {t("ai.stop")}
+          </button>
+          <button type="button" class="assistant-send" disabled={draft().trim().length === 0 || draft().length > MAX_PROMPT} onClick={() => void handleSend("steer")} title={t("ai.steer.title")} data-testid="ai-steer">
+            {t("ai.steer")}
           </button>
         </Show>
+        <button type="submit" class="assistant-send" disabled={draft().trim().length === 0 || draft().length > MAX_PROMPT} data-testid="ai-send">
+          <Send size={14} aria-hidden="true" />
+          {running() ? t("ai.queue") : t("ai.send")}
+        </button>
           </div>
         </div>
         <div id={`${promptId}-hint`} class="assistant-composer-hint"><span>{t("ai.input.shortcut.hint")}</span><span>{t("ai.composer.brand")}</span></div>
@@ -590,7 +606,13 @@ interface MessageBubbleProps {
 
 function MessageBubble(props: MessageBubbleProps): JSX.Element {
   const ai = useAiStore()
-  const toolCalls = (): ReadonlyArray<StreamEvent> => props.message.events.filter((e) => e.type === "tool_call" || e.type === "tool_result")
+  const segments = createMemo(() => groupExploration(timelineOf(props.message), (callId) => ai.toolCalls()[callId]?.status === "ok"))
+  const duration = (): string | undefined => {
+    const end = props.message.finishedAt
+    if (end === undefined) return undefined
+    const ms = Date.parse(end) - Date.parse(props.message.createdAt)
+    return Number.isFinite(ms) && ms >= 0 ? (ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`) : undefined
+  }
   const permissions = (): ReadonlyArray<StreamEvent> => props.message.events.filter((e) => e.type === "permission_request")
   const isUser = (): boolean => props.message.role === "user"
 
@@ -602,24 +624,56 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
         </span>
         <span>{formatTimestamp(props.message.createdAt)}</span>
       </div>
-      <Show when={props.message.thinking !== undefined && props.message.thinking !== ""}>
-        <details class="mb-1 rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-500 dark:border-gray-700" data-testid="ai-thinking">
-          <summary class="cursor-pointer">{t("ai.thinking")}</summary>
-          <p class="mt-1 whitespace-pre-wrap">{props.message.thinking}</p>
-        </details>
-      </Show>
-      <div
-        class="assistant-message-body text-sm whitespace-pre-wrap break-words"
-        classList={{
-          "ml-auto max-w-[90%]": isUser(),
-          "mr-auto w-full": !isUser()
-        }}
-      >
-        <Show when={props.message.text.length > 0}>
-          {props.message.text}
-          <Show when={props.message.status === "streaming"}>
-            <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
-          </Show>
+      <div class="space-y-1.5" classList={{ "ml-auto max-w-[90%]": isUser(), "mr-auto w-full": !isUser() }} data-testid="ai-timeline">
+        <For each={segments()}>
+          {(segment, index) => {
+            const last = (): boolean => index() === segments().length - 1
+            const streaming = (): boolean => props.message.status === "streaming"
+            if (segment.kind === "reasoning") {
+              return (
+                <details class="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-500 dark:border-gray-700" open={streaming() && last()} data-testid="ai-thinking">
+                  <summary class="cursor-pointer">{t("ai.thinking")}</summary>
+                  <p class="mt-1 whitespace-pre-wrap italic">{segment.text}</p>
+                </details>
+              )
+            }
+            if (segment.kind === "text") {
+              return (
+                <div class="assistant-message-body text-sm whitespace-pre-wrap break-words">
+                  {segment.text}
+                  <Show when={streaming() && last()}>
+                    <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
+                  </Show>
+                </div>
+              )
+            }
+            if (segment.kind === "retry") {
+              return <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="ai-retry-row">↻ {t("ai.agent.retry", { n: segment.attempt })} · {segment.message}</p>
+            }
+            if (segment.kind === "group") {
+              const titles = (): string => {
+                const counts = new Map<string, number>()
+                for (const c of segment.calls) counts.set(c.tool, (counts.get(c.tool) ?? 0) + 1)
+                return [...counts].map(([tool, n]) => (n > 1 ? `${toolTitle(tool)} ×${n}` : toolTitle(tool))).join(", ")
+              }
+              return (
+                <details class="pl-2 text-xs text-gray-600 dark:text-gray-400" data-testid="ai-tool-group">
+                  <summary class="cursor-pointer">{t("ai.tool.explored", { count: segment.calls.length })}: {titles()}</summary>
+                  <ul class="mt-1 space-y-1"><For each={segment.calls}>{(c) => <ToolRow tool={c.tool} call={ai.toolCalls()[c.callId]} projectId={ai.projectId()} />}</For></ul>
+                </details>
+              )
+            }
+            const call = createMemo(() => ai.toolCalls()[segment.callId])
+            return <ul class="space-y-1 pl-2"><ToolRow tool={segment.tool} call={call()} projectId={ai.projectId()} /></ul>
+          }}
+        </For>
+        <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
+          <p class="text-[10px] text-gray-500" data-testid="ai-turn-footer">
+            ▣ {t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {usage().outputTokens} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
+          </p>
+        </Show>
+        <Show when={props.message.status === "streaming" && segments().length === 0}>
+          <span class="inline-block animate-pulse text-sm" aria-hidden="true">▍</span>
         </Show>
         <Show when={(props.message.attachments?.length ?? 0) > 0}>
           <p class="mt-1 flex flex-wrap gap-1 text-[11px] text-blue-700 dark:text-blue-300" data-testid="message-attachments">
@@ -630,37 +684,6 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
           <p class="mt-1 text-xs text-red-600 dark:text-red-400">{props.message.error}</p>
         </Show>
       </div>
-
-      <Show when={toolCalls().length > 0}>
-        <ul class="space-y-1 pl-2">
-          <For each={toolCalls()}>
-            {(event) => {
-              if (event.type === "tool_call") {
-                const result = createMemo(() => {
-                  const calls = ai.toolCalls()
-                  return calls[event.callId]
-                })
-                return (
-                  <li class="assistant-tool-call flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400" data-testid="tool-call">
-                    <Wrench size={12} aria-hidden="true" />
-                    <code class="text-[10px] font-mono">{event.tool}</code>
-                    <Show when={result()?.status === "ok"}>
-                      <span class="text-green-600">{t("ai.message.tool.ok", { tool: event.tool })}</span>
-                    </Show>
-                    <Show when={result()?.status === "error"}>
-                      <span class="text-red-600">{t("ai.message.tool.error", { tool: event.tool })}</span>
-                    </Show>
-                    <Show when={result()?.status === "running"}>
-                      <LoaderCircle size={10} aria-hidden="true" class="animate-spin" />
-                    </Show>
-                  </li>
-                )
-              }
-              return null
-            }}
-          </For>
-        </ul>
-      </Show>
 
       <Show when={permissions().length > 0}>
         <ul class="space-y-1 pl-2">

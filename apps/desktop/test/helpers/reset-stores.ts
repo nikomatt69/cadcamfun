@@ -5,6 +5,7 @@ import { useSelectionStore } from "../../src/cad/store/selectorStore.ts"
 import { useVerifyStore } from "../../src/cam/store/verifyStore.ts"
 import { useCamStore } from "../../src/cam/store/camStore.ts"
 import { useDocumentStore } from "../../src/cad/store/documentStore.ts"
+import { DEFAULT_SECTION } from "../../src/cad/lib/section.ts"
 import { forgetPushed } from "../../src/ai/editor-sync.ts"
 
 export const resetStores = (): void => {
@@ -14,7 +15,7 @@ export const resetStores = (): void => {
   useDocumentStore.getState().clear()
   forgetPushed()
   useCamStore.getState().reset()
-  useCADStore.setState({ tolerance: 0.01 })
+  useCADStore.setState({ tolerance: 0.01, section: DEFAULT_SECTION })
   const cad = useCADStore.getState()
   if (cad.showDimensions) cad.toggleDimensions()
 }

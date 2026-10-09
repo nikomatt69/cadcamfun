@@ -1,6 +1,7 @@
 /// <reference path="./sdk-next.d.ts" />
 import type { HostEvent } from "@nikcli-ai/sdk-next"
 import type { AiEvent } from "../events.ts"
+import { childAgent } from "./agents.ts"
 
 /**
  * Maps the host's bus events for ONE session to `AiEvent`s.
@@ -25,6 +26,16 @@ export interface EventMapperState {
   retry: { attempt: number; message: string } | undefined
   /** Message of a `session.error` for this session. */
   sessionError: string | undefined
+  /** The agent's plan as of its last `todowrite`. */
+  todos: ReadonlyArray<{ readonly content: string; readonly status: string }>
+  /** Tool calls started in this turn, by the agent and by its specialists. */
+  toolCalls: number
+  /** The most recent tool call ended in an error, and what it said; cleared by the next success. */
+  lastToolError: string | undefined
+  /** Texts this stream sent itself (the prompt, a re-sent prompt): a user message with one of them is not news. */
+  readonly ownTexts: Set<string>
+  /** User messages already reported as `user_message`. */
+  readonly reportedUser: Set<string>
 }
 
 export const newMapperState = (): EventMapperState => ({
@@ -37,7 +48,12 @@ export const newMapperState = (): EventMapperState => ({
   step: 0,
   idle: false,
   retry: undefined,
-  sessionError: undefined
+  sessionError: undefined,
+  todos: [],
+  toolCalls: 0,
+  lastToolError: undefined,
+  ownTexts: new Set(),
+  reportedUser: new Set()
 })
 
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
@@ -59,6 +75,51 @@ const todosOf = (value: unknown): Array<{ id?: string; content: string; status: 
   return out
 }
 
+/**
+ * Why a finished tool call counts as failed: the host marked it an error, or the tool answered `{ok:false, error}` (our tools
+ * report a refused call that way, as a normal result). Undefined when it worked.
+ */
+export const toolFailure = (status: string | undefined, output: string): string | undefined => {
+  if (status === "error") return output || "The tool call failed."
+  if (!output.startsWith("{")) return undefined
+  try {
+    const value = JSON.parse(output) as { ok?: unknown; error?: unknown; problems?: unknown }
+    if (value.ok !== false) return undefined
+    // `ok:false` with findings (a design check, a simulation) is a result about the model, not a refused call.
+    return typeof value.error === "string" ? value.error : Array.isArray(value.problems) && value.problems.length > 0 ? value.problems.map(String).join("; ") : undefined
+  } catch { return undefined }
+}
+
+/** The tool events of a specialist's session, as events of the parent's turn (call ids carry the child's session id: two sessions may reuse one). */
+const mapChildTool = (sessionId: string, childId: string, agent: string, part: Record<string, unknown>, state: EventMapperState): ReadonlyArray<AiEvent> => {
+  if (str(part["type"]) !== "tool") return []
+  const tool = str(part["tool"]) ?? ""
+  if (tool === "" || tool === "todowrite" || tool === "todoread" || tool === "skill") return []
+  const callId = `${childId}:${str(part["callID"]) ?? str(part["id"]) ?? ""}`
+  const toolState = rec(part["state"])
+  const status = str(toolState?.["status"])
+  if (status === "pending") {
+    const chars = str(toolState?.["raw"])?.length ?? 0
+    const last = state.progress.get(callId)
+    if (state.startedCalls.has(callId) || (last !== undefined && chars - last < 500)) return []
+    state.progress.set(callId, chars)
+    return [{ type: "tool_progress", sessionId, agent, callId, tool, chars }]
+  }
+  const out: AiEvent[] = []
+  if ((status === "running" || status === "completed" || status === "error") && !state.startedCalls.has(callId)) {
+    state.startedCalls.add(callId)
+    state.toolCalls += 1
+    out.push({ type: "tool_call", sessionId, agent, callId, tool, input: toolState?.["input"] ?? {} })
+  }
+  if ((status === "completed" || status === "error") && !state.finishedCalls.has(callId)) {
+    state.finishedCalls.add(callId)
+    const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
+    state.lastToolError = toolFailure(status, output)
+    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed", output })
+  }
+  return out
+}
+
 export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
   const props = event.properties
   switch (event.type) {
@@ -76,10 +137,27 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
     }
     case "message.part.updated": {
       const part = rec(props["part"])
-      if (!part || str(part["sessionID"]) !== sessionId) return []
+      const partSession = str(part?.["sessionID"])
+      if (!part || partSession === undefined) return []
+      // A specialist the agent handed work to runs in a child session: its tool calls are part of this turn (the editor shows
+      // what it changes as it happens), its text and reasoning stay with it.
+      const agent = partSession === sessionId ? undefined : childAgent(sessionId, partSession)
+      if (partSession !== sessionId && agent === undefined) return []
+      if (agent !== undefined) return mapChildTool(sessionId, partSession, agent, part, state)
       const messageId = str(part["messageID"])
-      if (messageId && (state.userMessages.has(messageId) || state.internalMessages.has(messageId))) return []
       const type = str(part["type"])
+      // A user message the stream did not send itself and that is not the application's own wording (continuations, task
+      // reports are synthetic): the user wrote it while the agent worked, and it has just been taken into the conversation.
+      if (type === "text" && messageId && state.userMessages.has(messageId)) {
+        const text = str(part["text"])?.trim()
+        const partId = str(part["id"]) ?? messageId
+        if (text && part["synthetic"] !== true && !state.ownTexts.has(text) && !state.reportedUser.has(partId)) {
+          state.reportedUser.add(partId)
+          return [{ type: "user_message", sessionId, text }]
+        }
+        return []
+      }
+      if (messageId && (state.userMessages.has(messageId) || state.internalMessages.has(messageId))) return []
       if (type === "reasoning") {
         const messageId = str(part["messageID"])
         const delta = str(props["delta"])
@@ -122,6 +200,7 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
         const plan = todos === undefined ? undefined : JSON.stringify(todos)
         if (todos !== undefined && plan !== undefined && plan !== state.plans.get(callId)) {
           state.plans.set(callId, plan)
+          state.todos = todos
           const out: AiEvent[] = [{ type: "todo", sessionId, todos }]
           if (status === "completed" && !state.finishedCalls.has(callId)) { state.finishedCalls.add(callId); state.startedCalls.add(callId) }
           return out
@@ -129,6 +208,7 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
         if (tool === "todowrite" || tool === "todoread") return []
         if (status === "running" && !state.startedCalls.has(callId)) {
           state.startedCalls.add(callId)
+          state.toolCalls += 1
           return [{ type: "tool_call", sessionId, callId, tool, input: toolState?.["input"] ?? {} }]
         }
         if ((status === "completed" || status === "error") && !state.finishedCalls.has(callId)) {
@@ -136,16 +216,12 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
           const out: AiEvent[] = []
           if (!state.startedCalls.has(callId)) {
             state.startedCalls.add(callId)
+            state.toolCalls += 1
             out.push({ type: "tool_call", sessionId, callId, tool, input: toolState?.["input"] ?? {} })
           }
-          out.push({
-            type: "tool_result",
-            sessionId,
-            callId,
-            tool,
-            ok: status === "completed",
-            output: (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
-          })
+          const finalOutput = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
+          state.lastToolError = toolFailure(status, finalOutput)
+          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed", output: finalOutput })
           return out
         }
       }

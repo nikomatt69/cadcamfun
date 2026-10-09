@@ -220,7 +220,10 @@ describe("element helpers", () => {
     expect(b.min).toEqual({ x: 8, y: 17, z: 26 })
     expect(b.max).toEqual({ x: 12, y: 23, z: 34 })
     expect(elementBounds({ type: "hemisphere", x: 0, y: 0, z: 0, radius: 5, direction: "down" }).max.z).toBe(0)
-    expect(elementBounds({ type: "capsule", x: 0, y: 0, z: 0, radius: 2, height: 10 }).dimensions.depth).toBe(14)
+    // A capsule lies along its `direction` (default y, as the editor draws it).
+    expect(elementBounds({ type: "capsule", x: 0, y: 0, z: 0, radius: 2, height: 10, direction: "z" }).dimensions.depth).toBe(14)
+    expect(elementBounds({ type: "capsule", x: 0, y: 0, z: 0, radius: 2, height: 10 }).dimensions.height).toBe(14)
+    expect(elementBounds({ type: "capsule", x: 0, y: 0, z: 0, radius: 2, height: 10, direction: "x" }).dimensions.width).toBe(14)
     expect(elementBounds({ type: "torus", x: 0, y: 0, z: 0, radius: 10, tubeRadius: 2 }).dimensions.width).toBe(24)
   })
 

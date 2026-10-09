@@ -7,7 +7,7 @@
  * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
-import { MAX_CURVE_SEGMENTS, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
+import { MAX_CURVE_SEGMENTS, MIN_GEAR_TEETH, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
 
 type Fields = Readonly<Record<string, unknown>>
 
@@ -34,7 +34,7 @@ export const ELEMENT_SPECS = {
   prism: { defaults: { ...at, radius: 50, height: 100, sides: 6 }, doc: "regular prism: radius, height, sides" },
   hemisphere: { defaults: { ...at, radius: 50, segments: 32, direction: "up" }, doc: "hemisphere: radius, direction up|down" },
   ellipsoid: { defaults: { ...at, radiusX: 50, radiusY: 35, radiusZ: 25, segments: 32 }, doc: "ellipsoid: radiusX, radiusY, radiusZ" },
-  capsule: { defaults: { ...at, radius: 25, height: 100, direction: "y" }, doc: "capsule: radius, height, direction x|y|z" },
+  capsule: { defaults: { ...at, radius: 25, height: 100, direction: "y" }, doc: "capsule: radius, height, direction x|y|z (default y; \"z\" stands it up like a cylinder)" },
   // ---- profiles to solids
   extrusion: {
     defaults: { ...at, shape: "rect", width: 50, height: 30, radius: 25, depth: 10, bevel: false },
@@ -43,12 +43,12 @@ export const ELEMENT_SPECS = {
   revolution: {
     defaults: { ...at, profile: pts2, segments: 32, angle: 6.283185307179586, axis: "y" },
     required: ["profile"],
-    doc: "lathe / revolved solid: profile [{x: radius, y: height}] >=2 points, axis x|y, angle (rad, default full turn)"
+    doc: "lathe / revolved solid: profile [{x: radius, y: height}] >=2 points, axis x|y (y stands the solid on Z, x lays it along X), angle (rad, default full turn)"
   },
   sweep: {
     defaults: { ...at, profile: [{ x: -10, y: -10 }, { x: 10, y: -10 }, { x: 10, y: 10 }, { x: -10, y: 10 }], path: [{ x: 0, y: 0, z: 0 }, { x: 50, y: 50, z: 50 }, { x: 100, y: 0, z: 0 }], radius: 10, segments: 64 },
     required: ["path"],
-    doc: "profile swept along path [{x,y,z}] (>=2 points); a round tube of `radius` when profile has < 3 points"
+    doc: "profile (a polygon of >= 3 {x,y} points in its own plane) swept along path [{x,y,z}] (>=2 points, relative to x,y,z); give no profile for a round tube of `radius`"
   },
   loft: {
     defaults: { ...at, profiles: [{ radius: 20 }, { radius: 40 }, { radius: 10 }], positions: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 50 }, { x: 0, y: 0, z: 100 }], closed: false },
@@ -64,6 +64,13 @@ export const ELEMENT_SPECS = {
     required: ["history"],
     doc: "a dimension-driven part: history {parameters: {name: number | \"expression\"}, features: [...]} rebuilt from the top whenever a parameter changes. Features: sketch {id, type:\"sketch\", plane: XY|YZ|ZX, offset?, sketch: {entities: points/lines/circles/arcs, constraints}}, extrude {id, type:\"extrude\", sketch, depth, operation: new|union|subtract|intersect, direction?: up|down|symmetric}, revolve {sketch, axis: x|y|{line}, angle? (deg)}, hole {plane, offset?, at:[u,v], diameter, depth}, pattern {feature, kind: linear|circular, count, step | centre, span?}. Any dimension may be an expression of the parameters"
   },
+  // ---- containers
+  component: {
+    defaults: { ...at, elements: [] as unknown[] },
+    required: ["elements"],
+    doc: "a named part made of several elements (an assembly, a sub-part): elements = the children, each a full element placed RELATIVE to the component's x, y, z; give it a name. One layer holds many components"
+  },
+  group: { defaults: { ...at, elements: [] as unknown[] }, required: ["elements"], doc: "like component, for a loose set of elements that move together" },
   // ---- 2D and curves
   circle: { defaults: { ...at, radius: 50, linewidth: 1 }, doc: "circle: radius" },
   rectangle: { defaults: { ...at, width: 100, height: 100, linewidth: 1 }, doc: "rectangle centred on x,y: width, height" },
@@ -77,27 +84,36 @@ export const ELEMENT_SPECS = {
   nurbs: { defaults: { points: [{ x: 0, y: 0, z: 0 }, { x: 30, y: 50, z: 0 }, { x: 60, y: -20, z: 0 }, { x: 100, y: 0, z: 0 }], degree: 3, divisions: 100, linewidth: 1 }, required: ["points"], doc: "NURBS with control points [{x,y,z}] (>=4)" },
   text3d: { defaults: { ...at, text: "Text", height: 10, depth: 2, font: "Arial" }, doc: "3D text: text, height, depth" },
   // ---- mechanical parts
-  gear: { defaults: { ...at, moduleValue: 2, teeth: 20, thickness: 10, pressureAngle: 20, holeDiameter: 10 }, doc: "spur gear: moduleValue, teeth, thickness, holeDiameter" },
-  spring: { defaults: { ...at, radius: 30, wireRadius: 5, turns: 5, height: 100 }, doc: "coil spring: radius, wireRadius, turns, height" },
-  bolt: { defaults: { ...at, size: "M8", length: 50, thread: "M8x1.25", grade: "8.8" }, doc: "bolt: size (M8), length" },
-  screw: { defaults: { ...at, size: "M8", length: 40, thread: "M8x1.25", grade: "8.8" }, doc: "screw: size (M8), length" },
-  nut: { defaults: { ...at, size: "M8", thread: "M8x1.25", style: "hex" }, doc: "nut: size (M8)" },
-  washer: { defaults: { ...at, size: "M8", outerDiameter: 16, thickness: 1.5 }, doc: "washer: size, outerDiameter, thickness" },
+  gear: { defaults: { ...at, moduleValue: 2, teeth: 20, thickness: 10, pressureAngle: 20, holeDiameter: 10 }, doc: "involute spur gear on Z, centred on its thickness: moduleValue, teeth (whole, >= 6), thickness, pressureAngle (deg), holeDiameter (< root circle = m (teeth - 2.5))" },
+  spring: { defaults: { ...at, radius: 30, wireRadius: 5, turns: 5, height: 100 }, doc: "coil spring along Z: radius, wireRadius, turns, height" },
+  bolt: { defaults: { ...at, size: "M8", length: 50, thread: "M8x1.25", grade: "8.8" }, doc: "bolt along Z, head up: size (M8), length" },
+  screw: { defaults: { ...at, size: "M8", length: 40, thread: "M8x1.25", grade: "8.8" }, doc: "screw along Z, head up: size (M8), length" },
+  nut: { defaults: { ...at, size: "M8", thread: "M8x1.25", style: "hex" }, doc: "hex nut with a bore, axis Z: size (M8)" },
+  washer: { defaults: { ...at, size: "M8", outerDiameter: 16, thickness: 1.5 }, doc: "flat washer, axis Z: size (bore), outerDiameter, thickness" },
   // ---- architecture
-  wall: { defaults: { ...at, length: 300, height: 100, thickness: 20, openings: [] }, doc: "wall: length, height, thickness" },
-  column: { defaults: { ...at, radius: 20, height: 200, style: "simple" }, doc: "column: radius, height" },
-  stair: { defaults: { ...at, width: 100, height: 150, depth: 200, steps: 10 }, doc: "stair: width, height, depth, steps" },
+  wall: { defaults: { ...at, length: 300, height: 100, thickness: 20, openings: [] }, doc: "wall: length (X), thickness (Y), height (Z); z is its base (0 = standing on the ground)" },
+  column: { defaults: { ...at, radius: 20, height: 200, style: "simple" }, doc: "column standing on Z: radius, height" },
+  stair: { defaults: { ...at, width: 100, height: 150, depth: 200, steps: 10 }, doc: "stair: width (X), depth = run toward -Y, height = rise on Z, steps" },
   door: { defaults: { ...at, width: 36, height: 80, thickness: 2, style: "simple" }, doc: "door: width, height" },
   window: { defaults: { ...at, width: 50, height: 80, thickness: 5, style: "simple" }, doc: "window: width, height" },
-  floor: { defaults: { ...at, width: 300, depth: 300, thickness: 10 }, doc: "floor slab: width, depth, thickness" },
-  roof: { defaults: { ...at, width: 300, depth: 300, height: 80 }, doc: "roof: width, depth, height" }
+  floor: { defaults: { ...at, width: 300, depth: 300, thickness: 10 }, doc: "floor slab: width (X), depth (Y), thickness (Z)" },
+  roof: { defaults: { ...at, width: 300, depth: 300, height: 80 }, doc: "pitched roof: width (X), depth (Y), height (Z) above its base at z" }
 } as const satisfies Record<string, Spec>
 
 export type ElementType = keyof typeof ELEMENT_SPECS
 export const ELEMENT_TYPES = Object.keys(ELEMENT_SPECS) as ReadonlyArray<ElementType>
 
 /** Fields every element may carry besides its own. */
-const COMMON = ["name", "color", "wireframe", "layer", "layerId", "rotation", "scale", "opacity", "linewidth"] as const
+/** A component or group holds at most this many children (one call holds at most 40 elements in all). */
+const MAX_CHILDREN = 40
+const COMMON = ["name", "color", "wireframe", "layer", "layerId", "component", "rotation", "scale", "opacity", "linewidth"] as const
+
+/**
+ * The base pieces: plain solids the assistant lays down first and then combines, cuts or builds on. They are created as
+ * wireframe so the structure of what is being built reads through (and a section cuts through visible edges); a finished
+ * solid whose surfaces matter says `wireframe: false`. Booleans, extrusions, revolutions and mechanical parts are not base pieces.
+ */
+export const BASE_PRIMITIVES: ReadonlySet<string> = new Set(["cube", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule"])
 
 /** How finely the editor draws round shapes; `tolerance` sets them from the allowed deviation instead. */
 const TESSELLATION = ["segments", "radialSegments", "tubularSegments", "capSegments"] as const
@@ -166,7 +182,10 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     if (typeof given === "number" && !Number.isFinite(given)) return { ok: false, error: `${type}.${key} must be a finite number` }
     element[key] = given
   }
+  // No profile given means the round tube of `radius`, not the default sample square.
+  if (type === "sweep" && input["profile"] === undefined) element["profile"] = []
   for (const key of COMMON) if (input[key] !== undefined) element[key] = input[key]
+  if (BASE_PRIMITIVES.has(type) && element["wireframe"] === undefined) element["wireframe"] = true
   if (input["rotation"] !== undefined) {
     const r = input["rotation"] as Record<string, unknown> | null
     if (typeof r !== "object" || r === null || Array.isArray(r) || !["x", "y", "z"].some((k) => k in r) || !Object.values(r).every((v) => typeof v === "number" && Number.isFinite(v))) {
@@ -191,6 +210,23 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     if (built.bodies.length === 0) return { ok: false, error: `The history builds no solid. ${issues.length > 0 ? issues.join("; ") : "It has no extrude or revolve."}` }
     if (issues.length > 0) warning = `The history builds ${built.bodies.length} solid(s) with problems: ${issues.join("; ")}`
   }
+  if (type === "component" || type === "group") {
+    const children = element["elements"] as unknown[]
+    if (children.length === 0) return { ok: false, error: `${type}.elements needs at least one child element` }
+    if (children.length > MAX_CHILDREN) return { ok: false, error: `${type}.elements holds at most ${MAX_CHILDREN} children` }
+    const checked: Record<string, unknown>[] = []
+    for (const [index, child] of children.entries()) {
+      if (typeof child !== "object" || child === null || Array.isArray(child)) return { ok: false, error: `${type}.elements[${index}] must be an element object` }
+      const kind = (child as { type?: unknown }).type
+      // A Boolean names operands by id or by index in the call; neither can point inside a component.
+      if (typeof kind === "string" && kind.startsWith("boolean-")) return { ok: false, error: `${type}.elements[${index}] is a ${kind}: build the Boolean as its own element, then put its result with the component's other parts in the same layer` }
+      const result = normalizeElement(child as Record<string, unknown>)
+      if (!result.ok) return { ok: false, error: `${type}.elements[${index}]: ${result.error}` }
+      if (result.warning !== undefined) warning = warning ?? `${type}.elements[${index}]: ${result.warning}`
+      checked.push(result.element)
+    }
+    element["elements"] = checked
+  }
   if (input["tolerance"] !== undefined) {
     const tolerance = input["tolerance"]
     if (typeof tolerance !== "number" || !Number.isFinite(tolerance) || tolerance <= 0) return { ok: false, error: `${type}.tolerance must be a positive number of millimetres (0.001 = 1 micron)` }
@@ -206,6 +242,14 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
   for (const key of ["width", "height", "depth", "radius", "length", "thickness"]) {
     const v = element[key]
     if (typeof v === "number" && v <= 0 && type !== "arc") return { ok: false, error: `${type}.${key} must be positive` }
+  }
+  if (type === "gear") {
+    const teeth = element["teeth"] as number, moduleValue = element["moduleValue"] as number
+    if (!Number.isInteger(teeth) || teeth < MIN_GEAR_TEETH) return { ok: false, error: `gear.teeth must be a whole number of at least ${MIN_GEAR_TEETH}` }
+    const angle = element["pressureAngle"] as number
+    if (!(angle > 0 && angle < 45)) return { ok: false, error: "gear.pressureAngle must be between 0 and 45 degrees" }
+    const root = (moduleValue * teeth) / 2 - 1.25 * moduleValue
+    if (num(element["holeDiameter"]) / 2 >= root) return { ok: false, error: `gear.holeDiameter must be smaller than the root circle (${(2 * root).toFixed(2)} mm for this gear)` }
   }
   if (typeof element["tolerance"] === "number") warning = warning ?? tessellate(element, element["tolerance"])
   return warning === undefined ? { ok: true, element } : { ok: true, element, warning }

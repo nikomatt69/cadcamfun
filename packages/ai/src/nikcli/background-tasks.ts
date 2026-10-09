@@ -9,6 +9,12 @@ export interface BackgroundTaskOwner {
 export interface BackgroundTaskInput extends BackgroundTaskOwner {
   readonly prompt: string;
   readonly description: string;
+  /** The specialist that does the work (`agents.ts`); the researcher when omitted. */
+  readonly agent?: string;
+  /** The task changes the document: at most one such task runs at a time per project. */
+  readonly edits?: boolean;
+  /** `false`: the caller waits for the result and the parent is not woken with it. Default `true`. */
+  readonly background?: boolean;
 }
 
 export interface BackgroundTaskRunnerInput extends BackgroundTaskInput {
@@ -35,6 +41,8 @@ export interface BackgroundTaskManagerInterface {
   read(owner: BackgroundTaskOwner, id: string): BackgroundTask;
   cancel(owner: BackgroundTaskOwner, id: string): BackgroundTask;
   cancelParent(owner: BackgroundTaskOwner): number;
+  /** Resolves with the task once it has stopped (completed, failed or cancelled); `signal` aborting cancels it. */
+  wait(owner: BackgroundTaskOwner, id: string, signal?: AbortSignal): Promise<BackgroundTask>;
   dispose(): Promise<void>;
 }
 
@@ -59,6 +67,9 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   private readonly entries = new Map<string, Entry>();
   private readonly queue: Entry[] = [];
   private readonly active = new Set<Promise<void>>();
+  /** Tasks whose runner has stopped (what `wait` resolves on). */
+  private readonly settled = new Set<string>();
+  private readonly waiters = new Map<string, Array<(task: BackgroundTask) => void>>();
   private options: BackgroundTaskManagerOptions;
   private disposed = false;
   private disposal: Promise<void> | undefined;
@@ -94,6 +105,9 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         parentSessionId: input.parentSessionId,
         prompt: input.prompt,
         description: input.description,
+        ...(input.agent !== undefined ? { agent: input.agent } : {}),
+        ...(input.edits === true ? { edits: true } : {}),
+        background: input.background !== false,
         status: "queued",
       },
       controller: new AbortController(),
@@ -117,6 +131,16 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     const entry = this.ownedEntry(owner, id);
     this.cancelEntry(entry);
     return { ...entry.task };
+  }
+
+  wait(owner: BackgroundTaskOwner, id: string, signal?: AbortSignal): Promise<BackgroundTask> {
+    const entry = this.ownedEntry(owner, id);
+    return new Promise<BackgroundTask>((resolve) => {
+      if (this.settled.has(id)) return resolve({ ...entry.task });
+      this.waiters.set(id, [...(this.waiters.get(id) ?? []), resolve]);
+      if (signal?.aborted) this.cancelEntry(entry);
+      else signal?.addEventListener("abort", () => this.cancelEntry(entry), { once: true });
+    });
   }
 
   cancelParent(owner: BackgroundTaskOwner): number {
@@ -160,8 +184,9 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
 
   private drain(): void {
     while (!this.disposed && this.active.size < MAX_BACKGROUND_TASKS) {
-      const entry = this.queue.shift();
-      if (!entry) break;
+      const index = this.queue.findIndex((candidate) => this.runnable(candidate));
+      if (index < 0) break;
+      const entry = this.queue.splice(index, 1)[0]!;
       const runner = this.options.runner;
       if (runner === undefined) {
         // No runner installed yet: push the entry back and wait for setRunner().
@@ -169,11 +194,15 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         break;
       }
       entry.task = { ...entry.task, status: "running" };
-      const work = Promise.resolve().then(() => runner({
+      // Cancelled before the runner got to start: there is nothing to run, and the abort event has already fired.
+      const work = Promise.resolve().then(() => entry.controller.signal.aborted ? "" : runner({
         projectId: entry.task.projectId,
         parentSessionId: entry.task.parentSessionId,
         prompt: entry.task.prompt,
         description: entry.task.description,
+        ...(entry.task.agent !== undefined ? { agent: entry.task.agent } : {}),
+        ...(entry.task.edits === true ? { edits: true } : {}),
+        background: entry.task.background !== false,
         signal: entry.controller.signal,
       })).then(
         (text) => {
@@ -196,7 +225,22 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     }
   }
 
+  /** A task that changes the document waits while another one for the same project is changing it. */
+  private runnable(entry: Entry): boolean {
+    if (entry.task.edits !== true) return true;
+    for (const other of this.entries.values()) {
+      if (other !== entry && other.task.status === "running" && other.task.edits === true && other.task.projectId === entry.task.projectId) return false;
+    }
+    return true;
+  }
+
   private notify(entry: Entry): void {
+    this.settled.add(entry.task.id);
+    const waiting = this.waiters.get(entry.task.id);
+    if (waiting) {
+      this.waiters.delete(entry.task.id);
+      for (const resolve of waiting) resolve({ ...entry.task });
+    }
     const callback = this.options.onCompletion;
     if (!callback) return;
     const snapshot = { ...entry.task };

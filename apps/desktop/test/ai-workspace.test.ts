@@ -233,3 +233,67 @@ describe("the editor follows the stored drawing, whatever shape the tools wrote"
     expect(useElementsStore.getState().elements.some((e) => e.name === "Mine")).toBe(true)
   })
 })
+
+describe("the assistant lays out, groups and organises what it built", () => {
+  const seed = async () => {
+    useElementsStore.getState().addElements([{ type: "cube", name: "Block", x: 0, y: 0, z: 0, width: 10, height: 10, depth: 10 }])
+    const doc = await prepareWorkspace(app.state)
+    const [mine] = useElementsStore.getState().elements
+    return { doc, id: mine!.id }
+  }
+
+  test("a row of copies appears in the canvas store with new ids, the original stays", async () => {
+    const { doc, id } = await seed()
+    const result = await handlers.transformEntities(doc.projectId, { ids: [id], transform: { move: { x: 30, y: 0, z: 0 } }, copies: 3 }) as { ok: boolean; copied: boolean; elements: Array<{ id: string; x: number }> }
+    expect(result).toMatchObject({ ok: true, copied: true })
+    mirrorToolResult("cad_transform_entities", true, json(result))
+    const xs = useElementsStore.getState().elements.map((e) => e["x"]).sort((a, b) => Number(a) - Number(b))
+    expect(xs).toEqual([0, 30, 60, 90])
+    expect(new Set(useElementsStore.getState().elements.map((e) => e.id)).size).toBe(4)
+  })
+
+  test("moving without copies updates the same element; an unknown id is told, not thrown", async () => {
+    const { doc, id } = await seed()
+    const moved = await handlers.transformEntities(doc.projectId, { ids: [id], transform: { move: { x: 5, y: 0, z: 0 }, rotate: { axis: "z", degrees: 90 } }, copies: 0 })
+    mirrorToolResult("cad_transform_entities", true, json(moved))
+    expect(useElementsStore.getState().elements.find((e) => e.id === id)).toMatchObject({ x: 5, rotation: { z: expect.closeTo(90, 3) } })
+    expect(await handlers.transformEntities(doc.projectId, { ids: ["ghost"], transform: { move: { x: 1, y: 0, z: 0 } }, copies: 0 })).toMatchObject({ ok: false })
+  })
+
+  test("grouping replaces the parts with one component, and ungrouping brings them back in place", async () => {
+    const { doc, id } = await seed()
+    const added = await handlers.addElements(doc.projectId, [{ type: "cylinder", x: 40, y: 0, z: 0, radius: 3, height: 20 }]) as { ids: string[]; elements: object[] }
+    mirrorToolResult("cad_add_elements", true, json(added))
+    const grouped = await handlers.groupEntities(doc.projectId, { ids: [id, added.ids[0]!], ungroup: false, name: "Pair" }) as { ok: boolean; ids: string[]; removed: string[] }
+    expect(grouped.ok).toBe(true)
+    mirrorToolResult("cad_group_entities", true, json(grouped))
+    const after = useElementsStore.getState().elements
+    expect(after.map((e) => e.type)).toEqual(["component"])
+    expect(after[0]).toMatchObject({ name: "Pair", x: 0 })
+    expect((after[0]!["elements"] as Array<{ x: number }>).map((c) => c.x)).toEqual([0, 40])
+
+    const opened = await handlers.groupEntities(doc.projectId, { ids: grouped.ids, ungroup: true }) as object
+    mirrorToolResult("cad_group_entities", true, json(opened))
+    expect(useElementsStore.getState().elements.map((e) => [e.type, e["x"]]).sort()).toEqual([["cube", 0], ["cylinder", 40]])
+  })
+
+  test("cad_editor creates and colours a layer, moves what is on a deleted one, switches the view and hides elements", async () => {
+    const { id } = await seed()
+    const actions = [
+      { action: "layer_create", layer: "Housing", color: "#ff0000" }, { action: "layer_create", layer: "Spare" },
+      { action: "layer_rename", layer: "spare", newName: "Fixtures" }, { action: "view_2d" }, { action: "hide", ids: [id] }
+    ]
+    mirrorToolResult("cad_editor", true, json({ ok: true, actions }))
+    const layers = useLayerStore.getState().layers
+    expect(layers.find((l) => l.name === "Housing")).toMatchObject({ color: "#ff0000", visible: true })
+    expect(layers.some((l) => l.name === "Fixtures")).toBe(true)
+    expect(useElementsStore.getState().elements.find((e) => e.id === id)!["visible"]).toBe(false)
+
+    useElementsStore.getState().updateElement(id, { layerId: layers.find((l) => l.name === "Fixtures")!.id, visible: true })
+    mirrorToolResult("cad_editor", true, json({ ok: true, actions: [{ action: "layer_delete", layer: "Fixtures", moveTo: "Housing" }, { action: "layer_hide", layer: "nope" }] }))
+    const housing = useLayerStore.getState().layers.find((l) => l.name === "Housing")!
+    expect(useLayerStore.getState().layers.some((l) => l.name === "Fixtures")).toBe(false)
+    expect(useElementsStore.getState().elements.find((e) => e.id === id)!.layerId).toBe(housing.id)
+  })
+})
+

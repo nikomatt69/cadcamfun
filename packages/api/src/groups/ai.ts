@@ -127,8 +127,18 @@ export const SkillBody = Schema.Struct({
 export const SkillSaved = Schema.Struct({ skill: SkillInfo, skills: Schema.Array(SkillInfo), live: Schema.Boolean })
 const skillParam = { name: Schema.String }
 export const RemoveSessionBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String) })
+/** A message written while the agent works: `queue` waits for the next safe step, `steer` goes in at once. */
+export const QueueBody = Schema.Struct({
+  sessionId: Schema.String, message: Schema.String, projectId: opt(Schema.String),
+  delivery: opt(Schema.Literals(["queue", "steer"]))
+})
 export const SessionStateBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String) })
-export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String) })
+export const SessionTask = Schema.Struct({
+  id: Schema.String, agent: Schema.String, description: Schema.String,
+  status: Schema.Literals(["queued", "running", "completed", "error", "cancelled"]),
+  background: Schema.Boolean, text: opt(Schema.String), error: opt(Schema.String)
+})
+export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String), tasks: opt(Schema.Array(SessionTask)) })
 export const RemoveSessionReply = Schema.Struct({ removed: Schema.Boolean })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
@@ -150,6 +160,7 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("chatStream", "/api/ai/chat/stream", {
       payload: StreamChatBody, success: HttpApiSchema.StreamSse({ data: chatEvents }), error: [BadRequest, InternalError]
     }),
+    HttpApiEndpoint.post("chatQueue", "/api/ai/chat/queue", { payload: QueueBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("chatAbort", "/api/ai/chat/abort", { payload: AbortBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("permissionReply", "/api/ai/permission/reply", { payload: PermissionReplyBody, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("completion", "/api/ai/completion", { payload: CompletionBody, success: CompletionReply, error: [BadRequest, InternalError] }),

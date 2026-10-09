@@ -8,6 +8,7 @@ import { Schema } from "effect"
 import type { z } from "zod"
 import type { HostToolSpec } from "../nikcli/runtime.ts"
 import type { ToolHandlersShape } from "./handlers.ts"
+import { lenient } from "./lenient-arguments.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 
 export interface ToolContext {
@@ -41,7 +42,7 @@ export const defineTool = <S extends z.ZodType>(id: string, config: ToolConfig<S
 export const toSpec = (definition: ToolDefinition, context: ToolContext): HostToolSpec => ({
   id: definition.id,
   description: definition.description,
-  parameters: definition.parameters,
+  parameters: lenient(definition.parameters),
   execute: async (input) => JSON.stringify(await definition.execute(input, context))
 })
 

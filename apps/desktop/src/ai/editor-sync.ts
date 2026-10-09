@@ -7,15 +7,31 @@
  * element on both sides). Anything that is not a CAD tool result, or did not succeed, changes nothing.
  */
 import { useElementsStore } from "../cad/store/elementsStore.ts"
-import { classify } from "../cad/lib/browser.ts"
+import { classify, isolate } from "../cad/lib/browser.ts"
+import { useSelectionStore } from "../cad/store/selectorStore.ts"
 import { useCADStore } from "../cad/store/cadStore.ts"
 import { useDocumentStore } from "../cad/store/documentStore.ts"
 import { useLayerStore } from "../cad/store/layerStore.ts"
+import { mergeSection } from "../cad/lib/section.ts"
 
 export type SyncOp =
   | { readonly kind: "add"; readonly elements: ReadonlyArray<Record<string, unknown>> }
   | { readonly kind: "update"; readonly elements: ReadonlyArray<Record<string, unknown>> }
   | { readonly kind: "delete"; readonly ids: ReadonlyArray<string> }
+  | { readonly kind: "editor"; readonly actions: ReadonlyArray<EditorAction> }
+
+/** One thing `cad_editor` asked of the editor: a layer, the view, the selection, what is shown. */
+export interface EditorAction {
+  readonly action: string
+  readonly layer?: string
+  readonly newName?: string
+  readonly color?: string
+  readonly moveTo?: string
+  readonly ids?: ReadonlyArray<string>
+  readonly axis?: string
+  readonly position?: number
+  readonly inverted?: boolean
+}
 
 const isElement = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && typeof (value as { id?: unknown }).id === "string" && typeof (value as { type?: unknown }).type === "string"
@@ -28,12 +44,27 @@ export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
   const elements = Array.isArray(result.elements) ? result.elements.filter(isElement) : []
   if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements") || tool.endsWith("cad_import_drawing")) return elements.length > 0 ? [{ kind: "add", elements }] : []
   if (tool.endsWith("cad_modify_entities")) return elements.length > 0 ? [{ kind: "update", elements }] : []
+  if (tool.endsWith("cad_transform_entities")) {
+    if (elements.length === 0) return []
+    return [{ kind: (result as { copied?: unknown }).copied === true ? "add" : "update", elements }]
+  }
+  if (tool.endsWith("cad_group_entities")) {
+    const removed = Array.isArray((result as { removed?: unknown }).removed) ? ((result as { removed: unknown[] }).removed).filter((id): id is string => typeof id === "string") : []
+    return [...(removed.length > 0 ? [{ kind: "delete" as const, ids: removed }] : []), ...(elements.length > 0 ? [{ kind: "add" as const, elements }] : [])]
+  }
+  if (tool.endsWith("cad_editor")) {
+    const actions = Array.isArray((result as { actions?: unknown }).actions) ? ((result as { actions: unknown[] }).actions).filter((a): a is EditorAction => typeof a === "object" && a !== null && typeof (a as { action?: unknown }).action === "string") : []
+    return actions.length > 0 ? [{ kind: "editor", actions }] : []
+  }
   if (tool.endsWith("cad_delete_entities")) {
     const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : []
     return ids.length > 0 ? [{ kind: "delete", ids }] : []
   }
   return []
 }
+
+/** Colours for the layers the assistant creates, so its parts read apart in the layer list. */
+const LAYER_COLORS = ["#1e88e5", "#43a047", "#fb8c00", "#8e24aa", "#e53935", "#00acc1", "#fdd835", "#6d4c41"] as const
 
 /**
  * The layer an element belongs on: an existing id, an existing layer's name (any case), the active layer for the
@@ -47,7 +78,7 @@ const layerFor = (requested: unknown): string => {
   if (byId) return byId.id
   const byName = layers.layers.find((layer) => layer.name.toLowerCase() === wanted.toLowerCase())
   if (byName) return byName.id
-  layers.addLayer({ name: wanted, visible: true, locked: false, color: "#1e88e5" })
+  layers.addLayer({ name: wanted, visible: true, locked: false, color: LAYER_COLORS[layers.layers.length % LAYER_COLORS.length]! })
   const created = useLayerStore.getState().layers.find((layer) => layer.name === wanted)
   return created?.id ?? layers.activeLayer
 }
@@ -56,6 +87,49 @@ const layerFor = (requested: unknown): string => {
 export const FIT_VIEW_EVENT = "cadcam:fit-view"
 const requestFitView = (): void => {
   if (typeof window !== "undefined") window.dispatchEvent(new window.CustomEvent(FIT_VIEW_EVENT))
+}
+
+const layerNamed = (name: string | undefined) => {
+  const wanted = (name ?? "").trim().toLowerCase()
+  return wanted === "" ? undefined : useLayerStore.getState().layers.find((layer) => layer.id === name || layer.name.toLowerCase() === wanted)
+}
+
+/** Does what `cad_editor` asked, in order. An action that cannot be done (an unknown layer) is skipped, never an obstacle. */
+export const applyEditorActions = (actions: ReadonlyArray<EditorAction>): void => {
+  const layers = useLayerStore.getState()
+  const elements = useElementsStore.getState()
+  for (const a of actions) {
+    const layer = layerNamed(a.layer)
+    switch (a.action) {
+      case "layer_create": if (!layer && a.layer) layers.addLayer({ name: a.layer.trim(), visible: true, locked: false, color: a.color ?? LAYER_COLORS[useLayerStore.getState().layers.length % LAYER_COLORS.length]! }); break
+      case "layer_rename": if (layer && a.newName) layers.updateLayer(layer.id, { name: a.newName.trim() }); break
+      case "layer_color": if (layer && a.color) layers.updateLayer(layer.id, { color: a.color }); break
+      case "layer_show": if (layer) layers.updateLayer(layer.id, { visible: true }); break
+      case "layer_hide": if (layer) layers.updateLayer(layer.id, { visible: false }); break
+      case "layer_lock": if (layer) layers.updateLayer(layer.id, { locked: true }); break
+      case "layer_unlock": if (layer) layers.updateLayer(layer.id, { locked: false }); break
+      case "layer_activate": if (layer) layers.setActiveLayer(layer.id); break
+      case "layer_delete": {
+        if (!layer || useLayerStore.getState().layers.length <= 1) break
+        const target = layerNamed(a.moveTo) ?? useLayerStore.getState().layers.find((candidate) => candidate.id !== layer.id)!
+        for (const element of useElementsStore.getState().elements) if (element.layerId === layer.id) elements.updateElement(element.id, { layerId: target.id })
+        layers.deleteLayer(layer.id)
+        break
+      }
+      case "view_3d": useCADStore.getState().setViewMode("3d"); break
+      case "view_2d": useCADStore.getState().setViewMode("2d"); break
+      case "view_fit": requestFitView(); break
+      case "section_on": useCADStore.getState().setSection(mergeSection({ ...useCADStore.getState().section, enabled: true }, { axis: a.axis, position: a.position, inverted: a.inverted })); useCADStore.getState().setViewMode("3d"); break
+      case "section_off": useCADStore.getState().setSection({ enabled: false }); break
+      case "select": if (a.ids && a.ids.length > 0) useSelectionStore.getState().selectMultiple([...a.ids]); break
+      case "select_none": useSelectionStore.getState().clearSelection(); break
+      case "show": for (const id of a.ids ?? []) elements.updateElement(id, { visible: true }); break
+      case "hide": for (const id of a.ids ?? []) elements.updateElement(id, { visible: false }); break
+      case "isolate": for (const patch of isolate(useElementsStore.getState().elements, a.ids ?? [])) elements.updateElement(patch.id, { visible: patch.visible }); break
+      case "undo": useElementsStore.getState().undo(); break
+      case "redo": useElementsStore.getState().redo(); break
+    }
+  }
 }
 
 /** Applies the changes to the elements store; returns how many elements were added, updated and removed. */
@@ -74,6 +148,7 @@ const applyOpsNow = (ops: ReadonlyArray<SyncOp>): { readonly added: number; read
   const store = useElementsStore.getState()
   let added = 0, updated = 0, removed = 0
   for (const op of ops) {
+    if (op.kind === "editor") { applyEditorActions(op.actions); continue }
     if (op.kind === "add") {
       const known = new Set(useElementsStore.getState().elements.map((element) => element.id))
       const fresh = op.elements.filter((element) => !known.has(String(element["id"])))

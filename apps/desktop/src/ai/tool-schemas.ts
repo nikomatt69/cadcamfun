@@ -73,6 +73,26 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
       changes: record
     })).check(Schema.isMinLength(1))
   }),
+  cad_transform_entities: Schema.Struct({
+    ids: Schema.Array(nonEmptyString).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    dx: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    dy: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    dz: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    rotateAxis: Schema.optional(Schema.Union([Schema.Literal("x"), Schema.Literal("y"), Schema.Literal("z")])),
+    rotateDegrees: Schema.optional(Schema.Number.check(Schema.isFinite())),
+    scale: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))),
+    about: Schema.optional(Schema.Struct({ x: Schema.Number, y: Schema.Number, z: Schema.Number })),
+    copies: Schema.optional(intNonNegative.check(Schema.isLessThanOrEqualTo(100)))
+  }),
+  cad_group_entities: Schema.Struct({
+    ids: Schema.Array(nonEmptyString).check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+    name: Schema.optional(nonEmptyString),
+    ungroup: Schema.optional(Schema.Boolean),
+    layer: Schema.optional(nonEmptyString)
+  }),
+  cad_editor: Schema.Struct({
+    actions: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(40))
+  }),
   cad_delete_entities: Schema.Struct({
     ids: Schema.Array(nonEmptyString).check(Schema.isMinLength(1)),
     confirm: Schema.Literal(true)

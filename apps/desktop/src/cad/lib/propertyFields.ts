@@ -469,6 +469,17 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
         { name: "wireframe", label: "Wireframe", type: "checkbox" }
       ];
 
+    // A parametric part: its geometry comes from its history, edited in the parametric panel below the form.
+    case "parametric":
+      return [
+        { name: "x", label: "X", type: "number", step: 0.1 },
+        { name: "y", label: "Y", type: "number", step: 0.1 },
+        { name: "z", label: "Z", type: "number", step: 0.1 },
+        { name: "color", label: "Color", type: "color" },
+        { name: "rotation", label: "Rotation", type: "vector3", unit: "°" },
+        { name: "wireframe", label: "Wireframe", type: "checkbox" }
+      ];
+
     // ======= OPERAZIONI DI TRASFORMAZIONE =======
     case "revolution":
       return [

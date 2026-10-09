@@ -2,6 +2,8 @@
  * Files the user attaches to a chat message.
  *
  *   image (png, jpeg, webp, gif)  -> a file part the model looks at (a drawing, a photo, a sketch)
+ *   pdf                           -> a file part too (a dimensioned drawing as a document); a model that cannot read PDFs gets
+ *                                    the transform's explicit "cannot read" notice instead of a failed request
  *   text (dxf, svg, csv, gcode, ...) -> kept by name for the tools (`cad_import_drawing` reads a DXF/SVG attachment) and, when
  *                                       short, shown to the model in the message itself
  *   anything else                    -> refused with a reason (never silently dropped)
@@ -12,6 +14,7 @@ import { Schema } from "effect"
 
 export const MAX_ATTACHMENTS = 5
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+export const MAX_PDF_BYTES = 10 * 1024 * 1024
 export const MAX_TEXT_CHARS = 2_000_000
 /** Text files up to this size are also written into the message, so the model reads them without a tool call. */
 export const INLINE_TEXT_CHARS = 6_000
@@ -47,8 +50,9 @@ const TEXT_EXTENSIONS = new Set(["dxf", "svg", "step", "stp", "csv", "txt", "nc"
 
 const extensionOf = (name: string): string => name.slice(name.lastIndexOf(".") + 1).toLowerCase()
 
-export const kindOf = (attachment: Pick<Attachment, "name" | "mime">): "image" | "text" | "unsupported" => {
+export const kindOf = (attachment: Pick<Attachment, "name" | "mime">): "image" | "pdf" | "text" | "unsupported" => {
   if (attachment.mime !== undefined && IMAGE_MIMES.has(attachment.mime)) return "image"
+  if (attachment.mime === "application/pdf" || extensionOf(attachment.name) === "pdf") return "pdf"
   const ext = extensionOf(attachment.name)
   if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "webp" || ext === "gif") return "image"
   if (TEXT_EXTENSIONS.has(ext) || (attachment.mime ?? "").startsWith("text/")) return "text"
@@ -110,6 +114,13 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
       const mime = mimeOfImage(attachment)
       parts.push({ type: "file", mime, filename: name, url: `data:${mime};base64,${attachment.data}` })
       lines.push(`- ${name}: image (attached below). Read the dimensions, shapes and notes in it; for a dimensioned drawing build the part with cad_add_elements from the numbers you read.`)
+    } else if (kind === "pdf") {
+      if (bytesOf(attachment.data) > MAX_PDF_BYTES) {
+        rejected.push({ name, reason: `PDF larger than ${MAX_PDF_BYTES / 1024 / 1024} MB` })
+        continue
+      }
+      parts.push({ type: "file", mime: "application/pdf", filename: name, url: `data:application/pdf;base64,${attachment.data}` })
+      lines.push(`- ${name}: PDF document (attached below). Read the dimensions, views and notes in it; for a dimensioned drawing build the part with cad_add_elements from the numbers you read.`)
     } else if (kind === "text") {
       if (attachment.data.length > MAX_TEXT_CHARS) {
         rejected.push({ name, reason: `text longer than ${MAX_TEXT_CHARS} characters` })
@@ -127,7 +138,7 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
         lines.push(`- ${name}: text, ${attachment.data.length} characters (${hint}).`)
       }
     } else {
-      rejected.push({ name, reason: "unsupported file type (images, DXF, SVG, G-code and text files are read)" })
+      rejected.push({ name, reason: "unsupported file type (images, PDF, DXF, SVG, G-code and text files are read)" })
     }
   }
   for (const r of rejected) lines.push(`- ${r.name}: NOT read - ${r.reason}.`)

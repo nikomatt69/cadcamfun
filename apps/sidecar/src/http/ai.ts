@@ -1,6 +1,6 @@
 import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiBackground, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
-  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, GcodeActionError, GcodeActionFailure, InternalError
+  AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
 import { Effect, Option, Redacted, Stream } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm"
 import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
+import { ActingUser } from "../services/acting-user.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -28,6 +29,7 @@ const aiError = (e: { _tag: string; message?: string }) =>
 export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(handlers) {
   const ai = yield* AiService
   const credentials = yield* AiCredentials
+  const actingUser = yield* ActingUser
   const background = yield* Effect.serviceOption(AiBackground)
   const host = yield* Effect.serviceOption(AiHost)
   const { query } = yield* Database
@@ -115,6 +117,8 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       (e) => Effect.fail(new AiFailure({ error: aiError(e as never) })))))
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
+      // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
+      actingUser.set(yield* CurrentUser)
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
@@ -133,7 +137,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const state = yield* ai.sessionState(payload.sessionId, payload.projectId).pipe(
         Effect.mapError((e) => new InternalError({ message: e.message }))
       )
-      return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}) }
+      return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}), ...(state.tasks !== undefined ? { tasks: state.tasks } : {}) }
     }))
     .handle("removeSession", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
@@ -176,6 +180,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       yield* reloadSkills
       const skills = yield* skillInfos
       return { skills, max: MAX_USER_SKILLS }
+    }))
+    .handle("chatQueue", ({ payload }) => Effect.gen(function*() {
+      if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
+      if (!payload.message || payload.message.trim() === "") return yield* new BadRequest({ message: "message is required" })
+      yield* ai.queue({ sessionId: payload.sessionId, message: payload.message, ...(payload.delivery ? { delivery: payload.delivery } : {}) }).pipe(
+        Effect.mapError((e) => new BadRequest({ message: e.message }))
+      )
+      return { message: "Queued" }
     }))
     .handle("chatAbort", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })

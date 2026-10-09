@@ -3,6 +3,8 @@ import { resetStores } from "./helpers/reset-stores.ts"
 import { applyOps, mirrorToolResult, opsFor } from "../src/ai/editor-sync.ts"
 import { useElementsStore } from "../src/cad/store/elementsStore.ts"
 import { useLayerStore } from "../src/cad/store/layerStore.ts"
+import { useCADStore } from "../src/cad/store/cadStore.ts"
+import { plateTemplate } from "@cadcamfun/core"
 
 const json = (value: unknown) => JSON.stringify(value)
 const cube = { id: "e1", type: "cube", layerId: "default", x: 1, y: 2, z: 3, width: 10, height: 10, depth: 10 }
@@ -54,5 +56,13 @@ describe("assistant results -> editor", () => {
     expect(useElementsStore.getState().elements.find((e) => e.id === "e1")).toMatchObject({ x: 50, radius: 4 })
     expect(applyOps([{ kind: "delete", ids: ["e1", "ghost"] }]).removed).toBe(1)
     expect(useElementsStore.getState().elements.some((e) => e.id === "e1")).toBe(false)
+  })
+
+  test("a solid the assistant builds (a parametric part, an extrusion, a Boolean) switches a 2D view to 3D", () => {
+    for (const element of [{ id: "p1", type: "parametric", history: plateTemplate() }, { id: "x1", type: "extrusion" }, { id: "b1", type: "boolean-union", operands: [] }]) {
+      useCADStore.getState().setViewMode("2d")
+      applyOps([{ kind: "add", elements: [{ ...element, layerId: "default" }] }])
+      expect(useCADStore.getState().viewMode).toBe("3d")
+    }
   })
 })

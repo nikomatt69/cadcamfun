@@ -9,8 +9,11 @@ import { cadAddEntities } from "./cad_add_entities.ts"
 import { cadCheckDesign } from "./cad_check_design.ts"
 import { cadDeleteEntities } from "./cad_delete_entities.ts"
 import { cadDescribeDrawing } from "./cad_describe_drawing.ts"
+import { cadEditor } from "./cad_editor.ts"
+import { cadGroupEntities } from "./cad_group_entities.ts"
 import { cadImportDrawing } from "./cad_import_drawing.ts"
 import { cadModifyEntities } from "./cad_modify_entities.ts"
+import { cadTransformEntities } from "./cad_transform_entities.ts"
 import { camAnalyzeGcode } from "./cam_analyze_gcode.ts"
 import { camCreateOperation } from "./cam_create_operation.ts"
 import { camDescribeMachine } from "./cam_describe_machine.ts"
@@ -27,7 +30,7 @@ import { memoryRecall } from "./memory_recall.ts"
 import { memoryRemember } from "./memory_remember.ts"
 
 export const BUILT_IN_TOOLS = [
-  cadAddEntities, cadAddElements, cadImportDrawing, cadModifyEntities, cadDeleteEntities, cadDescribeDrawing, cadCheckDesign,
+  cadAddEntities, cadAddElements, cadImportDrawing, cadModifyEntities, cadTransformEntities, cadGroupEntities, cadEditor, cadDeleteEntities, cadDescribeDrawing, cadCheckDesign,
   camDescribeMachine, camCreateOperation, camListOperations, camUpdateOperation, camSuggestParameters, camGenerateGcode, camAnalyzeGcode, camVerifyToolpath,
   libLookupMaterial, libLookupTool, memoryRemember, memoryRecall
 ] as const

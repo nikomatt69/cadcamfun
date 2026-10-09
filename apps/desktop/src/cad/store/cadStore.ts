@@ -2,6 +2,7 @@
 import { create } from "../../state/zustand.ts";
 import { DEFAULT_TOLERANCE } from "@cadcamfun/core";
 import { useElementsStore } from "./elementsStore.ts";
+import { DEFAULT_SECTION, type SectionState } from "../lib/section.ts";
 
 type ViewMode = "2d" | "3d";
 type OriginPreset =
@@ -84,10 +85,15 @@ interface CADState {
   tolerance: number;
   setTolerance: (tolerance: number) => void;
   setWorkpieceFromElement: (elementId: string) => void;
+  /** The section view: a plane that cuts the model open at one point along an axis. */
+  section: SectionState;
+  setSection: (patch: Partial<SectionState>) => void;
 }
 
 export const useCADStore = create<CADState>((set, get) => ({
   viewMode: "3d",
+  section: DEFAULT_SECTION,
+  setSection: (patch) => set((state) => ({ section: { ...state.section, ...patch } })),
   tolerance: DEFAULT_TOLERANCE,
   setTolerance: (tolerance) => set({ tolerance }),
   activeTool: "select",

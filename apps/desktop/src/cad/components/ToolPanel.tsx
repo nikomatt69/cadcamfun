@@ -117,6 +117,9 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
         {positionFields()}
         <div class="mt-3">
           <p class="text-xs text-gray-500 mb-2">This element type ({props.type}) has additional properties available in advanced mode.</p>
+          <Show when={props.type === "parametric"}>
+            <p class="text-xs text-gray-500 mb-2">Starts as a plate with a hole. Select it afterwards to edit its parameters (width, depth, thick, hole) and features in the property panel.</p>
+          </Show>
           <Show when={props.type.includes("boolean")}>
             <div class="text-xs text-gray-500 mb-2">
               <p>To use boolean operations:</p>

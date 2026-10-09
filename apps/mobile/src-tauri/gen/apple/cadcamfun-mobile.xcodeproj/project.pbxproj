@@ -1,0 +1,465 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		03669C54953A9BB576AA75D4 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 22B9869BCFAF97CE832E6D67 /* UIKit.framework */; };
+		1E9EB2182F310815F6928388 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C5BBC61708BCC95004DE935A /* WebKit.framework */; };
+		22DE8BF97BA53B6DAAF315AF /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = BD84CAC4E4468DBE3311825D /* main.mm */; };
+		4C93A22748CE52C450ED16DE /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F687155BB295448054D040C9 /* CoreGraphics.framework */; };
+		70330613A6DCE70EA7F7E8EF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 827E95B50DEB446D2820F737 /* LaunchScreen.storyboard */; };
+		95B5D4B94B6554D3DE82C81B /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EF88C45BDC50251420A43A33 /* libapp.a */; };
+		AD6EE93D587D98547AD1449F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 8BBE1F6DC0212D3E5090FD83 /* assets */; };
+		E4FA6588D7336D233A72FB3A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5BC89880492D8C459D49478C /* Assets.xcassets */; };
+		E68793ADA546C2F2D034917A /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1C853047350D1D725FB4EED2 /* MetalKit.framework */; };
+		E6F361A50AE1F08A96ACB103 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D24DEEEE73B19C242352D12B /* QuartzCore.framework */; };
+		F579E2F639DC2E1387FA910E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8ADA2870E06726B36140522 /* Metal.framework */; };
+		FB63DBE31A8D99DD55EDE498 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 380A356865EDD402F8911742 /* Security.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		086CCA0E8B5587C099F51C91 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		1C853047350D1D725FB4EED2 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		22B9869BCFAF97CE832E6D67 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		2EF289F4EE7103E27258E6F6 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		380A356865EDD402F8911742 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		5BC89880492D8C459D49478C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		694BAEECF27303102C848181 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		827E95B50DEB446D2820F737 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		8BBE1F6DC0212D3E5090FD83 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		9F741E971E1AA019B5C6F381 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		B8442ADFAB633F965B054091 /* cadcamfun-mobile_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "cadcamfun-mobile_iOS.entitlements"; sourceTree = "<group>"; };
+		BD84CAC4E4468DBE3311825D /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		C5BBC61708BCC95004DE935A /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		C8ADA2870E06726B36140522 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		D24DEEEE73B19C242352D12B /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		DC0967468EB799DB09B44AC8 /* cadcamfun-mobile_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "cadcamfun-mobile_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF88C45BDC50251420A43A33 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		F687155BB295448054D040C9 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		26E051101E642B0716536313 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				95B5D4B94B6554D3DE82C81B /* libapp.a in Frameworks */,
+				4C93A22748CE52C450ED16DE /* CoreGraphics.framework in Frameworks */,
+				F579E2F639DC2E1387FA910E /* Metal.framework in Frameworks */,
+				E68793ADA546C2F2D034917A /* MetalKit.framework in Frameworks */,
+				E6F361A50AE1F08A96ACB103 /* QuartzCore.framework in Frameworks */,
+				FB63DBE31A8D99DD55EDE498 /* Security.framework in Frameworks */,
+				03669C54953A9BB576AA75D4 /* UIKit.framework in Frameworks */,
+				1E9EB2182F310815F6928388 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0879339F83CCCA26527546EF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F687155BB295448054D040C9 /* CoreGraphics.framework */,
+				EF88C45BDC50251420A43A33 /* libapp.a */,
+				C8ADA2870E06726B36140522 /* Metal.framework */,
+				1C853047350D1D725FB4EED2 /* MetalKit.framework */,
+				D24DEEEE73B19C242352D12B /* QuartzCore.framework */,
+				380A356865EDD402F8911742 /* Security.framework */,
+				22B9869BCFAF97CE832E6D67 /* UIKit.framework */,
+				C5BBC61708BCC95004DE935A /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1D8D31918FA1E974A52A3B63 /* cadcamfun-mobile */ = {
+			isa = PBXGroup;
+			children = (
+				BD84CAC4E4468DBE3311825D /* main.mm */,
+				8D3D89265FF1E345BA29B748 /* bindings */,
+			);
+			path = "cadcamfun-mobile";
+			sourceTree = "<group>";
+		};
+		2C7FB708569DBC61B0069435 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		63200D33F1D377A061319C6C /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				1D8D31918FA1E974A52A3B63 /* cadcamfun-mobile */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		7CCBC0E84C07B5892960D6B1 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				9F741E971E1AA019B5C6F381 /* lib.rs */,
+				086CCA0E8B5587C099F51C91 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		8D3D89265FF1E345BA29B748 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				2EF289F4EE7103E27258E6F6 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		9BBDA4440B446D9BEED304D6 /* cadcamfun-mobile_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				B8442ADFAB633F965B054091 /* cadcamfun-mobile_iOS.entitlements */,
+				694BAEECF27303102C848181 /* Info.plist */,
+			);
+			path = "cadcamfun-mobile_iOS";
+			sourceTree = "<group>";
+		};
+		BFEE334E21361873BF099D59 = {
+			isa = PBXGroup;
+			children = (
+				8BBE1F6DC0212D3E5090FD83 /* assets */,
+				5BC89880492D8C459D49478C /* Assets.xcassets */,
+				827E95B50DEB446D2820F737 /* LaunchScreen.storyboard */,
+				9BBDA4440B446D9BEED304D6 /* cadcamfun-mobile_iOS */,
+				2C7FB708569DBC61B0069435 /* Externals */,
+				63200D33F1D377A061319C6C /* Sources */,
+				7CCBC0E84C07B5892960D6B1 /* src */,
+				0879339F83CCCA26527546EF /* Frameworks */,
+				E18C99884FA9E8973B84F6BC /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E18C99884FA9E8973B84F6BC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DC0967468EB799DB09B44AC8 /* cadcamfun-mobile_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FB039A6FA529D7A7EAB00723 /* cadcamfun-mobile_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E637DB5F05AC5F0E0799AA5B /* Build configuration list for PBXNativeTarget "cadcamfun-mobile_iOS" */;
+			buildPhases = (
+				A9F3FEAE994898367E9B2CB3 /* Build Rust Code */,
+				4442754D57624385F4E2E8DD /* Sources */,
+				D8A5B76C52948B32879E2598 /* Resources */,
+				26E051101E642B0716536313 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "cadcamfun-mobile_iOS";
+			packageProductDependencies = (
+			);
+			productName = "cadcamfun-mobile_iOS";
+			productReference = DC0967468EB799DB09B44AC8 /* cadcamfun-mobile_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DD351C356B873322344D020A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					FB039A6FA529D7A7EAB00723 = {
+						DevelopmentTeam = 5FAU2JSAM3;
+					};
+				};
+			};
+			buildConfigurationList = 78937298D2F8443E062C8443 /* Build configuration list for PBXProject "cadcamfun-mobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = BFEE334E21361873BF099D59;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E18C99884FA9E8973B84F6BC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FB039A6FA529D7A7EAB00723 /* cadcamfun-mobile_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D8A5B76C52948B32879E2598 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4FA6588D7336D233A72FB3A /* Assets.xcassets in Resources */,
+				70330613A6DCE70EA7F7E8EF /* LaunchScreen.storyboard in Resources */,
+				AD6EE93D587D98547AD1449F /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A9F3FEAE994898367E9B2CB3 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bun tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4442754D57624385F4E2E8DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				22DE8BF97BA53B6DAAF315AF /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3908103571499E59B4EB3E0C /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		7679B1EA3B4303385DA861C9 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		98DB99F28428D8C59DB70E2B /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "cadcamfun-mobile_iOS/cadcamfun-mobile_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "5FAU2JSAM3";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "cadcamfun-mobile_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.cadcamfun.companion;
+				PRODUCT_NAME = "CADCAMFUN";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		D6FADEF12D98E2122F9DAC6E /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "cadcamfun-mobile_iOS/cadcamfun-mobile_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "5FAU2JSAM3";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "cadcamfun-mobile_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.cadcamfun.companion;
+				PRODUCT_NAME = "CADCAMFUN";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		78937298D2F8443E062C8443 /* Build configuration list for PBXProject "cadcamfun-mobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7679B1EA3B4303385DA861C9 /* debug */,
+				3908103571499E59B4EB3E0C /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		E637DB5F05AC5F0E0799AA5B /* Build configuration list for PBXNativeTarget "cadcamfun-mobile_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				98DB99F28428D8C59DB70E2B /* debug */,
+				D6FADEF12D98E2122F9DAC6E /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DD351C356B873322344D020A /* Project object */;
+}

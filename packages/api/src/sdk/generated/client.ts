@@ -83,6 +83,8 @@ import type {
   AiChatOutput,
   AiChatStreamInput,
   AiChatStreamOutput,
+  AiChatQueueInput,
+  AiChatQueueOutput,
   AiChatAbortInput,
   AiChatAbortOutput,
   AiPermissionReplyInput,
@@ -1194,6 +1196,23 @@ export function make(options: ClientOptions) {
               projectId: input?.["projectId"],
               context: input?.["context"],
               model: input?.["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      chatQueue: (input: AiChatQueueInput, requestOptions?: RequestOptions) =>
+        request<AiChatQueueOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/chat/queue`,
+            body: {
+              sessionId: input["sessionId"],
+              message: input["message"],
+              projectId: input["projectId"],
+              delivery: input["delivery"],
             },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],

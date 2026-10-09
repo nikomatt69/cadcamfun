@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { cam } from "@cadcamfun/core"
 import { applyChanges, describeElements, elementsOf, newElements } from "../src/services/ai-elements.ts"
 
 let n = 0
@@ -50,6 +51,29 @@ describe("assistant element mapping", () => {
     expect(applyChanges(rect!, { origin: { x: 100, y: 100 } })).toMatchObject({ x: 105, y: 105 })
     const [torus] = newElements([{ type: "torus", center: { x: 0, y: 0 }, radius: 10, tube: 2 }], "L1", id)
     expect(applyChanges(torus!, { tube: 3, layer: "L9" })).toMatchObject({ tubeRadius: 3, layerId: "L9" })
+  })
+
+  test("a change carries any field of the element, and parameters merge into a parametric history", () => {
+    const [cube] = newElements([{ type: "cube", center: { x: 0, y: 0, z: 0 }, width: 10, height: 10, depth: 10 }], "L1", id)
+    expect(applyChanges(cube!, { x: 5, rotation: { x: 90, y: 0, z: 0 }, id: "other", type: "sphere" })).toMatchObject({ id: cube!.id, type: "cube", x: 5, rotation: { x: 90, y: 0, z: 0 } })
+    const part = { id: "p", type: "parametric", layerId: "L1", history: { parameters: { width: 60, depth: 40 }, features: [{ id: "f" }] } } as never
+    const wider = applyChanges(part, { parameters: { width: 80 } }) as unknown as { history: { parameters: Record<string, number>; features: unknown[] }; parameters?: unknown }
+    expect(wider.history.parameters).toEqual({ width: 80, depth: 40 })
+    expect(wider.history.features).toHaveLength(1)
+    expect(wider.parameters).toBeUndefined()
+  })
+
+  test("the overview uses real bounds for solids that have no radius: an extrusion, a capsule on its side, a wall", () => {
+    const boundsOf = (element: Record<string, unknown>) => cam.generator.elementBounds(element as never)
+    const elements = [
+      { id: "a", type: "extrusion", layerId: "L", x: 100, y: 0, z: 0, shape: "rect", width: 20, height: 10, depth: 30 },
+      { id: "b", type: "capsule", layerId: "L", x: 0, y: 0, z: 0, radius: 5, height: 40, direction: "x" }
+    ] as never
+    const d = describeElements(elements, 200, boundsOf)
+    expect(d.bounds).toEqual({ min: { x: -25, y: -5, z: -5 }, max: { x: 110, y: 5, z: 30 } })
+    expect(d.elements.map((e) => e.size)).toEqual([[20, 10, 30], [50, 10, 10]])
+    // Without the hook the old reading by type is kept.
+    expect(describeElements(elements).bounds).not.toBeNull()
   })
 
   test("the overview counts, bounds and lists", () => {

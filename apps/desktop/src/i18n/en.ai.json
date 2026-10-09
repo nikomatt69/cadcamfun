@@ -20,7 +20,7 @@
   "ai.context.messages": "Messages",
   "ai.context.included": "Workspace context",
   "ai.context.excluded": "Context off",
-  "ai.context.usageHint": "Tokens are cumulative reported usage, not live context occupancy. Saved conversations contain text; the host manages model context separately.",
+  "ai.context.usageHint": "Cumulative tokens are the total reported across the conversation. The gauge in the header shows the live context: the tokens of the latest model call against the model's window.",
   "ai.sessions.newConversation": "New conversation",
   "ai.processing.enhanced": "nikcli is working…",
   "ai.processing.usingEnhanced": "Working with the active model",
@@ -29,7 +29,6 @@
   "ai.docked": "Docked",
   "ai.you": "You",
   "ai.assistant": "Assistant",
-
   "ai.header.subtitle": "Project: {name} • {count} elements • nikcli {host}",
   "ai.header.noProject": "No active project",
   "ai.header.subtitleNoCount": "Project: {name} • nikcli {host}",
@@ -38,7 +37,6 @@
   "ai.header.memory": "{count} notes",
   "ai.header.sessions": "{count} sessions",
   "ai.header.elements": "elements",
-
   "ai.stats.title": "Session statistics",
   "ai.stats.exchanges": "Exchanges",
   "ai.stats.toolCalls": "Tool calls",
@@ -46,13 +44,11 @@
   "ai.stats.usage": "Tokens",
   "ai.stats.memoryEntries": "Memory entries",
   "ai.stats.latency": "Avg turn",
-
   "ai.toolbar.statistics": "Session statistics",
   "ai.toolbar.memory": "Saved notes",
   "ai.toolbar.model": "Model",
   "ai.toolbar.context": "Include context",
   "ai.toolbar.refresh": "Refresh models",
-
   "ai.model.label": "Model",
   "ai.providers.title": "Providers & API keys",
   "ai.providers.keyPlaceholder": "API key",
@@ -72,7 +68,6 @@
   "ai.model.provider.openai": "OpenAI",
   "ai.model.provider.minimax": "MiniMax",
   "ai.model.provider.gateway": "Gateway",
-
   "ai.model.current": "Current model",
   "ai.catalogue.providerCount": "{count} providers",
   "ai.catalogue.modelCount": "{count} models",
@@ -82,18 +77,15 @@
   "ai.catalogue.noProviderModels": "This provider publishes no model in the catalogue.",
   "ai.catalogue.loading": "Loading the provider catalogue…",
   "ai.catalogue.unavailable": "The provider catalogue is unavailable. The AI host may not have started yet.",
-
   "ai.thinking.title": "Thinking",
   "ai.thinking.expand": "Show details",
   "ai.thinking.collapse": "Hide details",
   "ai.thinking.processing": "nikcli is thinking…",
-
   "ai.suggestions.title": "Suggestions",
   "ai.suggestions.dismiss": "Dismiss",
   "ai.suggestions.apply": "Use",
   "ai.suggestions.empty": "No suggestions for this project yet.",
   "ai.suggestions.emptyHint": "Draw geometry or add a CAM operation to see suggestions.",
-
   "ai.message.user": "You",
   "ai.message.assistant": "Assistant",
   "ai.message.system": "System",
@@ -109,25 +101,20 @@
   "ai.message.copied": "Copied",
   "ai.message.error": "Failed to get a response.",
   "ai.message.aborted": "The request was cancelled.",
-
   "ai.tool.tools": "Available tools",
   "ai.tool.toolsHint": "The assistant can run only these tools (locked-down by nikcli):",
   "ai.tool.count": "{count} tools",
-
   "ai.memory.title": "Saved notes",
   "ai.memory.key": "Key",
   "ai.memory.value": "Value",
   "ai.memory.empty": "No notes yet. The assistant remembers preferences and facts between conversations.",
   "ai.memory.add": "Add note",
   "ai.memory.delete": "Delete",
-
   "ai.status.configured": "Configured",
   "ai.status.missing": "No key",
   "ai.status.host.nikcli": "nikcli",
   "ai.status.host.direct": "direct",
-
   "ai.permission.needed": "The assistant is asking for permission to {permission}.",
-
   "ai.skills.title": "Skills",
   "ai.skills.count": "{builtIn} built-in · {user}/{max} yours",
   "ai.skills.hint": "A skill is a SKILL.md the assistant reads when a task fits (front matter name + description, then the steps). It can run nothing and add no permissions.",
@@ -171,27 +158,22 @@
   "ai.input.shortcut.hint": "Enter to send · Shift+Enter for newline",
   "ai.input.charCount": "{count}/4000",
   "ai.input.attaching": "Context attached",
-
   "ai.page.title": "AI assistant",
   "ai.page.subtitle": "Ask about the current project; answers stream in.",
   "ai.page.placeholder": "Describe what you want to machine",
   "ai.page.send": "Send",
-
   "ai.error.config": "No AI provider is configured. Open Settings → AI to add a key.",
   "ai.error.provider": "The model provider failed. Try a different model or retry.",
   "ai.error.aborted": "The request was cancelled.",
   "ai.error.internal": "The assistant hit an internal error.",
   "ai.error.network": "Could not reach the AI sidecar.",
-
   "ai.copilot.toggle": "Toggle AI Copilot",
   "ai.copilot.enable": "Enable AI Copilot",
   "ai.copilot.disable": "Disable AI Copilot",
-
   "mcp.type.sse": "Server-Sent Events (SSE)",
   "mcp.type.stdio": "Standard I/O (stdio)",
   "mcp.type.sseShort": "SSE",
   "mcp.type.stdioShort": "stdio",
-
   "mcp.settings.title": "MCP Server Settings",
   "mcp.settings.directory": "Server Directory",
   "mcp.settings.editor": "Editor MCP.json",
@@ -216,7 +198,6 @@
   "mcp.settings.statusError": "Failed to update server status",
   "mcp.settings.deleteError": "Failed to delete server",
   "mcp.settings.confirmDelete": "Are you sure you want to delete this server?",
-
   "mcp.form.serverName": "Server Name",
   "mcp.form.namePlaceholder": "My MCP Server",
   "mcp.form.nameRequired": "Name is required",
@@ -241,14 +222,12 @@
   "mcp.form.saving": "Saving...",
   "mcp.form.update": "Update Server",
   "mcp.form.cancel": "Cancel",
-
   "mcp.edit.back": "← Back to Server Settings",
   "mcp.edit.title": "Edit MCP Server",
   "mcp.edit.loadError": "Failed to load server details",
   "mcp.edit.updateError": "Failed to update server",
   "mcp.edit.notFound": "Server not found",
   "mcp.edit.backToSettings": "Back to Settings",
-
   "mcp.editor.title": "Editor MCP.json",
   "mcp.editor.back": "← Torna alle Impostazioni MCP",
   "mcp.editor.loadError": "Impossibile caricare il file di configurazione MCP",
@@ -272,7 +251,6 @@
   "mcp.editor.infoType": "Tipo di server (solo \"sse\" supportato)",
   "mcp.editor.infoUrl": "URL del server MCP",
   "mcp.editor.infoEnabled": "Stato di abilitazione (true/false)",
-
   "mcp.directory.title": "MCP Server Directory",
   "mcp.directory.countOne": "{count} server available",
   "mcp.directory.countMany": "{count} servers available",
@@ -290,11 +268,9 @@
   "mcp.directory.view": "View Details",
   "mcp.directory.loadError": "Failed to load servers",
   "mcp.directory.updateError": "Failed to update server",
-
   "mcp.toast.enabled": "Server enabled successfully",
   "mcp.toast.disabled": "Server disabled successfully",
   "mcp.toast.infoUnavailable": "Server info unavailable",
-
   "mcp.detail.back": "Back to Directory",
   "mcp.detail.notFound": "Server not found",
   "mcp.detail.loadError": "Failed to load server details",
@@ -309,5 +285,33 @@
   "mcp.detail.noTools": "No tools available",
   "mcp.detail.parameters": "Parameters:",
   "mcp.detail.offline": "Server information not available. The server might be offline or inaccessible.",
-  "mcp.detail.disabledNote": "This server is currently disabled. Enable it to view server information."
+  "mcp.detail.disabledNote": "This server is currently disabled. Enable it to view server information.",
+  "ai.agent.name.researcher": "Researcher",
+  "ai.agent.name.editor": "Editor",
+  "ai.agent.name.modeler": "Modeler",
+  "ai.agent.name.machinist": "Machinist",
+  "ai.tasks.title": "Agent tasks",
+  "ai.tasks.background": "background",
+  "ai.tasks.inTurn": "in this turn",
+  "ai.tasks.status.queued": "waiting",
+  "ai.tasks.status.running": "working",
+  "ai.tasks.status.completed": "done",
+  "ai.tasks.status.error": "failed",
+  "ai.tasks.status.cancelled": "cancelled",
+  "ai.tool.input": "Input",
+  "ai.tool.output": "Output",
+  "ai.tool.openVcs": "Open version control",
+  "ai.queue": "Queue",
+  "ai.steer": "Send now",
+  "ai.steer.title": "Interrupt and send now (Ctrl/Cmd+Enter)",
+  "ai.pending.queue": "Queued: the agent takes it in at the next step",
+  "ai.pending.steer": "Sending now",
+  "ai.context.gauge.label": "Context window",
+  "ai.context.gauge.tokens": "{tokens} tokens in context",
+  "ai.context.gauge.percent": "{percent}% of the {limit}-token window",
+  "ai.context.gauge.unknown": "Window size unknown for this model",
+  "ai.context.gauge.warn": "Getting full: the host summarises the conversation when it runs out.",
+  "ai.context.gauge.full": "Nearly full: the next steps may trigger a summary.",
+  "ai.tool.explored": "Looked at {count} things",
+  "ai.interrupted": "interrupted"
 }

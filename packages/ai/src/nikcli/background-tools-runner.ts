@@ -5,11 +5,15 @@ import {
   type BackgroundTask,
   type BackgroundTaskRunnerInput
 } from "./background-tasks.ts"
+import { adoptChildSession, subagentById, SUBAGENTS } from "./agents.ts"
+import { isTransientFailure } from "./chat.ts"
 import type { NikCliRuntime } from "./runtime.ts"
 
-export const CADCAM_WORKER_AGENT = "cadcam-worker"
+export const CADCAM_WORKER_AGENT = SUBAGENTS.researcher.host
 export const BACKGROUND_FINDINGS_PREFIX = "[CADCAM_AGENT background findings] "
-const WORKER_TIMEOUT_MS = 5 * 60 * 1000
+/** A specialist whose provider call failed for a reason that passes is asked again this many times. */
+const WORKER_RESUMES = 2
+const WORKER_BACKOFF_MS = 3_000
 
 const extractWorkerText = (
   parts: ReadonlyArray<{ type: string; text?: string }> | undefined
@@ -52,45 +56,73 @@ class WorkerRunner {
     private readonly parentSessionId: string
   ) {}
 
+  /** The model the parent conversation is using, so a specialist works with a model that is known to be connected. */
+  private async parentModel(host: Awaited<ReturnType<typeof this.hostOf>>): Promise<{ providerID: string; modelID: string } | undefined> {
+    try {
+      const messages = await host.client.session.messages({ sessionID: this.parentSessionId, limit: 20 })
+      for (const message of [...messages].reverse()) {
+        const model = message.info.role === "user" ? message.info.model : undefined
+        if (model?.providerID && model.modelID) return { providerID: model.providerID, modelID: model.modelID }
+      }
+    } catch {
+      // No record of the parent: the host picks its default model.
+    }
+    return undefined
+  }
+
+  private hostOf() {
+    return runPromise(this.runtime.host(this.projectId))
+  }
+
   async run(input: BackgroundTaskRunnerInput): Promise<string> {
     if (this.aborted) throw new Error("worker aborted")
+    const spec = subagentById(input.agent)
     const work: Promise<string> = (async (): Promise<string> => {
-      const host = await runPromise(this.runtime.host(this.projectId))
+      const host = await this.hostOf()
+      const model = await this.parentModel(host)
       const session = await host.client.session
         .create({ title: input.description, parentID: this.parentSessionId })
         .catch(async () => host.client.session.create({ title: input.description }))
+      // The parent's stream carries this session's tool calls, so what the specialist edits shows up in the editor live.
+      const release = adoptChildSession(this.parentSessionId, session.id, spec.id)
       try {
         const controller = new AbortController()
-        const timer = setTimeout(
-          () => controller.abort(new Error("worker timeout")),
-          WORKER_TIMEOUT_MS
-        )
+        const timer = setTimeout(() => controller.abort(new Error(`${spec.id} timeout`)), spec.timeoutMs)
         const onAbort = () => controller.abort(input.signal.reason ?? new Error("parent cancelled"))
         if (input.signal.aborted) controller.abort(input.signal.reason ?? new Error("parent cancelled"))
         input.signal.addEventListener("abort", onAbort, { once: true })
         try {
-          const result = await host.client["session-prompt"].prompt(
-            {
-              sessionID: session.id,
-              agent: CADCAM_WORKER_AGENT,
-              delivery: "queue",
-              parts: [{ type: "text", text: input.prompt }]
-            },
-            { signal: controller.signal }
-          )
-          if (result.info?.error?.name !== undefined) {
-            throw new Error(result.info.error.data?.message ?? result.info.error.name)
+          let text = input.prompt
+          for (let attempt = 0; ; attempt += 1) {
+            try {
+              const result = await host.client["session-prompt"].prompt(
+                {
+                  sessionID: session.id,
+                  agent: spec.host,
+                  delivery: "queue",
+                  ...(model ? { model } : {}),
+                  parts: [{ type: "text", text }]
+                },
+                { signal: controller.signal }
+              )
+              if (result.info?.error?.name !== undefined) throw new Error(result.info.error.data?.message ?? result.info.error.name)
+              if (result.name !== undefined) throw new Error(describePromptFailure(result))
+              return extractWorkerText(result.parts)
+            } catch (cause) {
+              const message = cause instanceof Error ? cause.message : String(cause)
+              if (attempt >= WORKER_RESUMES || controller.signal.aborted || !isTransientFailure(message)) throw cause
+              // The conversation of the child is intact: ask it to carry on after a pause.
+              await new Promise((r) => setTimeout(r, WORKER_BACKOFF_MS * 2 ** attempt))
+              text = "The connection to the model failed and has been restored. Continue from where you stopped: do not repeat steps that already completed (read the conversation and the tool results), and finish the job."
+            }
           }
-          if (result.name !== undefined) {
-            throw new Error(describePromptFailure(result))
-          }
-          return extractWorkerText(result.parts)
         } finally {
           clearTimeout(timer)
           input.signal.removeEventListener("abort", onAbort)
         }
       } finally {
-await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
+        release()
+        await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
       }
     })() as Promise<string>
     this.current = work
@@ -142,8 +174,7 @@ export class BackgroundToolsRunner {
 
   async cancelForParent(parentSessionId: string): Promise<number> {
     const cancelled = this.manager.cancelParent({ projectId: this.projectId, parentSessionId })
-    const runner = this.runners.get(parentSessionId)
-    await runner?.abort()
+    for (const [key, runner] of this.runners) if (key.endsWith(`\u0000${parentSessionId}`)) await runner.abort()
     return cancelled
   }
 
@@ -154,10 +185,11 @@ export class BackgroundToolsRunner {
   }
 
   private async invoke(input: BackgroundTaskRunnerInput): Promise<string> {
-    const key = input.parentSessionId
+    // The specialist works in the host of the project that asked for it: its tools act on that project's drawing.
+    const key = `${input.projectId}\u0000${input.parentSessionId}`
     let runner = this.runners.get(key)
     if (runner === undefined) {
-      runner = new WorkerRunner(this.runtime, this.projectId, input.parentSessionId)
+      runner = new WorkerRunner(this.runtime, input.projectId, input.parentSessionId)
       this.runners.set(key, runner)
     }
     return await runner.run(input)
@@ -171,17 +203,19 @@ export class BackgroundToolsRunner {
    */
   private async deliver(task: BackgroundTask): Promise<void> {
     if (task.status === "cancelled" || task.status === "running" || task.status === "queued") return
+    // A caller that waited for the result already has it.
+    if (task.background === false) return
     const host = await runPromise(this.runtime.host(task.projectId))
     const body =
       task.status === "completed"
-        ? `${BACKGROUND_FINDINGS_PREFIX}${task.text ?? ""}`
-        : `${BACKGROUND_FINDINGS_PREFIX}status=${task.status}${task.error ? `; error=${task.error}` : ""}`
+        ? `${BACKGROUND_FINDINGS_PREFIX}agent=${task.agent ?? "researcher"}; task=${task.description}\n${task.text ?? ""}`
+        : `${BACKGROUND_FINDINGS_PREFIX}agent=${task.agent ?? "researcher"}; status=${task.status}${task.error ? `; error=${task.error}` : ""}`
     try {
       await host.client["session-prompt"].promptAsync({
         sessionID: task.parentSessionId,
         agent: "cadcam",
         delivery: "queue",
-        parts: [{ type: "text", text: body }]
+        parts: [{ type: "text", text: body, synthetic: true }]
       })
     } catch {
       // Parent session removed (404) or busy after dispose; the worker already settled.

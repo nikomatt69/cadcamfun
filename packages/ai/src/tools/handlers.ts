@@ -22,6 +22,10 @@ export interface ToolHandlersShape {
   addElements(projectId: string, elements: ReadonlyArray<Record<string, unknown>>): Promise<unknown>
   modifyEntities(projectId: string, changes: ReadonlyArray<{ id: string; changes: unknown }>): Promise<unknown>
   deleteEntities(projectId: string, ids: ReadonlyArray<string>): Promise<unknown>
+  /** Moves, turns and scales existing elements, or lays out `copies` copies of them (each copy is the transform applied once more). */
+  transformEntities(projectId: string, input: { ids: ReadonlyArray<string>; transform: cad.ElementTransform; copies: number }): Promise<unknown>
+  /** Gathers elements into one component, or opens components into their parts. */
+  groupEntities(projectId: string, input: { ids: ReadonlyArray<string>; ungroup: boolean; name?: string; layer?: string }): Promise<unknown>
   describeDrawing(projectId: string): Promise<unknown>
   /** Design-space and model checks (`cad.checkModel`) of the open drawing. */
   checkDesign(projectId: string): Promise<unknown>

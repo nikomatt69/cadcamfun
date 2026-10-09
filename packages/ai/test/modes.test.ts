@@ -61,3 +61,23 @@ describe("systemPrompt with mode and context", () => {
     expect(prompt).toContain("general CAD/CAM")
   })
 })
+describe("model family working style (nikcli's per-family system prompts)", () => {
+  test("families follow nikcli's mapping", async () => {
+    const { modelFamilyOf } = await import("../src/prompts/system.ts")
+    expect(["gpt-5.2", "openai/gpt-6-astra", "gpt-reserve"].map(modelFamilyOf)).toEqual(["codex", "codex", "codex"])
+    expect(["gpt-4o", "o3-mini"].map(modelFamilyOf)).toEqual(["autonomous", "autonomous"])
+    expect(modelFamilyOf("gemini-3-pro")).toBe("gemini")
+    expect(modelFamilyOf("claude-sonnet-5-5")).toBe("claude")
+    expect(modelFamilyOf("MiniMax-M2")).toBe("other")
+  })
+
+  test("Claude gets the base prompt untouched; the others get their block after the mode", async () => {
+    const { systemPrompt } = await import("../src/prompts/system.ts")
+    const base = systemPrompt("ctx")
+    expect(systemPrompt("ctx", undefined, "claude-sonnet-5-5")).toBe(base)
+    const gpt4 = systemPrompt("ctx", undefined, "gpt-4o")
+    expect(gpt4.startsWith(base)).toBe(true)
+    expect(gpt4).toContain("Keep going until the request is completely resolved")
+    expect(systemPrompt("ctx", undefined, "gpt-5").slice(base.length)).toContain("short sentence")
+  })
+})

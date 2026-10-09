@@ -43,6 +43,17 @@ describe("sanitizeError", () => {
     expect(out.toLowerCase()).toContain("rate limit")
   })
 
+  test("every provider's overflow wording gets the context-window advice, including the host's own overflow message", () => {
+    for (const raw of [
+      "prompt is too long: 250000 tokens > 200000 maximum",
+      "context_length_exceeded",
+      "Your input exceeds the context window of this model",
+      "The conversation has exceeded the model's context limit.\nConsider:\n  - Starting a new conversation"
+    ]) {
+      expect(sanitizeError(raw)).toContain("context window")
+    }
+  })
+
   test("maps context length errors to a friendly message", () => {
     const out = sanitizeError("maximum context length is 4096 tokens")
     expect(out.toLowerCase()).toContain("context")

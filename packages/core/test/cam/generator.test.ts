@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { interpretGcode } from "../../src/cam/testing/gcode-interpreter.ts"
 import {
   DEFAULT_GEOMETRY,
@@ -18,6 +18,9 @@ import {
   type ToolpathSettings
 } from "../../src/cam/generator/index.ts"
 import { verifyRequestFor, verifyToolpath } from "../../src/cam/verify/index.ts"
+
+// The surface engine runs real machining simulations: on a busy machine (CI, a second suite) they need more than the default 5 s.
+setDefaultTimeout(60_000)
 
 const cam = { testing: { interpretGcode } }
 const settings = (patch: Partial<ToolpathSettings> = {}): ToolpathSettings => ({ ...DEFAULT_SETTINGS, ...patch })

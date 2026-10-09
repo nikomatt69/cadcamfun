@@ -23,9 +23,13 @@ import { useVerifyStore } from "../cam/store/verifyStore.ts"
 import { appProjectId, persistDrawingContext, prepareWorkspace, verificationState } from "./drawing-context.ts"
 import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "./persisted.ts"
 import type { ChatAttachment } from "./attachments.ts"
+import { contextTokensOf } from "./context-metrics.ts"
 import { mirrorCamResult } from "./cam-sync.ts"
 import { mirrorToolResult, reconcileFromStored } from "./editor-sync.ts"
-import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTodo, AiToolCalls, ChatModel } from "./types.ts"
+import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel } from "./types.ts"
+
+export type PendingDelivery = "queue" | "steer"
+export interface AiPending { readonly id: string; readonly text: string; readonly delivery: PendingDelivery }
 
 export interface AiStats {
   readonly exchanges: number
@@ -50,15 +54,25 @@ export interface AiStore {
   readonly goal: Accessor<AiGoal | undefined>
   /** What the agent is doing now: step, a tool being written, a retry, a compaction. */
   readonly activity: Accessor<AiActivity>
+  /** The jobs handed to specialist agents in this conversation, background ones included, live. */
+  readonly tasks: Accessor<ReadonlyArray<AiTask>>
   readonly model: Accessor<ChatModel | undefined>
   readonly setModel: (next: ChatModel | undefined | ((prev: ChatModel | undefined) => ChatModel | undefined)) => void
   readonly includeContext: Accessor<boolean>
   readonly setIncludeContext: (next: boolean | ((prev: boolean) => boolean)) => void
   readonly stats: Accessor<AiStats>
+  /** Tokens of the latest model call: what the next call resends, i.e. the live context occupancy. */
+  readonly contextTokens: Accessor<number>
   readonly suggestions: Accessor<ReadonlyArray<Suggestion>>
   readonly dismissSuggestion: (id: string) => void
   readonly projectId: Accessor<string | undefined>
-  readonly send: (prompt: string, attachments?: ReadonlyArray<ChatAttachment>) => Promise<void>
+  /**
+   * Sends a message. While the agent works it is handed to the running turn instead (nikcli's prompt box does the same):
+   * `queue` is taken in at the next safe step, `steer` at once; attachments only go with a message that starts a turn.
+   */
+  readonly send: (prompt: string, attachments?: ReadonlyArray<ChatAttachment>, delivery?: PendingDelivery) => Promise<void>
+  /** Messages written while the agent works that it has not taken in yet. */
+  readonly pending: Accessor<ReadonlyArray<AiPending>>
   readonly abort: () => void
   readonly clear: () => void
   readonly newSession: () => void
@@ -111,7 +125,10 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const [plan, setPlan] = createSignal<ReadonlyArray<AiTodo>>([])
   const [goal, setGoal] = createSignal<AiGoal | undefined>()
   const [activity, setActivity] = createSignal<AiActivity>({ step: 0, compacted: false })
+  const [tasks, setTasks] = createSignal<ReadonlyArray<AiTask>>([])
+  const [pending, setPending] = createSignal<ReadonlyArray<AiPending>>([])
   const [stats, setStats] = createSignal<AiStats>(emptyStats())
+  const [contextTokens, setContextTokens] = createSignal(0)
   const [dismissedSuggestions, setDismissedSuggestions] = createSignal<ReadonlyArray<string>>([])
   const [projectContextRevision, setProjectContextRevision] = createSignal(0)
 
@@ -167,31 +184,125 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   const projectId = (): string | undefined => appProjectId(app)
 
+  /** Merge what a task tool answered (one task or a list) into the task list, so the chat shows it before the next poll. */
+  const noteTasks = (output: string): void => {
+    let parsed: unknown
+    try { parsed = JSON.parse(output) } catch { return }
+    const incoming = (Array.isArray(parsed) ? parsed : [parsed]).filter((t): t is AiTask => typeof t === "object" && t !== null && typeof (t as AiTask).id === "string" && typeof (t as AiTask).status === "string")
+    if (incoming.length === 0) return
+    setTasks((current) => {
+      const byId = new Map(current.map((t) => [t.id, t] as const))
+      for (const task of incoming) byId.set(task.id, { ...byId.get(task.id), ...task, agent: task.agent ?? "researcher", background: task.background !== false })
+      return [...byId.values()]
+    })
+  }
+
+  // Background tasks go on after the turn ends, and when one finishes the host wakes the agent with its report and the agent
+  // answers on its own. No stream carries that, so the host's session state is polled until the tasks and the answer are done.
+  const POLL_MS = 2_000
+  const WAKE_ROUNDS = 25
+  let watching = false
+  const activeTask = (list: ReadonlyArray<AiTask>): boolean => list.some((t) => t.status === "queued" || t.status === "running")
+  const watchTasks = async (): Promise<void> => {
+    if (watching) return
+    watching = true
+    try {
+      const delivered = new Set<string>()
+      let woken = false
+      let quiet = 0
+      let waiting = 0
+      for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+        const sid = sessionId()
+        if (sid === undefined) return
+        let state: { readonly busy: boolean; readonly text: string; readonly error?: string; readonly tasks?: ReadonlyArray<AiTask> } | undefined
+        try {
+          state = await app.runtime.run(app.client.ai.sessionState({ payload: { sessionId: sid, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } })) as typeof state
+        } catch {
+          if (++quiet >= 5) return
+          continue
+        }
+        quiet = 0
+        const list = state?.tasks ?? []
+        if (list.length > 0) setTasks((current) => {
+          const known = new Set(list.map((t) => t.id))
+          // A task the host no longer lists (it restarted) cannot finish: do not leave it spinning.
+          const lost = current.filter((t) => !known.has(t.id) && (t.status === "queued" || t.status === "running") && status() === "idle").map((t) => ({ ...t, status: "cancelled" as const }))
+          return [...list.map((t) => ({ ...t, background: t.background !== false })), ...lost]
+        })
+        else if (status() === "idle") setTasks((current) => current.map((t) => t.status === "queued" || t.status === "running" ? { ...t, status: "cancelled" as const } : t))
+        if (status() === "connecting" || status() === "streaming") { quiet = 0; waiting = 0; continue }
+        if (activeTask(list)) { waiting = 0; continue }
+        // Reports of finished background tasks come back to the agent on their own: wait for that turn, then show its answer.
+        const owed = list.filter((t) => t.background && t.status !== "cancelled" && !delivered.has(t.id))
+        if (state?.busy === true) { woken = true; waiting = 0; continue }
+        if (woken) {
+          for (const t of owed) delivered.add(t.id)
+          const answer = state?.text.trim() ?? ""
+          if (answer !== "" && !messages().some((m) => m.role === "assistant" && m.text === answer)) {
+            appendMessage({ id: nextMessageId(), role: "assistant", text: answer, createdAt: new Date().toISOString(), events: [], status: "done" })
+            saveTranscript()
+          }
+          // What the agent changed after the report is in the stored drawing, not in this editor yet.
+          void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+          woken = false
+          if (owed.length === 0) return
+          continue
+        }
+        if (owed.length === 0 || ++waiting >= WAKE_ROUNDS) return
+      }
+    } finally {
+      watching = false
+    }
+  }
+
   const applyEvent = (event: AiEvent): void => {
     const idForEvent = activeAssistantId ?? `${event.sessionId}:assistant`
     if (event.type === "reasoning") {
       const id = idForEvent
-      if (!messages().some((m) => m.id === id)) appendMessage({ id, role: "assistant", text: "", createdAt: new Date().toISOString(), events: [], status: "streaming", thinking: event.text })
-      else patchMessage(id, (prev) => ({ ...prev, thinking: (prev.thinking ?? "") + event.text }))
+      if (!messages().some((m) => m.id === id)) appendMessage({ id, role: "assistant", text: "", createdAt: new Date().toISOString(), events: [event], status: "streaming", thinking: event.text })
+      else patchMessage(id, (prev) => ({ ...prev, thinking: (prev.thinking ?? "") + event.text, events: [...prev.events, event] }))
       // One thinking step per step of the turn, however many deltas it arrives in.
       if (!thinkingCounted.has(activity().step)) { thinkingCounted.add(activity().step); setStats((s) => ({ ...s, thinkingSteps: s.thinkingSteps + 1 })) }
+      return
+    }
+    if (event.type === "user_message") {
+      // A message written while the agent worked has been taken in: it goes into the transcript where it happened and what the
+      // agent writes from here on answers it.
+      const now = new Date().toISOString()
+      const taken = pending().find((p) => p.text.trim() === event.text.trim())
+      const previous = activeAssistantId
+      const answerId = nextMessageId()
+      batch(() => {
+        if (taken !== undefined) setPending((current) => current.filter((p) => p.id !== taken.id))
+        if (previous !== undefined) patchMessage(previous, (prev) => ({ ...prev, status: prev.status === "streaming" ? "done" : prev.status }))
+        appendMessage({ id: nextMessageId(), role: "user", text: event.text, createdAt: now, events: [], status: "done" })
+        appendMessage({ id: answerId, role: "assistant", text: "", createdAt: now, events: [], status: "streaming" })
+        activeAssistantId = answerId
+      })
+      saveTranscript()
       return
     }
     if (event.type === "tool_progress") {
       setToolCalls((current) => current[event.callId]?.status === "running" || current[event.callId]?.status === "ok" || current[event.callId]?.status === "error"
         ? current
-        : { ...current, [event.callId]: { tool: event.tool, input: {}, status: "preparing", chars: event.chars, sessionId: event.sessionId } })
+        : { ...current, [event.callId]: { tool: event.tool, input: {}, status: "preparing", chars: event.chars, sessionId: event.sessionId, ...(event.agent !== undefined ? { agent: event.agent } : {}) } })
       setActivity((a) => ({ ...a, preparing: { tool: event.tool, chars: event.chars } }))
       return
     }
     if (event.type === "step") {
       if (event.phase === "start") { setActivity((a) => ({ ...a, step: event.index, preparing: undefined })) }
-      else if (event.usage) setStats((s) => ({ ...s, totalInputTokens: s.totalInputTokens + event.usage!.inputTokens, totalOutputTokens: s.totalOutputTokens + event.usage!.outputTokens }))
+      else if (event.usage) { setContextTokens(contextTokensOf(event.usage)); setStats((s) => ({ ...s, totalInputTokens: s.totalInputTokens + event.usage!.inputTokens, totalOutputTokens: s.totalOutputTokens + event.usage!.outputTokens })) }
       return
     }
     if (event.type === "todo") { setPlan(event.todos); return }
     if (event.type === "goal") { setGoal(event.goal ?? undefined); return }
-    if (event.type === "retry") { setActivity((a) => ({ ...a, retry: { attempt: event.attempt, message: event.message } })); return }
+    if (event.type === "retry") {
+      setActivity((a) => ({ ...a, retry: { attempt: event.attempt, message: event.message } }))
+      // Shown where it happened, as nikcli's session view shows a retried request.
+      if (messages().some((m) => m.id === idForEvent)) patchMessage(idForEvent, (prev) => ({ ...prev, events: [...prev.events, event] }))
+      return
+    }
     if (event.type === "compacted") { setActivity((a) => ({ ...a, compacted: true })); return }
     if (event.type === "delta") {
       if (activity().retry !== undefined) setActivity((a) => ({ ...a, retry: undefined }))
@@ -207,7 +318,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     if (event.type === "tool_call") {
       const id = idForEvent
       setActivity((a) => ({ ...a, preparing: undefined, retry: undefined }))
-      setToolCalls((current) => ({ ...current, [event.callId]: { tool: event.tool, input: event.input, status: "running", sessionId: event.sessionId } }))
+      setToolCalls((current) => ({ ...current, [event.callId]: { tool: event.tool, input: event.input, status: "running", sessionId: event.sessionId, ...(event.agent !== undefined ? { agent: event.agent } : {}) } }))
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       setStats((s) => ({ ...s, toolCalls: s.toolCalls + 1 }))
       return
@@ -218,6 +329,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       // Whatever the tool answered, the stored drawing is the truth: bring the editor in line with it.
       if (event.ok && event.tool.includes("cad_")) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
       if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output)
+      if (event.tool === "agent_task" || event.tool === "agent_tasks" || event.tool === "agent_task_read" || event.tool === "agent_task_cancel") noteTasks(event.output)
       const id = idForEvent
       setToolCalls((current) => {
         const existing = current[event.callId]
@@ -236,7 +348,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
     if (event.type === "done") {
       const id = idForEvent
-      patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage }))
+      patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage, finishedAt: new Date().toISOString() }))
       setStats((s) => ({
         ...s,
         exchanges: s.exchanges + 1,
@@ -291,11 +403,50 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const finishStream = (next: "idle" | "error"): void => {
     setStatus(next)
     handle = undefined
+    // Background tasks may still be running; their reports come back after the turn.
+    if (tasks().length > 0) void watchTasks()
+    // A message the agent did not take in before the turn ended is sent now, as the next message.
+    const [waiting, ...rest] = pending()
+    if (waiting !== undefined && waiting.text !== "") {
+      setPending(rest)
+      void send(waiting.text)
+    }
   }
 
-  const send: AiStore["send"] = async (prompt, attachments = []) => {
+  const enqueue = async (text: string, delivery: PendingDelivery): Promise<void> => {
+    const sid = sessionId()
+    if (sid === undefined) return
+    const item: AiPending = { id: nextMessageId(), text, delivery }
+    setPending((current) => [...current, item])
+    // The turn may still be connecting: the host has no turn to add the message to until it streams.
+    for (let waited = 0; status() === "connecting" && waited < 100; waited += 1) await new Promise((resolve) => setTimeout(resolve, 100))
+    let lastFailure: unknown
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (!pending().some((p) => p.id === item.id)) return
+      try {
+        await app.runtime.run(app.client.ai.chatQueue({ payload: { sessionId: sid, message: text, delivery, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } }))
+        return
+      } catch (cause) {
+        lastFailure = cause
+        if (status() !== "streaming") break
+        await new Promise((resolve) => setTimeout(resolve, 400))
+      }
+    }
+    // The host could not take it (the turn is over): it is an ordinary message.
+    setPending((current) => current.filter((p) => p.id !== item.id))
+    console.error("Could not queue the message", lastFailure)
+    if (status() === "idle" || status() === "error") void send(text)
+    else setError(lastFailure instanceof Error ? lastFailure.message : String(lastFailure))
+  }
+
+  const send: AiStore["send"] = async (prompt, attachments = [], delivery = "queue") => {
     const text = prompt.trim()
-    if (text.length === 0 || status() === "connecting" || status() === "streaming") return
+    if (text.length === 0) return
+    if (status() === "connecting" || status() === "streaming") {
+      // The turn is running: the message joins it instead of being dropped.
+      await enqueue(text, delivery)
+      return
+    }
     const sid = sessionId() ?? newSessionId()
     const at = new Date().toISOString()
     if (!sessionId()) {
@@ -306,7 +457,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     appendMessage({ id: userId, role: "user", text, createdAt: at, events: [], status: "done", ...(attachments.length > 0 ? { attachments: attachments.map((a) => a.name) } : {}) })
     const assistantId = nextMessageId()
     activeAssistantId = assistantId
-    appendMessage({ id: assistantId, role: "assistant", text: "", createdAt: at, events: [], status: "streaming" })
+    appendMessage({ id: assistantId, role: "assistant", text: "", createdAt: at, events: [], status: "streaming", ...(modelSig() ? { model: modelSig()!.model } : {}) })
     saveTranscript()
     thinkingCounted.clear()
     batch(() => {
@@ -352,6 +503,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     if (sid === undefined) return
     handle?.abort()
     handle = undefined
+    setPending([])
+    // The answer that was being written ends here, marked as stopped.
+    if (activeAssistantId !== undefined) patchMessage(activeAssistantId, (prev) => prev.status === "streaming" ? { ...prev, status: "done", interrupted: true, finishedAt: new Date().toISOString() } : prev)
     app.runtime.runVoid(app.client.ai.chatAbort({ payload: { sessionId: sid } }))
     setStatus("idle")
   }
@@ -363,9 +517,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setToolCalls({})
       setPermissions([])
       setStats(emptyStats())
+      setContextTokens(0)
       setError(undefined)
       setPlan([])
       setGoal(undefined)
+      setTasks([])
+      setPending([])
       setActivity({ step: 0, compacted: false })
     })
     saveTranscript()
@@ -379,9 +536,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setToolCalls({})
       setPermissions([])
       setStats(emptyStats())
+      setContextTokens(0)
       setError(undefined)
       setPlan([])
       setGoal(undefined)
+      setTasks([])
+      setPending([])
       setActivity({ step: 0, compacted: false })
     })
   }
@@ -392,9 +552,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setToolCalls({})
       setPermissions([])
       setStats(emptyStats())
+      setContextTokens(0)
       setError(undefined)
       setPlan([])
       setGoal(undefined)
+      setTasks([])
+      setPending([])
       setActivity({ step: 0, compacted: false })
     })
   }
@@ -465,9 +628,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   })
 
   return {
-    status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity,
-    model, setModel, includeContext, setIncludeContext, stats, suggestions, dismissSuggestion,
-    projectId, send, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission
+    status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity, tasks,
+    model, setModel, includeContext, setIncludeContext, stats, contextTokens, suggestions, dismissSuggestion,
+    projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission
   }
 })
 

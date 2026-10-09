@@ -1,4 +1,4 @@
-import { cam, segmentsFor } from "@cadcamfun/core";
+import { cam, gearOutline, segmentsFor } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
 import * as THREE from "three";
@@ -48,10 +48,36 @@ const booleanSolid = (element: any): SolidMesh | null => {
   return result;
 };
 
+/** Whether a Boolean forms a solid; the canvas hides the operands of the ones that do and keeps them drawn for the ones that do not. */
+export const booleanFormed = (element: any): boolean => booleanSolid(element) !== null;
+
 /** The editor never draws a curve with more chords than this by default (an element can ask for more with `segments`). */
 const DISPLAY_SEGMENT_CAP = 256;
 
+/** The diameter in millimetres of a metric size such as "M8" (the fallback when it is not one). */
+const metricDiameter = (size: unknown, fallback: number): number => {
+  const match = typeof size === "string" ? size.match(/M(\d+(?:\.\d+)?)/i) : null;
+  return match ? Number(match[1]) : fallback;
+};
+
+/**
+ * Elements the builders below model with Y up (height on Y: a wall, a column, a stair, a coil, a bolt with its head on +Y).
+ * The scene is Z-up, so they are stood up on their way out: height and axis on Z, the second horizontal direction on -Y.
+ */
+const Y_UP_BUILT = new Set(["wall", "floor", "roof", "window", "door", "stair", "column", "spring", "screw", "bolt", "rivet"]);
+
 export const createThreeObject = (element: any): THREE.Object3D | null => {
+  const object = buildObject(element);
+  if (object === null || !Y_UP_BUILT.has(element.type)) return object;
+  const { originOffset } = useCADStore.getState();
+  object.rotation.set(Math.PI / 2, 0, 0);
+  // A wall's z is its base (0 = standing on the ground), so moving it by d moves it by d; everything else is placed by x, y, z.
+  const z = element.type === "wall" ? (element.z || 0) + (element.height || 30) / 2 : element.z || 0;
+  object.position.set((element.x || 0) + originOffset.x, (element.y || 0) + originOffset.y, z + originOffset.z);
+  return object;
+};
+
+const buildObject = (element: any): THREE.Object3D | null => {
     const { originOffset, tolerance: documentTolerance } = useCADStore.getState();
     // Round shapes: the element's own `segments`, else enough for its tolerance (its own, else the drawing's), never coarser than 32.
     const seg = (radius: number): number =>
@@ -1149,56 +1175,66 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
 
         // Rotate based on the specified axis
         if (element.axis === "x") {
-          revolution.rotation.y = Math.PI / 2;
+          revolution.rotation.z = -Math.PI / 2;
         } else if (element.axis === "y") {
           revolution.rotation.x = Math.PI / 2;
         }
 
         return revolution;
 
-      case "sweep":
-        if (!element.profile || !element.path) return null;
+      case "sweep": {
+        if (!Array.isArray(element.profile) || !Array.isArray(element.path) || element.path.length < 2) return null;
 
-        // This requires the three-csg library or similar for advanced operations
-        // Simplified implementation using TubeGeometry
+        // The profile (a polygon of >= 3 points in its own XY plane, or a round tube of `radius`) carried along the path on a
+        // moving frame, with the two ends closed. The path is relative to the element's x, y, z.
+        const sweepPoints: THREE.Vector2[] = element.profile.length >= 3
+          ? element.profile.map((point: any) => new THREE.Vector2(point.x, point.y))
+          : Array.from({ length: 24 }, (_, k) => new THREE.Vector2((element.radius || 0.5) * Math.cos((k / 24) * Math.PI * 2), (element.radius || 0.5) * Math.sin((k / 24) * Math.PI * 2)));
+        // Counter-clockwise, so the cap triangles face outward.
+        if (THREE.ShapeUtils.isClockWise(sweepPoints)) sweepPoints.reverse();
 
-        // Create a shape from the profile
-        const sweepShape = new THREE.Shape();
-        if (element.profile.length >= 3) {
-          sweepShape.moveTo(element.profile[0].x, element.profile[0].y);
-          for (let i = 1; i < element.profile.length; i++) {
-            sweepShape.lineTo(element.profile[i].x, element.profile[i].y);
+        const sweepPath = new THREE.CatmullRomCurve3(element.path.map((point: any) => new THREE.Vector3(point.x, point.y, point.z || 0)));
+        const steps = Math.max(2, Math.floor(element.segments || 64));
+        const frames = sweepPath.computeFrenetFrames(steps, false);
+        const ring = sweepPoints.length;
+        const sweepPositions: number[] = [];
+        for (let i = 0; i <= steps; i++) {
+          const centre = sweepPath.getPointAt(i / steps);
+          const normal = frames.normals[i]!, binormal = frames.binormals[i]!;
+          for (const point of sweepPoints) {
+            sweepPositions.push(
+              centre.x + point.x * normal.x + point.y * binormal.x,
+              centre.y + point.x * normal.y + point.y * binormal.y,
+              centre.z + point.x * normal.z + point.y * binormal.z
+            );
           }
-          sweepShape.closePath();
-        } else {
-          // Default to circle if profile not provided properly
-          sweepShape.absarc(0, 0, element.radius || 0.5, 0, Math.PI * 2, false);
         }
+        const sweepIndices: number[] = [];
+        for (let i = 0; i < steps; i++) {
+          for (let k = 0; k < ring; k++) {
+            const a = i * ring + k, b = i * ring + ((k + 1) % ring), c = (i + 1) * ring + ((k + 1) % ring), d = (i + 1) * ring + k;
+            sweepIndices.push(a, b, c, a, c, d);
+          }
+        }
+        const capTriangles = THREE.ShapeUtils.triangulateShape(sweepPoints, []);
+        const lastRing = steps * ring;
+        for (const [a, b, c] of capTriangles) {
+          sweepIndices.push(a!, c!, b!);
+          sweepIndices.push(lastRing + a!, lastRing + b!, lastRing + c!);
+        }
+        const sweepGeometry = new THREE.BufferGeometry();
+        sweepGeometry.setAttribute("position", new THREE.Float32BufferAttribute(sweepPositions, 3));
+        sweepGeometry.setIndex(sweepIndices);
+        sweepGeometry.computeVertexNormals();
 
-        // Create a path for the sweep
-        const pathPoints = element.path.map((point: any) => new THREE.Vector3(point.x, point.y, point.z || 0));
-
-        const sweepPath = new THREE.CatmullRomCurve3(pathPoints);
-
-        // Create a tube along the path with the shape as cross-section
-        // Note: This is a simplification; full sweep would need custom geometry
-        const tubeGeometry = new THREE.TubeGeometry(
-          sweepPath,
-          element.segments || 64,
-          element.radius || 0.5,
-          element.radialSegments || 8,
-          element.closed || false
-        );
-
-        const sweepMaterial = new THREE.MeshStandardMaterial({
+        const sweep = new THREE.Mesh(sweepGeometry, new THREE.MeshStandardMaterial({
           color: element.color || 0x2196f3,
-          wireframe: element.wireframe || false
-        });
-
-        const sweep = new THREE.Mesh(tubeGeometry, sweepMaterial);
-        sweep.position.set(originOffset.x, originOffset.y, originOffset.z);
-
+          wireframe: element.wireframe || false,
+          side: THREE.DoubleSide
+        }));
+        sweep.position.set((element.x || 0) + originOffset.x, (element.y || 0) + originOffset.y, (element.z || 0) + originOffset.z);
         return sweep;
+      }
 
       case "loft":
         if (!element.profiles || !element.positions || element.profiles.length < 2) return null;
@@ -1425,73 +1461,28 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
 
         return filletGroup;
 
-      case "gear":
-        // Create a simplified gear visualization
-        const gearGroup = new THREE.Group();
-
-        // Basic parameters
-        const moduleValue = element.moduleValue || 1; // Module in mm
-        const teeth = element.teeth || 20;
-        const thickness = element.thickness || 5;
-        const pressureAngle = ((element.pressureAngle || 20) * Math.PI) / 180;
-
-        // Derived parameters
-        const pitchDiameter = moduleValue * teeth;
-        const pitchRadius = pitchDiameter / 2;
-        const baseRadius = pitchRadius * Math.cos(pressureAngle);
-        const addendum = moduleValue;
-        const dedendum = 1.25 * moduleValue;
-        const outerRadius = pitchRadius + addendum;
-        const rootRadius = pitchRadius - dedendum;
-
-        // Create the base cylinder
-        const gearCylinder = new THREE.Mesh(
-          new THREE.CylinderGeometry(pitchRadius, pitchRadius, thickness, 32),
-          new THREE.MeshStandardMaterial({
-            color: element.color || 0xb0bec5,
-            wireframe: element.wireframe || false
-          })
-        );
-        gearGroup.add(gearCylinder);
-
-        // Create teeth (simplified as cylinders)
-        for (let i = 0; i < teeth; i++) {
-          const angle = (i / teeth) * Math.PI * 2;
-          const x = (outerRadius + moduleValue * 0.25) * Math.cos(angle);
-          const z = (outerRadius + moduleValue * 0.25) * Math.sin(angle);
-
-          const tooth = new THREE.Mesh(
-            new THREE.CylinderGeometry(moduleValue * 0.8, moduleValue * 0.8, thickness, 8),
-            new THREE.MeshStandardMaterial({
-              color: element.color || 0xb0bec5
-            })
-          );
-
-          tooth.position.set(x, 0, z);
-          gearGroup.add(tooth);
+      case "gear": {
+        // The involute spur gear of core (the same outline the CAM model machines), extruded along Z and centred on its thickness,
+        // with the bore cut through.
+        const gearThickness = element.thickness > 0 ? element.thickness : 5;
+        let outline: ReadonlyArray<{ x: number; y: number }>;
+        try {
+          outline = gearOutline({ moduleValue: element.moduleValue > 0 ? element.moduleValue : 1, teeth: Math.floor(element.teeth || 20), pressureAngle: element.pressureAngle > 0 ? element.pressureAngle : 20 });
+        } catch {
+          return null;
         }
-
-        // Create center hole if specified
-        if (element.holeDiameter) {
-          const hole = new THREE.Mesh(
-            new THREE.CylinderGeometry(element.holeDiameter / 2, element.holeDiameter / 2, thickness + 1, 32),
-            new THREE.MeshStandardMaterial({
-              color: 0x212121
-            })
-          );
-          gearGroup.add(hole);
+        const gearShape = new THREE.Shape(outline.map((point) => new THREE.Vector2(point.x, point.y)));
+        if (element.holeDiameter > 0) {
+          const gearBore = new THREE.Path();
+          gearBore.absarc(0, 0, element.holeDiameter / 2, 0, Math.PI * 2, true);
+          gearShape.holes.push(gearBore);
         }
-
-        gearGroup.position.set(
-          element.x + originOffset.x,
-          element.y + originOffset.y,
-          (element.z || 0) + originOffset.z
-        );
-
-        // Rotate to standard orientation
-        gearGroup.rotation.x = Math.PI / 2;
-
-        return gearGroup;
+        const gearGeometry = new THREE.ExtrudeGeometry(gearShape, { depth: gearThickness, bevelEnabled: false, curveSegments: 48 });
+        gearGeometry.translate(0, 0, -gearThickness / 2);
+        const gear = new THREE.Mesh(gearGeometry, new THREE.MeshStandardMaterial({ color: element.color || 0xb0bec5, wireframe: element.wireframe || false }));
+        gear.position.set(element.x + originOffset.x, element.y + originOffset.y, (element.z || 0) + originOffset.z);
+        return gear;
+      }
 
       case "spring":
         // Create a helical spring
@@ -1563,7 +1554,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
             wireframe: element.wireframe || false
           })
         );
-        shaft2.position.y = -shaftLength2 / 2;
+        // The shaft runs from the tip (-length / 2) up to the underside of the head, so the two touch.
+        shaft2.position.y = -(element.length || 20) / 2 + shaftLength2 / 2;
         screwGroup.add(shaft2);
 
         // Add thread detail
@@ -1575,7 +1567,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           const angle = t * (shaftLength2 / (diameter * 0.2)) * Math.PI * 2;
           const radius = diameter / 2 + 0.05;
           const x = radius * Math.cos(angle);
-          const y = -shaftLength2 + t * shaftLength2;
+          const y = -(element.length || 20) / 2 + t * shaftLength2;
           const z = radius * Math.sin(angle);
 
           threadHelixPoints.push(new THREE.Vector3(x, y, z));
@@ -1598,126 +1590,48 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           (element.z || 0) + originOffset.z
         );
 
-        // Apply rotation if specified
-        if (element.rotation) {
-          screwGroup.rotation.x = THREE.MathUtils.degToRad(element.rotation.x || 0);
-          screwGroup.rotation.y = THREE.MathUtils.degToRad(element.rotation.y || 0);
-          screwGroup.rotation.z = THREE.MathUtils.degToRad(element.rotation.z || 0);
-        } else {
-          // Default orientation
-          screwGroup.rotation.x = Math.PI;
-        }
-
         return screwGroup;
 
-      case "nut":
-        // Create a simplified nut
-        const nutGroup = new THREE.Group();
-
-        // Parse size
-        let nutDiameter = 5; // Default 5mm
-        if (element.size && typeof element.size === "string") {
-          const match = element.size.match(/M(\d+)/i);
-          if (match) {
-            nutDiameter = parseInt(match[1], 10);
-          }
-        }
-
-        // Derived dimensions
+      case "nut": {
+        // A hexagonal nut with a real bore, standing on Z like every other solid: across-corners 1.8 d, thickness 0.8 d.
+        const nutDiameter = metricDiameter(element.size, 5);
         const nutThickness = nutDiameter * 0.8;
         const nutWidth = nutDiameter * 1.8;
-
-        // Create hexagonal prism
         const nutShape = new THREE.Shape();
         for (let i = 0; i < 6; i++) {
           const angle = (i / 6) * Math.PI * 2;
           const x = (nutWidth / 2) * Math.cos(angle);
           const y = (nutWidth / 2) * Math.sin(angle);
-
-          if (i === 0) {
-            nutShape.moveTo(x, y);
-          } else {
-            nutShape.lineTo(x, y);
-          }
+          if (i === 0) nutShape.moveTo(x, y);
+          else nutShape.lineTo(x, y);
         }
         nutShape.closePath();
+        const bore = new THREE.Path();
+        bore.absarc(0, 0, nutDiameter / 2, 0, Math.PI * 2, true);
+        nutShape.holes.push(bore);
+        const nutGeometry = new THREE.ExtrudeGeometry(nutShape, { depth: nutThickness, bevelEnabled: false, curveSegments: 32 });
+        nutGeometry.translate(0, 0, -nutThickness / 2);
+        const nut = new THREE.Mesh(nutGeometry, new THREE.MeshStandardMaterial({ color: element.color || 0x9e9e9e, wireframe: element.wireframe || false }));
+        nut.position.set(element.x + originOffset.x, element.y + originOffset.y, (element.z || 0) + originOffset.z);
+        return nut;
+      }
 
-        const extrudeSettings2 = {
-          depth: nutThickness,
-          bevelEnabled: false
-        };
-
-        const nutGeometry = new THREE.ExtrudeGeometry(nutShape, extrudeSettings2);
-        const nutMaterial = new THREE.MeshStandardMaterial({
-          color: element.color || 0x9e9e9e,
-          wireframe: element.wireframe || false
-        });
-
-        const nutBody = new THREE.Mesh(nutGeometry, nutMaterial);
-        nutBody.rotation.x = Math.PI / 2;
-        nutGroup.add(nutBody);
-
-        // Create center hole
-        const holeGeometry = new THREE.CylinderGeometry(nutDiameter / 2, nutDiameter / 2, nutThickness + 0.2, 32);
-
-        const holeMaterial = new THREE.MeshBasicMaterial({
-          color: 0x000000
-        });
-
-        const hole = new THREE.Mesh(holeGeometry, holeMaterial);
-        nutGroup.add(hole);
-
-        nutGroup.position.set(
-          element.x + originOffset.x,
-          element.y + originOffset.y,
-          (element.z || 0) + originOffset.z
-        );
-
-        // Apply rotation if specified
-        if (element.rotation) {
-          nutGroup.rotation.x = THREE.MathUtils.degToRad(element.rotation.x || 0);
-          nutGroup.rotation.y = THREE.MathUtils.degToRad(element.rotation.y || 0);
-          nutGroup.rotation.z = THREE.MathUtils.degToRad(element.rotation.z || 0);
-        }
-
-        return nutGroup;
-
-      case "washer":
-        // Create a washer
-        let washerDiameter = 5; // Default 5mm
-        if (element.size && typeof element.size === "string") {
-          const match = element.size.match(/M(\d+)/i);
-          if (match) {
-            washerDiameter = parseInt(match[1], 10);
-          }
-        }
-
-        // Derived dimensions
-        const outerDiameter = washerDiameter * 2.2;
-        const washerThickness = washerDiameter * 0.2;
-
-        // Create washer geometry (toroidal shape)
-        const washerGeometry = new THREE.RingGeometry(washerDiameter / 2, outerDiameter / 2, 32, 1);
-
-        const washerMaterial = new THREE.MeshStandardMaterial({
-          color: element.color || 0x9e9e9e,
-          wireframe: element.wireframe || false
-        });
-
-        const washer = new THREE.Mesh(washerGeometry, washerMaterial);
+      case "washer": {
+        // A flat ring with thickness, standing on Z: bore = the bolt size, outside and thickness from the element.
+        const washerDiameter = metricDiameter(element.size, 5);
+        const outerDiameter = element.outerDiameter > washerDiameter ? element.outerDiameter : washerDiameter * 2.2;
+        const washerThickness = element.thickness > 0 ? element.thickness : washerDiameter * 0.2;
+        const washerShape = new THREE.Shape();
+        washerShape.absarc(0, 0, outerDiameter / 2, 0, Math.PI * 2, false);
+        const washerBore = new THREE.Path();
+        washerBore.absarc(0, 0, washerDiameter / 2, 0, Math.PI * 2, true);
+        washerShape.holes.push(washerBore);
+        const washerGeometry = new THREE.ExtrudeGeometry(washerShape, { depth: washerThickness, bevelEnabled: false, curveSegments: 48 });
+        washerGeometry.translate(0, 0, -washerThickness / 2);
+        const washer = new THREE.Mesh(washerGeometry, new THREE.MeshStandardMaterial({ color: element.color || 0x9e9e9e, wireframe: element.wireframe || false }));
         washer.position.set(element.x + originOffset.x, element.y + originOffset.y, (element.z || 0) + originOffset.z);
-
-        // Give it thickness
-        washer.scale.set(1, 1, washerThickness);
-
-        // Apply rotation if specified
-        if (element.rotation) {
-          washer.rotation.x = THREE.MathUtils.degToRad(element.rotation.x || 0);
-          washer.rotation.y = THREE.MathUtils.degToRad(element.rotation.y || 0);
-          washer.rotation.z = THREE.MathUtils.degToRad(element.rotation.z || 0);
-        }
-
         return washer;
+      }
 
       case "rivet":
         // Create a simplified rivet
@@ -1749,7 +1663,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
             wireframe: element.wireframe || false
           })
         );
-        shaft.position.y = -shaftLength / 2;
+        shaft.position.y = -rivetLength / 2 + shaftLength / 2;
         rivetGroup.add(shaft);
 
         rivetGroup.position.set(
@@ -1757,16 +1671,6 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           element.y + originOffset.y,
           (element.z || 0) + originOffset.z
         );
-
-        // Apply rotation if specified
-        if (element.rotation) {
-          rivetGroup.rotation.x = THREE.MathUtils.degToRad(element.rotation.x || 0);
-          rivetGroup.rotation.y = THREE.MathUtils.degToRad(element.rotation.y || 0);
-          rivetGroup.rotation.z = THREE.MathUtils.degToRad(element.rotation.z || 0);
-        } else {
-          // Default orientation
-          rivetGroup.rotation.x = Math.PI;
-        }
 
         return rivetGroup;
 
@@ -1819,7 +1723,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
 
       case "floor":
         const floorWidth = element.width || 100;
-        const floorLength = element.length || 100;
+        const floorLength = element.depth || element.length || 100;
         const floorThickness = element.thickness || 2;
 
         const floorGeometry = new THREE.BoxGeometry(floorWidth, floorThickness, floorLength);
@@ -1839,7 +1743,7 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
 
       case "roof":
         const roofWidth = element.width || 100;
-        const roofLength = element.length || 100;
+        const roofLength = element.depth || element.length || 100;
         const roofHeight = element.height || 20;
         const roofStyle = element.style || "pitched";
 
@@ -1880,7 +1784,6 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
           });
 
           const pitchedRoof = new THREE.Mesh(pitchedRoofGeometry, pitchedRoofMaterial);
-          pitchedRoof.rotation.x = -Math.PI / 2;
           pitchedRoof.position.z = -roofLength / 2;
           roofGroup.add(pitchedRoof);
         }

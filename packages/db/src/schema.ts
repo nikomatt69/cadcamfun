@@ -1160,3 +1160,59 @@ export const workflowRunTable = sqliteTable(
 )
 
 export type WorkflowRun = typeof workflowRunTable.$inferSelect
+
+// CAD surfacing slice (`specs/14-cad-cam-parity-roadmap.md` §5.1): persisted
+// triangle-mesh results and a focused audit log for CAD surface operations.
+// These two tables live alongside the existing ActivityLog and AIAnalysisLog
+// because they record a higher-frequency, lower-stakes stream than the
+// general activity log. Foreign keys cascade from the owning project.
+
+export const meshAssetTable = sqliteTable(
+  "MeshAsset",
+  {
+    id: text("id").primaryKey().$defaultFn(newId),
+    projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+    /** Shape kind that produced this asset (e.g. "chamferBox", "sweep", "loft"). */
+    kind: text("kind").notNull(),
+    /** Inputs to the operation as JSON: the BoxSolid schema, sweep profile/path, etc. */
+    inputs: text("inputs", { mode: "json" }).notNull(),
+    /** Compact summary: vertex count, triangle count, signed volume (mm³), bounds. */
+    stats: text("stats", { mode: "json" }).notNull(),
+    /** The actual triangle mesh, stored as a JSON-friendly view (positions + indices as `number[]`). */
+    mesh: text("mesh", { mode: "json" }).notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  },
+  (t) => [index("MeshAsset_projectId_kind_idx").on(t.projectId, t.kind)]
+)
+
+export type MeshAsset = typeof meshAssetTable.$inferSelect
+export type NewMeshAsset = typeof meshAssetTable.$inferInsert
+
+export const cadOperationLogTable = sqliteTable(
+  "CadOperationLog",
+  {
+    id: text("id").primaryKey().$defaultFn(newId),
+    projectId: text("projectId").notNull().references((): AnySQLiteColumn => projectTable.id, { onDelete: "cascade" }),
+    /** Surface kind: "chamferBox" | "chamferCylinderTop" | "sweep" | "loft" | "shell". */
+    operation: text("operation").notNull(),
+    /** Asset that resulted, when successful; null on error. */
+    meshAssetId: text("meshAssetId").references((): AnySQLiteColumn => meshAssetTable.id, { onDelete: "set null" }),
+    /** Outcome: "ok" or "error". */
+    outcome: text("outcome", { enum: ["ok", "error"] }).notNull(),
+    /** Wall-clock cost in milliseconds (recorded by the OTel span exporter). */
+    durationMs: real("durationMs").notNull(),
+    /** Inputs as JSON for replay; errors carry a message in `error`. */
+    inputs: text("inputs", { mode: "json" }).notNull(),
+    error: text("error"),
+    /** OpenTelemetry trace id, hex-encoded (32 chars). */
+    traceId: text("traceId"),
+    /** OpenTelemetry span id, hex-encoded (16 chars). */
+    spanId: text("spanId"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date()),
+  },
+  (t) => [index("CadOperationLog_projectId_idx").on(t.projectId)]
+)
+
+export type CadOperationLog = typeof cadOperationLogTable.$inferSelect
+export type NewCadOperationLog = typeof cadOperationLogTable.$inferInsert
+

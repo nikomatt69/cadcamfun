@@ -123,3 +123,6 @@
   .dark .assistant-surface { --assistant-muted: #cbd8e9; --assistant-line: #a0b4cf; }
   .assistant-nav button { border-color: #b4c9e8; color: #fff; }
 }
+.assistant-context-gauge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #c1d3ef; }
+.assistant-context-gauge[data-level="warn"] { color: #f5c26b; }
+.assistant-context-gauge[data-level="full"] { color: #f08a8a; }

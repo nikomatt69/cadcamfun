@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { segmentsFor } from "@cadcamfun/core"
+import { plateTemplate, segmentsFor } from "@cadcamfun/core"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
 
@@ -66,6 +66,28 @@ describe("cad tools provision what is missing", () => {
     expect(await run("cad_modify_entities", { changes: [{ id: "nope", changes: { radius: 1 } }] })).toMatchObject({ ok: false })
     const removed = await run("cad_delete_entities", { ids: added.ids, confirm: true }) as { deleted: number }
     expect(removed.deleted).toBe(1)
+  })
+
+  test("cad_modify_entities moves and turns a solid, changes a parametric dimension, and refuses a change that breaks the part", async () => {
+    const template = plateTemplate()
+    const plate = { type: "parametric", name: "Plate", history: template }
+    const added = await run("cad_add_elements", { elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, plate] }) as { ok: boolean; ids: string[]; problems?: string[]; skipped?: Array<{ error: string }> }
+    expect(added.ok).toBe(true)
+    const [cubeId, plateId] = added.ids as [string, string]
+    // Placement and rotation reach the stored element (they used to be dropped by the change schema).
+    const moved = await run("cad_modify_entities", { changes: [{ id: cubeId, changes: { x: 40, z: 5, rotation: { x: 90, y: 0, z: 0 } } }] }) as { ok: boolean; elements: Array<Record<string, unknown>> }
+    expect(moved.elements[0]).toMatchObject({ x: 40, z: 5, rotation: { x: 90, y: 0, z: 0 } })
+    // One named dimension changes, the features stay.
+    const wider = await run("cad_modify_entities", { changes: [{ id: plateId, changes: { parameters: { width: 90 } } }] }) as { ok: boolean; elements: Array<{ history: { parameters: Record<string, number>; features: unknown[] } }> }
+    expect(wider).toMatchObject({ ok: true })
+    expect(wider.elements[0]!.history.parameters).toEqual({ ...template.parameters, width: 90 })
+    expect(wider.elements[0]!.history.features).toHaveLength(template.features.length)
+    // A history that builds nothing, a rotation that is not {x,y,z} and a negative size change nothing at all.
+    for (const bad of [{ history: { parameters: {}, features: [] } }, { rotation: "ninety" }]) {
+      const refused = await run("cad_modify_entities", { changes: [{ id: bad.history ? plateId : cubeId, changes: bad }] }) as { ok: boolean; error: string }
+      expect(refused.ok).toBe(false)
+      expect(refused.error).toContain("Nothing changed")
+    }
   })
 
   test("cad_add_elements builds 3D: a revolved bottle, a car from solids, booleans by index", async () => {

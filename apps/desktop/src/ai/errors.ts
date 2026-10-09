@@ -30,7 +30,8 @@ const FRIENDLY: ReadonlyArray<readonly [RegExp, string]> = [
   [/authentication|login\s+fail|invalid\s+api\s+key|unauthor/i, "Authentication failed. Check the API key in Settings → AI."],
   [/rate\s*limit|too\s+many\s+requests|429/i, "Rate limit reached. Try again in a moment."],
   [/model\s+not\s+found|unknown\s+model/i, "This model is not available for your account."],
-  [/context\s*length|too\s+long|maximum\s+context/i, "The request exceeded the model's context length. Shorten the prompt or split it."],
+  // nikcli's overflow wordings (`provider/error.ts`): the window is full, which a pause does not cure.
+  [/context[\s_]*(?:length|window|limit)|too\s+long|maximum\s+(?:context|prompt)|exceeds?\s+the\s+(?:available\s+context|limit\s+of)|token\s+limit|reduce\s+the\s+length/i, "The conversation no longer fits the model's context window. The assistant summarises it on its own as it fills; if this keeps happening, start a new conversation or pick a model with a larger window."],
   [/timeout|timed\s+out|deadline/i, "The provider timed out. Try again."],
   // A body that stops before the stream ended: the connection was closed while the model was still working.
   [/decode\s+error|body\s+(?:was\s+)?(?:terminated|closed)|connection\s+(?:closed|reset)|socket\s+(?:closed|hang)|\bterminated\b|stream\s+ended\s+unexpectedly/i, "The connection to the assistant was interrupted while it was working. Ask again; for something big (many parts) ask for it in smaller steps."],

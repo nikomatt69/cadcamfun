@@ -43,11 +43,11 @@ describe("dexel model from CAD elements", () => {
   })
 
   test("rotated elements are placed where the scene draws them; unsupported shapes are reported, not faked", () => {
-    const part = buildPartModel([{ type: "cube", width: 40, height: 10, depth: 6, rotation: { x: 0, y: 0, z: 90 } }, { type: "gear", name: "G1" }], { cell: 0.2 })!
+    const part = buildPartModel([{ type: "cube", width: 40, height: 10, depth: 6, rotation: { x: 0, y: 0, z: 90 } }, { type: "spring", name: "G1" }], { cell: 0.2 })!
     expect(part.bounds.max[0] - part.bounds.min[0]).toBeCloseTo(10, 9)
     expect(part.bounds.max[1] - part.bounds.min[1]).toBeCloseTo(40, 9)
-    expect(part.skipped).toEqual(['gear "G1"'])
-    expect(buildPartModel([{ type: "gear" }])).toBeUndefined()
+    expect(part.skipped).toEqual(['spring "G1"'])
+    expect(buildPartModel([{ type: "spring" }])).toBeUndefined()
   })
 
   test("a huge part is meshed coarser instead of running out of memory, and says so", () => {

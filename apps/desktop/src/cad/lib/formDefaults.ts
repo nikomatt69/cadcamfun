@@ -2,6 +2,8 @@
  * Initial values of the "Add element" form of the tool panel, per element type (position, rotation, scale, colour and
  * the type-specific parameters). Same defaults as the legacy panel.
  */
+import { plateTemplate } from "@cadcamfun/core"
+
 export interface FormDefaults { [key: string]: any }
 
 export const formDefaults = (type: string): FormDefaults => {
@@ -167,6 +169,12 @@ export const formDefaults = (type: string): FormDefaults => {
         break;
       case "boolean-intersect":
         specificProps = { operands: [], color: "#2196F3" };
+        break;
+
+      // A dimension-driven part: a plate with a hole, edited afterwards in the property panel (parameters, features).
+      case "parametric":
+        specificProps = { name: "Parametric plate", history: plateTemplate(), color: "#26A69A" };
+        baseProps.wireframe = undefined;
         break;
 
       // Operazioni di trasformazione

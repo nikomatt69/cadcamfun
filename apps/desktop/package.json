@@ -12,7 +12,7 @@
     "stub-sidecar": "bun scripts/build-stub-sidecar.ts",
     "tauri": "tauri",
     "tauri:dev": "bun scripts/build-stub-sidecar.ts --if-missing && tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "bun run tauri build"
   },
   "dependencies": {
     "@cadcamfun/api": "workspace:*",

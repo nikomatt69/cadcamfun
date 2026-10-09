@@ -44,6 +44,10 @@ const stubManager = (): BackgroundTaskManagerInterface & { calls: Array<{ method
       return next
     },
     cancelParent: () => 0,
+    wait: async (o, id) => {
+      calls.push({ method: "wait", args: [o, id] })
+      return { ...fakeTask, status: "completed", text: "report" }
+    },
     dispose: () => Promise.resolve()
   } satisfies BackgroundTaskManagerInterface & { calls: Array<{ method: string; args: unknown[] }> }
 }

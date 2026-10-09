@@ -10,7 +10,8 @@ import LoaderCircle from "lucide-solid/icons/loader-circle"
 import X from "lucide-solid/icons/x"
 import { t } from "../i18n/index.ts"
 import { useAiStore } from "./context.tsx"
-import type { AiTodo } from "./types.ts"
+import type { AiTask, AiTodo } from "./types.ts"
+import { agentLabel } from "./ToolRow.tsx"
 
 const kb = (chars: number): string => (chars < 1000 ? `${chars} B` : `${(chars / 1000).toFixed(1)} KB`)
 
@@ -20,12 +21,17 @@ const icon = (todo: AiTodo): JSX.Element =>
       : todo.status === "cancelled" ? <X size={12} aria-hidden="true" class="text-gray-400" />
         : <Circle size={12} aria-hidden="true" class="text-gray-400" />
 
+const taskIcon = (task: AiTask): JSX.Element =>
+  task.status === "completed" ? <Check size={12} aria-hidden="true" class="text-green-600" />
+    : task.status === "running" || task.status === "queued" ? <LoaderCircle size={12} aria-hidden="true" class="animate-spin text-blue-600" />
+      : <X size={12} aria-hidden="true" class={task.status === "error" ? "text-red-600" : "text-gray-400"} />
+
 export function AgentActivity(): JSX.Element {
   const ai = useAiStore()
   const running = (): boolean => ai.status() === "connecting" || ai.status() === "streaming"
   const done = (): number => ai.plan().filter((x) => x.status === "completed").length
   return (
-    <Show when={ai.plan().length > 0 || ai.goal() !== undefined || running()}>
+    <Show when={ai.plan().length > 0 || ai.goal() !== undefined || running() || ai.tasks().length > 0}>
       <section class="border-b border-gray-200 bg-gray-50/70 px-4 py-2 text-xs dark:border-gray-700 dark:bg-gray-800/60" data-testid="ai-activity" aria-live="polite">
         <Show when={ai.goal()}>
           {(goal) => (
@@ -45,6 +51,28 @@ export function AgentActivity(): JSX.Element {
                 <li class="flex items-start gap-1.5" classList={{ "text-gray-400 line-through": todo.status === "completed" || todo.status === "cancelled", "font-medium": todo.status === "in_progress" }} data-status={todo.status}>
                   <span class="mt-0.5">{icon(todo)}</span>
                   <span>{todo.content}</span>
+                </li>
+              )}</For>
+            </ul>
+          </details>
+        </Show>
+        <Show when={ai.tasks().length > 0}>
+          <details open class="mt-1" data-testid="ai-tasks">
+            <summary class="cursor-pointer font-semibold">{t("ai.tasks.title")} {ai.tasks().filter((x) => x.status === "completed").length}/{ai.tasks().length}</summary>
+            <ul class="mt-1 space-y-1">
+              <For each={ai.tasks()}>{(task) => (
+                <li data-testid="ai-task" data-status={task.status} data-agent={task.agent}>
+                  <details>
+                    <summary class="flex cursor-pointer flex-wrap items-center gap-x-2">
+                      <span class="mt-0.5">{taskIcon(task)}</span>
+                      <span class="rounded bg-blue-100 px-1.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">{agentLabel(task.agent)}</span>
+                      <span class="min-w-0 flex-1 truncate" title={task.description}>{task.description}</span>
+                      <span class="text-[10px] text-gray-500">{t(`ai.tasks.status.${task.status}` as never)} · {task.background ? t("ai.tasks.background") : t("ai.tasks.inTurn")}</span>
+                    </summary>
+                    <Show when={task.text ?? task.error}>
+                      {(report) => <pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-1.5 text-[10px] dark:bg-gray-800" data-testid="ai-task-report">{report()}</pre>}
+                    </Show>
+                  </details>
                 </li>
               )}</For>
             </ul>

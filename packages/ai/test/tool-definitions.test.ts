@@ -49,3 +49,55 @@ describe("one definition per tool (nikcli style)", () => {
     expect(() => defineTool("ext_nothing", { parameters: z.object({}), execute: async () => ({}) })).toThrow("has no prompt")
   })
 })
+
+describe("arguments written the XML way", () => {
+  test("lists wrapped in item, text nodes and numbers as strings are put back into the shape the schema describes", async () => {
+    const { sanitizeArguments, lenient } = await import("../src/tools/lenient-arguments.ts")
+    expect(sanitizeArguments({ elements: { item: { type: "cube", width: "5", name: "7", profile: { item: [{ x: "0", y: "1.5" }] } } } })).toEqual({
+      elements: [{ type: "cube", width: 5, name: "7", profile: [{ x: 0, y: 1.5 }] }]
+    })
+    expect(sanitizeArguments({ name: { $text: "Wheel" } })).toEqual({ name: "Wheel" })
+    // Already well-formed arguments are untouched.
+    const good = { elements: [{ type: "cube", width: 5, operands: [0, 1], name: "a" }] }
+    expect(sanitizeArguments(good)).toEqual(good)
+    const { z } = await import("zod")
+    const schema = lenient(z.object({ elements: z.array(z.looseObject({ type: z.string() })).min(1) }))
+    expect(schema.safeParse({ elements: { item: { type: "cube", width: "5" } } }).success).toBe(true)
+    expect(z.toJSONSchema(schema, { io: "input" })).toBeDefined()
+  })
+})
+
+describe("assemblies without nesting", () => {
+  test("elements that name the same component become one component, booleans and their operands stay out", async () => {
+    const { groupIntoComponents } = await import("../src/tools/cad_add_elements.ts")
+    const { normalizeElement } = await import("../src/element-catalog.ts")
+    const entry = (index: number, input: Record<string, unknown>) => { const r = normalizeElement(input); if (!r.ok) throw new Error(r.error); return { index, element: r.element } }
+    const kept = [
+      entry(0, { type: "cylinder", x: 100, y: 5, z: 0, component: "Wheel", layer: "wheels" }),
+      entry(1, { type: "cube", x: 110, y: 5, z: 0, component: "Wheel", layer: "wheels" }),
+      entry(2, { type: "cube", x: 0, y: 0, z: 0 }),
+      entry(3, { type: "boolean-subtract", operands: [2, 0] })
+    ]
+    const out = groupIntoComponents(kept)
+    // Element 0 is a Boolean operand: it stays; only element 1 names the component, so a single member is still wrapped.
+    expect(out.map((e) => e.element["type"])).toEqual(["cylinder", "component", "cube", "boolean-subtract"])
+    const grouped = groupIntoComponents([kept[0]!, kept[1]!].map((k, i) => ({ ...k, index: i + 10 })))
+    expect(grouped).toHaveLength(1)
+    const component = grouped[0]!.element
+    expect(component).toMatchObject({ type: "component", name: "Wheel", x: 100, y: 5, layer: "wheels" })
+    expect((component["elements"] as Array<Record<string, unknown>>).map((c) => [c["type"], c["x"]])).toEqual([["cylinder", 0], ["cube", 10]])
+  })
+})
+
+describe("cad_editor section actions", () => {
+  test("section_on needs a position; section_off needs nothing", async () => {
+    const { cadEditor } = await import("../src/tools/cad_editor.ts")
+    const ctx = { handlers: {} as never, projectId: "p" }
+    const run = (actions: unknown) => cadEditor.execute(cadEditor.parameters.parse({ actions }), ctx) as Promise<{ ok: boolean; problems?: string[] }>
+    expect((await run([{ action: "section_on", axis: "z" }])).ok).toBe(false)
+    expect((await run([{ action: "section_on", axis: "z" }])).problems?.[0]).toContain("position")
+    expect((await run([{ action: "section_on", axis: "x", position: 40, inverted: true }])).ok).toBe(true)
+    expect((await run([{ action: "section_off" }])).ok).toBe(true)
+    expect(() => cadEditor.parameters.parse({ actions: [{ action: "section_on", axis: "w", position: 1 }] })).toThrow()
+  })
+})

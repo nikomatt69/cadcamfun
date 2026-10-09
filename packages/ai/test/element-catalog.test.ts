@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { plateTemplate } from "@cadcamfun/core"
-import { ELEMENT_SPECS, ELEMENT_TYPES, chordError, elementCatalogueLines, elementCatalogueText, normalizeElement, segmentsFor } from "../src/element-catalog.ts"
+import { BASE_PRIMITIVES, ELEMENT_SPECS, ELEMENT_TYPES, chordError, elementCatalogueLines, elementCatalogueText, normalizeElement, segmentsFor } from "../src/element-catalog.ts"
 
 describe("element catalogue", () => {
   test("every type normalises from just its name (or tells what it still needs)", () => {
@@ -14,7 +14,21 @@ describe("element catalogue", () => {
 
   test("defaults fill the rest and the caller's values win", () => {
     const r = normalizeElement({ type: "cylinder", radius: 7, z: 3, color: "#ff0000", name: "Wheel" })
-    expect(r).toEqual({ ok: true, element: { type: "cylinder", x: 0, y: 0, z: 3, radius: 7, height: 100, color: "#ff0000", name: "Wheel" } })
+    expect(r).toEqual({ ok: true, element: { type: "cylinder", x: 0, y: 0, z: 3, radius: 7, height: 100, color: "#ff0000", name: "Wheel", wireframe: true } })
+  })
+
+  test("base pieces are created as wireframe unless the caller says otherwise; nothing else is", () => {
+    for (const type of ["cube", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule"]) {
+      const r = normalizeElement({ type })
+      expect(r.ok && r.element["wireframe"]).toBe(true)
+      expect(BASE_PRIMITIVES.has(type)).toBe(true)
+    }
+    const solid = normalizeElement({ type: "cube", wireframe: false })
+    expect(solid.ok && solid.element["wireframe"]).toBe(false)
+    for (const input of [{ type: "extrusion" }, { type: "gear" }, { type: "bolt" }, { type: "circle" }, { type: "wall" }]) {
+      const r = normalizeElement(input)
+      expect(r.ok && "wireframe" in r.element).toBe(false)
+    }
   })
 
   test("a revolved profile (a bottle) keeps its points", () => {
@@ -123,5 +137,23 @@ describe("parametric elements", () => {
   test("it is in the catalogue the prompt is made from", () => {
     expect(elementCatalogueLines()).toContain("- parametric:")
     expect(elementCatalogueText()).toContain("parametric (")
+  })
+})
+
+describe("components and groups", () => {
+  const cube = { type: "cube", x: 10, width: 20 }
+  test("a component keeps its children, each normalised", () => {
+    const result = normalizeElement({ type: "component", name: "Wheel", elements: [cube, { type: "cylinder", radius: 5 }] })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const children = result.element["elements"] as Array<Record<string, unknown>>
+    expect(children).toHaveLength(2)
+    expect(children[0]).toMatchObject({ type: "cube", x: 10, width: 20, height: 100 })
+    expect(result.element["name"]).toBe("Wheel")
+  })
+  test("a component without children, or with a bad child, says what is wrong", () => {
+    expect(normalizeElement({ type: "component", elements: [] })).toMatchObject({ ok: false, error: expect.stringContaining("at least one child") })
+    expect(normalizeElement({ type: "group", elements: [{ type: "cube", width: -1 }] })).toMatchObject({ ok: false, error: expect.stringContaining("elements[0]") })
+    expect(normalizeElement({ type: "group", elements: [{ type: "boolean-union", operands: [0, 1] }] })).toMatchObject({ ok: false, error: expect.stringContaining("boolean-union") })
   })
 })

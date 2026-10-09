@@ -8,7 +8,9 @@ Do not use it
 - With an id you have not read: get ids from cad_describe_drawing or from an add result.
 
 Parameters
-- changes: 1 or more {id, changes}. changes may hold any of: center {x,y,z?}, start, end, origin (rectangles: the corner), radius, startAngle, endAngle, width, height, depth, tube (torus), points, closed, name, color, layer. Only the fields you give change.
+- changes: 1 or more {id, changes}. changes may hold any of: center {x,y,z?}, start, end, origin (rectangles: the corner), radius, startAngle, endAngle, width, height, depth, tube (torus), points, closed, name, color, layer; and any other field of the element in its own shape (the one cad_add_elements takes): x, y, z, rotation {x,y,z} in DEGREES, scale, wireframe, opacity, segments, radiusX, length, thickness, profile, path, operands, history... Only the fields you give change; an array or object field is replaced whole.
+- A parametric part: {"parameters": {"width": 80}} changes that named dimension and keeps its features (sent as `parameters`, not inside `history`). Send `history` only to change the features themselves.
+- The result is refused (nothing changes) when the change would leave an element the editor cannot draw, for example a parametric history that builds no solid; the error says why.
 - Millimetres, radians. radius, width, height, depth, tube must be > 0.
 
 Result (JSON)
@@ -17,3 +19,4 @@ Result (JSON)
 
 Example
 - Make wheel "w1" bigger and move it: {"changes":[{"id":"w1","changes":{"radius":35,"center":{"x":-120,"y":60,"z":35}}}]}
+- Turn a bracket "b1" upright and make a parametric plate "p1" 10 mm wider: {"changes":[{"id":"b1","changes":{"rotation":{"x":90,"y":0,"z":0}}},{"id":"p1","changes":{"parameters":{"width":70}}}]}

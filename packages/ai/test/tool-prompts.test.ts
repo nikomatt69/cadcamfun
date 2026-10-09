@@ -9,7 +9,11 @@ import { readdirSync } from "node:fs"
 
 const handlers = new Proxy({} as never, { get: () => async () => ({ ok: true }) })
 const tools = buildTools(handlers, "p")
-const keysOf = (tool: (typeof tools)[number]): string[] => Object.keys(((tool.parameters as unknown) as { shape: Record<string, unknown> }).shape)
+/** The tool's own fields: the host's schema is the tool's schema behind a step that tidies the arguments (`lenient`). */
+const keysOf = (tool: (typeof tools)[number]): string[] => {
+  const schema = tool.parameters as unknown as { shape?: Record<string, unknown>; _zod: { def: { out?: { shape: Record<string, unknown> } } } }
+  return Object.keys(schema.shape ?? schema._zod.def.out?.shape ?? {})
+}
 
 describe("tool prompts (one .txt per tool)", () => {
   test("every tool has exactly one prompt file and nothing else is there", () => {

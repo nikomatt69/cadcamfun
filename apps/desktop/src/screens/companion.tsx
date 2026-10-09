@@ -4,12 +4,20 @@
  * The pairing link carries a one-time device token, so it is held in memory only while the QR code is on screen.
  */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { Smartphone } from "lucide-solid"
 import qrcode from "qrcode-generator"
 import { useApp } from "../state/context.ts"
 import { useRead } from "../app/queries.ts"
 import { toast } from "../components/ui/feedback.tsx"
 import { t } from "../i18n/index.ts"
-import { PANEL, WorkspacePage } from "../components/WorkspacePage.tsx"
+import { WorkspacePage } from "../components/WorkspacePage.tsx"
+
+const CARD = "rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+const LABEL = "mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+const FIELD = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+const PRIMARY = "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+const SECONDARY = "rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+const DANGER = "rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
 
 const qrSvg = (text: string): string => {
   const qr = qrcode(0, "M")
@@ -18,7 +26,8 @@ const qrSvg = (text: string): string => {
   return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true })
 }
 
-export function CompanionScreen(): JSX.Element {
+/** The pairing body (gateway switch, QR code, paired devices); embedded in the Settings "Devices" tab and in the standalone page. */
+export function CompanionPanel(): JSX.Element {
   const app = useApp()
   const status = useRead((c) => c.companion.status())
   const [name, setName] = createSignal("iPhone")
@@ -37,57 +46,76 @@ export function CompanionScreen(): JSX.Element {
   const state = () => status.data()
 
   return (
-    <WorkspacePage title={t("companion.title")}>
-      <div class="mx-auto max-w-2xl space-y-6">
-      <p class="text-sm text-gray-500 dark:text-gray-400">{t("companion.subtitle")}</p>
+    <div class="space-y-6">
+      <div>
+        <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("companion.title")}</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("companion.subtitle")}</p>
+      </div>
 
-      <Show when={status.error()}><p class="text-red-600">{t("companion.error.load")}</p></Show>
+      <Show when={status.error()}><p class="text-sm text-red-600 dark:text-red-400">{t("companion.error.load")}</p></Show>
 
       <Show when={state()}>
         {(s) => (
           <>
-            <section class={PANEL}>
-              <p>{s().enabled ? t("companion.status.on", { port: String(s().port ?? "") }) : t("companion.status.off")}</p>
-              <Show when={s().fingerprint}><p class="mt-2 break-all text-xs text-gray-500">{t("companion.fingerprint")}: <code>{s().fingerprint}</code></p></Show>
-              <div class="mt-3">
+            <section class={CARD}>
+              <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                  <span class={`inline-block h-2.5 w-2.5 rounded-full ${s().enabled ? "bg-green-500" : "bg-gray-400"}`} />
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    {s().enabled ? t("companion.status.on", { port: String(s().port ?? "") }) : t("companion.status.off")}
+                  </p>
+                </div>
                 <Show
                   when={s().enabled}
-                  fallback={<button class="btn" onClick={() => act(() => app.runtime.run(app.client.companion.enable({ payload: {} })))}>{t("companion.enable")}</button>}
+                  fallback={<button class={PRIMARY} onClick={() => act(() => app.runtime.run(app.client.companion.enable({ payload: {} })))}>{t("companion.enable")}</button>}
                 >
-                  <button class="btn" onClick={() => { setLink(undefined); void act(() => app.runtime.run(app.client.companion.disable())) }}>{t("companion.disable")}</button>
+                  <button class={SECONDARY} onClick={() => { setLink(undefined); void act(() => app.runtime.run(app.client.companion.disable())) }}>{t("companion.disable")}</button>
                 </Show>
               </div>
+              <Show when={s().fingerprint}>
+                <p class="mt-3 break-all text-xs text-gray-500 dark:text-gray-400">{t("companion.fingerprint")}: <code>{s().fingerprint}</code></p>
+              </Show>
             </section>
 
             <Show when={s().enabled}>
-              <section class={`${PANEL} space-y-3`}>
-                <h2 class="font-medium">{t("companion.pair")}</h2>
-                <label class="block text-sm">{t("companion.pair.name")}
-                  <input class="mt-1 w-full rounded border p-2" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
-                </label>
-                <label class="block text-sm">{t("companion.pair.host")}
-                  <input class="mt-1 w-full rounded border p-2" placeholder={s().host} value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
-                </label>
-                <button class="btn" onClick={() => act(async () => {
+              <section class={`${CARD} space-y-4`}>
+                <h4 class="text-base font-medium text-gray-900 dark:text-white">{t("companion.pair")}</h4>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class={LABEL}>{t("companion.pair.name")}</label>
+                    <input class={FIELD} value={name()} onInput={(e) => setName(e.currentTarget.value)} />
+                  </div>
+                  <div>
+                    <label class={LABEL}>{t("companion.pair.host")}</label>
+                    <input class={FIELD} placeholder={s().host} value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
+                  </div>
+                </div>
+                <button class={PRIMARY} onClick={() => act(async () => {
                   const paired = await app.runtime.run(app.client.companion.pair({ payload: { name: name(), ...(host().trim() ? { host: host().trim() } : {}) } }))
                   setLink(paired.link)
                 })}>{t("companion.pair.create")}</button>
                 <Show when={qr()}>
                   {/* eslint-disable-next-line solid/no-innerhtml -- generated locally from the pairing link, no user HTML */}
-                  <div class="mx-auto w-64 bg-white p-2" innerHTML={qr()} />
-                  <p class="text-xs text-gray-500">{t("companion.pair.hint")}</p>
+                  <div class="mx-auto w-64 rounded-lg bg-white p-2 shadow-sm" innerHTML={qr()} />
+                  <p class="text-center text-xs text-gray-500 dark:text-gray-400">{t("companion.pair.hint")}</p>
                 </Show>
               </section>
             </Show>
 
-            <section class={PANEL}>
-              <h2 class="font-medium">{t("companion.devices")}</h2>
-              <ul class="mt-2 space-y-2">
-                <For each={s().devices} fallback={<li class="text-sm text-gray-500">{t("companion.devices.empty")}</li>}>
+            <section class={CARD}>
+              <h4 class="text-base font-medium text-gray-900 dark:text-white">{t("companion.devices")}</h4>
+              <ul class="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+                <For each={s().devices} fallback={<li class="py-2 text-sm text-gray-500 dark:text-gray-400">{t("companion.devices.empty")}</li>}>
                   {(d) => (
-                    <li class="flex items-center justify-between">
-                      <span>{d.name}<br /><span class="text-xs text-gray-500">{d.lastSeen ? t("companion.devices.lastSeen", { when: new Date(d.lastSeen).toLocaleString() }) : t("companion.devices.never")}</span></span>
-                      <button class="btn" onClick={() => act(() => app.runtime.run(app.client.companion.revoke({ params: { id: d.id } })))}>{t("companion.revoke")}</button>
+                    <li class="flex items-center justify-between gap-4 py-3">
+                      <div class="flex items-center gap-3">
+                        <Smartphone class="h-5 w-5 text-gray-400" aria-hidden="true" />
+                        <div>
+                          <p class="text-sm font-medium text-gray-900 dark:text-white">{d.name}</p>
+                          <p class="text-xs text-gray-500 dark:text-gray-400">{d.lastSeen ? t("companion.devices.lastSeen", { when: new Date(d.lastSeen).toLocaleString() }) : t("companion.devices.never")}</p>
+                        </div>
+                      </div>
+                      <button class={DANGER} onClick={() => act(() => app.runtime.run(app.client.companion.revoke({ params: { id: d.id } })))}>{t("companion.revoke")}</button>
                     </li>
                   )}
                 </For>
@@ -96,7 +124,14 @@ export function CompanionScreen(): JSX.Element {
           </>
         )}
       </Show>
-      </div>
+    </div>
+  )
+}
+
+export function CompanionScreen(): JSX.Element {
+  return (
+    <WorkspacePage title={t("companion.title")}>
+      <div class="mx-auto max-w-2xl"><CompanionPanel /></div>
     </WorkspacePage>
   )
 }

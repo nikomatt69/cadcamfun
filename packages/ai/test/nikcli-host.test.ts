@@ -125,7 +125,8 @@ describe("embedded nikcli host", () => {
       }
       // `skill` loads the playbooks this package installed (skills/index.ts); nothing else is offered.
       // The host's own planning tools (plan, goal, skills) are offered besides ours; nothing that touches files or a shell is.
-      const HOST_PLANNING = ["skill", "todowrite", "todoread", "create_goal", "get_goal", "update_goal"]
+      // `code_mode` is the confined program runner: its tools are ours, and shell, files and web calls from it are refused (agent-persistence.test.ts).
+      const HOST_PLANNING = ["skill", "todowrite", "todoread", "create_goal", "get_goal", "update_goal", "code_mode"]
       expect(names.every((n) => n === "cad_probe" || n === "invalid" || HOST_PLANNING.includes(n) || (TOOL_IDS as ReadonlyArray<string>).includes(n))).toBe(true)
     }
     expect(existsSync(marker)).toBe(false)
@@ -181,6 +182,22 @@ describe("embedded nikcli host", () => {
     const sessionId = await Effect.runPromise(createHostSession(host, "failing"))
     const events = await collect(hostChatStream({ host, sessionId, message: "hello", model, continues: 0 }))
     expect(events.at(-1)?.type).toBe("error")
+  }, 60_000)
+
+  test("a second message sent while the first is still being answered is never reported as a provider error", async () => {
+    const host = await Effect.runPromise(runtime.host("project-b"))
+    script = () => ({ text: "answer", chunks: ["ans", "wer"] })
+    const sessionId = await Effect.runPromise(createHostSession(host, "two at once"))
+    const [first, second] = await Promise.all([
+      collect(hostChatStream({ host, sessionId, message: "first", model })),
+      collect(hostChatStream({ host, sessionId, message: "second", model }))
+    ])
+    for (const events of [first, second]) {
+      const last = events.at(-1)
+      // Answered, or told plainly that it was interrupted; the host's "Session interrupted" never reaches the user as a provider error.
+      expect(last?.type === "done" || (last?.type === "error" && last.code === "aborted")).toBe(true)
+      expect(events.some((e) => e.type === "error" && e.code === "provider")).toBe(false)
+    }
   }, 60_000)
 
   test("real host automatically compacts overflow and keeps summaries out of chat", async () => {

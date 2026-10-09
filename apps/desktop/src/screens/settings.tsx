@@ -1,8 +1,8 @@
 /**
  * `/settings` — visual parity with `.reference/src/pages/settings/index.tsx`.
  *
- * Seven tabs (Profile / Account / Security / Subscription / Notifications / AI /
- * Language) over the glassmorphic gradient page, each rendering the legacy component of
+ * Eight tabs (Profile / Account / Security / Subscription / Notifications / AI /
+ * Devices / Language) over the glassmorphic gradient page, each rendering the legacy component of
  * the same name ported under `src/components/settings/`.
  *
  * The legacy page gates on `useSession()` (pending spinner, redirect to sign-in). The
@@ -13,7 +13,7 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Bell, Cpu, Globe, Lock, Shield, Tag, User } from "lucide-solid"
+import { Bell, Cpu, Globe, Lock, Shield, Smartphone, Tag, User } from "lucide-solid"
 import { t } from "../i18n/index.ts"
 import { useApp } from "../state/context.ts"
 import { endSession } from "../state/session.ts"
@@ -24,9 +24,10 @@ import { SessionManagement } from "../components/settings/session-management.tsx
 import { PasskeySettings } from "../components/settings/passkey-settings.tsx"
 import { SubscriptionSettings } from "../components/settings/subscription-settings.tsx"
 import { AISettingsPanel } from "../components/settings/ai-settings-panel.tsx"
+import { CompanionPanel } from "./companion.tsx"
 import { LanguageSelector, SUPPORTED_LANGUAGES } from "../components/settings/language-selector.tsx"
 
-type TabId = "profile" | "account" | "security" | "billing" | "notifications" | "ai" | "language"
+type TabId = "profile" | "account" | "security" | "billing" | "notifications" | "ai" | "devices" | "language"
 
 interface Tab {
   readonly id: TabId
@@ -60,6 +61,7 @@ export function SettingsScreen(): JSX.Element {
     { id: "billing", name: t("settings.tab.subscription"), Icon: Tag },
     { id: "notifications", name: t("settings.tab.notifications"), Icon: Bell },
     { id: "ai", name: t("settings.tab.ai"), Icon: Cpu },
+    { id: "devices", name: t("settings.tab.devices"), Icon: Smartphone },
     { id: "language", name: t("settings.tab.language"), Icon: Globe }
   ]
 
@@ -135,6 +137,8 @@ export function SettingsScreen(): JSX.Element {
           </div>
         </div>
       </Show>
+
+      <Show when={tab === "devices"}><CompanionPanel /></Show>
 
       <Show when={tab === "language"}>
         <div class="space-y-6">

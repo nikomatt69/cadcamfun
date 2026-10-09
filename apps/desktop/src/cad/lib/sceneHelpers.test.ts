@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 import * as THREE from "three"
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
-import { applyDragDelta, booleanElement, buildElementObject, commitDrag, type DragStart } from "./sceneHelpers.ts"
+import { applyDragDelta, booleanElement, buildElementObject, commitDrag, fitCameraToObjects, type DragStart } from "./sceneHelpers.ts"
 
 const layerId = () => useLayerStore.getState().activeLayer
 const reset = () => useElementsStore.setState({ elements: [], selectedElement: null, history: [[]], currentHistoryIndex: 0 })
@@ -99,5 +100,92 @@ describe("boolean operations", () => {
     const result = booleanElement("union", objects(), "layer")!
     const object = buildElementObject({ id: "r", layerId: "layer", ...result } as never)!
     expect(new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3()).x).toBeCloseTo(3)
+  })
+})
+
+describe("the Z-up view the assistant builds for", () => {
+  test("a camera with Z up keeps its up axis through orbit updates and fit-to-view", () => {
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.01, 5000)
+    camera.up.set(0, 0, 1)
+    camera.position.set(300, -300, 240)
+    const orbit = new OrbitControls(camera, Object.assign(new EventTarget(), {
+      getRootNode: () => new EventTarget(), style: {}, setPointerCapture: () => {}, releasePointerCapture: () => {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 })
+    }) as unknown as HTMLElement)
+    orbit.update()
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 100))
+    tower.position.set(0, 0, 50)
+    tower.updateMatrixWorld(true)
+    const center = fitCameraToObjects(camera, orbit.target, [tower])!
+    orbit.target.copy(center)
+    orbit.update()
+    // The screen's up direction is the world's +Z, so a part standing along Z stands upright on screen.
+    const screenUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
+    expect(screenUp.z).toBeGreaterThan(0.5)
+    expect(Math.abs(screenUp.x) + Math.abs(screenUp.y)).toBeLessThan(1.2)
+    expect(camera.position.z).toBeGreaterThan(center.z)
+    orbit.dispose()
+  })
+})
+
+describe("every element is drawn Z-up, the way the assistant and the toolpath see it", () => {
+  const size = (element: Record<string, unknown>): THREE.Vector3 => {
+    const object = buildElementObject({ id: "e", layerId: "layer", x: 0, y: 0, z: 0, ...element } as never)!
+    return new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3())
+  }
+  const box = (element: Record<string, unknown>): THREE.Box3 =>
+    new THREE.Box3().setFromObject(buildElementObject({ id: "e", layerId: "layer", x: 0, y: 0, z: 0, ...element } as never)!)
+
+  test("a wall is long on X, thick on Y and tall on Z, standing on the ground", () => {
+    const s = size({ type: "wall", length: 300, height: 100, thickness: 20 })
+    expect([s.x, s.y, s.z]).toEqual([300, 20, 100].map((v) => expect.closeTo(v, 5)))
+    expect(box({ type: "wall", length: 300, height: 100, thickness: 20 }).min.z).toBeCloseTo(0, 5)
+  })
+
+  test("a floor and a roof use their width and depth; both are flat on XY", () => {
+    const floor = size({ type: "floor", width: 300, depth: 200, thickness: 10 })
+    expect([floor.x, floor.y, floor.z]).toEqual([300, 200, 10].map((v) => expect.closeTo(v, 5)))
+    const roof = size({ type: "roof", width: 300, depth: 200, height: 80, style: "pitched" })
+    expect([roof.x, roof.y, roof.z]).toEqual([300, 200, 80].map((v) => expect.closeTo(v, 5)))
+  })
+
+  test("a column, a stair and a spring rise along Z", () => {
+    const column = size({ type: "column", radius: 20, height: 200 })
+    expect(column.z).toBeCloseTo(200, 5)
+    expect(column.x).toBeCloseTo(40, 0)
+    const stair = size({ type: "stair", width: 100, height: 150, depth: 200, steps: 10 })
+    expect([stair.x, stair.y, stair.z]).toEqual([100, 200, 150].map((v) => expect.closeTo(v, 5)))
+    const spring = size({ type: "spring", radius: 30, wireRadius: 5, turns: 5, height: 100 })
+    expect(spring.z).toBeGreaterThan(100)
+    expect(spring.z).toBeLessThan(115)
+    expect(spring.x).toBeGreaterThan(60)
+  })
+
+  test("a bolt stands on Z with its head up; a nut and a washer are rings with a bore and a thickness", () => {
+    const bolt = box({ type: "bolt", size: "M8", length: 50 })
+    expect(bolt.getSize(new THREE.Vector3()).z).toBeGreaterThan(45)
+    expect(bolt.getSize(new THREE.Vector3()).x).toBeLessThan(20)
+    const washer = size({ type: "washer", size: "M8", outerDiameter: 16, thickness: 1.5 })
+    expect([washer.x, washer.z]).toEqual([16, 1.5].map((v) => expect.closeTo(v, 3)))
+    const nut = buildElementObject({ id: "n", layerId: "layer", type: "nut", size: "M8", x: 0, y: 0, z: 0 } as never)!
+    const geometry = (nut as THREE.Mesh).geometry
+    // The bore cuts vertices on the circle of the bolt's radius: a solid hexagonal prism has none.
+    const p = geometry.getAttribute("position")
+    let bore = 0
+    for (let i = 0; i < p.count; i++) if (Math.abs(Math.hypot(p.getX(i), p.getY(i)) - 4) < 1e-6) bore++
+    expect(bore).toBeGreaterThan(0)
+  })
+
+  test("a rotation on a washer or a bolt is applied once", () => {
+    const washer = size({ type: "washer", size: "M8", outerDiameter: 16, thickness: 1.5, rotation: { x: 90, y: 0, z: 0 } })
+    expect(washer.y).toBeCloseTo(1.5, 3)
+    expect(washer.z).toBeCloseTo(16, 3)
+  })
+
+  test("a lathe about X lies along X, about Y stands on Z", () => {
+    const profile = [{ x: 10, y: 0 }, { x: 10, y: 20 }]
+    const alongX = size({ type: "revolution", profile, axis: "x" })
+    expect(alongX.x).toBeCloseTo(20, 5)
+    const stood = size({ type: "revolution", profile, axis: "y" })
+    expect(stood.z).toBeCloseTo(20, 5)
   })
 })

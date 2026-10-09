@@ -28,6 +28,7 @@ export * from "./offset.ts"
 export * from "./snap.ts"
 export * from "./dxf.ts"
 export * from "./solid.ts"
+export * from "./gear.ts"
 export * from "./migrate.ts"
 export * from "./testing.ts"
 
@@ -61,3 +62,7 @@ export * from "./sketch.ts"
 export * from "./csg.ts"
 export * from "./history.ts"
 export * from "./history-edit.ts"
+export * from "./element-transform.ts"
+// Surface helpers add their own `Mesh` interface (already exported through
+// `solid.ts`); only the runtime-shaped types it owns are re-exported.
+export { chamferBox, chamferCylinderTop, sweepMesh, loftMesh, shellMesh, surfaceBounds, surfaceVolume } from "./surface.ts"

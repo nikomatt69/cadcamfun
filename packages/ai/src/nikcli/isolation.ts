@@ -63,7 +63,9 @@ const SCRUBBED = [
   "NIKCLI_DISCORD_WEBHOOK_URL",
   "NIKCLI_FIGMA_TOKEN",
   "NIKCLI_LOG_REDACT",
-  "NIKCLI_TEST_MODE"
+  "NIKCLI_TEST_MODE",
+  // The confined program runner (`code_mode`) is how the agent builds complex geometry and G-code in loops; see config.ts.
+  "NIKCLI_DISABLE_CODE_MODE"
 ] as const
 
 export interface IsolationOptions {
@@ -98,7 +100,6 @@ export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): 
   NIKCLI_DISABLE_EXTERNAL_SKILLS: "1",
   NIKCLI_DISABLE_BROWSER_CONTROL_TOOL: "1",
   NIKCLI_DISABLE_COMPUTER_TOOL: "1",
-  NIKCLI_DISABLE_CODE_MODE: "1",
   NIKCLI_PERMISSION_MODE: "default",
   ...(options?.overrideHome === false ? {} : { HOME: paths.home, USERPROFILE: paths.home })
 })

@@ -67,6 +67,23 @@ export const flattenElements = (elements: ReadonlyArray<CadElement>): CadElement
   return out
 }
 
+const zero: V3 = { x: 0, y: 0, z: 0 }
+/** The diameter of a metric size such as "M8" (the fallback when it is not one), as the editor reads it. */
+const metricDiameter = (size: unknown, fallback: number): number => {
+  const match = typeof size === "string" ? size.match(/M(\d+(?:\.\d+)?)/i) : null
+  return match ? Number(match[1]) : fallback
+}
+const points3 = (list: unknown): V3[] => Array.isArray(list) ? list.filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null).map((p) => ({ x: num(p["x"]), y: num(p["y"]), z: num(p["z"]) })) : []
+const points2 = (list: unknown): Array<{ x: number; y: number }> => points3(list)
+/** The box of some points, grown by `radius` on every side and moved by `origin`. */
+const aroundPoints = (points: ReadonlyArray<V3>, radius: number, origin: V3): Bounds => {
+  if (points.length === 0) return boundsOf({ ...origin }, { ...origin })
+  return boundsOf(
+    { x: origin.x + Math.min(...points.map((p) => p.x)) - radius, y: origin.y + Math.min(...points.map((p) => p.y)) - radius, z: origin.z + Math.min(...points.map((p) => p.z)) - radius },
+    { x: origin.x + Math.max(...points.map((p) => p.x)) + radius, y: origin.y + Math.max(...points.map((p) => p.y)) + radius, z: origin.z + Math.max(...points.map((p) => p.z)) + radius }
+  )
+}
+
 /** Bounding box of one element in CAD coordinates (legacy `extractElementGeometry().boundingBox`). */
 export const elementBounds = (e: CadElement): Bounds => {
   const x = num(e["x"])
@@ -109,8 +126,10 @@ export const elementBounds = (e: CadElement): Bounds => {
     }
     case "capsule": {
       const r = num(e["radius"])
-      const total = num(e["height"]) + r * 2
-      return centered(e, r, r, -total / 2, total / 2)
+      const half = (num(e["height"]) + r * 2) / 2
+      // A capsule lies along its `direction` (x | y | z, default y), as the editor and the element mesh draw it.
+      const along = e["direction"] === "x" ? "x" : e["direction"] === "z" ? "z" : "y"
+      return along === "z" ? centered(e, r, r, -half, half) : along === "x" ? centered(e, half, r, -r, r) : centered(e, r, half, -r, r)
     }
     case "ellipse": {
       const rx = num(e["radiusX"]) || num(e["width"]) / 2
@@ -124,6 +143,68 @@ export const elementBounds = (e: CadElement): Bounds => {
         : [{ x: num(e["x1"]), y: num(e["y1"]), z: num(e["z1"] ?? e["z"]) }, { x: num(e["x2"]), y: num(e["y2"]), z: num(e["z2"] ?? e["z"]) }, { x: num(e["x3"]), y: num(e["y3"]), z: num(e["z3"] ?? e["z"]) }]
       const xs = pts.map(p => num(p.x)), ys = pts.map(p => num(p.y)), zs = pts.map(p => num(p.z))
       return boundsOf({ x: Math.min(...xs), y: Math.min(...ys), z: Math.min(...zs) }, { x: Math.max(...xs), y: Math.max(...ys), z: Math.max(...zs) })
+    }
+    // ---- architecture, standing on Z exactly as the editor draws it (`createThreeObject`).
+    case "wall": return centered(e, num(e["length"]) / 2, num(e["thickness"]) / 2, 0, num(e["height"]))
+    case "floor": return centered(e, num(e["width"]) / 2, num(e["depth"] || e["length"]) / 2, -num(e["thickness"]) / 2, num(e["thickness"]) / 2)
+    case "roof": {
+      const w = num(e["width"]) / 2, d = num(e["depth"] || e["length"]) / 2, h = num(e["height"])
+      return e["style"] === "flat" ? centered(e, w, d, -h / 8, h / 8) : centered(e, w, d, 0, h)
+    }
+    case "column": {
+      const r = num(e["radius"]), h = num(e["height"])
+      const plain = e["style"] === undefined || e["style"] === "simple"
+      const crowned = e["style"] === "ionic" || e["style"] === "corinthian"
+      return centered(e, plain ? r : r * 1.2, plain ? r : r * 1.2, -h / 2, h / 2 + (crowned ? h * 0.025 : 0))
+    }
+    case "stair": {
+      const depth = num(e["depth"])
+      const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
+      return boundsOf({ x: x - num(e["width"]) / 2, y: y - depth, z }, { x: x + num(e["width"]) / 2, y, z: z + num(e["height"]) })
+    }
+    case "window": return centered(e, num(e["width"]) / 2, num(e["thickness"]) / 2, -num(e["height"]) / 2, num(e["height"]) / 2)
+    case "door": {
+      // The knob stands out of the face that looks toward -Y by 0.6 thickness + its radius (0.08 width).
+      const t = num(e["thickness"]), w = num(e["width"]), h = num(e["height"])
+      const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
+      return boundsOf({ x: x - w / 2, y: y - Math.max(t / 2, t * 0.6 + w * 0.08), z: z - h / 2 }, { x: x + w / 2, y: y + t / 2, z: z + h / 2 })
+    }
+    // ---- standard parts
+    case "spring": {
+      const r = num(e["radius"]) + num(e["wireRadius"]), h = num(e["height"]) / 2 + num(e["wireRadius"])
+      return centered(e, r, r, -h, h)
+    }
+    case "bolt": case "screw": case "rivet": {
+      const d = e["type"] === "rivet" ? num(e["diameter"]) || 3 : metricDiameter(e["size"], 5)
+      const head = e["type"] === "rivet" ? d : d * 0.9
+      const half = (num(e["length"]) || (e["type"] === "rivet" ? 10 : 20)) / 2
+      return centered(e, head, head, -half, half)
+    }
+    case "nut": {
+      const d = metricDiameter(e["size"], 5)
+      return centered(e, d * 0.9, d * 0.9 * Math.cos(Math.PI / 6), -d * 0.4, d * 0.4)
+    }
+    case "washer": {
+      const d = metricDiameter(e["size"], 5)
+      const outer = num(e["outerDiameter"]) > d ? num(e["outerDiameter"]) : d * 2.2
+      const t = num(e["thickness"]) > 0 ? num(e["thickness"]) : d * 0.2
+      return centered(e, outer / 2, outer / 2, -t / 2, t / 2)
+    }
+    case "text3d": {
+      const text = typeof e["text"] === "string" ? e["text"] : ""
+      const h = num(e["height"]) || 5
+      return centered(e, (text.length > 0 ? text.length * h * 0.6 : 10) / 2, h / 2, -(num(e["depth"]) || 2) / 2, (num(e["depth"]) || 2) / 2)
+    }
+    // ---- curves and sweeps are given by points; the curve stays inside the hull of its points.
+    case "spline": case "bezier": case "nurbs": case "path3d": return aroundPoints(points3(e["points"]), 0, zero)
+    case "sweep": {
+      const profile = points2(e["profile"])
+      const r = profile.length >= 3 ? Math.max(...profile.map((p) => Math.hypot(p.x, p.y))) : num(e["radius"]) || 0.5
+      return aroundPoints(points3(e["path"]), r, { x, y, z })
+    }
+    case "loft": {
+      const radius = Math.max(0, ...(Array.isArray(e["profiles"]) ? e["profiles"] as Array<{ radius?: unknown }> : []).map((p) => num(p?.radius)))
+      return aroundPoints(points3(e["positions"]), radius, { x, y, z })
     }
     default: {
       // A solid with no formula of its own here (an extrusion, a revolution, a mesh, a parametric part) has the bounds of its mesh:

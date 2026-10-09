@@ -33,6 +33,8 @@ describe("chat attachments", () => {
     expect(out.note).toContain("a.exe: NOT read")
     expect(kindOf({ name: "photo.JPG" })).toBe("image")
     expect(kindOf({ name: "x.iges" })).toBe("unsupported")
+    expect(kindOf({ name: "part.PDF" })).toBe("pdf")
+    expect(kindOf({ name: "x", mime: "application/pdf" })).toBe("pdf")
   })
 
   test("cad_import_drawing reads an attached DXF by name and says what is attached when it is not found", async () => {
@@ -72,5 +74,16 @@ describe("chat attachments", () => {
     expect(added[0]![0]).toMatchObject({ type: "extrusion", depth: 6 })
     const noDepth = JSON.parse(await tool.execute({ content: "0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n", format: "dxf" }, ctx)) as { ok: boolean }
     expect(noDepth.ok).toBe(false)
+  })
+
+  test("a PDF becomes a file part the model reads, with its own size limit", () => {
+    const pdf = Buffer.from("%PDF-1.4 test").toString("base64")
+    const out = prepareAttachments("p-pdf", [{ name: "drawing.pdf", mime: "application/pdf", data: pdf, encoding: "base64" }])
+    expect(out.parts).toEqual([{ type: "file", mime: "application/pdf", filename: "drawing.pdf", url: `data:application/pdf;base64,${pdf}` }])
+    expect(out.note).toContain("PDF document")
+    const tooBig = "A".repeat(14 * 1024 * 1024)
+    const refused = prepareAttachments("p-pdf", [{ name: "huge.pdf", data: tooBig, encoding: "base64" }])
+    expect(refused.parts).toEqual([])
+    expect(refused.rejected[0]?.reason).toContain("PDF larger than 10 MB")
   })
 })

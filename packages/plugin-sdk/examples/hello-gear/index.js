@@ -6061,9 +6061,14 @@ var decodeSolid = decodeUnknownEffect2(SolidSchema);
 class DrawingMigrationError extends TaggedError2("DrawingMigrationError") {
 }
 // packages/core/src/cad/design.ts
-var SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"]);
+var SOLIDS = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "prism", "hemisphere", "ellipsoid", "capsule", "extrusion", "revolution", "parametric", "sweep", "loft", "gear", "spring", "bolt", "screw", "nut", "washer", "wall", "column", "stair"]);
 var BOOLEANS = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
 var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 * Math.PI / 2, 2 * Math.PI];
+// packages/core/src/cad/expr.ts
+var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
+var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
+// packages/core/src/cad/element-transform.ts
+var DEG = Math.PI / 180;
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
@@ -6080,6 +6085,11 @@ var ArcSchema2 = TaggedStruct("Arc", {
 });
 var DwellSchema = TaggedStruct("Dwell", { seconds: NonNegative });
 var CommentSchema = TaggedStruct("Comment", { text: String4 });
+var OrientSchema = TaggedStruct("Orient", {
+  a: optionalKey2(Finite),
+  b: optionalKey2(Finite),
+  c: optionalKey2(Finite)
+});
 var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak"]);
 var CycleSchema = TaggedStruct("Cycle", {
   cycle: CycleKindSchema,
@@ -6095,7 +6105,8 @@ var MoveSchema = Union2([
   ArcSchema2,
   DwellSchema,
   CommentSchema,
-  CycleSchema
+  CycleSchema,
+  OrientSchema
 ]);
 var CoolantSchema = Literals(["off", "flood", "mist"]);
 var ProgramUnitsSchema = Literals(["mm", "inch"]);
@@ -6161,6 +6172,9 @@ var StockSchema = Struct({
 });
 var decodeStock = decodeUnknownEffect2(StockSchema);
 var encodeStock = encodeEffect(StockSchema);
+// packages/core/src/cam/indexing.ts
+var DEG2 = 180 / Math.PI;
+var RAD = Math.PI / 180;
 // packages/core/src/cam/params.ts
 var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
 var Positive3 = Finite.check(isGreaterThan2(0));
@@ -6247,8 +6261,24 @@ class EngraveParams extends Class3("cam/EngraveParams")(Struct({
   tolerance: withDefault2(Positive3, 0.01)
 }).check(heightsOrdered)) {
 }
+// packages/core/src/cam/operations/adaptive.ts
+class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
+  ...OperationFields,
+  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
+  climb: withDefault2(Boolean3, true),
+  helixPitch: withDefault2(Positive3, 1),
+  tolerance: withDefault2(Positive3, 0.01)
+}).check(heightsOrdered)) {
+}
+
 // packages/core/src/cam/operations/surface.ts
-var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline"]);
+var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest"]);
+var RestFromSchema = Struct({
+  diameter: Positive3,
+  kind: withDefault2(ToolKindSchema, "endmill"),
+  tipRadius: optionalKey2(Positive3),
+  allowance: optionalKey2(NonNegative3)
+});
 
 class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
   ...OperationFields,
@@ -6262,7 +6292,29 @@ class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
   tolerance: withDefault2(Positive3, 0.01),
   entry: withDefault2(PocketEntrySchema, "helix"),
   helixPitch: withDefault2(Positive3, 1),
-  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3)
+  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
+  restFrom: optionalKey2(RestFromSchema),
+  restThreshold: withDefault2(Positive3, 0.02),
+  clearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
+  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/thread.ts
+class ThreadParams extends Class3("cam/ThreadParams")(Struct({
+  ...OperationFields,
+  stepdown: withDefault2(Positive3, 1e6),
+  x: withDefault2(Finite, 0),
+  y: withDefault2(Finite, 0),
+  diameter: Positive3,
+  pitch: Positive3,
+  internal: withDefault2(Boolean3, true),
+  rightHand: withDefault2(Boolean3, true),
+  climb: withDefault2(Boolean3, true),
+  passes: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
+  springPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
+  compensateFeed: withDefault2(Boolean3, true),
+  leadIn: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 2 })), 0.5),
+  tolerance: withDefault2(NonNegative3, 0.01)
 }).check(heightsOrdered)) {
 }
 // packages/core/src/cam/generator/cycles.ts
@@ -6305,6 +6357,7 @@ var CODE_OF = {
 
 // packages/core/src/cam/model/element-mesh.ts
 var TAU2 = 2 * Math.PI;
+var parametricCache = new Map;
 
 // packages/core/src/cam/model/dexel.ts
 var EMPTY = new Float64Array(0);
@@ -6389,6 +6442,8 @@ var ToolpathSettingsSchema = Struct({
   finishingAllowance: withDefault2(NonNegative3, 0.2),
   finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
   surfaceStrategy: withDefault2(Literals(["roughing", "parallel", "waterline"]), "roughing"),
+  surfaceClearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
+  adaptiveEngagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
   scallop: withDefault2(NonNegative3, 0),
   rasterAngle: withDefault2(Num2, 0),
   rasterOneWay: withDefault2(Boolean3, false),
@@ -6402,6 +6457,7 @@ var ToolpathSettingsSchema = Struct({
   useToolCompensation: withDefault2(Boolean3, false),
   useAdaptiveFeeds: withDefault2(Boolean3, false),
   useRestMachining: withDefault2(Boolean3, false),
+  restToolDiameter: withDefault2(Positive3, 10),
   toolNumber: withDefault2(PositiveInt, 1),
   workOffset: withDefault2(Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
   probeCycle: withDefault2(Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
@@ -6410,6 +6466,11 @@ var ToolpathSettingsSchema = Struct({
   probeStylus: withDefault2(Positive3, 4),
   probeDialect: withDefault2(Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
   probeFeatureSize: withDefault2(Positive3, 20),
+  threadPitch: withDefault2(Positive3, 1.5),
+  threadType: withDefault2(Literals(["internal", "external"]), "internal"),
+  threadHand: withDefault2(Literals(["right", "left"]), "right"),
+  threadPasses: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
+  threadSpringPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
   latheZero: withDefault2(Literals(["face", "chuck"]), "face"),
   bedOrigin: withDefault2(Literals(["corner", "center"]), "corner"),
   nozzleDiameter: withDefault2(Positive3, 0.4),
