@@ -279,3 +279,106 @@ html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace
     opacity: 1 !important;
   }
 }
+
+/* ---- Machining strategy palette (Fusion 360 / Hypermill style) ------------------- */
+.strategy-palette { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.strategy-palette__head { display: flex; flex-direction: column; gap: 2px; padding: 0 2px; }
+.strategy-palette__body { display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; padding-right: 2px; }
+.strategy-palette__body--compact { max-height: 200px; }
+.strategy-palette__cat { display: flex; flex-direction: column; gap: 4px; }
+.strategy-palette__cat-head { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.strategy-palette__cat-bar { display: inline-block; width: 3px; height: 12px; border-radius: 2px; background: #007acc; }
+.strategy-palette__cat-bar[data-accent="purple"] { background: #9333ea; }
+.strategy-palette__cat-bar[data-accent="cyan"]   { background: #0891b2; }
+.strategy-palette__cat-bar[data-accent="amber"]  { background: #d97706; }
+.strategy-palette__cat-bar[data-accent="orange"] { background: #ea580c; }
+.strategy-palette__cat-bar[data-accent="green"]  { background: #059669; }
+.strategy-palette__cat-bar[data-accent="red"]    { background: #dc2626; }
+.strategy-palette__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 0;
+}
+.strategy-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--workspace-border, #d5dde5);
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 56px;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+html.dark .strategy-cell { background: rgba(20, 28, 38, 0.55); border-color: #35414d; }
+.strategy-cell:hover { background: rgba(239, 246, 255, 0.9); border-color: #93c5fd; }
+html.dark .strategy-cell:hover { background: rgba(30, 58, 138, 0.45); border-color: #60a5fa; }
+.strategy-cell--active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.10));
+  border-color: #3b82f6;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.4), 0 1px 4px rgba(59, 130, 246, 0.18);
+}
+html.dark .strategy-cell--active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.35), rgba(99, 102, 241, 0.18));
+  border-color: #60a5fa;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.4), 0 1px 4px rgba(96, 165, 250, 0.25);
+}
+.strategy-cell--mapped {
+  border-style: dashed;
+  border-color: #93c5fd;
+}
+html.dark .strategy-cell--mapped { border-color: #60a5fa; }
+.strategy-cell__icon { display: inline-flex; align-items: center; justify-content: center; }
+.strategy-cell__label { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.strategy-palette__detail {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(239, 246, 255, 0.85);
+  border: 1px solid #bfdbfe;
+  border-left-width: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.strategy-palette__detail[data-accent="purple"] { background: rgba(245, 243, 255, 0.85); border-color: #d8b4fe; }
+.strategy-palette__detail[data-accent="cyan"]   { background: rgba(236, 254, 255, 0.85); border-color: #a5f3fc; }
+.strategy-palette__detail[data-accent="amber"]  { background: rgba(255, 251, 235, 0.85); border-color: #fcd34d; }
+.strategy-palette__detail[data-accent="orange"] { background: rgba(255, 247, 237, 0.85); border-color: #fed7aa; }
+.strategy-palette__detail[data-accent="green"]  { background: rgba(236, 253, 245, 0.85); border-color: #a7f3d0; }
+.strategy-palette__detail[data-accent="red"]    { background: rgba(254, 242, 242, 0.85); border-color: #fecaca; }
+html.dark .strategy-palette__detail { background: rgba(15, 23, 42, 0.7); border-color: #475569; }
+.strategy-palette__detail-title { font-size: 12px; font-weight: 600; color: #1d4ed8; }
+.strategy-palette__detail[data-accent="purple"] .strategy-palette__detail-title { color: #7c3aed; }
+.strategy-palette__detail[data-accent="cyan"]   .strategy-palette__detail-title { color: #0e7490; }
+.strategy-palette__detail[data-accent="amber"]  .strategy-palette__detail-title { color: #b45309; }
+.strategy-palette__detail[data-accent="orange"] .strategy-palette__detail-title { color: #c2410c; }
+.strategy-palette__detail[data-accent="green"]  .strategy-palette__detail-title { color: #047857; }
+.strategy-palette__detail[data-accent="red"]    .strategy-palette__detail-title { color: #b91c1c; }
+.strategy-palette__detail-desc { font-size: 11px; color: #4b5563; line-height: 1.4; margin: 0; }
+html.dark .strategy-palette__detail-desc { color: #cbd5e1; }
+.strategy-palette__detail-hint { font-size: 10px; color: #6b7280; margin-top: 2px; font-style: italic; }
+html.dark .strategy-palette__detail-hint { color: #94a3b8; }
+
+/* Capabilities overview panel */
+.capabilities-overview { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.capabilities-overview__group { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--workspace-border, #d5dde5); background: rgba(255,255,255,0.55); }
+html.dark .capabilities-overview__group { background: rgba(20, 28, 38, 0.55); border-color: #35414d; }
+.capabilities-overview__title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #1d4ed8; }
+.capabilities-overview__title[data-accent="purple"] { color: #7c3aed; }
+.capabilities-overview__title[data-accent="cyan"]   { color: #0e7490; }
+.capabilities-overview__title[data-accent="amber"]  { color: #b45309; }
+.capabilities-overview__title[data-accent="orange"] { color: #c2410c; }
+.capabilities-overview__title[data-accent="green"]  { color: #047857; }
+.capabilities-overview__title[data-accent="red"]    { color: #b91c1c; }
+.capabilities-overview__items { font-size: 11px; line-height: 1.5; color: #374151; }
+html.dark .capabilities-overview__items { color: #cbd5e1; }
+.capabilities-overview__items + .capabilities-overview__items { margin-top: 4px; }

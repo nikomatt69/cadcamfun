@@ -29,6 +29,7 @@ import { OperationSection } from "./generator/OperationSection.tsx"
 import { OriginSection } from "./generator/OriginSection.tsx"
 import { PrinterParamsSection } from "./generator/PrinterParamsSection.tsx"
 import { ToolSection } from "./generator/ToolSection.tsx"
+import CapabilitiesOverview from "./CapabilitiesOverview.tsx"
 
 export interface ToolpathGeneratorProps {
   /** Receives the generated (or cycle-edited) program text. */
@@ -153,6 +154,10 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
           <p class="text-sm text-green-800 dark:text-green-200">{gen.success}</p>
         </div>
       </Show>
+
+      <Motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} class="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <CapabilitiesOverview />
+      </Motion.div>
 
       <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} class="space-y-3 mt-8">
         <Motion.button

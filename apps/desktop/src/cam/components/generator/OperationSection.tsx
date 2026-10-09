@@ -10,6 +10,10 @@ import { PrinterPreview } from "./PrinterPreview.tsx"
 import { PrinterSettings } from "./PrinterSettings.tsx"
 import { INPUT, LABEL, NumberField, Section } from "./ui.tsx"
 import { t } from "../../../i18n/index.ts"
+import StrategyPalette, {
+  paletteToCoreOperation,
+  type MachineFamily
+} from "./StrategyPalette.tsx"
 
 const BTN_BLUE = "px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
 const BTN_GREEN = "px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -301,33 +305,32 @@ export function OperationSection(): JSX.Element {
   const info = () => cam.generator.getOperationDescription(gen.settings.operationType)
   const operation = (event: Event & { currentTarget: HTMLSelectElement }): void =>
     gen.updateSettings("operationType", event.currentTarget.value as typeof gen.settings.operationType)
+  const machineFamily = (): MachineFamily =>
+    gen.settings.machineType === "lathe" ? "lathe" : gen.settings.machineType === "3dprinter" ? "3dprinter" : "mill"
+  /** Receive a palette cell id, and apply the underlying `operationType` the core schema understands.
+   *  Multi-axis and advanced drilling variants resolve to the closest supported core op while
+   *  still being visible in the palette as Fusion-class strategies. */
+  const handlePaletteSelect = (paletteId: string): void => {
+    const target = paletteToCoreOperation(machineFamily(), paletteId)
+    if (target === gen.settings.operationType) {
+      // Even if the core op is the same, persist a hint so the assistant / multi-toolpath can
+      // observe which Fusion-style cell was the user's first selection.
+      gen.updateSettings("operationType", gen.settings.operationType)
+      return
+    }
+    gen.updateSettings("operationType", target as typeof gen.settings.operationType)
+  }
   return (
     <Section id="operation" delay={0.25} tone="purple" icon={Play} title="Operation" testId="operation-section">
       <div>
         <label class={LABEL}>Operation Type</label>
         <Switch>
-          <Match when={gen.settings.machineType === "mill"}>
-            <select class={INPUT} value={gen.settings.operationType} onChange={operation}>
-              <option value="contour">Contouring</option>
-              <option value="pocket">Pocket Clearing</option>
-              <option value="drill">Drilling</option>
-              <option value="engrave">Engraving</option>
-              <option value="profile">3D Profile</option>
-              <option value="threading">Threading</option>
-              <option value="3d_surface">3D Surface</option>
-              <option value="probing">Probing (touch probe / tool setter)</option>
-            </select>
-          </Match>
-          <Match when={gen.settings.machineType === "lathe"}>
-            <select class={INPUT} value={gen.settings.operationType} onChange={operation}>
-              <option value="turning">Turning</option>
-              <option value="facing">Facing</option>
-              <option value="boring">Boring</option>
-              <option value="threading">Threading</option>
-              <option value="grooving">Grooving</option>
-              <option value="parting">Parting</option>
-              <option value="knurling">Knurling</option>
-            </select>
+          <Match when={gen.settings.machineType === "mill" || gen.settings.machineType === "lathe"}>
+            <StrategyPalette
+              family={machineFamily() === "3dprinter" ? "mill" : machineFamily()}
+              activeOperation={gen.settings.operationType}
+              onSelect={handlePaletteSelect}
+            />
           </Match>
           <Match when={gen.settings.machineType === "3dprinter"}>
             <div class="flex flex-col gap-4">

@@ -83,17 +83,98 @@ const meshStats = (kind: string, mesh: Mesh): { kind: string; vertexCount: numbe
 const OK = "ok" as const
 const ERR = "error" as const
 
-/**
- * Span id helper. When a span is active in the Effect runtime the OTel
- * bridge exposes its context; otherwise we emit null and the row falls back
- * to its primary key for ordering.
- */
 const currentSpanIds = (): { readonly traceId: string | null; readonly spanId: string | null } => {
   const span = trace.getActiveSpan()
   if (span === undefined) return { traceId: null, spanId: null }
   const ctx = span.spanContext()
   return { traceId: ctx.traceId, spanId: ctx.spanId }
 }
+
+const toDatabaseError = (operation: string, error: unknown): DatabaseError =>
+  new DatabaseError({ operation, cause: error instanceof Error ? error : new Error(String(error)) })
+
+type QueryFn = <A>(operation: string, run: (db: Db) => PromiseLike<A> | A) => Effect.Effect<A, DatabaseError>
+
+interface RunArgs {
+  readonly spanName: string
+  readonly projectId: string
+  readonly kind: string
+  readonly inputs: unknown
+  readonly run: () => Promise<Mesh>
+}
+
+const runWithSpan = (query: QueryFn, { spanName, projectId, kind, inputs, run }: RunArgs): Effect.Effect<MeshAssetView, DatabaseError> =>
+  Effect.gen(function*() {
+    const startedAt = Date.now()
+    const inputsJson = JSON.stringify(inputs)
+    const result: Mesh = yield* Effect.tryPromise({
+      try: () => run(),
+      catch: (error) => toDatabaseError(`${kind}.run`, error)
+    }).pipe(
+      Effect.catch((error) => Effect.gen(function*() {
+        const errIds = currentSpanIds()
+        yield* query("cadSurfaceRepo.logError", async (db) => {
+          await db.insert(schema.cadOperationLogTable).values({
+            projectId,
+            operation: kind,
+            meshAssetId: null,
+            outcome: ERR,
+            durationMs: Date.now() - startedAt,
+            inputs: inputsJson,
+            error: error.message,
+            traceId: errIds.traceId,
+            spanId: errIds.spanId
+          })
+        })
+        return yield* Effect.fail(error)
+      }))
+    )
+    const durationMs = Date.now() - startedAt
+    const finalIds = currentSpanIds()
+    const view = yield* query("cadSurfaceRepo.persist", async (db): Promise<MeshAssetView> => {
+      const [inserted] = await db.insert(schema.meshAssetTable).values({
+        projectId,
+        kind,
+        inputs: inputsJson,
+        stats: JSON.stringify(meshStats(kind, result)),
+        mesh: JSON.stringify(meshToJSON(result))
+      }).returning()
+      if (!inserted) throw new Error("meshAsset insert returned no row")
+      await db.insert(schema.cadOperationLogTable).values({
+        projectId,
+        operation: kind,
+        meshAssetId: inserted.id,
+        outcome: OK,
+        durationMs,
+        inputs: inputsJson,
+        error: null,
+        traceId: finalIds.traceId,
+        spanId: finalIds.spanId
+      })
+      const stats = typeof inserted.stats === "string" ? JSON.parse(inserted.stats) as { vertexCount: number; triangleCount: number; signedVolume: number } : { vertexCount: 0, triangleCount: 0, signedVolume: 0 }
+      return {
+        id: inserted.id,
+        projectId: inserted.projectId,
+        kind: inserted.kind,
+        vertexCount: stats.vertexCount,
+        triangleCount: stats.triangleCount,
+        signedVolume: stats.signedVolume,
+        bounds: meshBounds(result),
+        mesh: meshToJSON(result),
+        traceId: finalIds.traceId,
+        spanId: finalIds.spanId,
+        createdAt: inserted.createdAt
+      }
+    })
+    return view
+  }).pipe(
+    Effect.withSpan(spanName, {
+      attributes: {
+        "cadcamfun.project_id": projectId,
+        "cadcamfun.operation": kind
+      }
+    })
+  )
 
 export class CadSurfaceRepo extends Context.Service<CadSurfaceRepo, {
   chamferBox(projectId: string, input: ChamferBoxInput): Effect.Effect<MeshAssetView, DatabaseError>
@@ -108,16 +189,41 @@ export class CadSurfaceRepo extends Context.Service<CadSurfaceRepo, {
   static readonly layer = Layer.effect(CadSurfaceRepo, Effect.gen(function*() {
     const { query } = yield* Database
     return CadSurfaceRepo.of({
-      chamferBox: (projectId, input) =>
-        runWithSpan("cad.chamferBox", projectId, "chamferBox", input, () => Promise.resolve(chamferBox(input.box, input.distance))),
-      chamferCylinderTop: (projectId, input) =>
-        runWithSpan("cad.chamferCylinderTop", projectId, "chamferCylinderTop", input, () => Promise.resolve(chamferCylinderTop(input.cylinder, input.distance))),
-      sweep: (projectId, input) =>
-        runWithSpan("cad.sweep", projectId, "sweep", input, () => Promise.resolve(sweepMesh(input.profile, input.path))),
-      loft: (projectId, input) =>
-        runWithSpan("cad.loft", projectId, "loft", input, () => Promise.resolve(loftMesh(input.sections))),
-      shell: (projectId, input) =>
-        runWithSpan("cad.shell", projectId, "shell", input, () => Promise.resolve(shellMesh(input.mesh, input.thickness))),
+      chamferBox: (projectId, input) => runWithSpan(query, {
+        spanName: "cad.chamferBox",
+        projectId,
+        kind: "chamferBox",
+        inputs: input,
+        run: () => Promise.resolve(chamferBox(input.box, input.distance))
+      }),
+      chamferCylinderTop: (projectId, input) => runWithSpan(query, {
+        spanName: "cad.chamferCylinderTop",
+        projectId,
+        kind: "chamferCylinderTop",
+        inputs: input,
+        run: () => Promise.resolve(chamferCylinderTop(input.cylinder, input.distance))
+      }),
+      sweep: (projectId, input) => runWithSpan(query, {
+        spanName: "cad.sweep",
+        projectId,
+        kind: "sweep",
+        inputs: input,
+        run: () => Promise.resolve(sweepMesh(input.profile, input.path))
+      }),
+      loft: (projectId, input) => runWithSpan(query, {
+        spanName: "cad.loft",
+        projectId,
+        kind: "loft",
+        inputs: input,
+        run: () => Promise.resolve(loftMesh(input.sections))
+      }),
+      shell: (projectId, input) => runWithSpan(query, {
+        spanName: "cad.shell",
+        projectId,
+        kind: "shell",
+        inputs: { thickness: input.thickness },
+        run: () => Promise.resolve(shellMesh(input.mesh, input.thickness))
+      }),
       recentLog: (projectId, limit) =>
         query("cadSurfaceRepo.recentLog", async (db) => {
           const rows = await db.select({
@@ -144,88 +250,6 @@ export class CadSurfaceRepo extends Context.Service<CadSurfaceRepo, {
     })
   }))
 }
-
-/**
- * Generic runner for a surface operation: emits the OTel span, persists the
- * result to Drizzle, audits the call. Error path goes through the same
- * auditor so the log shows the failure mode alongside its inputs.
- */
-const runWithSpan = <A>(
-  spanName: string,
-  projectId: string,
-  kind: string,
-  inputs: unknown,
-  run: () => Promise<Mesh>
-): Effect.Effect<MeshAssetView, DatabaseError> =>
-  Effect.gen(function*() {
-    const { query } = yield* Database
-    const startedAt = Date.now()
-    const result = yield* Effect.tryPromise({
-      try: () => run(),
-      catch: (error) => error instanceof Error ? error : new Error(String(error))
-    }).pipe(
-      Effect.catchAll((error) => Effect.gen(function*() {
-        const ids = currentSpanIds()
-        yield* query("cadSurfaceRepo.logError", async (db) => {
-          await db.insert(schema.cadOperationLogTable).values({
-            projectId,
-            operation: kind,
-            meshAssetId: null,
-            outcome: ERR,
-            durationMs: Date.now() - startedAt,
-            inputs: JSON.stringify(inputs),
-            error: error.message,
-            traceId: ids.traceId,
-            spanId: ids.spanId
-          })
-        })
-        return yield* Effect.fail(error)
-      }))
-    )
-    const durationMs = Date.now() - startedAt
-    const ids = currentSpanIds()
-    return yield* query("cadSurfaceRepo.persist", async (db): Promise<MeshAssetView> => {
-      const [inserted] = await db.insert(schema.meshAssetTable).values({
-        projectId,
-        kind,
-        inputs: JSON.stringify(inputs),
-        stats: JSON.stringify(meshStats(kind, result)),
-        mesh: JSON.stringify(meshToJSON(result))
-      }).returning()
-      if (!inserted) throw new Error("meshAsset insert returned no row")
-      await db.insert(schema.cadOperationLogTable).values({
-        projectId,
-        operation: kind,
-        meshAssetId: inserted.id,
-        outcome: OK,
-        durationMs,
-        inputs: JSON.stringify(inputs),
-        error: null,
-        traceId: ids.traceId,
-        spanId: ids.spanId
-      })
-      return {
-        id: inserted.id,
-        projectId: inserted.projectId,
-        kind: inserted.kind,
-        vertexCount: inserted.stats ? JSON.parse(inserted.stats).vertexCount : 0,
-        triangleCount: inserted.stats ? JSON.parse(inserted.stats).triangleCount : 0,
-        signedVolume: inserted.stats ? JSON.parse(inserted.stats).signedVolume : 0,
-        bounds: meshBounds(result),
-        mesh: meshToJSON(result),
-        traceId: ids.traceId,
-        spanId: ids.spanId,
-        createdAt: inserted.createdAt
-      }
-    })
-  }).pipe(
-    Effect.withSpan(spanName, {
-      attributes: {
-        "cadcamfun.project_id": projectId,
-        "cadcamfun.operation": kind
-      }
-    })
-  )
 
 // Re-export the type for callers that import the repo just for the view shape.
 export type { cad }

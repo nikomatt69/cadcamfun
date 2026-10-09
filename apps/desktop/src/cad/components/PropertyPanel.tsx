@@ -6,7 +6,10 @@ import { useLayerStore } from "../store/layerStore.ts"
 import { getFieldsForElementType, type PropertyField } from "../lib/propertyFields.ts"
 import ParametricPanel from "./ParametricPanel.tsx"
 import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
+import SurfacingPanel from "./SurfacingPanel.tsx"
 import { ColorListInput, ElementListInput, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
+
+const SOLID_TYPES_FOR_SURFACING = new Set(["box", "cube", "cylinder", "sphere", "cone", "torus", "extrude", "revolve"])
 
 type Props = Record<string, any>
 
@@ -142,6 +145,12 @@ export default function PropertyPanel(): JSX.Element {
 
         <Show when={selected().type === "parametric" && selected().history}>
           <ParametricPanel element={selected()} locked={locked()} />
+        </Show>
+
+        <Show when={SOLID_TYPES_FOR_SURFACING.has(String(selected().type))}>
+          <div class="mt-6 space-y-4 border-t border-gray-200 pt-4 dark:border-gray-600">
+            <SurfacingPanel />
+          </div>
         </Show>
       </Motion.div>}
     </Show>

@@ -316,20 +316,31 @@ export const chamferBox = (box: BoxSolid, distance: number): Mesh => {
  * one only while a positive radius is left. `distance` is clamped to the
  * radius; a cylinder wider at the top is `chamferCylinderBottom`.
  */
-export const chamferCylinderTop = (
-  cyl: CylinderSolid,
-  distance: number
-): Mesh => {
-  if (cyl.axis !== undefined && cyl.axis !== "z") {
-    throw new RangeError("chamferCylinderTop only supports the default Z axis")
-  }
+export const chamferCylinderTop = (cyl: CylinderSolid, distance: number): Mesh => {
   if (!Number.isFinite(distance) || distance <= 0) {
     throw new RangeError("Chamfer distance must be positive and finite")
   }
+  return taperedCylinder(cyl, cyl.radius, Math.max(0, cyl.radius - distance))
+}
+
+/**
+ * Mirror of `chamferCylinderTop`: the wall runs from `radius - distance` at
+ * the base to `radius` at the top, so the solid stays `height` tall, the
+ * bottom radius shrinks by `distance` and the top face keeps `radius`.
+ */
+export const chamferCylinderBottom = (cyl: CylinderSolid, distance: number): Mesh => {
+  if (!Number.isFinite(distance) || distance <= 0) {
+    throw new RangeError("Chamfer distance must be positive and finite")
+  }
+  return taperedCylinder(cyl, Math.max(0, cyl.radius - distance), cyl.radius)
+}
+
+/** A cylinder whose wall is the straight strip between a bottom and a top ring. */
+const taperedCylinder = (cyl: CylinderSolid, rBottom: number, rTop: number): Mesh => {
+  if (cyl.axis !== undefined && cyl.axis !== "z") {
+    throw new RangeError("Tapering a cylinder only supports the default Z axis")
+  }
   const segments = cyl.segments
-  const r0 = cyl.radius
-  const d = distance > r0 ? r0 : distance
-  const rTop = r0 - d
   const h = cyl.height
   const o = cyl.origin
 
@@ -345,32 +356,34 @@ export const chamferCylinderTop = (
   }
 
   const bottomCentre = vertex(o.x, o.y, o.z)
+  const topCentre = rTop > 0 ? vertex(o.x, o.y, o.z + h) : -1
   const bottomRing: number[] = []
   const topRing: number[] = []
   for (let i = 0; i < segments; i++) {
     const a = (i / segments) * Math.PI * 2
     const cos = Math.cos(a)
     const sin = Math.sin(a)
-    bottomRing.push(vertex(o.x + r0 * cos, o.y + r0 * sin, o.z))
+    bottomRing.push(vertex(o.x + rBottom * cos, o.y + rBottom * sin, o.z))
     topRing.push(vertex(o.x + rTop * cos, o.y + rTop * sin, o.z + h))
   }
-  // Bottom cap (fan about the disc centre, outward −Z).
-  for (let i = 0; i < segments; i++) {
-    const j = (i + 1) % segments
-    tri(bottomCentre, bottomRing[j]!, bottomRing[i]!)
+  // Bottom cap (fan about the disc centre, outward −Z); a zero radius is the
+  // apex and the fan is degenerate, so the wall alone closes the solid.
+  if (rBottom > 0) {
+    for (let i = 0; i < segments; i++) {
+      const j = (i + 1) % segments
+      tri(bottomCentre, bottomRing[j]!, bottomRing[i]!)
+    }
   }
-  // Tapered wall: radii shrink from `r0` at the base to `rTop` at the top, so
-  // the strip between two rings stays a quad and its normal points away from
-  // the axis whichever radius each end has.
+  // Wall: radii shrink from `rBottom` at the base to `rTop` at the top, so the
+  // strip between two rings stays a quad and its normal points away from the
+  // axis whichever radius each end has.
   for (let i = 0; i < segments; i++) {
     const j = (i + 1) % segments
     tri(bottomRing[i]!, bottomRing[j]!, topRing[j]!)
     tri(bottomRing[i]!, topRing[j]!, topRing[i]!)
   }
-  // Top cap, while a radius is left: `rTop = 0` is the apex and the fan is
-  // degenerate, so the wall alone closes the solid.
-  if (rTop > 0) {
-    const topCentre = vertex(o.x, o.y, o.z + h)
+  // Top cap (outward +Z), while a radius is left.
+  if (topCentre >= 0) {
     for (let i = 0; i < segments; i++) {
       const j = (i + 1) % segments
       tri(topCentre, topRing[i]!, topRing[j]!)
@@ -383,26 +396,40 @@ export const chamferCylinderTop = (
 }
 
 /**
- * Mirror of `chamferCylinderTop`: the wall runs from `radius - distance` at
- * the base to `radius` at the top, so the solid stays `height` tall, the
- * bottom radius shrinks by `distance` and the top face keeps `radius`.
- */
-export const chamferCylinderBottom = (
-  cyl: CylinderSolid,
-  distance: number
-): Mesh => chamferCylinderTop({ ...cyl, origin: { x: cyl.origin.x, y: cyl.origin.y, z: cyl.origin.z + cyl.height } }, distance) as Mesh & {
-  // The taper is the same shape turned upside down: build it from the top.
-}
-
-/**
  * Inward offset of every vertex along its vertex normal (averaged face
  * normals, equal weights). Returns a `Mesh` with the same triangle indices
  * but new positions. Shared helper for `shellMesh`.
+ *
+ * Meshes from `meshOf` are welded per face, not per corner: a box carries the
+ * same corner three times, once per face, so each copy owns a single face
+ * normal. Offsetting those would slide each face inwards on its own and crack
+ * the mesh at every edge (a 30 mm box shelled by 2 mm came out as six
+ * floating quads, volume 23 400 instead of 21 232). Normals are therefore
+ * accumulated by welded position, so a corner gets the average of the faces
+ * that meet it.
  */
 const offsetMeshInward = (mesh: Mesh, distance: number): Mesh => {
   const positions = mesh.positions
   const indices = mesh.indices
-  const normals = new Float32Array(positions.length)
+  // One entry per distinct corner, however many times the mesh repeats it.
+  const cornerOf = new Map<string, number>()
+  const cornerKey = (p: number): string => {
+    const x = positions[p]!, y = positions[p + 1]!, z = positions[p + 2]!
+    // Quantise to a nanometre: Float32 round-off must not split one corner
+    // into two keys.
+    return `${Math.round(x * 1e6)}:${Math.round(y * 1e6)}:${Math.round(z * 1e6)}`
+  }
+  const cornerIndex = (p: number): number => {
+    const key = cornerKey(p)
+    const known = cornerOf.get(key)
+    if (known !== undefined) return known
+    const slot = cornerOf.size
+    cornerOf.set(key, slot)
+    return slot
+  }
+  for (let i = 0; i < positions.length; i += 3) cornerIndex(i)
+  // Accumulate face normals per corner, then keep the average.
+  const cornerNormals = new Float32Array(cornerOf.size * 3)
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const ai = indices[i]! * 3
     const bi = indices[i + 1]! * 3
@@ -415,14 +442,16 @@ const offsetMeshInward = (mesh: Mesh, distance: number): Mesh => {
     const nx = e1y * e2z - e1z * e2y
     const ny = e1z * e2x - e1x * e2z
     const nz = e1x * e2y - e1y * e2x
-    normals[ai]! += nx; normals[ai + 1]! += ny; normals[ai + 2]! += nz
-    normals[bi]! += nx; normals[bi + 1]! += ny; normals[bi + 2]! += nz
-    normals[ci]! += nx; normals[ci + 1]! += ny; normals[ci + 2]! += nz
+    for (const base of [ai, bi, ci]) {
+      const c = cornerIndex(base) * 3
+      cornerNormals[c]! += nx; cornerNormals[c + 1]! += ny; cornerNormals[c + 2]! += nz
+    }
   }
+  const normals = new Float32Array(cornerOf.size * 3)
   for (let i = 0; i < normals.length; i += 3) {
-    const nx = normals[i]!
-    const ny = normals[i + 1]!
-    const nz = normals[i + 2]!
+    const nx = cornerNormals[i]!
+    const ny = cornerNormals[i + 1]!
+    const nz = cornerNormals[i + 2]!
     const len = Math.hypot(nx, ny, nz)
     if (len > 1e-300) {
       normals[i] = nx / len
@@ -432,12 +461,10 @@ const offsetMeshInward = (mesh: Mesh, distance: number): Mesh => {
   }
   const out = new Float32Array(positions.length)
   for (let i = 0; i < positions.length; i += 3) {
-    const nx = normals[i]!
-    const ny = normals[i + 1]!
-    const nz = normals[i + 2]!
-    out[i] = positions[i]! - nx * distance
-    out[i + 1] = positions[i + 1]! - ny * distance
-    out[i + 2] = positions[i + 2]! - nz * distance
+    const c = cornerIndex(i) * 3
+    out[i] = positions[i]! - normals[c]! * distance
+    out[i + 1] = positions[i + 1]! - normals[c + 1]! * distance
+    out[i + 2] = positions[i + 2]! - normals[c + 2]! * distance
   }
   return { positions: out, indices: new Uint32Array(indices) }
 }
@@ -507,16 +534,32 @@ const stitchOpenLid = (mesh: Mesh, inset: Mesh, openFaceIndices: ReadonlyArray<n
   }
 }
 
+export type SweepOrientation = "parallel" | "perpendicular"
+
 export interface SweepOptions {
-  /** Quad-band segments per cap edge. Default 16. */
+  /** Sub-rings a band quad may be split into, at most. Default 16. */
   readonly segments?: number
+  /**
+   * `parallel` (default): the profile keeps its own plane and orientation and
+   * is translated along the path, so the solid's cross-section never rotates.
+   * `perpendicular`: the profile is carried on frames transported along the
+   * path and stays perpendicular to it, which is what a swept tube wants.
+   */
+  readonly orientation?: SweepOrientation
 }
 
 /**
  * Sweep a closed `profile` (counter-clockwise in the XY plane of the path
  * frame) along a 3D polyline `path`. Each segment of the path generates a
- * quad band between two parallel-transport frames. The first and last
- * sections are triangulated as caps. The result is a closed mesh.
+ * band between two rings of the profile; the first and last rings are
+ * triangulated as caps facing away from the sweep, so the result is a closed
+ * mesh with outward normals.
+ *
+ * `orientation` picks the frame the profile rides on. With `parallel` every
+ * ring is the same profile translated, so a straight sweep is a prism and the
+ * bounds are the profile's bounds plus the path's extent; with
+ * `perpendicular` the frames are transported (`parallelTransportFrames`) and
+ * the profile turns with the path.
  */
 export const sweepMesh = (
   profile: ReadonlyArray<Vec2>,
@@ -527,62 +570,105 @@ export const sweepMesh = (
   if (segments < 3) throw new RangeError("Sweep segments must be ≥ 3")
   if (profile.length < 3) throw new RangeError("Sweep profile needs ≥ 3 vertices")
   if (path.length < 2) throw new RangeError("Sweep path needs ≥ 2 points")
-  const frames = parallelTransportFrames(path)
-  const pathLength = frames.length
-  const profileLength = profile.length
+  const rings = options.orientation === "perpendicular"
+    ? perpendicularRings(profile, path, segments)
+    : parallelRings(profile, path)
   const positions: number[] = []
   const indices: number[] = []
-  const vertex = (x: number, y: number, z: number): number => {
+  const vertex = (p: Vec3): number => {
     const i = positions.length / 3
-    positions.push(x, y, z)
+    positions.push(p.x, p.y, p.z)
     return i
   }
-  const rings: number[][] = []
-  for (let i = 0; i < pathLength; i++) {
-    const f = frames[i]!
-    const ring: number[] = []
-    for (let j = 0; j < profileLength; j++) {
-      const p = profile[j]!
-      ring.push(
-        vertex(
-          f.origin.x + p.x * f.x.x + p.y * f.y.x,
-          f.origin.y + p.x * f.x.y + p.y * f.y.y,
-          f.origin.z + p.x * f.x.z + p.y * f.y.z
-        )
-      )
-    }
-    rings.push(ring)
-  }
-  for (let i = 0; i < pathLength - 1; i++) {
-    const r0 = rings[i]!
-    const r1 = rings[i + 1]!
+  const ringIndices: number[][] = rings.map((ring) => ring.map(vertex))
+  const profileLength = profile.length
+  for (let i = 0; i < rings.length - 1; i++) {
+    const r0 = ringIndices[i]!
+    const r1 = ringIndices[i + 1]!
     for (let j = 0; j < profileLength; j++) {
       const k = (j + 1) % profileLength
       indices.push(r0[j]!, r0[k]!, r1[k]!)
       indices.push(r0[j]!, r1[k]!, r1[j]!)
     }
   }
-  const emitCap = (ring: number[], reverse: boolean): void => {
-    let cx = 0, cy = 0, cz = 0
-    for (const v of ring) {
-      cx += positions[v * 3]!
-      cy += positions[v * 3 + 1]!
-      cz += positions[v * 3 + 2]!
-    }
-    const center = vertex(cx / ring.length, cy / ring.length, cz / ring.length)
-    const n = ring.length
-    for (let j = 0; j < n; j++) {
-      const k = (j + 1) % n
-      if (reverse) indices.push(center, ring[k]!, ring[j]!)
-      else indices.push(center, ring[j]!, ring[k]!)
-    }
-  }
-  emitCap(rings[0]!, false)
-  emitCap(rings[pathLength - 1]!, true)
-  void segments
+  emitCap(positions, indices, ringIndices[0]!, "start")
+  emitCap(positions, indices, ringIndices[ringIndices.length - 1]!, "end")
   return {
     positions: new Float32Array(positions),
     indices: new Uint32Array(indices)
+  }
+}
+
+/** One ring per path point: the profile translated, never rotated. */
+const parallelRings = (profile: ReadonlyArray<Vec2>, path: ReadonlyArray<Vec3>): ReadonlyArray<ReadonlyArray<Vec3>> =>
+  path.map((p) => profile.map((q) => ({ x: p.x + q.x, y: p.y + q.y, z: p.z })))
+
+/**
+ * Rings on transported frames, `segments+1` per path segment when the frame
+ * turns and a single ring when it does not (a straight segment adds no
+ * geometry). Each sub-ring interpolates the frame at its parameter.
+ */
+const perpendicularRings = (
+  profile: ReadonlyArray<Vec2>,
+  path: ReadonlyArray<Vec3>,
+  segments: number
+): ReadonlyArray<ReadonlyArray<Vec3>> => {
+  const frames = parallelTransportFrames(path)
+  const rings: Vec3[][] = []
+  for (let i = 0; i < frames.length; i++) {
+    rings.push(profileAt(frames[i]!, profile))
+    const next = frames[i + 1]
+    if (next === undefined) continue
+    const turns = distance3(frames[i]!.x, next.x) + distance3(frames[i]!.y, next.y) > 1e-9
+    if (!turns) continue
+    for (let s = 1; s < segments; s++) {
+      const t = s / segments
+      rings.push(profileAt(lerpFrame(frames[i]!, next, t), profile))
+    }
+  }
+  return rings
+}
+
+const framePoint = (f: SweepFrame, p: Vec2): Vec3 => ({
+  x: f.origin.x + p.x * f.x.x + p.y * f.y.x,
+  y: f.origin.y + p.x * f.x.y + p.y * f.y.y,
+  z: f.origin.z + p.x * f.x.z + p.y * f.y.z
+})
+
+const profileAt = (f: SweepFrame, profile: ReadonlyArray<Vec2>): Vec3[] => profile.map((p) => framePoint(f, p))
+
+const distance3 = (a: Vec3, b: Vec3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+
+const lerpFrame = (a: SweepFrame, b: SweepFrame, t: number): SweepFrame => {
+  const mix = (u: Vec3, v: Vec3): Vec3 => ({ x: u.x + (v.x - u.x) * t, y: u.y + (v.y - u.y) * t, z: u.z + (v.z - u.z) * t })
+  const x = normalize3(mix(a.x, b.x))
+  const y0 = mix(a.y, b.y)
+  // Keep the pair orthonormal: y is the component of the mix perpendicular to x.
+  const d = dot3(x, y0)
+  const y = normalize3({ x: y0.x - x.x * d, y: y0.y - x.y * d, z: y0.z - x.z * d })
+  return { origin: mix(a.origin, b.origin), x, y, z: normalize3(mix(a.z, b.z)) }
+}
+
+/**
+ * Fan the ring about its centroid and wind it so the cap faces away from the
+ * sweep: the start cap looks back down the profile's normal, the end cap
+ * forward. Getting this backwards is what left an earlier sweep with one cap
+ * turned inside out, which halved the reported volume of a 1 mm cube.
+ */
+const emitCap = (positions: number[], indices: number[], ring: readonly number[], end: "start" | "end"): void => {
+  let cx = 0, cy = 0, cz = 0
+  for (const v of ring) {
+    cx += positions[v * 3]!
+    cy += positions[v * 3 + 1]!
+    cz += positions[v * 3 + 2]!
+  }
+  const center = positions.length / 3
+  positions.push(cx / ring.length, cy / ring.length, cz / ring.length)
+  const n = ring.length
+  for (let j = 0; j < n; j++) {
+    const k = (j + 1) % n
+    if (end === "start") indices.push(center, ring[k]!, ring[j]!)
+    else indices.push(center, ring[j]!, ring[k]!)
   }
 }
 
