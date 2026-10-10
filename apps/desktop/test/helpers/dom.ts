@@ -30,7 +30,7 @@ export function installDom(url = "http://localhost/"): Window {
   const g = globalThis as Record<string, unknown>
   for (const key of [
     "window", "document", "navigator", "location", "history", "localStorage", "sessionStorage", "HTMLElement", "HTMLInputElement",
-    "HTMLTextAreaElement", "HTMLSelectElement", "HTMLFormElement", "HTMLAnchorElement", "HTMLButtonElement", "Node", "Element",
+    "HTMLTextAreaElement", "HTMLSelectElement", "HTMLFormElement",     "HTMLAnchorElement", "HTMLButtonElement", "HTMLHeadElement", "HTMLOptionElement", "HTMLOptGroupElement", "HTMLDataListElement", "HTMLLabelElement", "HTMLFieldSetElement", "HTMLLegendElement", "HTMLOutputElement", "HTMLProgressElement", "HTMLMeterElement", "HTMLDetailsElement", "HTMLSummaryElement", "HTMLDialogElement", "HTMLMenuElement", "HTMLTemplateElement", "HTMLSlotElement", "HTMLTimeElement", "Node", "Element",
     "Event", "CustomEvent", "MouseEvent", "KeyboardEvent", "InputEvent", "FocusEvent", "SubmitEvent", "PointerEvent",
     "MutationObserver", "ResizeObserver", "IntersectionObserver", "DOMParser", "getComputedStyle", "matchMedia",
     "requestAnimationFrame", "cancelAnimationFrame", "CSS", "Image", "SVGElement", "DocumentFragment", "ShadowRoot", "customElements"

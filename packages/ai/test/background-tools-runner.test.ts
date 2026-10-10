@@ -23,7 +23,8 @@ const stubHost = (overrides?: {
                 calls.push({ method: "session.create", args: [input] })
                 return { id: "child" }
               },
-              remove: async () => true
+              remove: async () => true,
+              messages: async () => []
             },
             "session-prompt": {
               prompt: async (input: unknown) => {

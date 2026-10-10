@@ -122,10 +122,9 @@ export const NotificationsScreen: Component<NotificationsScreenProps> = (props) 
                   const meta = typeMeta(n.type)
                   return (
                     <li
-                      class="row"
                       role="button"
                       tabIndex={0}
-                      classList={{ unread: !n.isRead }}
+                      classList={{ row: true, unread: !n.isRead }}
                       style={{ "animation-delay": `${Math.min(i(), 6) * 35}ms` }}
                       onClick={() => { void markRead(n) }}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void markRead(n) } }}

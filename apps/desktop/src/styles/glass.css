@@ -82,8 +82,16 @@
 }
 
 /* Pair neutral glass surfaces with foregrounds from the same theme. */
-:root[data-glass] :is(.ui-card, .ui-modal, .ui-popover, .ui-toast, .ui-palette-panel,
-    .ui-btn-secondary, .ui-icon-btn, .ui-input, .ui-select, .ui-textarea) {
+:root[data-glass] .ui-card,
+:root[data-glass] .ui-modal,
+:root[data-glass] .ui-popover,
+:root[data-glass] .ui-toast,
+:root[data-glass] .ui-palette-panel,
+:root[data-glass] .ui-btn-secondary,
+:root[data-glass] .ui-icon-btn,
+:root[data-glass] .ui-input,
+:root[data-glass] .ui-select,
+:root[data-glass] .ui-textarea {
   color: var(--glass-text);
 }
 

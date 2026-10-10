@@ -71,10 +71,20 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       )
       if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
     }
-    const memory = yield* kv.list(`ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`).pipe(
+    const memoryPrefix = `ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`
+    const memory = yield* kv.list(memoryPrefix).pipe(
       Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI notes", error).pipe(Effect.as([])))
     )
-    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice(`ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`.length), value: m.value })).reverse())
+    // Notes stored without a project namespace (`ai.memory.<key>`) are global and apply to every conversation.
+    const globalMemory = payload.projectId === undefined
+      ? []
+      : yield* kv.list("ai.memory.").pipe(
+        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load global AI notes", error).pipe(Effect.as([])))
+      )
+    const notes = renderNotes([
+      ...memory.map((m) => ({ key: m.key.slice(memoryPrefix.length), value: m.value })),
+      ...globalMemory.map((m) => ({ key: m.key.slice("ai.memory.".length), value: m.value }))
+    ].reverse())
     if (notes !== "") parts.push(notes)
     return parts.join("\n\n")
   })

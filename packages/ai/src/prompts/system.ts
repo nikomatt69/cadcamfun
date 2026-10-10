@@ -125,7 +125,7 @@ const FAMILY_PROMPTS: Readonly<Record<ModelFamily, string>> = {
   // The base prompt is written for Claude.
   claude: "",
   codex: `Working style for this model:
-- Before a tool call, briefly state its purpose and execute it in this turn.
+- Before a tool call, briefly state its purpose in a short sentence and execute it in this turn.
 - Be concise. Report what you built and what you checked, not how you thought about it.
 - Do not hand control back while the plan has open items: finish them, verify, then answer.`,
   autonomous: `Working style for this model:
