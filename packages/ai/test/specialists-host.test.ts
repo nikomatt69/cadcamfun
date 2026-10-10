@@ -93,6 +93,8 @@ describe("an editing specialist inside a real host turn", () => {
       const parentId = events.find((event) => event.type === "done")?.sessionId
       if (!parentId) throw new Error("Missing resolved parent")
       expect(parentId).not.toBe(alias)
+      const crossed = yield* Stream.runCollect(ai.chat({ projectId: "another-project", sessionId: alias, message: "edit", model: { provider: "fake", model: "fake-model" } })).pipe(Effect.flip)
+      expect(crossed.message).toContain("different project")
       const owner = { projectId, parentSessionId: parentId }
       const task = manager.enqueue({ ...owner, description: "cancel with parent", prompt: "inspect", background: true })
       expect(yield* ai.removeSession(alias, "untrusted-project-hint")).toBe(true)
@@ -132,7 +134,7 @@ describe("an editing specialist inside a real host turn", () => {
     expect(names).toContain("cad_modify_entities")
     expect(names).toContain("cad_describe_drawing")
     for (const forbidden of ["cam_generate_gcode", "cad_add_elements", "agent_task", "task", "bash"]) expect(names).not.toContain(forbidden)
-    expect(names.filter((n) => !SUBAGENTS.editor.tools.includes(n) && n !== "skill" && n !== "invalid" && n !== "code_mode")).toEqual([])
+    expect(names.filter((n) => !SUBAGENTS.editor.tools.includes(n) && n !== "skill" && n !== "invalid" && n !== "code_mode" && n !== "search_tools" && n !== "question")).toEqual([])
     expect(editorRequests[0]!.model).toBe("fake-model")
     // Its instructions are the editor's, not the main agent's.
     expect(JSON.stringify(editorRequests[0]!.messages[0])).toContain("smallest change")

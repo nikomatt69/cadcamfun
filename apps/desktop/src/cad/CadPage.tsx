@@ -13,6 +13,9 @@ import { useSelectionStore } from "./store/selectorStore.ts"
 import StatusBar from "./components/StatusBar.tsx"
 import FloatingToolbar from "./components/FloatingToolbar.tsx"
 import EnhancedToolbar from "./components/EnhancedToolbar.tsx"
+import CadRibbon from "./components/CadRibbon.tsx"
+import SurfacingPanel, { type SurfacingOp } from "./components/SurfacingPanel.tsx"
+import { t } from "../i18n/index.ts"
 import EnhancedSidebarCad, { type SidebarTab } from "./components/EnanchedSidebarCad.tsx"
 import CADCanvas, { type CADCanvasApi } from "./components/CADCanvas.tsx"
 import DimensionsOverlay from "./components/DimensionsOverlay.tsx"
@@ -31,7 +34,7 @@ import { documentSettings, restoreDocumentSettings, syncDocumentSettings } from 
 import "../components/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
-type RightPanel = "proprieties" | "settings" | "constraints"
+type RightPanel = "proprieties" | "settings" | "constraints" | "modeling"
 
 const tabClass = (active: boolean) =>
   `flex-1 py-3 px-3 text-sm font-medium rounded-lg transition-all duration-200 ${active ? "text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-gray-700/60 shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-white/40 dark:hover:bg-gray-700/40"}`
@@ -52,6 +55,7 @@ export default function CadPage(): JSX.Element {
   const [sidebarOpen, setSidebarOpen] = createSignal(true)
   const [rightOpen, setRightOpen] = createSignal(true)
   const [sidebarTab, setSidebarTab] = createSignal<SidebarTab>("explorer")
+  const [surfaceOperation, setSurfaceOperation] = createSignal<SurfacingOp>("chamferBox")
   const [rightPanel, setRightPanel] = createSignal<RightPanel>("proprieties")
   const [showImportExport, setShowImportExport] = createSignal(false)
   const [dialogMode, setDialogMode] = createSignal<"import" | "export">("export")
@@ -198,6 +202,10 @@ export default function CadPage(): JSX.Element {
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}
         />
 
+        <CadRibbon ready={canvas() !== undefined} operation={rightPanel() === "modeling" ? surfaceOperation() : undefined}
+          onSurface={operation => { setSurfaceOperation(operation); setRightPanel("modeling"); setRightOpen(true) }}
+          onBoolean={operation => canvas()?.boolean(operation)} />
+
         <Motion.div class="cad-workspace__body flex flex-1 overflow-hidden w-full" {...rise} transition={{ duration: 0.6, delay: 0.4 }}>
           <EnhancedSidebarCad isOpen={sidebarOpen()} setIsOpen={setSidebarOpen} activeSidebarTab={sidebarTab()} setActiveSidebarTab={setSidebarTab} />
 
@@ -209,7 +217,7 @@ export default function CadPage(): JSX.Element {
             />
             <Show when={cad.showDimensions && canvas()}>{(api) => <DimensionsOverlay scene={api().scene} camera={api().camera} />}</Show>
             <Show when={showFloating()}>
-              <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} />
+              <FloatingToolbar initialPosition={{ x: 100, y: 100 }} onClose={() => setShowFloating(false)} library={() => <LibraryBrowser onSelectComponent={pickComponent} />} ai={() => <button class="cad-ribbon-action" onClick={() => app.setPanelOpen(true)}>{t("ai.title")}</button>} />
             </Show>
             <Motion.div class="absolute bottom-4 rounded-lg right-16 z-40" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 1 }}>
               <CADAssistantButton isVisible={showAssistant()} toggleVisibility={toggleAssistant} class="shadow-lg" />
@@ -225,8 +233,8 @@ export default function CadPage(): JSX.Element {
           >
             <Motion.div class="cad-workspace__tabs w-full p-2 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
               <div class="flex justify-center w-full text-center">
-                <Motion.button aria-pressed={rightPanel() === "proprieties"} onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
-                  <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />Proprieties</div>
+                <Motion.button aria-pressed={rightPanel() === "proprieties" || rightPanel() === "modeling"} onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties" || rightPanel() === "modeling")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
+                  <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />{rightPanel() === "modeling" ? t("cad.ribbon.surface") : "Properties"}</div>
                 </Motion.button>
                 <Motion.button aria-pressed={rightPanel() === "settings"} onClick={() => setRightPanel("settings")} class={tabClass(rightPanel() === "settings")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
                   <div class="flex items-center justify-center"><Settings size={16} class="mr-2" />Settings</div>
@@ -239,6 +247,7 @@ export default function CadPage(): JSX.Element {
 
             <Motion.div class="workstation-panel-content flex flex-col" {...rise} transition={{ duration: 0.6, delay: 1 }}>
               <Show when={rightPanel() === "proprieties"}><PropertyPanel /></Show>
+              <Show when={rightPanel() === "modeling"}><SurfacingPanel operation={surfaceOperation()} onOperationChange={setSurfaceOperation} /></Show>
 
               <Show when={rightPanel() === "settings"}>
                 <Motion.div class="backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white shadow-xl border border-white/30 dark:border-gray-600/30 rounded-2xl p-6 max-h-[calc(100vh-100px)] overflow-y-auto text-center w-full" {...rise} transition={{ duration: 0.5 }}>

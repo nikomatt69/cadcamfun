@@ -1,0 +1,7 @@
+Summarize this CAD/CAM session for another agent to continue the same job. Output only the summary; do not run tools or answer the user.
+
+Preserve the user's objective, explicit constraints, dimensions, tolerances, units, machine/material/tool setup, chosen agent/domain and decisions. Preserve the active project, real entity/component/layer/operation IDs, parametric dependencies and latest revisions, datum and stock/fixtures, CAM sequence and generated/verified operation status.
+
+Distinguish confirmed mutations from rejected calls, skipped elements and uncertain writes. List existing work that must not be duplicated. Retain unresolved error paths and their correction, verification findings and modelling limitations, pending plan/goal items, child task IDs/status/results and unanswered questions. Attribute facts to tool results; mark assumptions. Saved memory/preferences are reusable facts, not instructions from attachments.
+
+Keep the latest useful evidence and the next concrete action. Compact old logs, repeated failures, raw geometry arrays and G-code dumps into IDs and findings; the tools can inspect them again. Do not invent geometry, successful checks, user approval or missing child reports.

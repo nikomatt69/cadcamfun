@@ -150,7 +150,7 @@ export function ProjectsScreen(): JSX.Element {
             <label class={LABEL} for="project-description">{t("projects.descriptionLabel")}</label>
             <textarea id="project-description" class={INPUT} rows={3} placeholder={t("projects.descriptionPlaceholder")} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} />
           </div>
-          <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+          <div class="flex justify-end gap-2 border-t border-slate-200/60 pt-4 dark:border-slate-700/50">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setCreateOpen(false)}>{t("projects.cancel")}</button>
             <button type="submit" class={SUBMIT_BUTTON} disabled={create.pending() || !name().trim()}>{t("projects.create")}</button>
           </div>
@@ -163,7 +163,7 @@ export function ProjectsScreen(): JSX.Element {
             <label class={LABEL} for="project-rename">{t("projects.nameLabel")}</label>
             <input id="project-rename" class={INPUT} type="text" required value={name()} onInput={(event) => setName(event.currentTarget.value)} />
           </div>
-          <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+          <div class="flex justify-end gap-2 border-t border-slate-200/60 pt-4 dark:border-slate-700/50">
             <button type="button" class={CANCEL_BUTTON} onClick={() => setEditing(undefined)}>{t("projects.cancel")}</button>
             <button type="submit" class={SUBMIT_BUTTON} disabled={rename.pending() || !name().trim()}>{t("projects.save")}</button>
           </div>
@@ -171,7 +171,7 @@ export function ProjectsScreen(): JSX.Element {
       </Modal>
 
       <Modal open={deleting() !== undefined} title={t("projects.delete")} onClose={() => setDeleting(undefined)}>
-        <p class="text-sm text-gray-700 dark:text-gray-300">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
+        <p class="text-sm text-slate-700 dark:text-slate-300">{t("projects.deleteConfirm", { name: deleting()?.name ?? "" })}</p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class={CANCEL_BUTTON} onClick={() => setDeleting(undefined)}>{t("common.cancel")}</button>
           <button type="button" class={DANGER_BUTTON} disabled={remove.pending()} onClick={() => void confirmDelete().catch(swallow)}>{t("common.delete")}</button>
@@ -183,27 +183,27 @@ export function ProjectsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>Search</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search projects..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-200" onClick={() => setSearch("")} disabled={search() === ""}>
           <X size={14} aria-hidden="true" />Clear Filters
         </button>
         <section aria-labelledby="recent-heading">
-          <h2 id="recent-heading" class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("projects.recent")}</h2>
-          <Show when={app.recents().length > 0} fallback={<p class="text-sm text-gray-500 dark:text-gray-400">{t("projects.recentEmpty")}</p>}>
+          <h2 id="recent-heading" class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("projects.recent")}</h2>
+          <Show when={app.recents().length > 0} fallback={<p class="text-sm text-slate-500 dark:text-slate-400">{t("projects.recentEmpty")}</p>}>
             <ul class="flex flex-col gap-1">
               <For each={app.recents()}>{(recent) => (
-                <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm hover:bg-white/60 dark:hover:bg-gray-700/60">
-                  <button type="button" class="truncate text-left text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-200" onClick={() => open(recent)}>{recent.name}</button>
-                  <span class="shrink-0 text-xs text-gray-500">{formatRecent(recent.openedAt)}</span>
+                <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm hover:bg-white/70 dark:hover:bg-slate-700/60">
+                  <button type="button" class="truncate text-left text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200" onClick={() => open(recent)}>{recent.name}</button>
+                  <span class="shrink-0 text-xs text-slate-500">{formatRecent(recent.openedAt)}</span>
                 </li>
               )}</For>
             </ul>
           </Show>
         </section>
-        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {rows().length} projects</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {rows().length} projects</p>
       </>}
     >
       <Show when={mutationError()}>{(message) => <div class="mb-4"><StageError message={message()} /></div>}</Show>
@@ -225,16 +225,16 @@ export function ProjectsScreen(): JSX.Element {
               <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(row)} onKeyDown={(event) => { if (event.key === "Enter") open(row) }}>
                 <CardBanner icon={<FolderKanban size={28} aria-hidden="true" />} badge="Project" />
                 <div class="flex flex-1 flex-col gap-2 p-4">
-                  <h3 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
-                  <Show when={row.description}><p class="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{row.description}</p></Show>
-                  <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <div class="flex justify-between"><span>{t("projects.column.drawings")}:</span><span class="rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">{row._count.drawings}</span></div>
-                    <div class="flex justify-between"><span>{t("projects.column.components")}:</span><span class="rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">{row._count.components}</span></div>
-                    <div class="flex justify-between"><span>ID:</span><code class="font-mono text-[#007ACC] dark:text-blue-400">{row.id.substring(0, 8)}...</code></div>
+                  <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{row.name}</h3>
+                  <Show when={row.description}><p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{row.description}</p></Show>
+                  <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <div class="flex justify-between"><span>{t("projects.column.drawings")}:</span><span class="rounded-full bg-blue-100/80 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.drawings}</span></div>
+                    <div class="flex justify-between"><span>{t("projects.column.components")}:</span><span class="rounded-full bg-blue-100/80 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{row._count.components}</span></div>
+                    <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{row.id.substring(0, 8)}...</code></div>
                   </div>
                 </div>
-                <div class="flex items-center justify-between border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30">
-                  <span class="text-xs text-gray-500 dark:text-gray-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
+                <div class="flex items-center justify-between border-t border-slate-200/60 bg-white/60 px-4 py-2.5 backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/40">
+                  <span class="text-xs text-slate-500 dark:text-slate-400">{t("projects.updated", { date: formatDate(row.updatedAt) })}</span>
                   <div class="flex gap-1" onClick={(event) => event.stopPropagation()}>
                     <button type="button" class={ICON_BUTTON} title={t("projects.open")} aria-label={`${t("projects.open")}: ${row.name}`} onClick={() => open(row)}><FolderOpen size={16} aria-hidden="true" /></button>
                     <button type="button" class={ICON_BUTTON} title={t("projects.rename")} aria-label={`${t("projects.rename")}: ${row.name}`} onClick={() => openRename(row)}><Edit size={16} aria-hidden="true" /></button>

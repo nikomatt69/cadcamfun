@@ -1,5 +1,9 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Assistant controls (2026-10-10)
+
+See `24-assistant-control-flow.md`: WP6 adds role/domain/thinking selectors, manual context compaction, interactive native question replies and background task cancellation in the existing assistant. Controls remain bound to the active session/project and generated API; context follows host limits, with unknown values explicit. Status: in progress. Change log: 2026-10-10 — registered assistant control UI ownership before implementation.
+
 ## Bootstrap and graphics performance alignment (2026-10-09)
 
 WP6/WP7 follow-up from `23-ai-runtime-architecture.md`: each bootstrap attempt owns late-acquired resources and cancellable network work; credentials belong to a client instance. Meshing jobs are bounded, errors/timeouts close pending work, superseded scene work is terminated, and static views avoid redundant GPU rendering. Preserve existing controls, editor behavior and display appearance. CADCanvas owns a demand-driven frame scheduler: idle scenes schedule no frames, hidden documents suspend rendering, and orbit damping wakes only until settled. Scene teardown releases owned geometries, materials and textures once and cancels pointer/fullscreen callbacks.
@@ -61,6 +65,14 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## 5. Change log
 
+- 2026-10-10: WP6 floating-tool refinement owns `src/cad/components/FloatingToolbar.tsx`: captured pointer drag isolated from canvas input, layout-coordinate bounds, re-clamping on canvas/tool-window resize, keyboard movement and a single compact content scroller. The AI tab opens the existing assistant dock.
+
+- 2026-10-10: WP6 owns the compact CAD ribbon in `src/cad/components/CadRibbon.tsx`, its integration in `src/cad/CadPage.tsx`, controlled operation selection in `src/cad/components/SurfacingPanel.tsx`, CAD locale entries and shared workstation styling. The 54px strip exposes existing modeling operations, booleans and section controls, with parameters in the inspector; no geometry or renderer changes are required. WP6 also owns the container-responsive layout of `src/cam/components/MachineCycles.tsx`: stacked configuration at sidebar widths, readable cycle rows and two columns only in wide containers.
+
+- 2026-10-10: restored an opaque blue primary-button backdrop when the calmer finish removes gradients; native glass neutral surfaces now pair their foreground with the light/dark theme. This fixes white labels disappearing on the white dashboard surface without changing navigation or layout.
+
+- 2026-10-10: visual refinement complete in shared desktop styles: opaque white light-theme shell, native glass chrome, page cards and workspace panels; compact shared surface radii, square joined workspace edges and stable tab radii across hover/focus. Dark-theme colors, viewport rendering, layout and behavior are preserved. Verification: both workstation tests pass and `git diff --check` passes; the full desktop test run encountered timeouts, and typecheck/build have not returned a result. Native visual verification remains outstanding.
+
 - 2026-10-08: shared page-consistency stylesheet applies compact surface/control radii, neutral borders, aligned controls and generator-style glass tabs to page and standalone route containers; CAD/CAM workspace-specific styles remain isolated. Individual route visual verification remains outstanding; no browser control used.
 
 - 2026-10-08 follow-up: extracted the existing CAD quick-navigation routes into keyboard-reachable `components/workspace-navigation.tsx` and reused them in CAM. All sidebar/inspector tabs and CAM workspace tabs share the generator inspector's neutral inactive, outlined charcoal hover/focus, and translucent blue selected rectangle with bottom underline. Added source-contract regression tests for shared navigation, tab styling and narrow-window stage protection; browser verification intentionally not performed per user instruction.
@@ -109,3 +121,5 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 - Sessions and billing: `state/session.ts` keeps the session token (a `Ref` read per request by the client middleware, mirrored to `localStorage`) and `startSession` / `endSession` switch accounts and drop the query cache. Sign-in, sign-up (signs in right after creating the account), magic-link verification and sign-out use them; the navbar shows the acting account with Sign in / Sign out. The pricing page renders the same plan catalogue as the subscription card (`screens/plans.ts`), marks the current plan, starts the Pro trial through `POST /api/subscriptions` and says plainly when paid checkout is unavailable.
 
 Secondary resources follow nikcli ownership: queries accept cancellation through the app Effect runtime, superseded requests and unmounted views interrupt their fibers, and hidden CAD plugin panels do not fetch a registry. AI catalogue resources are loaded when their accessor is first used; connected models are preferred, and providers are sorted by configured status.
+
+- 2026-10-10: compact CAD commands also expose Edit (Duplicate / Copy / Paste), Parametric part, Sketch (Line / Circle / Rectangle) and Solids (Box / Cylinder / Sphere / Cone / Torus), reusing ElementForm and the element clipboard. Creation respects the active layer lock. Remaining Italian user-facing strings in CAD simulation, CAM generator examples/errors, and settings feedback are translated to English.

@@ -75,8 +75,8 @@ export function AnalyticsHistoryScreen(): JSX.Element {
       title={t("history.title")}
       actions={<A href="/analytics" class={TOOLBAR_BUTTON}><ArrowLeft size={16} aria-hidden="true" />{t("history.back")}</A>}
       rail={<>
-        <p class="text-xs text-gray-500 dark:text-gray-400">{t("history.subtitle")}</p>
-        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"><Filter size={14} aria-hidden="true" />{t("history.filterTitle")}</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">{t("history.subtitle")}</p>
+        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400"><Filter size={14} aria-hidden="true" />{t("history.filterTitle")}</h2>
         <div class="flex flex-col gap-1">
           <For each={filterOptions()}>
             {(option) => (
@@ -84,10 +84,10 @@ export function AnalyticsHistoryScreen(): JSX.Element {
                 type="button"
                 aria-pressed={selectedFilter() === option.key}
                 onClick={() => setSelectedFilter(option.key)}
-                class={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium ${selectedFilter() === option.key ? "bg-blue-50 text-[#007ACC] dark:bg-blue-900/40 dark:text-blue-300" : "text-gray-700 hover:bg-white/60 dark:text-gray-300 dark:hover:bg-gray-700/60"}`}
+                class={`flex items-center justify-between rounded-md px-2.5 py-1.5 text-sm font-medium ${selectedFilter() === option.key ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "text-slate-700 hover:bg-white/60 dark:text-slate-300 dark:hover:bg-gray-700/60"}`}
               >
                 <span class="flex items-center gap-2"><option.Icon size={16} aria-hidden="true" />{option.label}</span>
-                <Show when={option.count > 0}><span class="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-700 dark:bg-gray-600 dark:text-gray-200">{option.count}</span></Show>
+                <Show when={option.count > 0}><span class="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700 dark:bg-gray-600 dark:text-gray-200">{option.count}</span></Show>
               </button>
             )}
           </For>
@@ -100,10 +100,10 @@ export function AnalyticsHistoryScreen(): JSX.Element {
             {(card) => (
               <div class={PANEL}>
                 <div class="mb-3 flex items-center justify-between">
-                  <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">{card.label}</h3>
+                  <h3 class="text-sm font-medium text-slate-600 dark:text-slate-400">{card.label}</h3>
                   <card.Icon size={20} class={card.accent} aria-hidden="true" />
                 </div>
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{loading() ? "..." : card.value}</p>
+                <p class="text-2xl font-bold text-slate-900 dark:text-white">{loading() ? "..." : card.value}</p>
                 <p class={`mt-1 text-xs ${card.accent}`}>{loading() ? t("history.loading") : card.caption}</p>
               </div>
             )}
@@ -111,9 +111,9 @@ export function AnalyticsHistoryScreen(): JSX.Element {
         </div>
 
         <div class={`${PANEL} !p-0 overflow-hidden`}>
-          <div class="border-b border-gray-200/50 p-5 dark:border-gray-600/50">
-            <h3 class="flex items-center gap-2 text-lg font-medium text-gray-800 dark:text-gray-200"><Activity size={18} class="text-indigo-500" aria-hidden="true" />{t("history.timeline")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <div class="border-b border-slate-200/50 p-5 dark:border-slate-700/50">
+            <h3 class="flex items-center gap-2 text-lg font-medium text-slate-800 dark:text-gray-200"><Activity size={18} class="text-indigo-500" aria-hidden="true" />{t("history.timeline")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {selectedFilter() === "all" ? t("history.allActivities") : t("history.filteredBy", { key: selectedFilter().toUpperCase() })}
             </p>
           </div>

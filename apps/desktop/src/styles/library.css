@@ -14,8 +14,8 @@
   border-radius: var(--ui-radius-2xl);
   background:
     linear-gradient(135deg, rgba(239, 246, 255, 0.7) 0%, rgba(255, 255, 255, 0.5) 35%, rgba(252, 231, 243, 0.6) 100%);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: var(--ui-blur-md) saturate(180%);
+  -webkit-backdrop-filter: var(--ui-blur-md) saturate(180%);
   border: 1px solid rgba(226, 232, 240, 0.7);
   box-shadow: var(--ui-shadow-md);
   overflow: hidden;
@@ -43,12 +43,12 @@ html.dark .library-tabs { border-color: rgba(51, 65, 85, 0.7); }
   justify-content: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md);
   background: transparent;
   border: 0;
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgb(75, 85, 99);
+  color: rgb(71, 85, 105);
   cursor: pointer;
   transition: background 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms, transform 80ms;
   -webkit-tap-highlight-color: transparent;
@@ -122,7 +122,7 @@ html.dark .library-toolbar-title h2 { color: rgb(241, 245, 249); }
 .library-toolbar-title p {
   margin: 0;
   font-size: 0.875rem;
-  color: rgb(107, 114, 128);
+  color: rgb(100, 116, 139);
 }
 
 .library-toolbar-row {
@@ -167,10 +167,10 @@ html.dark .library-toolbar-count { color: rgb(52, 211, 153); }
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-lg);
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(226, 232, 240, 0.7);
   transition: background 180ms, border-color 180ms, transform 180ms;
 }
@@ -196,7 +196,7 @@ html.dark .library-card-title { color: rgb(241, 245, 249); }
 .library-card-detail {
   margin: 0;
   font-size: 0.75rem;
-  color: rgb(107, 114, 128);
+  color: rgb(100, 116, 139);
 }
 .library-card-actions {
   display: flex;
@@ -211,9 +211,9 @@ html.dark .library-card-title { color: rgb(241, 245, 249); }
   align-items: center;
   gap: 0.875rem;
   padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md);
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(226, 232, 240, 0.6);
 }
 html.dark .library-row { background: rgba(30, 41, 59, 0.55); border-color: rgba(51, 65, 85, 0.6); }
@@ -239,7 +239,7 @@ html.dark .library-row { background: rgba(30, 41, 59, 0.55); border-color: rgba(
   text-align: center;
 }
 .library-empty h3 { margin: 0; font-size: 1rem; font-weight: 600; color: rgb(55, 65, 81); }
-.library-empty p { margin: 0; font-size: 0.875rem; color: rgb(107, 114, 128); }
+.library-empty p { margin: 0; font-size: 0.875rem; color: rgb(100, 116, 139); }
 
 .library-form {
   display: flex;
@@ -259,8 +259,8 @@ html.dark .library-form { border-color: rgba(51, 65, 85, 0.7); }
   padding: 1.5rem;
   border-radius: var(--ui-radius-2xl);
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--ui-blur-md);
+  -webkit-backdrop-filter: var(--ui-blur-md);
   border: 1px solid rgba(226, 232, 240, 0.7);
 }
 html.dark .library-detail-aside {
@@ -270,7 +270,7 @@ html.dark .library-detail-aside {
 .library-detail-aside pre {
   margin: 0;
   padding: 0.875rem;
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md);
   background: rgba(15, 23, 42, 0.85);
   color: rgb(220, 220, 220);
   font-size: 0.75rem;

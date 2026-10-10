@@ -186,7 +186,7 @@ test("catalogue reads share one acquisition and connected-only reads skip host s
       auth: async () => ({ openai: [{ type: "api" }] })
     } } })
   } as unknown as NikCliRuntime
-  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }), Layer.succeed(AiHost, { runtime, scheduler: new BackgroundTaskManager() }))
+  const base = Layer.mergeAll(AiCredentials.layer, AiConfig.layer({ dataDir: "/unused", forceGateway: false }), Layer.succeed(AiHost, { runtime, scheduler: new BackgroundTaskManager({}) }))
   const live = AiService.layer.pipe(Layer.provideMerge(DirectModel.layerWith(() => streamModel(["x"])).pipe(Layer.provideMerge(base))))
   await Effect.runPromise(Effect.gen(function*() {
     const ai = yield* AiService
@@ -200,4 +200,15 @@ test("catalogue reads share one acquisition and connected-only reads skip host s
     yield* ai.providers
     expect(acquisitions).toBe(2)
   }).pipe(Effect.provide(live)))
+})
+
+test("a gateway credential does not advertise unrelated providers as connected", async () => {
+  await Effect.runPromise(Effect.gen(function* () {
+    const credentials = yield* AiCredentials
+    const ai = yield* AiService
+    yield* credentials.set("gateway", Redacted.make("test-gateway-key"))
+    expect((yield* ai.providers).filter((provider) => provider.configured).map((provider) => provider.id)).toEqual(["gateway"])
+    expect((yield* ai.availableModels).every((model) => model.provider === "gateway")).toBe(true)
+    expect((yield* ai.availableModels).length).toBeGreaterThan(0)
+  }).pipe(Effect.provide(layer(() => streamModel(["x"])))))
 })

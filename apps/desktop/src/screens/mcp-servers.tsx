@@ -26,7 +26,7 @@ const CARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 const HOVER_SHADOW = "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
 
 const PAGE_BG = "min-h-full"
-const CARD = "rounded-2xl border border-white/20 bg-white/80 shadow-xl backdrop-blur-md dark:border-gray-700/30 dark:bg-gray-800/80"
+const CARD = "ui-card ui-card-heavy"
 
 /** The status dot that pulses while the server is active. */
 function McpStatusDot(props: { readonly enabled: boolean; readonly size: "sm" | "md" }): JSX.Element {

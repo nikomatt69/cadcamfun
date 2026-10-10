@@ -188,7 +188,10 @@ pub fn record_pending(pending: &PendingUpdate, info: PendingUpdateInfo) {
 }
 
 /// Takes the pending update, so a second install is refused.
-pub fn consume_pending(pending: &PendingUpdate, unsaved_work: bool) -> Result<PendingUpdateInfo, UpdateError> {
+pub fn consume_pending(
+    pending: &PendingUpdate,
+    unsaved_work: bool,
+) -> Result<PendingUpdateInfo, UpdateError> {
     let mut guard = pending.0.lock().map_err(|_| UpdateError::Failed {
         message: "updater state is poisoned".to_string(),
     })?;
@@ -463,7 +466,10 @@ mod tests {
         );
         let consumed = consume_pending(&pending, false);
         assert_eq!(consumed.map(|i| i.version), Ok("6.1.0".to_string()));
-        assert_eq!(consume_pending(&pending, false), Err(UpdateError::NoneAvailable));
+        assert_eq!(
+            consume_pending(&pending, false),
+            Err(UpdateError::NoneAvailable)
+        );
     }
 
     #[tokio::test]
@@ -479,16 +485,32 @@ mod tests {
     #[test]
     fn refusing_unsaved_work_preserves_the_pending_update() {
         let pending = PendingUpdate::default();
-        record_pending(&pending, PendingUpdateInfo { version: "6.1.0".into(), critical: false });
-        assert_eq!(consume_pending(&pending, true), Err(UpdateError::UnsavedWork));
-        assert_eq!(consume_pending(&pending, false).expect("pending update").version, "6.1.0");
+        record_pending(
+            &pending,
+            PendingUpdateInfo {
+                version: "6.1.0".into(),
+                critical: false,
+            },
+        );
+        assert_eq!(
+            consume_pending(&pending, true),
+            Err(UpdateError::UnsavedWork)
+        );
+        assert_eq!(
+            consume_pending(&pending, false)
+                .expect("pending update")
+                .version,
+            "6.1.0"
+        );
     }
 
     #[tokio::test]
     async fn repeated_requests_are_coalesced_into_one_pending_check() {
         let service = UpdaterService::new();
         let mut rx = service.take_receiver().expect("receiver");
-        for _ in 0..1000 { service.request(CheckTrigger::Manual); }
+        for _ in 0..1000 {
+            service.request(CheckTrigger::Manual);
+        }
         assert_eq!(rx.recv().await, Some(CheckTrigger::Manual));
         assert!(rx.try_recv().is_err());
     }

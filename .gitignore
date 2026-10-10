@@ -102,3 +102,6 @@ data/
 apps/mobile/native/target/
 apps/mobile/src-tauri/target/
 apps/mobile/dist/
+
+# Local updater signing credentials
+/tauri-signing.json

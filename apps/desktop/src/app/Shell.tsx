@@ -197,8 +197,8 @@ export function Shell(props: ShellProps): JSX.Element {
             <div class={layout() === "workspace" ? "reference-workspace-container" : layout() === "standalone" ? "reference-standalone-container" : "reference-page-container"}>
               {props.children}
             </div>
-            <Show when={layout() === "page"}><ReferenceFooter /></Show>
           </main>
+          <Show when={layout() === "page"}><ReferenceFooter /></Show>
           <Show when={showScrollTop() && layout() === "page"}><button type="button" class="reference-scroll-top" aria-label={t("shell.scrollTop")} onClick={() => main?.scrollTo({ top: 0, behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}><ChevronUp size={20} /></button></Show>
         </div>
 

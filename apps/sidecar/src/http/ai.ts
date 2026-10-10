@@ -1,4 +1,5 @@
-import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { projectMemoryPrefix } from "@cadcamfun/ai"
+import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -70,10 +71,10 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       )
       if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
     }
-    const memory = yield* kv.list("ai.memory.").pipe(
+    const memory = yield* kv.list(`ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`).pipe(
       Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI notes", error).pipe(Effect.as([])))
     )
-    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice("ai.memory.".length), value: m.value })).reverse())
+    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice(`ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`.length), value: m.value })).reverse())
     if (notes !== "") parts.push(notes)
     return parts.join("\n\n")
   })
@@ -82,18 +83,27 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     ai.complete({ prompt, ...(system ? { system } : {}), ...(model ? { model: { model } } : {}) })
 
   return handlers
+    .handle("agents", () => Effect.succeed(ai.agents))
+    .handle("sessionControl", ({ payload }) => ai.controlSession(payload).pipe(Effect.mapError((error) => new BadRequest({ message: error.message }))))
     .handle("setCredentials", ({ payload }) => Effect.gen(function*() {
-      const known = yield* catalogue
-      if (!knownProvider(payload.provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
+      const provider = payload.provider
+      if (provider === undefined || provider.trim() === "") return yield* new BadRequest({ message: "Unknown provider" })
+      if (!isBuiltinProviderId(provider)) {
+        const known = yield* catalogue
+        if (!knownProvider(provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
+      }
       if (!payload.key || !payload.key.trim()) return yield* new BadRequest({ message: "API key is required" })
-      yield* credentials.set(payload.provider, Redacted.make(payload.key), payload.baseUrl ? { baseUrl: payload.baseUrl } : undefined)
+      yield* credentials.set(provider, Redacted.make(payload.key), payload.baseUrl ? { baseUrl: payload.baseUrl } : undefined)
       yield* ai.invalidateCatalogue
       return yield* status
     }).pipe(Effect.catchTag("AiConfigError", (e) => Effect.fail(new BadRequest({ message: e.message })))))
     .handle("clearCredentials", ({ params }) => Effect.gen(function*() {
-      const known = yield* catalogue
-      if (!knownProvider(params.provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
-      yield* credentials.clear(params.provider)
+      const provider = params.provider
+      if (!isBuiltinProviderId(provider)) {
+        const known = yield* catalogue
+        if (!knownProvider(provider, known)) return yield* new BadRequest({ message: "Unknown provider" })
+      }
+      yield* credentials.clear(provider)
       yield* ai.invalidateCatalogue
       return yield* status
     }))
@@ -172,6 +182,9 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
+        ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
+        ...(payload.agent ? { agent: payload.agent } : {}),
+        ...(payload.mode ? { mode: payload.mode } : {}),
         ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
         ...(payload.projectId ? { projectId: payload.projectId } : {}),
         ...(context ? { context } : {}),
@@ -237,13 +250,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return { message: "Aborted" }
     }))
     .handle("permissionReply", ({ payload }) => Effect.gen(function*() {
-      if (!Option.isSome(host)) return yield* new BadRequest({ message: "Permission prompts are only available through nikcli" })
-      const projectHost = yield* host.value.runtime.host("default").pipe(
-        Effect.mapError((error) => new InternalError({ message: error instanceof Error ? error.message : "Unable to reach nikcli host" }))
-      )
-      yield* replyHostPermission(projectHost, payload.requestId, payload.decision).pipe(
-        Effect.mapError((error) => new InternalError({ message: error.message }))
-      )
+      yield* ai.controlSession({ sessionId: payload.sessionId, ...(payload.projectId ? { projectId: payload.projectId } : {}), action: "reply_permission", requestId: payload.requestId, decision: payload.decision }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
       return { message: "Permission reply sent" }
     }))
     .handle("completion", ({ payload }) => Effect.gen(function*() {

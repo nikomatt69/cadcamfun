@@ -24,7 +24,7 @@ export default function ToolWearCostForm(props: ToolWearCostFormProps): JSX.Elem
   const isLoadingTools = (): boolean => tools.loading()
   const toolError = (): string | null => {
     const error = tools.error()
-    return error ? `Errore caricamento utensili: ${error}` : null
+    return error ? `Failed to load tools: ${error}` : null
   }
 
   const resetForm = (): void => {

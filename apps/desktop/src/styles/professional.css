@@ -59,7 +59,13 @@ html.dark body { background-image: none !important; background-color: #111418; }
 .ui-card-interactive:hover, .ui-card:hover, .ui-btn:hover, .ui-icon-btn:hover { transform: none !important; }
 .ui-glow, .ui-dots { display: none; }
 .ui-status-dot-pulse { animation: none; }
-.ui-btn-primary { background-image: none !important; }
+/* Removing the gradient must keep a solid backdrop for the white label. */
+.ui-btn-primary {
+  --ui-btn-bg: #205bc2;
+  --ui-btn-fg: #fff;
+  background-color: #205bc2;
+  background-image: none !important;
+}
 
 /* ---- Dashboard hero: the glow behind the card is dropped, the rest stays ---- */
 .dashboard-hero-glow { display: none !important; }

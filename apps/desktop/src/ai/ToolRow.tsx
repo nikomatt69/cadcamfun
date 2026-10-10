@@ -370,6 +370,7 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
     <li class="assistant-tool-call text-xs text-gray-700 dark:text-gray-300" data-testid="tool-call" data-tool={props.tool} data-agent={agent() ?? ""} data-status={status() ?? ""} data-shape={block() ? "block" : "inline"}>
       <div class={block() ? "border-l-2 pl-2" : "pl-1"} classList={{ "border-green-500": block() && tone() === "ok", "border-amber-500": block() && tone() === "warn", "border-red-500": block() && tone() === "error" }}>
         <Header />
+        <For each={props.call?.images ?? []}>{(url) => <figure class="mt-2"><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${toolTitle(props.tool)} captured viewport for review`} class="max-h-80 rounded border object-contain" loading="lazy" /></a><figcaption>Captured viewport · {agent() ?? "CAD/CAM assistant"}</figcaption></figure>}</For>
         <Show when={failure()}>
           {(message) => <p class="mt-0.5 break-words text-red-600 dark:text-red-400" data-testid="tool-error">{message().slice(0, 600)}</p>}
         </Show>

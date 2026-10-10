@@ -77,11 +77,11 @@ const sellerMetrics = (): ReadonlyArray<SellerMetric> => [
 ]
 
 const priceLabel = (price: number): string => (price === 0 ? "Free" : `€${price.toFixed(2)}`)
-const PILL = "rounded-full bg-purple-100/80 px-2 py-0.5 font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+const PILL = "rounded-full bg-blue-100/80 px-2 py-0.5 font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
 const STATUS_PILL: Readonly<Record<PurchaseRecord["status"], string>> = {
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  refunded: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+  completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  refunded: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
 }
 
 export function MarketplaceScreen(props: {
@@ -139,7 +139,7 @@ function MarketplaceBrowse(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>Search</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder={t("marketplace.hero.searchPlaceholder")} value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
@@ -157,13 +157,13 @@ function MarketplaceBrowse(): JSX.Element {
           </select>
         </label>
         <div class="flex items-center justify-between pt-1">
-          <button type="button" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
-          <div class="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600" role="group" aria-label="View">
-            <button type="button" class={`p-1.5 ${view() === "grid" ? "bg-blue-50 text-[#007ACC] dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-400"}`} title="Grid View" aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
-            <button type="button" class={`p-1.5 ${view() === "list" ? "bg-blue-50 text-[#007ACC] dark:bg-blue-900/40 dark:text-blue-300" : "bg-white text-gray-600 dark:bg-gray-900 dark:text-gray-400"}`} title="List View" aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
+          <button type="button" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
+          <div class="flex overflow-hidden rounded-md border border-slate-200/70 dark:border-slate-700/50" role="group" aria-label="View">
+            <button type="button" class={`p-1.5 ${view() === "grid" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "bg-white/70 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400"}`} title="Grid View" aria-pressed={view() === "grid"} onClick={() => setView("grid")}><Grid3x3 size={16} aria-hidden="true" /></button>
+            <button type="button" class={`p-1.5 ${view() === "list" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" : "bg-white/70 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400"}`} title="List View" aria-pressed={view() === "list"} onClick={() => setView("list")}><List size={16} aria-hidden="true" /></button>
           </div>
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{items().length} of {sampleItems().length} {t("marketplace.hero.stats.items").toLowerCase()}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{items().length} of {sampleItems().length} {t("marketplace.hero.stats.items").toLowerCase()}</p>
       </>}
     >
       <Show
@@ -173,22 +173,22 @@ function MarketplaceBrowse(): JSX.Element {
         <Show
           when={view() === "grid"}
           fallback={
-            <div class="overflow-hidden rounded-xl border border-gray-200/60 bg-white/70 shadow-lg dark:border-gray-700/50 dark:bg-gray-800/70">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-900">
+            <div class="ui-card ui-card-default overflow-hidden !p-0">
+              <table class="min-w-full divide-y divide-slate-200/70 dark:divide-slate-700/50">
+                <thead class="bg-slate-50/70 dark:bg-slate-800/40">
                   <tr>
-                    <For each={["Name", "Category", "Author", "Rating", "Downloads", "Price"]}>{(label) => <th scope="col" class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</th>}</For>
+                    <For each={["Name", "Category", "Author", "Rating", "Downloads", "Price"]}>{(label) => <th scope="col" class="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</th>}</For>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
+                <tbody class="divide-y divide-slate-200/70 bg-white/60 dark:divide-slate-700/50 dark:bg-slate-900/30">
                   <For each={items()}>{(item) => (
-                    <tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50" onClick={() => open(item)}>
-                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white"><span class="mr-2" aria-hidden="true">{item.emoji}</span>{item.title}</td>
+                    <tr class="cursor-pointer transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10" onClick={() => open(item)}>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900 dark:text-white"><span class="mr-2" aria-hidden="true">{item.emoji}</span>{item.title}</td>
                       <td class="whitespace-nowrap px-4 py-3"><span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{item.category}</span></td>
-                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.author}</td>
-                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.rating}</td>
-                      <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{item.downloads}</td>
-                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{priceLabel(item.price)}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{item.author}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{item.rating}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{item.downloads}</td>
+                      <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">{priceLabel(item.price)}</td>
                     </tr>
                   )}</For>
                 </tbody>
@@ -201,15 +201,15 @@ function MarketplaceBrowse(): JSX.Element {
               <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => open(item)} onKeyDown={(event) => { if (event.key === "Enter") open(item) }}>
                 <CardBanner icon={<span class="text-2xl leading-7" aria-hidden="true">{item.emoji}</span>} badge={item.category} />
                 <div class="flex flex-1 flex-col gap-2 p-4">
-                  <h3 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{item.title}</h3>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">{t("marketplace.item.by")} {item.author}</p>
-                  <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  <h3 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{item.title}</h3>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">{t("marketplace.item.by")} {item.author}</p>
+                  <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <div class="flex justify-between"><span>{t("marketplace.item.rating")}:</span><span class={`inline-flex items-center gap-1 ${PILL}`}><Star size={12} aria-hidden="true" />{item.rating}</span></div>
                     <div class="flex justify-between"><span>{t("marketplace.item.downloads")}:</span><span class={`inline-flex items-center gap-1 ${PILL}`}><DownloadIcon size={12} aria-hidden="true" />{item.downloads}</span></div>
                   </div>
                 </div>
-                <div class="flex items-center justify-between border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30">
-                  <span class="text-sm font-semibold text-gray-900 dark:text-white">{priceLabel(item.price)}</span>
+                <div class="flex items-center justify-between border-t border-slate-200/60 bg-white/60 px-4 py-2.5 backdrop-blur-sm dark:border-slate-700/50 dark:bg-slate-800/40">
+                  <span class="text-sm font-semibold text-slate-900 dark:text-white">{priceLabel(item.price)}</span>
                   <A href={`/marketplace/items/${item.id}`} class={TOOLBAR_PRIMARY} onClick={(event) => event.stopPropagation()}>{t("marketplace.item.buy")}</A>
                 </div>
               </div>
@@ -233,12 +233,12 @@ function MarketplaceItem(props: { readonly id: string | undefined }): JSX.Elemen
           <div class={`${PANEL} flex items-center justify-center md:col-span-1`}><span class="text-7xl" aria-hidden="true">{i().emoji}</span></div>
           <div class={`${PANEL} md:col-span-2`}>
             <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-300">{i().category}</span>
-            <h2 class="mt-3 text-xl font-bold text-gray-900 dark:text-white">{i().title}</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{t("marketplace.item.by")} {i().author}</p>
+            <h2 class="mt-3 text-xl font-bold text-slate-900 dark:text-white">{i().title}</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">{t("marketplace.item.by")} {i().author}</p>
             <div class="mt-5 grid grid-cols-3 gap-4">
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{t("marketplace.item.rating")}</h3><p class="font-medium text-gray-900 dark:text-white">{i().rating}</p></div>
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{t("marketplace.item.downloads")}</h3><p class="font-medium text-gray-900 dark:text-white">{i().downloads}</p></div>
-              <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Price</h3><p class="font-medium text-gray-900 dark:text-white">{priceLabel(i().price)}</p></div>
+              <div class="rounded-md bg-slate-50/70 p-3 backdrop-blur-sm dark:bg-slate-800/50"><h3 class="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">{t("marketplace.item.rating")}</h3><p class="font-medium text-slate-900 dark:text-white">{i().rating}</p></div>
+              <div class="rounded-md bg-slate-50/70 p-3 backdrop-blur-sm dark:bg-slate-800/50"><h3 class="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">{t("marketplace.item.downloads")}</h3><p class="font-medium text-slate-900 dark:text-white">{i().downloads}</p></div>
+              <div class="rounded-md bg-slate-50/70 p-3 backdrop-blur-sm dark:bg-slate-800/50"><h3 class="mb-1 text-sm font-medium text-slate-500 dark:text-slate-400">Price</h3><p class="font-medium text-slate-900 dark:text-white">{priceLabel(i().price)}</p></div>
             </div>
           </div>
         </div>
@@ -257,12 +257,12 @@ function MarketplacePurchases(): JSX.Element {
           <For each={records}>{(r) => (
             <div class={`${PANEL} flex flex-wrap items-center justify-between gap-3`}>
               <div class="min-w-0">
-                <h3 class="truncate text-base font-semibold text-gray-900 dark:text-white">{r.title}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{r.date}</p>
+                <h3 class="truncate text-base font-semibold text-slate-900 dark:text-white">{r.title}</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{r.date}</p>
               </div>
               <div class="flex items-center gap-3">
                 <span class={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_PILL[r.status]}`}>{r.status}</span>
-                <span class="font-semibold text-gray-900 dark:text-white">€{r.amount.toFixed(2)}</span>
+                <span class="font-semibold text-slate-900 dark:text-white">€{r.amount.toFixed(2)}</span>
               </div>
             </div>
           )}</For>
@@ -279,9 +279,9 @@ function MarketplaceSeller(): JSX.Element {
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <For each={sellerMetrics()}>{(m) => (
           <div class={`${PANEL} flex flex-col gap-1`}>
-            <span class="text-sm text-gray-500 dark:text-gray-400">{m.label}</span>
-            <strong class="text-2xl font-bold text-gray-900 dark:text-white">{m.value}</strong>
-            <span class="w-max rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">{m.change}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{m.label}</span>
+            <strong class="text-2xl font-bold text-slate-900 dark:text-white">{m.value}</strong>
+            <span class="w-max rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">{m.change}</span>
           </div>
         )}</For>
       </div>
@@ -294,8 +294,8 @@ function MarketplaceSuccess(): JSX.Element {
   return (
     <WorkspaceDetail title={t("marketplace.success.title")} {...BACK}>
       <div class={`${PANEL} mx-auto mt-6 max-w-xl text-center`}>
-        <h2 class="mb-2 text-xl font-bold text-gray-900 dark:text-white">{t("marketplace.success.title")}</h2>
-        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{t("marketplace.success.warning")}</p>
+        <h2 class="mb-2 text-xl font-bold text-slate-900 dark:text-white">{t("marketplace.success.title")}</h2>
+        <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">{t("marketplace.success.warning")}</p>
         <A href="/marketplace/purchases" class={TOOLBAR_PRIMARY}>{t("marketplace.purchases.title")}</A>
       </div>
     </WorkspaceDetail>
@@ -303,5 +303,5 @@ function MarketplaceSuccess(): JSX.Element {
 }
 
 function NotFoundMarketplace(): JSX.Element {
-  return <WorkspaceDetail title={t("marketplace.hero.title")} {...BACK}><p class="p-8 text-center text-sm text-gray-500 dark:text-gray-400" role="alert">{t("marketplace.error")}</p></WorkspaceDetail>
+  return <WorkspaceDetail title={t("marketplace.hero.title")} {...BACK}><p class="p-8 text-center text-sm text-slate-500 dark:text-slate-400" role="alert">{t("marketplace.error")}</p></WorkspaceDetail>
 }

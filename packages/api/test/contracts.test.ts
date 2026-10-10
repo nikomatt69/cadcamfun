@@ -48,6 +48,7 @@ test("OpenAPI preserves status codes, concrete payloads and non-JSON encodings",
   expect(document.paths["/api/plugins/install"]?.post?.requestBody).toHaveProperty("content.multipart/form-data")
   expect(document.paths["/api/plugins/bootstrap.js"]?.get?.responses["200"]).toHaveProperty("content.application/javascript")
   expect(document.paths["/api/auth/reset-password"]?.post?.requestBody).toBeDefined()
+  expect(document.paths["/api/ai/models"]?.get?.parameters).toEqual(expect.arrayContaining([expect.objectContaining({ name: "configuredOnly", in: "query", required: false })]))
   expect(document).toMatchSnapshot()
 })
 

@@ -53,18 +53,18 @@ const formatDate = (dateString: string): string => {
 }
 
 const roleBadge = (role: "ADMIN" | "MANAGER" | "MEMBER"): string =>
-  role === "ADMIN" ? "bg-red-100 text-red-800" : role === "MANAGER" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
+  role === "ADMIN" ? "bg-red-100 text-red-800" : role === "MANAGER" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-800"
 
 type DetailTab = "overview" | "chat" | "members" | "projects" | "settings"
 type Role = "ADMIN" | "MANAGER" | "MEMBER"
 
 const TAB_BASE = "whitespace-nowrap rounded-md px-3 py-2 font-medium text-sm"
 const TAB_ACTIVE = "border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-const TAB_IDLE = "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+const TAB_IDLE = "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
 
-const LEGACY_CARD = "rounded-xl border border-white/40 bg-white/70 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
+const LEGACY_CARD = "ui-card ui-card-default"
 const LEGACY_INPUT =
-  "block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+  "block w-full rounded-md border border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-gray-400"
 
 /** `/organizations` — the list page with its create modal. */
 export function OrganizationsScreen(): JSX.Element {
@@ -112,16 +112,16 @@ export function OrganizationsScreen(): JSX.Element {
         <label class="block">
           <span class={RAIL_LABEL}>Search</span>
           <div class="relative">
-            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search organizations..." value={search()} onInput={(event) => setSearch(event.currentTarget.value)} />
           </div>
         </label>
-        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />Clear Filters</button>
-        <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} organizations</p>
+        <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={() => setSearch("")} disabled={search() === ""}><X size={14} aria-hidden="true" />Clear Filters</button>
+        <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {orgs.data()?.length ?? 0} organizations</p>
       </>}
       overlays={
         <Modal open={showModal()} title={t("org.modal.title")} onClose={() => { if (!isSubmitting()) setShowModal(false) }}>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.modal.body")}</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.modal.body")}</p>
           {/* The legacy modal shows the list hook's `error`; a failed create lands here too. */}
           <Show when={error() ?? orgs.error()}><StageError message={String(error() ?? orgs.error())} /></Show>
           <form onSubmit={(event) => void submit(event)} class="space-y-4">
@@ -133,7 +133,7 @@ export function OrganizationsScreen(): JSX.Element {
               <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
               <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
             </div>
-            <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
               <button type="button" disabled={isSubmitting()} onClick={() => setShowModal(false)} class={CANCEL_BUTTON}>{t("org.modal.cancel")}</button>
               <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
             </div>
@@ -196,8 +196,8 @@ export function CreateOrganizationScreen(): JSX.Element {
           <div class="mb-6 flex items-center gap-4">
             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30"><Users class="h-6 w-6 text-blue-600 dark:text-blue-400" /></div>
             <div>
-              <h2 class="text-lg font-medium text-gray-900 dark:text-white">{t("org.create.details")}</h2>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.create.lead")}</p>
+              <h2 class="text-lg font-medium text-slate-900 dark:text-white">{t("org.create.details")}</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.create.lead")}</p>
             </div>
           </div>
           <Show when={error()}><div class="mb-4"><StageError message={error() ?? ""} /></div></Show>
@@ -210,7 +210,7 @@ export function CreateOrganizationScreen(): JSX.Element {
               <label for="description" class={LABEL}>{t("org.modal.descriptionLabel")}</label>
               <textarea id="description" name="description" rows={3} value={description()} onInput={(event) => setDescription(event.currentTarget.value)} placeholder={t("org.modal.descriptionPlaceholder")} class={INPUT} />
             </div>
-            <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div class="flex justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
               <button type="button" onClick={() => navigate(-1)} class={CANCEL_BUTTON}>{t("common.cancel")}</button>
               <button type="submit" disabled={isSubmitting()} class={SUBMIT_BUTTON}>{isSubmitting() ? t("org.modal.creating") : t("org.modal.submit")}</button>
             </div>
@@ -238,8 +238,8 @@ export function OrganizationDetailScreen(): JSX.Element {
 
   const notFound = (
     <div class="p-6 text-center">
-      <h1 class="mb-4 text-2xl font-bold text-gray-900 dark:text-white">{t("org.notFound.title")}</h1>
-      <p class="mb-6 text-gray-600 dark:text-gray-400">{t("org.notFound.body")}</p>
+      <h1 class="mb-4 text-2xl font-bold text-slate-900 dark:text-white">{t("org.notFound.title")}</h1>
+      <p class="mb-6 text-slate-600 dark:text-slate-400">{t("org.notFound.body")}</p>
       <button
         type="button"
         onClick={() => navigate("/profile")}
@@ -276,11 +276,11 @@ export function OrganizationDetailScreen(): JSX.Element {
               </>}
             >
               <Show when={(org().description ?? "").length > 0}>
-                <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">{org().description}</p>
+                <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">{org().description}</p>
               </Show>
 
               {/* Tabs */}
-              <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
+              <div class="mb-6 border-b border-slate-200/60 dark:border-slate-700/50">
                 <nav class="-mb-px flex space-x-4">
                   <button
                     type="button"
@@ -328,8 +328,8 @@ export function OrganizationDetailScreen(): JSX.Element {
                   <div class="p-6">
                     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                       <div>
-                        <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.overview.about")}</h2>
-                        <p class="text-gray-600 dark:text-gray-400">
+                        <h2 class="mb-4 text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.overview.about")}</h2>
+                        <p class="text-slate-600 dark:text-slate-400">
                           <Show
                             when={(org().description ?? "").length > 0}
                             fallback={t("org.overview.noDescription")}
@@ -338,33 +338,33 @@ export function OrganizationDetailScreen(): JSX.Element {
                           </Show>
                         </p>
 
-                        <h3 class="mb-2 mt-6 text-md font-medium text-gray-900 dark:text-blue-400">{t("org.overview.details")}</h3>
-                        <div class="rounded-md bg-gray-50 p-4 dark:bg-gray-900">
+                        <h3 class="mb-2 mt-6 text-md font-medium text-slate-900 dark:text-blue-400">{t("org.overview.details")}</h3>
+                        <div class="rounded-md bg-slate-50/70 p-4 backdrop-blur-sm dark:bg-slate-800/50">
                           <div class="grid grid-cols-2 gap-2 text-sm">
                             <div>
-                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.created")}</span>
-                              <span class="dark:text-gray-300">{formatDate(org().createdAt)}</span>
+                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.created")}</span>
+                              <span class="dark:text-slate-300">{formatDate(org().createdAt)}</span>
                             </div>
                             <div>
-                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.updated")}</span>
-                              <span class="dark:text-gray-300">{formatDate(org().updatedAt)}</span>
+                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.updated")}</span>
+                              <span class="dark:text-slate-300">{formatDate(org().updatedAt)}</span>
                             </div>
                             <div>
-                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.members")}</span>
-                              <span class="dark:text-gray-300">{org().members.length}</span>
+                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.members")}</span>
+                              <span class="dark:text-slate-300">{org().members.length}</span>
                             </div>
                             <div>
-                              <span class="block text-gray-500 dark:text-gray-400">{t("org.overview.projects")}</span>
-                              <span class="dark:text-gray-300">{org().projectCount}</span>
+                              <span class="block text-slate-500 dark:text-slate-400">{t("org.overview.projects")}</span>
+                              <span class="dark:text-slate-300">{org().projectCount}</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
                       <div>
-                        <h2 class="mb-4 text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.overview.activity")}</h2>
-                        <div class="divide-y rounded-md border dark:divide-gray-700 dark:border-gray-700">
-                          <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+                        <h2 class="mb-4 text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.overview.activity")}</h2>
+                        <div class="divide-y rounded-md border border-slate-200/60 dark:divide-slate-700/50 dark:border-slate-700/50">
+                          <div class="p-4 text-center text-slate-500 dark:text-slate-400">
                             {t("org.overview.noActivity")}
                           </div>
                         </div>
@@ -375,8 +375,8 @@ export function OrganizationDetailScreen(): JSX.Element {
 
                 <Show when={activeTab() === "members"}>
                   <div>
-                    <div class="flex items-center justify-between border-gray-200 p-6 dark:border-gray-700">
-                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.members.title")}</h2>
+                    <div class="flex items-center justify-between border-slate-200/60 p-6 dark:border-slate-700/50">
+                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.members.title")}</h2>
                       <Show when={canManageMembers()}>
                         <button
                           type="button"
@@ -390,26 +390,26 @@ export function OrganizationDetailScreen(): JSX.Element {
                     </div>
                     <div class="p-6">
                       <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead class="bg-gray-50 dark:bg-gray-700">
+                        <table class="min-w-full divide-y divide-slate-200/70 dark:divide-slate-700/50">
+                          <thead class="bg-slate-50/70 dark:bg-slate-800/40">
                             <tr>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 {t("org.members.member")}
                               </th>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 {t("org.members.role")}
                               </th>
-                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                              <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 {t("org.members.joined")}
                               </th>
                               <Show when={canManageMembers()}>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                   {t("org.members.actions")}
                                 </th>
                               </Show>
                             </tr>
                           </thead>
-                          <tbody class="divide-y divide-gray-200 bg-[#F8FBFF] dark:divide-gray-700 dark:bg-gray-800">
+                          <tbody class="divide-y divide-slate-200/70 bg-white/60 dark:divide-slate-700/50 dark:bg-slate-900/30">
                             <For each={org().members}>
                               {(member) => (
                                 <tr>
@@ -419,8 +419,8 @@ export function OrganizationDetailScreen(): JSX.Element {
                                         <Show
                                           when={member.image !== null && member.image.length > 0}
                                           fallback={
-                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-600">
-                                              <User class="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-600">
+                                              <User class="h-6 w-6 text-slate-400 dark:text-slate-500" />
                                             </div>
                                           }
                                         >
@@ -432,28 +432,28 @@ export function OrganizationDetailScreen(): JSX.Element {
                                         </Show>
                                       </div>
                                       <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-blue-400">
+                                        <div class="text-sm font-medium text-slate-900 dark:text-blue-400">
                                           {member.name ?? t("org.members.unnamed")}
                                         </div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">{member.email}</div>
+                                        <div class="text-sm text-slate-500 dark:text-slate-400">{member.email}</div>
                                       </div>
                                     </div>
                                   </td>
                                   <td class="whitespace-nowrap px-6 py-4">
-                                    <span class={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 dark:text-gray-900 ${roleBadge(member.role)}`}>
+                                    <span class={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 dark:text-slate-900 ${roleBadge(member.role)}`}>
                                       {member.role}
                                     </span>
                                   </td>
-                                  <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                  <td class="whitespace-nowrap px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                                     {formatDate(member.joinedAt)}
                                   </td>
                                   <Show when={canManageMembers()}>
                                     <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                                       {/* Legacy renders these two buttons without handlers; v6 has no member endpoints either. */}
-                                      <button type="button" class="mr-3 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
+                                      <button type="button" class="mr-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                                         {t("org.members.edit")}
                                       </button>
-                                      <button type="button" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                                      <button type="button" class="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300">
                                         {t("org.members.remove")}
                                       </button>
                                     </td>
@@ -470,8 +470,8 @@ export function OrganizationDetailScreen(): JSX.Element {
 
                 <Show when={activeTab() === "projects"}>
                   <div>
-                    <div class="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
-                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.projects.title")}</h2>
+                    <div class="flex items-center justify-between border-b border-slate-200/60 p-6 dark:border-slate-700/50">
+                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.projects.title")}</h2>
                       <button
                         type="button"
                         onClick={() => navigate(newProjectHref())}
@@ -485,7 +485,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                       {/* No organization-projects endpoint: the legacy empty state, always. */}
                       <div class="py-12 text-center">
                         <svg
-                          class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"
+                          class="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -498,8 +498,8 @@ export function OrganizationDetailScreen(): JSX.Element {
                             d="M9 12h6m-6 4h6m-6-8h6M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-4m-7 9.5V4.7c0-1 .573-1.902 1.465-2.332A2.066 2.066 0 0111.535 2c.365 0 .72.13 1 .366.28.236.47.56.535.92L14 8"
                           />
                         </svg>
-                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-blue-400">{t("org.projects.empty")}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.projects.emptyBody")}</p>
+                        <h3 class="mt-2 text-sm font-medium text-slate-900 dark:text-blue-400">{t("org.projects.empty")}</h3>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.projects.emptyBody")}</p>
                         <div class="mt-6">
                           <button
                             type="button"
@@ -516,22 +516,22 @@ export function OrganizationDetailScreen(): JSX.Element {
 
                 <Show when={activeTab() === "settings" && canManageSettings()}>
                   <div>
-                    <div class="border-b border-gray-200 p-6 dark:border-gray-700">
-                      <h2 class="text-lg font-medium text-gray-900 dark:text-blue-400">{t("org.settings.title")}</h2>
-                      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.settings.body")}</p>
+                    <div class="border-b border-slate-200 p-6 dark:border-slate-700">
+                      <h2 class="text-lg font-medium text-slate-900 dark:text-blue-400">{t("org.settings.title")}</h2>
+                      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.settings.body")}</p>
                     </div>
                     <div class="p-6">
                       {/* Legacy submits this form to nothing (no handler): it is inert here too. */}
                       <form class="space-y-6" onSubmit={(event) => event.preventDefault()}>
                         <div>
-                          <label for="orgName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label for="orgName" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
                             {t("org.settings.name")}
                           </label>
                           <input type="text" name="orgName" id="orgName" class={`mt-1 ${LEGACY_INPUT}`} value={org().name} readonly />
                         </div>
 
                         <div>
-                          <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label for="description" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
                             {t("org.settings.description")}
                           </label>
                           <textarea
@@ -554,14 +554,14 @@ export function OrganizationDetailScreen(): JSX.Element {
                         </div>
                       </form>
 
-                      <div class="mt-10 border-t border-gray-200 pt-10 dark:border-gray-700">
+                      <div class="mt-10 border-t border-slate-200 pt-10 dark:border-slate-700">
                         <h3 class="text-lg font-medium text-red-700 dark:text-red-500">{t("org.settings.danger")}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("org.settings.dangerBody")}</p>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("org.settings.dangerBody")}</p>
                         <div class="mt-3">
                           {/* Inert: legacy never wired a handler to this button. */}
                           <button
                             type="button"
-                            class="inline-flex justify-center rounded-md border border-red-300 bg-[#F8FBFF] px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-800/30"
+                            class="inline-flex justify-center rounded-md border border-red-300 bg-white/60 px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:border-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-800/30"
                           >
                             {t("org.settings.delete")}
                           </button>
@@ -578,7 +578,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                   <div class="fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="invite-member-title">
                     <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
                       <div
-                        class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                        class="fixed inset-0 bg-slate-500 bg-opacity-75 transition-opacity"
                         aria-hidden="true"
                         onClick={() => setShowInviteModal(false)}
                       />
@@ -588,28 +588,28 @@ export function OrganizationDetailScreen(): JSX.Element {
                       </span>
 
                       <Motion.div
-                        class="inline-block w-full max-w-lg overflow-hidden rounded-lg bg-[#F8FBFF] text-left shadow-xl align-bottom sm:my-8 sm:align-middle dark:bg-gray-800"
+                        class="inline-block w-full max-w-lg overflow-hidden rounded-lg bg-white/60 text-left shadow-xl align-bottom sm:my-8 sm:align-middle dark:bg-slate-900"
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2, easing: EASE } }}
                         transition={{ duration: 0.3, easing: CARD_EASE }}
                       >
                         <form onSubmit={submitInvite}>
-                          <div class="bg-[#F8FBFF] px-4 pb-4 pt-5 sm:p-6 sm:pb-4 dark:bg-gray-800">
+                          <div class="bg-white/60 px-4 pb-4 pt-5 sm:p-6 sm:pb-4 dark:bg-slate-900">
                             <div class="sm:flex sm:items-start">
-                              <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10 dark:bg-gray-700">
+                              <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10 dark:bg-slate-800">
                                 <Mail class="h-6 w-6 text-blue-600 dark:text-blue-400" />
                               </div>
                               <div class="mt-3 w-full text-center sm:ml-4 sm:mt-0 sm:text-left">
-                                <h3 id="invite-member-title" class="text-lg font-medium leading-6 text-gray-900 dark:text-blue-400">
+                                <h3 id="invite-member-title" class="text-lg font-medium leading-6 text-slate-900 dark:text-blue-400">
                                   {t("org.invite.title")}
                                 </h3>
                                 <div class="mt-2">
-                                  <p class="text-sm text-gray-500 dark:text-gray-400">{t("org.invite.body")}</p>
+                                  <p class="text-sm text-slate-500 dark:text-slate-400">{t("org.invite.body")}</p>
                                 </div>
 
                                 <div class="mt-4">
-                                  <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     {t("org.invite.email")}
                                   </label>
                                   <input
@@ -625,7 +625,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                                 </div>
 
                                 <div class="mt-4">
-                                  <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  <label for="role" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     {t("org.invite.role")}
                                   </label>
                                   <select
@@ -633,7 +633,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                                     name="role"
                                     value={inviteRole()}
                                     onChange={(event) => setInviteRole(event.currentTarget.value as Role)}
-                                    class={`mt-1 block w-full appearance-none rounded-md py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white ${LEGACY_INPUT}`}
+                                    class={`mt-1 block w-full appearance-none rounded-md py-2 pl-3 pr-10 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-slate-800 dark:text-white ${LEGACY_INPUT}`}
                                   >
                                     <option value="MEMBER">{t("org.invite.roleMember")}</option>
                                     <option value="MANAGER">{t("org.invite.roleManager")}</option>
@@ -645,7 +645,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                               </div>
                             </div>
                           </div>
-                          <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-gray-900">
+                          <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-slate-900">
                             <button
                               type="submit"
                               class="w-full inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm"
@@ -655,7 +655,7 @@ export function OrganizationDetailScreen(): JSX.Element {
                             <button
                               type="button"
                               onClick={() => setShowInviteModal(false)}
-                              class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-[#F8FBFF] px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                              class="mt-3 inline-flex w-full justify-center rounded-md border border-slate-300 bg-white/60 px-4 py-2 text-base font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-gray-600"
                             >
                               {t("org.modal.cancel")}
                             </button>

@@ -34,6 +34,7 @@ import { t } from "../i18n/index.ts"
 import { ACCEPT, MAX_ATTACHMENTS, readAttachment, type ChatAttachment } from "./attachments.ts"
 import { useAiStore } from "./context.tsx"
 import { ContextGauge } from "./ContextGauge.tsx"
+import { AssistantControls, AssistantQuestions } from "./AssistantControls.tsx"
 import { useApp } from "../state/context.ts"
 import { AgentActivity } from "./AgentActivity.tsx"
 import { SessionsPanel } from "./SessionsPanel.tsx"
@@ -41,7 +42,7 @@ import { ProviderBadge } from "./ProviderBadge.tsx"
 import { ProviderSettings } from "./ProviderSettings.tsx"
 import { SkillsSettings } from "./SkillsSettings.tsx"
 import "./assistant.css"
-import { EXTRA_TOOL_SUMMARIES, TOOL_IDS, TOOL_SUMMARIES, toolTitle } from "./tools.ts"
+import { toolTitle } from "./tools.ts"
 import { ToolRow } from "./ToolRow.tsx"
 import { groupExploration, timelineOf } from "./timeline.ts"
 import type { AiEvent as StreamEvent, AiMessage } from "./types.ts"
@@ -288,7 +289,9 @@ export function EnhancedAssistant(props: Props): JSX.Element {
         </section>
       </Show>
 
+      <AssistantControls />
       <AgentActivity />
+      <AssistantQuestions />
 
       <div
         ref={transcript}
@@ -386,6 +389,9 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <div><dt>{t("ai.stats.usage")}</dt><dd>{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</dd></div>
           </dl>
           <p>{t("ai.context.usageHint")}</p>
+          <button data-testid="ai-compact" type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !ai.sessionId() || ai.tasks().some((task) => task.status === "queued" || task.status === "running")} onClick={() => void ai.compact()}>{t(ai.controlBusy() ? "ai.controls.compacting" : "ai.controls.compact")}</button>
+          <Show when={ai.hostContext()}>{(context) => <p class="mt-2 text-xs">{t("ai.controls.contextPolicy", { threshold: context().compactAt?.toLocaleString() ?? t("ai.context.gauge.unknown"), output: context().requestOutput?.toLocaleString() ?? t("ai.context.gauge.unknown") })}</p>}</Show>
+          <Show when={ai.hostContext()?.memory}>{(memory) => <div class="mt-2"><p class="text-xs">{t("ai.controls.memoryPolicy", { hours: memory().minHours, sessions: memory().minSessions, count: memory().sessionsSinceLastBrain })}</p><button type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !memory().enabled || ai.tasks().some((task) => task.status === "queued" || task.status === "running")} onClick={() => void ai.consolidateMemory()}>{t("ai.controls.learnMemory")}</button></div>}</Show>
           <label class="assistant-context-toggle"><input type="checkbox" checked={ai.includeContext()} onChange={(event) => ai.setIncludeContext(event.currentTarget.checked)} />{t("ai.toolbar.context")}</label>
         </section>
       </Show>

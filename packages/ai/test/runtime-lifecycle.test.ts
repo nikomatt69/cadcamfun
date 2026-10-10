@@ -24,6 +24,7 @@ describe("runtime admission", () => {
       await expect(Effect.runPromise(runtime.setProviderKey("fake", "test"))).rejects.toThrow("closed")
       await expect(Effect.runPromise(runtime.updateProviders([]))).rejects.toThrow("closed")
       await expect(Effect.runPromise(runtime.reloadSkills())).rejects.toThrow("closed")
+      expect(() => runtime.catalogueReady).toThrow("closed")
       expect(toolsRead).toBe(0)
     } finally { await Effect.runPromise(Scope.close(scope, Exit.void)); rmSync(dataDir, { recursive: true, force: true }) }
   })

@@ -29,6 +29,7 @@ export interface ModelSelector {
   readonly provider?: ProviderId
   readonly model?: string
   readonly tier?: Tier
+  readonly variant?: string
 }
 
 export interface ModelInfo {

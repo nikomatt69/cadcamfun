@@ -70,10 +70,11 @@ describe("AI tool catalogue (spec 08-ai.md §3)", () => {
   })
   test("every tool has a human-readable summary", () => {
     expect(TOOL_SUMMARIES.length).toBe(TOOL_IDS.length)
+    expect(TOOL_SUMMARIES.map((summary) => summary.id).sort()).toEqual([...TOOL_IDS].sort())
     for (const summary of TOOL_SUMMARIES) {
       expect(summary.title.length).toBeGreaterThan(0)
       expect(summary.description.length).toBeGreaterThan(0)
-      expect(["cad", "cam", "library", "memory"]).toContain(summary.category)
+      expect(["cad", "cam", "library", "memory", "research"]).toContain(summary.category)
     }
   })
 })
@@ -216,3 +217,11 @@ const expectResultOf = (
   if (result.type !== "tool_result") throw new Error(`expected tool_result, got ${result.type}`)
   return result
 }
+
+ test("native questions decode and tool calls pass through the host-owned controls", () => {
+  const question = decodeEvent(JSON.stringify({ type: "question_request", sessionId: "s", requestId: "q", questions: [{ header: "Stock", question: "Choose", options: [{ label: "Aluminium", description: "Stock" }], custom: false }] }))
+  expect(question.type).toBe("question_request")
+  expect(decodeEvent(JSON.stringify({ type: "question_resolved", sessionId: "s", requestId: "q" })).type).toBe("question_resolved")
+  const state = { started: new Set<string>(), finished: new Set<string>() }
+  expect(dispatch({ type: "tool_call", sessionId: "s", callId: "q", tool: "question", input: { questions: [] } }, state)[0]?.type).toBe("tool_call")
+ })

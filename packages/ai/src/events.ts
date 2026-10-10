@@ -29,7 +29,8 @@ export const ToolResultEvent = Schema.Struct({
   callId: Schema.String,
   tool: Schema.String,
   ok: Schema.Boolean,
-  output: Schema.String
+  output: Schema.String,
+  images: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMaxLength(4_000_100))).check(Schema.isMaxLength(2)))
 })
 
 export const PermissionRequestEvent = Schema.Struct({
@@ -39,6 +40,13 @@ export const PermissionRequestEvent = Schema.Struct({
   permission: Schema.String,
   patterns: Schema.Array(Schema.String)
 })
+
+export const QuestionInfoSchema = Schema.Struct({ header: Schema.String, question: Schema.String,
+  options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })),
+  multiple: Schema.optionalKey(Schema.Boolean), custom: Schema.optionalKey(Schema.Boolean) })
+export const QuestionRequestEvent = Schema.Struct({ type: Schema.Literal("question_request"), sessionId: Schema.String, requestId: Schema.String,
+  questions: Schema.Array(QuestionInfoSchema) })
+export const QuestionResolvedEvent = Schema.Struct({ type: Schema.Literal("question_resolved"), sessionId: Schema.String, requestId: Schema.String })
 
 export const UsageSchema = Schema.Struct({
   inputTokens: Schema.Number,
@@ -156,6 +164,8 @@ export const AiEventSchema = Schema.Union([
   ToolCallEvent,
   ToolResultEvent,
   PermissionRequestEvent,
+  QuestionRequestEvent,
+  QuestionResolvedEvent,
   DoneEvent,
   ErrorEvent
 ])

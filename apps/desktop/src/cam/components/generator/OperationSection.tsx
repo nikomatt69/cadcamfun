@@ -184,9 +184,9 @@ function ThicknessField(props: { readonly class?: string }): JSX.Element {
 }
 
 const SAMPLE = [
-  "; Esempio di G-code", "G0 Z5 ; Posizione sicura", "G0 X0 Y0 ; Vai all'origine", "G1 Z-1 F100 ; Scendi a profondità 1mm",
-  "G1 X10 Y0 F200 ; Muovi a X=10mm", "G1 X10 Y10 F200 ; Muovi a Y=10mm", "G1 X0 Y10 F200 ; Muovi a X=0mm", "G1 X0 Y0 F200 ; Torna all'origine",
-  "G0 Z5 ; Torna a posizione sicura", ""
+  "; Sample G-code", "G0 Z5 ; Safe position", "G0 X0 Y0 ; Move to origin", "G1 Z-1 F100 ; Lower to a depth of 1 mm",
+  "G1 X10 Y0 F200 ; Move to X=10mm", "G1 X10 Y10 F200 ; Move to Y=10mm", "G1 X0 Y10 F200 ; Move to X=0mm", "G1 X0 Y0 F200 ; Return to origin",
+  "G0 Z5 ; Return to safe position", ""
 ].join("\n")
 
 const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT_SETTINGS.probeCycle; readonly label: string }> = [
@@ -441,14 +441,14 @@ export function OperationSection(): JSX.Element {
                     gen.setAIProcessing(true)
                     setTimeout(() => {
                       gen.setCustomPath(
-                        "; G-code generato automaticamente da AI\n" +
-                        "G0 Z10 ; Posizione sicura\n" +
-                        "G0 X0 Y0 ; Posizione iniziale\n" +
-                        `G1 Z-${s.depth / 2} F${s.plungerate} ; Prima profondità\n` +
-                        `G1 X10 Y10 F${s.feedrate} ; Movimento lineare\n` +
-                        `G2 X20 Y0 I0 J-10 F${s.feedrate} ; Arco in senso orario\n` +
-                        `G1 X0 Y0 F${s.feedrate} ; Ritorno all'origine\n` +
-                        "G0 Z10 ; Posizione sicura\n"
+                        "; AI-generated G-code\n" +
+                        "G0 Z10 ; Safe position\n" +
+                        "G0 X0 Y0 ; Initial position\n" +
+                        `G1 Z-${s.depth / 2} F${s.plungerate} ; First depth\n` +
+                        `G1 X10 Y10 F${s.feedrate} ; Linear move\n` +
+                        `G2 X20 Y0 I0 J-10 F${s.feedrate} ; Clockwise arc\n` +
+                        `G1 X0 Y0 F${s.feedrate} ; Return to origin\n` +
+                        "G0 Z10 ; Safe position\n"
                       )
                       gen.setAIProcessing(false)
                     }, 2000)

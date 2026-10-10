@@ -101,8 +101,8 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "account"}>
         <div class="space-y-8">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.tab.account")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.account.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.tab.account")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.account.subtitle")}</p>
           </div>
 
           {/* Session Management Section */}
@@ -110,10 +110,10 @@ export function SettingsScreen(): JSX.Element {
             <SessionManagement />
           </div>
 
-          <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <h4 class="text-base font-medium text-gray-900 dark:text-white">{t("settings.account.deletionTitle")}</h4>
+          <div class="border-t border-slate-200 dark:border-slate-700 pt-6">
+            <h4 class="text-base font-medium text-slate-900 dark:text-white">{t("settings.account.deletionTitle")}</h4>
             <div class="mt-2">
-              <p class="text-sm text-gray-500 dark:text-gray-400">
+              <p class="text-sm text-slate-500 dark:text-slate-400">
                 Once you delete your account, you cannot go back. All your data will be permanently removed. Please
                 be certain.
               </p>
@@ -143,35 +143,35 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "language"}>
         <div class="space-y-6">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.lang.title")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.lang.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.lang.title")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.lang.subtitle")}</p>
           </div>
 
           <div class="max-w-xl">
             <div class="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div class="sm:col-span-4">
-                <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label for="language" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   {t("settings.locale")}
                 </label>
                 <div class="mt-1">
                   <LanguageSelector />
                 </div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   {t("settings.lang.current", { name: SUPPORTED_LANGUAGES.en })}
                 </p>
               </div>
             </div>
 
             <div class="mt-8">
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">{t("settings.glass.title")}</h4>
-              <label class="mt-3 flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300" data-testid="glass-setting">
+              <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.glass.title")}</h4>
+              <label class="mt-3 flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300" data-testid="glass-setting">
                 <input type="checkbox" class="mt-1" aria-label={t("settings.glass.title")} checked={app.settings.settings().glass} onChange={(event) => app.settings.update({ glass: event.currentTarget.checked })} />
                 <span>{t("settings.glass.body")}</span>
               </label>
             </div>
 
             <div class="mt-8">
-              <h4 class="text-sm font-medium text-gray-900 dark:text-white">{t("settings.lang.available")}</h4>
+              <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.lang.available")}</h4>
               <div class="mt-4 space-y-4">
                 <For each={Object.entries(SUPPORTED_LANGUAGES)}>
                   {([code, name]) => (
@@ -182,8 +182,8 @@ export function SettingsScreen(): JSX.Element {
                         </Show>
                       </div>
                       <div class="ml-3">
-                        <p class="text-sm text-gray-700 dark:text-gray-300">{name}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                        <p class="text-sm text-slate-700 dark:text-slate-300">{name}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
                           {code === "en" ? t("settings.lang.currentLanguage") : ""}
                         </p>
                       </div>
@@ -193,14 +193,14 @@ export function SettingsScreen(): JSX.Element {
               </div>
             </div>
 
-            <div class="mt-8 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+            <div class="mt-8 bg-slate-50 dark:bg-slate-900 p-4 rounded-md">
               <div class="flex items-start">
                 <div class="flex-shrink-0">
-                  <Globe class="h-5 w-5 text-gray-400" aria-hidden="true" />
+                  <Globe class="h-5 w-5 text-slate-400" aria-hidden="true" />
                 </div>
                 <div class="ml-3">
-                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">{t("settings.lang.infoTitle")}</h4>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <h4 class="text-sm font-medium text-slate-900 dark:text-white">{t("settings.lang.infoTitle")}</h4>
+                  <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Translations are loaded automatically when you change language. If you encounter any issues with
                     translations, please contact support.
                   </p>
@@ -214,14 +214,14 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "notifications"}>
         <div class="space-y-6">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.notif.title")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.notif.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.notif.title")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.notif.subtitle")}</p>
           </div>
 
           {/* Email notifications */}
           <div class="mt-6">
             <fieldset>
-              <legend class="text-base font-medium text-gray-900 dark:text-white">{t("settings.notif.email")}</legend>
+              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.email")}</legend>
               <div class="mt-4 space-y-4">
                 <div class="flex items-start">
                   <div class="flex items-center h-5">
@@ -230,14 +230,14 @@ export function SettingsScreen(): JSX.Element {
                       name="comments"
                       type="checkbox"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded bg-gray-100 dark:bg-gray-700"
+                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800"
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label for="comments" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="comments" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.comments")}
                     </label>
-                    <p class="text-gray-500 dark:text-gray-400">
+                    <p class="text-slate-500 dark:text-slate-400">
                       Get notified when someone comments on your posts.
                     </p>
                   </div>
@@ -249,14 +249,14 @@ export function SettingsScreen(): JSX.Element {
                       name="mentions"
                       type="checkbox"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded bg-gray-100 dark:bg-gray-700"
+                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 rounded bg-slate-100 dark:bg-slate-800"
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label for="mentions" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="mentions" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.mentions")}
                     </label>
-                    <p class="text-gray-500 dark:text-gray-400">Get notified when someone mentions you.</p>
+                    <p class="text-slate-500 dark:text-slate-400">Get notified when someone mentions you.</p>
                   </div>
                 </div>
               </div>
@@ -264,9 +264,9 @@ export function SettingsScreen(): JSX.Element {
           </div>
 
           {/* Push notifications */}
-          <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
             <fieldset>
-              <legend class="text-base font-medium text-gray-900 dark:text-white">{t("settings.notif.push")}</legend>
+              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.notif.push")}</legend>
               <div class="mt-4 space-y-4">
                 <div class="flex items-start">
                   <div class="flex items-center h-5">
@@ -275,14 +275,14 @@ export function SettingsScreen(): JSX.Element {
                       name="push-notifications"
                       type="radio"
                       checked
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700"
+                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label for="push-everything" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-everything" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushAll")}
                     </label>
-                    <p class="text-gray-500 dark:text-gray-400">Receive all push notifications.</p>
+                    <p class="text-slate-500 dark:text-slate-400">Receive all push notifications.</p>
                   </div>
                 </div>
                 <div class="flex items-start">
@@ -291,14 +291,14 @@ export function SettingsScreen(): JSX.Element {
                       id="push-email"
                       name="push-notifications"
                       type="radio"
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700"
+                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label for="push-email" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-email" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushEmail")}
                     </label>
-                    <p class="text-gray-500 dark:text-gray-400">Only receive notifications via email.</p>
+                    <p class="text-slate-500 dark:text-slate-400">Only receive notifications via email.</p>
                   </div>
                 </div>
                 <div class="flex items-start">
@@ -307,14 +307,14 @@ export function SettingsScreen(): JSX.Element {
                       id="push-nothing"
                       name="push-notifications"
                       type="radio"
-                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700"
+                      class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                     />
                   </div>
                   <div class="ml-3 text-sm">
-                    <label for="push-nothing" class="font-medium text-gray-700 dark:text-gray-300">
+                    <label for="push-nothing" class="font-medium text-slate-700 dark:text-slate-300">
                       {t("settings.notif.pushNone")}
                     </label>
-                    <p class="text-gray-500 dark:text-gray-400">Do not receive push notifications.</p>
+                    <p class="text-slate-500 dark:text-slate-400">Do not receive push notifications.</p>
                   </div>
                 </div>
               </div>
@@ -326,8 +326,8 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "ai"}>
         <div class="space-y-6">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.tab.ai")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.ai.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.tab.ai")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.ai.subtitle")}</p>
           </div>
 
           <div class="mt-6">
@@ -343,13 +343,13 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "billing"}>
         <div class="space-y-6">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.billing.title")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.billing.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.billing.title")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.billing.subtitle")}</p>
           </div>
 
           <div class="mt-6">
             <fieldset>
-              <legend class="text-base font-medium text-gray-900 dark:text-white">{t("settings.billing.title")}</legend>
+              <legend class="text-base font-medium text-slate-900 dark:text-white">{t("settings.billing.title")}</legend>
               <div class="mt-4 space-y-4">
                 <SubscriptionSettings />
               </div>
@@ -361,8 +361,8 @@ export function SettingsScreen(): JSX.Element {
       <Show when={tab === "security"}>
         <div class="space-y-6">
           <div>
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">{t("settings.tab.security")}</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settings.security.subtitle")}</p>
+            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">{t("settings.tab.security")}</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("settings.security.subtitle")}</p>
           </div>
 
           <div class="mt-6">
@@ -376,17 +376,17 @@ export function SettingsScreen(): JSX.Element {
   return (
     <WorkspacePage title={t("settings.title")}>
       <div class="mx-auto w-full max-w-7xl">
-        <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">{t("settings.index.subtitle")}</p>
+        <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">{t("settings.index.subtitle")}</p>
 
         {/* Main Content */}
         <Motion.div
-          class="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl shadow-lg rounded-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden"
+          class="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-lg rounded-2xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
           {/* Tabs - Desktop */}
-          <div class="hidden sm:block bg-gray-50/70 dark:bg-gray-900/70 border-b border-gray-200/50 dark:border-gray-700/50">
+          <div class="hidden sm:block bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-700/50">
             <div class="px-4 sm:px-6 lg:px-8">
               <nav class="-mb-px flex justify-between w-full">
                 <For each={tabs}>
@@ -401,7 +401,7 @@ export function SettingsScreen(): JSX.Element {
                       classList={{
                         "border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-900/20":
                           activeTab() === tab.id,
-                        "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-100/30 dark:hover:bg-gray-700/20":
+                        "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 hover:bg-slate-100/30 dark:hover:bg-gray-700/20":
                           activeTab() !== tab.id
                       }}
                       aria-pressed={activeTab() === tab.id}
@@ -418,7 +418,7 @@ export function SettingsScreen(): JSX.Element {
           </div>
 
           {/* Tabs - Mobile */}
-          <div class="sm:hidden bg-gray-50/70 dark:bg-gray-900/70 border-b border-gray-200/50 dark:border-gray-700/50">
+          <div class="sm:hidden bg-slate-50/70 dark:bg-slate-900/70 border-b border-slate-200/50 dark:border-slate-700/50">
             <div class="px-1">
               <div class="flex justify-between w-full py-1">
                 <For each={tabs}>
@@ -432,7 +432,7 @@ export function SettingsScreen(): JSX.Element {
                       class="flex-1 flex flex-col items-center py-2 px-1 text-xs font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ease-out rounded-lg"
                       classList={{
                         "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20": activeTab() === tab.id,
-                        "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-700/30":
+                        "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-gray-700/30":
                           activeTab() !== tab.id
                       }}
                       aria-pressed={activeTab() === tab.id}

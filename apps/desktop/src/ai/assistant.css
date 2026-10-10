@@ -1,5 +1,5 @@
 .assistant-surface {
-  --assistant-bg: #fbfcfe;
+  --assistant-bg: #fff;
   --assistant-surface: #fff;
   --assistant-ink: #192b45;
   --assistant-muted: #617187;
@@ -8,7 +8,9 @@
   color: var(--assistant-ink);
   background: var(--assistant-bg);
   border: 1px solid var(--assistant-line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg, 8px);
+  overflow: hidden;
+  box-shadow: 0 18px 40px -16px rgba(15, 23, 42, 0.22), 0 2px 4px rgba(15, 23, 42, 0.04);
   font-optical-sizing: auto;
   min-width: 0;
   min-height: 0;
@@ -26,6 +28,7 @@
   background: radial-gradient(ellipse at 10% 0, #3c80dd80, transparent 65%), linear-gradient(115deg, #173c75, #142b50 75%);
   color: #fff;
   border-bottom: 1px solid #ffffff1f;
+  border-radius: var(--radius-lg, 8px) var(--radius-lg, 8px) 0 0;
 }
 .assistant-header > div:last-child { padding: 18px 18px 12px; gap: 14px; }
 .assistant-header h2 { font-size: 15px; letter-spacing: -.025em; }

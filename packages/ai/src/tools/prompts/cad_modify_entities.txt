@@ -9,7 +9,7 @@ Do not use it
 
 Parameters
 - changes: 1 or more {id, changes}. changes may hold any of: center {x,y,z?}, start, end, origin (rectangles: the corner), radius, startAngle, endAngle, width, height, depth, tube (torus), points, closed, name, color, layer; and any other field of the element in its own shape (the one cad_add_elements takes): x, y, z, rotation {x,y,z} in DEGREES, scale, wireframe, opacity, segments, radiusX, length, thickness, profile, path, operands, history... Only the fields you give change; an array or object field is replaced whole.
-- A parametric part: {"parameters": {"width": 80}} changes that named dimension and keeps its features (sent as `parameters`, not inside `history`). Send `history` only to change the features themselves.
+- For named dimensions of a parametric part, prefer cad_parametric inspect/update with expectedRevision. Here {"parameters":{"width":80}} also keeps the features; send history only to change features, as an object with the same schema cad_parametric validates.
 - The result is refused (nothing changes) when the change would leave an element the editor cannot draw, for example a parametric history that builds no solid; the error says why.
 - Millimetres, radians. radius, width, height, depth, tube must be > 0.
 

@@ -64,24 +64,24 @@ const imageKey = (userId: string): string => `user_profile_image_${userId}`
 const saveImageToLocalStorage = (file: File, userId: string): Promise<string> =>
   new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
-      reject(new Error("Il file non è un immagine valida"))
+      reject(new Error("The file is not a valid image"))
       return
     }
     const reader = new FileReader()
     reader.onload = (event) => {
       const result = event.target?.result
       if (typeof result !== "string") {
-        reject(new Error("Errore durante la lettura del file"))
+        reject(new Error("Failed to read the file"))
         return
       }
       try {
         window.localStorage.setItem(imageKey(userId), result)
         resolve(result)
       } catch {
-        reject(new Error("Impossibile salvare l'immagine. Prova con un'immagine più piccola."))
+        reject(new Error("Unable to save the image. Try a smaller image."))
       }
     }
-    reader.onerror = () => reject(new Error("Errore durante la lettura del file"))
+    reader.onerror = () => reject(new Error("Failed to read the file"))
     reader.readAsDataURL(file)
   })
 

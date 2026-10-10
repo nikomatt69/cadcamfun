@@ -27,7 +27,7 @@ import { ConversationDetail } from "../components/chat/conversation-detail.tsx"
 import { NewConversation } from "../components/chat/new-conversation.tsx"
 
 /** A chat panel: the shared glass card, filling its column. */
-const CHAT_PANEL = "min-w-0 overflow-hidden rounded-xl border border-white/40 bg-white/70 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
+const CHAT_PANEL = "ui-card ui-card-default min-w-0 overflow-hidden"
 
 export function LegacyChat(props: { readonly mode?: "conversation" | "new" | "group" }): JSX.Element {
   const params = useParams<{ id: string; conversationId?: string }>()

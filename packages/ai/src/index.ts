@@ -57,3 +57,5 @@ export * from "./vision.ts"
 export * from "./web-search.ts"
 export type { cadInspectInput } from "./tools/cad_inspect.ts"
 export type { cadComponentRelationsInput } from "./tools/cad_component_relations.ts"
+
+export * from "./project-memory.ts"

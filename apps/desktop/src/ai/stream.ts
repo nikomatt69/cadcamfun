@@ -12,7 +12,7 @@
  */
 import { Effect, Queue, Schema, Stream } from "effect"
 import type { Client, AppRuntime } from "../state/client.ts"
-import type { AiEvent, AiTodo, ProviderId, Tier } from "./types.ts"
+import type { AiEvent, AiTodo, AiQuestion, ProviderId, Tier } from "./types.ts"
 import type { ChatAttachment } from "./attachments.ts"
 import { AGENT_TOOL_IDS, TOOL_IDS, VCS_TOOL_IDS, type ToolId } from "./tools.ts"
 import { ToolInputSchemas } from "./tool-schemas.ts"
@@ -52,8 +52,12 @@ const AiEventSchema = Schema.fromJsonString(
   })
 )
 
+const viewportImages = (value: unknown): ReadonlyArray<string> => (Array.isArray(value) ? value : []).filter((url): url is string => typeof url === "string" && url.length <= 4_000_100 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(url)).slice(0, 2)
+
 const decodeEvent = (json: string): AiEvent => {
   const raw = JSON.parse(json) as Record<string, unknown>
+  const decodedAgent = decodeAgentEvent(raw)
+  if (decodedAgent) return decodedAgent
   const type = raw["type"]
   const sessionId = typeof raw["sessionId"] === "string" ? (raw["sessionId"] as string) : ""
   if (type === "delta") return { type: "delta", sessionId, text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "" }
@@ -70,7 +74,8 @@ const decodeEvent = (json: string): AiEvent => {
     callId: typeof raw["callId"] === "string" ? (raw["callId"] as string) : "",
     tool: typeof raw["tool"] === "string" ? (raw["tool"] as string) : "",
     ok: raw["ok"] === true,
-    output: typeof raw["output"] === "string" ? cap(raw["output"], MAX_OUTPUT_BYTES, "<truncated>") : ""
+    output: typeof raw["output"] === "string" ? cap(raw["output"], MAX_OUTPUT_BYTES, "<truncated>") : "",
+    ...(viewportImages(raw["images"]).length ? { images: viewportImages(raw["images"]) } : {})
   }
   if (type === "permission_request") return {
     type: "permission_request", sessionId,
@@ -116,7 +121,10 @@ export interface StreamInput {
   readonly projectId?: string
   readonly context?: string
   readonly attachments?: ReadonlyArray<ChatAttachment>
-  readonly model?: { readonly provider: ProviderId; readonly model: string; readonly tier?: Tier }
+  readonly model?: { readonly provider: ProviderId; readonly model: string; readonly tier?: Tier; readonly variant?: string }
+  readonly permissionMode?: "auto" | "ask" | "approve"
+  readonly agent?: string
+  readonly mode?: "general" | "cad" | "cam" | "gcode" | "toolpath"
 }
 
 export interface StreamHandle {
@@ -178,7 +186,9 @@ export const streamChatEffect = (
             ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
             ...(input.context !== undefined ? { context: input.context } : {}),
             ...(input.attachments !== undefined && input.attachments.length > 0 ? { attachments: input.attachments } : {}),
-            ...(input.model !== undefined ? { model: input.model } : {})
+            ...(input.model !== undefined ? { model: input.model } : {}),
+            ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
+            ...(input.agent !== undefined ? { agent: input.agent } : {}), ...(input.mode !== undefined ? { mode: input.mode } : {})
           } })
           const stream = await Effect.runPromise(http)
           const items = Stream.toAsyncIterable(stream)
@@ -227,6 +237,21 @@ const decodeAgentEvent = (raw: unknown): AiEvent | undefined => {
   const sessionId = typeof r["sessionId"] === "string" ? r["sessionId"] : ""
   const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0)
   switch (r["type"]) {
+    case "question_request": {
+      if (typeof r["requestId"] !== "string" || !Array.isArray(r["questions"])) return undefined
+      const questions = r["questions"].slice(0, 12).flatMap((value): AiQuestion[] => {
+        if (value === null || typeof value !== "object") return []
+        const q = value as Record<string, unknown>
+        if (typeof q["header"] !== "string" || typeof q["question"] !== "string" || !Array.isArray(q["options"])) return []
+        return [{ header: cap(q["header"], 100, ""), question: cap(q["question"], 4000, ""), options: q["options"].slice(0, 20).flatMap((value) => {
+          if (value === null || typeof value !== "object") return []
+          const option = value as Record<string, unknown>
+          return typeof option["label"] === "string" && typeof option["description"] === "string" ? [{ label: cap(option["label"], 100, ""), description: cap(option["description"], 2000, "") }] : []
+        }), ...(typeof q["multiple"] === "boolean" ? { multiple: q["multiple"] } : {}), ...(typeof q["custom"] === "boolean" ? { custom: q["custom"] } : {}) }]
+      })
+      return questions.length ? { type: "question_request", sessionId, requestId: r["requestId"], questions } : undefined
+    }
+    case "question_resolved": return typeof r["requestId"] === "string" ? { type: "question_resolved", sessionId, requestId: r["requestId"] } : undefined
     case "reasoning": return typeof r["text"] === "string" && r["text"] !== "" ? { type: "reasoning", sessionId, text: cap(r["text"], MAX_TEXT_BYTES, "<truncated>") } : undefined
     case "tool_progress": return { type: "tool_progress", sessionId, ...(typeof r["agent"] === "string" && r["agent"] !== "" ? { agent: r["agent"] } : {}), callId: String(r["callId"] ?? ""), tool: String(r["tool"] ?? ""), chars: num(r["chars"]) }
     case "step": {
@@ -288,12 +313,12 @@ const decodeEventSafely = (raw: unknown): Effect.Effect<AiEvent, AiStreamError> 
     catch: (e) => new AiStreamError({ message: e instanceof Error ? e.message : "Failed to parse AI event." })
   })
 
-const decodeEventFromUnknown = (raw: { type: string; sessionId: string; agent?: string; text?: string; callId?: string; tool?: string; input?: unknown; ok?: boolean; output?: string; requestId?: string; permission?: string; patterns?: ReadonlyArray<string>; code?: string; message?: string; usage?: { inputTokens: number; outputTokens: number } }): AiEvent => {
+const decodeEventFromUnknown = (raw: { type: string; sessionId: string; agent?: string; text?: string; callId?: string; tool?: string; input?: unknown; ok?: boolean; output?: string; images?: ReadonlyArray<string>; requestId?: string; permission?: string; patterns?: ReadonlyArray<string>; code?: string; message?: string; usage?: { inputTokens: number; outputTokens: number } }): AiEvent => {
   if (raw.type === "delta") return { type: "delta", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
   if (raw.type === "user_message") return { type: "user_message", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
   const agent = raw.agent !== undefined && raw.agent !== "" ? { agent: raw.agent } : {}
   if (raw.type === "tool_call") return { type: "tool_call", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", input: raw.input }
-  if (raw.type === "tool_result") return { type: "tool_result", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", ok: raw.ok === true, output: cap(raw.output ?? "", MAX_OUTPUT_BYTES, "<truncated>") }
+  if (raw.type === "tool_result") return { type: "tool_result", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", ok: raw.ok === true, output: cap(raw.output ?? "", MAX_OUTPUT_BYTES, "<truncated>"), ...(viewportImages(raw.images).length ? { images: viewportImages(raw.images) } : {}) }
   if (raw.type === "permission_request") return { type: "permission_request", sessionId: raw.sessionId, requestId: raw.requestId ?? "", permission: raw.permission ?? "", patterns: raw.patterns ?? [] }
   if (raw.type === "done") return {
     type: "done", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>"),
@@ -356,7 +381,7 @@ const rejectToolCall = (
  */
 /** Tools the host itself offers the agent (its skill loader, plan and goal): no schema of ours, never rejected. */
 export const HOST_TOOLS: ReadonlyArray<string> = [
-  "skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal", "code_mode",
+  "question", "search_tools", "invalid", "skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal", "code_mode",
   // Added by the sidecar beside the CAD/CAM tools: delegation, version control, workflows. The host validated their arguments.
   ...AGENT_TOOL_IDS, ...VCS_TOOL_IDS
 ]

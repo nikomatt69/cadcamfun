@@ -8,7 +8,9 @@ import { useLayerStore } from "../src/cad/store/layerStore.ts"
 /** Every type the assistant can create. The types that cannot be defaulted take the catalogue's own sample of the field they need. */
 const needs: Record<string, Record<string, unknown>> = {
   component: { elements: [{ type: "cube" }, { type: "cylinder", x: 80 }] }, group: { elements: [{ type: "sphere" }] },
-  parametric: { history: plateTemplate() }
+  parametric: { history: plateTemplate() },
+  // Imported meshes have no synthetic default: provide an actual closed tetrahedron.
+  mesh: { vertices: [{ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 }, { x: 0, y: 10, z: 0 }, { x: 0, y: 0, z: 10 }], faces: [[0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]] }
 }
 const made = (): Array<Record<string, unknown>> => ELEMENT_TYPES.filter((type) => !type.startsWith("boolean-")).flatMap((type) => {
   const spec = ELEMENT_SPECS[type] as { readonly defaults: Record<string, unknown>; readonly required?: ReadonlyArray<string> }

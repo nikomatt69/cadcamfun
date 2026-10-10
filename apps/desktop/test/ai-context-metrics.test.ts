@@ -35,6 +35,8 @@ describe("context metrics", () => {
     expect(usableWindow({ context: 200_000, output: 8_000 })).toBe(192_000)
     expect(usableWindow({ context: 200_000 })).toBe(168_000)
     expect(usableWindow({ context: 10_000 })).toBe(0)
+    expect(usableWindow({ context: 200_000, input: 128_000, output: 64_000 })).toBe(108_000)
+    expect(usableWindow({ context: 200_000, input: 128_000, output: 64_000, reserved: 10_000 })).toBe(118_000)
     // 170k of 200k is only 85%, but past the 168k a 32k answer leaves room for.
     expect(contextMetrics(170_000, { context: 200_000, output: 64_000 })).toMatchObject({ percent: 85, level: "full", compactAt: 168_000 })
     expect(contextMetrics(145_000, { context: 200_000, output: 64_000 }).level).toBe("warn")

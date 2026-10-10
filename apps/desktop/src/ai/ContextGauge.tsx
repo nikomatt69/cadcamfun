@@ -12,7 +12,12 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export function ContextGauge(): JSX.Element {
   const ai = useAiStore()
-  const metrics = createMemo(() => contextMetrics(ai.contextTokens(), contextWindowFor(ai.model(), ai.providers(), ai.models())))
+  const metrics = createMemo(() => {
+    const host = ai.hostContext()
+    const window = contextWindowFor(ai.model(), ai.providers(), ai.models())
+    const result = contextMetrics(ai.contextTokens(), window)
+    return host?.compactAt !== undefined && host.model === ai.model()?.model && host.provider === ai.model()?.provider ? { ...result, compactAt: host.compactAt, level: ai.contextTokens() >= host.compactAt ? "full" as const : result.level } : result
+  })
   const title = (): string => {
     const m = metrics()
     const parts = [t("ai.context.gauge.tokens", { tokens: m.tokens.toLocaleString() })]

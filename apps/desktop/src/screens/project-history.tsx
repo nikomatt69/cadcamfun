@@ -39,10 +39,10 @@ interface VcsStatus { readonly branch: string; readonly head: string | null; rea
 interface VcsBranches { readonly current: string; readonly branches: Readonly<Record<string, string>> }
 interface PullDetail { readonly pullRequest: Pull; readonly reviews: ReadonlyArray<Review>; readonly changes: ReadonlyArray<Change> }
 
-const BTN = "px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+const BTN = "px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm hover:bg-slate-50 dark:hover:bg-gray-700 disabled:opacity-50"
 const PRIMARY = "px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
-const CARD = "rounded-xl border border-white/40 bg-white/70 p-4 shadow-md backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-800/70"
-const INPUT = "w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 text-sm"
+const CARD = "ui-card ui-card-default !p-4"
+const INPUT = "w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-sm"
 const PILL = (state: string): string => `ml-2 rounded-full border px-2 py-0.5 text-xs ${state === "open" || state === "running" ? "text-blue-600" : state === "merged" || state === "success" || state === "approve" ? "text-green-600" : "text-red-600"}`
 
 const short = (oid: string): string => oid.slice(0, 7)
@@ -100,7 +100,7 @@ jobs:
 const STEP_MARK: Record<"success" | "failure" | "skipped", string> = {
   success: "text-green-600",
   failure: "text-red-600",
-  skipped: "text-gray-400",
+  skipped: "text-slate-400",
 }
 
 /**
@@ -111,13 +111,13 @@ const STEP_MARK: Record<"success" | "failure" | "skipped", string> = {
 function RunTimeline(props: { readonly run: Run }): JSX.Element {
   const events = () => props.run.events ?? []
   return (
-    <div class="mt-2 border-l-2 border-gray-200 pl-3 dark:border-gray-700">
-      <Show when={events().length > 0} fallback={<p class="text-xs text-gray-500">{t("vcs.actions.noEvents")}</p>}>
+    <div class="mt-2 border-l-2 border-slate-200 pl-3 dark:border-slate-700">
+      <Show when={events().length > 0} fallback={<p class="text-xs text-slate-500">{t("vcs.actions.noEvents")}</p>}>
         <ul class="space-y-1 text-xs">
           <For each={events()}>
             {(e) => (
               <li>
-                <Switch fallback={<span class="text-gray-500">{(e as { type: string }).type}</span>}>
+                <Switch fallback={<span class="text-slate-500">{(e as { type: string }).type}</span>}>
                   <Match when={e.type === "invalid"}>
                     <span class="text-red-600">{(e as { message: string }).message}</span>
                   </Match>
@@ -129,14 +129,14 @@ function RunTimeline(props: { readonly run: Run }): JSX.Element {
                       {(e as { uses: string }).uses}
                     </span>
                     <Show when={(e as { message?: string }).message}>
-                      <span class="text-gray-500"> — {(e as { message: string }).message}</span>
+                      <span class="text-slate-500"> — {(e as { message: string }).message}</span>
                     </Show>
                     <Show when={(e as { status: string }).status === "skipped"}>
-                      <span class="text-gray-400"> ({t("vcs.actions.skipped")})</span>
+                      <span class="text-slate-400"> ({t("vcs.actions.skipped")})</span>
                     </Show>
                   </Match>
                   <Match when={e.type === "job-end"}>
-                    <span class="text-gray-500">{(e as { job: string }).job} · {(e as { status: string }).status}</span>
+                    <span class="text-slate-500">{(e as { job: string }).job} · {(e as { status: string }).status}</span>
                   </Match>
                 </Switch>
               </li>
@@ -394,7 +394,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
               {(f) => (
                 <li>
                   <button
-                    class={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-left ${open() === f.name ? "bg-blue-50 dark:bg-blue-950" : "hover:bg-gray-50 dark:hover:bg-gray-800"}`}
+                    class={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-left ${open() === f.name ? "bg-blue-50 dark:bg-blue-950" : "hover:bg-slate-50 dark:hover:bg-gray-800"}`}
                     aria-expanded={open() === f.name}
                     onClick={() => select(f.name)}
                   >
@@ -406,7 +406,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
             </For>
           </ul>
         }>
-          <p class="text-sm text-gray-500">{t("vcs.workflows.empty")}</p>
+          <p class="text-sm text-slate-500">{t("vcs.workflows.empty")}</p>
         </Show>
 
         <div class="flex gap-2">
@@ -422,7 +422,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
               </Show>
               <Show
                 when={editing()}
-                fallback={<pre class="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-2 font-mono text-xs dark:bg-gray-900">{file().content}</pre>}
+                fallback={<pre class="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-2 font-mono text-xs dark:bg-slate-900">{file().content}</pre>}
               >
                 <textarea
                   class={`${INPUT} min-h-48 font-mono text-xs`}
@@ -430,7 +430,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
                   value={draft()}
                   onInput={(e) => setDraft(e.currentTarget.value)}
                 />
-                <p class="text-xs text-gray-500">{t("vcs.workflows.stepsHint")}</p>
+                <p class="text-xs text-slate-500">{t("vcs.workflows.stepsHint")}</p>
                 <div class="flex gap-2">
                   <input class={INPUT} placeholder={t("vcs.workflows.savePrompt")} value={commitMessage()} onInput={(e) => setCommitMessage(e.currentTarget.value)} />
                   <button class={PRIMARY} disabled={busy() || !commitMessage().trim()} onClick={save}>{t("vcs.workflows.save")}</button>
@@ -461,10 +461,10 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
       </Show>
       <Show when={notice()}><p role="status" class="text-green-600">{notice()}</p></Show>
 
-      <nav class="flex gap-2 border-b border-gray-200 dark:border-gray-700" role="tablist">
+      <nav class="flex gap-2 border-b border-slate-200 dark:border-slate-700" role="tablist">
         <For each={TABS}>
           {([key, label]) => (
-            <button role="tab" aria-selected={tab() === key} class={`px-3 py-2 text-sm ${tab() === key ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`} onClick={() => setTab(key)}>{t(label)}</button>
+            <button role="tab" aria-selected={tab() === key} class={`px-3 py-2 text-sm ${tab() === key ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-500"}`} onClick={() => setTab(key)}>{t(label)}</button>
           )}
         </For>
       </nav>
@@ -484,14 +484,14 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
         </Show>
         <section class="grid gap-4 md:grid-cols-2">
           <ul class={`${CARD} space-y-2`}>
-            <Show when={commits().length === 0}><li class="text-sm text-gray-500">{t("vcs.history.empty")}</li></Show>
+            <Show when={commits().length === 0}><li class="text-sm text-slate-500">{t("vcs.history.empty")}</li></Show>
             <For each={commits()}>
               {(c) => (
                 <li class="cursor-pointer text-sm" onClick={() => selectCommit(c)}>
                   <code>{short(c.oid)}</code> {c.message.split("\n")[0]}
                   <For each={labels().get(c.oid) ?? []}>{(b) => <span class="ml-2 rounded bg-blue-100 px-1 text-xs text-blue-700">{b}</span>}</For>
-                  <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-gray-500">{t("vcs.history.merge")}</span></Show>
-                  <div class="text-xs text-gray-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</div>
+                  <Show when={c.parents.length > 1}><span class="ml-2 text-xs text-slate-500">{t("vcs.history.merge")}</span></Show>
+                  <div class="text-xs text-slate-500">{c.author.name} · {new Date(c.author.time * 1000).toLocaleString()}</div>
                 </li>
               )}
             </For>
@@ -514,7 +514,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
             <For each={Object.entries(branches())}>
               {([name, oid]) => (
                 <li class="flex items-center justify-between text-sm">
-                  <span><strong>{name}</strong> <code class="text-gray-500">{short(oid)}</code><Show when={name === branch()}><span class={PILL("open")}>{t("vcs.branches.current")}</span></Show></span>
+                  <span><strong>{name}</strong> <code class="text-slate-500">{short(oid)}</code><Show when={name === branch()}><span class={PILL("open")}>{t("vcs.branches.current")}</span></Show></span>
                   <Show when={name !== branch()}><button class={BTN} onClick={() => checkout(name)}>{t("vcs.branches.checkout")}</button></Show>
                 </li>
               )}
@@ -533,7 +533,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
             <div class={`${CARD} space-y-3`}>
               <button class={BTN} onClick={() => setOpenPull(undefined)}>←</button>
               <h2 class="text-lg font-medium">#{(loadedPull()?.pullRequest ?? openPull()!.pull).number} {(loadedPull()?.pullRequest ?? openPull()!.pull).title}<span class={PILL((loadedPull()?.pullRequest ?? openPull()!.pull).state)}>{(loadedPull()?.pullRequest ?? openPull()!.pull).state}</span><Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show></h2>
-              <p class="text-sm text-gray-500">{(loadedPull()?.pullRequest ?? openPull()!.pull).head} → {(loadedPull()?.pullRequest ?? openPull()!.pull).base}</p>
+              <p class="text-sm text-slate-500">{(loadedPull()?.pullRequest ?? openPull()!.pull).head} → {(loadedPull()?.pullRequest ?? openPull()!.pull).base}</p>
               <Show when={(loadedPull()?.pullRequest ?? openPull()!.pull).body}><p class="text-sm">{(loadedPull()?.pullRequest ?? openPull()!.pull).body}</p></Show>
               <h3 class="font-medium">{t("vcs.pulls.files")}</h3>
               <ChangeList changes={loadedPull()?.changes ?? []} />
@@ -551,9 +551,9 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
             </div>
           }>
             <ul class={`${CARD} space-y-2`}>
-              <Show when={pulls().length === 0}><li class="text-sm text-gray-500">{t("vcs.pulls.empty")}</li></Show>
+              <Show when={pulls().length === 0}><li class="text-sm text-slate-500">{t("vcs.pulls.empty")}</li></Show>
               <For each={pulls()}>
-                {(p) => <li class="cursor-pointer text-sm" onClick={() => loadPull(p)}>#{p.number} {p.title}<span class={PILL(p.state)}>{p.state}</span><Show when={p.authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show><div class="text-xs text-gray-500">{p.head} → {p.base}</div></li>}
+                {(p) => <li class="cursor-pointer text-sm" onClick={() => loadPull(p)}>#{p.number} {p.title}<span class={PILL(p.state)}>{p.state}</span><Show when={p.authorKind === "ai"}><span class={PILL("open")}>{t("vcs.pulls.ai")}</span></Show><div class="text-xs text-slate-500">{p.head} → {p.base}</div></li>}
               </For>
             </ul>
             <div class={`${CARD} space-y-2`}>
@@ -574,7 +574,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
           <button class={PRIMARY} disabled={busy()} onClick={dispatch}>{t("vcs.actions.run")}</button>
           <WorkflowEditor />
           <ul class="space-y-2 text-sm">
-            <Show when={runs().length === 0}><li class="text-gray-500">{t("vcs.actions.empty")}</li></Show>
+            <Show when={runs().length === 0}><li class="text-slate-500">{t("vcs.actions.empty")}</li></Show>
             <For each={runs()}>
               {(r) => (
                 <li>
@@ -584,7 +584,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
                     onClick={() => setOpenRun(openRun() === r.id ? undefined : r.id)}
                   >
                     <span>{r.workflow}<span class={PILL(r.status)}>{r.status}</span></span>
-                    <span class="text-xs text-gray-500">{r.event} · <code>{short(r.sha)}</code> · {new Date(r.startedAt).toLocaleString()}</span>
+                    <span class="text-xs text-slate-500">{r.event} · <code>{short(r.sha)}</code> · {new Date(r.startedAt).toLocaleString()}</span>
                   </button>
                   <Show when={openRun() === r.id}><RunTimeline run={r} /></Show>
                 </li>
@@ -598,7 +598,7 @@ const runsQ = useQuery<ReadonlyArray<Run>>(
         <section class={`${CARD} space-y-3`}>
           <label class="block text-sm">{t("vcs.github.remote")}<input class={`${INPUT} mt-1`} placeholder="owner/repo" value={remote()} onInput={(e) => setRemote(e.currentTarget.value)} /></label>
           <label class="block text-sm">{t("vcs.github.token")}<input type="password" autocomplete="off" class={`${INPUT} mt-1`} value={token()} onInput={(e) => setToken(e.currentTarget.value)} /></label>
-          <p class="text-xs text-gray-500">{t("vcs.github.tokenHint")}</p>
+          <p class="text-xs text-slate-500">{t("vcs.github.tokenHint")}</p>
           <div class="flex gap-2">
             <button class={BTN} disabled={busy()} onClick={saveRemote}>{t("vcs.github.save")}</button>
             <button class={PRIMARY} disabled={busy() || !remote().trim() || !token().trim()} onClick={() => sync("push")}>{t("vcs.github.push")}</button>

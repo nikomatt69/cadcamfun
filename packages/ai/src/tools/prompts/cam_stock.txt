@@ -7,3 +7,6 @@ Parameters
 
 Result
 inspect returns configured stock, origin conventions and volume in mm³ or an explicit missing-stock result. set updates the drawing stock, preserves all finished elements, invalidates G-code/verification of affected operations and mirrors dimensions and placement into the UI. Re-generate and run cam_verify_toolpath before claiming a program is valid. The verifier returns stockVolume, removedVolume and remainingVolume at its actual resolution; holders, fixtures and target must be provided for their checks. A cylindrical hint is not a cylindrical-stock simulation (the verifier uses a box heightfield).
+
+Missing-stock recovery
+A missing stock result from inspect is a prerequisite, not a broken tool. Read the actual part extents, material and setup. If the user authorised choosing the setup, use action set with explicit dimensions, placement and stated allowance, then inspect again. Otherwise use question to obtain the missing stock dimensions. Never repeat inspect unchanged or invent quantitative removal from absent stock.

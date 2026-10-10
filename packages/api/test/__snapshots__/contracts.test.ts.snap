@@ -1400,6 +1400,83 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/ai/agents": {
+      "get": {
+        "operationId": "ai.agents",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                      },
+                      "edits": {
+                        "type": "boolean",
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "title": {
+                        "type": "string",
+                      },
+                      "tools": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "description",
+                      "tools",
+                      "edits",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/analyze-gcode": {
       "post": {
         "operationId": "ai.analyzeGcode",
@@ -2072,6 +2149,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "agent": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "attachments": {
                     "anyOf": [
                       {
@@ -2142,6 +2229,23 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                     ],
                   },
+                  "mode": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "general",
+                          "cad",
+                          "cam",
+                          "gcode",
+                          "toolpath",
+                        ],
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "model": {
                     "anyOf": [
                       {
@@ -2182,8 +2286,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               },
                             ],
                           },
+                          "variant": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
                         },
                         "type": "object",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "permissionMode": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "auto",
+                          "ask",
+                          "approve",
+                        ],
+                        "type": "string",
                       },
                       {
                         "type": "null",
@@ -2578,6 +2707,32 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "type": "object",
                     },
+                    "tools": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "description",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "providers",
@@ -2670,6 +2825,32 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "string",
                       },
                       "type": "object",
+                    },
+                    "tools": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "description",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
                     },
                   },
                   "required": [
@@ -2797,6 +2978,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "balanced",
                                   "best",
                                 ],
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "variant": {
+                            "anyOf": [
+                              {
                                 "type": "string",
                               },
                               {
@@ -3003,6 +3194,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "balanced",
                                   "best",
                                 ],
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "variant": {
+                            "anyOf": [
+                              {
                                 "type": "string",
                               },
                               {
@@ -3481,6 +3682,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               },
                             ],
                           },
+                          "variant": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
                         },
                         "type": "object",
                       },
@@ -3716,6 +3927,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                               },
                             ],
                           },
+                          "variant": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
                         },
                         "type": "object",
                       },
@@ -3899,7 +4120,27 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
     "/api/ai/models": {
       "get": {
         "operationId": "ai.models",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "configuredOnly",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "true",
+                    "false",
+                  ],
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4018,6 +4259,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "reject",
                     ],
                     "type": "string",
+                  },
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
                   },
                   "requestId": {
                     "type": "string",
@@ -4268,6 +4519,28 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "id": {
                               "type": "string",
                             },
+                            "inputWindow": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
                             "maxOutput": {
                               "anyOf": [
                                 {
@@ -4289,8 +4562,31 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "provider": {
                               "type": "string",
                             },
+                            "reasoning": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
+                            },
                             "tools": {
                               "type": "boolean",
+                            },
+                            "variants": {
+                              "anyOf": [
+                                {
+                                  "items": {
+                                    "type": "string",
+                                  },
+                                  "type": "array",
+                                },
+                                {
+                                  "type": "null",
+                                },
+                              ],
                             },
                             "vision": {
                               "type": "boolean",
@@ -4571,6 +4867,707 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/sessions/control": {
+      "post": {
+        "operationId": "ai.sessionControl",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "status",
+                      "compact",
+                      "cancel_task",
+                      "answer_question",
+                      "reject_question",
+                      "reply_permission",
+                      "consolidate_memory",
+                    ],
+                    "type": "string",
+                  },
+                  "answers": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "items": {
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "type": "array",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "decision": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "once",
+                          "always",
+                          "reject",
+                        ],
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "model": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "provider": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "tier": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "fast",
+                                  "balanced",
+                                  "best",
+                                ],
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "variant": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                        },
+                        "type": "object",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "requestId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "sessionId": {
+                    "type": "string",
+                  },
+                  "taskId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                },
+                "required": [
+                  "sessionId",
+                  "action",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "busy": {
+                      "type": "boolean",
+                    },
+                    "context": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "auto": {
+                          "type": "boolean",
+                        },
+                        "compactAt": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "compacted": {
+                          "type": "boolean",
+                        },
+                        "contextWindow": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "inputWindow": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "maxOutput": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "memory": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean",
+                                },
+                                "hoursSinceLastBrain": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "lastBrainAt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "memoryEnabled": {
+                                  "type": "boolean",
+                                },
+                                "minHours": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "minSessions": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "sessionsSinceLastBrain": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "shouldTrigger": {
+                                  "type": "boolean",
+                                },
+                              },
+                              "required": [
+                                "enabled",
+                                "memoryEnabled",
+                                "minHours",
+                                "minSessions",
+                                "lastBrainAt",
+                                "hoursSinceLastBrain",
+                                "sessionsSinceLastBrain",
+                                "shouldTrigger",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "model": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "provider": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "prune": {
+                          "type": "boolean",
+                        },
+                        "requestOutput": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "reserved": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "source": {
+                          "enum": [
+                            "host-config",
+                          ],
+                          "type": "string",
+                        },
+                        "tokens": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "source",
+                        "auto",
+                        "prune",
+                        "compacted",
+                      ],
+                      "type": "object",
+                    },
+                    "permissions": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "patterns": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "permission": {
+                                "type": "string",
+                              },
+                              "requestId": {
+                                "type": "string",
+                              },
+                              "sessionId": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "requestId",
+                              "sessionId",
+                              "permission",
+                              "patterns",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "questions": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "questions": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "custom": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "header": {
+                                  "type": "string",
+                                },
+                                "multiple": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean",
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "options": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "description": {
+                                        "type": "string",
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "label",
+                                      "description",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                                "question": {
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "header",
+                                "question",
+                                "options",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "requestId": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "requestId",
+                          "questions",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "tasks": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "agent": {
+                            "type": "string",
+                          },
+                          "background": {
+                            "type": "boolean",
+                          },
+                          "description": {
+                            "type": "string",
+                          },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "status": {
+                            "enum": [
+                              "queued",
+                              "running",
+                              "completed",
+                              "error",
+                              "cancelled",
+                            ],
+                            "type": "string",
+                          },
+                          "text": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "agent",
+                          "description",
+                          "status",
+                          "background",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "text": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "busy",
+                    "text",
+                    "tasks",
+                    "questions",
+                    "context",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
           },
           "401": {
             "content": {
@@ -5279,6 +6276,32 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       },
                       "type": "object",
                     },
+                    "tools": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "description",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "providers",
@@ -5375,6 +6398,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                   "balanced",
                                   "best",
                                 ],
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "variant": {
+                            "anyOf": [
+                              {
                                 "type": "string",
                               },
                               {
@@ -36541,6 +37574,291 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "type": "object",
                   },
                   "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "vcs",
+        ],
+      },
+    },
+    "/api/projects/{id}/actions/workflows": {
+      "get": {
+        "operationId": "vcs.listWorkflows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "content": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "path": {
+                        "type": "string",
+                      },
+                      "problem": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                    },
+                    "required": [
+                      "name",
+                      "path",
+                      "content",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictEncoded",
+                },
+              },
+            },
+            "description": "Conflict",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "vcs",
+        ],
+      },
+    },
+    "/api/projects/{id}/actions/workflows/{name}": {
+      "get": {
+        "operationId": "vcs.workflow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "query",
+            "name": "ref",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "path": {
+                      "type": "string",
+                    },
+                    "problem": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "name",
+                    "path",
+                    "content",
+                  ],
+                  "type": "object",
                 },
               },
             },

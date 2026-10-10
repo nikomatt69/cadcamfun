@@ -30,11 +30,21 @@ describe("specialist roster", () => {
       expect(agent.mode).toBe("subagent")
       expect(agent.permission["*"]).toBe("deny")
       const allowed = Object.keys(agent.permission).filter((k) => agent.permission[k] === "allow" && k !== "skill" && k !== "code_mode").sort()
-      expect(allowed).toEqual([...SUBAGENTS[id].tools].sort())
+      expect(allowed).toEqual([...SUBAGENTS[id].tools, "invalid", "search_tools", "question"].sort())
       expect(agent.permission["task"]).toBeUndefined()
     }
     expect(config.agent["cadcam-editor"]!.permission["cam_generate_gcode"]).toBeUndefined()
     expect(config.agent["cadcam"]!.permission["task"]).toBe("deny")
+  })
+
+  test("permission modes use native evaluation and preserve role denials", () => {
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission_mode?: string; permission: Record<string, string> }> }
+    expect(config.agent["cadcam-auto"]?.permission_mode).toBe("auto")
+    expect(config.agent["cadcam-ask"]?.permission_mode).toBe("default")
+    expect(config.agent["cadcam-ask"]?.permission["cad_parametric"]).toBe("ask")
+    expect(config.agent["cadcam"]?.permission["cad_parametric"]).toBe("allow")
+    expect(config.agent["cadcam-modeler-auto"]?.permission["cam_create_operation"]).toBeUndefined()
+    expect(config.agent["cadcam-modeler-auto"]?.permission["*"]).toBe("deny")
   })
 
   test("a tool the project did not register is left out of the specialist's permissions", () => {

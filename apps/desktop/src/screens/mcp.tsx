@@ -101,7 +101,7 @@ export function McpSettingsScreen(): JSX.Element {
         </Show>
 
         <Show when={showAddForm()}>
-          <div class="mb-8 rounded-lg border bg-gray-50 p-4">
+          <div class="mb-8 rounded-lg border bg-slate-50 p-4">
             <h2 class="mb-4 text-xl font-semibold">{t("mcp.settings.addNew")}</h2>
             <McpServerForm
               onSubmit={addServer}
@@ -117,18 +117,18 @@ export function McpSettingsScreen(): JSX.Element {
             <div class="grid gap-6 md:grid-cols-1">
               <For each={servers()}>{(server) =>
                 <div class="overflow-hidden rounded-lg border shadow-sm">
-                  <div class={`p-4 ${server.enabled ? "bg-green-50" : "bg-gray-50"}`}>
+                  <div class={`p-4 ${server.enabled ? "bg-green-50" : "bg-slate-50"}`}>
                     <div class="flex items-center justify-between">
                       <h2 class="text-xl font-semibold">{server.name}</h2>
                       <div class="flex items-center">
                         <div class={`mr-2 h-3 w-3 rounded-full ${server.enabled ? "bg-green-500" : "bg-gray-400"}`} />
-                        <span class="text-sm text-gray-600">
+                        <span class="text-sm text-slate-600">
                           {server.enabled ? t("mcp.settings.enabled") : t("mcp.settings.disabled")}
                         </span>
                       </div>
                     </div>
 
-                    <div class="mt-2 text-sm text-gray-600">
+                    <div class="mt-2 text-sm text-slate-600">
                       <div class="mb-1">
                         <span class="font-medium">{t("mcp.settings.type")}</span>{" "}
                         {server.type === "sse" ? t("mcp.type.sse") : t("mcp.type.stdio")}
@@ -137,7 +137,7 @@ export function McpSettingsScreen(): JSX.Element {
                       <Show when={server.type === "sse"}>
                         <div class="mb-1">
                           <span class="font-medium">{t("mcp.settings.url")}</span>{" "}
-                          <span class="rounded bg-gray-100 px-1 font-mono text-xs">{server.url}</span>
+                          <span class="rounded bg-slate-100 px-1 font-mono text-xs">{server.url}</span>
                         </div>
                       </Show>
 
@@ -145,13 +145,13 @@ export function McpSettingsScreen(): JSX.Element {
                         <>
                           <div class="mb-1">
                             <span class="font-medium">{t("mcp.settings.command")}</span>{" "}
-                            <span class="rounded bg-gray-100 px-1 font-mono text-xs">{server.command}</span>
+                            <span class="rounded bg-slate-100 px-1 font-mono text-xs">{server.command}</span>
                           </div>
 
                           <Show when={Array.isArray(server.args) && server.args.length > 0}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.args")}</span>{" "}
-                              <span class="rounded bg-gray-100 px-1 font-mono text-xs">
+                              <span class="rounded bg-slate-100 px-1 font-mono text-xs">
                                 {(server.args as string[]).join(" ")}
                               </span>
                             </div>
@@ -160,14 +160,14 @@ export function McpSettingsScreen(): JSX.Element {
                           <Show when={server.workingDirectory !== undefined && server.workingDirectory !== null && server.workingDirectory !== ""}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.workingDirectory")}</span>{" "}
-                              <span class="rounded bg-gray-100 px-1 font-mono text-xs">{server.workingDirectory}</span>
+                              <span class="rounded bg-slate-100 px-1 font-mono text-xs">{server.workingDirectory}</span>
                             </div>
                           </Show>
 
                           <Show when={server.defaultWorkingDirectory !== undefined && server.defaultWorkingDirectory !== null && server.defaultWorkingDirectory !== ""}>
                             <div class="mb-1">
                               <span class="font-medium">{t("mcp.settings.defaultWorkingDirectory")}</span>{" "}
-                              <span class="rounded bg-gray-100 px-1 font-mono text-xs">{server.defaultWorkingDirectory}</span>
+                              <span class="rounded bg-slate-100 px-1 font-mono text-xs">{server.defaultWorkingDirectory}</span>
                             </div>
                           </Show>
                         </>
@@ -176,11 +176,11 @@ export function McpSettingsScreen(): JSX.Element {
                   </div>
 
                   {/* flex-wrap: Enable/Disable + Delete + Edit stay fully visible in narrow cards. */}
-                  <div class="flex flex-wrap items-center justify-between gap-2 border-t bg-gray-50 p-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-t bg-slate-50 p-3">
                     <div class="flex flex-wrap gap-2">
                       <button
                         class={`rounded px-3 py-1 text-sm ${server.enabled
-                          ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                          ? "bg-slate-200 text-slate-800 hover:bg-gray-300"
                           : "bg-green-100 text-green-800 hover:bg-green-200"}`}
                         onClick={() => void toggleStatus(server, !server.enabled)}
                       >
@@ -206,7 +206,7 @@ export function McpSettingsScreen(): JSX.Element {
             </div>
           }
         >
-          <div class="rounded bg-gray-100 p-8 text-center">
+          <div class="rounded bg-slate-100 p-8 text-center">
             <p class="mb-4">{t("mcp.settings.empty")}</p>
             <Show when={!showAddForm()}>
               <button
@@ -283,11 +283,11 @@ export function McpConfigEditorScreen(): JSX.Element {
       </Show>
 
       <div class="mb-4">
-        <p class="mb-2 text-gray-600">{t("mcp.editor.intro")}</p>
+        <p class="mb-2 text-slate-600">{t("mcp.editor.intro")}</p>
 
         <div class="mb-2 flex space-x-2">
           <button
-            class="rounded bg-gray-500 px-3 py-1 text-sm text-white hover:bg-gray-600"
+            class="rounded bg-slate-500 px-3 py-1 text-sm text-white hover:bg-gray-600"
             onClick={formatJson}
           >
             {t("mcp.editor.format")}
@@ -319,7 +319,7 @@ export function McpConfigEditorScreen(): JSX.Element {
         <div class="p-8 text-center">{t("mcp.editor.loading")}</div>
       </Show>
 
-      <div class="mt-4 text-sm text-gray-600">
+      <div class="mt-4 text-sm text-slate-600">
         <h2 class="mb-1 font-semibold">{t("mcp.editor.infoTitle")}</h2>
         <p class="mb-2">
           {t("mcp.editor.infoIntro")}
@@ -383,7 +383,7 @@ export function McpEditServerScreen(): JSX.Element {
               </div>
               <div class="mt-4">
                 <A href="/settings/mcp">
-                  <button class="rounded bg-gray-300 px-4 py-2 font-bold text-gray-800 hover:bg-gray-400">
+                  <button class="rounded bg-gray-300 px-4 py-2 font-bold text-slate-800 hover:bg-gray-400">
                     {t("mcp.edit.backToSettings")}
                   </button>
                 </A>
@@ -395,7 +395,7 @@ export function McpEditServerScreen(): JSX.Element {
             <McpErrorBanner message={error() ?? ""} onDismiss={() => setError(undefined)} />
           </Show>
 
-          <div class="rounded-lg border bg-gray-50 p-4">
+          <div class="rounded-lg border bg-slate-50 p-4">
             <McpServerForm
               initialValues={read.data()}
               onSubmit={updateServer}

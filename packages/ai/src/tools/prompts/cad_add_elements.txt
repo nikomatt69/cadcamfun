@@ -9,13 +9,14 @@ Use it
 Do not use it
 - For a flat 2D sketch the user asked for ("draw a circle", a profile to machine): cad_add_entities.
 - To change an existing element: cad_modify_entities with its id.
+- Prefer cad_parametric validate/create for a dimension-driven history; it includes an exact sketch example. Both tools enforce the SAME history schema.
 
 Write the call as plain JSON: "elements" is an array of flat objects, numbers are numbers (5, not "5"), lists are arrays (never {"item": ...} or {"$text": ...}), and "type" and every field sit INSIDE the element object. For an assembly give each solid a "component" and a "layer" instead of nesting objects.
 
 Parameters
 - elements: 1 to 40 objects per call (a bigger model is several calls, each part of it logical: body, then wheels, then details; a very long call is cut off by the model's own output limit and fails), each {"type": <one of the types below>, ...fields}. Fields you leave out take the defaults of the editor's tool panel; fields you give must have the right JSON type (number, string, array).
 - Common to every type: tolerance, x, y, z (position in mm; the centre of a solid, the origin of a profile), name, color ("#rrggbb"), rotation {x,y,z} in DEGREES (the editor's own unit; arc and revolution angles stay in radians), wireframe (the base pieces - cube, sphere, cylinder, cone, torus, pyramid, prism, hemisphere, ellipsoid, capsule - are created as WIREFRAME unless you say wireframe false, so the structure of what you build reads through; give wireframe false on a finished solid whose surfaces the user should see; booleans, extrusions, revolutions and mechanical parts are solid by default), layer (a layer name; it is created if it does not exist), component (a part name: every element of the call that gives the same component becomes one component, so a wheel of a cylinder and a hub is two elements with component "Wheel", no nesting needed).
-- Each element is judged on its own: the valid ones are added, the invalid ones are listed under "skipped" ({index, error}) and are NOT in the drawing. Resend only those, corrected; never resend the ones that were added. A boolean whose operand was skipped is skipped too. If every element is invalid, "ok" is false and "problems" lists them all.
+- Valid elements are added; invalid ones appear under skipped [{index,error}]. Retry only skipped ones. Booleans with skipped operands are skipped too. If none is valid, ok:false and problems lists the errors.
 - operands (booleans): ids of existing elements, or the index (0-based) of an earlier element of the SAME call.
 
 Precision (microns)
@@ -39,6 +40,10 @@ Result (JSON)
 Examples
 - A block with a hole: [{"type":"cube","width":60,"height":40,"depth":20},{"type":"cylinder","radius":6,"height":30},{"type":"boolean-subtract","operands":[0,1]}]
 - A bottle: [{"type":"revolution","name":"Bottle","profile":[{"x":0,"y":0},{"x":30,"y":0},{"x":30,"y":150},{"x":10,"y":200},{"x":10,"y":260}]}]
+
+On failure
+- Repair the named field and retry: a history must be an object, never JSON encoded as a string. Sketch entities require kind: point|line|circle|arc; features and constraints require type. Do not switch tools to bypass validation.
+- With partial success, read back the added ids and resend only skipped elements. Rebuild Boolean references for the new batch; numeric operands cannot refer to indexes from a previous call.
 
 After it
 - Check with cad_describe_drawing; report ids and positions rather than prose.

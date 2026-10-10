@@ -30,7 +30,7 @@ export default function MaterialCostForm(props: MaterialCostFormProps): JSX.Elem
   const isLoadingMaterials = (): boolean => materials.loading()
   const materialError = (): string | null => {
     const error = materials.error()
-    return error ? `Errore caricamento materiali: ${error}` : null
+    return error ? `Failed to load materials: ${error}` : null
   }
 
   const resetForm = (): void => {

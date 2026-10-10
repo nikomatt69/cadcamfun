@@ -69,6 +69,9 @@ export function AgentActivity(): JSX.Element {
                       <span class="min-w-0 flex-1 truncate" title={task.description}>{task.description}</span>
                       <span class="text-[10px] text-gray-500">{t(`ai.tasks.status.${task.status}` as never)} · {task.background ? t("ai.tasks.background") : t("ai.tasks.inTurn")}</span>
                     </summary>
+                    <Show when={task.status === "queued" || task.status === "running"}>
+                      <button type="button" class="mt-1 rounded border px-2 py-1" disabled={ai.controlBusy()} onClick={() => void ai.cancelTask(task.id)}>{t("ai.controls.cancelTask")}</button>
+                    </Show>
                     <Show when={task.text ?? task.error}>
                       {(report) => <pre class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-1.5 text-[10px] dark:bg-gray-800" data-testid="ai-task-report">{report()}</pre>}
                     </Show>

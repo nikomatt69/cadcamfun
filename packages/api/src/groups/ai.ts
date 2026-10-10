@@ -10,7 +10,7 @@ const nullable = Schema.NullOr(Schema.String)
  */
 export const AiProviderId = Schema.String
 export const AiTier = Schema.Literals(["fast", "balanced", "best"])
-export const AiModelSelector = Schema.Struct({ provider: opt(AiProviderId), model: opt(Schema.String), tier: opt(AiTier) })
+export const AiModelSelector = Schema.Struct({ provider: opt(AiProviderId), model: opt(Schema.String), tier: opt(AiTier), variant: opt(Schema.String) })
 
 /** `{ error }` bodies used by the legacy chat routes. */
 export class AiBadRequest extends Schema.TaggedError<AiBadRequest>()("AiBadRequest", { error: Schema.String }, { httpApiStatus: 400 }) {}
@@ -44,6 +44,7 @@ export const AiHostModel = Schema.Struct({
   provider: Schema.String,
   contextWindow: Schema.Number,
   maxOutput: Schema.Number,
+  inputWindow: opt(Schema.Number), reasoning: opt(Schema.Boolean), variants: opt(Schema.Array(Schema.String)),
   tools: Schema.Boolean,
   vision: Schema.Boolean,
   /** USD per million tokens. */
@@ -72,12 +73,14 @@ export const ChatAttachment = Schema.Struct({
   name: Schema.String, mime: opt(Schema.String), data: Schema.String, encoding: opt(Schema.Literals(["base64", "text"]))
 })
 export const StreamChatBody = Schema.Struct({
+  permissionMode: opt(Schema.Literals(["auto", "ask", "approve"])),
+  agent: opt(Schema.String), mode: opt(Schema.Literals(["general", "cad", "cam", "gcode", "toolpath"])),
   attachments: opt(Schema.Array(ChatAttachment)),
   message: opt(Schema.String), sessionId: opt(Schema.String), projectId: opt(Schema.String),
   context: opt(Schema.String), model: opt(AiModelSelector)
 })
 export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String) })
-export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]) })
+export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String), requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]) })
 
 export const CompletionBody = Schema.Struct({
   prompt: opt(Schema.String), systemPrompt: opt(Schema.String), model: opt(Schema.String), temperature: opt(Schema.Number)
@@ -167,12 +170,23 @@ export const SessionTask = Schema.Struct({
 })
 export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String), tasks: opt(Schema.Array(SessionTask)) })
 export const RemoveSessionReply = Schema.Struct({ removed: Schema.Boolean })
+export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, tools: Schema.Array(Schema.String), edits: Schema.Boolean })
+export const QuestionInfo = Schema.Struct({ header: Schema.String, question: Schema.String, options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })), multiple: opt(Schema.Boolean), custom: opt(Schema.Boolean) })
+export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questions: Schema.Array(QuestionInfo) })
+export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),
+  action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory"]),
+  taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
+export const SessionControlReply = Schema.Struct({ permissions: opt(Schema.Array(Schema.Struct({ requestId: Schema.String, sessionId: Schema.String, permission: Schema.String, patterns: Schema.Array(Schema.String) }))), busy: Schema.Boolean, text: Schema.String, tasks: Schema.Array(SessionTask), questions: Schema.Array(PendingQuestion),
+  context: Schema.Struct({ memory: Schema.optional(Schema.Struct({ enabled: Schema.Boolean, memoryEnabled: Schema.Boolean, minHours: Schema.Number, minSessions: Schema.Number, lastBrainAt: Schema.Number, hoursSinceLastBrain: Schema.Number, sessionsSinceLastBrain: Schema.Number, shouldTrigger: Schema.Boolean })), source: Schema.Literal("host-config"), auto: Schema.Boolean, prune: Schema.Boolean, reserved: opt(Schema.Number),
+    provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean }) })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Unknown
 
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(
+    HttpApiEndpoint.get("agents", "/api/ai/agents", { success: Schema.Array(AssistantAgent), error: [InternalError] }),
+    HttpApiEndpoint.post("sessionControl", "/api/ai/sessions/control", { payload: SessionControlBody, success: SessionControlReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("removeSession", "/api/ai/sessions/remove", { payload: RemoveSessionBody, success: RemoveSessionReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("skills", "/api/ai/skills", { success: SkillList, error: [InternalError] }),

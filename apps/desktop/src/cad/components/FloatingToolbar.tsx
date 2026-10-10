@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { ChevronDown, ChevronUp, Copy, Maximize2, Move, RotateCcw, Sliders, Trash2, X } from "lucide-solid"
 import { useCADStore } from "../store/cadStore.ts"
@@ -6,6 +6,7 @@ import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useTransformControlsStore } from "../store/transformControlsStore.ts"
 import ToolPanel from "./ToolPanel.tsx"
+import { t } from "../../i18n/index.ts"
 
 interface Position { x: number; y: number }
 
@@ -32,9 +33,10 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
   const [position, setPosition] = createSignal<Position>(props.initialPosition ?? { x: 100, y: 100 })
   const [expanded, setExpanded] = createSignal(true)
   const [dragging, setDragging] = createSignal(false)
-  const [windowSize, setWindowSize] = createSignal({ width: window.innerWidth, height: window.innerHeight })
   let toolbar: HTMLDivElement | undefined
   let grab: Position = { x: 0, y: 0 }
+  let dragOrigin: Position = { x: 0, y: 0 }
+  let pointerId: number | undefined
 
   /**
    * The window floats *inside* the surface it belongs to (the canvas), not over the
@@ -51,44 +53,67 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
   })
   const noSelection = () => !elements.selectedElement
 
-  /** Clamps to the host's box; before layout (or headless) the point is kept as given. */
+  /** Use layout dimensions so animated ancestor transforms cannot move the window outside its host. */
   const constrain = (point: Position): Position => {
-    const rect = toolbar?.getBoundingClientRect()
-    const box = host()?.getBoundingClientRect()
-    const width = rect?.width ?? 300
-    const height = rect?.height ?? 100
-    if (!box || box.width === 0 || box.height === 0) return point
+    const parent = host()
+    if (!parent || parent.clientWidth === 0 || parent.clientHeight === 0) return point
     return {
-      x: Math.min(Math.max(0, point.x), Math.max(0, box.width - width)),
-      y: Math.min(Math.max(0, point.y), Math.max(0, box.height - height))
+      x: Math.min(Math.max(0, point.x), Math.max(0, parent.clientWidth - (toolbar?.offsetWidth ?? 340))),
+      y: Math.min(Math.max(0, point.y), Math.max(0, parent.clientHeight - (toolbar?.offsetHeight ?? 100)))
     }
   }
-
-  const move = (event: MouseEvent) => {
-    if (!dragging()) return
-    const box = host()?.getBoundingClientRect()
-    setPosition(constrain({ x: event.clientX - grab.x - (box?.left ?? 0), y: event.clientY - grab.y - (box?.top ?? 0) }))
+  const clamp = () => setPosition(previous => {
+    const next = constrain(previous)
+    return next.x === previous.x && next.y === previous.y ? previous : next
+  })
+  const move = (event: PointerEvent) => {
+    if (!dragging() || event.pointerId !== pointerId) return
+    event.stopPropagation()
+    const parent = host()
+    const box = parent?.getBoundingClientRect()
+    const scaleX = parent && box?.width ? box.width / parent.clientWidth : 1
+    const scaleY = parent && box?.height ? box.height / parent.clientHeight : 1
+    setPosition(constrain({ x: dragOrigin.x + (event.clientX - grab.x) / scaleX, y: dragOrigin.y + (event.clientY - grab.y) / scaleY }))
   }
-  const stop = () => setDragging(false)
-  const start = (event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest("button")) return
-    const rect = toolbar?.getBoundingClientRect()
-    grab = { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) }
+  const stop = (event: PointerEvent) => {
+    if (event.pointerId !== pointerId) return
+    event.stopPropagation()
+    const header = event.currentTarget as HTMLElement
+    if (header.hasPointerCapture?.(event.pointerId)) header.releasePointerCapture(event.pointerId)
+    pointerId = undefined
+    setDragging(false)
+  }
+  const start = (event: PointerEvent) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return
+    event.preventDefault()
+    event.stopPropagation()
+    clamp()
+    grab = { x: event.clientX, y: event.clientY }
+    dragOrigin = position()
+    pointerId = event.pointerId
+    const header = event.currentTarget as HTMLElement
+    header.focus({ preventScroll: true })
+    header.setPointerCapture?.(event.pointerId)
     setDragging(true)
   }
-
+  const moveWithKeys = (event: KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return
+    const delta = event.shiftKey ? 1 : 10
+    const offsets: Record<string, Position> = { ArrowLeft: { x: -delta, y: 0 }, ArrowRight: { x: delta, y: 0 }, ArrowUp: { x: 0, y: -delta }, ArrowDown: { x: 0, y: delta } }
+    const offset = offsets[event.key]
+    if (!offset && event.key !== "Home") return
+    event.preventDefault()
+    event.stopPropagation()
+    setPosition(previous => constrain(offset ? { x: previous.x + offset.x, y: previous.y + offset.y } : props.initialPosition ?? { x: 100, y: 100 }))
+  }
   onMount(() => {
-    const resize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight })
-    window.addEventListener("resize", resize)
-    window.addEventListener("mousemove", move)
-    window.addEventListener("mouseup", stop)
-    onCleanup(() => {
-      window.removeEventListener("resize", resize)
-      window.removeEventListener("mousemove", move)
-      window.removeEventListener("mouseup", stop)
-    })
+    clamp()
+    const observer = new ResizeObserver(clamp)
+    if (host()) observer.observe(host()!)
+    if (toolbar) observer.observe(toolbar)
+    window.addEventListener("resize", clamp)
+    onCleanup(() => { observer.disconnect(); window.removeEventListener("resize", clamp) })
   })
-  createEffect(() => { windowSize(); setPosition((previous) => constrain(previous)) })
 
   const reason = (action: string) => (noSelection() ? "No element selected" : isLayerLocked() ? "Layer is locked" : action)
   const blocked = () => noSelection() || isLayerLocked()
@@ -101,7 +126,7 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
           <div class="p-2 flex flex-col">{props.library ? props.library() : null}</div>
         </Show>
       }>
-        <div class="p-2 flex flex-col gap-2">
+        <div class="cad-floating-transforms">
           <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Move Element")} onClick={() => transform.setMode("translate")}><Move size={16} class="mb-1" /><span>Move</span></button>
           <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Rotate Element")} onClick={() => transform.setMode("rotate")}><RotateCcw size={16} class="mb-1" /><span>Rotate</span></button>
           <button class={TOOL_BUTTON} disabled={blocked()} title={reason("Scale Element")} onClick={() => transform.setMode("scale")}><Maximize2 size={16} class="mb-1" /><span>Scale</span></button>
@@ -111,18 +136,21 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
         </div>
       </Show>
     }>
-      <div class="p-2 grid  gap-2"><ToolPanel /></div>
+      <ToolPanel />
     </Show>
   )
 
   return (
-    <Motion.div
+    <div
       ref={toolbar}
-      style={{ position: "absolute", left: `${position().x}px`, top: `${position().y}px`, "touch-action": "none", "z-index": 1000 }}
-      initial={{ opacity: 0, scale: 0.8, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.3 }}
-      class="bg-white max-h-[80vh] dark:bg-gray-800 rounded-xl shadow-lg backdrop-blur-lg bg-opacity-90 dark:bg-opacity-90 border border-gray-200 dark:border-gray-700"
+      style={{ position: "absolute", left: `${position().x}px`, top: `${position().y}px`, "z-index": 1000 }}
+      class="cad-floating-toolbar" data-testid="cad-floating-toolbar"
+      on:pointerdown={event => event.stopPropagation()} on:pointerup={event => event.stopPropagation()}
     >
-      <div class="p-1 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 hover:bg-black/[0.02]" classList={{ "cursor-grabbing": dragging(), "cursor-grab": !dragging() }} onMouseDown={start}>
+      <div class="cad-floating-header" tabIndex={0} aria-label={t("cad.moveToolbar")} title={t("cad.moveToolbar")}
+        classList={{ "cursor-grabbing": dragging(), "cursor-grab": !dragging() }}
+        on:pointerdown={start} on:pointermove={move} on:pointerup={stop} on:pointercancel={stop}
+        on:lostpointercapture={() => { pointerId = undefined; setDragging(false) }} on:keydown={moveWithKeys}>
         <div class="flex items-center space-x-1">
           <Motion.button hover={{ scale: 1.05 }} press={{ scale: 0.95 }} onClick={() => setExpanded(!expanded())} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" aria-label={expanded() ? "Collapse" : "Expand"}>
             <Show when={expanded()} fallback={<ChevronDown size={14} />}><ChevronUp size={14} /></Show>
@@ -133,18 +161,18 @@ export default function FloatingToolbar(props: FloatingToolbarProps): JSX.Elemen
       </div>
 
       <Show when={expanded()}>
-        <div class="p-1.5 overflow-y-auto max-h-[70vh]">
-          <div class="flex space-x-0.5 mb-2 bg-gray-100 dark:bg-gray-700 p-0.5 rounded-lg">
+        <div class="cad-floating-body">
+          <div class="cad-floating-tabs" role="group" aria-label={t("cad.ribbon.toolModes")}>
             <For each={MODES}>{(tab) =>
               <Motion.button
-                onClick={() => setMode(tab)} hover={{ scale: 1.05 }} press={{ scale: 0.95 }}
+                aria-pressed={mode() === tab} onClick={() => setMode(tab)} hover={{ scale: 1.05 }} press={{ scale: 0.95 }}
                 class={`flex-1 px-2 py-1 text-xs font-medium rounded-md ${mode() === tab ? "bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"}`}
-              >{tab.charAt(0).toUpperCase() + tab.slice(1)}</Motion.button>}
+              >{tab === "ai" ? "AI" : tab.charAt(0).toUpperCase() + tab.slice(1)}</Motion.button>}
             </For>
           </div>
-          {panel()}
+          <div class="cad-floating-content">{panel()}</div>
         </div>
       </Show>
-    </Motion.div>
+    </div>
   )
 }

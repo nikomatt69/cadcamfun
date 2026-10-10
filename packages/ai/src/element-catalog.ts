@@ -8,6 +8,7 @@
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
 import { historySchema } from "./parametric.ts"
+import { formatToolValidationError } from "./tool-validation.ts"
 import { MAX_CURVE_SEGMENTS, MIN_GEAR_TEETH, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
 
 type Fields = Readonly<Record<string, unknown>>
@@ -64,7 +65,7 @@ export const ELEMENT_SPECS = {
   parametric: {
     defaults: { ...at, history: { parameters: {}, features: [] } },
     required: ["history"],
-    doc: "a dimension-driven part: history {parameters: {name: number | \"expression\"}, features: [...]} rebuilt from the top whenever a parameter changes. Features: sketch {id, type:\"sketch\", plane: XY|YZ|ZX, offset?, sketch: {entities: points/lines/circles/arcs, constraints}}, extrude {id, type:\"extrude\", sketch, depth, operation: new|union|subtract|intersect, direction?: up|down|symmetric}, revolve {sketch, axis: x|y|{line}, angle? (deg)}, hole {plane, offset?, at:[u,v], diameter, depth}, pattern {feature, kind: linear|circular, count, step | centre, span?}. Any dimension may be an expression of the parameters"
+    doc: "dimension-driven part: history OBJECT {parameters:{name:number|\"expression\"},features:[...]}. Validate with cad_parametric first. Every feature has id/type: sketch {plane:XY|YZ|ZX,offset?,sketch:{entities:[...],constraints:[]}}, extrude {sketch:earlierId,depth,operation:new|union|subtract|intersect,direction?:up|down|symmetric}, revolve {sketch,axis:x|y|{line},operation,angle? (deg)}, hole {plane,at:[u,v],diameter,depth}, pattern {feature,kind:linear|circular,count,step|centre,span?}. Entities use kind, not type: point {id,kind:point,x,y}; line {id,kind:line,p1,p2}; circle {id,kind:circle,center,radius}; arc {id,kind:arc,center,start,end}. References are point IDs. Constraints use type. Parameter expressions only in dimension fields"
   },
   // ---- containers
   component: {
@@ -215,7 +216,7 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
   }
   if (type === "parametric") {
     const decoded = historySchema.safeParse(element["history"])
-    if (!decoded.success) return { ok: false, error: `parametric.history: ${decoded.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` }
+    if (!decoded.success) return { ok: false, error: `parametric.history: ${formatToolValidationError("cad_add_elements", decoded.error)}` }
     const history: History = decoded.data
     element["history"] = history
     // Build it now: a history that makes nothing is the model's mistake to hear about, not the user's to find on screen.

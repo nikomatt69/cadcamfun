@@ -5,8 +5,9 @@
    through the existing tokens. Reduced transparency / increased contrast turn it back into opaque surfaces.
    ======================================================================== */
 :root[data-glass] {
-  --glass-fill: rgba(255, 255, 255, 0.5);
-  --glass-fill-strong: rgba(255, 255, 255, 0.72);
+  --glass-fill: #fff;
+  --glass-fill-strong: #fff;
+  --glass-text: #1f2937;
   --glass-rim: rgba(255, 255, 255, 0.55);
   --glass-edge: rgba(15, 23, 42, 0.08);
   --glass-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.28);
@@ -16,6 +17,7 @@
 :root[data-glass].dark {
   --glass-fill: rgba(30, 36, 48, 0.46);
   --glass-fill-strong: rgba(30, 36, 48, 0.7);
+  --glass-text: #f1f5f9;
   --glass-rim: rgba(255, 255, 255, 0.16);
   --glass-edge: rgba(0, 0, 0, 0.35);
   --glass-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.55);
@@ -79,6 +81,12 @@
   backdrop-filter: blur(12px);
 }
 
+/* Pair neutral glass surfaces with foregrounds from the same theme. */
+:root[data-glass] :is(.ui-card, .ui-modal, .ui-popover, .ui-toast, .ui-palette-panel,
+    .ui-btn-secondary, .ui-icon-btn, .ui-input, .ui-select, .ui-textarea) {
+  color: var(--glass-text);
+}
+
 /* The CAD and CAM viewports keep their own opaque canvas: glass is for chrome, not for the drawing. */
 :root[data-glass] canvas { background-color: transparent; }
 :root[data-glass] .cad-workspace,
@@ -101,4 +109,9 @@
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+
+/* Light chrome stays white even over the native macOS window material. */
+:root[data-glass]:not(.dark) .reference-shell {
+  background: #fff !important;
 }

@@ -22,7 +22,7 @@ import { ActivityChart, type ChartMetric } from "../components/analytics/activit
 import { AiDashboard } from "../components/analytics/ai-dashboard.tsx"
 import { UserCostAnalytics } from "../components/analytics/user-cost-analytics.tsx"
 
-const TOOLBAR_ACTIVE = "inline-flex items-center gap-1.5 rounded-lg border border-[#007ACC]/60 bg-blue-50/80 px-3 py-1.5 text-sm font-medium text-[#007ACC] shadow-sm dark:bg-blue-900/40 dark:text-blue-300"
+const TOOLBAR_ACTIVE = "inline-flex items-center gap-1.5 rounded-lg border border-[#007ACC]/60 bg-blue-50/80 px-3 py-1.5 text-sm font-medium text-blue-600 shadow-sm dark:bg-blue-900/40 dark:text-blue-300"
 
 type Section = "overview" | "charts" | "ai" | "costs"
 type Preset = "today" | "7days" | "30days" | "90days" | "year"
@@ -144,11 +144,11 @@ export function AnalyticsScreen(): JSX.Element {
         </nav>
       }
       rail={<>
-        <p class="text-xs text-gray-500 dark:text-gray-400">{t("dash.subtitle")}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">{t("dash.subtitle")}</p>
         <div class="flex flex-wrap gap-2">
           <For each={PRESETS}>
             {([preset, labelKey]) => (
-              <button type="button" onClick={() => setDateRangePreset(preset)} class="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-[#007ACC] dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-blue-900/30">
+              <button type="button" onClick={() => setDateRangePreset(preset)} class="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-blue-900/30">
                 {t(labelKey)}
               </button>
             )}
@@ -184,7 +184,7 @@ export function AnalyticsScreen(): JSX.Element {
 
       <Show when={activeSection() === "charts"} keyed>
         <div class={PANEL}>
-          <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{t("dash.trends")}</h2>
+          <h2 class="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{t("dash.trends")}</h2>
           <Show when={chartsKey()} keyed>
             <ActivityChart
               startDate={dateRange().startDate}

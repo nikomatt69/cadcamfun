@@ -1,8 +1,9 @@
 /// <reference path="./sdk-next.d.ts" />
 import type { FilePart } from "../attachments.ts"
-import { Effect, Scope } from "effect"
+import type { z } from "zod"
+import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
+import { rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
@@ -12,6 +13,8 @@ import { buildHostConfig, type HostProviderSpec, type HostCompactionSettings } f
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
 import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
+import { bootstrapStep, describeBootstrapFailure } from "./bootstrap-errors.ts"
+import { HostToolRegistry } from "./tool-registry.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolSpec {
@@ -19,6 +22,8 @@ export interface HostToolSpec {
   readonly description: string
   /** zod 4 object schema (what nikcli sends to the model as JSON Schema). */
   readonly parameters: unknown
+  /** nikcli validates before execute; keep recovery guidance on that path too. */
+  readonly formatValidationError?: (error: z.ZodError) => string
   readonly execute: (
     input: unknown,
     ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }
@@ -126,7 +131,7 @@ const loadSdk = (paths: IsolatedPaths, isolation: IsolationOptions | undefined):
 }
 
 const toConfigError = (message: string) => (cause: unknown) =>
-  new AiConfigError({ message: `${message}: ${cause instanceof Error ? cause.message : String(cause)}` })
+  new AiConfigError({ message: `${message}: ${describeBootstrapFailure(cause)}` })
 
 /** Acquire the runtime; the Scope owns log-filter and host teardown. */
 export const makeNikCliRuntime = (
@@ -147,7 +152,7 @@ export const makeNikCliRuntime = (
 
     // The host bundle is large and evaluating it blocks the event loop, which is what kept the sidecar from answering its
     // health check (and the shell from connecting) for ten seconds and more on a busy machine. It is loaded when the first
-    // host is needed, or warmed once `warmAfter` settles (the sidecar passes the moment it has announced itself) so the first chat does not pay for it.
+    // host is needed, or optionally warmed once `warmAfter` settles. The sidecar keeps this demand-loaded.
     let sdkReady: Promise<Sdk> | undefined
     const getSdk = (): Promise<Sdk> => {
       assertOpen()
@@ -164,76 +169,87 @@ export const makeNikCliRuntime = (
     // The metadata seed shares the first catalogue reader's lifecycle, not application startup.
     const catalogueController = new AbortController()
     let catalogueReady: Promise<CatalogueSeed> | undefined
+    const ensureCatalogue = () => {
+      assertOpen()
+      return catalogueReady ??= seedModelsCache(paths, { ...options.catalogue, signal: catalogueController.signal })
+    }
 
     let providers = options.providers
     const hosts = new Map<string, Promise<ProjectHost>>()
     const liveKeys = new Set<string>()
     const pendingKeys = new Map<string, string>()
-    const toolIdsOf = (projectId: string) => options.toolsFor(projectId).map((t) => t.id)
+    const toolRegistry = new HostToolRegistry(options.toolsFor)
+    const toolIdsOf = (projectId: string) => toolRegistry.ids(projectId)
 
     const userSkills = createUserSkillStore(join(options.dataDir, "ai", "skills"))
-    const writeConfig = async (projectId: string) => {
-      await installSkills(paths.config, await userSkills.list())
-      await writeFile(
-        join(paths.config, "nikcli.json"),
-        JSON.stringify(
-          buildHostConfig({
-            providers,
-            toolIds: toolIdsOf(projectId),
-            systemPrompt: options.systemPrompt,
-            ...(options.compaction ? { compaction: options.compaction } : {})
-          }),
-          null,
-          2
-        )
-      )
-    }
+    const configurationLock = yield* Semaphore.make(1)
+    let skillsRevision = 0
+    let installedSkillsRevision = -1
+    const writeConfig = (projectId: string): Promise<void> => Effect.runPromise(
+      configurationLock.withPermit(Effect.tryPromise({
+        try: async () => {
+          assertOpen()
+          if (installedSkillsRevision !== skillsRevision) {
+            const revision = skillsRevision
+            await installSkills(paths.config, await userSkills.list())
+            installedSkillsRevision = revision
+          }
+          const file = join(paths.config, "nikcli.json")
+          const temporary = `${file}.${crypto.randomUUID()}.tmp`
+          try {
+            await writeFile(temporary, JSON.stringify(buildHostConfig({
+              providers,
+              toolIds: toolIdsOf(projectId),
+              systemPrompt: options.systemPrompt,
+              ...(options.compaction ? { compaction: options.compaction } : {})
+            }), null, 2))
+            await rename(temporary, file)
+          } finally {
+            await rm(temporary, { force: true }).catch(() => undefined)
+          }
+        },
+        catch: (cause) => cause instanceof Error ? cause : new Error("Host configuration publication failed")
+      }))
+    )
 
     const createHost = async (projectId: string): Promise<ProjectHost> => {
       assertOpen()
       const scratch = projectScratchDir(paths, projectId)
       mkdirSync(scratch, { recursive: true })
       const directory = realpathSync(scratch)
-      await writeConfig(projectId)
-      const sdk = await getSdk().catch((cause) => { throw new Error(toConfigError("Failed to load the embedded nikcli host")(cause).message) })
-      const client = await Effect.runPromise(sdk.NikCli.create({ directory }))
-      const specs = options.toolsFor(projectId)
+      // A restored external-provider chat can arrive before the model browser.
+      if ([...pendingKeys.keys()].some((id) => !providers.some((provider) => provider.id === id))) {
+        await bootstrapStep("model catalogue", ensureCatalogue)
+      }
+      await bootstrapStep("configuration", () => writeConfig(projectId))
+      const sdk = await bootstrapStep("SDK import", getSdk)
+      const client = await bootstrapStep("client creation", () => Effect.runPromise(sdk.NikCli.create({ directory })))
+      const specs = toolRegistry.tools(projectId)
       const defined = specs.map((spec) =>
         sdk.Tool.define(spec.id, async () => ({
           description: spec.description,
           parameters: spec.parameters,
+          ...(spec.formatValidationError ? { formatValidationError: spec.formatValidationError } : {}),
           execute: async (args: never, ctx: ToolExecuteContext) => {
+            await ctx.ask({ permission: spec.id, patterns: [`project:${projectId}`], always: [`project:${projectId}`], metadata: { input: args } })
             const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
             const result = spec.executeWithFiles ? await spec.executeWithFiles(args, call) : { output: await spec.execute(args, call) }
             return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
           }
         }))
       )
-      await Effect.runPromise(client.tools.register(...defined))
+      await bootstrapStep("tool registration", () => Effect.runPromise(client.tools.register(...defined)))
       // Keys set before this host existed.
-      for (const [providerId, key] of pendingKeys) await client.provider.api({ providerID: providerId, key })
+      for (const [providerId, key] of pendingKeys) await bootstrapStep(`credential replay for ${providerId}`, () => client.provider.api({ providerID: providerId, key }))
       return { projectId, directory, client }
     }
 
     const runtime: NikCliRuntime = {
-      toolCatalogue: () => {
-        const specs = options.toolsFor("default")
-        const seen = new Set<string>()
-        for (const spec of specs) {
-          if (seen.has(spec.id)) throw new Error(`Duplicate host tool id: ${spec.id}`)
-          seen.add(spec.id)
-        }
-        return [...specs.map(({ id, description }) => ({ id, description })),
-          { id: "search_tools", description: "Find and load permitted deferred tools by exact name or capability through the native session registry." },
-          { id: "invalid", description: "Report invalid tool calls so the assistant can correct the tool name or arguments." },
-          { id: "code_mode", description: "Execute confined JavaScript using the permitted registered tools, with correlated nested-call progress." },
-          { id: "skill", description: "Read a registered CAD/CAM playbook." },
-          ...["todowrite", "todoread", "create_goal", "get_goal", "update_goal"].map((id) => ({ id, description: "Native agent planning and goal control." }))]
-      },
+      toolCatalogue: () => toolRegistry.catalogue("default"),
       paths,
       get catalogueReady() {
         assertOpen()
-        return catalogueReady ??= seedModelsCache(paths, { ...options.catalogue, signal: catalogueController.signal })
+        return ensureCatalogue()
       },
       host: (projectId) =>
         Effect.tryPromise({
@@ -276,6 +292,7 @@ export const makeNikCliRuntime = (
         Effect.tryPromise({
           try: async () => {
             assertOpen()
+            skillsRevision++
             for (const [projectId, promise] of hosts) {
               const host = await promise
               await writeConfig(projectId)

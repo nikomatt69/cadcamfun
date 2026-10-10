@@ -37,8 +37,8 @@ interface UserItem {
 
 type ItemIcon = (props: { readonly size?: number; readonly class?: string }) => JSX.Element
 
-const CARD = "bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out border border-gray-200/50 dark:border-gray-700/50 overflow-hidden cursor-pointer group"
-const STAT_CARD = "bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-gray-700/40 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out group"
+const CARD = "bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-xl transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out border border-slate-200/50 dark:border-slate-700/50 overflow-hidden cursor-pointer group"
+const STAT_CARD = "bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm rounded-2xl p-4 border border-white/40 dark:border-slate-700/40 hover:bg-white/80 dark:hover:bg-gray-800/80 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-out group"
 
 const formatMonth = (iso: string): string => {
   const parsed = Date.parse(iso)
@@ -52,16 +52,16 @@ const shortDate = (iso: string): string => {
 
 const EmptyState = (props: { readonly icon: JSX.Element; readonly title: string; readonly description: string }): JSX.Element => (
   <Motion.div
-    class="col-span-1 sm:col-span-2 lg:col-span-3 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 p-12 text-center"
+    class="col-span-1 sm:col-span-2 lg:col-span-3 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 p-12 text-center"
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.3 }}
   >
-    <div class="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500">
+    <div class="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-400 dark:text-slate-500">
       {props.icon}
     </div>
-    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">{props.title}</h3>
-    <p class="text-gray-600 dark:text-gray-400">{props.description}</p>
+    <h3 class="text-lg font-medium text-slate-900 dark:text-white mb-2">{props.title}</h3>
+    <p class="text-slate-600 dark:text-slate-400">{props.description}</p>
   </Motion.div>
 )
 
@@ -86,8 +86,8 @@ export function ProfileScreen(): JSX.Element {
 
   const notFound = (
     <div class="p-6 text-center">
-      <h1 class="text-2xl font-bold text-gray-900 mb-4">{t("profile.notFoundTitle")}</h1>
-      <p class="text-gray-600 mb-4">{t("profile.notFoundBody")}</p>
+      <h1 class="text-2xl font-bold text-slate-900 mb-4">{t("profile.notFoundTitle")}</h1>
+      <p class="text-slate-600 mb-4">{t("profile.notFoundBody")}</p>
       <A href="/" class="text-blue-600 hover:text-blue-800">{t("profile.returnHome")}</A>
     </div>
   )
@@ -99,7 +99,7 @@ export function ProfileScreen(): JSX.Element {
       class={`flex-1 px-6 py-4 text-sm font-semibold rounded-2xl transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out relative flex items-center justify-center space-x-2 ${
         activeTab() === id
           ? "text-white shadow-xl"
-          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50/50 dark:hover:bg-gray-700/30"
+          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-gray-200 hover:bg-slate-50/50 dark:hover:bg-gray-700/30"
       }`}
       hover={{ scale: 1.02, y: -1 }}
       press={{ scale: 0.98 }}
@@ -140,9 +140,9 @@ export function ProfileScreen(): JSX.Element {
             </Show>
           </div>
           <div class="p-6">
-            <h3 class={`text-lg font-semibold text-gray-900 dark:text-white ${hoverClass} transition-colors duration-150 ease-out`}>{item.name}</h3>
+            <h3 class={`text-lg font-semibold text-slate-900 dark:text-white ${hoverClass} transition-colors duration-150 ease-out`}>{item.name}</h3>
             <Show when={withDescription}>
-              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.description ?? t("profile.noDescription")}</p>
+              <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">{item.description ?? t("profile.noDescription")}</p>
             </Show>
             <p class={metaClass}>{t("profile.updated", { date: shortDate(item.updatedAt) })}</p>
           </div>
@@ -158,7 +158,7 @@ export function ProfileScreen(): JSX.Element {
           <div class="max-w-7xl mx-auto">
             {/* Profile Header */}
             <Motion.div
-              class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/20 dark:border-gray-700/20 mb-8 overflow-hidden relative"
+              class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/20 dark:border-slate-700/20 mb-8 overflow-hidden relative"
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.4 }}
@@ -192,7 +192,7 @@ export function ProfileScreen(): JSX.Element {
                     <Show
                       when={typeof profile.data()?.image === "string" && (profile.data()?.image?.length ?? 0) > 0}
                       fallback={
-                        <div class="relative h-40 w-40 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center border-6 border-white dark:border-gray-800 shadow-2xl">
+                        <div class="relative h-40 w-40 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center border-6 border-white dark:border-slate-800 shadow-2xl">
                           <User size={64} class="text-white" />
                         </div>
                       }
@@ -200,11 +200,11 @@ export function ProfileScreen(): JSX.Element {
                       <img
                         src={profile.data()?.image ?? ""}
                         alt="Profile"
-                        class="relative h-40 w-40 rounded-3xl object-cover border-6 border-white dark:border-gray-800 shadow-2xl"
+                        class="relative h-40 w-40 rounded-3xl object-cover border-6 border-white dark:border-slate-800 shadow-2xl"
                       />
                     </Show>
                     {/* Online status indicator */}
-                    <div class="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-3 border-white dark:border-gray-800 rounded-full shadow-lg" />
+                    <div class="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-3 border-white dark:border-slate-800 rounded-full shadow-lg" />
                   </Motion.div>
 
                   <div class="flex-1 mt-6 xl:mt-0 xl:pb-6">
@@ -244,8 +244,8 @@ export function ProfileScreen(): JSX.Element {
                                 <Mail class="h-4 w-4 text-blue-600 dark:text-blue-400" />
                               </div>
                               <div class="min-w-0 flex-1">
-                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("profile.email")}</p>
-                                <p class="text-gray-900 dark:text-white font-medium truncate">{profile.data()?.email}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("profile.email")}</p>
+                                <p class="text-slate-900 dark:text-white font-medium truncate">{profile.data()?.email}</p>
                               </div>
                             </div>
                           </Show>
@@ -255,8 +255,8 @@ export function ProfileScreen(): JSX.Element {
                                 <MapPin class="h-4 w-4 text-green-600 dark:text-green-400" />
                               </div>
                               <div class="min-w-0 flex-1">
-                                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("profile.location")}</p>
-                                <p class="text-gray-900 dark:text-white font-medium">{profile.data()?.location}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("profile.location")}</p>
+                                <p class="text-slate-900 dark:text-white font-medium">{profile.data()?.location}</p>
                               </div>
                             </div>
                           </Show>
@@ -265,8 +265,8 @@ export function ProfileScreen(): JSX.Element {
                               <Calendar class="h-4 w-4 text-purple-600 dark:text-purple-400" />
                             </div>
                             <div class="min-w-0 flex-1">
-                              <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("profile.joined")}</p>
-                              <p class="text-gray-900 dark:text-white font-medium">{formatMonth(profile.data()?.createdAt ?? "")}</p>
+                              <p class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">{t("profile.joined")}</p>
+                              <p class="text-slate-900 dark:text-white font-medium">{formatMonth(profile.data()?.createdAt ?? "")}</p>
                             </div>
                           </div>
                         </Motion.div>
@@ -274,12 +274,12 @@ export function ProfileScreen(): JSX.Element {
                         {/* Enhanced Bio */}
                         <Show when={typeof profile.data()?.bio === "string" && (profile.data()?.bio?.length ?? 0) > 0}>
                           <Motion.div
-                            class="bg-gray-50/50 dark:bg-gray-700/20 rounded-2xl p-4 border border-gray-200/50 dark:border-gray-600/30"
+                            class="bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl p-4 border border-slate-200/50 dark:border-slate-700/30"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.4, duration: 0.5 }}
                           >
-                            <p class="text-gray-700 dark:text-gray-300 leading-relaxed">{profile.data()?.bio}</p>
+                            <p class="text-slate-700 dark:text-slate-300 leading-relaxed">{profile.data()?.bio}</p>
                           </Motion.div>
                         </Show>
 
@@ -343,7 +343,7 @@ export function ProfileScreen(): JSX.Element {
                         {/* Share Profile Button */}
                         <Motion.button
                           type="button"
-                          class="inline-flex items-center px-6 py-2.5 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm text-gray-700 dark:text-gray-300 rounded-xl hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-md hover:shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out text-sm font-medium"
+                          class="inline-flex items-center px-6 py-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-700 dark:text-slate-300 rounded-xl hover:bg-white dark:hover:bg-gray-700 border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-lg transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out text-sm font-medium"
                           hover={{ scale: 1.02, y: -1 }}
                           press={{ scale: 0.98 }}
                         >
@@ -357,7 +357,7 @@ export function ProfileScreen(): JSX.Element {
               </div>
 
               {/* Enhanced Stats Section */}
-              <div class="bg-gradient-to-r from-gray-50/80 via-white/50 to-gray-50/80 dark:from-gray-700/40 dark:via-gray-800/30 dark:to-gray-700/40 border-t border-gray-200/30 dark:border-gray-600/30 backdrop-blur-sm">
+              <div class="bg-gradient-to-r from-gray-50/80 via-white/50 to-gray-50/80 dark:from-gray-700/40 dark:via-gray-800/30 dark:to-gray-700/40 border-t border-slate-200/30 dark:border-slate-700/30 backdrop-blur-sm">
                 <div class="px-8 py-6 grid grid-cols-2 lg:grid-cols-4 gap-6">
                   <Motion.div class={STAT_CARD} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
                     <div class="flex items-center space-x-3">
@@ -365,8 +365,8 @@ export function ProfileScreen(): JSX.Element {
                         <Folder class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{(projects.data() ?? []).length}</p>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{t("shell.projects")}</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{(projects.data() ?? []).length}</p>
+                        <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{t("shell.projects")}</p>
                       </div>
                     </div>
                   </Motion.div>
@@ -377,8 +377,8 @@ export function ProfileScreen(): JSX.Element {
                         <Box class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{(components.data() ?? []).length}</p>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{t("shell.components")}</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{(components.data() ?? []).length}</p>
+                        <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{t("shell.components")}</p>
                       </div>
                     </div>
                   </Motion.div>
@@ -389,8 +389,8 @@ export function ProfileScreen(): JSX.Element {
                         <Wrench class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{(toolpaths.data() ?? []).length}</p>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{t("shell.toolpaths")}</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{(toolpaths.data() ?? []).length}</p>
+                        <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{t("shell.toolpaths")}</p>
                       </div>
                     </div>
                   </Motion.div>
@@ -401,8 +401,8 @@ export function ProfileScreen(): JSX.Element {
                         <Layout class="h-5 w-5 text-white" />
                       </div>
                       <div class="flex-1">
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{(organizations.data() ?? []).length}</p>
-                        <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{t("shell.organizations")}</p>
+                        <p class="text-2xl font-bold text-slate-900 dark:text-white">{(organizations.data() ?? []).length}</p>
+                        <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{t("shell.organizations")}</p>
                       </div>
                     </div>
                   </Motion.div>
@@ -412,7 +412,7 @@ export function ProfileScreen(): JSX.Element {
 
             {/* Enhanced Tabs Section */}
             <Motion.div class="mb-8" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <div class="bg-white/80 dark:bg-gray-800/80 backdrop-blur-2xl rounded-3xl border border-white/20 dark:border-gray-700/20 p-2 shadow-lg">
+              <div class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-white/20 dark:border-slate-700/20 p-2 shadow-lg">
                 <nav class="flex space-x-2">
                   {tabButton("projects", t("shell.projects"), Folder)}
                   {tabButton("components", t("shell.components"), Box)}
@@ -441,7 +441,7 @@ export function ProfileScreen(): JSX.Element {
                           Folder,
                           "text-blue-600 dark:text-blue-400",
                           "group-hover:text-blue-600 dark:group-hover:text-blue-400",
-                          "text-sm text-gray-500 dark:text-gray-400 mt-2",
+                          "text-sm text-slate-500 dark:text-slate-400 mt-2",
                           false
                         )
                       }
@@ -461,7 +461,7 @@ export function ProfileScreen(): JSX.Element {
                           Box,
                           "text-purple-600 dark:text-purple-400",
                           "group-hover:text-purple-600 dark:group-hover:text-purple-400",
-                          "text-xs text-gray-400 dark:text-gray-500 mt-2",
+                          "text-xs text-slate-400 dark:text-slate-500 mt-2",
                           true
                         )
                       }
@@ -481,7 +481,7 @@ export function ProfileScreen(): JSX.Element {
                           Wrench,
                           "text-green-600 dark:text-green-400",
                           "group-hover:text-green-600 dark:group-hover:text-green-400",
-                          "text-sm text-gray-500 dark:text-gray-400 mt-2",
+                          "text-sm text-slate-500 dark:text-slate-400 mt-2",
                           false
                         )
                       }

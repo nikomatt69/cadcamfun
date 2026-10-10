@@ -63,6 +63,9 @@ import type {
   UserVerifyChangeOutput,
   UserByIdInput,
   UserByIdOutput,
+  AiAgentsOutput,
+  AiSessionControlInput,
+  AiSessionControlOutput,
   AiSessionStateInput,
   AiSessionStateOutput,
   AiRemoveSessionInput,
@@ -1092,6 +1095,32 @@ export function make(options: ClientOptions) {
         ),
     },
     ai: {
+      agents: (requestOptions?: RequestOptions) =>
+        request<AiAgentsOutput>(
+          { method: "GET", path: `/api/ai/agents`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      sessionControl: (input: AiSessionControlInput, requestOptions?: RequestOptions) =>
+        request<AiSessionControlOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/sessions/control`,
+            body: {
+              sessionId: input["sessionId"],
+              projectId: input["projectId"],
+              action: input["action"],
+              taskId: input["taskId"],
+              requestId: input["requestId"],
+              answers: input["answers"],
+              decision: input["decision"],
+              model: input["model"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       sessionState: (input: AiSessionStateInput, requestOptions?: RequestOptions) =>
         request<AiSessionStateOutput>(
           {
@@ -1310,6 +1339,9 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/ai/chat/stream`,
             body: {
+              permissionMode: input?.["permissionMode"],
+              agent: input?.["agent"],
+              mode: input?.["mode"],
               attachments: input?.["attachments"],
               message: input?.["message"],
               sessionId: input?.["sessionId"],
@@ -1357,7 +1389,12 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/ai/permission/reply`,
-            body: { sessionId: input["sessionId"], requestId: input["requestId"], decision: input["decision"] },
+            body: {
+              sessionId: input["sessionId"],
+              projectId: input["projectId"],
+              requestId: input["requestId"],
+              decision: input["decision"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

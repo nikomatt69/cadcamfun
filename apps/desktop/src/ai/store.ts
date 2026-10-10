@@ -8,7 +8,7 @@
  *
  * Status: spec 06-desktop-ui.md §1 + spec 08-ai.md §3; nikcli is the base (WP8).
  */
-import { batch, createEffect, createMemo, createRoot, createSignal, onCleanup, type Accessor, type Setter } from "solid-js"
+import { batch, createEffect, createMemo, createRoot, createSignal, onCleanup, untrack, type Accessor, type Setter } from "solid-js"
 import { useApp } from "../state/context.ts"
 import { startVisionBridge } from "./vision.ts"
 import { streamChat, type StreamHandle } from "./stream.ts"
@@ -27,7 +27,7 @@ import type { ChatAttachment } from "./attachments.ts"
 import { contextTokensOf } from "./context-metrics.ts"
 import { mirrorCamResult } from "./cam-sync.ts"
 import { mirrorToolResult, reconcileFromStored } from "./editor-sync.ts"
-import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel } from "./types.ts"
+import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "./types.ts"
 
 export type PendingDelivery = "queue" | "steer"
 export interface AiPending { readonly id: string; readonly text: string; readonly delivery: PendingDelivery }
@@ -82,6 +82,22 @@ export interface AiStore {
   readonly renameSession: (id: string, title: string) => void
   readonly deleteSession: (id: string) => void
   readonly replyPermission: (requestId: string, decision: "once" | "always" | "reject") => Promise<void>
+  readonly agents: Accessor<ReadonlyArray<AiAgent>>
+  readonly permissionMode: Accessor<"auto" | "ask" | "approve">
+  readonly setPermissionMode: (mode: "auto" | "ask" | "approve") => void
+  readonly agent: Accessor<string>
+  readonly setAgent: (agent: string) => void
+  readonly mode: Accessor<"general" | "cad" | "cam" | "gcode" | "toolpath">
+  readonly setMode: (mode: "general" | "cad" | "cam" | "gcode" | "toolpath") => void
+  readonly questions: Accessor<ReadonlyArray<AiPendingQuestion>>
+  readonly hostContext: Accessor<AiContextState | undefined>
+  readonly controlBusy: Accessor<boolean>
+  readonly controlError: Accessor<string | undefined>
+  readonly refreshControls: () => Promise<void>
+  readonly consolidateMemory: () => Promise<void>
+  readonly compact: () => Promise<void>
+  readonly cancelTask: (id: string) => Promise<void>
+  readonly replyQuestion: (requestId: string, answers?: ReadonlyArray<ReadonlyArray<string>>) => Promise<void>
 }
 
 const MAX_SESSIONS = 50
@@ -130,6 +146,14 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const [pending, setPending] = createSignal<ReadonlyArray<AiPending>>([])
   const [stats, setStats] = createSignal<AiStats>(emptyStats())
   const [contextTokens, setContextTokens] = createSignal(0)
+  const [agents, setAgents] = createSignal<ReadonlyArray<AiAgent>>([])
+  const [permissionMode, setPermissionMode] = createSignal<"auto" | "ask" | "approve">("ask")
+  const [agent, setAgent] = createSignal("cadcam")
+  const [mode, setMode] = createSignal<"general" | "cad" | "cam" | "gcode" | "toolpath">("general")
+  const [questions, setQuestions] = createSignal<ReadonlyArray<AiPendingQuestion>>([])
+  const [hostContext, setHostContext] = createSignal<AiContextState>()
+  const [controlBusy, setControlBusy] = createSignal(false)
+  const [controlError, setControlError] = createSignal<string>()
   const [dismissedSuggestions, setDismissedSuggestions] = createSignal<ReadonlyArray<string>>([])
   const [projectContextRevision, setProjectContextRevision] = createSignal(0)
 
@@ -202,27 +226,34 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   // answers on its own. No stream carries that, so the host's session state is polled until the tasks and the answer are done.
   const POLL_MS = 2_000
   const WAKE_ROUNDS = 25
+  let disposed = false
   let watching = false
   const activeTask = (list: ReadonlyArray<AiTask>): boolean => list.some((t) => t.status === "queued" || t.status === "running")
-  const watchTasks = async (): Promise<void> => {
+  const watchTasks = async (initialBusy = false): Promise<void> => {
     if (watching) return
     watching = true
+    const watchedSession = sessionId(), watchedProject = projectId()
     try {
       const delivered = new Set<string>()
-      let woken = false
+      let woken = initialBusy
       let quiet = 0
       let waiting = 0
       for (;;) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
         const sid = sessionId()
-        if (sid === undefined) return
+        if (disposed || sid === undefined || sid !== watchedSession || projectId() !== watchedProject) return
         let state: { readonly busy: boolean; readonly text: string; readonly error?: string; readonly tasks?: ReadonlyArray<AiTask> } | undefined
         try {
-          state = await app.runtime.run(app.client.ai.sessionState({ payload: { sessionId: sid, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } })) as typeof state
+          state = await app.runtime.run(app.client.ai.sessionControl({ payload: { action: "status", sessionId: sid, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } })) as typeof state
         } catch {
           if (++quiet >= 5) return
           continue
         }
+        if (sessionId() !== watchedSession || projectId() !== watchedProject) return
+        const controls = state as typeof state & { permissions?: ReadonlyArray<AiPermission>; questions?: ReadonlyArray<AiPendingQuestion>; context?: AiContextState }
+        if (controls?.permissions) setPermissions(controls.permissions)
+        if (controls?.questions) setQuestions(controls.questions)
+        if (controls?.context) { setHostContext(controls.context); if (controls.context.tokens !== undefined) setContextTokens(controls.context.tokens) }
         quiet = 0
         const list = state?.tasks ?? []
         if (list.length > 0) setTasks((current) => {
@@ -335,7 +366,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setToolCalls((current) => {
         const existing = current[event.callId]
         if (existing === undefined) return current
-        return { ...current, [event.callId]: { ...existing, status: event.ok ? "ok" : "error", output: event.output } }
+        return { ...current, [event.callId]: { ...existing, status: event.ok ? "ok" : "error", output: event.output, ...(event.images ? { images: event.images } : {}) } }
       })
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       return
@@ -347,7 +378,16 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       return
     }
+    if (event.type === "question_request") {
+      setQuestions((current) => [...current.filter((q) => q.requestId !== event.requestId), { requestId: event.requestId, questions: event.questions }])
+      return
+    }
+    if (event.type === "question_resolved") {
+      setQuestions((current) => current.filter((q) => q.requestId !== event.requestId))
+      return
+    }
     if (event.type === "done") {
+      void refreshControls()
       const id = idForEvent
       patchMessage(id, (prev) => ({ ...prev, status: "done", text: event.text || prev.text, usage: event.usage, finishedAt: new Date().toISOString() }))
       setStats((s) => ({
@@ -441,6 +481,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   }
 
   const send: AiStore["send"] = async (prompt, attachments = [], delivery = "queue") => {
+    if (controlBusy()) return
     const text = prompt.trim()
     if (text.length === 0) return
     if (status() === "connecting" || status() === "streaming") {
@@ -495,6 +536,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(activeProjectId ? { projectId: activeProjectId } : {}),
       ...(m ? { model: m } : {}),
+      agent: agent(), mode: mode(), permissionMode: permissionMode(),
     })
     setStatus("streaming")
   }
@@ -598,10 +640,45 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     const permission = permissions().find((item) => item.requestId === requestId)
     if (!permission) return
     await app.runtime.run(app.client.ai.permissionReply({
-      payload: { sessionId: permission.sessionId, requestId, decision }
+      payload: { sessionId: permission.sessionId, requestId, decision, ...(projectId() ? { projectId: projectId()! } : {}) }
     }))
     setPermissions((current) => current.filter((item) => item.requestId !== requestId))
   }
+
+  type ControlAction = "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "consolidate_memory"
+  const control = async (action: ControlAction, fields: { taskId?: string; requestId?: string; answers?: ReadonlyArray<ReadonlyArray<string>> } = {}): Promise<void> => {
+    const sid = sessionId(), project = projectId()
+    if (!sid || action !== "status" && controlBusy()) return
+    if (action !== "status") { setControlBusy(true); setControlError(undefined) }
+    try {
+      const state = await app.runtime.run(app.client.ai.sessionControl({ payload: { sessionId: sid, ...(project ? { projectId: project } : {}), action, ...fields, ...(model() ? { model: model()! } : {}) } }))
+      if (disposed || sessionId() !== sid || projectId() !== project) return
+      batch(() => {
+        if (state.permissions) setPermissions(state.permissions)
+        setQuestions(state.questions); setTasks(state.tasks); setHostContext(state.context)
+        if (state.context.tokens !== undefined) setContextTokens(state.context.tokens)
+        if (state.context.compacted) { setContextTokens(0); setActivity((current) => ({ ...current, compacted: true })) }
+      })
+      if (state.busy && status() !== "streaming" && status() !== "connecting" || activeTask(state.tasks)) void watchTasks(state.busy)
+    } catch (cause) {
+      if (action !== "status" && sessionId() === sid) setControlError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (action !== "status") setControlBusy(false) }
+  }
+  const refreshControls = () => control("status")
+  const consolidateMemory = () => control("consolidate_memory")
+  const compact = () => control("compact")
+  const cancelTask = (taskId: string) => control("cancel_task", { taskId })
+  const replyQuestion = (requestId: string, answers?: ReadonlyArray<ReadonlyArray<string>>) => control(answers ? "answer_question" : "reject_question", { requestId, ...(answers ? { answers } : {}) })
+
+  let controlsGeneration = 0
+  createEffect(() => {
+    const sid = sessionId()
+    projectId()
+    const generation = ++controlsGeneration
+    setQuestions([]); setHostContext(undefined); setControlError(undefined)
+    if (sid) untrack(() => void refreshControls())
+    void app.runtime.run(app.client.ai.agents()).then((list) => { if (generation === controlsGeneration) setAgents(list) }).catch(() => undefined)
+  })
 
   const suggestions = createMemo<ReadonlyArray<Suggestion>>(() => {
     void dismissedSuggestions()
@@ -624,6 +701,8 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   const stopVisionBridge = startVisionBridge(app)
   onCleanup(() => {
+    disposed = true
+    controlsGeneration++
     stopVisionBridge()
     handle?.abort()
     handle = undefined
@@ -633,7 +712,8 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   return {
     status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity, tasks,
     model, setModel, includeContext, setIncludeContext, stats, contextTokens, suggestions, dismissSuggestion,
-    projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission
+    projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission,
+    permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, questions, hostContext, controlBusy, controlError, refreshControls, compact, consolidateMemory, cancelTask, replyQuestion
   }
 })
 

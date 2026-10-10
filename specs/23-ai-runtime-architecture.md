@@ -1,6 +1,6 @@
 # Sidecar, workers and AI sessions — nikcli architecture alignment
 
-Status: analysis and lifecycle alignment in progress. Owners: WP8 (`packages/ai`), WP4 (`apps/sidecar`, HTTP delegation only). No database, UI or Rust contract changes in this increment.
+Status: adopted lifecycle, demand-loading and rendering changes implemented and regression-checked. The remaining architectural work below is not implemented. Owners: WP8 (AI runtime), WP3/WP4 (typed catalogue filter, HTTP/services), WP6/WP7 (bootstrap, queries and viewport), WP9 (plugin RPC), WP10 (native updater). Related specifications record each cross-work-package change before implementation. No database migration in this increment.
 
 ## Decision and evidence
 
@@ -47,3 +47,50 @@ Regressions must cover cancelled-editor exclusion, queue bounds with free global
 ## Change log
 
 - 2026-10-09: local nikcli inspection; WP8 lifecycle contract and WP4 delegation to the session-owning service specified before implementation.
+
+
+## Demand loading and native/UI alignment
+
+The AI provider is UI-scoped and its status, models and full provider catalogue are separate lazy resources. The assistant requests `/api/ai/models?configuredOnly=true`; an installation without connected providers answers without starting an embedded host. The full-list default is preserved for other callers. Settings sort connected providers first. Both model menus page results in batches of 50 and support search; searches reuse a prebuilt provider index rather than rebuilding model strings per keystroke.
+
+The AI service uses `Effect.cachedInvalidateWithTTL` to coalesce concurrent catalogue reads. Credential mutations invalidate it after the runtime applies the change. The sidecar does not prewarm the SDK or download model metadata during bootstrap. A lazy, single-flight catalogue seed is aborted and joined during runtime shutdown. Optional OpenTelemetry imports are deferred until a collector is configured.
+
+Typed client runtimes own credentials independently and accept AbortSignals through `ManagedRuntime.runPromise`. View queries interrupt superseded/unmounted reads. CAD fetches plugin metadata only when its plugin panel is open. Changing only chart presentation retains analytics data instead of repeating its API request.
+
+CADCanvas and View3D own a frame scheduler which coalesces invalidations, settles orbit damping, suspends hidden views and schedules no idle frames. Browser frame APIs retain their Window receiver (required by WebKit). Toolpath playback requests continuous frames while active. Resource teardown deduplicates owned geometry/material/texture disposal; pointer callbacks and fullscreen timers are cancelled. Meshing IPC serializes work, bounds admission, correlates replies, times out hung workers and terminates superseded scene work.
+
+Plugin RPC has ready gating, correlation IDs, scope-owned disposal, interruption cleanup and at most 64 outstanding requests per plugin. Scope closure settles pending requests before terminating workers. Rust supervises bounded reaping and suppresses restart when process exit cannot be established, moves keychain/path work to its blocking pool, and owns a single updater task with coalesced requests. Effect logs are one-line JSON; the supervisor preserves severity after redaction.
+
+## Remaining performance limits
+
+- A scoped in-process AI host still evaluates its SDK on the sidecar thread when first requested. Lazy loading and coalescing reduce unnecessary work; they do not prove CPU isolation. A dedicated AI Worker requires tool proxies and package/build verification.
+- Heavy legacy CSG and Three.js edge extraction can still execute on the UI thread. Scene-scale geometry pooling/instancing and a CSG worker need picking/export/selection regressions before introduction.
+- The live event bus uses an unbounded subscriber buffer. A bounded stream with explicit overflow/resynchronization needs a contract across desktop and mobile; silently dropping events is not introduced here.
+- Persisted scheduler jobs, crash recovery and task push events remain the separate work described above.
+- GPU/CPU/RAM percentage improvements require before/after runs on the same native workload. Scheduler/resource invariants are regression-tested; no percentage claim is inferred from them.
+
+## Bootstrap diagnostics (2026-10-10)
+
+Host acquisition reports its failing bootstrap phase (configuration, SDK import, client creation, tool registration or credential replay) and the SDK HTTP status when available. Credentials and response bodies are excluded. A saved MiniMax coding-plan key is covered by an offline embedded-host bootstrap test; this does not validate a real provider request or establish the cause of an older desktop failure.
+
+First host acquisition with saved credentials for a provider outside the declared defaults joins metadata seeding before tool/provider initialization. Built-in-only hosts remain independent of the metadata network request. Connected-only model results require credentials for their own provider; a gateway key does not mark unrelated provider rows as connected. Metadata response admission is bounded and cache publication is atomic.
+
+Runtime configuration publication is serialized with an Effect semaphore and atomic rename. Built-in/user skill installation is shared across project bootstraps and explicitly invalidated on skill reload, avoiding repeated filesystem work while preserving updates. Parallel project bootstrap is regression-covered.
+
+A client conversation binding cannot cross project ownership: chat admission rejects an alias already bound to another project before acquiring that project host. The system prompt was compacted from 12,953 to 10,369 characters without raising its existing 10,400-character budget; specialist capacity is stated as global, matching the runtime scheduler.
+
+## Verification — 2026-10-10
+
+- Full AI suite: 294 passed, zero failures (39 files), including real embedded-host calls against a local fake provider, isolated host directories, scoped shutdown, specialist ownership and retry behavior.
+- Desktop/sidecar integration: 65 passed, zero failures, covering connected-provider ordering, model selection, typed AI endpoints, bootstrap and plugin RPC/HTTP.
+- Source-process lifecycle: three passed, covering EOF, shutdown IPC and SIGTERM with persisted DB state across restart. Effect logs stay on stderr; stdout retains startup-event framing.
+- Graphics/scheduler/background regressions: 43 passed, zero failures. These checks do not constitute a native GPU benchmark or an end-to-end WebKit rendering verification.
+- Rust: 64 passed, two explicitly ignored (real OS keychain and packaged-sidecar test); Clippy passed with warnings denied.
+- AI, desktop, sidecar and API TypeScript checks passed. Generated SDK consistency and OpenAPI contract snapshots passed.
+- MiniMax coding-plan bootstrap, saved-key replay, connected metadata and concurrent project acquisition passed using a synthetic public catalogue and test key, without calling MiniMax. The production screenshot's historical UnexpectedStatus was not reproduced and is not declared resolved; bootstrap now reports phase and HTTP status to diagnose any recurrence.
+
+## Full monorepo regression check — 2026-10-10
+
+After reproducing the three desktop failures, their fixtures/assertions were aligned with the current contracts: imported meshes require actual vertices/faces, tool summaries include the research category with exact ID coverage, and operation updates invalidate old G-code/verification before regeneration. The CAM test still verifies that editing newly verified G-code marks its report stale.
+
+`bun --no-env-file test packages apps scripts`: 2,191 passed, zero failed, 231 files, one passing snapshot. Desktop TypeScript and whitespace checks passed. This supersedes the earlier selected-suite result for Bun tests; it is not a claim that native packaged-sidecar/keychain or live-provider checks ran.

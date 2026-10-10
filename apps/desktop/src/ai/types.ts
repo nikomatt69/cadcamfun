@@ -18,6 +18,7 @@ export interface ChatModel {
   readonly provider: ProviderId
   readonly model: string
   readonly tier?: Tier
+  readonly variant?: string
 }
 
 export interface ModelInfo {
@@ -38,6 +39,9 @@ export interface HostModel {
   readonly provider: string
   readonly contextWindow: number
   readonly maxOutput: number
+  readonly inputWindow?: number
+  readonly reasoning?: boolean
+  readonly variants?: ReadonlyArray<string>
   readonly tools: boolean
   readonly vision: boolean
   /** USD per million tokens. */
@@ -63,6 +67,22 @@ export interface AiUsage {
   readonly outputTokens: number
 }
 
+export interface AiQuestion {
+  readonly header: string
+  readonly question: string
+  readonly options: ReadonlyArray<{ readonly label: string; readonly description: string }>
+  readonly multiple?: boolean
+  readonly custom?: boolean
+}
+export interface AiPendingQuestion { readonly requestId: string; readonly questions: ReadonlyArray<AiQuestion> }
+export interface AiAgent { readonly id: string; readonly title: string; readonly description: string; readonly tools: ReadonlyArray<string>; readonly edits: boolean }
+export interface AiContextState {
+  readonly memory?: { readonly enabled: boolean; readonly memoryEnabled: boolean; readonly minHours: number; readonly minSessions: number; readonly sessionsSinceLastBrain: number }
+  readonly auto: boolean; readonly prune: boolean; readonly reserved?: number
+  readonly provider?: string; readonly model?: string; readonly contextWindow?: number; readonly inputWindow?: number
+  readonly maxOutput?: number; readonly requestOutput?: number; readonly compactAt?: number; readonly tokens?: number; readonly compacted: boolean
+}
+
 export type AiMessageStatus = "streaming" | "done" | "error"
 
 export interface AiMessage {
@@ -86,10 +106,12 @@ export interface AiMessage {
 }
 
 export type AiEvent =
+  | { readonly type: "question_request"; readonly sessionId: string; readonly requestId: string; readonly questions: ReadonlyArray<AiQuestion> }
+  | { readonly type: "question_resolved"; readonly sessionId: string; readonly requestId: string }
   | { readonly type: "user_message"; readonly sessionId: string; readonly text: string }
   | { readonly type: "delta"; readonly sessionId: string; readonly text: string }
   | { readonly type: "tool_call"; readonly sessionId: string; /** The specialist running the tool; absent for the main agent. */ readonly agent?: string; readonly callId: string; readonly tool: string; readonly input: unknown }
-  | { readonly type: "tool_result"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly ok: boolean; readonly output: string }
+  | { readonly type: "tool_result"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly ok: boolean; readonly output: string; readonly images?: ReadonlyArray<string> }
   | { readonly type: "permission_request"; readonly sessionId: string; readonly requestId: string; readonly permission: string; readonly patterns: ReadonlyArray<string> }
   | { readonly type: "done"; readonly sessionId: string; readonly text: string; readonly usage?: AiUsage; /** The connection dropped and the finished answer was read back from the host. */ readonly recovered?: boolean }
   | { readonly type: "error"; readonly sessionId: string; readonly code: "provider" | "config" | "aborted" | "internal"; readonly message: string }
@@ -131,6 +153,7 @@ export interface AiTask {
 }
 
 export interface AiToolCall {
+  readonly images?: ReadonlyArray<string>
   /** The specialist running it; absent when the main agent does. */
   readonly agent?: string
   readonly tool: string
@@ -162,6 +185,7 @@ export interface AiSession {
 }
 
 export interface AiStatus {
+  readonly tools?: ReadonlyArray<{ readonly id: string; readonly description: string }>
   readonly providers: Readonly<Record<string, "configured" | "missing">>
   readonly configured: boolean
   readonly host: "nikcli" | "direct"

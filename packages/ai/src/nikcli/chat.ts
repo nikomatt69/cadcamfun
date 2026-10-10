@@ -17,6 +17,8 @@ export interface HostChatInput {
   /** Extra system text appended for this turn (project context). */
   readonly system?: string
   readonly model: { readonly providerID: string; readonly modelID: string }
+  readonly agent?: string
+  readonly variant?: string
   /**
    * How many times the turn is resumed on its own after the provider failed for a reason that passes (overload, rate limit,
    * outage, a dropped provider connection). Each resume waits longer (nikcli's retry curve, capped); the count restarts whenever
@@ -324,7 +326,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           let result: HostPromptResult
           try {
             result = await host.client["session-prompt"].prompt(
-              { sessionID: sessionId, agent: CADCAM_AGENT, model: input.model, ...(input.system ? { system: input.system } : {}), parts },
+              { sessionID: sessionId, agent: input.agent ?? CADCAM_AGENT, model: input.model, ...(input.variant ? { variant: input.variant } : {}), ...(input.system ? { system: input.system } : {}), parts },
               { signal: controller.signal }
             )
           } catch (cause) {
@@ -439,7 +441,7 @@ export type PendingDelivery = "queue" | "steer"
 export const queueHostMessage = (host: ProjectHost, sessionId: string, message: string, delivery: PendingDelivery): Effect.Effect<void, AiProviderError> =>
   Effect.tryPromise({
     try: async () => {
-      await host.client["session-prompt"].promptAsync({ sessionID: sessionId, agent: CADCAM_AGENT, delivery, parts: [{ type: "text", text: message }] })
+      await host.client["session-prompt"].promptAsync({ sessionID: sessionId, agent: [...await host.client.session.messages({ sessionID: sessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent ?? CADCAM_AGENT, delivery, parts: [{ type: "text", text: message }] })
     },
     catch: (cause) => new AiProviderError({ message: describeHostFailure(cause) })
   })

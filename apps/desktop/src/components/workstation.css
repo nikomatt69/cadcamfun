@@ -1,6 +1,6 @@
 .cad-workspace,
 .cam-workspace {
-  --workspace-panel: #f8fafc;
+  --workspace-panel: #fff;
   --workspace-border: #d5dde5;
   --workstation-radius: 5px;
   font-size: 12px;
@@ -160,11 +160,11 @@ html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace
 :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):focus-visible {
   background: rgba(75, 85, 99, 0.12);
   border-color: rgba(107, 114, 128, 0.45);
-  border-radius: 6px;
+  border-radius: 5px 5px 0 0;
 }
 @media (hover: hover) and (pointer: fine) {
   :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"]:hover {
-    border-radius: 999px;
+    border-radius: 5px 5px 0 0;
     border-color: rgba(148, 163, 184, 0.35);
     border-bottom-color: #007acc;
     background: rgba(239, 246, 255, 0.8);
@@ -180,7 +180,7 @@ html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace
   :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):hover {
     background: rgba(75, 85, 99, 0.12);
     border-color: rgba(107, 114, 128, 0.45);
-    border-radius: 6px;
+    border-radius: 5px 5px 0 0;
   }
 }
 
@@ -390,3 +390,48 @@ html.dark .capabilities-overview__items { color: #cbd5e1; }
 @media (max-width: 980px) {
   .cam-ribbon > :nth-child(2) { overflow-x: auto; }
 }
+
+/* Compact CAD operation ribbon: viewport-independent height and overflow. */
+.cad-ribbon { display: flex; flex-shrink: 0; min-width: 0; max-width: 100%; overflow-x: auto; align-items: stretch; background: var(--workspace-panel); border-bottom: 1px solid var(--workspace-border); }
+.cad-ribbon-group { flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 5px 10px 6px; border-right: 1px solid var(--workspace-border); }
+.cad-ribbon-group:last-child { border-right: 0; }
+.cad-ribbon-heading { color: #2563eb; font-size: 10px; line-height: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .035em; }
+.cad-ribbon-actions { display: flex; align-items: center; gap: 4px; }
+.cad-ribbon-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 26px; padding: 3px 7px; border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-panel); color: #374151; font-size: 11px; line-height: 18px; white-space: nowrap; }
+.cad-ribbon-action svg { flex-shrink: 0; }
+.cad-ribbon-action[aria-pressed="true"] { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
+.cad-ribbon-action:disabled { opacity: .45; cursor: not-allowed; }
+.cad-ribbon-actions :is(input, select) { min-height: 26px; padding: 3px 5px; border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-panel); color: inherit; font-size: 11px; }
+.cad-ribbon-position { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+.cad-ribbon-position input { width: 70px; }
+html.dark .cad-ribbon-heading { color: #60a5fa; }
+html.dark .cad-ribbon-action { color: #e2e8f0; }
+html.dark .cad-ribbon-action[aria-pressed="true"] { color: #93c5fd; background: #1e3a5f; border-color: #3b82f6; }
+@media (hover: hover) and (pointer: fine) { .cad-ribbon-action:hover:not(:disabled) { border-color: #60a5fa; background: #eff6ff; color: #1d4ed8; } html.dark .cad-ribbon-action:hover:not(:disabled) { background: #1e3a5f; color: #bfdbfe; } }
+
+/* Cycle cards respond to the inspector width, not the window's breakpoint. */
+.machine-cycles { min-width: 0; container-type: inline-size; }
+.machine-cycles-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; }
+.machine-cycles-layout > div { min-width: 0; }
+.machine-cycle-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 6px; }
+.machine-cycle-choice { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; padding: 8px; text-align: left; }
+.machine-cycle-choice > div { width: 22px; height: 22px; flex-shrink: 0; margin: 0; }
+.machine-cycle-choice svg { width: 22px; height: 22px; }
+.machine-cycle-choice > span { min-width: 0; white-space: normal; overflow-wrap: break-word; font-size: 11px; line-height: 15px; }
+@container (min-width: 640px) { .machine-cycles-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* The tool window stays inside the canvas; only its content scrolls. */
+.cad-floating-toolbar { display: flex; flex-direction: column; width: min(340px, calc(100% - 16px)); max-height: min(440px, calc(100% - 16px)); min-width: 0; overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 8px; background: var(--workspace-panel); color: inherit; box-shadow: 0 4px 16px #0002; }
+.cad-floating-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; min-height: 32px; padding: 4px 6px; border-bottom: 1px solid var(--workspace-border); touch-action: none; user-select: none; }
+.cad-floating-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.cad-floating-tabs { display: flex; gap: 3px; padding: 5px; flex-shrink: 0; border-bottom: 1px solid var(--workspace-border); }
+.cad-floating-tabs button { min-width: 0; padding: 5px 6px; font-size: 11px; border-radius: 5px; }
+.cad-floating-content { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 8px; }
+.cad-floating-content > div { max-height: none; overflow: visible; padding: 0; background: transparent; box-shadow: none; }
+.cad-floating-content h4 { font-size: 10px; line-height: 14px; margin-bottom: 5px; }
+.cad-floating-content .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.cad-floating-content .grid-cols-4 button { aspect-ratio: auto; min-height: 52px; border: 1px solid var(--workspace-border); background: var(--workspace-panel); border-radius: 5px; }
+.cad-floating-content .grid-cols-4 button > span { white-space: normal; overflow-wrap: break-word; }
+.cad-floating-transforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.cad-floating-transforms button { min-height: 46px; box-shadow: none; border: 1px solid var(--workspace-border); }
+.cad-floating-header:focus-visible { outline: 2px solid #3b82f6; outline-offset: -2px; }

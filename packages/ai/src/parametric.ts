@@ -10,10 +10,10 @@ const operation = z.enum(["new", "union", "subtract", "intersect"])
 const pair = z.tuple([dimensionSchema, dimensionSchema])
 const triple = z.tuple([dimensionSchema, dimensionSchema, dimensionSchema])
 const entity = z.discriminatedUnion("kind", [
-  z.object({ id, kind: z.literal("point"), x: n, y: n }),
-  z.object({ id, kind: z.literal("line"), p1: id, p2: id }),
-  z.object({ id, kind: z.literal("circle"), center: id, radius: n.positive() }),
-  z.object({ id, kind: z.literal("arc"), center: id, start: id, end: id })
+  z.object({ id, kind: z.literal("point"), x: n, y: n }).describe("Sketch point: discriminator kind, numeric x/y in mm; parameterize through constraints."),
+  z.object({ id, kind: z.literal("line"), p1: id, p2: id }).describe("Sketch line: kind, p1/p2 are IDs of points in this sketch, not coordinates."),
+  z.object({ id, kind: z.literal("circle"), center: id, radius: n.positive() }).describe("Sketch circle: kind, center is a point ID; radius is a positive number in mm."),
+  z.object({ id, kind: z.literal("arc"), center: id, start: id, end: id }).describe("Sketch arc: kind, center/start/end are point IDs in this sketch.")
 ])
 const named = { id: id.optional() }
 const unaryLine = (type: "horizontal" | "vertical") => z.object({ ...named, type: z.literal(type), line: id })
@@ -43,7 +43,7 @@ const feature = z.discriminatedUnion("type", [
 ])
 
 export const parameterSchema = z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/), dimensionSchema).refine((p) => Object.keys(p).length <= 80, "At most 80 parameters")
-export const historySchema = z.object({ parameters: parameterSchema, features: z.array(feature).min(1).max(80) }).superRefine((history, ctx) => {
+export const historySchema = z.object({ parameters: parameterSchema, features: z.array(feature).min(1).max(80) }).describe("JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve references.").superRefine((history, ctx) => {
   const seen = new Map<string, z.infer<typeof feature>>()
   const issue = (index: number, message: string) => ctx.addIssue({ code: "custom", path: ["features", index], message })
   history.features.forEach((f, index) => {

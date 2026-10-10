@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { isolatedPaths } from "../src/nikcli/isolation.ts"
-import { modelsCacheFile, seedModelsCache } from "../src/nikcli/models-cache.ts"
+import { modelsCacheFile, seedModelsCache, readCatalogueBody, MAX_CATALOGUE_BYTES } from "../src/nikcli/models-cache.ts"
 
 const paths = () => isolatedPaths(mkdtempSync(join(tmpdir(), "cadcam-cache-")))
 
@@ -22,4 +22,18 @@ describe("model catalogue cache", () => {
     expect(await seedModelsCache(p, { network: true })).toBe("present")
     expect(await seedModelsCache(p)).toBe("present")
   })
+})
+
+test("model metadata buffering is bounded even without Content-Length", async () => {
+  let cancelled = false
+  const response = new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new Uint8Array(MAX_CATALOGUE_BYTES))
+      controller.enqueue(new Uint8Array(1))
+    },
+    cancel() { cancelled = true }
+  }))
+  expect(await readCatalogueBody(response)).toBeUndefined()
+  expect(cancelled).toBe(true)
+  expect(await readCatalogueBody(new Response('{"ok":true}'))).toBe('{"ok":true}')
 })

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, systemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape
+  searchWeb, makeNikCliRuntime, agentSystemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted, Schema } from "effect"
@@ -595,7 +595,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
     providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
-    systemPrompt: systemPrompt(),
+    systemPrompt: agentSystemPrompt(),
     // Host imports and model metadata start on demand, after the editor is usable.
     // One request to models.dev, only while `<cache>/models.json` is missing: that file is
     // what turns "the four providers we declare" into the whole catalogue. Offline tests

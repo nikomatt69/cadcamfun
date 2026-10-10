@@ -356,6 +356,31 @@ export type UserCreateTokenPayload = {
   readonly expiresIn?: number | undefined
 }
 
+export type AiSessionControlPayload = {
+  readonly sessionId: string
+  readonly projectId?: string | undefined
+  readonly action:
+    | "status"
+    | "compact"
+    | "cancel_task"
+    | "answer_question"
+    | "reject_question"
+    | "reply_permission"
+    | "consolidate_memory"
+  readonly taskId?: string | undefined
+  readonly requestId?: string | undefined
+  readonly answers?: ReadonlyArray<ReadonlyArray<string>> | undefined
+  readonly decision?: "once" | "always" | "reject" | undefined
+  readonly model?:
+    | {
+        readonly provider?: string | undefined
+        readonly model?: string | undefined
+        readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
+      }
+    | undefined
+}
+
 export type AiSessionStatePayload = { readonly sessionId: string; readonly projectId?: string | undefined }
 
 export type AiRemoveSessionPayload = { readonly sessionId: string; readonly projectId?: string | undefined }
@@ -380,6 +405,7 @@ export type AiTitlePayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -393,6 +419,7 @@ export type AiDesignAnalysisPayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -407,6 +434,7 @@ export type AiMachiningParametersPayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -421,6 +449,7 @@ export type AiGcodeOptimizationPayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -434,6 +463,7 @@ export type AiDesignSuggestionsPayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -445,6 +475,9 @@ export type AiChatPayload = {
 }
 
 export type AiChatStreamPayload = {
+  readonly permissionMode?: "auto" | "ask" | "approve" | undefined
+  readonly agent?: string | undefined
+  readonly mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" | undefined
   readonly attachments?:
     | ReadonlyArray<{
         readonly name: string
@@ -462,6 +495,7 @@ export type AiChatStreamPayload = {
         readonly provider?: string | undefined
         readonly model?: string | undefined
         readonly tier?: "fast" | "balanced" | "best" | undefined
+        readonly variant?: string | undefined
       }
     | undefined
 }
@@ -477,6 +511,7 @@ export type AiChatAbortPayload = { readonly sessionId?: string | undefined }
 
 export type AiPermissionReplyPayload = {
   readonly sessionId: string
+  readonly projectId?: string | undefined
   readonly requestId: string
   readonly decision: "once" | "always" | "reject"
 }
@@ -1751,6 +1786,77 @@ export type UserByIdOutput = {
   organizations: Array<{ id: string; name: string; role: string }>
 }
 
+export type AiAgentsOutput = Array<{
+  id: string
+  title: string
+  description: string
+  tools: Array<string>
+  edits: boolean
+}>
+
+export type AiSessionControlInput = {
+  readonly sessionId: AiSessionControlPayload["sessionId"]
+  readonly projectId?: AiSessionControlPayload["projectId"]
+  readonly action: AiSessionControlPayload["action"]
+  readonly taskId?: AiSessionControlPayload["taskId"]
+  readonly requestId?: AiSessionControlPayload["requestId"]
+  readonly answers?: AiSessionControlPayload["answers"]
+  readonly decision?: AiSessionControlPayload["decision"]
+  readonly model?: AiSessionControlPayload["model"]
+}
+
+export type AiSessionControlOutput = {
+  permissions?: Array<{ requestId: string; sessionId: string; permission: string; patterns: Array<string> }> | undefined
+  busy: boolean
+  text: string
+  tasks: Array<{
+    id: string
+    agent: string
+    description: string
+    status: "queued" | "running" | "completed" | "error" | "cancelled"
+    background: boolean
+    text?: string | undefined
+    error?: string | undefined
+  }>
+  questions: Array<{
+    requestId: string
+    questions: Array<{
+      header: string
+      question: string
+      options: Array<{ label: string; description: string }>
+      multiple?: boolean | undefined
+      custom?: boolean | undefined
+    }>
+  }>
+  context: {
+    memory?:
+      | {
+          enabled: boolean
+          memoryEnabled: boolean
+          minHours: number
+          minSessions: number
+          lastBrainAt: number
+          hoursSinceLastBrain: number
+          sessionsSinceLastBrain: number
+          shouldTrigger: boolean
+        }
+      | undefined
+    source: "host-config"
+    auto: boolean
+    prune: boolean
+    reserved?: number | undefined
+    provider?: string | undefined
+    model?: string | undefined
+    contextWindow?: number | undefined
+    maxOutput?: number | undefined
+    inputWindow?: number | undefined
+    requestOutput?: number | undefined
+    compactAt?: number | undefined
+    tokens?: number | undefined
+    compacted: boolean
+  }
+}
+
 export type AiSessionStateInput = {
   readonly sessionId: AiSessionStatePayload["sessionId"]
   readonly projectId?: AiSessionStatePayload["projectId"]
@@ -1861,6 +1967,9 @@ export type AiProvidersOutput = Array<{
     provider: string
     contextWindow: number
     maxOutput: number
+    inputWindow?: number | undefined
+    reasoning?: boolean | undefined
+    variants?: Array<string> | undefined
     tools: boolean
     vision: boolean
     cost: { input: number; output: number }
@@ -1943,6 +2052,9 @@ export type AiChatInput = {
 export type AiChatOutput = { reply: string; hasMcpData: boolean }
 
 export type AiChatStreamInput = {
+  readonly permissionMode?: AiChatStreamPayload["permissionMode"]
+  readonly agent?: AiChatStreamPayload["agent"]
+  readonly mode?: AiChatStreamPayload["mode"]
   readonly attachments?: AiChatStreamPayload["attachments"]
   readonly message?: AiChatStreamPayload["message"]
   readonly sessionId?: AiChatStreamPayload["sessionId"]
@@ -1968,6 +2080,7 @@ export type AiChatAbortOutput = { message: string }
 
 export type AiPermissionReplyInput = {
   readonly sessionId: AiPermissionReplyPayload["sessionId"]
+  readonly projectId?: AiPermissionReplyPayload["projectId"]
   readonly requestId: AiPermissionReplyPayload["requestId"]
   readonly decision: AiPermissionReplyPayload["decision"]
 }

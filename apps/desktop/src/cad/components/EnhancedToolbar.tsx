@@ -154,7 +154,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           <button
             onClick={openSimulation}
             class={`p-1.5 border shadow-sm rounded-md flex items-center transition-all duration-200 ${simulationPosition() ? "bg-orange-50 dark:bg-orange-900 border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300" : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900 hover:border-orange-300 text-gray-700 dark:text-gray-300 hover:text-orange-700"}`}
-            title="Apri Simulazione FEA"
+            title="Open FEA simulation"
           >
             <Activity size={16} />
           </button>
@@ -275,13 +275,13 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
               <div class="flex items-center space-x-3">
                 <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center"><Activity size={18} class="text-white" /></div>
                 <div>
-                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Simulazione FEA Integrata</h2>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">Analisi strutturale, termica e accoppiata in tempo reale</p>
+                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Integrated FEA Simulation</h2>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">Real-time structural, thermal, and coupled analysis</p>
                 </div>
               </div>
               <div class="flex items-center space-x-2">
                 <div class="text-xs text-gray-500 dark:text-gray-400 mr-4">
-                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse" />Sistema attivo</span>
+                  <span class="inline-flex items-center"><div class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse" />System active</span>
                 </div>
                 <button onClick={() => setSimulationPosition(null)} class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors" aria-label="Close"><X size={20} /></button>
               </div>
@@ -290,13 +290,13 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             <div class="absolute bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-800/50 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-4 py-2">
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center space-x-4 text-gray-600 dark:text-gray-400">
-                  <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />Canvas simulazione attivo</span>
-                  <span>⌨️ Ctrl+Shift+S: Toggle simulazione</span>
-                  <span>⌨️ F9: Cambia modalità</span>
-                  <span>⌨️ Esc: Chiudi</span>
+                  <span class="flex items-center"><div class="w-2 h-2 bg-blue-400 rounded-full mr-1" />Simulation canvas active</span>
+                  <span>⌨️ Ctrl+Shift+S: Toggle simulation</span>
+                  <span>⌨️ F9: Switch mode</span>
+                  <span>⌨️ Esc: Close</span>
                 </div>
                 <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
-                  <span>Modalità avanzata</span>
+                  <span>Advanced mode</span>
                   <div class="w-1 h-4 bg-gradient-to-t from-orange-400 to-red-500 rounded-full" />
                 </div>
               </div>

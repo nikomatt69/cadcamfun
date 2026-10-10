@@ -28,6 +28,8 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { assertSigningConfig, bundleRoot, indexArtifacts, previousReleaseTag, releaseVersion, targetInfo } from "./release-helpers.ts";
 
+import { signingEnvironment } from "./signing-config.ts";
+
 const ROOT = resolve(import.meta.dir, "..");
 const DESKTOP = join(ROOT, "apps", "desktop");
 const SRC_TAURI = join(DESKTOP, "src-tauri");
@@ -110,7 +112,7 @@ function quote(value: string): string {
 /** Spawns a command, streaming its output; returns stdout for commands we parse. */
 async function run(
   command: readonly string[],
-  options: { cwd?: string; capture?: boolean } = {},
+  options: { cwd?: string; capture?: boolean; env?: Record<string, string | undefined> } = {},
 ): Promise<CommandResult> {
   const cwd = options.cwd ?? ROOT;
   if (dryRun) {
@@ -126,7 +128,7 @@ async function run(
     stdin: "inherit",
     stdout: options.capture ? "pipe" : "inherit",
     stderr: options.capture ? "pipe" : "inherit",
-    env: childEnv(),
+    env: options.env ?? childEnv(),
   });
   const [stdout, stderr, code] = await Promise.all([
     options.capture ? new Response(child.stdout as ReadableStream).text() : Promise.resolve(""),
@@ -310,7 +312,10 @@ async function stepResources(): Promise<void> {
 
 async function stepBundle(): Promise<void> {
   const triple = await resolveTarget();
-  if (!dryRun) assertSigningConfig(JSON.parse(await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8")), process.env, targetInfo(triple).platform, process.env.CADCAM_RELEASE === "1");
+  const config = JSON.parse(await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8"));
+  // Only the bundler receives local signing credentials; checks and sidecar builds do not.
+  const signingEnv = dryRun ? childEnv() : signingEnvironment(ROOT, process.env, config.plugins?.updater?.pubkey);
+  if (!dryRun) assertSigningConfig(config, signingEnv, targetInfo(triple).platform, process.env.CADCAM_RELEASE === "1");
   announce(5, "build the desktop frontend and bundle the app");
   await run(["bun", "run", "--filter", "@cadcamfun/desktop", "build"]);
   // `tauri build` also runs `beforeBuildCommand` from tauri.conf.json, which
@@ -322,7 +327,7 @@ async function stepBundle(): Promise<void> {
     ...(thumbprint && targetInfo(triple).platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
   } })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
-  await run(tauri, { cwd: DESKTOP });
+  await run(tauri, { cwd: DESKTOP, env: signingEnv });
 }
 
 // ──────────────────────────────── step 6 ──────────────────────────────────
@@ -574,6 +579,9 @@ Options:
                       (default: apps/desktop/src-tauri/target/release-artifacts)
   --dry-run           print the plan, write nothing, change nothing
   -h, --help          show this help
+
+Local updater signing uses ignored tauri-signing.json when no environment key is set.
+Platform certificates are still required for CADCAM_RELEASE=1.
 
 Examples:
   bun scripts/build.ts                              full release build

@@ -13,7 +13,7 @@ import { toast } from "../components/ui/feedback.tsx"
 import { t } from "../i18n/index.ts"
 import { WorkspacePage } from "../components/WorkspacePage.tsx"
 
-const CARD = "rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+const CARD = "ui-card ui-card-default !p-6"
 const LABEL = "mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
 const FIELD = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 const PRIMARY = "rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"

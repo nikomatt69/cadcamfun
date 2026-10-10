@@ -1,5 +1,9 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Assistant control integration (2026-10-10)
+
+See `24-assistant-control-flow.md`: WP3 adds schema-first agents/session-control endpoints and optional chat role/mode/model variant; WP4 delegates controls to WP8's session-bound service. Generate both clients after changes. Status: in progress. Change log: 2026-10-10 — registered the assistant control contract before implementation.
+
 ## AI lifecycle alignment (2026-10-09)
 
 See `23-ai-runtime-architecture.md`. WP4's session-removal handler delegates to WP8's `AiService.removeSession(sessionId, projectId?)`, which resolves client/host identity and joins children before parent removal. The HTTP request/reply schemas remain unchanged. IPC auditing also covers bounded startup/shutdown and plugin RPC failure settlement.

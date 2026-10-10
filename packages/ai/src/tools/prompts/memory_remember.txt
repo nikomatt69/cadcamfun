@@ -1,3 +1,5 @@
+Automatically save a verified, reusable project fact after a successful setup or a user correction. Do not save a failed call, an unverified assumption or a transient progress log. Notes are scoped to this project and overwrite the same key.
+
 Save a short note that you will see again in later conversations: a preference, a fact about the part, the stock or the machine.
 
 Use it

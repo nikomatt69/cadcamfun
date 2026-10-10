@@ -66,6 +66,7 @@ Effect.gen(function*() {
   yield* awaitShutdown
 }).pipe(
   Effect.scoped,
+  Effect.provide(Logger.layer([Logger.withConsoleError(Logger.formatJson)])),
   Effect.provideService(Logger.LogToStderr, true),
   Effect.catchCause((cause) =>
     Cause.hasInterruptsOnly(cause) ? Effect.void :

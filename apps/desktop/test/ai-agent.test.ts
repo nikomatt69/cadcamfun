@@ -73,3 +73,53 @@ describe("the agent's work is shown", () => {
     } finally { client.ai.chatStream = original }
   }, 60000)
 })
+
+test("assistant controls select roles and modes, answer questions and compact through the typed client", async () => {
+  const client = app.state.client as unknown as { ai: { chatStream: unknown; sessionControl: unknown } }
+  const originalStream = client.ai.chatStream, originalControl = client.ai.sessionControl
+  const controls: Array<Record<string, unknown>> = []
+  let sent: Record<string, unknown> | undefined
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  client.ai.chatStream = (input: { payload: Record<string, unknown> }) => {
+    sent = input.payload
+    const sid = input.payload.sessionId
+    return Effect.succeed(Stream.concat(
+      Stream.fromIterable([JSON.stringify({ type: "tool_call", sessionId: sid, callId: "question-call", tool: "question", input: { questions: [] } }), JSON.stringify({ type: "question_request", sessionId: sid, requestId: "q-ui", questions: [{ header: "Stock", question: "Which stock?", options: [{ label: "Aluminium", description: "Use aluminium" }], custom: false }] })]),
+      Stream.fromEffect(Effect.promise(() => gate.then(() => JSON.stringify({ type: "done", sessionId: sid, text: "Stock confirmed." }))))
+    ))
+  }
+  client.ai.sessionControl = (input: { payload: Record<string, unknown> }) => {
+    controls.push(input.payload)
+    if (input.payload.action === "answer_question") release()
+    return Effect.succeed({ busy: false, text: "", tasks: [], questions: [], context: { auto: true, prune: true, contextWindow: 100_000, compactAt: 95_904, requestOutput: 4096, compacted: input.payload.action === "compact" } })
+  }
+  const { dispose } = app.visit("/cad")
+  try {
+    await flush()
+    if (!q('[data-testid="ai-panel"]')) (await w("open assistant", () => q<HTMLButtonElement>('button[title="Show CAD Assistant"]'))).click()
+    const panel = await w("controls", () => q('[data-testid="ai-controls"]'))
+    const selectors = panel.querySelectorAll<HTMLSelectElement>("select")
+    await w("role catalogue", () => selectors[0]?.querySelector('option[value="modeler"]'))
+    selectors[0]!.value = "modeler"; selectors[0]!.dispatchEvent(new window.Event("change", { bubbles: true }))
+    selectors[1]!.value = "cad"; selectors[1]!.dispatchEvent(new window.Event("change", { bubbles: true }))
+    selectors[2]!.value = "auto"; selectors[2]!.dispatchEvent(new window.Event("change", { bubbles: true }))
+    const input = await w("composer", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))
+    input.value = "Model this part"; input.dispatchEvent(new window.Event("input", { bubbles: true }))
+    await flush(); q<HTMLButtonElement>("button.assistant-send")!.click()
+    const question = await w("question UI", () => q('[data-testid="ai-question"]'))
+    expect(sent?.agent).toBe("modeler"); expect(sent?.mode).toBe("cad")
+    expect(sent?.permissionMode).toBe("auto")
+    question.querySelector<HTMLInputElement>('input[type="radio"]')!.click()
+    await flush(); question.querySelector<HTMLButtonElement>("button")!.click()
+    await w("question reply", () => controls.find((control) => control.action === "answer_question"))
+    expect(controls.find((control) => control.action === "answer_question")?.answers).toEqual([["Aluminium"]])
+    await w("turn finished", () => q<HTMLButtonElement>("button.assistant-send")?.disabled === false)
+    q<HTMLButtonElement>('button[title="Conversation context"]')!.click()
+    const compact = await w("compact button", () => q<HTMLButtonElement>('[data-testid="ai-compact"]'))
+    await w("compaction available", () => !compact.disabled); compact.click()
+    await w("compact request", () => controls.find((control) => control.action === "compact"))
+  } finally {
+    release(); dispose(); client.ai.chatStream = originalStream; client.ai.sessionControl = originalControl
+  }
+}, 60000)

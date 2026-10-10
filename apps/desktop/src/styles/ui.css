@@ -13,11 +13,11 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
   font-feature-settings: "ss01", "cv11", "calt";
-  --ui-radius-sm: 0.5rem;
-  --ui-radius-md: 0.875rem;
-  --ui-radius-lg: 1.25rem;
-  --ui-radius-xl: 1.75rem;
-  --ui-radius-2xl: 2rem;
+  --ui-radius-sm: 5px;
+  --ui-radius-md: 8px;
+  --ui-radius-lg: 8px;
+  --ui-radius-xl: 12px;
+  --ui-radius-2xl: 12px;
   --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
   --ui-shadow-md: 0 6px 16px -8px rgba(15, 23, 42, 0.18), 0 2px 4px rgba(15, 23, 42, 0.04);
   --ui-shadow-lg: 0 24px 48px -24px rgba(15, 23, 42, 0.28), 0 6px 12px rgba(15, 23, 42, 0.06);
@@ -50,23 +50,44 @@
   transform-origin: var(--ui-popover-origin, center);
 }
 
-/* --- Hardware-accelerated press feedback (Emil: scale 0.97 on :active) --- */
+/* --- Origin-aware menu / tooltip / dropdown (Emil: scale from trigger, not center) --- */
+.ui-menu,
+.ui-tooltip,
+.ui-dropdown {
+  transform-origin: var(--ui-popover-origin, center);
+}
+
+/* --- Hardware-accelerated press feedback (Emil: scale 0.97 on :active, 100ms in) --- */
 .ui-press {
-  transition: transform var(--ui-release-duration) var(--ui-ease-out);
+  transition: transform 100ms var(--ui-ease-out);
   will-change: transform;
 }
 .ui-press:active {
   transform: scale(0.97);
-  transition-duration: var(--ui-press-duration);
+  transition-duration: 60ms;
+}
+@media (hover: none) {
+  .ui-press, .ui-press:active { transform: none !important; }
+}
+
+/* --- Scroll edge effect: fade mask where floating UI meets scrolling content --- */
+.ui-scroll-edge-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 12px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 12px, black 100%);
+}
+.ui-scroll-edge-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, black 12px, black 100%);
+  mask-image: linear-gradient(to top, transparent 0, black 12px, black 100%);
+}
+.ui-scroll-edge-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
 }
 
 /* --- Touch-guard: gate hover effects behind fine pointer --- */
 @media (hover: hover) and (pointer: fine) {
   .ui-hover-lift:hover { transform: translateY(-2px); }
   .ui-hover-glow:hover { box-shadow: 0 12px 32px -12px rgba(59, 130, 246, 0.4); }
-}
-@media (hover: none) {
-  .ui-press, .ui-press:active { transform: none !important; }
 }
 
 html.dark {
@@ -79,21 +100,21 @@ html.dark {
 .cad-workspace,
 .cam-workspace {
   --workspace-border: rgba(148, 163, 184, 0.24);
-  --workspace-panel: rgba(248, 250, 252, 0.94);
+  --workspace-panel: #fff;
   --workspace-stage: #f2f5f8;
-  background: #e9edf2;
+  background: #fff;
   color: #17212b;
 }
 .cad-workspace__frame,
 .cam-workspace__frame {
-  background: #e9edf2;
+  background: #fff;
 }
 .cad-workspace__body,
 .cam-workspace__body {
   min-height: 0;
   gap: 0.625rem;
   padding: 0.625rem;
-  background: linear-gradient(145deg, #e9edf2, #e3e9ef);
+  background: #fff;
 }
 .cad-workspace__sidebar,
 .cam-workspace__sidebar,
@@ -101,7 +122,7 @@ html.dark {
 .cam-workspace__inspector {
   background: var(--workspace-panel);
   border: 1px solid var(--workspace-border);
-  border-radius: 0.8rem;
+  border-radius: var(--ui-radius-md);
   box-shadow: 0 5px 18px rgba(30, 45, 60, 0.07);
 }
 .cad-workspace__sidebar,
@@ -111,12 +132,12 @@ html.dark {
 .cad-workspace__tabs,
 .cam-workspace__tabs {
   border-bottom: 1px solid var(--workspace-border);
-  background: rgba(235, 241, 246, 0.8);
+  background: #fff;
 }
 .cad-workspace__stage,
 .cam-workspace__stage {
   border: 1px solid rgba(123, 141, 158, 0.28);
-  border-radius: 0.8rem;
+  border-radius: var(--ui-radius-md);
   background-color: var(--workspace-stage);
   background-image: radial-gradient(rgba(92, 112, 130, 0.13) 0.7px, transparent 0.7px);
   background-size: 18px 18px;

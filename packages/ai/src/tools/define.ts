@@ -10,6 +10,7 @@ import type { FilePart } from "../attachments.ts"
 import type { HostToolSpec } from "../nikcli/runtime.ts"
 import type { ToolHandlersShape } from "./handlers.ts"
 import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
+import { formatToolValidationError, toolValidationFailure } from "../tool-validation.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 
 export interface ToolContext {
@@ -52,13 +53,14 @@ export const toSpec = (definition: ToolDefinition, context: ToolContext): HostTo
     try {
       if (call.signal.aborted) return { output: json({ ok: false, error: "Tool execution cancelled." }) }
       const parsed = definition.parameters.safeParse(sanitizeArguments(input))
-      if (!parsed.success) return { output: json({ ok: false, error: "Invalid tool arguments.", problems: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).slice(0, 12) }) }
+      if (!parsed.success) return { output: json(toolValidationFailure(definition.id, parsed.error)) }
       const result = await definition.execute(parsed.data, { ...context, signal: call.signal, sessionId: call.sessionId })
       return result instanceof ToolMediaResult ? { output: json(result.value), files: result.files } : { output: json(result) }
     } catch (error) { return { output: json({ ok: false, error: safeToolError(error) }) } }
   }
   return {
     id: definition.id, description: definition.description, parameters: lenient(definition.parameters),
+    formatValidationError: (error) => formatToolValidationError(definition.id, error),
     execute: async (input, call) => (await run(input, call)).output,
     executeWithFiles: run
   }

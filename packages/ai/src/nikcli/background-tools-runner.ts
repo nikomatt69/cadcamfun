@@ -1,4 +1,5 @@
 /// <reference path="./sdk-next.d.ts" />
+import { hostAgentWithPermissions, inheritedPermissionMode } from "./permission-modes.ts"
 import { Effect } from "effect"
 import {
   BackgroundTaskManager,
@@ -45,12 +46,12 @@ class WorkerRunner {
   ) {}
 
   /** The model the parent conversation is using, so a specialist works with a model that is known to be connected. */
-  private async parentModel(host: Awaited<ReturnType<typeof this.hostOf>>): Promise<{ providerID: string; modelID: string } | undefined> {
+  private async parentModel(host: Awaited<ReturnType<typeof this.hostOf>>): Promise<{ model: { providerID: string; modelID: string }; system?: string; variant?: string; agent?: string } | undefined> {
     try {
       const messages = await host.client.session.messages({ sessionID: this.parentSessionId, limit: 20 })
       for (const message of [...messages].reverse()) {
         const model = message.info.role === "user" ? message.info.model : undefined
-        if (model?.providerID && model.modelID) return { providerID: model.providerID, modelID: model.modelID }
+        if (model?.providerID && model.modelID) return { agent: message.info.agent, model: { providerID: model.providerID, modelID: model.modelID }, ...(message.info.system ? { system: message.info.system } : {}), ...(message.info.variant ? { variant: message.info.variant } : {}) }
       }
     } catch {
       // No record of the parent: the host picks its default model.
@@ -77,6 +78,9 @@ class WorkerRunner {
       const release = adoptChildSession(this.parentSessionId, session.id, spec.id)
       try {
         const controller = new AbortController()
+        let aborting: Promise<unknown> | undefined
+        const abortChild = () => { aborting ??= host.client.session.abort({ sessionID: session.id }).catch(() => undefined) }
+        controller.signal.addEventListener("abort", abortChild, { once: true })
         const timer = setTimeout(() => controller.abort(new Error(`${spec.id} timeout`)), spec.timeoutMs)
         const onAbort = () => controller.abort(input.signal.reason ?? new Error("parent cancelled"))
         if (input.signal.aborted) controller.abort(input.signal.reason ?? new Error("parent cancelled"))
@@ -89,9 +93,9 @@ class WorkerRunner {
               const result = await host.client["session-prompt"].prompt(
                 {
                   sessionID: session.id,
-                  agent: spec.host,
+                  ...(model ?? {}),
+                  agent: hostAgentWithPermissions(spec.host, inheritedPermissionMode(model?.agent)),
                   delivery: "queue",
-                  ...(model ? { model } : {}),
                   parts: [{ type: "text", text }]
                 },
                 { signal: controller.signal }
@@ -115,6 +119,8 @@ class WorkerRunner {
         } finally {
           clearTimeout(timer)
           input.signal.removeEventListener("abort", onAbort)
+          controller.signal.removeEventListener("abort", abortChild)
+          await aborting
         }
       } finally {
         release()
@@ -197,7 +203,7 @@ export class BackgroundToolsRunner {
     try {
       await host.client["session-prompt"].promptAsync({
         sessionID: task.parentSessionId,
-        agent: "cadcam",
+        agent: [...await host.client.session.messages({ sessionID: task.parentSessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent ?? "cadcam",
         delivery: "queue",
         parts: [{ type: "text", text: body, synthetic: true }]
       })

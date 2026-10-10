@@ -19,6 +19,9 @@ export interface HostModelInfo {
   readonly provider: string
   readonly contextWindow: number
   readonly maxOutput: number
+  readonly inputWindow?: number
+  readonly reasoning: boolean
+  readonly variants: ReadonlyArray<string>
   /** The model can be given tools (the `cad_*` catalogue). */
   readonly tools: boolean
   /** The model accepts image input. */
@@ -43,8 +46,11 @@ const toModel = (provider: string, id: string, raw: HostModel): HostModelInfo =>
   id,
   name: raw.name ?? id,
   provider,
-  contextWindow: number(raw.limit?.context, 200_000),
-  maxOutput: number(raw.limit?.output, 16_000),
+  contextWindow: number(raw.limit?.context),
+  maxOutput: number(raw.limit?.output),
+  ...(number(raw.limit?.input) > 0 ? { inputWindow: number(raw.limit?.input) } : {}),
+  reasoning: raw.capabilities?.reasoning === true,
+  variants: Object.keys(raw.variants ?? {}).sort(),
   tools: raw.capabilities?.toolcall === true,
   vision: raw.capabilities?.attachment === true || raw.capabilities?.input?.image === true,
   cost: { input: number(raw.cost?.input), output: number(raw.cost?.output) }
@@ -61,7 +67,7 @@ export const hostCatalog = (
   projectId = "default"
 ): Effect.Effect<ReadonlyArray<HostProviderInfo>, AiConfigError> =>
   Effect.gen(function* () {
-    // Read the seed first: the runtime starts it at boot without waiting, and
+    // Read the lazy seed first: it starts on catalogue demand, and
     // `provider.list()` only sees models.dev once `<cache>/models.json` exists.
     yield* Effect.promise(() => runtime.catalogueReady)
     const host = yield* runtime.host(projectId)

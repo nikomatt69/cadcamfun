@@ -33,7 +33,7 @@
   --warning: #f59e0b;
   --info: #3b82f6;
   --foreground: #1f2937;
-  --background: #f9fafb;
+  --background: #ffffff;
   --surface: #ffffff;
   --surface-hover: #f3f4f6;
   
@@ -53,7 +53,7 @@
 /* Base styles */
 @layer base {
   body {
-    @apply bg-[#F9FCFF] dark:bg-gradient-to-b from-gray-800 to-gray-600 text-gray-900 dark:text-gray-100 antialiased;
+    @apply bg-white dark:bg-gradient-to-b from-gray-800 to-gray-600 text-gray-900 dark:text-gray-100 antialiased;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
@@ -110,7 +110,7 @@
 
   .fixed-cycle-editor {
     background-color: #f5f5f5;
-    border-radius: 8px;
+    border-radius: var(--ui-radius-md);
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -137,7 +137,7 @@
     background-color: #1e1e1e;
     color: #dcdcdc;
     padding: 6px 10px;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-sm);
     font-size: 14px;
   }
   
@@ -170,7 +170,7 @@
     flex: 1;
     padding: 8px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-sm);
     font-size: 14px;
   }
   
@@ -196,7 +196,7 @@
     background-color: #2196f3;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-sm);
     padding: 8px 16px;
     font-size: 14px;
     cursor: pointer;
@@ -214,7 +214,7 @@
   /* Styles for the fixed cycles info panel */
   .fixed-cycles-info-panel {
     background-color: #f5f5f5;
-    border-radius: 8px;
+    border-radius: var(--ui-radius-md);
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -237,7 +237,7 @@
   .cycle-item {
     background-color: white;
     border: 1px solid #e0e0e0;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-sm);
     padding: 12px;
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s;
@@ -289,7 +289,7 @@
     background-color: #4caf50;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-sm);
     padding: 8px 16px;
     font-size: 14px;
     cursor: pointer;
@@ -345,8 +345,8 @@
 
 .transform-info {
   font-family: system-ui, -apple-system, sans-serif;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
 }
 
 /* Disable text selection on gizmo */
@@ -751,17 +751,17 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
   /* Base glassmorphism effects - From https://css.glass */
   .glass-light {
     background: rgba(255, 255, 255, 0.02);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-md);
+    backdrop-filter: var(--ui-blur-sm);
+    -webkit-backdrop-filter: var(--ui-blur-sm);
     border: 1px solid rgba(255, 255, 255, 0.18);
   }
   
   .glass-medium {
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-md);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     border: 1px solid rgba(255, 255, 255, 0.25);
@@ -769,8 +769,8 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
   
   .glass-strong {
     background: rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-md);
     backdrop-filter: blur(5px);
     -webkit-backdrop-filter: blur(5px);
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -791,19 +791,19 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
 
   .glass-hover-light:hover {
     background: rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     border-color: rgba(255, 255, 255, 0.25);
   }
   
   .glass-hover-medium:hover {
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     border-color: rgba(255, 255, 255, 0.35);
   }
   
   .glass-hover-strong:hover {
     background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     border-color: rgba(255, 255, 255, 0.4);
   }
 
@@ -817,16 +817,16 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
       box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
       border-color 180ms cubic-bezier(0.23, 1, 0.32, 1);
     background: rgba(255, 255, 255, 0.02);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-md);
+    backdrop-filter: var(--ui-blur-sm);
+    -webkit-backdrop-filter: var(--ui-blur-sm);
     border: 1px solid rgba(255, 255, 255, 0.18);
   }
   
   .card-glass:hover {
     background: rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     border-color: rgba(255, 255, 255, 0.25);
     /* No hover lift: a card that jumps every time the pointer crosses it reads
        as decoration, not feedback (calmer finish; border + shadow carry state). */
@@ -841,23 +841,23 @@ body.cursor-erase { cursor: url('/cursors/erase.svg') 12 12, crosshair !importan
       border-color 180ms cubic-bezier(0.23, 1, 0.32, 1),
       transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
     background: rgba(255, 255, 255, 0.02);
-    border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-md);
+    backdrop-filter: var(--ui-blur-sm);
+    -webkit-backdrop-filter: var(--ui-blur-sm);
     border: 1px solid rgba(255, 255, 255, 0.15);
   }
   
   .glass-interactive:hover {
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     border-color: rgba(255, 255, 255, 0.2);
   }
   
   .glass-interactive:active {
     transform: scale(0.99);
     background: rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--ui-shadow-md);
     transition-duration: var(--ui-press-duration, 60ms);
   }
 
@@ -1349,7 +1349,7 @@ input:checked + .toggle-slider:before {
   background-color: #333;
   color: white;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--ui-radius-sm);
   font-size: 12px;
   white-space: nowrap;
   opacity: 0;
@@ -1729,17 +1729,17 @@ input:checked + .toggle-slider:before {
 /* Dark mode glassmorphism variants - From https://css.glass */
 .dark .glass-light {
   background: rgba(30, 41, 59, 0.02);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .dark .glass-medium {
   background: rgba(30, 41, 59, 0.05);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -1747,8 +1747,8 @@ input:checked + .toggle-slider:before {
 
 .dark .glass-strong {
   background: rgba(30, 41, 59, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   border: 1px solid rgba(148, 163, 184, 0.3);
@@ -1757,8 +1757,8 @@ input:checked + .toggle-slider:before {
 /* Dark mode hover effects - From https://css.glass */
 .dark .glass-hover-light:hover {
   background: rgba(30, 41, 59, 0.05);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -1766,8 +1766,8 @@ input:checked + .toggle-slider:before {
 
 .dark .glass-hover-medium:hover {
   background: rgba(30, 41, 59, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   border: 1px solid rgba(148, 163, 184, 0.3);
@@ -1775,27 +1775,27 @@ input:checked + .toggle-slider:before {
 
 .dark .glass-hover-strong:hover {
   background: rgba(30, 41, 59, 0.12);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 /* Dark mode card glass - From https://css.glass */
 .dark .card-glass {
   background: rgba(30, 41, 59, 0.02);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .dark .card-glass:hover {
   background: rgba(30, 41, 59, 0.05);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -1804,17 +1804,17 @@ input:checked + .toggle-slider:before {
 /* Dark mode interactive glass - From https://css.glass */
 .dark .glass-interactive {
   background: rgba(30, 41, 59, 0.02);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .dark .glass-interactive:hover {
   background: rgba(30, 41, 59, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-lg);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -1857,7 +1857,7 @@ input:checked + .toggle-slider:before {
 
 ::-webkit-scrollbar-thumb {
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--ui-radius-sm);
 }
 
 /* Dark mode scrollbars */

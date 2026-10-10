@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { z } from "zod"
 import type { AiEvent } from "../src/events.ts"
 import { hostChatStream, createHostSession } from "../src/nikcli/chat.ts"
+import { replySessionQuestion } from "../src/nikcli/session-controls.ts"
 import { defaultProviderSpecs, type HostProviderSpec } from "../src/nikcli/config.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
 import { compactHostSession, readHostContextPolicy } from "../src/nikcli/context.ts"
@@ -148,7 +149,7 @@ describe("embedded nikcli host", () => {
       // `skill` loads the playbooks this package installed (skills/index.ts); nothing else is offered.
       // The host's own planning tools (plan, goal, skills) are offered besides ours; nothing that touches files or a shell is.
       // `code_mode` is the confined program runner: its tools are ours, and shell, files and web calls from it are refused (agent-persistence.test.ts).
-      const HOST_PLANNING = ["skill", "todowrite", "todoread", "create_goal", "get_goal", "update_goal", "code_mode"]
+      const HOST_PLANNING = ["question", "search_tools", "skill", "todowrite", "todoread", "create_goal", "get_goal", "update_goal", "code_mode"]
       expect(names.every((n) => n === "cad_probe" || n === "invalid" || HOST_PLANNING.includes(n) || (TOOL_IDS as ReadonlyArray<string>).includes(n))).toBe(true)
     }
     expect(existsSync(marker)).toBe(false)
@@ -197,6 +198,74 @@ describe("embedded nikcli host", () => {
     const sent = chatTurns(fake.requests).at(-1)?.tools?.find((t) => t.function.name === "cad_probe")
     expect(JSON.stringify(sent?.function.parameters)).toContain("value")
   })
+
+  test("malformed history is rejected by the host with actionable recovery and no handler call", async () => {
+    const host = await Effect.runPromise(runtime.host("project-invalid-history"))
+    script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Payload requires correction." } : { toolCalls: [{ name: "cad_parametric", args: { action: "validate", history: "{}" } }] }
+    const sessionId = await Effect.runPromise(createHostSession(host, "invalid history"))
+    const events = await collect(hostChatStream({ host, sessionId, message: "validate", model, autoContinues: 0 }))
+    const result = events.find((event) => event.type === "tool_result" && event.tool === "cad_parametric")
+    expect(result?.type === "tool_result" && result.ok).toBe(false)
+    expect(result?.type === "tool_result" && result.output).toContain("history as a JSON object")
+    expect(result?.type === "tool_result" && result.output).toContain("No mutation")
+  })
+
+  test("Ask waits for native approval before executing and Reject prevents mutation", async () => {
+    const host = await Effect.runPromise(runtime.host("project-permissions"))
+    for (const decision of ["once", "reject"] as const) {
+      const before = executed.length
+      script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Settled." } : { toolCalls: [{ name: "cad_probe", args: { value: 42 } }] }
+      const sessionId = await Effect.runPromise(createHostSession(host, decision))
+      const events: AiEvent[] = []
+      await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-ask", message: "Probe", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+        events.push(event)
+        if (event.type === "permission_request") {
+          expect(executed.length).toBe(before)
+          await host.client.permission.reply({ requestID: event.requestId, reply: decision })
+        }
+      })))
+      expect(events.some((event) => event.type === "permission_request")).toBe(true)
+      expect(executed.length).toBe(before + (decision === "once" ? 1 : 0))
+    }
+  })
+
+  test("native questions wait for an owned answer and resume the same turn", async () => {
+    const host = await Effect.runPromise(runtime.host("project-questions"))
+    let asked = false
+    script = () => { if (asked) return { text: "Stock confirmed." }; asked = true; return { toolCalls: [{ name: "question", args: { questions: [{ header: "Stock", question: "Choose stock", options: [{ label: "Aluminium", description: "Use the aluminium stock" }] }] } }] } }
+    const sessionId = await Effect.runPromise(createHostSession(host, "question"))
+    const events: AiEvent[] = []
+    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, message: "Choose stock", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+      events.push(event)
+      if (event.type === "question_request") await replySessionQuestion(host, sessionId, { sessionId, action: "answer_question", requestId: event.requestId, answers: [["Aluminium"]] })
+    })))
+    expect(events.filter((event) => event.type === "tool_result" && !event.ok).map((event) => event.type === "tool_result" ? event.output : "")).toEqual([])
+    expect(events.some((event) => event.type === "question_request")).toBe(true)
+    expect(events.at(-1)?.type).toBe("done")
+    expect((await host.client.question.list()).some((question) => question.sessionID === sessionId)).toBe(false)
+  })
+
+  test("native Brain learns project habits with its own permissions and the caller model", async () => {
+    const host = await Effect.runPromise(runtime.host("project-memory-brain"))
+    const caller = await Effect.runPromise(createHostSession(host, "memory caller"))
+    script = () => ({ text: "The confirmed project unit is millimetres." })
+    await collect(hostChatStream({ host, sessionId: caller, message: "Remember units", model, autoContinues: 0 }))
+    const status = await host.client.brain.status()
+    expect(status).toMatchObject({ enabled: true, memoryEnabled: true, minHours: 24, minSessions: 5 })
+    const before = fake.requests.length
+    const filePath = join(host.directory, ".nikcli", "habits.md")
+    let stage = 0
+    script = () => stage++ === 0 ? { toolCalls: [{ name: "read", args: { filePath } }] }
+      : stage === 2 ? { toolCalls: [{ name: "edit", args: { filePath, oldString: "# User habits", newString: "# User habits\n\nConfirmed CAD/CAM units: millimetres." } }] }
+        : { text: "Project units consolidated." }
+    const result = await host.client.brain.trigger({ force: true, sessionID: caller })
+    expect(result.success).toBe(true)
+    const turns = chatTurns(fake.requests.slice(before))
+    expect(turns.length).toBeGreaterThanOrEqual(3)
+    expect(toolNames(turns[0]!)).toContain("read")
+    expect(toolNames(turns[0]!)).not.toContain("cad_add_elements")
+    expect(readFileSync(filePath, "utf8")).toContain("Confirmed CAD/CAM units")
+  }, 60_000)
 
   test("provider failures surface as a final error event", async () => {
     const host = await Effect.runPromise(runtime.host("project-b"))

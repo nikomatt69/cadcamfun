@@ -1,22 +1,23 @@
 .reference-shell {
   --page-radius: 8px;
-  --page-border: rgba(123, 141, 158, 0.25);
-  --page-surface: rgba(248, 250, 252, 0.94);
-  --page-tab: rgba(239, 246, 255, 0.8);
-  --page-accent: #007acc;
+  --page-border: rgba(226, 232, 240, 0.7);
+  --page-surface: #fff;
+  --page-tab: rgba(239, 246, 255, 0.85);
+  --page-accent: #2563eb;
 }
 
 html.dark .reference-shell {
-  --page-border: rgba(148, 163, 184, 0.2);
-  --page-surface: rgba(27, 35, 44, 0.94);
-  --page-tab: rgba(30, 58, 138, 0.3);
+  --page-border: rgba(51, 65, 85, 0.7);
+  --page-surface: rgba(15, 23, 42, 0.78);
+  --page-tab: rgba(30, 58, 138, 0.35);
   --page-accent: #60a5fa;
 }
 
 :is(.reference-page-container, .reference-standalone-container) {
   min-width: 0;
+  --ui-radius-sm: 5px;
   --ui-radius-md: 8px;
-  --ui-radius-lg: 10px;
+  --ui-radius-lg: 8px;
   --ui-radius-xl: 12px;
   --ui-radius-2xl: 12px;
 }
@@ -71,7 +72,7 @@ html.dark .reference-shell {
 
 @media (hover: hover) and (pointer: fine) {
   .reference-page-container nav > button[aria-pressed]:hover {
-    border-radius: 999px;
+    border-radius: 5px 5px 0 0;
     border-color: var(--page-border);
     background: rgba(148, 163, 184, 0.1);
     backdrop-filter: blur(3px);
@@ -147,7 +148,7 @@ html.dark .reference-shell {
 
 @media (hover: hover) and (pointer: fine) {
   :is(.reference-page-container, .reference-standalone-container) [role="tab"]:hover {
-    border-radius: 999px;
+    border-radius: 5px 5px 0 0;
     border-color: var(--page-border);
     background: rgba(148, 163, 184, 0.1);
     backdrop-filter: blur(3px);

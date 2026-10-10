@@ -134,7 +134,7 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
     expect(cam.verify.VerifyResponseSchema).toBeDefined()
   })
 
-  test("an update changes the settings in the panel and an editor edit afterwards marks the report stale", async () => {
+  test("an update invalidates verification and an edit after re-verification marks the report stale", async () => {
     const { doc, id } = await operation()
     await handlers.generateGcode(doc.projectId, id)
     await handlers.verifyOperation(doc.projectId, id, {})
@@ -143,6 +143,13 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
     await handlers.updateOperation(doc.projectId, id, { depth: 5 })
     await mirrorCamResult(app.state, "cam_update_operation", { operationId: id }, json({ ok: true, operationId: id }))
     expect(useGeneratorStore.getState().settings.depth).toBe(5)
+    expect(useCamStore.getState().gcode).toBe("")
+    expect(verificationState().state).toBe("not-run")
+    await handlers.generateGcode(doc.projectId, id)
+    await handlers.verifyOperation(doc.projectId, id, {})
+    await mirrorCamResult(app.state, "cam_verify_toolpath", { operationId: id }, json({ ok: true }))
+    expect(verificationState().state).not.toBe("not-run")
+    expect(verificationState().state).not.toBe("stale")
     useCamStore.getState().setGcode(`${useCamStore.getState().gcode}\n; edited`)
     expect(verificationState().state).toBe("stale")
   })

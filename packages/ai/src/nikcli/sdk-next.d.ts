@@ -6,6 +6,7 @@
  */
 declare module "@nikcli-ai/sdk-next" {
   import type { Effect } from "effect"
+  import type { z } from "zod"
 
   /** Context handed to `Tool.define(...).execute`. */
   export interface ToolExecuteContext {
@@ -13,6 +14,7 @@ declare module "@nikcli-ai/sdk-next" {
     readonly messageID: string
     readonly agent: string
     readonly callID?: string
+    readonly ask: (input: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise<void>
     readonly abort: AbortSignal
   }
 
@@ -27,6 +29,7 @@ declare module "@nikcli-ai/sdk-next" {
     readonly description: string
     /** A zod 4 object schema. */
     readonly parameters: unknown
+    readonly formatValidationError?: (error: z.ZodError) => string
     readonly execute: (args: never, ctx: ToolExecuteContext) => Promise<ToolExecuteResult>
   }
 
@@ -60,9 +63,11 @@ declare module "@nikcli-ai/sdk-next" {
     readonly id: string
     readonly role: string
     readonly error?: { readonly name?: string; readonly data?: { readonly message?: string } }
-    readonly tokens?: { readonly input: number; readonly output: number }
+    readonly tokens?: { readonly input: number; readonly output: number; readonly total?: number; readonly cache?: { readonly read: number; readonly write: number } }
     readonly finish?: string
     readonly summary?: boolean
+    readonly system?: string
+    readonly variant?: string
     readonly agent?: string
     /** On a user message: the model the turn was sent with. */
     readonly model?: { readonly providerID?: string; readonly modelID?: string }
@@ -106,7 +111,8 @@ declare module "@nikcli-ai/sdk-next" {
       readonly reasoning?: boolean
       readonly input?: { readonly text?: boolean; readonly image?: boolean }
     }
-    readonly limit?: { readonly context?: number; readonly output?: number }
+    readonly limit?: { readonly context?: number; readonly input?: number; readonly output?: number }
+    readonly variants?: Readonly<Record<string, unknown>>
     readonly cost?: { readonly input?: number; readonly output?: number }
     readonly status?: string
   }
@@ -140,6 +146,7 @@ declare module "@nikcli-ai/sdk-next" {
           delivery?: "steer" | "queue"
           agent?: string
           model?: { providerID: string; modelID: string }
+          variant?: string
           system?: string
           tools?: Record<string, boolean>
           parts: ReadonlyArray<
@@ -181,6 +188,15 @@ declare module "@nikcli-ai/sdk-next" {
         options?: RequestOptions
       ): Promise<boolean>
     }
+    readonly brain: {
+      status(options?: RequestOptions): Promise<HostBrainStatus>
+      trigger(input: { force?: boolean; sessionID?: string }, options?: RequestOptions): Promise<{ success: boolean; sessionsReviewed: number; hoursSinceLastBrain: number; error?: string; sessionID?: string }>
+    }
+    readonly question: {
+      list(options?: RequestOptions): Promise<ReadonlyArray<HostQuestionRequest>>
+      reply(input: { requestID: string; answers: ReadonlyArray<ReadonlyArray<string>> }, options?: RequestOptions): Promise<boolean>
+      reject(input: { requestID: string }, options?: RequestOptions): Promise<boolean>
+    }
     readonly config: {
       get(options?: RequestOptions): Promise<Record<string, unknown>>
     }
@@ -205,6 +221,17 @@ declare module "@nikcli-ai/sdk-next" {
     readonly tools: {
       register(...tools: ToolInfo[]): Effect.Effect<void, Error>
     }
+  }
+
+  export interface HostBrainStatus {
+    readonly enabled: boolean; readonly memoryEnabled: boolean; readonly minHours: number; readonly minSessions: number
+    readonly lastBrainAt: number; readonly hoursSinceLastBrain: number; readonly sessionsSinceLastBrain: number; readonly shouldTrigger: boolean
+  }
+
+  export interface HostQuestionRequest {
+    readonly id: string
+    readonly sessionID: string
+    readonly questions: ReadonlyArray<{ readonly header: string; readonly question: string; readonly options: ReadonlyArray<{ readonly label: string; readonly description: string }>; readonly multiple?: boolean; readonly custom?: boolean }>
   }
 
   export namespace NikCli {

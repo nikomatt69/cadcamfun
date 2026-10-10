@@ -33,7 +33,7 @@ const testConnection = async (endpointPath: string, apiKey: string | undefined):
     })
     if (!response.ok) {
       const errorText = await response.text()
-      return { success: false, message: `Errore di connessione: ${response.status} - ${errorText}` }
+      return { success: false, message: `Connection error: ${response.status} - ${errorText}` }
     }
     const data = (await response.json()) as { protocol?: string; resources?: unknown[]; tools?: unknown[] }
     if (data.protocol !== undefined && data.resources !== undefined && data.tools !== undefined) {
@@ -42,11 +42,11 @@ const testConnection = async (endpointPath: string, apiKey: string | undefined):
         message: `Connessione riuscita. Protocollo: ${data.protocol}, ${data.resources.length} risorse, ${data.tools.length} strumenti disponibili.`
       }
     }
-    return { success: false, message: "Risposta ricevuta ma il formato non è valido." }
+    return { success: false, message: "The response format is invalid." }
   } catch (error) {
     return {
       success: false,
-      message: `Errore durante il test della connessione: ${error instanceof Error ? error.message : String(error)}`
+      message: `Connection test failed: ${error instanceof Error ? error.message : String(error)}`
     }
   }
 }

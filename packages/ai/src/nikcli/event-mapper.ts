@@ -3,6 +3,14 @@ import type { HostEvent } from "@nikcli-ai/sdk-next"
 import type { AiEvent } from "../events.ts"
 import { childAgent } from "./agents.ts"
 
+/** Only bounded inline PNG evidence from the application's own viewport tools reaches the UI. */
+const toolImages = (tool: string, state: Record<string, unknown> | undefined) => {
+  if (tool !== "cad_vision" && tool !== "cam_vision") return {}
+  const attachments = state?.["attachments"]
+  const images = (Array.isArray(attachments) ? attachments : []).map((file) => file?.url).filter((url): url is string => typeof url === "string" && url.length <= 4_000_100 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(url)).slice(0, 2)
+  return images.length ? { images } : {}
+}
+
 /**
  * Maps the host's bus events for ONE session to `AiEvent`s.
  *
@@ -115,7 +123,7 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
     state.finishedCalls.add(callId)
     const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
     state.lastToolError = toolFailure(status, output)
-    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output })
+    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output, ...toolImages(tool, toolState) })
   }
   return out
 }
@@ -123,6 +131,28 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
 export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
   const props = event.properties
   switch (event.type) {
+    case "question.asked": {
+      const source = str(props["sessionID"])
+      if (!source || source !== sessionId && childAgent(sessionId, source) === undefined) return []
+      const requestId = str(props["id"])
+      if (!requestId || !Array.isArray(props["questions"])) return []
+      const questions = props["questions"].flatMap((value) => {
+        const q = rec(value)
+        if (!q || typeof q["header"] !== "string" || typeof q["question"] !== "string" || !Array.isArray(q["options"])) return []
+        const options = q["options"].flatMap((value) => {
+          const option = rec(value)
+          return option && typeof option["label"] === "string" && typeof option["description"] === "string" ? [{ label: option["label"], description: option["description"] }] : []
+        })
+        return [{ header: q["header"], question: q["question"], options, ...(typeof q["multiple"] === "boolean" ? { multiple: q["multiple"] } : {}), ...(typeof q["custom"] === "boolean" ? { custom: q["custom"] } : {}) }]
+      })
+      return questions.length ? [{ type: "question_request", sessionId, requestId, questions }] : []
+    }
+    case "question.replied":
+    case "question.rejected": {
+      const source = str(props["sessionID"])
+      if (!source || source !== sessionId && childAgent(sessionId, source) === undefined) return []
+      return [{ type: "question_resolved", sessionId, requestId: str(props["requestID"]) ?? "" }]
+    }
     case "message.updated": {
       const info = rec(props["info"])
       if (info && str(info["sessionID"]) === sessionId && info["role"] === "user") {
@@ -221,19 +251,20 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
           }
           const finalOutput = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
           state.lastToolError = toolFailure(status, finalOutput)
-          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output: finalOutput })
+          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output: finalOutput, ...toolImages(tool, toolState) })
           return out
         }
       }
       return []
     }
     case "permission.asked": {
-      if (str(props["sessionID"]) !== sessionId) return []
+      const owner = str(props["sessionID"])
+      if (!owner || (owner !== sessionId && childAgent(sessionId, owner) === undefined)) return []
       const patterns = Array.isArray(props["patterns"]) ? props["patterns"].filter((p): p is string => typeof p === "string") : []
       return [
         {
           type: "permission_request",
-          sessionId,
+          sessionId: owner,
           requestId: str(props["id"]) ?? "",
           permission: str(props["permission"]) ?? "unknown",
           patterns

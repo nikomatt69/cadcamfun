@@ -107,7 +107,7 @@ export function PluginsScreen(): JSX.Element {
       <label class="block">
         <span class={RAIL_LABEL}>Search</span>
         <div class="relative">
-          <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={16} aria-hidden="true" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" name="search" class={`${FIELD} pl-8`} placeholder="Search plugins..." value={search()} onInput={(e) => setSearch(e.currentTarget.value)} />
         </div>
       </label>
@@ -119,25 +119,25 @@ export function PluginsScreen(): JSX.Element {
           <option value="disabled">{t("plugins.disabled")}</option>
         </select>
       </label>
-      <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
-      <p class="text-xs text-gray-500 dark:text-gray-400" role="status">{filtered().length} of {plugins.data()?.length ?? 0} plugins</p>
+      <button type="button" class="inline-flex items-center gap-1 self-start text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:text-gray-200" onClick={clearFilters} disabled={!hasFilters()}><X size={14} aria-hidden="true" />Clear Filters</button>
+      <p class="text-xs text-slate-500 dark:text-slate-400" role="status">{filtered().length} of {plugins.data()?.length ?? 0} plugins</p>
     </>}
     overlays={<>
     <Show when={installOpen()}>
       <div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeInstall() }}>
-        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+        <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="install-plugin-heading" class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900">
           <div class="mb-4 flex items-center justify-between"><h2 id="install-plugin-heading" class="text-lg font-semibold">{t("plugins.install")}</h2><button onClick={closeInstall} disabled={pending()} aria-label={t("common.close")}><X size={20} /></button></div>
-          <div class="mb-4 border-b border-gray-200 dark:border-gray-700"><span class="inline-block border-b-2 border-blue-600 px-4 py-2 text-sm font-medium text-blue-600">{t("plugins.uploadFile")}</span></div>
-          <button type="button" class="mb-6 w-full rounded-lg border-2 border-dashed p-6 text-center" classList={{ "border-blue-500 bg-blue-50 dark:bg-blue-900/10": dragging(), "border-green-500 bg-green-50 dark:bg-green-900/10": !!file(), "border-gray-300 dark:border-gray-700": !dragging() && !file() }} disabled={pending()} onClick={() => picker?.click()} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); chooseFile(e.dataTransfer?.files[0]) }}>
-            <Show when={file()} fallback={<><Upload class="mx-auto mb-2 text-gray-400" size={32} /><p class="mb-1 font-medium text-gray-700 dark:text-gray-300">{t("plugins.dropPackage")}</p><p class="text-sm text-gray-500">{t("plugins.browsePackage")}</p></>}>{(selected) => <><CheckCircle class="mx-auto mb-2 text-green-500" size={36} /><p class="font-medium text-green-600">{selected().name}</p><p class="mt-1 text-sm text-gray-500">{(selected().size / 1024).toFixed(1)} KB</p></>}</Show>
+          <div class="mb-4 border-b border-slate-200 dark:border-slate-700"><span class="inline-block border-b-2 border-blue-600 px-4 py-2 text-sm font-medium text-blue-600">{t("plugins.uploadFile")}</span></div>
+          <button type="button" class="mb-6 w-full rounded-lg border-2 border-dashed p-6 text-center" classList={{ "border-blue-500 bg-blue-50 dark:bg-blue-900/10": dragging(), "border-green-500 bg-green-50 dark:bg-green-900/10": !!file(), "border-slate-300 dark:border-slate-700": !dragging() && !file() }} disabled={pending()} onClick={() => picker?.click()} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); chooseFile(e.dataTransfer?.files[0]) }}>
+            <Show when={file()} fallback={<><Upload class="mx-auto mb-2 text-slate-400" size={32} /><p class="mb-1 font-medium text-slate-700 dark:text-slate-300">{t("plugins.dropPackage")}</p><p class="text-sm text-slate-500">{t("plugins.browsePackage")}</p></>}>{(selected) => <><CheckCircle class="mx-auto mb-2 text-green-500" size={36} /><p class="font-medium text-green-600">{selected().name}</p><p class="mt-1 text-sm text-slate-500">{(selected().size / 1024).toFixed(1)} KB</p></>}</Show>
           </button>
           <input ref={picker} type="file" accept=".zip,.vsix" class="hidden" onChange={(e) => { chooseFile(e.currentTarget.files?.[0]); e.currentTarget.value = "" }} />
           <Show when={error()}><ErrorState label={t("common.error")} detail={error()} /></Show>
-          <div class="flex justify-end gap-3"><button class="rounded-md px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" disabled={pending()} onClick={closeInstall}>{t("common.cancel")}</button><button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" disabled={pending() || !file()} onClick={() => void install()}><Upload size={16} class="mr-2" />{pending() ? t("plugins.installing") : t("plugins.install")}</button></div>
+          <div class="flex justify-end gap-3"><button class="rounded-md px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-gray-700" disabled={pending()} onClick={closeInstall}>{t("common.cancel")}</button><button class="flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" disabled={pending() || !file()} onClick={() => void install()}><Upload size={16} class="mr-2" />{pending() ? t("plugins.installing") : t("plugins.install")}</button></div>
         </div>
       </div>
     </Show>
-    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
+    <Show when={removing()}><div class="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 p-4"><div role="alertdialog" aria-modal="true" aria-label={t("plugins.confirmUninstall")} class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900"><p class="mb-6">{t("plugins.confirmUninstall")}</p><div class="flex justify-end gap-3"><button class="btn btn-outline" disabled={pending()} onClick={() => setRemoving(undefined)}>{t("common.cancel")}</button><button class="btn btn-danger" disabled={pending()} onClick={() => void uninstall()}>{t("plugins.uninstall")}</button></div></div></div></Show>
     </>}
   >
     <Toast message={notice()} />
@@ -156,14 +156,14 @@ export function PluginsScreen(): JSX.Element {
             <div class={`${CARD} cursor-pointer`} role="link" tabIndex={0} onClick={() => navigate(`/plugins/${encodeURIComponent(plugin.id)}`)} onKeyDown={(e) => { if (e.key === "Enter") navigate(`/plugins/${encodeURIComponent(plugin.id)}`) }}>
               <CardBanner icon={<Puzzle size={28} aria-hidden="true" />} badge={`v${plugin.version}`} leftBadge={plugin.enabled ? t("plugins.enabled") : undefined} />
               <div class="flex flex-1 flex-col gap-2 p-4">
-                <h2 class="text-base font-semibold text-gray-900 group-hover:text-[#007ACC] dark:text-white dark:group-hover:text-blue-300">{plugin.manifest.name || plugin.id}</h2>
-                <p class="line-clamp-2 text-sm text-gray-600 dark:text-gray-400">{plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
-                <div class="mt-auto space-y-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  <div class="flex justify-between"><span>Status:</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-gray-200/80 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
-                  <div class="flex justify-between"><span>ID:</span><code class="font-mono text-[#007ACC] dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
+                <h2 class="text-base font-semibold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{plugin.manifest.name || plugin.id}</h2>
+                <p class="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{plugin.manifest.description || t("plugins.detail.noDescriptionShort")}</p>
+                <div class="mt-auto space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  <div class="flex justify-between"><span>Status:</span><span class="rounded-full px-2 py-0.5 font-medium" classList={{ "bg-green-100/80 text-green-800 dark:bg-green-900/30 dark:text-green-300": plugin.enabled, "bg-slate-200/80 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300": !plugin.enabled }}>{plugin.enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div>
+                  <div class="flex justify-between"><span>ID:</span><code class="font-mono text-blue-600 dark:text-blue-400">{plugin.id.substring(0, 8)}...</code></div>
                 </div>
               </div>
-              <div class="flex items-center justify-end gap-1 border-t border-gray-200/50 bg-gray-50/50 px-4 py-2.5 dark:border-gray-600/50 dark:bg-gray-700/30" onClick={(e) => e.stopPropagation()}>
+              <div class="flex items-center justify-end gap-1 border-t border-slate-200/50 bg-slate-50/50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/30" onClick={(e) => e.stopPropagation()}>
                 <button type="button" class={ICON_BUTTON} classList={{ "!text-green-600": plugin.enabled }} title={plugin.enabled ? t("plugins.disable") : t("plugins.enable")} aria-label={`${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}: ${plugin.manifest.name || plugin.id}`} aria-pressed={plugin.enabled} disabled={pending()} onClick={() => void toggle(plugin.id, plugin.enabled)}>
                   <Show when={plugin.enabled} fallback={<ToggleLeft size={18} aria-hidden="true" />}><ToggleRight size={18} aria-hidden="true" /></Show>
                 </button>
@@ -179,16 +179,16 @@ export function PluginsScreen(): JSX.Element {
 
 /** `DetailSection` — the legacy card with the `<h2>` rule under the title. */
 const DetailSection = (props: { readonly title: string; readonly children: JSX.Element; readonly class?: string }): JSX.Element => (
-  <div class={`mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:p-6 dark:border-gray-700 dark:bg-gray-800 ${props.class ?? ""}`}>
-    <h2 class="mb-3 border-b border-gray-200 pb-2 text-lg font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-200">
+  <div class={`mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:p-6 dark:border-slate-700 dark:bg-slate-900 ${props.class ?? ""}`}>
+    <h2 class="mb-3 border-b border-slate-200 pb-2 text-lg font-semibold text-slate-700 dark:border-slate-700 dark:text-gray-200">
       {props.title}
     </h2>
-    <div class="prose prose-sm max-w-none text-gray-600 dark:text-gray-400">{props.children}</div>
+    <div class="prose prose-sm max-w-none text-slate-600 dark:text-slate-400">{props.children}</div>
   </div>
 )
 
 const CodeBlock = (props: { readonly children: JSX.Element }): JSX.Element => (
-  <pre class="overflow-x-auto rounded-md bg-gray-100 p-3 text-xs text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+  <pre class="overflow-x-auto rounded-md bg-slate-100 p-3 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-300">
     <code>{props.children}</code>
   </pre>
 )
@@ -376,27 +376,27 @@ export function PluginDetailScreen(): JSX.Element {
                 {(src) => <img
                   src={src()}
                   alt={t("plugins.detail.iconAlt", { name: current().manifest.name })}
-                  class="h-12 w-12 flex-shrink-0 rounded-lg bg-gray-100 p-1 object-contain md:h-16 md:w-16"
+                  class="h-12 w-12 flex-shrink-0 rounded-lg bg-slate-100 p-1 object-contain md:h-16 md:w-16"
                   onError={(event) => { event.currentTarget.style.display = "none" }}
                 />}
               </Show>
               <div class="min-w-0">
-                <h2 class="truncate text-2xl font-semibold tracking-[-0.015em] text-gray-900 dark:text-gray-50" title={current().manifest.name}>
+                <h2 class="truncate text-2xl font-semibold tracking-[-0.015em] text-slate-900 dark:text-gray-50" title={current().manifest.name}>
                   {current().manifest.name}
                 </h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <p class="text-sm text-slate-500 dark:text-slate-400">
                   {t("plugins.version")} {current().manifest.version}
                   <Show when={current().manifest.author !== undefined && current().manifest.author.length > 0}>
                     {t("plugins.detail.byAuthor", { author: current().manifest.author })}
                   </Show>
                   <Show when={current().manifest.license !== undefined}>
-                    <span class="ml-2 rounded bg-gray-200 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                    <span class="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       {current().manifest.license}
                     </span>
                   </Show>
                 </p>
-                <p class="mt-1 truncate text-xs text-gray-400">
-                  {t("plugins.detail.idLabel")}<code class="rounded bg-gray-100 p-0.5 dark:bg-gray-800">{current().id}</code>
+                <p class="mt-1 truncate text-xs text-slate-400">
+                  {t("plugins.detail.idLabel")}<code class="rounded bg-slate-100 p-0.5 dark:bg-slate-900">{current().id}</code>
                 </p>
               </div>
             </div>
@@ -446,7 +446,7 @@ export function PluginDetailScreen(): JSX.Element {
                   type="button"
                   disabled={pending()}
                   onClick={() => setShowSettings(true)}
-                  class="whitespace-nowrap rounded bg-gray-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="whitespace-nowrap rounded bg-slate-500 px-4 py-2 font-bold text-white transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("plugins.detail.configure")}
                 </button>
@@ -469,11 +469,11 @@ export function PluginDetailScreen(): JSX.Element {
 
           {/* README Generation Area */}
           <Show when={showReadme()}>
-            <div class="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:p-6 dark:border-gray-700 dark:bg-gray-800">
-              <h2 class="mb-3 text-lg font-semibold text-gray-700 dark:text-gray-200">{t("plugins.detail.readmeHeading")}</h2>
+            <div class="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:p-6 dark:border-slate-700 dark:bg-slate-900">
+              <h2 class="mb-3 text-lg font-semibold text-slate-700 dark:text-gray-200">{t("plugins.detail.readmeHeading")}</h2>
               <Show when={generating()}>
                 <div class="flex items-center justify-center py-10">
-                  <LoadingSpinner /> <span class="ml-2 text-gray-500">{t("plugins.detail.generating")}</span>
+                  <LoadingSpinner /> <span class="ml-2 text-slate-500">{t("plugins.detail.generating")}</span>
                 </div>
               </Show>
               <Show when={readmeError()}>
@@ -484,14 +484,14 @@ export function PluginDetailScreen(): JSX.Element {
               </Show>
               <Show when={readme() !== undefined && !generating()}>
                 <div>
-                  <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-gray-100 p-1 text-xs dark:bg-gray-800">README.md</code> {t("plugins.detail.readmeHelp2")}
+                  <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
+                    {t("plugins.detail.readmeHelp1")} <code class="rounded bg-slate-100 p-1 text-xs dark:bg-slate-900">README.md</code> {t("plugins.detail.readmeHelp2")}
                   </p>
                   <textarea
                     readOnly
                     value={readme()}
                     aria-label={t("plugins.detail.readmeAria")}
-                    class="h-96 w-full rounded-md border border-gray-300 bg-gray-50 p-3 font-mono text-xs text-gray-800 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                    class="h-96 w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs text-slate-800 focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-200"
                   />
                   {/* No markdown renderer ships with the desktop build, so the preview shows the raw Markdown. */}
                   <h3 class="mb-2 mt-4 border-t pt-4 text-md font-semibold">{t("plugins.detail.preview")}</h3>
@@ -503,7 +503,7 @@ export function PluginDetailScreen(): JSX.Element {
               <Show when={!generating()}>
                 <button
                   type="button"
-                  class="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  class="mt-2 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   onClick={() => setShowReadme(false)}
                 >
                   {t("plugins.detail.hide")}
@@ -534,7 +534,7 @@ export function PluginDetailScreen(): JSX.Element {
               <DetailSection title={t("plugins.detail.description")}>
                 <Show
                   when={current().manifest.description !== undefined && current().manifest.description.length > 0}
-                  fallback={<p class="italic text-gray-400">{t("plugins.detail.noDescription")}</p>}
+                  fallback={<p class="italic text-slate-400">{t("plugins.detail.noDescription")}</p>}
                 >
                   <p>{current().manifest.description}</p>
                 </Show>
@@ -547,7 +547,7 @@ export function PluginDetailScreen(): JSX.Element {
               </Show>
 
               <DetailSection title={t("plugins.detail.logs")}>
-                <p class="italic text-gray-400">{t("plugins.detail.logsBody")}</p>
+                <p class="italic text-slate-400">{t("plugins.detail.logsBody")}</p>
               </DetailSection>
             </div>
 
@@ -555,7 +555,7 @@ export function PluginDetailScreen(): JSX.Element {
               <DetailSection title={t("plugins.detail.statusDetails")}>
                 <dl class="space-y-2">
                   <div class="flex justify-between">
-                    <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.statusLabel")}</dt>
+                    <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.statusLabel")}</dt>
                     <dd>
                       <Show when={current().enabled} fallback={<StatusBadge label={t("plugins.disabled")} type="warning" />}>
                         <StatusBadge label={t("plugins.enabled")} type="success" />
@@ -563,7 +563,7 @@ export function PluginDetailScreen(): JSX.Element {
                     </dd>
                   </div>
                   <div class="flex justify-between">
-                    <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.clientHost")}</dt>
+                    <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.clientHost")}</dt>
                     {/* v6 has no client-side plugin host, so the badge is always "Inactive". */}
                     <dd><StatusBadge label={t("plugins.detail.inactive")} type="info" /></dd>
                   </div>
@@ -576,24 +576,24 @@ export function PluginDetailScreen(): JSX.Element {
                     </div>
                   </Show>
                   <div class="flex justify-between">
-                    <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.version")}:</dt>
+                    <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.version")}:</dt>
                     <dd>{current().manifest.version}</dd>
                   </div>
                   <Show when={current().manifest.author !== undefined && current().manifest.author.length > 0}>
                     <div class="flex justify-between">
-                      <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.author")}:</dt>
+                      <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.author")}:</dt>
                       <dd>{current().manifest.author}</dd>
                     </div>
                   </Show>
                   <Show when={current().manifest.license !== undefined}>
                     <div class="flex justify-between">
-                      <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.licenseLabel")}</dt>
+                      <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.licenseLabel")}</dt>
                       <dd>{current().manifest.license}</dd>
                     </div>
                   </Show>
                   <Show when={current().manifest.repository !== undefined}>
                     <div class="flex items-center justify-between">
-                      <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.repositoryLabel")}</dt>
+                      <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.repositoryLabel")}</dt>
                       <dd>
                         <a
                           href={current().manifest.repository}
@@ -607,13 +607,13 @@ export function PluginDetailScreen(): JSX.Element {
                     </div>
                   </Show>
                   <div class="flex justify-between">
-                    <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.installedLabel")}</dt>
+                    <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.installedLabel")}</dt>
                     <dd title={new Date(current().installedAt).toLocaleString()}>
                       {new Date(current().installedAt).toLocaleDateString()}
                     </dd>
                   </div>
                   <div class="flex justify-between">
-                    <dt class="font-medium text-gray-600 dark:text-gray-300">{t("plugins.detail.updatedLabel")}</dt>
+                    <dt class="font-medium text-slate-600 dark:text-slate-300">{t("plugins.detail.updatedLabel")}</dt>
                     <dd title={new Date(current().updatedAt).toLocaleString()}>
                       {new Date(current().updatedAt).toLocaleDateString()}
                     </dd>
@@ -625,7 +625,7 @@ export function PluginDetailScreen(): JSX.Element {
                 <DetailSection title={t("plugins.detail.permissionsRequired")}>
                   <ul class="list-inside list-disc space-y-1">
                     <For each={current().manifest.permissions}>{(permission) =>
-                      <li><code class="break-all rounded bg-gray-100 p-0.5 text-xs dark:bg-gray-800">{permission}</code></li>
+                      <li><code class="break-all rounded bg-slate-100 p-0.5 text-xs dark:bg-slate-900">{permission}</code></li>
                     }</For>
                   </ul>
                 </DetailSection>
@@ -637,9 +637,9 @@ export function PluginDetailScreen(): JSX.Element {
                     <For each={Object.entries(current().manifest.dependencies ?? {})}>{([dependency, version]) =>
                       <li>
                         <A href={`/plugins/${encodeURIComponent(dependency)}`} class="text-blue-600 hover:underline dark:text-blue-400">
-                          <code class="break-all rounded bg-gray-100 p-0.5 text-xs dark:bg-gray-800">{dependency}</code>
+                          <code class="break-all rounded bg-slate-100 p-0.5 text-xs dark:bg-slate-900">{dependency}</code>
                         </A>
-                        <span class="ml-1 text-xs text-gray-500 dark:text-gray-400">({version})</span>
+                        <span class="ml-1 text-xs text-slate-500 dark:text-slate-400">({version})</span>
                       </li>
                     }</For>
                   </ul>

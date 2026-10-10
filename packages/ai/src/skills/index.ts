@@ -37,7 +37,7 @@ Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or a
 ## Recipes
 - **Block with a hole**: \`cube\` + \`cylinder\` (taller than the block), then \`boolean-subtract\` with \`operands: [0, 1]\` (indexes of the two elements in the same call).
 - **Bottle, vase, shaft, pulley**: ONE \`revolution\`. Give the half section as profile points from the axis outwards, bottom to top, e.g. \`[{x:0,y:0},{x:30,y:0},{x:30,y:150},{x:10,y:200},{x:10,y:260}]\`; use 32+ segments (default).
-- **Part the user will change the dimensions of** ("make it 10 mm wider", "I need it in three sizes"): ONE \`parametric\` element instead of loose solids. \`history.parameters\` holds the named dimensions (numbers or expressions of each other: \`"half": "width / 2"\`), \`history.features\` builds the part in order. A plate with a hole: \`parameters: {width: 60, depth: 40, thick: 8, hole: 10}\`, a \`sketch\` on plane \`XY\` with a rectangle (points p1..p4, lines l1..l4, \`fixed\` p1, \`horizontal\`/\`vertical\` on the sides, \`length\` l1 = \`"width"\`, l2 = \`"depth"\`), an \`extrude\` of it by \`"thick"\` (\`operation: "new"\`), then a \`hole\` on plane \`XY\` at \`offset: "thick"\`, \`at: ["width / 2", "depth / 2"]\`, \`diameter: "hole"\`, \`depth: "thick"\`. A change of one parameter later is \`cad_modify_entities\` with \`{parameters: {width: 70}}\` (named dimensions merge into the history, the features stay); send a whole \`history\` only to change the features themselves. The tool tells you at once what the history cannot build.
+- **Part the user will change the dimensions of** ("make it 10 mm wider", "I need it in three sizes"): ONE \`parametric\` element instead of loose solids. \`history.parameters\` holds the named dimensions (numbers or expressions of each other: \`"half": "width / 2"\`), \`history.features\` builds the part in order. A plate with a hole: \`parameters: {width: 60, depth: 40, thick: 8, hole: 10}\`, a \`sketch\` on plane \`XY\` with a rectangle (points p1..p4, lines l1..l4, \`fixed\` p1, \`horizontal\`/\`vertical\` on the sides, \`length\` l1 = \`"width"\`, l2 = \`"depth"\`), an \`extrude\` of it by \`"thick"\` (\`operation: "new"\`), then a \`hole\` on plane \`XY\` at \`offset: "thick"\`, \`at: ["width / 2", "depth / 2"]\`, \`diameter: "hole"\`, \`depth: "thick"\`. Validate a new history with \`cad_parametric\` before creating it; its prompt contains an exact JSON example. To change a parameter later, inspect the part and update it with \`expectedRevision\` (the features stay); send a whole \`history\` only to change the features themselves. The tool tells you at once what the history cannot build.
 - **Plate with a pattern of holes**: one \`cube\` plate, the holes as \`cylinder\`s, one \`boolean-subtract\` with the plate first.
 - **Bracket / L profile**: \`extrusion\` with \`profile\` points (>= 3, closed automatically) and \`depth\`.
 - **Pipe along a path**: \`sweep\` with \`path\` points and a round \`radius\`.
@@ -220,19 +220,20 @@ A parametric element holds \`history: { parameters, features }\`.
 
 - \`parameters\`: named dimensions, numbers or expressions of each other (\`"half": "width / 2"\`). Cycles are rejected.
 - \`features\` run in order: \`sketch\`, \`extrude\`, \`revolve\`, \`hole\`, \`pattern\` (linear or circular). A dimension is a parameter name or an expression.
+- History is a JSON object, never a string. Features and constraints use \`type\`; sketch entities use \`kind: point|line|circle|arc\`. Lines use point IDs in \`p1/p2\`; circles use a point ID in \`center\`. Read the complete \`cad_parametric\` validate example instead of inventing a rectangle entity.
 
 ## Workflow
 
 1. If the user names a quantity that will change (count, diameter, thickness, hole spacing), make it a parameter.
 2. Sketch on plane \`XY\` by default, with named lengths tied to parameters.
 3. Extrude with \`operation: "new"\`, \`direction: "up"\`, \`depth\` set to a parameter name.
-4. Add features that reference parameter names.
+4. Add features that reference parameter names, then call \`cad_parametric\` validate. Repair the reported paths and rebuild errors before create; switching to \`cad_add_elements\` cannot bypass the same history schema.
 5. End with \`cad_check_design\`. On \`RebuildFailed\`, read the cause, fix it, repeat.
 6. Save on an \`ai/<topic>\` branch with \`vcs_commit\` (see the version-control-cadcam skill).
 
 ## Editing later
 
-- Resize: \`cad_modify_entities\` with \`changes: { parameters: { width: 70 } }\`. Features stay.
+- Resize: \`cad_parametric\` inspect, then update with the real elementId, returned expectedRevision and \`parameters: {width:70}\`. Features and element ID stay. Inspect again if the revision is stale.
 - Add a feature: append it to the same parametric's history.
 - Rewrite the whole history only when the user asks. It is destructive.
 
@@ -344,6 +345,24 @@ jobs:
 
 Each run reports job-start, step and job-end events. A step has \`uses\`, a status (\`success\`, \`failure\` or \`skipped\`), and an optional message and outputs. A failing step never hides the verdict of the steps before it.`
 
+const CYCLE_PRESETS = `# Reusable machining cycle presets
+
+Load the operation schema before applying a preset. Read the actual machine, material, cutter, stock, origin and selected geometry. A preset is an ordered strategy, never invented feeds or a universal machine setting.
+
+- Closed recess: pocket, then a finishing pass with explicit allowance and a cutter that fits the inside radii.
+- External contour: profile after internal machining; include tabs or confirmed workholding where the schema supports them.
+- Deep recess: adaptive roughing, rest machining with a smaller cutter, then finish the selected faces.
+- Hole series: drill, with the supported peck cycle for depth; tapping or thread milling only with confirmed pitch and controller support.
+- Rotational part: facing, turning_od, then parting; threading_od only after confirming pitch, tool and machine.
+
+Use lib_lookup_tool and cam_suggest_parameters for starting values. Create operations through cam_create_operation, generate through cam_generate_gcode, analyse through cam_analyze_gcode, and verify through cam_verify_toolpath. Preserve real operation ids, predecessor links and remaining stock. Each flipped setup needs its own coordinate origin and fixtures. Report unsupported cycle/controller combinations instead of substituting an unrelated cycle.`
+
+const AUTO_MEMORY = `# Project memory and continuation
+
+Before work, read memory_recall and inspect the live document. Automatically save confirmed reusable units, machine/work offset, material, workholding choices, named design constraints and user corrections through memory_remember after successful work. Use stable keys to replace obsolete facts. Never save secrets, speculative geometry, failed operations or raw conversation logs.
+
+Project notes are loaded into fresh turns. Treat them as historical evidence and reconcile them with the current setup and revisions. Delegate a bounded job with real drawing/operation ids, units, constraints, setup and expected report. Specialists inherit the parent model and context, but their permissions still govern their work. After compaction, inspect the recorded ids and revisions before resuming mutations; preserve completed work and unresolved questions.`
+
 export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cad-3d-modeling", description: `Model 3D and 2D geometry in the open editor (${Object.keys(ELEMENT_SPECS).length} element types): conventions, recipes for common parts, how to build complex objects.`, category: "cad", tags: ["cad", "3d", "modeling"], body: MODELING },
   { name: "cam-operation-workflow", description: "The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.", category: "cam", tags: ["cam", "workflow", "gcode"], body: WORKFLOW },
@@ -358,6 +377,8 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "composed-cam-programs", description: "Compose CAM programs with several operations: sequencing, stock carry-over, multi-setup, lathe plus mill, verification per operation.", category: "cam", tags: ["cam", "workflow", "milling", "lathe"], body: COMPOSED_CAM },
   { name: "version-control-cadcam", description: "How the agent uses the git-style version control: branches, commits, pull requests and the rules that keep AI writes safe.", category: "vcs", tags: ["vcs", "branches", "pr"], body: VERSION_CONTROL },
   { name: "workflows-cadcam", description: "How the agent uses the Actions-style workflows: YAML shape, registered uses steps, interpolation, and when to dispatch manually.", category: "workflows", tags: ["workflows", "actions", "automation"], body: WORKFLOWS_CAM },
+  { name: "machining-cycle-presets", description: "Reusable pocket, contour, adaptive, drilling and turning sequences with explicit machine and verification requirements.", category: "cam", tags: ["cam", "cycles", "presets"], body: CYCLE_PRESETS },
+  { name: "project-auto-memory", description: "Automatically retain verified project facts and resume connected CAD/CAM tasks after delegation or compaction.", category: "general", tags: ["memory", "context", "continuation"], body: AUTO_MEMORY },
   { name: "stock-and-fixtures", description: "Stock, origin and fixtures: how to describe them so the verification can catch collisions.", category: "cam", tags: ["cam", "setup", "fixtures"], body: SETUP }
 ]
 

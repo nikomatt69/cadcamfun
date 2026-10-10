@@ -10,14 +10,14 @@
  * Surfacing works on the existing core — no new dependency, no native code.
  * Falls back to a friendly empty state when no closed solid is selected.
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import { Box, Layers, Plus, Sparkles, Wand2, Wrench } from "lucide-solid"
 import { cad as core } from "@cadcamfun/core"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { t, type Key } from "../../i18n/index.ts"
 
-type SurfacingOp = "chamferBox" | "chamferCylinderTop" | "shell" | "sweep" | "loft"
+export type SurfacingOp = "chamferBox" | "chamferCylinderTop" | "shell" | "sweep" | "loft"
 
 interface OpCell {
   readonly id: SurfacingOp
@@ -68,7 +68,7 @@ const parseSectionList = (raw: string): ReadonlyArray<{ z: number; points: Reado
 const SURFACT = (id: SurfacingOp, on: boolean): string =>
   `strategy-cell strategy-palette__cell ${on ? "strategy-cell--active" : ""}`
 
-export default function SurfacingPanel(): JSX.Element {
+export default function SurfacingPanel(props: { readonly operation?: SurfacingOp; readonly onOperationChange?: (operation: SurfacingOp) => void } = {}): JSX.Element {
   const elements = useElementsStore()
   const selection = useSelectionStore()
   const selectedSolid = createMemo(() => {
@@ -80,6 +80,7 @@ export default function SurfacingPanel(): JSX.Element {
     return element
   })
   const [op, setOp] = createSignal<SurfacingOp>("chamferBox")
+  createEffect(() => { if (props.operation) setOp(props.operation) })
   const [distance, setDistance] = createSignal(2)
   const [thickness, setThickness] = createSignal(1)
   const [openFaces, setOpenFaces] = createSignal("")
@@ -240,7 +241,7 @@ export default function SurfacingPanel(): JSX.Element {
                     class={SURFACT(cell.id, active())}
                     classList={{ "strategy-cell--active": active() }}
                     aria-pressed={active()}
-                    onClick={() => setOp(cell.id)}
+                    onClick={() => { setOp(cell.id); props.onOperationChange?.(cell.id) }}
                     title={t(cell.title)}
                   >
                     <span class="strategy-cell__icon">

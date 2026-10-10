@@ -56,7 +56,7 @@ export function CostsScreen(): JSX.Element {
   return <WorkspacePage
     title={t("costs.title")}
     rail={<form class="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void onCalculate() }}>
-      <p class="text-xs text-gray-500 dark:text-gray-400">{t("costs.subtitle")}</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400">{t("costs.subtitle")}</p>
       <label class="block"><span class={RAIL_LABEL}>{t("costs.toolpath")}</span>
         <select class={FIELD} value={toolpathId()} onChange={(e) => { setToolpathId(e.currentTarget.value); setResult(undefined) }}>
           <option value={NONE}>{t("costs.toolpathPlaceholder")}</option>
@@ -72,23 +72,23 @@ export function CostsScreen(): JSX.Element {
       <Show when={error()}><StageError message={`${t("costs.error")}: ${error()}`} /></Show>
       <Show when={result()} fallback={<StageEmpty icon={<DollarSign size={24} aria-hidden="true" />} title={t("costs.result")} hint={t("costs.empty")} />}>{(r) =>
         <article class={PANEL} aria-label={t("costs.result")}>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{t("costs.result")}</h2>
-          <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-gray-700 dark:text-gray-300">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{t("costs.result")}</h2>
+          <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
             <For each={lines(r())}>{([label, value]) => <><dt>{label}</dt><dd class="text-right">{money(value, r().currencyCode)}</dd></>}</For>
             <dt class="font-semibold">{t("costs.total")}</dt><dd class="text-right font-semibold">{money(r().totalCost, r().currencyCode)}</dd>
           </dl>
-          <p class="mt-3 text-xs text-gray-600 dark:text-gray-300">
+          <p class="mt-3 text-xs text-slate-600 dark:text-slate-300">
             {t("costs.pathLength")}: {r().details.calculatedValues.totalPathLengthMm.toFixed(1)} · {t("costs.machineMinutes")}: {r().details.calculatedValues.machineTimeMinutes.toFixed(1)}
           </p>
           <button type="button" class={`${TOOLBAR_BUTTON} mt-3`} disabled={pending()} onClick={() => void onSave()}>{t("costs.save")}</button>
         </article>}</Show>
       <section>
-        <h2 class="mb-2 font-semibold text-gray-900 dark:text-white">{t("costs.recent")}</h2>
+        <h2 class="mb-2 font-semibold text-slate-900 dark:text-white">{t("costs.recent")}</h2>
         <Show when={saved.loading() && !saved.data()}><StageLoading label={t("common.loading")} /></Show>
-        <Show when={saved.data()?.length === 0}><p class="text-sm text-gray-500 dark:text-gray-400">{t("costs.recentEmpty")}</p></Show>
+        <Show when={saved.data()?.length === 0}><p class="text-sm text-slate-500 dark:text-slate-400">{t("costs.recentEmpty")}</p></Show>
         <ul class="grid gap-2 text-sm">
           <For each={saved.data() ?? []}>{(row) =>
-            <li class={`${PANEL} flex justify-between !p-3 text-gray-800 dark:text-gray-200`}><span>{row.toolpath.name} · {formatDate(row.createdAt)}</span><span>{money(row.totalCost, row.currencyCode)}</span></li>}</For>
+            <li class={`${PANEL} flex justify-between !p-3 text-slate-800 dark:text-gray-200`}><span>{row.toolpath.name} · {formatDate(row.createdAt)}</span><span>{money(row.totalCost, row.currencyCode)}</span></li>}</For>
         </ul>
       </section>
     </div>

@@ -47,6 +47,7 @@ export const projectScratchDir = (paths: IsolatedPaths, projectId: string): stri
  * servers, extra config sources, secrets for connectors). Removed on setup.
  */
 const SCRUBBED = [
+  "NIKCLI_PERMISSION_MODE",
   "NIKCLI_AUTO_APPROVE",
   "NIKCLI_DANGEROUSLY_SKIP_PERMISSIONS",
   "NIKCLI_PERMISSION",
@@ -100,7 +101,8 @@ export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): 
   NIKCLI_DISABLE_EXTERNAL_SKILLS: "1",
   NIKCLI_DISABLE_BROWSER_CONTROL_TOOL: "1",
   NIKCLI_DISABLE_COMPUTER_TOOL: "1",
-  NIKCLI_PERMISSION_MODE: "default",
+  // Native interactive tools (question) are only registered for app/cli/desktop clients.
+  NIKCLI_CLIENT: "desktop",
   ...(options?.overrideHome === false ? {} : { HOME: paths.home, USERPROFILE: paths.home })
 })
 

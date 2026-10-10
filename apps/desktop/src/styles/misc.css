@@ -21,8 +21,8 @@
   width: min(28rem, 100%);
   border-radius: var(--ui-radius-2xl);
   background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: var(--ui-blur-lg) saturate(180%);
+  -webkit-backdrop-filter: var(--ui-blur-lg) saturate(180%);
   border: 1px solid rgba(226, 232, 240, 0.7);
   box-shadow: 0 24px 64px -32px rgba(15, 23, 42, 0.18), 0 8px 24px -8px rgba(15, 23, 42, 0.06);
   padding: 2rem;
@@ -47,7 +47,7 @@ html.dark .auth-shell {
   justify-content: center;
   width: 3.5rem;
   height: 3.5rem;
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-lg);
   background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
   color: white;
   box-shadow: 0 12px 28px -12px rgba(37, 99, 235, 0.5);
@@ -63,7 +63,7 @@ html.dark .auth-title { color: rgb(241, 245, 249); }
 .auth-subtitle {
   margin: 0;
   font-size: 0.875rem;
-  color: rgb(107, 114, 128);
+  color: rgb(100, 116, 139);
 }
 .auth-form {
   display: flex;
@@ -91,7 +91,7 @@ html.dark .auth-link { color: rgb(96, 165, 250); }
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.75rem;
-  border-radius: 0.75rem;
+  border-radius: var(--ui-radius-md);
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.25);
   font-size: 0.8125rem;
@@ -142,7 +142,7 @@ html.dark .auth-debug-link-label { color: rgb(253, 224, 71); }
   color: rgb(17, 24, 39);
 }
 html.dark .pricing-price { color: rgb(241, 245, 249); }
-.pricing-price-unit { font-size: 0.875rem; font-weight: 500; color: rgb(107, 114, 128); }
+.pricing-price-unit { font-size: 0.875rem; font-weight: 500; color: rgb(100, 116, 139); }
 .pricing-features {
   display: flex;
   flex-direction: column;
@@ -177,8 +177,8 @@ html.dark .pricing-features li { color: rgb(203, 213, 225); }
   padding: 1rem;
   border-radius: var(--ui-radius-2xl);
   background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--ui-blur-md);
+  -webkit-backdrop-filter: var(--ui-blur-md);
   border: 1px solid rgba(226, 232, 240, 0.7);
   display: flex;
   flex-direction: column;
@@ -199,7 +199,7 @@ html.dark .ai-conversation {
 }
 .ai-message-content {
   padding: 0.75rem 1rem;
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-lg);
   font-size: 0.9375rem;
   line-height: 1.5;
   background: linear-gradient(135deg, rgb(37, 99, 235), rgb(124, 58, 237));
@@ -220,10 +220,10 @@ html.dark .ai-message-assistant .ai-message-content {
   gap: 0.5rem;
   align-items: center;
   padding: 0.625rem;
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-lg);
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: var(--ui-blur-md);
+  -webkit-backdrop-filter: var(--ui-blur-md);
   border: 1px solid rgba(226, 232, 240, 0.7);
 }
 html.dark .ai-composer {
@@ -262,7 +262,7 @@ html.dark .ai-composer-input { color: rgb(241, 245, 249); }
 .profile-avatar {
   width: 6rem;
   height: 6rem;
-  border-radius: 1.5rem;
+  border-radius: var(--ui-radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,7 +333,7 @@ html.dark .legal-card p { color: rgb(203, 213, 225); }
 }
 .error-body {
   max-width: 36rem;
-  color: rgb(75, 85, 99);
+  color: rgb(71, 85, 105);
   margin: 0;
 }
 html.dark .error-body { color: rgb(148, 163, 184); }
@@ -375,7 +375,7 @@ html.dark .error-body { color: rgb(148, 163, 184); }
   border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
 }
 .costs-row:last-child { border-bottom: 0; }
-.costs-row-label { color: rgb(75, 85, 99); }
+.costs-row-label { color: rgb(71, 85, 105); }
 html.dark .costs-row-label { color: rgb(148, 163, 184); }
 .costs-row-value { font-weight: 600; color: rgb(17, 24, 39); }
 html.dark .costs-row-value { color: rgb(241, 245, 249); }
@@ -428,7 +428,7 @@ html.dark .costs-row-total-label { color: rgb(241, 245, 249); }
   color: transparent;
 }
 .waitlist-body {
-  color: rgb(75, 85, 99);
+  color: rgb(71, 85, 105);
   margin: 0 0 1.5rem;
   text-wrap: pretty;
 }
@@ -476,10 +476,10 @@ html.dark .waitlist-body { color: rgb(148, 163, 184); }
   background:
     linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(168, 85, 247, 0.18)),
     rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--ui-blur-md);
+  -webkit-backdrop-filter: var(--ui-blur-md);
   border: 1px solid rgba(226, 232, 240, 0.7);
-  color: rgb(107, 114, 128);
+  color: rgb(100, 116, 139);
 }
 html.dark .detail-thumbnail {
   background:
@@ -529,10 +529,10 @@ html.dark .detail-thumbnail {
   align-items: flex-start;
   gap: 0.875rem;
   padding: 0.875rem 1rem;
-  border-radius: 1rem;
+  border-radius: var(--ui-radius-lg);
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: var(--ui-blur-sm);
+  -webkit-backdrop-filter: var(--ui-blur-sm);
   border: 1px solid rgba(226, 232, 240, 0.7);
   transition: background 180ms;
 }
@@ -548,5 +548,5 @@ html.dark .notification-row {
 .notification-row-title { margin: 0; font-size: 0.9375rem; font-weight: 600; color: rgb(17, 24, 39); }
 .notification-row-unread .notification-row-title { color: rgb(37, 99, 235); }
 html.dark .notification-row-title { color: rgb(241, 245, 249); }
-.notification-row-content { margin: 0; font-size: 0.875rem; color: rgb(75, 85, 99); }
-.notification-row-meta { font-size: 0.75rem; color: rgb(107, 114, 128); }
+.notification-row-content { margin: 0; font-size: 0.875rem; color: rgb(71, 85, 105); }
+.notification-row-meta { font-size: 0.75rem; color: rgb(100, 116, 139); }

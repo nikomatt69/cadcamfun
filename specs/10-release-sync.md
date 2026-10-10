@@ -62,9 +62,15 @@ Offline-first with optional cloud sync is in the README but out of scope for v6.
 - `bunx --no-env-file tsc -p tsconfig.json`: passes without editing root configuration or other WPs.
 - `actionlint .github/workflows/ci.yml .github/workflows/release.yml`: passes.
 - Full build dry-run for `x86_64-apple-darwin`: passes and selects `bun-darwin-x64` and the target-specific bundle directory without signing credentials or writes.
-- Not run: actual signed installers, notarization, GitHub publication, updater signature verification with a real key, runtime update flow, or backup/rollback acceptance. The committed updater key is still a placeholder; real bundling fails closed until the owner configures it and supplies the required secrets. No signing key was generated or invented.
+- At the 2026-10-05 checkpoint, actual signed installers, notarization, GitHub publication, updater signature verification, runtime update flow and backup/rollback acceptance had not run. The updater key was still a placeholder; the local signing follow-up below supersedes that key configuration status.
 
 ## 7. Change log
 
 - v1: initial spec.
 - 2026-10-05: completed interrupted packaging follow-up: explicit architecture mapping and target paths, flat copied artifacts/checksums, tag/manual release gate, certificate thumbprint wiring, strict manifest merge and verified draft staging, helper/integration tests. Resource mapping now matches staged migrations. Root and other-WP sources unchanged; release acceptance is pending credentials and platform builds.
+
+## Local updater signing configuration (2026-10-10)
+
+The owner explicitly authorized generating an updater key pair and storing it in an ignored root file. `tauri-signing.json` holds the public key, encrypted private key and password with owner-only file permissions. The public key is configured in `tauri.conf.json`. The build loads local credentials only for bundling; explicit environment signing credentials take precedence as a pair. CI continues to use its secrets. Apple/Windows platform certificates are separate from updater signing and remain required for platform-signed releases. No local credentials are logged or committed.
+
+Verification: Tauri CLI `signer generate` created the pair and `signer sign` signed a temporary payload. Verification against the configured public key succeeded and rejected an altered payload. Credential permissions are `0600`, Git ignores the file, the 19 signing/release helper tests pass, and root TypeScript checking and bundle dry-run pass. Actual installer bundling, notarization and updater installation remain unverified in this follow-up.

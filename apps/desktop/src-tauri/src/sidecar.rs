@@ -201,17 +201,30 @@ fn convert_event(event: CommandEvent) -> Option<ProcEvent> {
     }
 }
 
+fn proc_log_level(is_stderr: bool, line: &str) -> log::Level {
+    let structured = serde_json::from_str::<serde_json::Value>(line).ok();
+    match structured
+        .as_ref()
+        .and_then(|record| record.get("level"))
+        .and_then(|level| level.as_str())
+    {
+        Some("TRACE") => log::Level::Trace,
+        Some("DEBUG") => log::Level::Debug,
+        Some("INFO") => log::Level::Info,
+        Some("WARN") | Some("WARNING") => log::Level::Warn,
+        Some("ERROR") | Some("FATAL") => log::Level::Error,
+        _ if is_stderr => log::Level::Warn,
+        _ => log::Level::Info,
+    }
+}
+
 fn log_proc_line(is_stderr: bool, line: &str, token: &str) {
     let line = line.trim_end();
     if line.is_empty() {
         return;
     }
     let line = redact_line(line, token);
-    if is_stderr {
-        log::warn!(target: "sidecar", "{line}");
-    } else {
-        log::info!(target: "sidecar", "{line}");
-    }
+    log::log!(target: "sidecar", proc_log_level(is_stderr, &line), "{line}");
 }
 
 /// Reads events until the ready line arrives, the process dies, or `limit` elapses.
@@ -944,6 +957,23 @@ mod tests {
         );
         assert_eq!(parse("only logs here\n"), Vec::new());
         assert_eq!(parse(""), Vec::new());
+    }
+
+    #[test]
+    fn structured_stderr_preserves_effect_log_levels() {
+        assert_eq!(
+            proc_log_level(true, r#"{"level":"INFO","message":"request complete"}"#),
+            log::Level::Info
+        );
+        assert_eq!(
+            proc_log_level(true, r#"{"level":"ERROR","message":"failure"}"#),
+            log::Level::Error
+        );
+        assert_eq!(
+            proc_log_level(true, "unknown native diagnostic"),
+            log::Level::Warn
+        );
+        assert_eq!(proc_log_level(false, "ordinary stdout"), log::Level::Info);
     }
 
     #[test]

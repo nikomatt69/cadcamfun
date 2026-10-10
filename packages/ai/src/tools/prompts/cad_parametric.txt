@@ -7,7 +7,25 @@ Parameters
 - name: part name (create); x, y, z: placement in mm; layer: optional existing or named layer.
 - parameters: names mapped to finite numbers or expressions (update). Only existing names may change; derived parameters remain expressions unless explicitly changed.
 - expectedRevision: revision returned by inspect; stale revisions are refused without writing.
-- cases: up to 12 non-mutating cases. Each has name, parameters (existing names), optional expectedBodies, minVolumeMm3 and maxVolumeMm3. Bounds/volume use the history's local coordinates.
+- cases: a JSON ARRAY of 1..12 objects, never a JSON-encoded string. Each has name, parameters (existing names), optional expectedBodies, minVolumeMm3 and maxVolumeMm3. Example: [{"name":"taller","parameters":{"height":25},"expectedBodies":1}]. Bounds/volume use the history's local coordinates.
+
+Exact history format
+- history is a JSON OBJECT {"parameters": {...}, "features": [...]}, never a string containing JSON, Markdown or source code. Expressions are strings only inside parameters and supported dimension fields.
+- Every feature has id and type. Every sketch entity has id and kind (NOT type): point {id,kind:"point",x,y}; line {id,kind:"line",p1,p2}; circle {id,kind:"circle",center,radius}; arc {id,kind:"arc",center,start,end}. p1/p2/center/start/end are point IDs, never coordinate objects. Coordinates and radii are finite numbers; drive them through constraints.
+- Constraints use type, NOT kind: fixed {type:"fixed",point,x?,y?}; horizontal/vertical {type,line}; length {type:"length",line,value}; radius/diameter {type,circle,value}. Include constraints, even when it is []. A rectangle is four points and four lines forming a closed loop, not an entity with kind:"rectangle".
+- Every extrude/revolve requires operation (new|union|subtract|intersect) and sketch (an earlier sketch feature ID). A sketch alone makes no solid. Every hole/pattern also needs its own id and type.
+
+Workflow and error recovery
+1. For a new history, call action:"validate" first. Repair schema errors, unresolved expressions and rebuild errors before action:"create" with the same history and a name. Validation writes nothing; do not use create to probe input formats.
+2. For existing parts, inspect the real elementId, then update parameters with the returned expectedRevision. On a stale revision, inspect again; do not guess it or replace the part.
+3. Read the failing path. "history: expected object, received string" means send the object directly. "entities.N.kind" means check that entity's kind and fields against the four shapes above. It does not mean the tool is unsupported.
+4. Correct the arguments and retry this tool. cad_add_elements validates parametric history with the SAME schema: switching tools does not fix malformed history. Never repeat an unchanged rejected call. Confirm any successful mutation by reading the result before retrying to avoid duplicates.
+
+Example: validate a dimension-driven cylinder (change the parameters to suit the requested part)
+```json
+{"action":"validate","history":{"parameters":{"radius":10,"height":20},"features":[{"id":"profile","type":"sketch","plane":"XY","sketch":{"entities":[{"id":"origin","kind":"point","x":0,"y":0},{"id":"outline","kind":"circle","center":"origin","radius":10}],"constraints":[{"type":"fixed","point":"origin","x":0,"y":0},{"type":"radius","circle":"outline","value":"radius"}]}},{"id":"body","type":"extrude","sketch":"profile","depth":"height","operation":"new"}]}}
+```
+After ok:true, send action:"create", name and the same history object. To update later: inspect the returned element id, then send action:"update", elementId, expectedRevision and parameters such as {"height":25}.
 
 Result
 inspect returns history, revision, dependencies and rebuild metrics. validate returns ok, resolved parameters, bodyCount, volumeMm3, bounds, issues and sketch solver statuses. create/update return existing editor-sync elements and ids. Failed validation changes nothing. test returns per-case pass/fail and metrics; it never changes the drawing. A test does not establish machine accuracy or manufacturability. Read back the revision after updates, use cad_check_design and cad_vision, then re-generate and verify any affected CAM operations.

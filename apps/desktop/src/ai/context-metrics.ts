@@ -10,6 +10,8 @@ import type { AiUsage, ChatModel, ModelInfo, ProviderInfo } from "./types.ts"
 export interface ModelWindow {
   readonly context: number
   readonly output?: number
+  readonly input?: number
+  readonly reserved?: number
 }
 
 /** `ProviderTransform.OUTPUT_TOKEN_MAX`: the cap nikcli puts on one call's output. */
@@ -20,7 +22,7 @@ export const OUTPUT_TOKEN_MAX = 32_000
  * the window minus what the next answer may take.
  */
 export const usableWindow = (window: ModelWindow): number =>
-  Math.max(0, window.context - (Math.min(window.output ?? OUTPUT_TOKEN_MAX, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX))
+  Math.max(0, window.input ? window.input - (window.reserved ?? Math.min(20_000, Math.min(window.output ?? OUTPUT_TOKEN_MAX, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX)) : window.context - (Math.min(window.output ?? OUTPUT_TOKEN_MAX, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX))
 
 export interface ContextMetrics {
   readonly tokens: number
@@ -46,7 +48,7 @@ export const contextWindowFor = (
   const listed = providers.find((p) => p.id === model.provider)?.models.find((m) => m.id === model.model)
   const context = listed?.contextWindow ?? models.find((m) => m.provider === model.provider && m.id === model.model)?.contextWindow
   if (context === undefined || context <= 0) return undefined
-  return { context, ...(listed !== undefined && listed.maxOutput > 0 ? { output: listed.maxOutput } : {}) }
+  return { context, ...(listed?.inputWindow ? { input: listed.inputWindow } : {}), ...(listed !== undefined && listed.maxOutput > 0 ? { output: listed.maxOutput } : {}) }
 }
 
 export const WARN_PERCENT = 70

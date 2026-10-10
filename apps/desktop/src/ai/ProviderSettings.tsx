@@ -165,10 +165,10 @@ export function ProviderSettings(): JSX.Element {
   const [search, setSearch] = createSignal("")
   const [openId, setOpenId] = createSignal<string | undefined>(undefined)
 
+  const index = createMemo(() => ai.providers().map((provider) => ({ provider, text: haystack(provider) })))
   const filtered = createMemo(() => {
     const q = search().trim().toLowerCase()
-    const all = ai.providers()
-    const matching = q.length === 0 ? all : all.filter((p) => haystack(p).includes(q))
+    const matching = index().filter((entry) => !q || entry.text.includes(q)).map((entry) => entry.provider)
     const status = ai.aiStatus()?.providers
     const connected = (provider: ProviderInfo) => provider.configured || status?.[provider.id] === "configured"
     return [...matching].sort((a, b) => Number(connected(b)) - Number(connected(a)) || a.name.localeCompare(b.name))

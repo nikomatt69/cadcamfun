@@ -107,7 +107,7 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
       }
       toast.success("Tutti i toolpath sono stati generati")
     } catch (error) {
-      toast.error("Errore nella generazione dei toolpath")
+      toast.error("Failed to generate toolpaths")
       console.error(error)
     } finally {
       setIsGeneratingAll(false)

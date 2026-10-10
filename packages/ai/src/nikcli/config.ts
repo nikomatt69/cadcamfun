@@ -1,5 +1,9 @@
+import { permissionAgents } from "./permission-modes.ts"
+import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
+import { NATIVE_TOOLS } from "./tool-registry.ts"
+import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
 
 /**
  * Builds the host's global `nikcli.json`. It contains no secrets: keys are
@@ -29,7 +33,7 @@ export interface HostProviderSpec {
   readonly name: string
   readonly protocol: HostProtocol
   readonly baseURL: string
-  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string; readonly context: number; readonly output: number; readonly vision?: boolean; readonly pdf?: boolean }>
+  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string; readonly context?: number; readonly input?: number; readonly output?: number; readonly vision?: boolean; readonly pdf?: boolean }>
 }
 
 const PROTOCOLS: Readonly<Record<BuiltinProviderId, { name: string; protocol: HostProtocol; baseURL: string }>> = {
@@ -48,8 +52,8 @@ export const defaultProviderSpecs = (baseUrls: Partial<Record<BuiltinProviderId,
       name: p.name,
       protocol: p.protocol,
       baseURL: baseUrls[id] ?? p.baseURL,
-      // nikcli asks a model for min(its output limit, 32 000) tokens: a long cad_add_elements call needs room to be written.
-      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, context: m.contextWindow, output: 32_000, vision: m.vision, pdf: id === "anthropic" || m.id.startsWith("anthropic/") }))
+      // Inherit models.dev limits; overriding them masks both output caps and compaction thresholds.
+      models: allModels([id]).map((m) => ({ id: m.id, name: m.id, vision: m.vision, pdf: id === "anthropic" || m.id.startsWith("anthropic/") }))
     }
   })
 
@@ -82,22 +86,8 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   // agent as "curated": allowed tools are active, every built-in tool is removed.
   const permission: Record<string, "allow" | "deny" | "ask"> = { "*": "deny" }
   for (const id of input.toolIds) permission[id] = "allow"
-  permission["invalid"] = "allow"
-  permission["search_tools"] = "allow"
-  // The playbooks in `skills/index.ts`: loading one only reads text this package wrote.
-  permission["skill"] = "allow"
-  // The plan the agent keeps while it works (nikcli's own todo list): data only, nothing it can run.
-  permission["todowrite"] = "allow"
-  permission["todoread"] = "allow"
-  // The host's goal loop: one objective, and the host keeps the agent working on it until it is verified complete.
-  permission["create_goal"] = "allow"
-  permission["get_goal"] = "allow"
-  permission["update_goal"] = "allow"
-  permission["task"] = "deny"
-  // nikcli's confined program runner: a restricted JavaScript subset (no import, fetch, process, files or timers) whose only
-  // tools are the ones this agent may call, so a loop of `cad_add_elements` or `cam_create_operation` is one call and only the
-  // final value comes back.
-  permission["code_mode"] = "allow"
+  for (const tool of NATIVE_TOOLS) permission[tool.id] = "allow"
+  permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.
   const specialists = Object.fromEntries(
     SUBAGENT_IDS.map((id) => {
@@ -108,6 +98,9 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
 
   const provider: Record<string, unknown> = {}
   for (const p of input.providers) {
+    for (const model of p.models) for (const limit of [model.context, model.input, model.output]) {
+      if (limit !== undefined && (!Number.isSafeInteger(limit) || limit <= 0)) throw new Error(`Invalid token limit for ${p.id}/${model.id}`)
+    }
     provider[p.id] = {
       name: p.name,
       npm: p.protocol === "anthropic" ? "@ai-sdk/anthropic" : p.protocol === "openai-responses" ? "@ai-sdk/openai" : "@ai-sdk/openai-compatible",
@@ -115,7 +108,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
       models: Object.fromEntries(
         p.models.map((m) => [
           m.id,
-          { name: m.name, tool_call: true, ...(m.vision !== undefined || m.pdf !== undefined ? { attachment: m.vision === true || m.pdf === true, modalities: { input: ["text", ...(m.vision ? ["image"] : []), ...(m.pdf ? ["pdf"] : [])], output: ["text"] } } : {}), limit: { context: m.context, output: m.output } }
+          { name: m.name, tool_call: true, ...(m.vision !== undefined || m.pdf !== undefined ? { attachment: m.vision === true || m.pdf === true, modalities: { input: ["text", ...(m.vision ? ["image"] : []), ...(m.pdf ? ["pdf"] : [])], output: ["text"] } } : {}), ...((m.context !== undefined || m.output !== undefined || m.input !== undefined) ? { limit: { ...(m.context !== undefined ? { context: m.context } : {}), ...(m.input !== undefined ? { input: m.input } : {}), ...(m.output !== undefined ? { output: m.output } : {}) } } : {}) }
         ])
       )
     }
@@ -125,12 +118,15 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     share: "disabled",
     autoupdate: false,
     snapshot: false,
+    experimental: { brain: true, memory: true },
     compaction: { auto: true, prune: true, ...input.compaction },
     username: "cadcam",
     provider,
-    default_agent: CADCAM_AGENT,
+    // Chat and specialist runners always select their role explicitly. Native Brain omits it.
+    default_agent: "cadcam-memory",
     agent: {
-      [CADCAM_AGENT]: {
+      "cadcam-memory": { mode: "primary", description: "Internal project memory consolidator", prompt: memoryPrompt.trim(), permission: { "*": "deny", read: "allow", edit: "allow", glob: "allow", grep: "allow", list: "allow", tree: "allow" } },
+      ...permissionAgents({ [CADCAM_AGENT]: {
         mode: "primary",
         description: "CAD/CAM assistant",
         // No step cap, as in nikcli (`agent.steps ?? Infinity`): one request runs from the model through the machining to the
@@ -138,7 +134,8 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
         prompt: input.systemPrompt,
         permission
       },
-      ...specialists,
+      ...specialists }, input.toolIds),
+      compaction: { prompt: compactionPrompt.trim(), permission: { "*": "deny" } },
       // Background helpers would spend extra model calls on titles and summaries.
       title: { disable: true },
       summary: { disable: true }
