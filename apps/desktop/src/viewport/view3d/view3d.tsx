@@ -6,10 +6,11 @@ import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { TransformControls } from "three/addons/controls/TransformControls.js"
 import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
-import { isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid } from "@cadcamfun/core"
+import { isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, type Playback } from "./playback.ts"
+import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
 export type RenderMode = "shaded" | "shaded-edges" | "wireframe" | "xray"
@@ -66,13 +67,27 @@ export interface View3DProps {
   readonly lighting?: ViewportLighting
   readonly material?: ViewportMaterial
   readonly section?: ViewportSection
+  readonly toolpathDisplay?: {
+    readonly showPoints: boolean
+    readonly showPointLabels: boolean
+    readonly pointFilter: "all" | ToolpathPointKind
+    readonly pointSize: number
+    readonly showArcCenters: boolean
+    readonly showArcRadii: boolean
+    readonly stockVisible: boolean
+    readonly stockOpacity: number
+    readonly arcTolerance: number
+  }
 }
 
 export const disposeGroup = (group: THREE.Object3D): void => {
   group.traverse(object => {
-    if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Sprite) {
       object.geometry.dispose()
-      for (const material of Array.isArray(object.material) ? object.material : [object.material]) material.dispose()
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material instanceof THREE.SpriteMaterial) material.map?.dispose()
+        material.dispose()
+      }
     }
   })
   group.clear()
@@ -94,7 +109,7 @@ export function View3D(props: View3DProps) {
   let rebuild = () => {}, setPreset = () => {}
   let playback: Playback = { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -269,11 +284,23 @@ export function View3D(props: View3DProps) {
         })
       } else installMesh(meshOf(solid, .1), index)
     }
-    const addLines = (positions: number[], rapid: boolean) => {
+    const addLines = (positions: number[], rapid: boolean, color?: number) => {
       if (!positions.length) return
       const geometry = new THREE.BufferGeometry(); geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-      const line = new THREE.LineSegments(geometry, rapid ? new THREE.LineDashedMaterial({ color: 0xf59e0b, dashSize: 2, gapSize: 1 }) : new THREE.LineBasicMaterial({ color: 0x38bdf8 }))
+      const line = new THREE.LineSegments(geometry, rapid ? new THREE.LineDashedMaterial({ color: color ?? 0xf59e0b, dashSize: 2, gapSize: 1 }) : new THREE.LineBasicMaterial({ color: color ?? 0x38bdf8 }))
       line.computeLineDistances(); content.add(line)
+    }
+    const pointColor: Record<ToolpathPointKind, number> = { rapid: 0xef4444, cut: 0x22c55e, arc: 0x3b82f6, cycle: 0xa855f7 }
+    const addPointLabel = (text: string, position: Vec3) => {
+      const canvas = document.createElement("canvas"); canvas.width = 128; canvas.height = 48
+      const context = canvas.getContext("2d")
+      if (!context) return
+      context.fillStyle = "rgba(15,23,42,.9)"; context.fillRect(0, 0, canvas.width, canvas.height)
+      context.fillStyle = "#fff"; context.font = "24px sans-serif"; context.textAlign = "center"; context.textBaseline = "middle"; context.fillText(text, 64, 24)
+      const texture = new THREE.CanvasTexture(canvas)
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })
+      const sprite = new THREE.Sprite(material); sprite.position.set(position.x, position.y, position.z + 2); sprite.scale.set(12, 4.5, 1)
+      content.add(sprite)
     }
     rebuild = () => {
       invalidate()
@@ -284,9 +311,9 @@ export function View3D(props: View3DProps) {
       if (props.stock) {
         const { size, origin: stockOrigin } = props.stock
         const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z)
-        const stock = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: .6 }))
+        const stock = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeometry), new THREE.LineBasicMaterial({ color: 0xc8a878, transparent: true, opacity: props.toolpathDisplay?.stockOpacity ?? .6 }))
         boxGeometry.dispose()
-        stock.position.set(stockOrigin.x + size.x / 2, stockOrigin.y + size.y / 2, stockOrigin.z + size.z / 2); content.add(stock)
+        stock.position.set(stockOrigin.x + size.x / 2, stockOrigin.y + size.y / 2, stockOrigin.z + size.z / 2); stock.visible = props.toolpathDisplay?.stockVisible ?? true; content.add(stock)
       }
       for (const raw of props.drawing?.entities ?? []) {
         if (!raw.visible || props.drawing?.layers.find(l => l.id === raw.layerId)?.visible === false) continue
@@ -299,10 +326,31 @@ export function View3D(props: View3DProps) {
           addLines(positions, false)
         }
       }
-      playback = props.program ? buildPlayback(props.program) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
+      playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
       const rapid: number[] = [], cuts: number[] = []
       for (const s of playback.segments) (s.rapid ? rapid : cuts).push(s.from.x, s.from.y, s.from.z, s.to.x, s.to.y, s.to.z)
       addLines(rapid, true); addLines(cuts, false)
+      if (props.program && props.toolpathDisplay) {
+        const overlay = toolpathOverlayModel(props.program)
+        if (props.toolpathDisplay.showPoints) {
+          for (const point of overlay.points) {
+            if (props.toolpathDisplay.pointFilter !== "all" && props.toolpathDisplay.pointFilter !== point.kind) continue
+            const geometry = new THREE.SphereGeometry(props.toolpathDisplay.pointSize, 10, 8)
+            const marker = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: pointColor[point.kind], depthTest: false }))
+            marker.position.set(point.position.x, point.position.y, point.position.z); marker.renderOrder = 20; content.add(marker)
+            if (props.toolpathDisplay.showPointLabels) addPointLabel(String(point.index), point.position)
+          }
+        }
+        if (props.toolpathDisplay.showArcCenters || props.toolpathDisplay.showArcRadii) {
+          for (const arc of overlay.arcs) {
+            if (props.toolpathDisplay.showArcCenters) {
+              const center = new THREE.Mesh(new THREE.SphereGeometry(props.toolpathDisplay.pointSize * 1.35, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf97316, depthTest: false }))
+              center.position.set(arc.center.x, arc.center.y, arc.center.z); center.renderOrder = 21; content.add(center)
+            }
+            if (props.toolpathDisplay.showArcRadii) addLines([arc.center.x, arc.center.y, arc.center.z, arc.from.x, arc.from.y, arc.from.z], false, 0xf97316)
+          }
+        }
+      }
       appearance()
       if (!initialized) { fit(); initialized = true }
     }

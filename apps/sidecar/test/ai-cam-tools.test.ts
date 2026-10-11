@@ -308,14 +308,41 @@ describe("library and chain tools (spec 22 §3)", () => {
       const saved = await h.saveComponent(project, added.ids, "Bracket pair") as { ok: boolean; componentId: string; children: number }
       expect(saved.ok).toBe(true)
       expect(saved.children).toBe(2)
-      const list = await h.listComponents(project, "project") as Array<{ id: string; name: string }>
-      expect(list.some((c) => c.id === saved.componentId && c.name === "Bracket pair")).toBe(true)
+      const canvas = await h.addElements(project, [{ type: "component", name: "Canvas fixture", elements: [{ type: "cube", width: 8, height: 8, depth: 8 }] }]) as { ids: string[] }
+      const list = await h.listComponents(project) as Array<{ id: string; name: string; children: number }>
+      expect(list).toContainEqual(expect.objectContaining({ id: canvas.ids[0], name: "Canvas fixture", children: 1 }))
+      expect(list.some((component) => component.id === saved.componentId)).toBe(false)
+      const reusable = await h.lookupComponent("Bracket pair") as Array<{ id: string; name: string }>
+      expect(reusable).toContainEqual(expect.objectContaining({ id: saved.componentId, name: "Bracket pair" }))
       const inserted = await h.insertComponent(project, saved.componentId, { move: { x: 5, y: 5, z: 0 } }) as { ok: boolean; ids: string[] }
       expect(inserted.ok).toBe(true)
       expect(inserted.ids.length).toBeGreaterThan(0)
       expect((await h.deleteComponent(saved.componentId)) as { ok: boolean }).toMatchObject({ ok: true })
       expect(await h.deleteComponent("nope")).toMatchObject({ ok: false })
       expect(await h.insertComponent(project, "nope")).toMatchObject({ ok: false })
+    } finally { await fresh.dispose() }
+  })
+
+  test("the component library searches accessible projects and reuses a saved component in another project", async () => {
+    const fresh = await makeApp()
+    try {
+      const h = await fresh.toolHandlers()
+      const source = (await fresh.call("/api/projects", { method: "POST", json: { name: "Source library" } })).body.id as string
+      const target = (await fresh.call("/api/projects", { method: "POST", json: { name: "Target assembly" } })).body.id as string
+      const added = await h.addElements(source, [{ type: "cube", name: "Reusable jaw", width: 30, height: 12, depth: 8, z: 4 }]) as { ids: string[] }
+      const saved = await h.saveComponent(source, added.ids, "Reusable vise jaw") as { ok: boolean; componentId: string }
+      expect(saved.ok).toBe(true)
+
+      const canvas = await h.listComponents(target) as Array<{ id: string }>
+      expect(canvas.some((component) => component.id === saved.componentId)).toBe(false)
+      const library = await h.lookupComponent("Reusable vise jaw") as Array<{ id: string; projectId: string; projectName: string }>
+      expect(library).toContainEqual(expect.objectContaining({ id: saved.componentId, projectId: source, projectName: "Source library" }))
+
+      const inserted = await h.insertComponent(target, saved.componentId, { move: { x: 40, y: 5, z: 0 } }) as { ok: boolean; component: { id: string }; ids: string[] }
+      expect(inserted).toMatchObject({ ok: true, component: { id: saved.componentId } })
+      expect(inserted.ids).toHaveLength(1)
+      const drawing = (await fresh.call(`/api/projects/${target}/drawings`)).body[0]
+      expect(drawing.data.elements).toEqual(expect.arrayContaining([expect.objectContaining({ id: inserted.ids[0] })]))
     } finally { await fresh.dispose() }
   })
 
@@ -331,6 +358,9 @@ describe("library and chain tools (spec 22 §3)", () => {
       expect(tool.created).toBe(true)
       const machine = await h.upsertMachineConfig({ name: "Mill", kind: "mill", postProcessor: "linuxcnc", kinematics: { x: { min: -300, max: 300 } } }) as { ok: boolean; id: string; created: boolean }
       expect(machine.created).toBe(true)
+      expect(await h.lookupMaterial("Al 6061 T6")).toContainEqual(expect.objectContaining({ id: mat.id, name: "Al 6061 T6" }))
+      expect(await h.lookupTool("6mm endmill")).toContainEqual(expect.objectContaining({ id: tool.id, diameter: 6 }))
+      expect(await h.lookupMachineConfig("Mill")).toContainEqual(expect.objectContaining({ id: machine.id, name: "Mill", type: "mill" }))
       const defaults = await h.setProjectDefault({ projectId: project, materialId: mat.id, toolId: tool.id, machineConfigId: machine.id })
       expect(defaults).toMatchObject({ ok: true, projectId: project })
     } finally { await fresh.dispose() }

@@ -1877,6 +1877,44 @@ export type AiSessionStateOutput = {
         error?: string | undefined
       }>
     | undefined
+  events?:
+    | Array<
+        | { type: "tool_call"; sessionId: string; agent?: string; callId: string; tool: string; input: unknown }
+        | {
+            type: "tool_result"
+            sessionId: string
+            agent?: string
+            callId: string
+            tool: string
+            ok: boolean
+            output: string
+            images?: Array<string>
+          }
+        | {
+            type: "todo"
+            sessionId: string
+            todos: Array<{
+              id?: string
+              content: string
+              status: "pending" | "in_progress" | "completed" | "cancelled"
+              priority?: string
+            }>
+          }
+        | {
+            type: "tool_diagnostic"
+            sessionId: string
+            agent?: string
+            callId: string
+            tool: string
+            kind: "argument" | "execution" | "partial" | "verification"
+            severity: "error" | "warning" | "info"
+            message: string
+            recovery?: string
+            mutationApplied?: boolean
+          }
+      >
+    | undefined
+  usage?: { inputTokens: number; outputTokens: number } | undefined
 }
 
 export type AiRemoveSessionInput = {
@@ -2063,7 +2101,94 @@ export type AiChatStreamInput = {
   readonly model?: AiChatStreamPayload["model"]
 }
 
-export type AiChatStreamOutput = unknown
+export type AiChatStreamOutput =
+  | { type: "turn"; sessionId: string; phase: "start" | "recovering" | "continuing" | "finish"; reason?: string }
+  | { type: "session_status"; sessionId: string; status: "busy" | "idle" | "retry" }
+  | { type: "permission_resolved"; sessionId: string; requestId: string; reply: "once" | "always" | "reject" }
+  | { type: "permission_blocked"; sessionId: string; permission: string; patterns: Array<string>; reason: string }
+  | { type: "compaction"; sessionId: string; phase: "start" | "finish" }
+  | { type: "context_snapshot"; sessionId: string; projectId: string; source: "workspace"; chars: number }
+  | {
+      type: "tool_diagnostic"
+      sessionId: string
+      agent?: string
+      callId: string
+      tool: string
+      kind: "argument" | "execution" | "partial" | "verification"
+      severity: "error" | "warning" | "info"
+      message: string
+      recovery?: string
+      mutationApplied?: boolean
+    }
+  | { type: "user_message"; sessionId: string; text: string }
+  | {
+      type: "goal"
+      sessionId: string
+      goal: {
+        objective: string
+        status: "active" | "paused" | "blocked" | "usage_limited" | "budget_limited" | "complete"
+        iteration: number
+        tokensUsed: number
+        tokenBudget?: number
+      } | null
+    }
+  | { type: "delta"; sessionId: string; text: string }
+  | { type: "reasoning"; sessionId: string; text: string }
+  | { type: "tool_progress"; sessionId: string; agent?: string; callId: string; tool: string; chars: number }
+  | {
+      type: "step"
+      sessionId: string
+      phase: "start" | "finish"
+      index: number
+      reason?: string
+      usage?: { inputTokens: number; outputTokens: number }
+    }
+  | {
+      type: "todo"
+      sessionId: string
+      todos: Array<{
+        id?: string
+        content: string
+        status: "pending" | "in_progress" | "completed" | "cancelled"
+        priority?: string
+      }>
+    }
+  | { type: "retry"; sessionId: string; attempt: number; message: string }
+  | { type: "compacted"; sessionId: string }
+  | { type: "tool_call"; sessionId: string; agent?: string; callId: string; tool: string; input: unknown }
+  | {
+      type: "tool_result"
+      sessionId: string
+      agent?: string
+      callId: string
+      tool: string
+      ok: boolean
+      output: string
+      images?: Array<string>
+    }
+  | { type: "permission_request"; sessionId: string; requestId: string; permission: string; patterns: Array<string> }
+  | {
+      type: "question_request"
+      sessionId: string
+      requestId: string
+      questions: Array<{
+        header: string
+        question: string
+        options: Array<{ label: string; description: string }>
+        multiple?: boolean
+        custom?: boolean
+      }>
+    }
+  | { type: "question_resolved"; sessionId: string; requestId: string }
+  | {
+      type: "done"
+      sessionId: string
+      text: string
+      usage?: { inputTokens: number; outputTokens: number }
+      recovered?: boolean
+    }
+  | { type: "error"; sessionId: string; code: "provider" | "config" | "aborted" | "internal"; message: string }
+  | { type: "heartbeat" }
 
 export type AiChatQueueInput = {
   readonly sessionId: AiChatQueuePayload["sessionId"]

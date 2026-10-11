@@ -2,16 +2,18 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { assertManifestAssets, mergeManifestValues, parseChecksums, validateManifest } from "./release-helpers.ts";
+import { assertManifestAssets, mergeManifestValues, parseChecksums, RELEASE_PLATFORM_KEYS, validateManifest } from "./release-helpers.ts";
 
 export async function stageRelease(installers: string, manifestPath: string, out: string, releaseUrl: string): Promise<void> {
   const raw: unknown = JSON.parse(await readFile(manifestPath, "utf8"));
   const validated = validateManifest(raw);
-  const manifest = mergeManifestValues([validated], validated.version, ["darwin-aarch64", "darwin-x86_64", "windows-x86_64", "linux-x86_64"]);
+  const manifest = mergeManifestValues([validated], validated.version, RELEASE_PLATFORM_KEYS);
   const assets = new Map<string, { path: string; digest: string }>();
   let notes: string | undefined;
   const directories = await readdir(installers, { withFileTypes: true });
-  if (directories.length !== 4 || directories.some((entry) => !entry.isDirectory())) throw new Error("Expected four installer artifact directories");
+  if (directories.length !== RELEASE_PLATFORM_KEYS.length || directories.some((entry) => !entry.isDirectory())) {
+    throw new Error(`Expected ${RELEASE_PLATFORM_KEYS.length} installer artifact directories`);
+  }
   for (const directory of directories.sort((a, b) => a.name.localeCompare(b.name))) {
     const root = join(installers, directory.name);
     const entries = parseChecksums(await readFile(join(root, "SHA256SUMS"), "utf8"));

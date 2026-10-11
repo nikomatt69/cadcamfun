@@ -3,8 +3,10 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { startFakeOpenAi, type FakeOpenAi } from "../../../packages/ai/test/helpers/fake-openai.ts"
-import { CompanionClient } from "../../mobile/src/companion/client.ts"
-import { parsePairingLink } from "../../mobile/src/companion/pairing.ts"
+import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
+import { CompanionClient } from "../../mobile/lib/client.ts"
+import { parsePairingLink } from "../../mobile/lib/pairing.ts"
+import type { ChatEvent } from "../../mobile/lib/sse.ts"
 
 setDefaultTimeout(120_000)
 
@@ -76,15 +78,34 @@ describe("the assistant from the phone", () => {
     const pairing = parsePairingLink(paired.link)
     const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
     const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-    const phone = new CompanionClient(pairing, pinned)
+    const phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
     // Phone side: ask the assistant, exactly as the app's chat does, and read the streamed events.
-    const events = []
-    for await (const event of phone.chat(project.id, "Make the plate 140 mm wide and open a pull request for it")) events.push(event)
+    const events: ChatEvent[] = []
+    for await (const event of phone.chat({ projectId: project.id, message: "Make the plate 140 mm wide and open a pull request for it" })) events.push(event)
     toolsCalled = events.flatMap((e) => (e.type === "tool_call" ? [String((e as { tool: string }).tool)] : []))
     expect(toolsCalled).toEqual(["vcs_start_change", "cad_add_entities", "vcs_commit", "vcs_open_pull_request"])
     expect(events.at(-1)?.type).toBe("done")
     expect(events.some((e) => e.type === "error")).toBe(false)
+
+    // A reconnecting phone reads stored evidence through the gateway; recovery never executes tools again.
+    const done = events.findLast((event): event is Extract<(typeof events)[number], { type: "done" }> => event.type === "done")
+    if (!done) throw new Error("Missing completed host turn")
+    expect(typeof done?.sessionId).toBe("string")
+    const recovered = await phone.sessionState(String(done?.sessionId))
+    expect(recovered.busy).toBe(false)
+    expect(recovered.text).toBe(done?.text)
+    const storedCalls = recovered.events?.filter((event) => event.type === "tool_call") ?? []
+    const streamedCalls = events.filter((event): event is Extract<(typeof events)[number], { type: "tool_call" }> => event.type === "tool_call")
+    expect(storedCalls.map((event) => ({ tool: event.tool, callId: event.callId }))).toEqual(
+      streamedCalls.map((event) => ({ tool: event.tool, callId: event.callId })),
+    )
+    const storedResults = recovered.events?.filter((event) => event.type === "tool_result") ?? []
+    expect(storedResults).toHaveLength(4)
+    expect(storedResults.every((event) => event.ok)).toBe(true)
+    expect(recovered.usage).toBeDefined()
+    expect(recovered.usage?.inputTokens).toBeGreaterThan(0)
+    expect(recovered.usage?.outputTokens).toBeGreaterThan(0)
 
     // The result, as the phone sees it: an AI pull request on its own branch, with the change in it.
     const pulls = await phone.pullRequests(project.id)

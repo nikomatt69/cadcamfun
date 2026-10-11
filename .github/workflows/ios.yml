@@ -31,31 +31,26 @@ jobs:
         with:
           bun-version: 1.4.2
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          targets: aarch64-apple-ios, aarch64-apple-ios-sim
-
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            apps/mobile/src-tauri/target
-          key: cargo-ios-${{ runner.os }}-${{ hashFiles('apps/mobile/src-tauri/Cargo.toml', 'apps/mobile/native/Cargo.toml') }}
-          restore-keys: cargo-ios-${{ runner.os }}-
+          node-version: 22
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Generate the Xcode project
         working-directory: apps/mobile
-        run: bunx tauri ios init --ci
+        run: bunx expo prebuild --platform ios --no-install
 
       - name: Build for the iOS simulator
         working-directory: apps/mobile
-        run: bunx tauri ios build --debug --target aarch64-sim --ci
+        run: |
+          pod install --project-directory=ios
+          xcodebuild -workspace ios/CADCAMFUN.xcworkspace -scheme CADCAMFUN -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/cadcamfun-ios" CODE_SIGNING_ALLOWED=NO build
+        env:
+          CI: "1"
+          EXPO_NO_TELEMETRY: "1"
 
       # Runs the app end to end, not just compiles it. The runner hosts a real sidecar with the companion gateway on; the
       # simulator shares the Mac's network, so the app pairs with it over pinned TLS, and the job then asserts, from the
@@ -75,8 +70,7 @@ jobs:
           api -X POST "http://127.0.0.1:$PORT/api/projects" -d '{"name":"CI bracket"}' > /dev/null
           LINK=$(api -X POST "http://127.0.0.1:$PORT/api/companion/pair" -d '{"name":"CI simulator","host":"127.0.0.1"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["link"])')
 
-          APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" -path "*sim*" 2>/dev/null | head -n 1)
-          if [ -z "$APP" ]; then APP=$(find apps/mobile/src-tauri/gen/apple ~/Library/Developer/Xcode/DerivedData -type d -name "*.app" 2>/dev/null | grep -i -E "iphonesimulator|sim" | head -n 1); fi
+          APP="$RUNNER_TEMP/cadcamfun-ios/Build/Products/Release-iphonesimulator/CADCAMFUN.app"
           echo "app bundle: $APP"
           test -n "$APP"
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
@@ -85,7 +79,8 @@ jobs:
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" "$BUNDLE_ID" --pair-link "$LINK"
+          xcrun simctl launch "$UDID" "$BUNDLE_ID"
+          xcrun simctl openurl "$UDID" "$LINK"
 
           # The desktop's view: the device token was accepted (lastSeen is set only after a pinned-TLS request authenticated).
           SEEN=""
@@ -123,5 +118,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-xcode-project
-          path: apps/mobile/src-tauri/gen/apple
+          path: apps/mobile/ios
           if-no-files-found: warn

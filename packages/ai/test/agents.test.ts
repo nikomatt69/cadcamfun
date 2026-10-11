@@ -4,10 +4,10 @@ import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/ni
 import { backgroundTools } from "../src/nikcli/background-tools.ts"
 import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
 import { mapHostEvent, newMapperState } from "../src/nikcli/event-mapper.ts"
+import { LIBRARY_READ_ALL, LIBRARY_WRITE_TOOL_IDS, CHAIN_TOOL_IDS, SIDECAR_TOOL_IDS } from "../src/tools/project-tools.ts"
 import { TOOL_IDS } from "../src/tools/registry.ts"
 
-const VCS_IDS = ["vcs_status", "vcs_start_change", "vcs_commit", "vcs_diff", "vcs_open_pull_request", "vcs_list_pull_requests", "actions_run"]
-const REGISTERED = [...TOOL_IDS, ...VCS_IDS, "agent_task", "agent_tasks", "agent_task_read", "agent_task_cancel"]
+const REGISTERED = [...TOOL_IDS, ...SIDECAR_TOOL_IDS]
 
 describe("specialist roster", () => {
   test("every tool a specialist names exists, and only the editors can change the document", () => {
@@ -21,6 +21,24 @@ describe("specialist roster", () => {
     expect(SUBAGENTS.machinist.tools.filter((t) => t.startsWith("cad_") && MUTATING.test(t))).toEqual([])
     // Committing and opening the pull request stay with the main agent.
     for (const id of SUBAGENT_IDS) for (const t of SUBAGENTS[id].tools) expect(["vcs_start_change", "vcs_commit", "vcs_open_pull_request"]).not.toContain(t)
+    // A repeated id would silently widen (or narrow) a permission map, and the host config reflects the set it builds.
+    for (const id of SUBAGENT_IDS) expect(new Set(SUBAGENTS[id].tools).size).toBe(SUBAGENTS[id].tools.length)
+    // The user's libraries: every role that reasons about machining or parts reads them (the editor only touches
+    // geometry, so it keeps the material and cutter lookups and no machine configuration).
+    for (const id of ["researcher", "modeler", "machinist", "reviewer"] as const) {
+      for (const t of LIBRARY_READ_ALL) expect(SUBAGENTS[id].tools, `${id} must read ${t}`).toContain(t)
+    }
+    for (const t of ["lib_lookup_component", "lib_lookup_material", "lib_lookup_tool"] as const) expect(SUBAGENTS.editor.tools).toContain(t)
+    // The operation chain is CAM knowledge; the modeller is handed parts, not sequences.
+    for (const id of ["researcher", "machinist", "reviewer"] as const) {
+      for (const t of CHAIN_TOOL_IDS) expect(SUBAGENTS[id].tools, `${id} must read ${t}`).toContain(t)
+    }
+    expect(SUBAGENTS.modeler.tools.filter((t) => CHAIN_TOOL_IDS.includes(t as typeof CHAIN_TOOL_IDS[number]))).toEqual([])
+    // Only the machinist writes the libraries, and the read-only roles never do.
+    for (const id of SUBAGENT_IDS) {
+      const writes = SUBAGENTS[id].tools.filter((t) => LIBRARY_WRITE_TOOL_IDS.includes(t as typeof LIBRARY_WRITE_TOOL_IDS[number]))
+      expect(writes, `${id} must not write the libraries`).toEqual(id === "machinist" ? [...LIBRARY_WRITE_TOOL_IDS] : [])
+    }
   })
 
   test("the host config has one deny-by-default agent per specialist with only its tools", () => {
@@ -28,7 +46,7 @@ describe("specialist roster", () => {
     for (const id of SUBAGENT_IDS) {
       const agent = config.agent[SUBAGENTS[id].host]!
       expect(agent.mode).toBe("subagent")
-      expect(agent.permission["*"]).toBe("deny")
+      expect(agent.permission["**"]).toBe("deny")
       const allowed = Object.keys(agent.permission).filter((k) => agent.permission[k] === "allow" && k !== "skill" && k !== "code_mode").sort()
       expect(allowed).toEqual([...SUBAGENTS[id].tools, "invalid", "search_tools", "question"].sort())
       expect(agent.permission["task"]).toBeUndefined()
@@ -44,7 +62,7 @@ describe("specialist roster", () => {
     expect(config.agent["cadcam-ask"]?.permission["cad_parametric"]).toBe("ask")
     expect(config.agent["cadcam"]?.permission["cad_parametric"]).toBe("allow")
     expect(config.agent["cadcam-modeler-auto"]?.permission["cam_create_operation"]).toBeUndefined()
-    expect(config.agent["cadcam-modeler-auto"]?.permission["*"]).toBe("deny")
+    expect(config.agent["cadcam-modeler-auto"]?.permission["**"]).toBe("deny")
   })
 
   test("a tool the project did not register is left out of the specialist's permissions", () => {

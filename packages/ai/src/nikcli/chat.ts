@@ -52,6 +52,10 @@ export const announcesWork = (text: string): boolean => {
  * the turn, not a guess about the request; the answer to a question or a finished job matches none of them.
  */
 export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToolError">, text: string, finish?: string): string | undefined => {
+  // Native refusal/unknown finishes and a request for missing input are not unfinished agent work.
+  if (finish !== undefined && !["stop", "length", "tool-calls", "tool_calls"].includes(finish)) return undefined
+  if (/\?\s*$/.test(text.trim())) return undefined
+  if (state.lastToolError && /permission (?:denied|rejected)|user (?:denied|rejected)|execution cancel(?:led|ed)/i.test(state.lastToolError)) return undefined
   // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
   if (finish === "length") {
     return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_add_elements call, one operation at a time, and keep going until the request is complete and checked."
@@ -61,7 +65,7 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
     return `Your plan still has unfinished items:\n${open.map((t) => `- ${t.content}`).join("\n")}\nContinue with the next one now with the tools. Do not stop to report progress: finish every item, check the result, mark the items completed, and only then report.`
   }
   if (state.lastToolError !== undefined) {
-    return `Your last tool call failed: ${state.lastToolError.slice(0, 400)}\nRead the error, fix the cause and carry on until the request is done. If it truly cannot be done, say exactly what blocks it and what you tried.`
+    return `Your last tool call failed: ${state.lastToolError.slice(0, 1_200)}\nRead the full output, including error paths, problems and recovery hints. Fix the named cause on the same tool; never repeat unchanged arguments. Before retrying a mutation, inspect the document: preserve confirmed entity/operation ids and retry only skipped items. Rebuild and verify affected CAD/CAM work after the correction. If it truly cannot be done, say exactly what blocks it and what you tried.`
   }
   if (announcesWork(text)) return "You said what you would do next but did not do it. Do it now with the tools, and keep going until the request is complete and checked."
   return undefined
@@ -97,8 +101,6 @@ export const DEFAULT_RESUMES = 5
 
 const CONNECT_TIMEOUT_MS = 5_000
 const IDLE_GRACE_MS = 2_000
-/** The host retries failed provider calls with growing backoff; we give up after this many (the host's own backoff grows each time, so a rate limit or a brief outage has time to clear). */
-const MAX_HOST_RETRIES = 4
 
 export const createHostSession = (host: ProjectHost, title: string): Effect.Effect<string, AiConfigError> =>
   Effect.tryPromise({
@@ -152,6 +154,8 @@ export interface HostSessionState {
   /** Text of the assistant's answer to the latest user message ("" while it has none). */
   readonly text: string
   readonly error?: string
+  readonly events?: ReadonlyArray<Extract<AiEvent, { type: "tool_call" | "tool_result" | "todo" | "tool_diagnostic" }>>
+  readonly usage?: { readonly inputTokens: number; readonly outputTokens: number }
   /** The specialist tasks this conversation started (background ones keep running after the turn ended). */
   readonly tasks?: ReadonlyArray<HostTaskInfo>
 }
@@ -189,6 +193,28 @@ export const taskInfos = (
  * Where a conversation stands, from the host's own record: what a client that lost its connection needs to carry on. The turn
  * is finished when the newest non-summary message is an assistant message with a turn-ending `finish` reason (or an error).
  */
+/** Rebuild continuation evidence after a detached stream stopped receiving live events. */
+const readContinuationState = (host: ProjectHost, sessionId: string): Promise<EventMapperState> =>
+  host.client.session.messages({ sessionID: sessionId, limit: 40 }).then((messages) => {
+    const visible = messages.filter((message) => message.info.summary !== true && message.info.agent !== "compaction")
+    let first = 0
+    for (const [index, message] of visible.entries()) {
+      const synthetic = message.parts.length > 0 && message.parts.every((part) => part.type === "text" && "synthetic" in part && part.synthetic === true)
+      if (message.info.role === "user" && !synthetic) first = index + 1
+    }
+    const state = newMapperState()
+    for (const message of visible.slice(first)) {
+      if (message.info.role !== "assistant") continue
+      for (const part of message.parts) {
+        if (part.type !== "tool") continue
+        mapHostEvent(sessionId, { type: "message.part.updated", properties: { part: { ...part, sessionID: sessionId, messageID: message.info.id } } }, state)
+      }
+    }
+    const last = visible.at(-1)
+    state.sessionError = last?.info.error?.data?.message ?? last?.info.error?.name
+    return state
+  })
+
 export const readHostSessionState = (host: ProjectHost, sessionId: string): Effect.Effect<HostSessionState, AiConfigError> =>
   Effect.tryPromise({
     try: async () => {
@@ -208,7 +234,20 @@ export const readHostSessionState = (host: ProjectHost, sessionId: string): Effe
       // `tool-calls` closes a step, not the turn: the model goes on once the tools have answered.
       const stepOnly = last.info.finish === undefined || last.info.finish === "tool-calls" || last.info.finish === "tool_calls"
       const busy = last.info.role === "user" || (error === undefined && stepOnly)
-      return { busy, text, ...(error !== undefined ? { error } : {}) } satisfies HostSessionState
+      const recovered: Array<Extract<AiEvent, { type: "tool_call" | "tool_result" | "todo" | "tool_diagnostic" }>> = []
+      const mapper = newMapperState()
+      for (const message of answer) {
+        for (const part of message.parts) {
+          if (part.type !== "tool" || !part.tool || !part.callID) continue
+          for (const event of mapHostEvent(sessionId, { type: "message.part.updated", properties: { part: { ...part, sessionID: sessionId, messageID: message.info.id } } }, mapper)) {
+            if (event.type === "tool_call" || event.type === "todo" || event.type === "tool_diagnostic") recovered.push(event)
+            if (event.type === "tool_result") recovered.push({ type: "tool_result", sessionId, callId: event.callId, tool: event.tool, ok: event.ok, output: event.output.slice(0, 16_000) })
+          }
+        }
+      }
+      const tokens = answer.flatMap((message) => message.info.tokens ? [message.info.tokens] : [])
+      const usage = tokens.reduce((total, item) => ({ inputTokens: total.inputTokens + item.input, outputTokens: total.outputTokens + item.output }), { inputTokens: 0, outputTokens: 0 })
+      return { busy, text, ...(error !== undefined ? { error } : {}), ...(recovered.length ? { events: recovered } : {}), ...(tokens.length ? { usage } : {}) } satisfies HostSessionState
     },
     catch: (cause) => new AiConfigError({ message: `Failed to read the session: ${describeHostFailure(cause)}` })
   })
@@ -251,8 +290,8 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
     Effect.gen(function* () {
       const { host, sessionId } = input
       const controller = new AbortController()
-      let finished = false
-      let giveUp: string | undefined
+      const subscriber = new AbortController()
+      yield* Effect.addFinalizer(() => Effect.sync(() => subscriber.abort()))
 
       // The turn belongs to the host session, not to this stream: when the client's connection drops (a closed laptop lid, a
       // restarted webview, an idle proxy) the assistant keeps working and finishes what it started, as nikcli does. Only an
@@ -263,23 +302,22 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       state.ownTexts.add(RESUME_PROMPT)
       let connected!: () => void
       const connectedPromise = new Promise<void>((resolve) => (connected = resolve))
-      const offer = (event: AiEvent) => void Queue.offerUnsafe(queue, event)
+      const offer = (event: AiEvent) => {
+        if (event.type === "done" || event.type === "error") Queue.offerUnsafe(queue, { type: "turn", sessionId, phase: "finish", reason: event.type === "done" ? "completed" : event.code })
+        Queue.offerUnsafe(queue, event)
+      }
 
       const pump = (async () => {
         try {
-          for await (const event of host.client.events.subscribe({ signal: controller.signal })) {
+          for await (const event of host.client.events.subscribe({ signal: subscriber.signal })) {
             // The in-process SSE body ignores the abort signal once headers are out, so the
             // loop only notices cancellation when the next bus event (telemetry, heartbeat) arrives.
-            if (controller.signal.aborted) break
+            if (controller.signal.aborted || subscriber.signal.aborted) break
             if (event.type === "server.connected") {
               connected()
               continue
             }
             for (const mapped of mapHostEvent(sessionId, event, state)) offer(mapped)
-            if (state.retry && state.retry.attempt >= MAX_HOST_RETRIES && !giveUp) {
-              giveUp = state.retry.message
-              void host.client.session.abort({ sessionID: sessionId }).catch(() => undefined)
-            }
           }
         } catch {
           // Aborted or transport closed: the prompt result decides the outcome.
@@ -298,7 +336,6 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         while (!controller.signal.aborted && Date.now() < until) {
           const current = await Effect.runPromise(readHostSessionState(host, sessionId)).catch(() => undefined)
           if (current !== undefined && !current.busy) {
-            finished = true
             if (current.error !== undefined) offer({ type: "error", sessionId, code: "provider", message: current.error })
             else offer({ type: "done", sessionId, text: [...answers, current.text].filter((t) => t.trim() !== "").join("\n\n") })
             controller.abort()
@@ -311,6 +348,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
 
       const run = (async () => {
         await Promise.race([connectedPromise, new Promise((r) => setTimeout(r, CONNECT_TIMEOUT_MS))])
+        offer({ type: "turn", sessionId, phase: "start" })
         const resumes = input.continues ?? DEFAULT_RESUMES
         let attempt = 0
         const maxContinues = input.autoContinues ?? DEFAULT_AUTO_CONTINUES
@@ -340,36 +378,36 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
                 await new Promise((r) => setTimeout(r, INTERRUPT_BACKOFF_MS * attempt))
                 continue
               }
-              finished = true
               controller.abort()
               offer({ type: "error", sessionId, code: "aborted", message: INTERRUPTED_MESSAGE })
               return
             }
             if (attempt < resumes && !controller.signal.aborted && isTransientFailure(message)) {
               attempt += 1
+              offer({ type: "turn", sessionId, phase: "recovering", reason: message })
               offer({ type: "retry", sessionId, attempt, message: `${message} Resuming automatically (${attempt}/${resumes}).` })
               await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
               parts = [{ type: "text", text: RESUME_PROMPT, synthetic: true }]
               continue
             }
-            finished = true
             controller.abort()
             offer({ type: "error", sessionId, code: "provider", message })
             return
           }
           // Let trailing bus events (final deltas, session.idle) reach the subscriber.
           const deadline = Date.now() + IDLE_GRACE_MS
-          while (!state.idle && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10))
-          const failure =
-            giveUp !== undefined
-              ? { message: giveUp, aborted: false }
-              : (failureOf(result) ?? (state.sessionError !== undefined ? { message: state.sessionError, aborted: false } : undefined))
+          while (!subscriber.signal.aborted && !state.idle && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10))
+          // Detached UI subscribers no longer update tool/todo state; use the host record, never stale live evidence.
+          let continuationState: EventMapperState | undefined = state
+          if (subscriber.signal.aborted) continuationState = await readContinuationState(host, sessionId).catch(() => undefined)
+          const sessionError = continuationState?.sessionError
+          const failure = failureOf(result) ?? (sessionError !== undefined ? { message: sessionError, aborted: false } : undefined)
           if (failure && !failure.aborted && attempt < resumes && isTransientFailure(failure.message)) {
             // The host gave up on this call; the conversation is intact, so ask it to carry on after a pause.
             attempt += 1
+            offer({ type: "turn", sessionId, phase: "recovering", reason: failure.message })
             offer({ type: "retry", sessionId, attempt, message: `${failure.message} Resuming automatically (${attempt}/${resumes}).` })
             await new Promise((r) => setTimeout(r, resumeDelay(attempt)))
-            giveUp = undefined
             state.retry = undefined
             state.sessionError = undefined
             state.idle = false
@@ -380,15 +418,16 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           if (!failure) attempt = 0
           if (failure && isInterruption(failure.message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
           const answerOf = (): string => (result.parts ?? []).filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
-          if (!failure && !controller.signal.aborted && continuations < maxContinues) {
+          if (!failure && !controller.signal.aborted && continuationState !== undefined && continuations < maxContinues) {
             const text = answerOf()
             // A nudge that produced no tool call at all did not help: stop nudging rather than loop on words.
-            stalls = callsAtNudge !== undefined && state.toolCalls === callsAtNudge ? stalls + 1 : 0
-            const nudge = stalls < MAX_STALLS ? continuationFor(state, text, result.info?.finish) : undefined
+            stalls = callsAtNudge !== undefined && continuationState.toolCalls === callsAtNudge ? stalls + 1 : 0
+            const nudge = stalls < MAX_STALLS ? continuationFor(continuationState, text, result.info?.finish) : undefined
             if (nudge !== undefined) {
               if (text.trim() !== "") answers.push(text)
               continuations += 1
-              callsAtNudge = state.toolCalls
+              offer({ type: "turn", sessionId, phase: "continuing", reason: nudge })
+              callsAtNudge = continuationState.toolCalls
               state.idle = false
               state.retry = undefined
               state.sessionError = undefined
@@ -396,7 +435,6 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               continue
             }
           }
-          finished = true
           if (failure) {
             // The host's "Session interrupted" (another message took over the session) is a cancellation, not a provider failure.
             const interrupted = failure.aborted || isInterruption(failure.message)
@@ -408,7 +446,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
               type: "done",
               sessionId,
               text,
-              ...(tokens ? { usage: { inputTokens: tokens.input, outputTokens: tokens.output } } : {})
+              ...(state.completedSteps.size > 0 ? { usage: state.usage } : tokens ? { usage: { inputTokens: tokens.input, outputTokens: tokens.output } } : {})
             })
           }
           controller.abort()
@@ -419,6 +457,7 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
       yield* Effect.tryPromise({
         try: async () => {
           await run
+          subscriber.abort()
           await Promise.race([pump, new Promise((r) => setTimeout(r, 150))])
         },
         catch: (cause) => new AiProviderError({ message: cause instanceof Error ? cause.message : String(cause) })
@@ -441,7 +480,14 @@ export type PendingDelivery = "queue" | "steer"
 export const queueHostMessage = (host: ProjectHost, sessionId: string, message: string, delivery: PendingDelivery): Effect.Effect<void, AiProviderError> =>
   Effect.tryPromise({
     try: async () => {
-      await host.client["session-prompt"].promptAsync({ sessionID: sessionId, agent: [...await host.client.session.messages({ sessionID: sessionId, limit: 20 })].reverse().find((message) => message.info.role === "user")?.info.agent ?? CADCAM_AGENT, delivery, parts: [{ type: "text", text: message }] })
+      const previous = (await host.client.session.messages({ sessionID: sessionId, limit: 20 })).findLast((entry) => entry.info.role === "user")?.info
+      const model = previous?.model
+      await host.client["session-prompt"].promptAsync({
+        sessionID: sessionId, agent: previous?.agent ?? CADCAM_AGENT,
+        ...(typeof model?.providerID === "string" && typeof model.modelID === "string" ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+        ...(previous?.variant ? { variant: previous.variant } : {}),
+        delivery, parts: [{ type: "text", text: message }]
+      })
     },
     catch: (cause) => new AiProviderError({ message: describeHostFailure(cause) })
   })

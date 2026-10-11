@@ -1,8 +1,8 @@
 # 19 — Context Awareness Contract
 
-Status: v1 — describes what the agent sees about the project, the unit system, the machine, the verification state, the selection and the user's intent, and what it must do to stay correct. Source-grounded in `packages/ai/src/workspace-context.ts`, `packages/ai/src/prompts/{system,workflows}.ts`, and `apps/desktop/src/state` (the editor snapshot store).
+Status: v2 — describes what the agent sees about the project, the unit system, the machine, the verification state, the selection and the user's intent, and what it must do to stay correct. Source-grounded in `packages/ai/src/workspace-context.ts`, `packages/ai/src/prompts/{system,workflows}.ts`, and `apps/desktop/src/state` (the editor snapshot store).
 
-The principle: **the agent's effective view of the project is the workspace context renderer plus the system prompt plus the conversation history nikcli holds**. The renderer is the only place units, tolerances and current state are set; the system prompt is the only place behavioural rules are set. Nothing else reaches the model. This spec records the contract: what is in the context, what is not, when the context is refreshed, and how the model must reason about it.
+The principle: **the agent's effective view of the project is the workspace context renderer plus the system prompt plus the conversation history nikcli holds**. The renderer summarizes units, tolerances and current state; system and specialist prompts define behavioural rules. Fresh tool results, discovered schemas and loaded skills also reach the model and can supersede the snapshot. This spec records the contract: what is in the context, what is not, when the context is refreshed, and how the model must reason about it.
 
 ## 1. The contract in one paragraph
 
@@ -76,7 +76,7 @@ interface WorkspaceSnapshot {
 
 ## 3. How the renderer reduces the world to text
 
-Source: `packages/ai/src/workspace-context.ts:51-135`. The renderer is the only place the agent's view of the project is shaped.
+Source: `packages/ai/src/workspace-context.ts`. The renderer is the only place the agent's view of the project is shaped.
 
 ### 3.1 Sections in priority order
 
@@ -94,11 +94,11 @@ Source: `packages/ai/src/workspace-context.ts:51-135`. The renderer is the only 
 
 ### 3.2 Budget enforcement
 
-`head = sections 1–9`. `left = budget - head.length`. Section 10 takes up to 70 % of `left`, capped at one row each. Section 11 takes the rest, capped at 12 lines.
+`head = sections 1–9`. `left = budget - head.length`. Section 10 prioritizes selected elements and takes up to 70 % of `left`. Section 11 takes the rest, capped at 12 original G-code lines. A final strict cap applies to all sections, retaining only complete lines so identifiers are never partially published. Truncation explicitly instructs inspection; tiny budgets may contain only part of that marker. Layer names are bounded and the first 12 layers are listed. Default workspace budget is 6,000 characters; saved-note budget is 1,500 characters including headers and omission notices.
 
 ### 3.3 Defensive encoding
 
-Every field uses `str(undefined → undefined)`, `num(undefined → undefined)`, `rec(not-object → {})`, `arr(not-array → [])`. The renderer never invents a value (`packages/ai/src/workspace-context.ts:15-25`). Sections whose data is missing are dropped, not synthesised.
+Every field uses `str(undefined → undefined)`, `num(undefined → undefined)`, `rec(not-object → {})`, `arr(not-array → [])`. The renderer never invents a value (`packages/ai/src/workspace-context.ts:15-25`). Sections whose data is missing are dropped or marked unknown. Missing display units and model counts do not imply mm or an empty drawing. Missing entity types/IDs remain unknown; unrecognized verification states are explicitly unknown, never passed. Labels have line breaks/control characters removed and names are JSON-quoted. Structured saved notes retain JSON fields, with bounded values and no accidental `[object Object]` conversion. Tool identifiers are kept whole or omitted. Finite model values retain source precision, including sub-micron tolerances; they are not rounded to three decimals.
 
 ## 4. The system prompt's role
 
@@ -112,7 +112,7 @@ Every field uses `str(undefined → undefined)`, `num(undefined → undefined)`,
 - **Version control.** Always call `vcs_status` first. `vcs_start_change` BEFORE edits on `ai/<topic>`. `vcs_commit` AFTER edits. `vcs_open_pull_request` to surface the work. Never commit to `main`, never merge.
 - **Files.** Attach a DXF/SVG/STEP via `cad_import_drawing { attachment, depth }` (or `up` for STEP). Say when an attachment was unread.
 - **Asking.** When the prompt is ambiguous, ask one question, not three. Never impersonate the user's silence as agreement.
-- **Style.** Bullet lists. Imperative English. The final message lists what was done with entity ids and old → new values in mm.
+- **Style.** Concise responses in the user’s language, reporting changed entity IDs and values with units, checked evidence and remaining limitations.
 
 The system prompt is built once per turn and not edited; the model's behavioural rules do not drift within a turn.
 
@@ -164,7 +164,7 @@ The renderer prints the selection ids; `cad_describe_drawing` returns them with 
 
 ### 7.2 Page
 
-`page: "cad" | "cam"` tells the agent whether the user is in CAD or CAM mode. CAD-side tools write to entities; CAM-side tools write to operations. A mixed request ("build this then machine it") is two turns.
+`page: "cad" | "cam"` tells the agent whether the user is in CAD or CAM mode. CAD-side tools write to entities; CAM-side tools write to operations. A mixed request ("build this then machine it") can continue through both phases in one host turn, checking each phase before proceeding.
 
 ### 7.3 View mode
 
@@ -216,15 +216,25 @@ When the prompt names a dimension that is missing ("the hole should be 5 mm too 
 
 ## 10. Acceptance criteria
 
-1. `renderWorkspaceContext(snapshot)` never invents a field; missing sections are dropped, not synthesised.
+1. `renderWorkspaceContext(snapshot)` never invents a value; missing data is omitted or explicitly unknown.
 2. The renderer budget is 6 000 chars by default; passing `budget: N` shrinks proportionally. The element list never claims to be exhaustive when the budget omitted rows.
 3. The system prompt's units line matches the renderer's units line on every turn.
 4. A 1-inch request converts to 25.4 mm before any tool call.
 5. The selection in the snapshot matches the editor's selection when the assistant panel is opened. The renderer never updates the selection during a turn; the agent reads the selection once at the start.
 6. A `verification.state === "stale"` after a tool call forces the agent to call `cam_verify_toolpath` before reporting.
-7. A `memory_recall("")` returns at most 1 500 characters of newest-first notes (`renderNotes`).
+7. `renderNotes` returns at most 1,500 characters including its heading and omission notice; structured values retain their keys.
 8. A specialist's `REPORT` is in `agents.ts#REPORT` and is appended verbatim to the prompt; the sidecar does not rewrite it.
+
+### 9.5 Result evidence and domain recovery
+
+A completed tool event is transport/lifecycle evidence, not proof of domain success. The main and specialist prompts require inspecting returned error status, skipped entries, warnings, verification findings, and revisions. Validation errors require correcting the failing field with its schema; revision conflicts require fresh inspection; uncertain mutation results require read-back before retrying. Partial success preserves confirmed IDs and retries only rejected work. Permission/auth failures cannot be bypassed with another tool. Provider/connection failures use the host's existing recovery loop rather than replaying mutations.
+
+Geometry, stock, tool, datum, offset or cutting-setting changes invalidate previous CAM checks. Regenerate affected G-code and re-run analysis and verification before reporting success. Compaction retains failure category, tool/call IDs, failing path/message, known mutation outcome and next action. CAD drawing coordinates, viewport origin offsets and CNC work offsets are distinct.
+
+The rendered setup includes exact drawing/selected-operation/toolpath IDs and snapshot capture time where available. Cutting parameters report depth and stepdown in mm, stepover in percent, feed/plunge in mm/min, spindle `rpm` (legacy `spindleSpeed` fallback), and safe Z in mm. Missing setup fields remain unknown. Snapshot labels, saved notes and attachments remain evidence rather than execution instructions.
 
 ## 11. Change log
 
 - v1: contract for what the agent sees and how it must reason about it. Extends `08-ai.md` §"Workspace integration" with the renderer / snapshot discipline.
+
+- v2 (2026-10-11): exact numeric precision and toolpath identifiers, malformed/unknown snapshot handling, selected-first geometry, strict complete-line workspace cap, bounded structured notes, setup parameter units, and result-aware recovery/compaction within the existing nikcli prompts. Regression coverage: workspace-context and tool-prompts suites.

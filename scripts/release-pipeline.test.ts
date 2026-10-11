@@ -6,16 +6,17 @@ import { join } from "node:path";
 import { buildManifest, mergeManifests } from "./updater-manifest.ts";
 import { stageRelease } from "./stage-release.ts";
 
-test("four targets produce verified flat draft assets and matching manifest URLs", async () => {
+test("six targets produce verified flat draft assets and matching manifest URLs", async () => {
   const root = await mkdtemp(join(tmpdir(), "cadcam-release-"));
   try {
     const installers = join(root, "installers");
     const manifests = join(root, "manifests");
     const releaseUrl = "https://github.com/example/app/releases/download/v6.0.0";
-    const platforms = ["darwin-aarch64", "darwin-x86_64", "windows-x86_64", "linux-x86_64"];
+    const platforms = ["darwin-aarch64", "darwin-x86_64", "windows-aarch64", "windows-x86_64", "linux-aarch64", "linux-x86_64"];
     const targets = [
       ["aarch64-apple-darwin", ".app.tar.gz"], ["x86_64-apple-darwin", ".app.tar.gz"],
-      ["x86_64-pc-windows-msvc", ".exe"], ["x86_64-unknown-linux-gnu", ".AppImage"],
+      ["aarch64-pc-windows-msvc", ".exe"], ["x86_64-pc-windows-msvc", ".exe"],
+      ["aarch64-unknown-linux-gnu", ".AppImage"], ["x86_64-unknown-linux-gnu", ".AppImage"],
     ];
     for (const [triple, suffix] of targets) {
       if (!triple || !suffix) throw new Error("Missing test target");
@@ -41,8 +42,8 @@ test("four targets produce verified flat draft assets and matching manifest URLs
     await writeFile(manifestPath, JSON.stringify(merged));
     const out = join(root, "out");
     await stageRelease(installers, manifestPath, out, releaseUrl);
-    expect((await readdir(out)).length).toBe(11);
-    expect((await readFile(join(out, "SHA256SUMS"), "utf8")).trim().split("\n").length).toBe(8);
+    expect((await readdir(out)).length).toBe(15);
+    expect((await readFile(join(out, "SHA256SUMS"), "utf8")).trim().split("\n").length).toBe(12);
     expect(JSON.parse(await readFile(join(out, "latest.json"), "utf8"))).toEqual(merged);
     await expect(stageRelease(installers, manifestPath, out, releaseUrl)).rejects.toThrow("empty");
     const first = merged.platforms["darwin-aarch64"];

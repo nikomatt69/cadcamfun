@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi"
 import { BadRequest, InternalError, NotFound } from "../errors.ts"
+import { AiStreamEventSchema, ToolCallEvent, ToolResultEvent, TodoEvent, ToolDiagnosticEvent, UsageSchema } from "../ai-events.ts"
 
 const opt = Schema.optional
 const nullable = Schema.NullOr(Schema.String)
@@ -168,7 +169,12 @@ export const SessionTask = Schema.Struct({
   status: Schema.Literals(["queued", "running", "completed", "error", "cancelled"]),
   background: Schema.Boolean, text: opt(Schema.String), error: opt(Schema.String)
 })
-export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String), tasks: opt(Schema.Array(SessionTask)) })
+/** Stored tool evidence for reconnecting clients; replay never executes tools. */
+export const AiRecoveryEvent = Schema.Union([
+  ToolCallEvent, ToolResultEvent, TodoEvent, ToolDiagnosticEvent
+])
+export const SessionStateReply = Schema.Struct({ busy: Schema.Boolean, text: Schema.String, error: opt(Schema.String), tasks: opt(Schema.Array(SessionTask)),
+  events: opt(Schema.Array(AiRecoveryEvent)), usage: opt(UsageSchema) })
 export const RemoveSessionReply = Schema.Struct({ removed: Schema.Boolean })
 export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.String, description: Schema.String, tools: Schema.Array(Schema.String), edits: Schema.Boolean })
 export const QuestionInfo = Schema.Struct({ header: Schema.String, question: Schema.String, options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })), multiple: opt(Schema.Boolean), custom: opt(Schema.Boolean) })
@@ -181,7 +187,7 @@ export const SessionControlReply = Schema.Struct({ permissions: opt(Schema.Array
     provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean }) })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
-const chatEvents = Schema.Unknown
+const chatEvents = Schema.Union([AiStreamEventSchema, Schema.Struct({ type: Schema.Literal("heartbeat") })])
 
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(

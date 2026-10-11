@@ -74,10 +74,34 @@ afterAll(async () => {
 
 const collect = (stream: Stream.Stream<AiEvent, unknown>) => Effect.runPromise(Stream.runCollect(stream)).then((c) => [...c])
 /** What the agent shows besides the answer itself: steps, progress of a tool call being written, plan, retries. */
-const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry", "compacted"])
+const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry", "compacted", "turn", "session_status", "compaction", "permission_resolved", "tool_diagnostic", "context_snapshot"])
 const content = (events: ReadonlyArray<AiEvent>) => events.filter((e) => !PROGRESS.has(e.type))
 
 describe("embedded nikcli host", () => {
+  test("domain schemas load on demand through the native registry and remain session-scoped", async () => {
+    const host = await Effect.runPromise(runtime.host("project-discovery"))
+    const before = fake.requests.length
+    let stage = 0
+    script = () => {
+      stage += 1
+      if (stage === 1) return { toolCalls: [{ name: "search_tools", args: { query: "cad_probe" } }] }
+      if (stage === 2) return { toolCalls: [{ name: "cad_probe", args: { value: 7 } }] }
+      return { text: "Discovered and executed." }
+    }
+    const sessionId = await Effect.runPromise(createHostSession(host, "discovery"))
+    const events = await collect(hostChatStream({ host, sessionId, message: "Discover the probe", model, autoContinues: 0 }))
+    const requests = fake.requests.slice(before)
+    expect(toolNames(requests[0]!)).toContain("search_tools")
+    expect(toolNames(requests[0]!)).not.toContain("cad_probe")
+    expect(toolNames(requests[1]!)).toContain("cad_probe")
+    for (const request of requests) for (const forbidden of ["bash", "write", "edit", "webfetch"]) expect(toolNames(request)).not.toContain(forbidden)
+    expect(events.find((event) => event.type === "tool_result" && event.tool === "cad_probe")).toMatchObject({ ok: true })
+    script = () => ({ text: "Fresh session." })
+    const fresh = await Effect.runPromise(createHostSession(host, "fresh discovery"))
+    const start = fake.requests.length
+    await collect(hostChatStream({ host, sessionId: fresh, message: "Hello", model, autoContinues: 0 }))
+    expect(toolNames(fake.requests[start]!)).not.toContain("cad_probe")
+  })
   test("keeps state under the isolated app data dir", async () => {
     const host = await Effect.runPromise(runtime.host("project-a"))
     expect(runtime.paths.root.startsWith(sharedDataDir)).toBe(true)
@@ -142,7 +166,7 @@ describe("embedded nikcli host", () => {
     expect(turns.length).toBeGreaterThan(0)
     for (const turn of turns) {
       const names = toolNames(turn)
-      expect(names).toContain("cad_probe")
+      expect(names).toContain("search_tools")
       for (const forbidden of ["bash", "edit", "write", "read", "webfetch", "websearch", "task", "glob", "grep", "apply_patch", "plugin", "monitor"]) {
         expect(names).not.toContain(forbidden)
       }
@@ -161,10 +185,12 @@ describe("embedded nikcli host", () => {
     const host = await Effect.runPromise(runtime.host("project-3d"))
     added.length = 0
     const profile = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 150 }, { x: 10, y: 200 }, { x: 10, y: 260 }]
-    script = (_index, _turn, lastRole) =>
-      lastRole === "tool"
-        ? { text: "Built." }
-        : { toolCalls: [{ name: "cad_add_elements", args: { elements: [{ type: "revolution", name: "Bottle", profile }, { type: "cube", width: 40, height: 40, depth: 40, color: "#cc0000" }] } }] }
+    let stage = 0
+    script = () => ++stage === 1
+      ? { toolCalls: [{ name: "search_tools", args: { query: "cad_add_elements" } }] }
+      : stage === 2
+        ? { toolCalls: [{ name: "cad_add_elements", args: { elements: [{ type: "revolution", name: "Bottle", profile }, { type: "cube", width: 40, height: 40, depth: 40, color: "#cc0000" }] } }] }
+        : { text: "Built." }
     const before = fake.requests.length
     const sessionId = await Effect.runPromise(createHostSession(host, "3d"))
     const events = await collect(hostChatStream({ host, sessionId, message: "make a bottle and a block", model }))
@@ -175,10 +201,9 @@ describe("embedded nikcli host", () => {
     expect(added[0]!.elements[0]).toMatchObject({ axis: "y", segments: 32, name: "Bottle" })
     expect(added[0]!.elements[1]).toMatchObject({ depth: 40, color: "#cc0000", x: 0 })
     expect(events.at(-1)?.type).toBe("done")
-    // The model is offered the 3D tool first and told, in the tool list itself, which one is for objects.
-    const first = chatTurns(fake.requests.slice(before))[0]!
-    const names = toolNames(first)
-    expect(names.indexOf("cad_add_elements")).toBeLessThan(names.indexOf("cad_add_entities"))
+    const turns = chatTurns(fake.requests.slice(before))
+    expect(toolNames(turns[0]!)).not.toContain("cad_add_elements")
+    expect(toolNames(turns[1]!)).toContain("cad_add_elements")
   })
 
   test("tool call -> handler -> result -> final text", async () => {
@@ -193,7 +218,8 @@ describe("embedded nikcli host", () => {
     expect(types).toEqual(["tool_call", "tool_result", "delta", "delta", "done"])
     const result = events.find((e) => e.type === "tool_result")
     expect(result).toMatchObject({ ok: true, tool: "cad_probe" })
-    expect(events.at(-1)).toMatchObject({ type: "done", text: "All done", usage: { inputTokens: 21, outputTokens: 9 } })
+    const usage = events.reduce((total, event) => event.type === "step" && event.phase === "finish" && event.usage ? { inputTokens: total.inputTokens + event.usage.inputTokens, outputTokens: total.outputTokens + event.usage.outputTokens } : total, { inputTokens: 0, outputTokens: 0 })
+    expect(events.at(-1)).toMatchObject({ type: "done", text: "All done", usage })
     // The JSON Schema nikcli sent to the model comes from our zod schema.
     const sent = chatTurns(fake.requests).at(-1)?.tools?.find((t) => t.function.name === "cad_probe")
     expect(JSON.stringify(sent?.function.parameters)).toContain("value")
@@ -269,7 +295,7 @@ describe("embedded nikcli host", () => {
 
   test("provider failures surface as a final error event", async () => {
     const host = await Effect.runPromise(runtime.host("project-b"))
-    script = () => ({ status: 500, body: JSON.stringify({ error: { message: "boom" } }) })
+    script = () => ({ status: 401, body: JSON.stringify({ error: { message: "boom" } }) })
     const sessionId = await Effect.runPromise(createHostSession(host, "failing"))
     const events = await collect(hostChatStream({ host, sessionId, message: "hello", model, continues: 0 }))
     expect(events.at(-1)?.type).toBe("error")

@@ -1,0 +1,5 @@
+{
+  "name": "companion-net",
+  "version": "1.0.0",
+  "description": "Pinned-TLS HTTP client for the CADCAMFUN companion gateway. iOS only."
+}

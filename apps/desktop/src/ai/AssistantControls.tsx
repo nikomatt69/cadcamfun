@@ -14,25 +14,25 @@ export function AssistantControls(): JSX.Element {
     return variant ? { ...model, variant } : model
   })
   return <section class="assistant-disclosure assistant-settings" data-testid="ai-controls">
-    <div class="flex flex-wrap gap-2">
-      <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs">{t("ai.controls.agent")}
-        <select class="rounded border bg-transparent px-2 py-1" value={ai.agent()} disabled={running()} onChange={(e) => ai.setAgent(e.currentTarget.value)}>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.agent")}
+        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.agent()} disabled={running()} onChange={(e) => ai.setAgent(e.currentTarget.value)}>
           <option value="cadcam">{t("ai.controls.coordinator")}</option>
           <For each={ai.agents().filter((agent) => agent.id !== "cadcam")}>{(agent) => <option value={agent.id}>{agent.title}</option>}</For>
         </select>
       </label>
-      <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs">{t("ai.controls.mode")}
-        <select class="rounded border bg-transparent px-2 py-1" value={ai.mode()} disabled={running()} onChange={(e) => ai.setMode(e.currentTarget.value as ReturnType<typeof ai.mode>)}>
+      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.mode")}
+        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.mode()} disabled={running()} onChange={(e) => ai.setMode(e.currentTarget.value as ReturnType<typeof ai.mode>)}>
           <For each={["general", "cad", "cam", "gcode", "toolpath"] as const}>{(mode) => <option value={mode}>{t(`ai.controls.mode.${mode}`)}</option>}</For>
         </select>
       </label>
-      <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs">{t("ai.controls.permissions")}
-        <select class="rounded border bg-transparent px-2 py-1" value={ai.permissionMode()} disabled={running()} onChange={(e) => ai.setPermissionMode(e.currentTarget.value as ReturnType<typeof ai.permissionMode>)}>
+      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.permissions")}
+        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.permissionMode()} disabled={running()} onChange={(e) => ai.setPermissionMode(e.currentTarget.value as ReturnType<typeof ai.permissionMode>)}>
           <For each={["auto", "ask", "approve"] as const}>{(mode) => <option value={mode}>{t(`ai.controls.permissions.${mode}`)}</option>}</For>
         </select>
       </label>
-      <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs">{t("ai.controls.thinking")}
-        <select class="rounded border bg-transparent px-2 py-1" value={ai.model()?.variant ?? ""} disabled={running() || variants().length === 0} onChange={(e) => changeVariant(e.currentTarget.value)}>
+      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.thinking")}
+        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.model()?.variant ?? ""} disabled={running() || variants().length === 0} onChange={(e) => changeVariant(e.currentTarget.value)}>
           <option value="">{t("ai.controls.modelDefault")}</option>
           <For each={variants()}>{(variant) => <option value={variant}>{variant}</option>}</For>
         </select>

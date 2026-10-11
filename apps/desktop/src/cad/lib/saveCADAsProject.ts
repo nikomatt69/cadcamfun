@@ -1,6 +1,7 @@
 import { toJsonSafe } from "../../state/json-safe.ts"
-import { useDocumentStore } from "../store/documentStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
+import { useDocumentStore } from "../store/documentStore.ts"
+import { createProjectWithContents } from "./projectSnapshot.ts"
 import type { AppState } from "../../state/context.ts"
 
 export interface SaveOptions {
@@ -10,21 +11,19 @@ export interface SaveOptions {
   readonly isPublic?: boolean | undefined
 }
 
-/** Creates a project and its main drawing from the editor's current elements. */
-export async function saveCADAsProject(app: Pick<AppState, "client" | "runtime">, options: SaveOptions): Promise<{ projectId: string; drawingId: string }> {
+/**
+ * "Save as Project": one project that holds everything — the drawing with its layers and settings,
+ * and the components saved in the library on this machine (spec 03 §2).
+ */
+export async function saveCADAsProject(app: Pick<AppState, "client" | "runtime" | "settings">, options: SaveOptions): Promise<{ projectId: string; drawingId: string; componentCount: number }> {
   if (!options.name) throw new Error("Project name is required")
   const { elements, selectedElement } = useElementsStore.getState()
-  const project = await app.runtime.run(app.client.projects.create({
-    payload: { name: options.name, description: options.description ?? null, organizationId: options.organizationId ?? null, isPublic: options.isPublic ?? false }
-  }))
-  const drawing = await app.runtime.run(app.client.drawings.createForProject({
-    params: { id: project.id },
-    payload: {
-      name: `${options.name} Drawing`,
-      description: `Main drawing for project ${options.name}`,
-      data: { elements: toJsonSafe(elements), selectedElement: selectedElement ? selectedElement.id : null, version: "1.0" }
-    }
-  }))
-  useDocumentStore.getState().setDocument({ projectId: project.id, drawingId: drawing.id, name: drawing.name })
-  return { projectId: project.id, drawingId: drawing.id }
+  if (elements.length === 0 && selectedElement === null) throw new Error("Nothing to save: the drawing has no elements")
+  const result = await createProjectWithContents(app, options)
+  useDocumentStore.getState().setDocument({ projectId: result.projectId, drawingId: result.drawingId, name: `${options.name}` })
+  return { projectId: result.projectId, drawingId: result.drawingId, componentCount: result.componentIds.length }
 }
+
+/** Re-exported so callers keep importing one symbol for the whole "save the project" surface. */
+export { syncProjectContents, drawingPayload } from "./projectSnapshot.ts"
+export { toJsonSafe }

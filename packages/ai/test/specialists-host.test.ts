@@ -31,7 +31,7 @@ const handlers = new Proxy({} as ToolHandlersShape, {
   }
 })
 
-const isParent = (request: ChatRequestBody): boolean => toolNames(request).includes("agent_task")
+const isParent = (request: ChatRequestBody): boolean => request.messages.some((message) => message.role === "system" && typeof message.content === "string" && message.content.includes("You are the main agent."))
 let editorRequests: ChatRequestBody[] = []
 let failChildOnce = false
 const script = (request: ChatRequestBody): Completion => {
@@ -43,7 +43,9 @@ const script = (request: ChatRequestBody): Completion => {
   }
   editorRequests.push(request)
   if (failChildOnce) { failChildOnce = false; return { status: 503, body: "overloaded" } }
-  return lastRole === "tool" ? { text: "Done: hole-1 radius 3 -> 4." } : { toolCalls: [{ name: "cad_describe_drawing", args: {} }] }
+  if (!toolNames(request).includes("cad_describe_drawing")) return { toolCalls: [{ name: "search_tools", args: { query: "cad_describe_drawing,cad_modify_entities" } }] }
+  const described = request.messages.some((message) => message.role === "assistant" && JSON.stringify(message.tool_calls).includes('"name":"cad_describe_drawing"'))
+  return lastRole === "tool" && described ? { text: "Done: hole-1 radius 3 -> 4." } : { toolCalls: [{ name: "cad_describe_drawing", args: {} }] }
 }
 const fake = startFakeOpenAi((request) => script(request))
 const fakeProvider: HostProviderSpec = {
@@ -93,16 +95,31 @@ describe("an editing specialist inside a real host turn", () => {
       const parentId = events.find((event) => event.type === "done")?.sessionId
       if (!parentId) throw new Error("Missing resolved parent")
       expect(parentId).not.toBe(alias)
+      const resumed = yield* Stream.runCollect(ai.chat({ projectId, sessionId: parentId, message: "make hole-1 8 mm", model: { provider: "fake", model: "fake-model" } }))
+      expect(resumed.find((event) => event.type === "done")?.sessionId).toBe(parentId)
+      expect(yield* ai.sessionState(parentId, "untrusted-project-hint").pipe(Effect.flip)).toMatchObject({ _tag: "AiConfigError" })
+      expect(yield* ai.queue({ sessionId: parentId, projectId: "untrusted-project-hint", message: "edit" }).pipe(Effect.flip)).toMatchObject({ _tag: "AiConfigError" })
+      const crossedReal = yield* Stream.runCollect(ai.chat({ projectId: "another-project", sessionId: parentId, message: "edit", model: { provider: "fake", model: "fake-model" } })).pipe(Effect.flip)
+      expect(crossedReal.message).toContain("different project")
+      const anonymous = yield* Stream.runCollect(ai.chat({ projectId, message: "make hole-1 8 mm", model: { provider: "fake", model: "fake-model" } }))
+      const anonymousId = anonymous.find((event) => event.type === "done")?.sessionId
+      if (!anonymousId) throw new Error("Missing unaliased session")
+      expect(yield* ai.sessionState(anonymousId, "untrusted-project-hint").pipe(Effect.flip)).toMatchObject({ _tag: "AiConfigError" })
+      expect(yield* ai.removeSession(anonymousId, projectId)).toBe(true)
       const crossed = yield* Stream.runCollect(ai.chat({ projectId: "another-project", sessionId: alias, message: "edit", model: { provider: "fake", model: "fake-model" } })).pipe(Effect.flip)
       expect(crossed.message).toContain("different project")
       const owner = { projectId, parentSessionId: parentId }
       const task = manager.enqueue({ ...owner, description: "cancel with parent", prompt: "inspect", background: true })
-      expect(yield* ai.removeSession(alias, "untrusted-project-hint")).toBe(true)
+      expect(yield* ai.removeSession(alias, "untrusted-project-hint")).toBe(false)
+      expect(["queued", "running", "completed"]).toContain(manager.read(owner, task.id).status)
+      expect(yield* ai.sessionState(alias, "untrusted-project-hint").pipe(Effect.flip)).toMatchObject({ _tag: "AiConfigError" })
+      expect(yield* ai.queue({ sessionId: alias, projectId: "untrusted-project-hint", message: "Edit another part" }).pipe(Effect.flip)).toMatchObject({ _tag: "AiConfigError" })
+      expect(yield* ai.removeSession(alias, projectId)).toBe(true)
       expect(manager.read(owner, task.id).status).toBe("cancelled")
       const host = yield* runtime.host(projectId)
       expect((yield* Effect.promise(() => host.client.session.list({}))).some((session) => session.id === parentId)).toBe(false)
     }).pipe(Effect.provide(service)))
-  })
+  }, 240_000)
 
   test("it runs with only its tools in the parent's project, streams its tool calls to the parent and returns its report", async () => {
     editorRequests = []
@@ -130,8 +147,9 @@ describe("an editing specialist inside a real host turn", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", text: "The editor finished." })
 
     // The specialist had the editor's tools and nothing else, and used the parent's model.
-    const names = toolNames(editorRequests[0]!)
-    expect(names).toContain("cad_modify_entities")
+    expect(toolNames(editorRequests[0]!)).not.toContain("cad_describe_drawing")
+    const names = toolNames(editorRequests.find((request) => toolNames(request).includes("cad_describe_drawing"))!)
+    // Discovery may match one or both requested editor tools, within the permitted roster.
     expect(names).toContain("cad_describe_drawing")
     for (const forbidden of ["cam_generate_gcode", "cad_add_elements", "agent_task", "task", "bash"]) expect(names).not.toContain(forbidden)
     expect(names.filter((n) => !SUBAGENTS.editor.tools.includes(n) && n !== "skill" && n !== "invalid" && n !== "code_mode" && n !== "search_tools" && n !== "question")).toEqual([])

@@ -27,6 +27,9 @@ export interface EventMapperState {
   /** Characters of arguments last reported per call still being written (progress is throttled). */
   readonly progress: Map<string, number>
   readonly plans: Map<string, string>
+  readonly completedSteps: Set<string>
+  readonly startedSteps: Set<string>
+  usage: { inputTokens: number; outputTokens: number }
   /** Steps of the current turn so far. */
   step: number
   idle: boolean
@@ -40,6 +43,7 @@ export interface EventMapperState {
   toolCalls: number
   /** The most recent tool call ended in an error, and what it said; cleared by the next success. */
   lastToolError: string | undefined
+  readonly toolErrors: Map<string, string>
   /** Texts this stream sent itself (the prompt, a re-sent prompt): a user message with one of them is not news. */
   readonly ownTexts: Set<string>
   /** User messages already reported as `user_message`. */
@@ -53,6 +57,9 @@ export const newMapperState = (): EventMapperState => ({
   finishedCalls: new Set(),
   progress: new Map(),
   plans: new Map(),
+  completedSteps: new Set(),
+  startedSteps: new Set(),
+  usage: { inputTokens: 0, outputTokens: 0 },
   step: 0,
   idle: false,
   retry: undefined,
@@ -60,6 +67,7 @@ export const newMapperState = (): EventMapperState => ({
   todos: [],
   toolCalls: 0,
   lastToolError: undefined,
+  toolErrors: new Map(),
   ownTexts: new Set(),
   reportedUser: new Set()
 })
@@ -69,6 +77,49 @@ const rec = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
 
 const STATUSES = ["pending", "in_progress", "completed", "cancelled"] as const
+
+/** Partial mutations are successful writes with unfinished items, even without an explicit error flag. */
+const partialProblem = (value: Record<string, unknown> | undefined): string | undefined => {
+  const skipped = value?.["skipped"]
+  const count = typeof skipped === "number" ? skipped : Array.isArray(skipped) ? skipped.length : 0
+  if (!(count > 0)) return undefined
+  const details = Array.isArray(skipped) ? skipped.slice(0, 8).flatMap((item) => {
+    if (typeof item === "string") return [item]
+    const detail = rec(item)
+    const error = str(detail?.["error"]) ?? str(detail?.["message"])
+    return error ? [`${typeof detail?.["index"] === "number" ? `elements[${detail["index"]}]: ` : ""}${error}`] : []
+  }) : []
+  return `Partial result: ${count} item(s) skipped${details.length ? `: ${details.join("; ")}` : ""}. Inspect confirmed changes and retry only skipped items.`.slice(0, 2_000)
+}
+
+const outputRecord = (output: string): Record<string, unknown> | undefined => {
+  try { return rec(JSON.parse(output)) } catch { return undefined }
+}
+
+const toolDiagnostics = (sessionId: string, callId: string, tool: string, output: string, failure?: string, agent?: string): ReadonlyArray<AiEvent> => {
+  let value: Record<string, unknown> | undefined
+  try { value = rec(JSON.parse(output)) } catch { /* Native execution errors may be plain text. */ }
+  const shared = { sessionId, callId, tool, ...(agent ? { agent } : {}) }
+  if (failure) {
+    const partial = (typeof value?.["skipped"] === "number" && value["skipped"] > 0) || (Array.isArray(value?.["skipped"]) && value["skipped"].length > 0)
+    const argument = value?.["_tag"] === "InvalidToolArguments" || /invalid arguments|schema validation|required field|elements\[|history\./i.test(failure)
+    return [{ type: "tool_diagnostic", ...shared, kind: partial ? "partial" : argument ? "argument" : "execution", severity: "error", message: failure,
+      ...(str(value?.["recovery"]) ? { recovery: str(value?.["recovery"])! } : {}),
+      ...(typeof value?.["mutationApplied"] === "boolean" ? { mutationApplied: value["mutationApplied"] } : {}) }]
+  }
+  const partial = partialProblem(value)
+  if (partial) return [{ type: "tool_diagnostic", ...shared, kind: "partial", severity: "warning", message: partial,
+    recovery: str(value?.["recovery"]) ?? "Inspect confirmed changes; correct and retry only skipped items.",
+    ...(typeof value?.["mutationApplied"] === "boolean" ? { mutationApplied: value["mutationApplied"] } : tool === "cad_add_elements" && Array.isArray(value?.["elements"]) && value["elements"].length > 0 ? { mutationApplied: true } : {}) }]
+  if (!["cad_check_design", "cam_analyze_gcode", "cam_verify_toolpath"].includes(tool) || !Array.isArray(value?.["issues"])) return []
+  return value["issues"].slice(0, 8).flatMap((item): AiEvent[] => {
+    const issue = rec(item)
+    const message = str(issue?.["message"])
+    if (!message) return []
+    const severity = issue?.["severity"] === "error" ? "error" : issue?.["severity"] === "warning" ? "warning" : "info"
+    return [{ type: "tool_diagnostic", ...shared, kind: "verification", severity, message: `${str(issue?.["code"]) ?? "Finding"}: ${message}`.slice(0, 2_000) }]
+  })
+}
 /** The host's todo list as plain data; anything that is not a list of {content, status} yields undefined. */
 const todosOf = (value: unknown): Array<{ id?: string; content: string; status: (typeof STATUSES)[number]; priority?: string }> | undefined => {
   if (!Array.isArray(value)) return undefined
@@ -89,12 +140,24 @@ const todosOf = (value: unknown): Array<{ id?: string; content: string; status: 
  */
 export const toolFailure = (status: string | undefined, output: string): string | undefined => {
   if (status === "error") return output || "The tool call failed."
-  if (!output.startsWith("{")) return undefined
   try {
-    const value = JSON.parse(output) as { ok?: unknown; error?: unknown; problems?: unknown }
-    if (value.ok !== false) return undefined
+    const value = rec(JSON.parse(output))
+    if (!value) return undefined
+    const problem = (item: unknown): string | undefined => {
+      if (typeof item === "string") return item
+      const detail = rec(item)
+      const message = str(detail?.["message"]) ?? str(detail?.["error"])
+      return message ? `${str(detail?.["path"]) ?? str(detail?.["code"]) ?? ""}: ${message}`.replace(/^: /, "") : undefined
+    }
+    const error = problem(value["error"])
+    const problems = Array.isArray(value["problems"]) ? value["problems"].flatMap((item) => problem(item) ?? []).slice(0, 8) : []
+    const errors = Array.isArray(value["errors"]) ? value["errors"].flatMap((item) => problem(item) ?? []).slice(0, 8) : []
     // `ok:false` with findings (a design check, a simulation) is a result about the model, not a refused call.
-    return typeof value.error === "string" ? value.error : Array.isArray(value.problems) && value.problems.length > 0 ? value.problems.map(String).join("; ") : undefined
+    const details = [error, ...problems, ...errors].filter((item): item is string => item !== undefined && item !== "")
+    if (details.length === 0) return value["success"] === false ? "The tool reported success:false without an error description." : undefined
+    if (value["ok"] !== false && value["success"] !== false && errors.length === 0) return undefined
+    const partial = (typeof value["skipped"] === "number" && value["skipped"] > 0) || (Array.isArray(value["skipped"]) && value["skipped"].length > 0)
+    return `${details.join("; ")}${partial ? " Partial result: inspect confirmed changes and retry only skipped items." : ""}`.slice(0, 2_000)
   } catch { return undefined }
 }
 
@@ -122,8 +185,9 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
   if ((status === "completed" || status === "error") && !state.finishedCalls.has(callId)) {
     state.finishedCalls.add(callId)
     const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
-    state.lastToolError = toolFailure(status, output)
-    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output, ...toolImages(tool, toolState) })
+    const failure = toolFailure(status, output)
+    out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && failure === undefined, output, ...toolImages(tool, toolState) })
+    out.push(...toolDiagnostics(sessionId, callId, tool, output, failure, agent))
   }
   return out
 }
@@ -161,7 +225,10 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
       }
       if (info && str(info["sessionID"]) === sessionId && (info["summary"] === true || info["agent"] === "compaction")) {
         const id = str(info["id"])
-        if (id) state.internalMessages.add(id)
+        if (id && !state.internalMessages.has(id)) {
+          state.internalMessages.add(id)
+          return [{ type: "compaction", sessionId, phase: "start" }]
+        }
       }
       return []
     }
@@ -195,13 +262,21 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
         return [{ type: "reasoning", sessionId, text: delta }]
       }
       if (type === "step-start") {
+        const id = str(part["id"])
+        if (id && state.startedSteps.has(id)) return []
+        if (id) state.startedSteps.add(id)
         state.step += 1
         return [{ type: "step", sessionId, phase: "start", index: state.step }]
       }
       if (type === "step-finish") {
+        const id = str(part["id"]) ?? `${messageId ?? ""}:${state.step}`
+        if (state.completedSteps.has(id)) return []
+        state.completedSteps.add(id)
         const tokens = rec(part["tokens"])
-        const input = typeof tokens?.["input"] === "number" ? tokens["input"] : 0
-        const output = typeof tokens?.["output"] === "number" ? tokens["output"] : 0
+        const count = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0
+        const input = count(tokens?.["input"])
+        const output = count(tokens?.["output"])
+        state.usage = { inputTokens: state.usage.inputTokens + input, outputTokens: state.usage.outputTokens + output }
         const reason = str(part["reason"])
         return [{ type: "step", sessionId, phase: "finish", index: Math.max(1, state.step), ...(reason !== undefined ? { reason } : {}), usage: { inputTokens: input, outputTokens: output } }]
       }
@@ -250,8 +325,13 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
             out.push({ type: "tool_call", sessionId, callId, tool, input: toolState?.["input"] ?? {} })
           }
           const finalOutput = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
-          state.lastToolError = toolFailure(status, finalOutput)
-          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed" && state.lastToolError === undefined, output: finalOutput, ...toolImages(tool, toolState) })
+          const failure = toolFailure(status, finalOutput)
+          const unresolved = failure ?? partialProblem(outputRecord(finalOutput))
+          if (unresolved !== undefined) state.toolErrors.set(tool, unresolved)
+          else state.toolErrors.delete(tool)
+          state.lastToolError = [...state.toolErrors.values()].at(-1)
+          out.push({ type: "tool_result", sessionId, callId, tool, ok: status === "completed" && failure === undefined, output: finalOutput, ...toolImages(tool, toolState) })
+          out.push(...toolDiagnostics(sessionId, callId, tool, finalOutput, failure))
           return out
         }
       }
@@ -271,15 +351,28 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
         }
       ]
     }
+    case "permission.replied": {
+      const owner = str(props["sessionID"])
+      if (!owner || owner !== sessionId && childAgent(sessionId, owner) === undefined) return []
+      const reply = props["reply"]
+      const requestId = str(props["requestID"])
+      return requestId && (reply === "once" || reply === "always" || reply === "reject") ? [{ type: "permission_resolved", sessionId: owner, requestId, reply }] : []
+    }
+    case "permission.blocked": {
+      const owner = str(props["sessionID"])
+      if (!owner || owner !== sessionId && childAgent(sessionId, owner) === undefined) return []
+      return [{ type: "permission_blocked", sessionId: owner, permission: str(props["permission"]) ?? "unknown", patterns: Array.isArray(props["patterns"]) ? props["patterns"].filter((value): value is string => typeof value === "string") : [], reason: str(props["reason"]) ?? "The host denied this action." }]
+    }
     case "session.status": {
       if (str(props["sessionID"]) !== sessionId) return []
       const status = rec(props["status"])
+      if (status?.["type"] === "busy" || status?.["type"] === "idle") return [{ type: "session_status", sessionId, status: status["type"] }]
       if (status?.["type"] === "retry") {
         const attempt = Number(status["attempt"] ?? 0)
         const message = str(status["message"]) ?? "The model request failed."
         const fresh = state.retry?.attempt !== attempt
         state.retry = { attempt, message }
-        if (fresh) return [{ type: "retry", sessionId, attempt, message }]
+        if (fresh) return [{ type: "session_status", sessionId, status: "retry" }, { type: "retry", sessionId, attempt, message }]
       }
       return []
     }
@@ -306,7 +399,7 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
       }]
     }
     case "session.compacted": {
-      return str(props["sessionID"]) === sessionId ? [{ type: "compacted", sessionId }] : []
+      return str(props["sessionID"]) === sessionId ? [{ type: "compaction", sessionId, phase: "finish" }, { type: "compacted", sessionId }] : []
     }
     case "session.idle": {
       if (str(props["sessionID"]) === sessionId) state.idle = true

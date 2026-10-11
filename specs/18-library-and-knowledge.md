@@ -106,7 +106,8 @@ A picking algorithm the agent executes (in text):
 
 ### 3.3 What the agent cannot do (today)
 
-- A **separate** `lib_*` write tool to create or edit library rows directly. Today the agent edits the DB through `cad_*`/`cam_*` tools that target a project, or via VCS commits that re-apply files. Future WP: a `lib_upsert_material`, `lib_upsert_tool`, `lib_upsert_machine_config` (see §6).
+- **Search the drawing's elements by text in a separate tool**: `cad_inspect` `action: "search"` does that (spec 22 §3.7), and pages through everything else with `offset`/`limit`.
+- Write library rows with a *package* tool (`packages/ai/src/tools/lib_*.ts`): the `lib_*` tools are inline host specs today, which is where they are documented (spec 22 §3.5 and §3.6).
 
 ## 4. Machine configurations — `cam_describe_machine`
 
@@ -130,9 +131,10 @@ Source: `packages/core/src/cam/machine.ts`. The agent reads the project's active
 
 ### 5.1 What a Component is
 
-A `Component` is a saved part: a `component` element the user has named, parameterised and stored so other projects can reuse it. The agent uses the catalogue (`cad_component_list`, `cad_component_save`, `cad_component_insert`, `cad_component_delete` per `08-ai.md` §"Tool catalogue"):
+A `Component` is a saved part: a `component` element the user has named, parameterised and stored so other projects can reuse it. Canvas inspection and saved-resource lookup are deliberately separate (`08-ai.md` §"Tool catalogue"):
 
-- `cad_component_list` — read all components in the project (or library).
+- `cad_component_list` — read component instances already present on the active CAD canvas (canvas element ids).
+- `lib_lookup_component` — search saved reusable components across every accessible project and public rows (saved component ids).
 - `cad_component_save` — capture selected elements into a reusable component.
 - `cad_component_insert` — insert a component by id; the agent specifies `transform` and the tool creates fresh element ids.
 - `cad_component_delete` — needs `confirm: true`.
@@ -153,17 +155,16 @@ The `modeler` skill (`packages/ai/src/skills/index.ts:38-46`) says "Standard par
 
 ## 6. Future write tools for the library
 
-A focused v6.x WP closes the gap the agent has today (read-only on the library, except through project operations):
+**Landed (2026-10-11):** the write tools below exist. `lib_upsert_material`, `lib_upsert_tool`, `lib_upsert_machine_config` and `lib_set_default` create or replace rows over the repos the library HTTP routes use; `lib_lookup_machine_config` closes the read gap (machine configurations had no user-facing read); `lib_delete({ kind, id, confirm: true })` removes a row under the same rules the HTTP routes enforce. They are inline host specs in `libraryToolSpecs` (spec 22 §3, §3.5 and §3.6), so the `cadcam` agent gets them and a specialist gets the ones it names. A library item the agent creates still lands in the project's commit, not in another repo: the VCS snapshot serialises `materials/`, `tools/` and `machine-configs/`.
 
 | Tool | Effect |
 | --- | --- |
-| `lib_upsert_material({ id?, name, properties, ... })` | create or update a material row; `confirm: true` for deletes |
-| `lib_upsert_tool({ id?, type, diameter, material, ... })` | create or update a tool row; `confirm: true` for deletes |
-| `lib_upsert_machine_config({ id?, name, kinematics, post, ... })` | create or update a machine; `confirm: true` for deletes |
-| `lib_attach_component({ componentId, projectId, transform })` | save a part into the project catalogue |
+| `lib_upsert_material({ id?, name, properties, ... })` | create or update a material row |
+| `lib_upsert_tool({ id?, type, diameter, material, ... })` | create or update a tool row |
+| `lib_upsert_machine_config({ id?, name, kinematics, post, ... })` | create or update a machine |
 | `lib_set_default({ materialId?, toolId?, machineConfigId? })` | mark a library item as the project's default (per project, versioned) |
-
-These land in the same WP11+ library migration that schedules the GitHub asset mirror (`13-vcs-actions-mobile.md` §8).
+| `lib_lookup_machine_config(query?)` | read the user's saved machines (kinematics, post, work offsets, ceilings) |
+| `lib_delete({ kind, id, confirm: true })` | delete a material, tool or machine config; a machine still used by toolpaths is refused |
 
 ## 7. Operations / toolpaths — what the agent remembers about them
 

@@ -9,6 +9,13 @@
         "tsconfig.*.json",
         "src/**/*.ts",
         "src/**/*.tsx",
+        "app/**/*.ts",
+        "app/**/*.tsx",
+        "components/**/*.ts",
+        "components/**/*.tsx",
+        "lib/**/*.ts",
+        "lib/**/*.tsx",
+        "modules/**/*.ts",
         "package.json"
       ],
       "outputs": []
@@ -20,6 +27,19 @@
         "tsconfig.*.json",
         "src/**/*.ts",
         "src/**/*.tsx",
+        "app/**/*.ts",
+        "app/**/*.tsx",
+        "components/**/*.ts",
+        "components/**/*.tsx",
+        "lib/**/*.ts",
+        "lib/**/*.tsx",
+        "modules/**/*.ts",
+        "global.css",
+        "tailwind.config.js",
+        "babel.config.js",
+        "metro.config.js",
+        "app.json",
+        "assets/**",
         "vite.config.*",
         "index.html",
         "package.json"
@@ -33,6 +53,7 @@
         "tsconfig.*.json",
         "src/**/*.ts",
         "test/**/*.ts",
+        "lib/**/*.ts",
         "package.json"
       ],
       "outputs": ["coverage/**"]

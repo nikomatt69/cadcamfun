@@ -105,23 +105,7 @@ export interface AiMessage {
   readonly interrupted?: boolean
 }
 
-export type AiEvent =
-  | { readonly type: "question_request"; readonly sessionId: string; readonly requestId: string; readonly questions: ReadonlyArray<AiQuestion> }
-  | { readonly type: "question_resolved"; readonly sessionId: string; readonly requestId: string }
-  | { readonly type: "user_message"; readonly sessionId: string; readonly text: string }
-  | { readonly type: "delta"; readonly sessionId: string; readonly text: string }
-  | { readonly type: "tool_call"; readonly sessionId: string; /** The specialist running the tool; absent for the main agent. */ readonly agent?: string; readonly callId: string; readonly tool: string; readonly input: unknown }
-  | { readonly type: "tool_result"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly ok: boolean; readonly output: string; readonly images?: ReadonlyArray<string> }
-  | { readonly type: "permission_request"; readonly sessionId: string; readonly requestId: string; readonly permission: string; readonly patterns: ReadonlyArray<string> }
-  | { readonly type: "done"; readonly sessionId: string; readonly text: string; readonly usage?: AiUsage; /** The connection dropped and the finished answer was read back from the host. */ readonly recovered?: boolean }
-  | { readonly type: "error"; readonly sessionId: string; readonly code: "provider" | "config" | "aborted" | "internal"; readonly message: string }
-  | { readonly type: "reasoning"; readonly sessionId: string; readonly text: string }
-  | { readonly type: "tool_progress"; readonly sessionId: string; readonly agent?: string; readonly callId: string; readonly tool: string; readonly chars: number }
-  | { readonly type: "step"; readonly sessionId: string; readonly phase: "start" | "finish"; readonly index: number; readonly reason?: string; readonly usage?: AiUsage }
-  | { readonly type: "todo"; readonly sessionId: string; readonly todos: ReadonlyArray<AiTodo> }
-  | { readonly type: "retry"; readonly sessionId: string; readonly attempt: number; readonly message: string }
-  | { readonly type: "compacted"; readonly sessionId: string }
-  | { readonly type: "goal"; readonly sessionId: string; readonly goal: AiGoal | null }
+export type AiEvent = import("@cadcamfun/api").AiStreamEvent
 
 export type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled"
 export interface AiTodo { readonly id?: string; readonly content: string; readonly status: TodoStatus; readonly priority?: string }

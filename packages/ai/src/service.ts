@@ -133,7 +133,7 @@ export class AiService extends Context.Service<AiService, {
   /** Where a conversation stands, for a client that lost its connection mid-turn (`busy: false` when there is no host session). */
   readonly sessionState: (sessionId: string, projectId?: string) => Effect.Effect<HostSessionState, AiError>
   /** A message written while the agent works: admitted to the host's pending queue (or steered in) and answered by the running turn. */
-  readonly queue: (input: { sessionId: string; message: string; delivery?: PendingDelivery }) => Effect.Effect<void, AiError>
+  readonly queue: (input: { sessionId: string; projectId?: string; message: string; delivery?: PendingDelivery }) => Effect.Effect<void, AiError>
 }>()("cadcamfun/AiService") {
   static readonly layer: Layer.Layer<AiService, never, AiCredentials | AiConfig | DirectModel> = Layer.effect(
     AiService,
@@ -244,19 +244,20 @@ export class AiService extends Context.Service<AiService, {
             if (mapped !== undefined) {
               if (yield* sessionExists(mapped.host, mapped.sessionId)) return mapped
               yield* Ref.update(sessionMap, (map) => {
-                map.delete(clientSessionId)
+                for (const [id, binding] of map) {
+                  if (binding.host === mapped.host && binding.sessionId === mapped.sessionId) map.delete(id)
+                }
                 return map
               })
             }
           }
           const sessionId = yield* createHostSession(projectHost, "CADCAMFUN chat")
           const target = { host: projectHost, sessionId }
-          if (clientSessionId !== undefined) {
-            yield* Ref.update(sessionMap, (map) => {
-              map.set(clientSessionId, target)
-              return map
-            })
-          }
+          yield* Ref.update(sessionMap, (map) => {
+            map.set(sessionId, target)
+            if (clientSessionId !== undefined) map.set(clientSessionId, target)
+            return map
+          })
           return target
         })
 
@@ -315,7 +316,10 @@ export class AiService extends Context.Service<AiService, {
                 host: target.host, sessionId: target.sessionId, message, files: attached.parts, system,
                 agent: hostAgentWithPermissions(agent, input.permissionMode), ...(variant ? { variant } : {}),
                 model: { providerID: resolved.provider, modelID: resolved.modelId }
-              }).pipe(Stream.mapError((e): AiError => e))
+              }).pipe(
+                Stream.mapError((e): AiError => e),
+                (stream) => input.context ? Stream.concat(Stream.succeed<AiEvent>({ type: "context_snapshot", sessionId: target.sessionId, projectId, source: "workspace", chars: input.context.length }), stream) : stream
+              )
             }
 
             // No embedded host: a stateless one-shot stream through the AI SDK.
@@ -455,22 +459,26 @@ export class AiService extends Context.Service<AiService, {
             }
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
             if (mapped !== undefined) {
+              if (projectId !== undefined && mapped.host.projectId !== projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
               return withTasks(yield* readHostSessionState(mapped.host, mapped.sessionId), { projectId: mapped.host.projectId, parentSessionId: mapped.sessionId })
             }
             const projectHost = yield* host.value.runtime.host(projectId ?? "default")
             if (!(yield* sessionExists(projectHost, sessionId))) return { busy: false, text: "" } satisfies HostSessionState
             return withTasks(yield* readHostSessionState(projectHost, sessionId), { projectId: projectHost.projectId, parentSessionId: sessionId })
           }),
-        queue: ({ sessionId, message, delivery }) =>
+        queue: ({ sessionId, projectId, message, delivery }) =>
           Effect.gen(function* () {
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
             if (mapped === undefined) return yield* new AiConfigError({ message: "There is no running conversation to add this message to." })
+            if (projectId !== undefined && mapped.host.projectId !== projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
             yield* queueHostMessage(mapped.host, mapped.sessionId, message, delivery ?? "queue")
           }),
         removeSession: Effect.fn("AiService.removeSession")(function* (sessionId: string, projectId?: string) {
-          (yield* Ref.get(controllers)).get(sessionId)?.abort()
           if (Option.isNone(host)) return false
           const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+          if (mapped !== undefined && projectId !== undefined && mapped.host.projectId !== projectId) return false
+          const activeControllers = yield* Ref.get(controllers)
+          activeControllers.get(sessionId)?.abort()
           const target = mapped !== undefined
             ? Option.some(mapped)
             : yield* host.value.runtime.host(projectId ?? "default").pipe(

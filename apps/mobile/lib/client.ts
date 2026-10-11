@@ -1,0 +1,172 @@
+import type { SessionControlReply, SessionStateReply, EntityChange, LiveEvent, NotificationRow, PullRequestRow, ReviewRow, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow } from "@cadcamfun/api"
+import type { Pairing } from "./pairing"
+import type { ChatEvent } from "./sse"
+import { sseParser } from "./sse"
+
+/** `GET /api/ai/status` payload, declared locally — importing the schema const would drag Effect into the bundle. */
+export interface AiStatusInfo {
+  providers?: Readonly<Record<string, string>>
+  configured: boolean
+  tools?: ReadonlyArray<{ id: string; description: string }>
+  host?: "nikcli" | "direct"
+}
+
+/** A raw HTTP response: status and text body (JSON is parsed by the caller). */
+export interface TransportResponse {
+  readonly status: number
+  readonly body: string
+}
+
+/**
+ * The wire layer the client talks to. On iOS this is the `companion-net` native module (pinned
+ * TLS); tests may explicitly inject a verified fetch adapter. The transport owns the pairing (base URL, bearer token,
+ * certificate fingerprint) so the client never sees credentials.
+ */
+export interface Transport {
+  request(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<TransportResponse>
+  /** Raw text chunks (SSE frames split arbitrarily); the caller feeds them to `sseParser`. */
+  stream(path: string, method: string, body?: unknown, signal?: AbortSignal): AsyncGenerator<string>
+}
+
+export class CompanionError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+  }
+}
+
+export interface ProjectSummary {
+  readonly id: string
+  readonly name: string
+  readonly description: string | null
+  readonly updatedAt: string
+}
+
+export interface PullRequestDetail {
+  readonly pullRequest: PullRequestRow
+  readonly reviews: ReadonlyArray<ReviewRow>
+  readonly changes: ReadonlyArray<EntityChange>
+}
+
+/**
+ * The phone's whole view of a desktop: the same HTTP API the desktop UI uses (no Effect runtime
+ * in the phone bundle — types only from `@cadcamfun/api`), through the pinned transport. Only the
+ * companion-gateway allow-list routes are reachable; everything else answers 403.
+ */
+export class CompanionClient {
+  constructor(private readonly transport: Transport) {}
+
+  private async request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+    const res = await this.transport.request(path, method, body, signal)
+    let json: unknown
+    try {
+      json = res.body ? (JSON.parse(res.body) as unknown) : undefined
+    } catch {
+      json = undefined
+    }
+    if (res.status < 200 || res.status >= 300) {
+      const message = (json as { message?: string } | undefined)?.message ?? `HTTP ${res.status}`
+      throw new CompanionError(res.status, message)
+    }
+    if (res.status !== 204 && (json === undefined || json === null || typeof json !== "object")) throw new CompanionError(res.status, "The desktop returned an invalid JSON response")
+    return json as T
+  }
+
+  private projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}`
+
+  health = (signal?: AbortSignal) => this.request<{ status?: string }>("GET", "/api/health", undefined, signal)
+  projects = (signal?: AbortSignal) => this.request<ProjectSummary[]>("GET", "/api/projects", undefined, signal)
+  project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
+
+  // ── Version control ─────────────────────────────────────────────────────
+
+  status = (id: string, signal?: AbortSignal) => this.request<VcsStatus>("GET", `${this.projectPath(id)}/vcs/status`, undefined, signal)
+  log = (id: string, limit = 50, signal?: AbortSignal) => this.request<VcsCommit[]>("GET", `${this.projectPath(id)}/vcs/log?limit=${limit}`, undefined, signal)
+  branches = (id: string, signal?: AbortSignal) => this.request<VcsBranches>("GET", `${this.projectPath(id)}/vcs/branches`, undefined, signal)
+  diff = (id: string, to: string, from?: string, signal?: AbortSignal) =>
+    this.request<EntityChange[]>("GET", `${this.projectPath(id)}/vcs/diff?to=${encodeURIComponent(to)}${from ? `&from=${encodeURIComponent(from)}` : ""}`, undefined, signal)
+  commit = (id: string, message: string) => this.request<VcsCommit>("POST", `${this.projectPath(id)}/vcs/commit`, { message })
+  createBranch = (id: string, name: string) => this.request<VcsBranches>("POST", `${this.projectPath(id)}/vcs/branches`, { name })
+  checkout = (id: string, branch: string) => this.request<VcsBranches>("POST", `${this.projectPath(id)}/vcs/checkout`, { branch })
+  restore = (id: string, rev: string) => this.request<VcsCommit>("POST", `${this.projectPath(id)}/vcs/restore`, { rev })
+
+  // ── Pull requests ───────────────────────────────────────────────────────
+
+  pullRequests = (id: string, state?: PullRequestRow["state"], signal?: AbortSignal) =>
+    this.request<PullRequestRow[]>("GET", `${this.projectPath(id)}/pulls${state ? `?state=${state}` : ""}`, undefined, signal)
+  pullRequest = (id: string, number: number, signal?: AbortSignal) => this.request<PullRequestDetail>("GET", `${this.projectPath(id)}/pulls/${number}`, undefined, signal)
+  review = (id: string, number: number, verdict: ReviewRow["verdict"], body = "") =>
+    this.request<ReviewRow>("POST", `${this.projectPath(id)}/pulls/${number}/reviews`, { verdict, body })
+  merge = (id: string, number: number) => this.request<PullRequestRow>("POST", `${this.projectPath(id)}/pulls/${number}/merge`)
+  close = (id: string, number: number) => this.request<PullRequestRow>("POST", `${this.projectPath(id)}/pulls/${number}/close`)
+
+  // ── Actions (workflows) ─────────────────────────────────────────────────
+
+  runs = (id: string, signal?: AbortSignal) => this.request<WorkflowRunRow[]>("GET", `${this.projectPath(id)}/actions/runs`, undefined, signal)
+  dispatch = (id: string, ref?: string) => this.request<WorkflowRunRow[]>("POST", `${this.projectPath(id)}/actions/dispatch`, ref ? { ref } : {})
+
+  // ── Assistant ───────────────────────────────────────────────────────────
+
+  /** Whether the paired desktop has a model key; checked before the user types. */
+  aiStatus = (signal?: AbortSignal) => this.request<AiStatusInfo>("GET", "/api/ai/status", undefined, signal)
+  sessionState = (sessionId: string, signal?: AbortSignal) => this.request<typeof SessionStateReply.Type>("POST", "/api/ai/sessions/state", { sessionId }, signal)
+  questionReply = (sessionId: string, requestId: string, answers: string[][]) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "answer_question", requestId, answers })
+  questionReject = (sessionId: string, requestId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "reject_question", requestId })
+
+  aiModels = (signal?: AbortSignal) => this.request<Array<{ id: string; provider: string; configured: boolean }>>("GET", "/api/ai/models", undefined, signal)
+
+  /** Stops the turn the given session is running; `sessionId` may be omitted to stop whatever is running. */
+  abortChat = (sessionId?: string) => this.request<{ message: string }>("POST", "/api/ai/chat/abort", sessionId ? { sessionId } : {})
+
+  /** Answers a `permission_request` frame. Unanswered, the assistant's tool call stalls. */
+  permissionReply = (sessionId: string, requestId: string, decision: "once" | "always" | "reject") =>
+    this.request<{ message: string }>("POST", "/api/ai/permission/reply", { sessionId, requestId, decision })
+
+  /**
+   * Streams the assistant's reply; the assistant works on `ai/*` branches and opens pull requests,
+   * never touching `main`. Passing a `sessionId` continues the same conversation as the desktop.
+   */
+  async *chat(
+    body: { projectId: string; message?: string; sessionId?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" },
+    signal?: AbortSignal,
+  ): AsyncGenerator<ChatEvent> {
+    const parse = sseParser<ChatEvent>()
+    let terminal = false
+    for await (const chunk of this.transport.stream("/api/ai/chat/stream", "POST", body, signal)) {
+      if (signal?.aborted) break
+      for (const event of parse(chunk)) {
+        if (!event || typeof event !== "object" || typeof event.type !== "string") continue
+        if (event.type === "done" || event.type === "error") terminal = true
+        yield event
+      }
+    }
+    if (!terminal && !signal?.aborted) throw new CompanionError(0, "The assistant connection ended before the turn finished")
+  }
+
+  /** Adds a steer/queued message to a running session without opening a new stream. */
+  queueChat = (sessionId: string, message: string, projectId?: string, delivery: "queue" | "steer" = "steer") =>
+    this.request<{ message: string }>("POST", "/api/ai/chat/queue", { sessionId, message, projectId, delivery })
+
+  // ── Notifications: the user's activity feed, shared with the desktop ────
+
+  notifications = (options: { readonly limit?: number; readonly onlyUnread?: boolean } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams()
+    if (options.limit !== undefined) query.set("limit", String(options.limit))
+    if (options.onlyUnread) query.set("onlyUnread", "true")
+    const suffix = query.size > 0 ? `?${query.toString()}` : ""
+    return this.request<{ notifications: ReadonlyArray<NotificationRow>; unreadCount: number }>("GET", `/api/notifications${suffix}`, undefined, signal)
+  }
+  markNotificationRead = (id: string, isRead = true) => this.request<NotificationRow>("PUT", `/api/notifications/${encodeURIComponent(id)}`, { isRead })
+  markAllNotificationsRead = () => this.request<{ message: string; count: number }>("POST", "/api/notifications/mark-all-read")
+  removeNotification = (id: string) => this.request<{ message: string }>("DELETE", `/api/notifications/${encodeURIComponent(id)}`)
+
+  // ── Live activity (SSE) ─────────────────────────────────────────────────
+
+  /** Tails the project's live activity stream; aborting the iteration closes the connection. */
+  async *events(projectId: string, signal?: AbortSignal): AsyncGenerator<LiveEvent> {
+    const parse = sseParser<LiveEvent>()
+    for await (const chunk of this.transport.stream(`${this.projectPath(projectId)}/events`, "GET", undefined, signal)) {
+      if (signal?.aborted) break
+      yield* parse(chunk)
+    }
+  }
+}

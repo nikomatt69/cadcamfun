@@ -1,9 +1,8 @@
 /**
  * SSE client for nikcli (spec 08-ai.md §3, WP8).
  *
- * The sidecar's `chatStream` endpoint is `HttpApiSchema.StreamSse({ data: unknown })`,
- * so the typed client resolves to `Effect<Stream<unknown, ...>>`. We narrow that
- * to the public `AiEvent` shape, decode each `data:` line as JSON, validate the
+ * The sidecar's `chatStream` endpoint carries the shared Effect event union.
+ * We decode each `data:` line as JSON, validate the
  * envelope, then run the nikcli-style tool-call checks (allow-list, input shape,
  * per-tool Effect Schema) before any event reaches the store.
  *
@@ -11,8 +10,9 @@
  * calls; cancelling the stream is enough to keep the UI responsive.
  */
 import { Effect, Queue, Schema, Stream } from "effect"
+import { AiStreamEventSchema } from "@cadcamfun/api"
 import type { Client, AppRuntime } from "../state/client.ts"
-import type { AiEvent, AiTodo, AiQuestion, ProviderId, Tier } from "./types.ts"
+import type { AiEvent, ProviderId, Tier } from "./types.ts"
 import type { ChatAttachment } from "./attachments.ts"
 import { AGENT_TOOL_IDS, TOOL_IDS, VCS_TOOL_IDS, type ToolId } from "./tools.ts"
 import { ToolInputSchemas } from "./tool-schemas.ts"
@@ -28,82 +28,25 @@ const MAX_INPUT_BYTES = 256_000
 const MAX_TEXT_BYTES = 64_000
 /** Cap tool_result output the same way: tool answers tend to be bounded. */
 const MAX_OUTPUT_BYTES = 256_000
-
-const AiEventSchema = Schema.fromJsonString(
-  Schema.Struct({
-    type: Schema.String,
-    sessionId: Schema.String,
-    text: Schema.optional(Schema.String),
-    agent: Schema.optional(Schema.String),
-    callId: Schema.optional(Schema.String),
-    tool: Schema.optional(Schema.String),
-    input: Schema.optional(Schema.Unknown),
-    ok: Schema.optional(Schema.Boolean),
-    output: Schema.optional(Schema.String),
-    requestId: Schema.optional(Schema.String),
-    permission: Schema.optional(Schema.String),
-    patterns: Schema.optional(Schema.Array(Schema.String)),
-    code: Schema.optional(Schema.String),
-    message: Schema.optional(Schema.String),
-    usage: Schema.optional(Schema.Struct({
-      inputTokens: Schema.Number,
-      outputTokens: Schema.Number
-    }))
-  })
-)
+const EVENT_TYPES = new Set<string>(AiStreamEventSchema.members.map((member) => member.fields.type.literal))
 
 const viewportImages = (value: unknown): ReadonlyArray<string> => (Array.isArray(value) ? value : []).filter((url): url is string => typeof url === "string" && url.length <= 4_000_100 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(url)).slice(0, 2)
 
-const decodeEvent = (json: string): AiEvent => {
-  const raw = JSON.parse(json) as Record<string, unknown>
-  const decodedAgent = decodeAgentEvent(raw)
-  if (decodedAgent) return decodedAgent
-  const type = raw["type"]
-  const sessionId = typeof raw["sessionId"] === "string" ? (raw["sessionId"] as string) : ""
-  if (type === "delta") return { type: "delta", sessionId, text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "" }
-  if (type === "user_message") return { type: "user_message", sessionId, text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "" }
-  const agent = typeof raw["agent"] === "string" && raw["agent"] !== "" ? { agent: raw["agent"] as string } : {}
-  if (type === "tool_call") return {
-    type: "tool_call", sessionId, ...agent,
-    callId: typeof raw["callId"] === "string" ? (raw["callId"] as string) : "",
-    tool: typeof raw["tool"] === "string" ? (raw["tool"] as string) : "",
-    input: raw["input"]
-  }
-  if (type === "tool_result") return {
-    type: "tool_result", sessionId, ...agent,
-    callId: typeof raw["callId"] === "string" ? (raw["callId"] as string) : "",
-    tool: typeof raw["tool"] === "string" ? (raw["tool"] as string) : "",
-    ok: raw["ok"] === true,
-    output: typeof raw["output"] === "string" ? cap(raw["output"], MAX_OUTPUT_BYTES, "<truncated>") : "",
-    ...(viewportImages(raw["images"]).length ? { images: viewportImages(raw["images"]) } : {})
-  }
-  if (type === "permission_request") return {
-    type: "permission_request", sessionId,
-    requestId: typeof raw["requestId"] === "string" ? (raw["requestId"] as string) : "",
-    permission: typeof raw["permission"] === "string" ? (raw["permission"] as string) : "",
-    patterns: Array.isArray(raw["patterns"]) ? (raw["patterns"] as ReadonlyArray<string>) : []
-  }
-  if (type === "done") {
-    const u = raw["usage"] as { inputTokens?: number; outputTokens?: number } | undefined
-    return {
-      type: "done", sessionId,
-      text: typeof raw["text"] === "string" ? cap(raw["text"], MAX_TEXT_BYTES, "<truncated>") : "",
-      ...(u && typeof u.inputTokens === "number" && typeof u.outputTokens === "number"
-        ? { usage: { inputTokens: u.inputTokens, outputTokens: u.outputTokens } } : {})
-    }
-  }
-  if (type === "error") {
-    const code = raw["code"] === "config" || raw["code"] === "aborted" || raw["code"] === "internal" ? raw["code"] : "provider"
-    const rawMessage = typeof raw["message"] === "string" ? cap(raw["message"], MAX_TEXT_BYTES, "<truncated>") : "AI request failed"
-    // Provider errors arrive as raw JSON with auth-header names and request
-    // ids. The UI transcript must not surface those; sanitise here.
-    if (code === "provider") console.error("AI provider error", rawMessage)
-    return { type: "error", sessionId, code, message: sanitizeError(rawMessage) }
-  }
-  return { type: "error", sessionId, code: "internal", message: sanitizeError(`Unknown AI event: ${type}`) }
-}
+/** The API's Effect union is the single desktop wire decoder. */
+export const decodeEvent = (json: string): AiEvent => decodeWireEvent(JSON.parse(json))
 
-export { decodeEvent }
+const decodeWireEvent = (raw: unknown): AiEvent => {
+  const event = Schema.decodeUnknownSync(AiStreamEventSchema)(raw)
+  switch (event.type) {
+    case "delta": case "user_message": case "reasoning": case "done":
+      return { ...event, text: cap(event.text, MAX_TEXT_BYTES, "<truncated>") }
+    case "tool_result":
+      return { ...event, output: cap(event.output, MAX_OUTPUT_BYTES, "<truncated>"), ...(event.images ? { images: viewportImages(event.images) } : {}) }
+    case "error": case "retry": case "tool_diagnostic":
+      return { ...event, message: sanitizeError(cap(event.message, MAX_TEXT_BYTES, "<truncated>")) }
+    default: return event
+  }
+}
 
 export interface StreamCallbacks {
   readonly onEvent: (event: AiEvent) => void
@@ -142,11 +85,12 @@ export const streamChatEffect = (
       const controller = new AbortController()
       const abort = () => controller.abort()
       signal?.addEventListener("abort", abort, { once: true })
+      if (signal?.aborted) controller.abort()
       yield* Effect.addFinalizer(() => Effect.sync(() => {
         signal?.removeEventListener("abort", abort)
         controller.abort()
       }))
-      const offer = (event: AiEvent) => void Queue.offerUnsafe(queue, event)
+      const offer = (event: AiEvent) => { if (!controller.signal.aborted) Queue.offerUnsafe(queue, event) }
       /** Per-session tool-call tracking, mirrors `event-mapper.ts` in nikcli:
        *  a `tool_result` without a preceding `tool_call` gets the call synthesised
        *  so the store always sees the start of a tool. */
@@ -159,20 +103,54 @@ export const streamChatEffect = (
       const recover = async (): Promise<boolean> => {
         const until = Date.now() + RECOVER_WINDOW_MS
         let misses = 0
+        const requests = new Set<string>()
+        const diagnostics = new Set<string>()
+        let plan = ""
         while (!controller.signal.aborted && Date.now() < until) {
           try {
-            const state = await Effect.runPromise(client.ai.sessionState({ payload: { sessionId: input.sessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }))
+            const state = await Effect.runPromise(client.ai.sessionState({ payload: { sessionId: input.sessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
             misses = 0
+            for (const raw of state.events ?? []) {
+              const event = decodeEvent(JSON.stringify(raw))
+              if (event.type === "tool_call" && calls.started.has(event.callId)) continue
+              if (event.type === "tool_diagnostic") {
+                const key = JSON.stringify(event)
+                if (diagnostics.has(key)) continue
+                diagnostics.add(key)
+              }
+              if (event.type === "todo") {
+                const key = JSON.stringify(event.todos)
+                if (key === plan) continue
+                plan = key
+              }
+              for (const mapped of dispatch(event, calls)) offer(mapped)
+            }
+            // Pending native decisions can outlive their SSE connection. Restore them while the turn waits.
+            if (state.busy && typeof client.ai.sessionControl === "function") {
+              try {
+                const controls = await Effect.runPromise(client.ai.sessionControl({ payload: { action: "status", sessionId: input.sessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
+                for (const question of controls.questions) {
+                  if (requests.has(question.requestId)) continue
+                  requests.add(question.requestId)
+                  offer({ type: "question_request", sessionId: input.sessionId, ...question })
+                }
+                for (const permission of controls.permissions ?? []) {
+                  if (requests.has(permission.requestId)) continue
+                  requests.add(permission.requestId)
+                  offer({ type: "permission_request", ...permission })
+                }
+              } catch { /* A controls failure does not discard successfully recovered tool evidence. */ }
+            }
             if (!state.busy) {
-              if (state.error !== undefined) offer({ type: "error", sessionId: input.sessionId, code: "provider", message: sanitizeError(state.error) })
-              else if (state.text.trim() !== "") offer({ type: "done", sessionId: input.sessionId, text: state.text, recovered: true })
+              if (state.error !== undefined) offer({ type: "error", sessionId: input.sessionId, code: /aborted|cancelled|session interrupted/i.test(state.error) ? "aborted" : "provider", message: sanitizeError(state.error) })
+              else if (state.text.trim() !== "" || (state.events?.length ?? 0) > 0) offer({ type: "done", sessionId: input.sessionId, text: state.text, recovered: true, ...(state.usage ? { usage: state.usage } : {}) })
               else return false
               return true
             }
           } catch {
             if (++misses >= 5) return false
           }
-          await new Promise((resolve) => setTimeout(resolve, RECOVER_POLL_MS))
+          await Effect.runPromise(Effect.sleep(`${RECOVER_POLL_MS} millis`), { signal: controller.signal }).catch(() => undefined)
         }
         return false
       }
@@ -180,6 +158,7 @@ export const streamChatEffect = (
       const pump = (async () => {
         let ended = false
         try {
+          if (controller.signal.aborted) return
           const http = client.ai.chatStream({ payload: {
             message: input.message,
             sessionId: input.sessionId,
@@ -190,24 +169,25 @@ export const streamChatEffect = (
             ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
             ...(input.agent !== undefined ? { agent: input.agent } : {}), ...(input.mode !== undefined ? { mode: input.mode } : {})
           } })
-          const stream = await Effect.runPromise(http)
-          const items = Stream.toAsyncIterable(stream)
-          for await (const item of items) {
-            if (controller.signal.aborted) break
-            // Keep-alive events carry nothing for the transcript.
-            if (isHeartbeat(item)) continue
-            const decoded = await Effect.runPromise(decodeEventSafely(item))
+          const stream = await Effect.runPromise(http, { signal: controller.signal })
+          await Effect.runPromise(stream.pipe(
+            Stream.filter((item) => !isIgnoredEvent(item)),
+            Stream.mapEffect(decodeEventSafely),
+            Stream.takeUntil((event) => event.type === "done" || event.type === "error"),
+            Stream.runForEach((decoded) => Effect.sync(() => {
+            if (controller.signal.aborted || ended) return
             for (const event of dispatch(decoded, calls)) {
               if (event.type === "done" || event.type === "error") ended = true
               offer(event)
             }
-          }
+          }))
+          ), { signal: controller.signal })
           // A stream that stops without its closing event was cut, not finished.
           if (!ended && !controller.signal.aborted) throw new Error("The connection closed before the answer was complete")
         } catch (cause) {
           if (controller.signal.aborted) return
-          // The full cause goes to the console for debugging; the UI sees a sanitised message.
-          console.error("AI stream interrupted", cause)
+          if (ended) return
+          offer({ type: "turn", sessionId: input.sessionId, phase: "recovering", reason: "The stream disconnected; reading stored tool evidence and pending decisions." })
           if (await recover()) return
           offer({
             type: "error" as const, sessionId: input.sessionId, code: "internal" as const, message: sanitizeError(describe(cause))
@@ -230,105 +210,20 @@ export const streamChatEffect = (
 const describe = (e: unknown): string =>
   e instanceof Error ? e.message : typeof e === "string" ? e : "The AI sidecar is unreachable."
 
-/** Events of the agent loop (steps, plan, reasoning, progress, retry, compaction, goal): passed on whole, only shape-checked. */
-const decodeAgentEvent = (raw: unknown): AiEvent | undefined => {
-  if (typeof raw !== "object" || raw === null) return undefined
-  const r = raw as Record<string, unknown>
-  const sessionId = typeof r["sessionId"] === "string" ? r["sessionId"] : ""
-  const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0)
-  switch (r["type"]) {
-    case "question_request": {
-      if (typeof r["requestId"] !== "string" || !Array.isArray(r["questions"])) return undefined
-      const questions = r["questions"].slice(0, 12).flatMap((value): AiQuestion[] => {
-        if (value === null || typeof value !== "object") return []
-        const q = value as Record<string, unknown>
-        if (typeof q["header"] !== "string" || typeof q["question"] !== "string" || !Array.isArray(q["options"])) return []
-        return [{ header: cap(q["header"], 100, ""), question: cap(q["question"], 4000, ""), options: q["options"].slice(0, 20).flatMap((value) => {
-          if (value === null || typeof value !== "object") return []
-          const option = value as Record<string, unknown>
-          return typeof option["label"] === "string" && typeof option["description"] === "string" ? [{ label: cap(option["label"], 100, ""), description: cap(option["description"], 2000, "") }] : []
-        }), ...(typeof q["multiple"] === "boolean" ? { multiple: q["multiple"] } : {}), ...(typeof q["custom"] === "boolean" ? { custom: q["custom"] } : {}) }]
-      })
-      return questions.length ? { type: "question_request", sessionId, requestId: r["requestId"], questions } : undefined
-    }
-    case "question_resolved": return typeof r["requestId"] === "string" ? { type: "question_resolved", sessionId, requestId: r["requestId"] } : undefined
-    case "reasoning": return typeof r["text"] === "string" && r["text"] !== "" ? { type: "reasoning", sessionId, text: cap(r["text"], MAX_TEXT_BYTES, "<truncated>") } : undefined
-    case "tool_progress": return { type: "tool_progress", sessionId, ...(typeof r["agent"] === "string" && r["agent"] !== "" ? { agent: r["agent"] } : {}), callId: String(r["callId"] ?? ""), tool: String(r["tool"] ?? ""), chars: num(r["chars"]) }
-    case "step": {
-      const u = r["usage"] as { inputTokens?: unknown; outputTokens?: unknown } | undefined
-      return {
-        type: "step", sessionId, phase: r["phase"] === "finish" ? "finish" : "start", index: num(r["index"]),
-        ...(typeof r["reason"] === "string" ? { reason: r["reason"] } : {}),
-        ...(u && typeof u.inputTokens === "number" && typeof u.outputTokens === "number" ? { usage: { inputTokens: u.inputTokens, outputTokens: u.outputTokens } } : {})
-      }
-    }
-    case "todo": {
-      const statuses = ["pending", "in_progress", "completed", "cancelled"] as const
-      const todos = (Array.isArray(r["todos"]) ? r["todos"] : []).flatMap((t): AiTodo[] => {
-        const x = t as Record<string, unknown>
-        return typeof x["content"] === "string"
-          ? [{ ...(typeof x["id"] === "string" ? { id: x["id"] } : {}), content: x["content"], status: statuses.find((s) => s === x["status"]) ?? "pending", ...(typeof x["priority"] === "string" ? { priority: x["priority"] } : {}) }]
-          : []
-      })
-      return { type: "todo", sessionId, todos }
-    }
-    case "retry": return { type: "retry", sessionId, attempt: num(r["attempt"]), message: sanitizeError(String(r["message"] ?? "")) }
-    case "compacted": return { type: "compacted", sessionId }
-    case "goal": {
-      const g = r["goal"] as Record<string, unknown> | null
-      if (g === null || typeof g !== "object") return { type: "goal", sessionId, goal: null }
-      const statuses = ["active", "paused", "blocked", "usage_limited", "budget_limited", "complete"] as const
-      const status = statuses.find((s) => s === g["status"])
-      if (status === undefined || typeof g["objective"] !== "string") return undefined
-      return { type: "goal", sessionId, goal: { objective: g["objective"], status, iteration: num(g["iteration"]), tokensUsed: num(g["tokensUsed"]), ...(typeof g["tokenBudget"] === "number" ? { tokenBudget: g["tokenBudget"] } : {}) } }
-    }
-    default: return undefined
+/** Unknown event names are forward compatible; known events still require valid payloads. */
+const isIgnoredEvent = (raw: unknown): boolean => {
+  if (typeof raw === "string") {
+    try { return isIgnoredEvent(JSON.parse(raw)) } catch { return false }
   }
+  if (typeof raw !== "object" || raw === null) return false
+  const type = (raw as { type?: unknown }).type
+  return typeof type === "string" && type.length > 0 && !EVENT_TYPES.has(type)
 }
 
-const isHeartbeat = (raw: unknown): boolean => {
-  if (typeof raw === "string") return raw.includes('"heartbeat"') && raw.length < 64 && raw.includes('"type"')
-  return typeof raw === "object" && raw !== null && (raw as { type?: unknown }).type === "heartbeat"
-}
-
-const decodeEventSafely = (raw: unknown): Effect.Effect<AiEvent, AiStreamError> =>
-  Effect.try({
-    try: () => {
-      const text = typeof raw === "string" ? raw : JSON.stringify(raw)
-      const parsed = JSON.parse(text) as unknown
-      const agent = decodeAgentEvent(parsed)
-      if (agent !== undefined) return agent
-      // Schema validation is best-effort: a non-conforming event still becomes a
-      // valid error event rather than crashing the stream. The narrow
-      // `decodeEvent` (the original lenient decoder) is the source of truth.
-      try {
-        const value = Schema.decodeUnknownSync(AiEventSchema)(parsed)
-        return decodeEventFromUnknown(value)
-      } catch {
-        // Fallback to the lenient decoder that does not throw on unknown types.
-        const json = typeof parsed === "string" ? parsed : text
-        return decodeEvent(json)
-      }
-    },
-    catch: (e) => new AiStreamError({ message: e instanceof Error ? e.message : "Failed to parse AI event." })
-  })
-
-const decodeEventFromUnknown = (raw: { type: string; sessionId: string; agent?: string; text?: string; callId?: string; tool?: string; input?: unknown; ok?: boolean; output?: string; images?: ReadonlyArray<string>; requestId?: string; permission?: string; patterns?: ReadonlyArray<string>; code?: string; message?: string; usage?: { inputTokens: number; outputTokens: number } }): AiEvent => {
-  if (raw.type === "delta") return { type: "delta", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
-  if (raw.type === "user_message") return { type: "user_message", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>") }
-  const agent = raw.agent !== undefined && raw.agent !== "" ? { agent: raw.agent } : {}
-  if (raw.type === "tool_call") return { type: "tool_call", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", input: raw.input }
-  if (raw.type === "tool_result") return { type: "tool_result", sessionId: raw.sessionId, ...agent, callId: raw.callId ?? "", tool: raw.tool ?? "", ok: raw.ok === true, output: cap(raw.output ?? "", MAX_OUTPUT_BYTES, "<truncated>"), ...(viewportImages(raw.images).length ? { images: viewportImages(raw.images) } : {}) }
-  if (raw.type === "permission_request") return { type: "permission_request", sessionId: raw.sessionId, requestId: raw.requestId ?? "", permission: raw.permission ?? "", patterns: raw.patterns ?? [] }
-  if (raw.type === "done") return {
-    type: "done", sessionId: raw.sessionId, text: cap(raw.text ?? "", MAX_TEXT_BYTES, "<truncated>"),
-    ...(raw.usage ? { usage: { inputTokens: raw.usage.inputTokens, outputTokens: raw.usage.outputTokens } } : {})
-  }
-  const code = raw.code === "config" || raw.code === "aborted" || raw.code === "internal" ? raw.code : "provider"
-  const rawMessage = cap(raw.message ?? "AI request failed", MAX_TEXT_BYTES, "<truncated>")
-  if (code === "provider") console.error("AI provider error", rawMessage)
-  return { type: "error", sessionId: raw.sessionId, code, message: sanitizeError(rawMessage) }
-}
+const decodeEventSafely = (raw: unknown): Effect.Effect<AiEvent, AiStreamError> => Effect.try({
+  try: () => decodeWireEvent(typeof raw === "string" ? JSON.parse(raw) : raw),
+  catch: () => new AiStreamError({ message: "The assistant sent an invalid event. Recovering the session may restore its results." })
+})
 
 const cap = (text: string, limit: number, marker: string): string =>
   text.length <= limit ? text : `${text.slice(0, limit - marker.length)}${marker}`
@@ -439,7 +334,7 @@ const reconcileToolResult = (
   event: Extract<AiEvent, { type: "tool_result" }>,
   state: CallState
 ): ReadonlyArray<AiEvent> => {
-  if (state.finished.has(event.callId)) return [event]
+  if (state.finished.has(event.callId)) return []
   const events: AiEvent[] = []
   if (!state.started.has(event.callId)) {
     state.started.add(event.callId)
@@ -456,7 +351,7 @@ const reconcileToolResult = (
  * event types pass through untouched.
  */
 export const dispatch = (event: AiEvent, state: CallState): ReadonlyArray<AiEvent> => {
-  if (event.type === "tool_call") return validateToolCall(event, state)
+  if (event.type === "tool_call") return state.started.has(event.callId) ? [] : validateToolCall(event, state)
   if (event.type === "tool_result") return reconcileToolResult(event, state)
   return [event]
 }
@@ -470,12 +365,10 @@ export const streamChat = (
   const program = streamChatEffect(deps.client, input, controller.signal).pipe(
     Stream.runForEach((event) => Effect.sync(() => deps.onEvent(event)))
   )
-  const run = deps.runtime.run(program.pipe(Effect.ensuring(Effect.sync(() => deps.onDone()))))
+  const run = deps.runtime.run(program, { signal: controller.signal })
   void run.catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error)
-    deps.onError(message)
-    deps.onDone()
-  })
+    if (!controller.signal.aborted) deps.onError(sanitizeError(describe(error)))
+  }).finally(() => deps.onDone())
   return {
     abort: () => {
       controller.abort()

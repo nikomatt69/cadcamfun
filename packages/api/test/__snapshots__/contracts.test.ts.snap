@@ -5747,6 +5747,208 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         },
                       ],
                     },
+                    "events": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "agent": {
+                                    "type": "string",
+                                  },
+                                  "callId": {
+                                    "type": "string",
+                                  },
+                                  "input": {},
+                                  "sessionId": {
+                                    "type": "string",
+                                  },
+                                  "tool": {
+                                    "type": "string",
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "tool_call",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "type",
+                                  "sessionId",
+                                  "callId",
+                                  "tool",
+                                  "input",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "agent": {
+                                    "type": "string",
+                                  },
+                                  "callId": {
+                                    "type": "string",
+                                  },
+                                  "images": {
+                                    "items": {
+                                      "maxLength": 4000100,
+                                      "type": "string",
+                                    },
+                                    "maxItems": 2,
+                                    "type": "array",
+                                  },
+                                  "ok": {
+                                    "type": "boolean",
+                                  },
+                                  "output": {
+                                    "type": "string",
+                                  },
+                                  "sessionId": {
+                                    "type": "string",
+                                  },
+                                  "tool": {
+                                    "type": "string",
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "tool_result",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "type",
+                                  "sessionId",
+                                  "callId",
+                                  "tool",
+                                  "ok",
+                                  "output",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "sessionId": {
+                                    "type": "string",
+                                  },
+                                  "todos": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "content": {
+                                          "type": "string",
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                        },
+                                        "priority": {
+                                          "type": "string",
+                                        },
+                                        "status": {
+                                          "enum": [
+                                            "pending",
+                                            "in_progress",
+                                            "completed",
+                                            "cancelled",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      },
+                                      "required": [
+                                        "content",
+                                        "status",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "type": "array",
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "todo",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "type",
+                                  "sessionId",
+                                  "todos",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "agent": {
+                                    "type": "string",
+                                  },
+                                  "callId": {
+                                    "type": "string",
+                                  },
+                                  "kind": {
+                                    "enum": [
+                                      "argument",
+                                      "execution",
+                                      "partial",
+                                      "verification",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "message": {
+                                    "type": "string",
+                                  },
+                                  "mutationApplied": {
+                                    "type": "boolean",
+                                  },
+                                  "recovery": {
+                                    "type": "string",
+                                  },
+                                  "sessionId": {
+                                    "type": "string",
+                                  },
+                                  "severity": {
+                                    "enum": [
+                                      "error",
+                                      "warning",
+                                      "info",
+                                    ],
+                                    "type": "string",
+                                  },
+                                  "tool": {
+                                    "type": "string",
+                                  },
+                                  "type": {
+                                    "enum": [
+                                      "tool_diagnostic",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "type",
+                                  "sessionId",
+                                  "callId",
+                                  "tool",
+                                  "kind",
+                                  "severity",
+                                  "message",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          "type": "array",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                     "tasks": {
                       "anyOf": [
                         {
@@ -5814,6 +6016,31 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "text": {
                       "type": "string",
+                    },
+                    "usage": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "inputTokens": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "outputTokens": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "inputTokens",
+                            "outputTokens",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
                     },
                   },
                   "required": [

@@ -15,11 +15,11 @@ import { useElementsStore } from "../cad/store/elementsStore.ts"
 import { useLayerStore } from "../cad/store/layerStore.ts"
 import { useSelectionStore } from "../cad/store/selectorStore.ts"
 import { useCamStore } from "../cam/store/camStore.ts"
-import { documentSettings } from "../state/document-settings.ts"
 import { toJsonSafe } from "../state/json-safe.ts"
 import { forgetPushed, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../cam/store/verifyStore.ts"
+import { drawingPayload } from "../cad/lib/projectSnapshot.ts"
 
 const { estimateTime } = cam
 
@@ -60,6 +60,7 @@ export function currentDrawingContext(app: AppState) {
   const gcode = camStore.gcode || generator.currentGCode
   const page = typeof window !== "undefined" && window.location.pathname.startsWith("/cam") ? "cam" : "cad"
   return {
+    capturedAt: new Date().toISOString(),
     page,
     projectId: document.projectId,
     drawingId: document.drawingId,
@@ -128,11 +129,13 @@ export async function ensureDocument(app: AppState): Promise<{ projectId: string
 
 /** Writes the live elements into the stored drawing, which also makes it the newest one the tools will pick. */
 export async function pushLiveDrawing(app: AppState, drawingId: string): Promise<void> {
-  const { selectedElement } = useElementsStore.getState()
   const elements = toJsonSafe(useElementsStore.getState().elements) as ReadonlyArray<Record<string, unknown>>
+  const row = await run(app)<{ readonly data?: unknown }>(app.client.drawings.get({ params: { id: drawingId } }))
+  const stored = row.data !== null && typeof row.data === "object" ? row.data as Record<string, unknown> : {}
   await run(app)(app.client.drawings.update({
     params: { id: drawingId },
-    payload: { data: { elements, selectedElement: selectedElement?.id ?? null, settings: documentSettings(app), version: "1.0" } }
+    // Keep server-owned drawing fields (most importantly an AI-set stock) when this page has not loaded them yet.
+    payload: { data: { ...stored, ...drawingPayload(app) } }
   }))
   rememberPushed(elements)
 }

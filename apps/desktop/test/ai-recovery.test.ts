@@ -18,11 +18,35 @@ describe("stream recovery", () => {
   test("heartbeats are dropped, the rest of the answer is untouched", async () => {
     const events = await run({
       ai: {
-        chatStream: () => Effect.succeed(sse({ type: "heartbeat" }, { type: "delta", sessionId: "s1", text: "Hi" }, { type: "heartbeat" }, { type: "done", sessionId: "s1", text: "Hi" })),
+        chatStream: () => Effect.succeed(sse({ type: "heartbeat" }, { type: "future_event", sessionId: "s1" }, { type: "delta", sessionId: "s1", text: "Hi" }, { type: "heartbeat" }, { type: "done", sessionId: "s1", text: "Hi" })),
         sessionState: () => Effect.die("must not be asked")
       }
     })
     expect(events.map((e) => e.type)).toEqual(["delta", "done"])
+  })
+
+  test("known malformed events recover rather than bypassing the wire schema", async () => {
+    const events = await run({ ai: {
+      chatStream: () => Effect.succeed(sse({ type: "delta", sessionId: "s1", text: 42 })),
+      sessionState: () => Effect.succeed({ busy: false, text: "Valid stored answer" })
+    } })
+    expect(events.some((event) => event.type === "delta")).toBe(false)
+    expect(events.at(-1)).toMatchObject({ type: "done", recovered: true, text: "Valid stored answer" })
+  })
+
+  test("recovery restores tool-only answers once and retains diagnostics and usage", async () => {
+    const call = { type: "tool_call", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", input: {} }
+    const result = { type: "tool_result", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", ok: false, output: "Drawing not found" }
+    const diagnostic = { type: "tool_diagnostic", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", kind: "execution", severity: "error", message: "Drawing not found" }
+    let reads = 0
+    const events = await run({ ai: {
+      chatStream: () => Effect.succeed(sse(call, result)),
+      sessionState: () => Effect.sync(() => ({ busy: ++reads < 2, text: "", events: [call, result, diagnostic], usage: { inputTokens: 10, outputTokens: 5 } }))
+    } })
+    expect(events.filter((event) => event.type === "tool_call")).toHaveLength(1)
+    expect(events.filter((event) => event.type === "tool_result")).toHaveLength(1)
+    expect(events.filter((event) => event.type === "tool_diagnostic")).toHaveLength(1)
+    expect(events.at(-1)).toMatchObject({ type: "done", recovered: true, usage: { inputTokens: 10, outputTokens: 5 } })
   })
 
   test("a connection that drops mid-answer is recovered from the host once the turn is finished", async () => {

@@ -248,7 +248,28 @@ Each run streams `RunEvent`s (`job-start`, `step`, `job-end`); an event has `use
 
 **Implementation note (landed, no-new-files):** the eleven tools below were added as *inline host specs* in `apps/sidecar/src/services/ai.ts` (`libraryToolSpecs`), not as `packages/ai/src/tools/<id>.ts` + `prompts/<id>.txt`. Reason: the host derives the permitted tool ids from `toolsFor(projectId)` (`packages/ai/src/nikcli/runtime.ts:164`), so an inline spec is auto-permitted for `cadcam` and any specialist that names it, needs no prompt file (the description is in the spec), and adds no new integration. The behaviours live on `ToolHandlersShape` (`packages/ai/src/tools/handlers.ts`): `listComponents`, `saveComponent`, `insertComponent`, `deleteComponent`, `upsertMaterial`, `upsertTool`, `upsertMachineConfig`, `setProjectDefault`, `suggestChain`, `chainStatus`; the sidecar implements them in `ai.ts` over `ComponentRepo`, `MaterialRepo`, `ToolRepo`, `MachineConfigRepo`, `KvStore`. Tests: `apps/sidecar/test/ai-cam-tools.test.ts` (`describe("library and chain tools (spec 22 §3)")`). If the tool eventually needs a package prompt, move it then; the inline path is the one that keeps this commit to existing files.
 
-### 3.1 `cad_component_*` library tools (add 4)
+### 3.5 Machine-configuration reads (add 1, landed)
+`lib_lookup_machine_config` is the third `lib_lookup_*` tool, added beside `lib_lookup_material` and `lib_lookup_tool` in `libraryToolSpecs`. Materials and tools had a read path; machine configurations had only `cam_describe_machine`, which describes a *kind* of machine (kinematics table) and not the user's saved rows. The new tool reads `MachineConfigRepo.list` for the acting user (public rows included) and returns `{id, name, description, type, config, isPublic, isOwner, usageCount, updatedAt}`; the handler is `lookupMachineConfig` on `ToolHandlersShape`. An empty query returns the most recently updated rows, so the model can enumerate the user's machines.
+
+### 3.6 Library deletes (add 1, landed)
+
+`lib_delete({ kind, id, confirm: true })` removes one library row: `kind` is `material`, `tool` or `machine_config`. One tool with a discriminator instead of three, because the tool surface is already 62 ids wide and the three deletions share the same shape. The rules are the existing HTTP ones, not new ones: a material or a tool is deleted when `find` returns it and `canWrite` is true (owner, or organisation write access); a machine configuration when `permission.isOwner` is true and `usageCount` is 0. The handler is `deleteLibrary` on `ToolHandlersShape`, and `confirm: z.literal(true)` makes it a separate user action.
+
+### 3.7 Searching the drawing's elements (no new tool, landed)
+
+`cad_inspect` grew an `action: "search"` instead of a new `cad_grep_elements` tool: the model already pages through elements with `offset`/`limit`, and a second read tool would only double the surface. `search` takes `query` (case-insensitive substring), optional `layerId` and `limit` (1–50, default 20) and returns every match's id, type, name, layer and the property paths and values the query was found in, plus `total`, `returned` and `complete` so a truncated result is never mistaken for a full one. The walk is bounded (depth 6, at most 20 hits per element, values clipped to 120 characters) and skips `elements`, `vertices` and `faces`, so searching a large model stays cheap. Implementation: `searchElement` and the `search` branch in `apps/sidecar/src/services/ai.ts`.
+
+### 3.8 Stock has two faces (landed, spec 18 §7 and 06)
+
+`cam_stock` `action: "set"` now writes both sides of the raw piece, which is what makes the CAD stock and the CAM stock one thing:
+
+- the drawing's `stock` (unchanged: CAM generation, verification and invalidation all read it), and
+- a `workpiece` **element** in the drawing, which is the raw piece the CAD scene draws (`createThreeObject` case `workpiece`), so it survives reopening the project and travels with the project's history through the VCS.
+
+The element's centre is `x, y, topZ - depth / 2`, so its top face is `topZ`. The stored stock's `elementId` is set to that element, which is what `cam-sync.ts` mirrors into the CAD store and what `job.ts` derives stock from when the CAD store is not configured. Pointing `elementId` at a real part element keeps that element as the stock's source and adds nothing to the scene. `action: "inspect"` reports the `workpiece` element and `workpieceMatchesStock`, which is false when the scene and the CAM stock disagree. Tests: `apps/sidecar/test/ai-stock-inspection.test.ts` ("explicit stock drives real removal simulation and invalidates generated programs on change").
+
+
+### 3.1 `cad_component_*` canvas/reuse tools plus `lib_lookup_component`
 
 Source layout (in `packages/ai/src/tools/`):
 
@@ -269,10 +290,12 @@ Content — `cad_component_list.ts`:
 import { z } from "zod"
 import { defineTool } from "./define.ts"
 export const cadComponentList = defineTool("cad_component_list", {
-  parameters: z.object({ projectId: z.string().optional(), scope: z.enum(["project", "library"]).default("project") }),
-  execute: ({ projectId, scope }, { handlers, projectId: ctx }) => handlers.listComponents(ctx ?? projectId ?? "", scope)
+  parameters: z.object({}),
+  execute: (_input, { handlers, projectId }) => handlers.listComponents(projectId)
 })
 ```
+
+`lib_lookup_component` is a sidecar host spec parallel to `lib_lookup_material`: it accepts `{ query }`, searches saved components across every project visible to the acting user (plus public components), and returns saved ids suitable for `cad_component_insert`.
 
 `cad_component_save.ts`:
 
@@ -311,7 +334,8 @@ export const cadComponentDelete = defineTool("cad_component_delete", {
 The `tools/handlers.ts` interface gains:
 
 ```ts
-listComponents(projectId: string, scope: "project" | "library"): Promise<unknown>
+listComponents(projectId: string): Promise<unknown>
+lookupComponent(query: string): Promise<unknown>
 saveComponent(ids: ReadonlyArray<string>, name: string): Promise<unknown>
 insertComponent(componentId: string, transform?: cad.ElementTransform): Promise<unknown>
 deleteComponent(componentId: string): Promise<unknown>
@@ -321,7 +345,8 @@ deleteComponent(componentId: string): Promise<unknown>
 
 Prompts (one-liners):
 
-- `cad_component_list.txt`: "List reusable components in this project or in the user's library. Read-only. Use before `cad_component_insert`."
+- `cad_component_list.txt`: "List component instances currently present on the active CAD canvas. Returns canvas element ids, not saved-library ids."
+- `lib_lookup_component`: "Search the user's saved reusable components. Use its saved component id with `cad_component_insert`."
 - `cad_component_save.txt`: "Gather selected elements into a named, reusable component. Children are references; later edits to the parent flow through."
 - `cad_component_insert.txt`: "Insert a component by id with an optional transform. Returns new element ids."
 - `cad_component_delete.txt`: "Delete a reusable component. Destructive — `confirm: true` required."
@@ -652,7 +677,11 @@ This collapses the three trigger types into one tool entry, matching `packages/w
 
 `services/project-vcs.ts` reserved `PullRequest.remoteNumber` for the future GitHub mirror step. The companion gateway log note already refuses `push`/`pull` for AI actors; the comment block documents the next concrete action.
 
-## 8. Acceptance criteria
+### 3.9 Who may use them (landed)
+
+`packages/ai/src/tools/project-tools.ts` holds the ids the sidecar registers beside `TOOL_IDS` (`LIBRARY_TOOL_IDS`, `VCS_TOOL_IDS`, `BACKGROUND_TOOL_IDS` → `SIDECAR_TOOL_IDS`) and the groups a specialist is built from (`LIBRARY_READ_ALL`, `LIBRARY_WRITE_TOOL_IDS`, `CHAIN_TOOL_IDS`, `COMPONENT_TOOL_IDS`). `nikcli/agents.ts` composes the five rosters from those groups, and the sidecar's `libraryToolSpecs` throws if it builds a spec whose id is not in `LIBRARY_TOOL_IDS`, so neither side can drift from the other. The table in spec 16 §3 is the readable form of the result: every specialist that reasons about machining or parts reads the libraries, only the `machinist` writes them, the read-only roles never write anything, and the tool surface grew by two ids instead of one per action.
+
+## 8. Acceptance criteria (updated)
 
 1. Each `gap` row in spec 21 maps to a section in this spec and a PR that lands it.
 2. The LSP errors in `workflow-steps.ts` disappear after §5.1 and §5.2 land.
@@ -661,7 +690,11 @@ This collapses the three trigger types into one tool entry, matching `packages/w
 5. The 4 newly written skills (`parametric-design`, `composed-cam-programs`, `version-control-cadcam`, `workflows-cadcam`) load via the host's `skill` tool.
 6. The 4 newly built workflow steps (`cam/sequence`, `vcs/commit`, `notify/push`, `ai/prompt`) pass `tool-prompts.test.ts`-style contract checks (each `uses` maps to a registered handler; unknown ones still fail fast).
 7. No existing test in spec 20 §9 breaks.
+8. `agents.test.ts` proves every specialist's tool id is registered, that no roster repeats an id, that library reads are on every machining/parts role, and that only `machinist` holds the library writes.
+9. `cam_stock` sets the raw piece on both sides: the drawing stock the CAM side machines and the `workpiece` element the CAD scene draws, with `workpieceMatchesStock` reporting any disagreement.
+10. Reopening a project through `/cad?projectId=` opens its newest drawing instead of an empty canvas.
 
 ## 9. Change log
 
 - v1: gap-fill with concrete source for 4 new skills, 11 new tools, 4 new workflow steps, 1 specialist addition (`reviewer`), 1 sidecar refinement (`vcs_restore_paths`, `actions_run` trigger parameter), 1 package export fix (`StepContext`), 1 widening fix (`Uint8Array<ArrayBufferLike>`). Tied row-by-row to spec 21.
+- v2 (2026-10-11): §3.5 `lib_lookup_machine_config` (the missing library read), §3.6 `lib_delete` (one discriminated tool for library deletes, `confirm: true`, HTTP rules reused), §3.7 `cad_inspect` `action: "search"` (element grep, no new tool id), §3.8 `cam_stock` writes the `workpiece` element beside the drawing stock so the CAD stock and the CAM stock are one piece. Recency note: the tool surface is already ~62 ids, so every addition here reuses an existing tool or adds a single discriminated tool instead of a new one per action.

@@ -29,7 +29,7 @@
   "ai.docked": "Docked",
   "ai.you": "You",
   "ai.assistant": "Assistant",
-  "ai.header.subtitle": "Project: {name} • {count} elements • nikcli {host}",
+  "ai.header.subtitle": "Project: {name} • {count} elements • {host}",
   "ai.header.noProject": "No active project",
   "ai.header.subtitleNoCount": "Project: {name} • nikcli {host}",
   "ai.header.fallback": "direct mode",
@@ -337,5 +337,12 @@
   "ai.controls.permissions": "Permissions",
   "ai.controls.permissions.auto": "Auto",
   "ai.controls.permissions.ask": "Ask",
-  "ai.controls.permissions.approve": "Approve"
+  "ai.controls.permissions.approve": "Approve",
+  "ai.model.search": "Search available models",
+  "ai.model.provider": "Connected provider",
+  "ai.model.allProviders": "All connected providers",
+  "ai.model.showMore": "Show more ({count})",
+  "ai.transcript.latest": "Latest message",
+  "ai.message.copyTitle": "Copy message",
+  "ai.input.stopHint": "Esc to stop"
 }

@@ -26,6 +26,10 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "babel-preset-expo": "~57.0.14",
+    "nativewind": "^4.1.23",
+    "react-native-worklets": "0.10.1",
     "turbo": "^2.11.7",
     "typescript": "^5.9.0"
   },

@@ -36,7 +36,15 @@ test("explicit stock drives real removal simulation and invalidates generated pr
   const changed = await run("cam_stock", { action: "set", stock: { ...stock, width: 60 } })
   expect(changed.invalidatedOperations).toContain(operation.operationId)
   expect((await run("cam_list_operations", {}))[0].generated).toBe(false)
-  expect((await run("cad_inspect", { action: "elements" })).elements).toHaveLength(1)
+  // The stock has two faces: the CAM one (drawing stock) and the CAD one (the `workpiece` element in the scene).
+  const elements = (await run("cad_inspect", { action: "elements" })).elements as Array<{ properties: Record<string, unknown> }>
+  expect(elements).toHaveLength(2)
+  const workpiece = elements.map((e) => e.properties).find((p) => p["type"] === "workpiece")
+  expect(workpiece).toMatchObject({ type: "workpiece", width: 60, height: 40, depth: 10, x: 2, y: 3, z: -5 })
+  const inspected = await run("cam_stock", { action: "inspect" })
+  expect(inspected.stock).toMatchObject({ width: 60, height: 40, depth: 10 })
+  expect(inspected.workpiece).toMatchObject({ width: 60, height: 40, depth: 10, x: 2, y: 3, z: -5 })
+  expect(inspected.workpieceMatchesStock).toBe(true)
 })
 test("component inspection exposes actual parameter dependencies and exact property pages", async () => {
   const created = await run("cad_add_elements", { elements: [

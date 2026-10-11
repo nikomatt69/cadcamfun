@@ -1,6 +1,9 @@
 import { cam, gearOutline, segmentsFor } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
+import { useCustomElementsStore } from "../store/customElementsStore.ts";
+import { evaluateCustomElement } from "./customElements/evaluate.ts";
+import { customElementOf } from "../types/customElements.ts";
 import * as THREE from "three";
 
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
@@ -2288,6 +2291,29 @@ const buildObject = (element: any): THREE.Object3D | null => {
         }
 
         return componentThreeGroup;
+
+      case "custom": {
+        // A custom element placed from the Custom Elements editor: the definition's geometry
+        // script runs with the values the instance was saved with, and the result sits at the
+        // element's origin. A script that no longer builds (its definition was edited or removed)
+        // draws nothing rather than breaking the whole drawing.
+        const instance = customElementOf(element)
+        const definition = instance ? useCustomElementsStore.getState().definitions[instance.definitionId] : undefined
+        if (!instance || !definition) return null;
+        let object: THREE.Object3D;
+        try {
+          object = evaluateCustomElement(definition, instance.parameters);
+        } catch {
+          return null;
+        }
+        object.position.set(
+          instance.position.x + originOffset.x,
+          instance.position.y + originOffset.y,
+          instance.position.z + originOffset.z
+        );
+        ensureObjectMetadata(object, element.id);
+        return object;
+      }
 
       default:
         console.warn(`Unknown element type: ${element.type}`);

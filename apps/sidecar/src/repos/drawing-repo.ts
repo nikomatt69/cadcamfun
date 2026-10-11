@@ -12,7 +12,8 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
   listByProject(projectId: string): Effect.Effect<DrawingRow[], DatabaseError>
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<DrawingRow, DatabaseError>
   update(id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }): Effect.Effect<DrawingRow, DatabaseError>
-  configureStock(id: string, stock: unknown): Effect.Effect<string[], DatabaseError>
+  /** Stores the drawing's CAM stock and invalidates programs generated against the previous raw piece. */
+  configureStock(id: string, stock: unknown): Effect.Effect<ReadonlyArray<string>, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/DrawingRepo") {
   static readonly layer = Layer.effect(

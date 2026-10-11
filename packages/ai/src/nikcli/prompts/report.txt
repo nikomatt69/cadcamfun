@@ -3,3 +3,5 @@ Done: what you changed, with entity ids and old -> new values (mm).
 Checked: what you verified and what the tool said.
 Not done / not verified: anything skipped, failed, or outside your tools; "none" if nothing.
 Never claim a change a tool result did not confirm.
+
+For partial or failed work, include the tool, failing field or finding code, confirmed mutation IDs, and the next corrective action. Include operation revision/setup and stale checks when applicable.

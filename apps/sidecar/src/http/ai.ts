@@ -210,7 +210,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const state = yield* ai.sessionState(payload.sessionId, payload.projectId).pipe(
         Effect.mapError((e) => new InternalError({ message: e.message }))
       )
-      return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}), ...(state.tasks !== undefined ? { tasks: state.tasks } : {}) }
+      return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}), ...(state.tasks !== undefined ? { tasks: state.tasks } : {}), ...(state.events !== undefined ? { events: state.events } : {}), ...(state.usage !== undefined ? { usage: state.usage } : {}) }
     }))
     .handle("removeSession", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
@@ -245,7 +245,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatQueue", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
       if (!payload.message || payload.message.trim() === "") return yield* new BadRequest({ message: "message is required" })
-      yield* ai.queue({ sessionId: payload.sessionId, message: payload.message, ...(payload.delivery ? { delivery: payload.delivery } : {}) }).pipe(
+      yield* ai.queue({ sessionId: payload.sessionId, message: payload.message, ...(payload.projectId !== undefined ? { projectId: payload.projectId } : {}), ...(payload.delivery ? { delivery: payload.delivery } : {}) }).pipe(
         Effect.mapError((e) => new BadRequest({ message: e.message }))
       )
       return { message: "Queued" }

@@ -162,6 +162,8 @@ declare module "@nikcli-ai/sdk-next" {
           sessionID: string
           delivery?: "steer" | "queue"
           agent?: string
+          model?: { providerID: string; modelID: string }
+          variant?: string
           parts: ReadonlyArray<{ type: "text"; text: string; synthetic?: boolean }>
         },
         options?: RequestOptions

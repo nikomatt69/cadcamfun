@@ -2,11 +2,12 @@ import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A, useNavigate } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Activity, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
+import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../components/ui/toast.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
+import { t } from "../../i18n/index.ts"
 import CADCanvas from "./CADCanvas.tsx"
 
 export interface EnhancedToolbarProps {
@@ -17,6 +18,8 @@ export interface EnhancedToolbarProps {
   setShowImportExportDialog(show: boolean): void
   setShowLibraryView(show: boolean): void
   setShowUnifiedLibrary(show: boolean): void
+  /** Opens the custom elements editor (authored parametric parts). */
+  setShowCustomElements(show: boolean): void
   setShowFloatingToolbar(show: boolean): void
   readonly showFloatingToolbar: boolean
   readonly selectedLibraryComponent: string | null
@@ -122,6 +125,9 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           </Motion.button>
           <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title="Unified Library" hover={hover} press={press}>
             <BookOpen size={16} class="text-gray-600 dark:text-gray-400" />
+          </Motion.button>
+          <Motion.button onClick={() => props.setShowCustomElements(true)} class={GLASS_BUTTON} title={t("cad.customElements.open")} hover={hover} press={press}>
+            <Blocks size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
 
           <Show when={elements.selectedElement}>

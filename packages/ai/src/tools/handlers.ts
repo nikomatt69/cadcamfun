@@ -52,12 +52,18 @@ export interface ToolHandlersShape {
   verifyOperation(projectId: string, operationId: string, options: VerifyToolOptions): Promise<unknown>
   lookupMaterial(query: string): Promise<unknown>
   lookupTool(query: string): Promise<unknown>
+  /** Saved reusable components across the user's accessible projects. */
+  lookupComponent(query: string): Promise<unknown>
+  /** The user's saved machine configurations (kinematics, post, work offsets, ceilings), searched like the other libraries. */
+  lookupMachineConfig(query: string): Promise<unknown>
+  /** Removes one library row by id (`confirm: true` is enforced by the tool schema, not here). */
+  deleteLibrary(input: { kind: "material" | "tool" | "machine_config"; id: string }): Promise<unknown>
   machine?(projectId: string): Promise<MachineProfile | undefined>
   /** Persistent notes the assistant keeps between sessions (the `ai.memory.*` keys of the key-value store). */
   remember(key: string, value: string): Promise<unknown>
   recall(prefix?: string): Promise<unknown>
-  /** Reusable components: list, gather elements into one, insert one by id, remove one. */
-  listComponents(projectId: string, scope: "project" | "library"): Promise<unknown>
+  /** Components that are instantiated in the active CAD drawing. */
+  listComponents(projectId: string): Promise<unknown>
   saveComponent(projectId: string, ids: ReadonlyArray<string>, name: string): Promise<unknown>
   insertComponent(projectId: string, componentId: string, transform?: cad.ElementTransform): Promise<unknown>
   deleteComponent(componentId: string): Promise<unknown>

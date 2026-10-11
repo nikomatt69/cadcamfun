@@ -1,0 +1,48 @@
+import { useCallback, useEffect, useState } from "react"
+import { ActivityIndicator, Platform, Text, View } from "react-native"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { parsePairingLink } from "@/lib/pairing"
+import { nativeAvailable } from "@/lib/native"
+import { useServer } from "@/lib/server"
+import { useTheme } from "@/lib/theme"
+import { ActionButton } from "@/components/ui/ActionButton"
+import { ErrorBanner } from "@/components/ui/ErrorBanner"
+
+/** Pairing URLs share the scanner's validation and never render their credentials. */
+export default function PairLinkScreen() {
+  const params = useLocalSearchParams<{ host?: string; token?: string; fp?: string; name?: string }>()
+  const router = useRouter()
+  const { palette } = useTheme()
+  const { save, booting } = useServer()
+  const [attempt, setAttempt] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const supported = Platform.OS === "web" || nativeAvailable
+  const host = params.host, token = params.token, fingerprint = params.fp, name = params.name
+  const connect = useCallback(async () => {
+    if (!supported) throw new Error("Secure pairing requires the CADCAMFUN development build. Install it with bun run ios from apps/mobile and open it instead of Expo Go.")
+    if (typeof host !== "string" || typeof token !== "string" || typeof fingerprint !== "string" || name !== undefined && typeof name !== "string") throw new Error("The pairing link is incomplete. Scan a new QR code from the desktop.")
+    const pairing = parsePairingLink(`cadcamfun://pair?${new URLSearchParams({ host, token, fp: fingerprint, name: name ?? "Desktop" })}`)
+    if (!await save(pairing)) throw new Error("The desktop did not answer. Check that its companion gateway is on, then retry.")
+  }, [supported, host, token, fingerprint, name, save])
+  useEffect(() => {
+    if (booting) return
+    let active = true
+    setBusy(true)
+    setError(null)
+    void connect().then(() => { if (active) router.replace("/projects") }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? cause.message : "Could not pair with the desktop")
+    }).finally(() => { if (active) setBusy(false) })
+    return () => { active = false }
+  }, [connect, attempt, booting, router])
+  return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16, backgroundColor: palette.background }}>
+    <Stack.Screen options={{ headerShown: false }} />
+    <Text style={{ color: palette.ink, fontSize: 24, fontWeight: "700" }}>Pair with your desktop</Text>
+    {busy || booting ? <ActivityIndicator color={palette.accent} /> : null}
+    {error ? <>
+      <ErrorBanner message={error} />
+      {supported ? <ActionButton label="Retry" onPress={() => setAttempt((previous) => previous + 1)} /> : null}
+      <ActionButton label="Back to pairing" variant="secondary" onPress={() => router.replace("/connect")} />
+    </> : <Text style={{ color: palette.soft }}>Checking the secure connection…</Text>}
+  </View>
+}

@@ -13,25 +13,26 @@ Legacy reference: `.reference/.github/workflows/desktop-build.yml`, `.reference/
 
 One reproducible script `scripts/build.ts` (Bun, not shell) run locally and in CI:
 
-1. `bun install --frozen-lockfile`
+1. `bun install --frozen-lockfile --os=* --cpu=*` so cross-target optional native dependencies are present (the same approach used by nikcli's builders).
 2. `bun run typecheck && bun test packages apps`
 3. Compile the sidecar for the host target triple into `apps/desktop/src-tauri/binaries/sidecar-<triple>` (`bun build --compile`; see `05-api-sidecar.md` §3).
 4. Copy `packages/db/drizzle/` into `apps/desktop/src-tauri/resources/migrations/`.
 5. `bun run --filter @cadcamfun/desktop build` (Vite) then `bunx tauri build`.
 6. Emit SHA-256 checksums and a release-notes file from commit messages since the last tag.
 
-Explicit target triples are passed to both Bun and Tauri. Rust `x86_64` maps to Bun `x64`; `aarch64` stays `aarch64`. Bundles are collected only from `<cargo-target-dir>/<triple>/release/bundle`, with the default Cargo directory under `src-tauri`. The output directory must be empty and outside the bundle tree. Installers and signatures are copied with deterministic flat names `<triple>--<original-basename>`; checksums use these exact copied names. Migration resources map `resources/migrations/` to runtime `migrations/`.
+Explicit target triples are passed to both Bun and Tauri. Rust `x86_64` maps to Bun `x64`; Rust `aarch64` maps to Bun `arm64`. Bundles are collected only from `<cargo-target-dir>/<triple>/release/bundle`, with the default Cargo directory under `src-tauri`. The output directory must be empty and outside the bundle tree. Installers and signatures are copied with deterministic flat names `<triple>--<original-basename>`; checksums use these exact copied names. Migration resources map `resources/migrations/` to runtime `migrations/`.
 
 Scripts must fail fast, print each step, and never read `.env*`.
 
 ## 2. CI (GitHub Actions)
 
 - `ci.yml` on PR/push: ubuntu runs install + typecheck + tests (including `cargo clippy`, `cargo test` for `src-tauri`); caches Bun and Cargo.
-- `release.yml` on tag `v*`: matrix macOS (arm64 + x64), Windows x64, Linux x64 → build, sign, notarise, upload to a draft GitHub Release, generate the updater manifest.
-- Linux packages `.deb`, `.rpm`, `.AppImage`; macOS `.dmg` (universal via two builds + `lipo`, or separate artefacts — decide and record here); Windows `.msi` + NSIS `.exe`.
+- `release.yml` on tag `v*`: six-target matrix for macOS, Windows and Linux on arm64 + x64 → build, sign, notarise, upload to a draft GitHub Release, generate the updater manifest. It follows nikcli's native-runner approach: both macOS targets use `macos-14` (Intel is cross-compiled), Windows ARM uses `windows-11-arm`, and Linux ARM uses `ubuntu-22.04-arm`.
+- `build-platforms.yml` on a `build/**` branch or manual dispatch uses the same six native targets to produce downloadable installer artifacts without requiring release/updater signing credentials. Like nikcli's desktop scripts, the sidecar is prepared for the explicit Rust target before Tauri bundles on the matching native runner.
+- Linux packages `.deb`, `.rpm`, `.AppImage`; macOS builds separate `.app` + `.dmg` artifacts per architecture so Tauri also emits the updater `.app.tar.gz`; Windows packages `.msi` + NSIS `.exe`.
 - macOS uses separate arm64 and x64 installers, not a universal binary. Modern Tauri updater assets are `.app.tar.gz`, `.AppImage`, and NSIS `.exe`, with sibling `.sig` files.
 - Manual releases require an existing `v`-prefixed tag input. The gate checks out that tag, installs Bun, verifies the checked-out commit and configured app version, and outputs immutable SHA/version/date metadata. Secret-bearing builds depend on this gate; branch pushes and fork release workflows are excluded. Windows imports the owner-provided certificate, passes its thumbprint to Tauri signing configuration, then removes it even on failure. No secret appears in an `if` expression.
-- `updater-manifest.ts` validates object shapes and consistent version/date/notes, rejects duplicate platforms, and requires all four platform keys when merging. `stage-release.ts` checks each downloaded target's checksums, rejects unexpected/duplicate files, compares notes and signatures, verifies exact release URLs against copied assets, and stages one flat draft asset set with a combined `SHA256SUMS`. Published releases are not modified by a rerun. The release remains a draft until the owner verifies and publishes it; draft assets are not an active updater feed.
+- `updater-manifest.ts` validates object shapes and consistent version/date/notes, rejects duplicate platforms, and requires all six platform keys when merging. `stage-release.ts` checks each downloaded target's checksums, rejects unexpected/duplicate files, compares notes and signatures, verifies exact release URLs against copied assets, and stages one flat draft asset set with a combined `SHA256SUMS`. Published releases are not modified by a rerun. The release remains a draft until the owner verifies and publishes it; draft assets are not an active updater feed.
 - Required secrets (names only, set by the owner in GitHub): `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD`. Workflows must not echo them and must not run on forks' PRs with secrets.
 
 ## 3. Auto-update

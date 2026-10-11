@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { CompanionClient } from "../../mobile/src/companion/client.ts"
-import { parsePairingLink } from "../../mobile/src/companion/pairing.ts"
+import { createFetchTransport } from "../../mobile/modules/companion-net/transport.ts"
+import { CompanionClient } from "../../mobile/lib/client.ts"
+import { parsePairingLink } from "../../mobile/lib/pairing.ts"
 import { fingerprintOf } from "../src/services/companion-gateway.ts"
 
 const entry = new URL("../src/main.ts", import.meta.url).pathname
@@ -47,7 +48,7 @@ describe("companion end to end", () => {
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       expect(fingerprintOf(pem)).toBe(pairing.fingerprint)
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-      const phone = new CompanionClient(pairing, pinned)
+      const phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
       const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
       await sidecar.local(`/api/projects/${project.id}/drawings`, { method: "POST", body: JSON.stringify({ name: "Plate", data: { w: 100 } }) })
@@ -87,7 +88,7 @@ describe("companion end to end", () => {
       const pairing = parsePairingLink(paired.link)
       const pem = readFileSync(join(dataDir, "companion", "cert.pem"), "utf8")
       const pinned = ((url: string, init: RequestInit) => fetch(url, { ...init, tls: { ca: pem, checkServerIdentity: () => undefined } } as RequestInit)) as unknown as typeof fetch
-      const phone = new CompanionClient(pairing, pinned)
+      const phone = new CompanionClient(createFetchTransport(pairing, pinned))
 
       const project = await (await sidecar.local("/api/projects", { method: "POST", body: JSON.stringify({ name: "Bracket" }) })).json()
       const draw = await (await sidecar.local(`/api/projects/${project.id}/drawings`, { method: "POST", body: JSON.stringify({ name: "Plate", data: { w: 100 } }) })).json()

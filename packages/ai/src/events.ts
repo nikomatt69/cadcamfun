@@ -1,5 +1,25 @@
 import { Schema } from "effect"
 
+const Count = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
+
+export const TurnEvent = Schema.Struct({ type: Schema.Literal("turn"), sessionId: Schema.String,
+  phase: Schema.Literals(["start", "recovering", "continuing", "finish"]), reason: Schema.optionalKey(Schema.String) })
+export const SessionStatusEvent = Schema.Struct({ type: Schema.Literal("session_status"), sessionId: Schema.String,
+  status: Schema.Literals(["busy", "idle", "retry"]) })
+export const PermissionResolvedEvent = Schema.Struct({ type: Schema.Literal("permission_resolved"), sessionId: Schema.String,
+  requestId: Schema.String, reply: Schema.Literals(["once", "always", "reject"]) })
+export const PermissionBlockedEvent = Schema.Struct({ type: Schema.Literal("permission_blocked"), sessionId: Schema.String,
+  permission: Schema.String, patterns: Schema.Array(Schema.String), reason: Schema.String })
+export const CompactionEvent = Schema.Struct({ type: Schema.Literal("compaction"), sessionId: Schema.String,
+  phase: Schema.Literals(["start", "finish"]) })
+export const ContextSnapshotEvent = Schema.Struct({ type: Schema.Literal("context_snapshot"), sessionId: Schema.String,
+  projectId: Schema.String, source: Schema.Literal("workspace"), chars: Count })
+export const ToolDiagnosticEvent = Schema.Struct({ type: Schema.Literal("tool_diagnostic"), sessionId: Schema.String,
+  agent: Schema.optionalKey(Schema.String), callId: Schema.String, tool: Schema.String,
+  kind: Schema.Literals(["argument", "execution", "partial", "verification"]),
+  severity: Schema.Literals(["error", "warning", "info"]), message: Schema.String,
+  recovery: Schema.optionalKey(Schema.String), mutationApplied: Schema.optionalKey(Schema.Boolean) })
+
 /**
  * Events streamed by `AiService.chat`. This is the contract shared with the
  * SSE endpoint in WP3: every member is a plain struct with a `type`
@@ -49,15 +69,16 @@ export const QuestionRequestEvent = Schema.Struct({ type: Schema.Literal("questi
 export const QuestionResolvedEvent = Schema.Struct({ type: Schema.Literal("question_resolved"), sessionId: Schema.String, requestId: Schema.String })
 
 export const UsageSchema = Schema.Struct({
-  inputTokens: Schema.Number,
-  outputTokens: Schema.Number
+  inputTokens: Count,
+  outputTokens: Count
 })
 
 export const DoneEvent = Schema.Struct({
   type: Schema.Literal("done"),
   sessionId: Schema.String,
   text: Schema.String,
-  usage: Schema.optionalKey(UsageSchema)
+  usage: Schema.optionalKey(UsageSchema),
+  recovered: Schema.optionalKey(Schema.Boolean)
 })
 
 export const ErrorEvent = Schema.Struct({
@@ -152,6 +173,13 @@ export const UserMessageEvent = Schema.Struct({
 })
 
 export const AiEventSchema = Schema.Union([
+  TurnEvent,
+  SessionStatusEvent,
+  PermissionResolvedEvent,
+  PermissionBlockedEvent,
+  CompactionEvent,
+  ContextSnapshotEvent,
+  ToolDiagnosticEvent,
   UserMessageEvent,
   GoalEvent,
   DeltaEvent,

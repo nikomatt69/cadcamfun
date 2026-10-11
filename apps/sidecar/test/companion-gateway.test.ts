@@ -77,10 +77,17 @@ describe("companion gateway", () => {
 
   test("refuses everything outside the allow-list", async () => {
     const before = seen.length
-    for (const [method, path] of [["PUT", "/api/ai/credentials"], ["GET", "/api/billing/status"], ["GET", "/api/companion"], ["DELETE", "/api/projects/p1"], ["GET", "/api/projects/p1/drawings"], ["POST", "/api/plugins/install"]] as const) {
+    for (const [method, path] of [["PUT", "/api/ai/credentials"], ["GET", "/api/billing/status"], ["GET", "/api/companion"], ["DELETE", "/api/projects/p1"], ["GET", "/api/projects/p1/drawings"], ["POST", "/api/plugins/install"], ["DELETE", "/api/ai/sessions/s1"]] as const) {
       expect((await call(path, { method })).status).toBe(403)
     }
     expect(seen.length).toBe(before)
+  })
+
+  test("forwards session recovery and native question decisions", async () => {
+    for (const path of ["sessions/state", "sessions/control"]) {
+      expect((await call(`/api/ai/${path}`, { method: "POST", body: "{}", headers: { "content-type": "application/json" } })).status).toBe(200)
+      expect(seen.at(-1)).toMatchObject({ method: "POST", path: `/api/ai/${path}`, auth: "Bearer REAL-SIDECAR-TOKEN" })
+    }
   })
 
   test("streams the assistant's SSE through unchanged", async () => {

@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* iOS system palette, light — material hierarchy via luminance steps */
+  --color-background: 242 242 247;
+  --color-surface: 255 255 255;
+  --color-panel: 235 235 240;
+  --color-border: 210 210 216;
+  --color-accent: 10 132 255;
+  --color-accent-strong: 0 64 221;
+  --color-accent-soft: 10 132 255;
+  --color-muted: 142 142 147;
+  --color-ink: 0 0 0;
+  --color-soft: 60 60 67;
+  --color-user-bubble: 10 132 255;
+  --color-assistant-bubble: 255 255 255;
+  --color-success: 52 199 89;
+  --color-danger: 255 59 48;
+  --color-warning: 255 149 0;
+  --color-info: 90 200 250;
+  --color-focus-ring: 10 132 255;
+
+  /* Glass material tokens */
+  --color-glass-shell: 255 255 255;
+  --color-glass-shell-strong: 255 255 255;
+  --color-glass-panel: 242 242 247;
+  --color-glass-border: 0 0 0;
+  --color-overlay: 0 0 0;
+}
+
+.dark {
+  --color-background: 0 0 0;
+  --color-surface: 28 28 30;
+  --color-panel: 36 36 40;
+  --color-border: 56 56 60;
+  --color-accent: 10 132 255;
+  --color-accent-strong: 100 170 255;
+  --color-accent-soft: 10 132 255;
+  --color-muted: 142 142 147;
+  --color-ink: 255 255 255;
+  --color-soft: 199 199 204;
+  --color-user-bubble: 10 132 255;
+  --color-assistant-bubble: 28 28 30;
+  --color-success: 48 209 88;
+  --color-danger: 255 69 58;
+  --color-warning: 255 179 64;
+  --color-info: 100 210 255;
+  --color-focus-ring: 10 132 255;
+
+  --color-glass-shell: 28 28 30;
+  --color-glass-shell-strong: 36 36 40;
+  --color-glass-panel: 36 36 40;
+  --color-glass-border: 255 255 255;
+  --color-overlay: 0 0 0;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Skeleton shimmer — horizontal sweep */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in var(--duration-ui, 200ms) var(--ease-out) both;
+  }
+  .animate-fade-out {
+    animation: fade-out var(--duration-fast, 150ms) var(--ease-out) both;
+  }
+  .animate-slide-up {
+    animation: slide-up var(--duration-ui, 200ms) var(--ease-out) both;
+  }
+  .animate-scale-in {
+    animation: scale-in var(--duration-ui, 200ms) var(--ease-out) both;
+  }
+  .animate-shimmer {
+    animation: shimmer 1.6s var(--ease-in-out) infinite;
+  }
+  .animate-pulse-soft {
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bg-glass-shell {
+    background-color: rgb(var(--color-glass-shell-strong));
+  }
+  .bg-glass-panel {
+    background-color: rgb(var(--color-glass-panel));
+  }
+}

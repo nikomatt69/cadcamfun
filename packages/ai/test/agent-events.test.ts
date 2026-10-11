@@ -41,10 +41,10 @@ describe("everything the agent does is visible", () => {
   test("a provider failure the host is retrying, and a compaction, are reported", () => {
     const state = newMapperState()
     const retry = (attempt: number) => map(state, { type: "session.status", properties: { sessionID: "s", status: { type: "retry", attempt, message: "Provider is overloaded" } } })
-    expect(retry(1)).toEqual([{ type: "retry", sessionId: "s", attempt: 1, message: "Provider is overloaded" }])
+    expect(retry(1)).toEqual([{ type: "session_status", sessionId: "s", status: "retry" }, { type: "retry", sessionId: "s", attempt: 1, message: "Provider is overloaded" }])
     expect(retry(1)).toEqual([])
-    expect(retry(2)).toHaveLength(1)
-    expect(map(state, { type: "session.compacted", properties: { sessionID: "s" } })).toEqual([{ type: "compacted", sessionId: "s" }])
+    expect(retry(2)).toHaveLength(2)
+    expect(map(state, { type: "session.compacted", properties: { sessionID: "s" } })).toEqual([{ type: "compaction", sessionId: "s", phase: "finish" }, { type: "compacted", sessionId: "s" }])
   })
 
   test("the goal the agent works toward, its progress and its end", () => {
@@ -76,6 +76,40 @@ describe("everything the agent does is visible", () => {
   })
 })
 
+describe("tool output diagnostics", () => {
+  test("a later successful read does not erase a failed CAD mutation", () => {
+    const state = newMapperState()
+    const result = (callID: string, tool: string, output: unknown) => map(state, part({ type: "tool", callID, tool, state: { status: "completed", input: {}, output: JSON.stringify(output) } }))
+    const failed = result("edit", "cad_add_elements", { ok: false, error: "Nothing was added.", problems: ["elements[0].radius: must be positive"], mutationApplied: false })
+    expect(failed.at(-1)).toMatchObject({ type: "tool_diagnostic", kind: "argument", mutationApplied: false })
+    expect(state.lastToolError).toContain("elements[0].radius")
+    result("read", "cad_describe_drawing", { ok: true })
+    expect(state.lastToolError).toContain("elements[0].radius")
+    result("fixed", "cad_add_elements", { ok: true, ids: ["solid-1"] })
+    expect(state.lastToolError).toBeUndefined()
+  })
+
+  test("partial and verification outputs stay distinct", () => {
+    const state = newMapperState()
+    const partial = map(state, part({ type: "tool", callID: "partial", tool: "cad_modify_entities", state: { status: "completed", input: {}, output: JSON.stringify({ ok: false, error: "One element is locked", skipped: ["locked"] }) } }))
+    expect(partial.at(-1)).toMatchObject({ type: "tool_diagnostic", kind: "partial", severity: "error" })
+    const checked = map(state, part({ type: "tool", callID: "verify", tool: "cam_verify_toolpath", state: { status: "completed", input: {}, output: JSON.stringify({ ok: false, issues: [{ severity: "error", code: "GOUGE", message: "Tool intersects the finished wall." }] }) } }))
+    expect(checked.find((event) => event.type === "tool_result")).toMatchObject({ ok: true })
+    expect(checked.at(-1)).toMatchObject({ type: "tool_diagnostic", kind: "verification", severity: "error", message: "GOUGE: Tool intersects the finished wall." })
+  })
+
+  test("duplicate native step updates account for usage only once", () => {
+    const state = newMapperState()
+    const start = part({ type: "step-start", id: "start-1" })
+    const finish = part({ type: "step-finish", id: "finish-1", tokens: { input: 100, output: 20 } })
+    expect(map(state, start)).toHaveLength(1)
+    expect(map(state, start)).toHaveLength(0)
+    expect(map(state, finish)).toHaveLength(1)
+    expect(map(state, finish)).toHaveLength(0)
+    expect(state.usage).toEqual({ inputTokens: 100, outputTokens: 20 })
+  })
+})
+
 describe("what the agent waits out and what it reports", () => {
   test("overload, rate limits, outages and dropped connections are resumed; bad keys, credit and context errors are not", async () => {
     const { isTransientFailure } = await import("../src/nikcli/chat.ts")
@@ -86,4 +120,24 @@ describe("what the agent waits out and what it reports", () => {
       expect(isTransientFailure(m), m).toBe(false)
     }
   })
+})
+
+test("real CAD partial mutations preserve successful writes and keep skipped-item recovery open", () => {
+  const state = newMapperState()
+  const output = { elements: [{ id: "solid-kept", type: "cube" }], skipped: [{ index: 1, error: "radius must be positive" }], note: "1 of 2 elements were added. Send only the skipped ones again." }
+  const events = map(state, part({ type: "tool", callID: "partial-add", tool: "cad_add_elements", state: { status: "completed", input: {}, output: JSON.stringify(output) } }))
+  expect(events.find((event) => event.type === "tool_result")).toMatchObject({ ok: true, output: JSON.stringify(output) })
+  expect(events.find((event) => event.type === "tool_diagnostic")).toMatchObject({ kind: "partial", severity: "warning", mutationApplied: true })
+  expect(state.lastToolError).toContain("elements[1]: radius must be positive")
+  expect(state.lastToolError).toContain("retry only skipped items")
+  map(state, part({ type: "tool", callID: "read-back", tool: "cad_describe_drawing", state: { status: "completed", input: {}, output: "{}" } }))
+  expect(state.lastToolError).toContain("skipped")
+  map(state, part({ type: "tool", callID: "fixed-subset", tool: "cad_add_elements", state: { status: "completed", input: {}, output: JSON.stringify({ elements: [{ id: "solid-fixed" }] }) } }))
+  expect(state.lastToolError).toBeUndefined()
+})
+
+test("partial read results do not invent mutation evidence", () => {
+  const state = newMapperState()
+  const events = map(state, part({ type: "tool", callID: "partial-read", tool: "cad_describe_drawing", state: { status: "completed", input: {}, output: JSON.stringify({ elements: [{ id: "existing" }], skipped: ["hidden"] }) } }))
+  expect(events.find((event) => event.type === "tool_diagnostic")).not.toHaveProperty("mutationApplied")
 })

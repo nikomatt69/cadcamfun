@@ -1,0 +1,9 @@
+.expo/
+android/
+dist/
+ios/Pods/
+ios/build/
+ios/Podfile.lock
+ios/*.xcworkspace/xcuserdata/
+ios/**/*.xcuserstate
+ios/**/*.xcuserdata/

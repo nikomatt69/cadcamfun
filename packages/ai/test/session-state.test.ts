@@ -20,6 +20,18 @@ const read = (messages: ReadonlyArray<Message>) => Effect.runPromise(readHostSes
 }), "ses-test"))
 
 describe("recovered host session state", () => {
+  test("recovers tool errors and completed-step usage without executing tools", async () => {
+    const state = await read([
+      message("user", "Model"),
+      message("assistant", "Partial", { finish: "stop", tokens: { input: 12, output: 4 } }, [
+        { id: "tool", type: "tool", callID: "c", tool: "cad_add_elements", state: { status: "completed", input: { elements: [] }, output: JSON.stringify({ ok: false, error: "Rebuild failed", problems: ["features[1].depth: missing"] }) } }
+      ])
+    ])
+    expect(state.events?.map((event) => event.type)).toEqual(["tool_call", "tool_result", "tool_diagnostic"])
+    expect(state.events?.find((event) => event.type === "tool_result")).toMatchObject({ ok: false })
+    expect(state.events?.at(-1)).toMatchObject({ type: "tool_diagnostic", message: "Rebuild failed; features[1].depth: missing" })
+    expect(state.usage).toEqual({ inputTokens: 12, outputTokens: 4 })
+  })
   test("joins multi-step answer text only from the latest user turn", async () => {
     expect(await read([
       message("user", "Old request"),

@@ -151,7 +151,7 @@ function ProviderRow(props: {
                   )}
                 </For>
               </ul>
-              <Show when={matchingModels().length > modelLimit()}><button type="button" class="text-xs text-blue-600" onClick={() => setModelLimit((value) => value + 50)}>Show more ({matchingModels().length - modelLimit()})</button></Show>
+              <Show when={matchingModels().length > modelLimit()}><button type="button" class="text-xs text-blue-600" onClick={() => setModelLimit((value) => value + 50)}>{t("ai.model.showMore", { count: matchingModels().length - modelLimit() })}</button></Show>
             </div>
           </Show>
         </div>

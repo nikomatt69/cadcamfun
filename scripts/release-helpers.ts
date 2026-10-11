@@ -1,5 +1,16 @@
 import { basename, join } from "node:path";
 
+export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
+  "darwin-aarch64": "aarch64-apple-darwin",
+  "darwin-x86_64": "x86_64-apple-darwin",
+  "windows-aarch64": "aarch64-pc-windows-msvc",
+  "windows-x86_64": "x86_64-pc-windows-msvc",
+  "linux-aarch64": "aarch64-unknown-linux-gnu",
+  "linux-x86_64": "x86_64-unknown-linux-gnu",
+};
+
+export const RELEASE_PLATFORM_KEYS = Object.freeze(Object.keys(RELEASE_PLATFORM_TRIPLES));
+
 export function targetInfo(triple: string): { platform: "darwin" | "linux" | "windows"; arch: "aarch64" | "x86_64"; bunTarget: string } {
   const arch = triple.split("-")[0];
   if (arch !== "aarch64" && arch !== "x86_64") throw new Error(`Unsupported target: ${triple}`);
@@ -7,7 +18,8 @@ export function targetInfo(triple: string): { platform: "darwin" | "linux" | "wi
     : /-unknown-linux-(gnu|musl)$/.test(triple) ? "linux"
     : triple.endsWith("-pc-windows-msvc") ? "windows" : null;
   if (platform === null) throw new Error(`Unsupported target: ${triple}`);
-  return { platform, arch, bunTarget: `bun-${platform}-${arch === "x86_64" ? "x64" : arch}${triple.endsWith("-musl") ? "-musl" : ""}` };
+  const bunArch = arch === "x86_64" ? "x64" : "arm64";
+  return { platform, arch, bunTarget: `bun-${platform}-${bunArch}${triple.endsWith("-musl") ? "-musl" : ""}` };
 }
 
 export function bundleRoot(srcTauri: string, triple: string, cargoTargetDir?: string): string {
@@ -121,10 +133,7 @@ export function assertManifestAssets(manifest: Manifest, names: readonly string[
     const prefix = `${releaseUrl.replace(/\/$/, "")}/`;
     if (!entry.url.startsWith(prefix)) throw new Error(`Wrong release URL for ${platform}`);
     const name = decodeURIComponent(entry.url.slice(prefix.length));
-    const triple = platform === "darwin-aarch64" ? "aarch64-apple-darwin"
-      : platform === "darwin-x86_64" ? "x86_64-apple-darwin"
-      : platform === "windows-x86_64" ? "x86_64-pc-windows-msvc"
-      : platform === "linux-x86_64" ? "x86_64-unknown-linux-gnu" : null;
+    const triple = RELEASE_PLATFORM_TRIPLES[platform] ?? null;
     const suffix = platform.startsWith("darwin-") ? ".app.tar.gz" : platform.startsWith("windows-") ? ".exe" : ".AppImage";
     if (!triple || !name.startsWith(`${triple}--`) || !name.endsWith(suffix) || !names.includes(name) || !names.includes(`${name}.sig`)) {
       throw new Error(`Missing or mismatched release assets for ${platform}`);

@@ -125,7 +125,10 @@ const nextMessageId = (() => {
 
 const initial = (): Persisted => ({ model: undefined, includeContext: true, sessions: [] })
 
-export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
+export const createAiStore = (): AiStore => {
+  let disposeStore: (() => void) | undefined
+  const store = createRoot((disposeRoot) => {
+  disposeStore = disposeRoot
   const app = useApp()
   const persistedInitial = loadPersisted<Persisted>(initial())
   const [modelSig, setModelSig] = createSignal<ChatModel | undefined>(persistedInitial.model)
@@ -187,6 +190,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   let handle: StreamHandle | undefined
   let activeAssistantId: string | undefined
+  let conversationGeneration = 0
+  let turnGeneration = 0
+  let streamedUsage = { inputTokens: 0, outputTokens: 0 }
   const thinkingCounted = new Set<number>()
 
   const upsertSession = (id: string, title: string, startedAt: string, project?: string): void => {
@@ -227,11 +233,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const POLL_MS = 2_000
   const WAKE_ROUNDS = 25
   let disposed = false
-  let watching = false
+  let watchingGeneration: number | undefined
   const activeTask = (list: ReadonlyArray<AiTask>): boolean => list.some((t) => t.status === "queued" || t.status === "running")
   const watchTasks = async (initialBusy = false): Promise<void> => {
-    if (watching) return
-    watching = true
+    const generation = conversationGeneration
+    if (watchingGeneration === generation) return
+    watchingGeneration = generation
     const watchedSession = sessionId(), watchedProject = projectId()
     try {
       const delivered = new Set<string>()
@@ -241,7 +248,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       for (;;) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
         const sid = sessionId()
-        if (disposed || sid === undefined || sid !== watchedSession || projectId() !== watchedProject) return
+        if (disposed || generation !== conversationGeneration || sid === undefined || sid !== watchedSession || projectId() !== watchedProject) return
         let state: { readonly busy: boolean; readonly text: string; readonly error?: string; readonly tasks?: ReadonlyArray<AiTask> } | undefined
         try {
           state = await app.runtime.run(app.client.ai.sessionControl({ payload: { action: "status", sessionId: sid, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } })) as typeof state
@@ -249,7 +256,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
           if (++quiet >= 5) return
           continue
         }
-        if (sessionId() !== watchedSession || projectId() !== watchedProject) return
+        if (disposed || generation !== conversationGeneration || sessionId() !== watchedSession || projectId() !== watchedProject) return
         const controls = state as typeof state & { permissions?: ReadonlyArray<AiPermission>; questions?: ReadonlyArray<AiPendingQuestion>; context?: AiContextState }
         if (controls?.permissions) setPermissions(controls.permissions)
         if (controls?.questions) setQuestions(controls.questions)
@@ -284,12 +291,19 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
         if (owed.length === 0 || ++waiting >= WAKE_ROUNDS) return
       }
     } finally {
-      watching = false
+      if (watchingGeneration === generation) watchingGeneration = undefined
     }
   }
 
   const applyEvent = (event: AiEvent): void => {
     const idForEvent = activeAssistantId ?? `${event.sessionId}:assistant`
+    if (event.type === "turn" || event.type === "session_status" || event.type === "permission_resolved" || event.type === "permission_blocked" || event.type === "tool_diagnostic" || event.type === "compaction" || event.type === "context_snapshot") {
+      if (event.type === "permission_resolved") setPermissions((current) => current.filter((item) => item.requestId !== event.requestId))
+      if (event.type === "compaction" && event.phase === "finish") setActivity((current) => ({ ...current, compacted: true }))
+      // Native idle/finish events can precede host recovery or continuation; the transport owns turn completion.
+      patchMessage(idForEvent, (previous) => ({ ...previous, events: [...previous.events, event] }))
+      return
+    }
     if (event.type === "reasoning") {
       const id = idForEvent
       if (!messages().some((m) => m.id === id)) appendMessage({ id, role: "assistant", text: "", createdAt: new Date().toISOString(), events: [event], status: "streaming", thinking: event.text })
@@ -324,7 +338,12 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
     if (event.type === "step") {
       if (event.phase === "start") { setActivity((a) => ({ ...a, step: event.index, preparing: undefined })) }
-      else if (event.usage) { setContextTokens(contextTokensOf(event.usage)); setStats((s) => ({ ...s, totalInputTokens: s.totalInputTokens + event.usage!.inputTokens, totalOutputTokens: s.totalOutputTokens + event.usage!.outputTokens })) }
+      else if (event.usage) {
+        const usage = event.usage
+        streamedUsage = { inputTokens: streamedUsage.inputTokens + usage.inputTokens, outputTokens: streamedUsage.outputTokens + usage.outputTokens }
+        setContextTokens(contextTokensOf(usage))
+        setStats((s) => ({ ...s, totalInputTokens: s.totalInputTokens + usage.inputTokens, totalOutputTokens: s.totalOutputTokens + usage.outputTokens }))
+      }
       return
     }
     if (event.type === "todo") { setPlan(event.todos); return }
@@ -359,7 +378,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       // The CAD tools ran in the sidecar: show their result in the editor the user has open.
       try { mirrorToolResult(event.tool, event.ok, event.output) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
       // Whatever the tool answered, the stored drawing is the truth: bring the editor in line with it.
-      if (event.ok && event.tool.includes("cad_")) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+      if (event.ok && (event.tool.includes("cad_") || event.tool.endsWith("cam_stock"))) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
       if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output)
       if (event.tool === "agent_task" || event.tool === "agent_tasks" || event.tool === "agent_task_read" || event.tool === "agent_task_cancel") noteTasks(event.output)
       const id = idForEvent
@@ -373,7 +392,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     }
     if (event.type === "permission_request") {
       const permission: AiPermission = { requestId: event.requestId, permission: event.permission, patterns: event.patterns, sessionId: event.sessionId }
-      setPermissions((current) => [...current, permission])
+      setPermissions((current) => [...current.filter((item) => item.requestId !== permission.requestId), permission])
       const id = idForEvent
       patchMessage(id, (prev) => ({ ...prev, events: [...prev.events, event] }))
       return
@@ -393,8 +412,8 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       setStats((s) => ({
         ...s,
         exchanges: s.exchanges + 1,
-        totalInputTokens: s.totalInputTokens + (event.usage?.inputTokens ?? 0),
-        totalOutputTokens: s.totalOutputTokens + (event.usage?.outputTokens ?? 0)
+        totalInputTokens: s.totalInputTokens + Math.max(0, (event.usage?.inputTokens ?? 0) - streamedUsage.inputTokens),
+        totalOutputTokens: s.totalOutputTokens + Math.max(0, (event.usage?.outputTokens ?? 0) - streamedUsage.outputTokens)
       }))
       touchSession(event.sessionId, new Date().toISOString(), 1)
       saveTranscript()
@@ -457,13 +476,15 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const enqueue = async (text: string, delivery: PendingDelivery): Promise<void> => {
     const sid = sessionId()
     if (sid === undefined) return
+    const generation = conversationGeneration, project = projectId()
+    const current = () => !disposed && generation === conversationGeneration && sessionId() === sid && projectId() === project
     const item: AiPending = { id: nextMessageId(), text, delivery }
     setPending((current) => [...current, item])
     // The turn may still be connecting: the host has no turn to add the message to until it streams.
-    for (let waited = 0; status() === "connecting" && waited < 100; waited += 1) await new Promise((resolve) => setTimeout(resolve, 100))
+    for (let waited = 0; current() && status() === "connecting" && waited < 100; waited += 1) await new Promise((resolve) => setTimeout(resolve, 100))
     let lastFailure: unknown
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      if (!pending().some((p) => p.id === item.id)) return
+      if (!current() || !pending().some((p) => p.id === item.id)) return
       try {
         await app.runtime.run(app.client.ai.chatQueue({ payload: { sessionId: sid, message: text, delivery, ...(projectId() !== undefined ? { projectId: projectId()! } : {}) } }))
         return
@@ -473,6 +494,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
         await new Promise((resolve) => setTimeout(resolve, 400))
       }
     }
+    if (!current() || !pending().some((p) => p.id === item.id)) return
     // The host could not take it (the turn is over): it is an ordinary message.
     setPending((current) => current.filter((p) => p.id !== item.id))
     console.error("Could not queue the message", lastFailure)
@@ -490,6 +512,8 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       return
     }
     const sid = sessionId() ?? newSessionId()
+    const generation = ++turnGeneration
+    streamedUsage = { inputTokens: 0, outputTokens: 0 }
     const at = new Date().toISOString()
     if (!sessionId()) {
       setSessionId(sid)
@@ -512,6 +536,7 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     let activeProjectId = projectId()
     try {
       const workspace = await prepareWorkspace(app)
+      if (disposed || generation !== turnGeneration || sessionId() !== sid) return
       activeProjectId = workspace.projectId
       if (includeContext()) {
         await persistDrawingContext(app, workspace.projectId)
@@ -520,16 +545,20 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     } catch (cause) {
       console.error("Could not prepare the workspace for the assistant", cause)
     }
+    if (disposed || generation !== turnGeneration || sessionId() !== sid) return
     const m = modelSig()
     handle = streamChat({
       client: app.client,
       runtime: app.runtime,
-      onEvent: applyEvent,
+      onEvent: (event) => { if (!disposed && generation === turnGeneration) applyEvent(event) },
       onError: (message) => {
+        if (disposed || generation !== turnGeneration) return
+        patchMessage(activeAssistantId ?? assistantId, (prev) => ({ ...prev, status: "error", error: message, finishedAt: new Date().toISOString() }))
         setError(message)
         setStatus("error")
+        saveTranscript()
       },
-      onDone: () => finishStream(status() === "error" ? "error" : "idle")
+      onDone: () => { if (!disposed && generation === turnGeneration) finishStream(error() !== undefined ? "error" : "idle") }
     }, {
       message: text,
       sessionId: sid,
@@ -544,56 +573,44 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
   const abort: AiStore["abort"] = () => {
     const sid = sessionId()
     if (sid === undefined) return
+    turnGeneration += 1
     handle?.abort()
     handle = undefined
     setPending([])
+    setPermissions([])
+    setQuestions([])
     // The answer that was being written ends here, marked as stopped.
     if (activeAssistantId !== undefined) patchMessage(activeAssistantId, (prev) => prev.status === "streaming" ? { ...prev, status: "done", interrupted: true, finishedAt: new Date().toISOString() } : prev)
+    saveTranscript()
     app.runtime.runVoid(app.client.ai.chatAbort({ payload: { sessionId: sid } }))
     setStatus("idle")
   }
 
   const clear: AiStore["clear"] = () => {
-    if (status() === "streaming") abort()
-    batch(() => {
-      setMessages([])
-      setToolCalls({})
-      setPermissions([])
-      setStats(emptyStats())
-      setContextTokens(0)
-      setError(undefined)
-      setPlan([])
-      setGoal(undefined)
-      setTasks([])
-      setPending([])
-      setActivity({ step: 0, compacted: false })
-    })
+    if (status() === "streaming" || status() === "connecting") abort()
+    resetConversation()
     saveTranscript()
   }
 
   const newSession: AiStore["newSession"] = () => {
-    if (status() === "streaming") abort()
-    batch(() => {
-      setSessionId(undefined)
-      setMessages([])
-      setToolCalls({})
-      setPermissions([])
-      setStats(emptyStats())
-      setContextTokens(0)
-      setError(undefined)
-      setPlan([])
-      setGoal(undefined)
-      setTasks([])
-      setPending([])
-      setActivity({ step: 0, compacted: false })
-    })
+    if (status() === "streaming" || status() === "connecting") abort()
+    resetConversation()
+    setSessionId(undefined)
   }
 
   const resetConversation = (): void => {
+    conversationGeneration += 1
+    turnGeneration += 1
+    activeAssistantId = undefined
     batch(() => {
       setMessages([])
       setToolCalls({})
       setPermissions([])
+      setQuestions([])
+      setHostContext(undefined)
+      setControlBusy(false)
+      setControlError(undefined)
+      setStatus("idle")
       setStats(emptyStats())
       setContextTokens(0)
       setError(undefined)
@@ -638,21 +655,23 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
 
   const replyPermission: AiStore["replyPermission"] = async (requestId, decision) => {
     const permission = permissions().find((item) => item.requestId === requestId)
+    const generation = conversationGeneration
     if (!permission) return
     await app.runtime.run(app.client.ai.permissionReply({
       payload: { sessionId: permission.sessionId, requestId, decision, ...(projectId() ? { projectId: projectId()! } : {}) }
     }))
-    setPermissions((current) => current.filter((item) => item.requestId !== requestId))
+    if (!disposed && generation === conversationGeneration) setPermissions((current) => current.filter((item) => item.requestId !== requestId))
   }
 
   type ControlAction = "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "consolidate_memory"
   const control = async (action: ControlAction, fields: { taskId?: string; requestId?: string; answers?: ReadonlyArray<ReadonlyArray<string>> } = {}): Promise<void> => {
-    const sid = sessionId(), project = projectId()
+    const sid = sessionId(), project = projectId(), generation = conversationGeneration
+    const current = () => !disposed && generation === conversationGeneration && sessionId() === sid && projectId() === project
     if (!sid || action !== "status" && controlBusy()) return
     if (action !== "status") { setControlBusy(true); setControlError(undefined) }
     try {
       const state = await app.runtime.run(app.client.ai.sessionControl({ payload: { sessionId: sid, ...(project ? { projectId: project } : {}), action, ...fields, ...(model() ? { model: model()! } : {}) } }))
-      if (disposed || sessionId() !== sid || projectId() !== project) return
+      if (!current()) return
       batch(() => {
         if (state.permissions) setPermissions(state.permissions)
         setQuestions(state.questions); setTasks(state.tasks); setHostContext(state.context)
@@ -661,8 +680,8 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
       })
       if (state.busy && status() !== "streaming" && status() !== "connecting" || activeTask(state.tasks)) void watchTasks(state.busy)
     } catch (cause) {
-      if (action !== "status" && sessionId() === sid) setControlError(cause instanceof Error ? cause.message : String(cause))
-    } finally { if (action !== "status") setControlBusy(false) }
+      if (action !== "status" && current()) setControlError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (action !== "status" && current()) setControlBusy(false) }
   }
   const refreshControls = () => control("status")
   const consolidateMemory = () => control("consolidate_memory")
@@ -675,9 +694,9 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     const sid = sessionId()
     projectId()
     const generation = ++controlsGeneration
-    setQuestions([]); setHostContext(undefined); setControlError(undefined)
+    setQuestions([]); setPermissions([]); setHostContext(undefined); setControlError(undefined); setControlBusy(false)
     if (sid) untrack(() => void refreshControls())
-    void app.runtime.run(app.client.ai.agents()).then((list) => { if (generation === controlsGeneration) setAgents(list) }).catch(() => undefined)
+    void app.runtime.run(app.client.ai.agents()).then((list) => { if (!disposed && generation === controlsGeneration) setAgents(list) }).catch(() => undefined)
   })
 
   const suggestions = createMemo<ReadonlyArray<Suggestion>>(() => {
@@ -706,7 +725,6 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     stopVisionBridge()
     handle?.abort()
     handle = undefined
-    disposeRoot()
   })
 
   return {
@@ -715,7 +733,10 @@ export const createAiStore = (): AiStore => createRoot((disposeRoot) => {
     projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission,
     permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, questions, hostContext, controlBusy, controlError, refreshControls, compact, consolidateMemory, cancelTask, replyQuestion
   }
-})
+  })
+  onCleanup(() => disposeStore?.())
+  return store
+}
 
 /** Memoised status pill text for the shell. */
 export const statusLabel = (status: "idle" | "connecting" | "streaming" | "error", error: string | undefined): string => {

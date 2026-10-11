@@ -37,7 +37,7 @@ packages/
 apps/
   sidecar/             @cadcamfun/sidecar Bun Effect server (HttpApi handlers, services, wiring)
   desktop/             @cadcamfun/desktop Vite + React UI and src-tauri/ (Rust shell)
-  mobile/              @cadcamfun/mobile  iOS companion (Tauri v2 + Solid), thin client of a paired desktop
+  mobile/              @cadcamfun/mobile  iOS companion (React Native + Expo Router), thin client of a paired desktop
 ```
 
 Dependency direction (no cycles): `core` ← `api` ← `sidecar`; `db` ← `sidecar`; `ai`, `plugin-sdk` ← `sidecar`; `api` (types only) ← `desktop`. `core` and `api` must not import `db`.
@@ -61,7 +61,7 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 | WP10 | Updates, sync, packaging, CI | `.github/workflows`, `scripts/`, `apps/desktop/src-tauri` (updater only) | `10-release-sync.md` | WP5 | **done** (pipeline + CI + updater; release secrets unset) |
 | WP11 | Git-style history + GitHub mirror | `packages/vcs` (+ `GitRepo/GitObject/GitRef/PullRequest*` tables, sidecar `vcs` services) | `13-vcs-actions-mobile.md` | WP0, WP4 | **done** core + sidecar + API; desktop panels and GitHub routes pending |
 | WP12 | Workflows (Actions-style) | `packages/workflow` | `13-vcs-actions-mobile.md` | WP11 | **done** engine + runner; only `project/*` steps registered |
-| WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **builds and launches in the iOS simulator** (macOS CI) — companion gateway + desktop pairing screen + pinned Rust client + iOS shell; device run, signing and TestFlight pending |
+| WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **Expo migration integrated** — gateway + pairing + pinned local native module + assistant/resources; 48 tests, typecheck and JS export pass; current native Release/device validation in progress; TestFlight pending |
 
 ### Parallelisation map
 

@@ -3,7 +3,8 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, agentSystemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape
+  searchWeb, makeNikCliRuntime, agentSystemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  LIBRARY_TOOL_IDS
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted, Schema } from "effect"
@@ -47,6 +48,32 @@ const elementBounds = (element: Record<string, unknown>, all?: ReadonlyArray<Ele
     const b = cam.generator.elementBounds(element as never)
     return Number.isFinite(b.min.x) && Number.isFinite(b.max.z) ? { min: b.min, max: b.max } : undefined
   } catch { return undefined }
+}
+
+/**
+ * Where a case-insensitive substring occurs in one element: its id, type, name, layer and scalar property values,
+ * children included. The walk is bounded (depth, matches, value length) so searching a big model stays cheap, and the
+ * large geometry arrays (`vertices`, `faces`) are skipped because they are not searchable evidence.
+ */
+const searchElement = (element: Element, needle: string): Array<{ path: string; value: string }> => {
+  const found: Array<{ path: string; value: string }> = []
+  const walk = (value: unknown, path: string, depth: number): void => {
+    if (found.length >= 20 || depth > 6 || value === null || value === undefined) return
+    if (typeof value === "object") {
+      const entries: ReadonlyArray<readonly [string, unknown]> = Array.isArray(value)
+        ? value.map((child, index) => [String(index), child] as const)
+        : Object.entries(value as Record<string, unknown>)
+      for (const [key, child] of entries) {
+        if (key === "elements" || key === "vertices" || key === "faces") continue
+        walk(child, path === "" ? key : `${path}/${key}`, depth + 1)
+      }
+      return
+    }
+    const text = String(value)
+    if (text.toLowerCase().includes(needle)) found.push({ path, value: text.slice(0, 120) })
+  }
+  walk({ ...element }, "", 0)
+  return found
 }
 
 /** The tool handlers the model can call, over the active project's newest drawing and the libraries. */
@@ -122,16 +149,53 @@ const toolHandlers = Effect.gen(function*() {
     stock: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId)
+      /** The raw piece as the CAD scene draws it, when the drawing holds one. */
+      const workpieceOf = (elements: ReadonlyArray<Element>, id?: string) => {
+        const own = elements.filter((e) => e["type"] === "workpiece")
+        return id === undefined ? own[0] : own.find((e) => e.id === id) ?? own[0]
+      }
+      const workpieceView = (element: Element | undefined) => element === undefined ? null : {
+        id: element.id, name: typeof element["name"] === "string" ? element.name : null,
+        width: element["width"], height: element["height"], depth: element["depth"], x: element["x"], y: element["y"], z: element["z"]
+      }
       if (input.action === "inspect") {
         const stock = loaded.data["stock"]
-        if (stock === undefined) return { ok: false, error: "No explicit stock configured. Set stock before quantitative removal verification.", ...where(loaded) }
+        const workpiece = workpieceView(workpieceOf(loaded.elements, typeof (stock as { elementId?: unknown } | undefined)?.elementId === "string" ? String((stock as { elementId: string }).elementId) : undefined))
+        if (stock === undefined) return { ok: false, error: "No explicit stock configured. Set stock before quantitative removal verification.", workpiece, ...where(loaded) }
         const decoded = Schema.decodeUnknownSync(cam.generator.StockSchema)(stock)
-        return { ok: true, stock: decoded, volumeMm3: decoded.width * decoded.height * decoded.depth, coordinateFrame: "CAD drawing coordinates; XY centre, Z top face", ...where(loaded) }
+        const matches = workpiece !== null && workpiece.width === decoded.width && workpiece.height === decoded.height && workpiece.depth === decoded.depth && workpiece.x === decoded.x && workpiece.y === decoded.y && workpiece.z === decoded.topZ - decoded.depth / 2
+        return { ok: true, stock: decoded, volumeMm3: decoded.width * decoded.height * decoded.depth, coordinateFrame: "CAD drawing coordinates; XY centre, Z top face", workpiece, workpieceMatchesStock: matches, ...where(loaded) }
       }
       const stock = Schema.decodeUnknownSync(cam.generator.StockSchema)(input.stock)
-      if (stock.elementId && !loaded.elements.some((e) => e.id === stock.elementId)) return { ok: false, error: "Stock reference element does not exist in the active drawing." }
+      const referenced = stock.elementId === undefined ? undefined : loaded.elements.find((e) => e.id === stock.elementId)
+      if (stock.elementId !== undefined && referenced === undefined) return { ok: false, error: "Stock reference element does not exist in the active drawing." }
       const invalidated = await Effect.runPromise(drawings.configureStock(loaded.id, stock))
-      return { ok: true, action: "set", stock, volumeMm3: stock.width * stock.height * stock.depth, invalidatedOperations: invalidated, note: "Stock changed. Generate and verify affected operations again.", ...where(loaded) }
+      // One stock with two faces: the drawing's `stock` is what CAM reads, and the `workpiece` element is what the
+      // CAD scene draws, so the raw piece is visible now, survives reopening the project and travels with its history.
+      // A stock named after a real part element keeps that element as its source and adds nothing to the scene.
+      const fromElement = referenced !== undefined && referenced["type"] !== "workpiece"
+      let elements = loaded.elements
+      let workpieceId: string | undefined
+      if (!fromElement) {
+        const existing = workpieceOf(loaded.elements, stock.elementId)
+        workpieceId = existing?.id ?? crypto.randomUUID()
+        const workpiece: Element = {
+          ...(existing ?? { layerId: "default", color: "#3080FF", wireframe: false }), id: workpieceId, type: "workpiece",
+          name: existing?.["name"] ?? "Stock", layerId: existing?.layerId ?? "default",
+          width: stock.width, height: stock.height, depth: stock.depth, x: stock.x, y: stock.y, z: stock.topZ - stock.depth / 2
+        }
+        elements = existing === undefined ? [...loaded.elements, workpiece] : loaded.elements.map((e) => (e.id === workpieceId ? workpiece : e))
+        // `configureStock` already stored the drawing's stock; both lands in the same document in one write.
+        await save(loaded.id, { ...loaded.data, stock: { ...stock, elementId: workpieceId } }, elements)
+      }
+      const stored = fromElement ? stock : { ...stock, elementId: workpieceId }
+      return {
+        ok: true, action: "set", stock: stored, volumeMm3: stock.width * stock.height * stock.depth,
+        workpiece: workpieceView(fromElement ? undefined : elements.find((e) => e.id === workpieceId)),
+        invalidatedOperations: invalidated,
+        note: `${fromElement ? "The stock is derived from the referenced element." : "The workpiece element is the raw piece drawn in the CAD scene: never machine it, and it is not part geometry."} Stock changed. Generate and verify affected operations again.${stock.radius > 0 ? " A radius marks a cylindrical stock; the CAD scene draws the workpiece element as a box." : ""}`,
+        ...where(loaded)
+      }
     },
     cadInspect: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
@@ -144,6 +208,20 @@ const toolHandlers = Effect.gen(function*() {
       if (input.action === "property") {
         const element = loaded.elements.find((e) => e.id === input.elementId)
         return element ? { ...readProperty(element, input.path, input.offset, input.maxChars), ...where(loaded) } : { ok: false, error: "Element not found in the active drawing." }
+      }
+      if (input.action === "search") {
+        const needle = input.query.trim().toLowerCase()
+        const hits = loaded.elements
+          .filter((e) => input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId)
+          .map((e) => ({ element: e, foundIn: searchElement(e, needle) }))
+          .filter((hit) => hit.foundIn.length > 0)
+        const page = hits.slice(0, input.limit)
+        return {
+          ok: true, query: input.query, total: hits.length, returned: page.length, complete: hits.length <= page.length,
+          elements: page.map(({ element, foundIn }) => ({ id: element.id, type: element.type, name: typeof element["name"] === "string" ? element.name : null, layerId: element.layerId, foundIn })),
+          note: hits.length > page.length ? `Limit reached: narrow the query or filter by layerId to find the rest.` : undefined,
+          ...where(loaded)
+        }
       }
       const matched = loaded.elements.filter((e) => (input.ids === undefined || input.ids.includes(e.id)) && (input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId))
       const page = matched.slice(input.offset, input.offset + input.limit)
@@ -413,10 +491,43 @@ const toolHandlers = Effect.gen(function*() {
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
     lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
     lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, notes: t.notes })),
-    listComponents: async (projectId, _scope) => {
+    lookupComponent: async (query) => {
+      const needle = query.trim().toLowerCase()
+      const rows = await Effect.runPromise(components.listVisible(acting().id))
+      return rows
+        .filter((c) => needle === "" || c.name.toLowerCase().includes(needle) || (c.description ?? "").toLowerCase().includes(needle) || c.project.name.toLowerCase().includes(needle))
+        .slice(0, 20)
+        .map((c) => ({ id: c.id, name: c.name, description: c.description, type: c.type, projectId: c.projectId, projectName: c.project.name, isPublic: c.isPublic, updatedAt: c.updatedAt }))
+    },
+    lookupMachineConfig: async (query) => (await Effect.runPromise(machines.list(acting().id, { ...(query === "" ? {} : { search: query }), includePublic: true, page: 1, limit: 10 }))).rows.slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, type: m.type, config: m.config, isPublic: m.isPublic, isOwner: m.isOwner, usageCount: m.usageCount, updatedAt: m.updatedAt })),
+    deleteLibrary: async (input) => {
+      const { kind, id } = input
+      if (kind === "material" || kind === "tool") {
+        // Same rule as the library HTTP routes: visible to the acting user, and writable (owner or organisation write access).
+        const found = kind === "material" ? await Effect.runPromise(materials.find(acting().id, id)) : await Effect.runPromise(tools.find(acting().id, id))
+        if (!found) return { ok: false, error: `Unknown ${kind} id: ${id}.` }
+        if (!found.canWrite) return { ok: false, error: `The acting user may not delete this ${kind}.` }
+        await Effect.runPromise(kind === "material" ? materials.remove(id) : tools.remove(id))
+        return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify_toolpath." }
+      }
+      const found = await Effect.runPromise(machines.find(acting().id, id))
+      if (!found) return { ok: false, error: `Unknown machine config id: ${id}.` }
+      if (!found.permission.isOwner) return { ok: false, error: "Only the owner may delete this machine config." }
+      if (found.usageCount > 0) return { ok: false, error: `This machine config is still used by ${found.usageCount} toolpath(s); reassign or delete them first.` }
+      await Effect.runPromise(machines.remove(id))
+      return { ok: true, kind, id }
+    },
+    listComponents: async (projectId) => {
       const loaded = await load(projectId)
-      const rows = await Effect.runPromise(components.listByProject(loaded.projectId))
-      return rows.map((c) => ({ id: c.id, name: c.name, type: c.type, updatedAt: c.updatedAt }))
+      return loaded.elements
+        .filter((element) => element.type === "component")
+        .map((element) => ({
+          id: element.id,
+          name: typeof element["name"] === "string" ? element["name"] : null,
+          layerId: element.layerId,
+          children: Array.isArray(element["elements"]) ? element["elements"].length : 0,
+          bounds: elementBounds(element, loaded.elements) ?? null
+        }))
     },
     saveComponent: async (projectId, ids, name) => {
       const loaded = await load(projectId)
@@ -555,11 +666,12 @@ const libraryToolSpecs = (handlers: ToolHandlersShape): ReadonlyArray<HostToolSp
   const run = <A>(self: Promise<A>): Promise<string> => self.then((value) => JSON.stringify(value)).catch((e) => JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }))
   const point3 = z.object({ x: z.number(), y: z.number(), z: z.number() })
   const transform = z.object({ move: point3.optional(), rotate: z.object({ axis: z.enum(["x", "y", "z"]), degrees: z.number(), about: point3.optional() }).optional(), scale: z.object({ factor: z.number(), about: point3.optional() }).optional() }).optional()
-  return [
-    { id: "cad_component_list", description: "List reusable components of this project (id, name, type). Read-only. Use before cad_component_insert to get a real componentId.", parameters: z.object({ scope: z.enum(["project", "library"]).default("project") }), execute: async (input, ctx) => run(handlers.listComponents(ctx.projectId, (input as { scope: "project" | "library" }).scope)) },
+  const specs: ReadonlyArray<HostToolSpec> = [
+    { id: "cad_component_list", description: "List component instances currently present in the active CAD canvas, including their element ids, layer, child count and bounds. Read-only; these are canvas element ids, not saved-library ids.", parameters: z.object({}), execute: async (_input, ctx) => run(handlers.listComponents(ctx.projectId)) },
     { id: "cad_component_save", description: "Gather elements by id into a named, reusable component of this project. Children are stored relative to the group's origin.", parameters: z.object({ ids: z.array(z.string()).min(1), name: z.string().min(1) }), execute: async (input, ctx) => { const i = input as { ids: string[]; name: string }; return run(handlers.saveComponent(ctx.projectId, i.ids, i.name)) } },
     { id: "cad_component_insert", description: "Insert a stored component into the active drawing by id, with an optional transform (move/rotate/scale). Returns the new element ids.", parameters: z.object({ componentId: z.string().min(1), transform }), execute: async (input, ctx) => { const i = input as { componentId: string; transform?: cad.ElementTransform }; return run(handlers.insertComponent(ctx.projectId, i.componentId, i.transform)) } },
     { id: "cad_component_delete", description: "Delete a reusable component by id. Destructive; require confirm: true.", parameters: z.object({ componentId: z.string().min(1), confirm: z.literal(true) }), execute: async (input) => run(handlers.deleteComponent((input as { componentId: string }).componentId)) },
+    { id: "lib_lookup_component", description: "Search saved reusable components across every accessible user/organisation project plus public components. Returns saved component ids for cad_component_insert; an empty query lists the newest visible entries.", parameters: z.object({ query: z.string().default("") }), execute: async (input) => run(handlers.lookupComponent((input as { query: string }).query)) },
     { id: "lib_upsert_material", description: "Create or replace a Material row (properties: name, numbers, strings). Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), description: z.string().optional(), properties: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMaterial(input as Record<string, unknown>)) },
     { id: "lib_upsert_tool", description: "Create or replace a Tool row: name, type, diameter (mm), material. Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), type: z.string(), diameter: z.number().positive(), material: z.string(), numberOfFlutes: z.number().int().positive().optional(), maxRPM: z.number().int().positive().optional(), coolantType: z.string().optional(), cuttingLength: z.number().positive().optional(), totalLength: z.number().positive().optional(), shankDiameter: z.number().positive().optional(), notes: z.string().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertTool(input as Record<string, unknown>)) },
     { id: "lib_upsert_machine_config", description: "Create or replace a MachineConfig row: name, kind (mill/lathe/3Dprinter), kinematics, postProcessor, workOffsets. Destructive replace when id names an existing row.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), kind: z.enum(["mill", "lathe", "3Dprinter"]), kinematics: z.record(z.string(), z.object({ min: z.number(), max: z.number() })).default({}), postProcessor: z.string(), workOffsets: z.array(z.string()).default(["G54", "G55", "G56", "G57", "G58", "G59"]), probing: z.record(z.string(), z.unknown()).optional(), maxRPM: z.number().int().positive().optional(), maxFeed: z.number().positive().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMachineConfig(input as Record<string, unknown>)) },
@@ -567,6 +679,9 @@ const libraryToolSpecs = (handlers: ToolHandlersShape): ReadonlyArray<HostToolSp
     { id: "cam_operations_suggest_chain", description: "Given the current operations and the chosen one, recommend the next operation as JSON suitable for cam_create_operation. Read-only.", parameters: z.object({ fromOperationId: z.string().optional(), materialHint: z.string().optional(), toolHint: z.string().optional() }), execute: async (input, ctx) => { const i = input as { fromOperationId?: string; materialHint?: string; toolHint?: string }; return run(handlers.suggestChain({ ...i, projectId: ctx.projectId })) } },
     { id: "cam_chain_status", description: "Read one operation's chain state: previous operation, rest-tool reference, whether G-code is generated, and warnings (OrphanRef). Read-only.", parameters: z.object({ operationId: z.string().min(1) }), execute: async (input, ctx) => run(handlers.chainStatus({ projectId: ctx.projectId, operationId: (input as { operationId: string }).operationId })) }
   ]
+  // One drift guard: an id a specialist (or a prompt) names must be one the host actually registers.
+  for (const spec of specs) if (!LIBRARY_TOOL_IDS.includes(spec.id as (typeof LIBRARY_TOOL_IDS)[number])) throw new Error(`Unregistered library tool id: ${spec.id}`)
+  return specs
 }
 
 /** The embedded nikcli host (the primary path); skipped with `CADCAMFUN_AI_HOST=direct`. */

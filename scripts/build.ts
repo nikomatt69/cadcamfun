@@ -56,6 +56,7 @@ const STEP_ALIASES: Readonly<Record<string, StepName>> = {
   migrations: "resources",
   bundle: "bundle",
   bundling: "bundle",
+  artifacts: "artifacts",
   artefacts: "artifacts",
   artifact: "artifacts",
   notes: "artifacts",
@@ -69,6 +70,7 @@ interface Options {
   steps: readonly StepName[];
   skipTests: boolean;
   skipInstall: boolean;
+  updaterArtifacts: boolean;
   dryRun: boolean;
   target?: string;
   bundles?: string;
@@ -90,6 +92,7 @@ let target: string | undefined;
 let bundles: string | undefined;
 let outDir = DEFAULT_OUT_DIR;
 let skipTests = false;
+let updaterArtifacts = true;
 
 function say(message: string): void {
   process.stdout.write(`${message}\n`);
@@ -173,7 +176,9 @@ async function requirePath(path: string, what: string): Promise<void> {
 
 async function stepInstall(): Promise<void> {
   announce(1, "install workspace dependencies");
-  await run(["bun", "install", "--frozen-lockfile"]);
+  // Match nikcli's cross-platform builder: keep every optional native dependency available so an
+  // Apple Silicon runner can compile the Intel sidecar and each native runner gets its FFI binary.
+  await run(["bun", "install", "--frozen-lockfile", "--os=*", "--cpu=*"]);
 }
 
 async function stepCheck(): Promise<void> {
@@ -211,7 +216,7 @@ async function resolveTarget(): Promise<string> {
   return triple;
 }
 
-/** `bun build --compile` target names, e.g. `bun-darwin-aarch64`, `bun-windows-x64`. */
+/** `bun build --compile` target names, e.g. `bun-darwin-arm64`, `bun-windows-x64`. */
 
 function sidecarOutfile(triple: string): string {
   const extension = triple.includes("windows") ? ".exe" : "";
@@ -314,18 +319,21 @@ async function stepBundle(): Promise<void> {
   const triple = await resolveTarget();
   const config = JSON.parse(await readFile(join(SRC_TAURI, "tauri.conf.json"), "utf8"));
   // Only the bundler receives local signing credentials; checks and sidecar builds do not.
-  const signingEnv = dryRun ? childEnv() : signingEnvironment(ROOT, process.env, config.plugins?.updater?.pubkey);
-  if (!dryRun) assertSigningConfig(config, signingEnv, targetInfo(triple).platform, process.env.CADCAM_RELEASE === "1");
+  const signingEnv = dryRun || !updaterArtifacts ? childEnv() : signingEnvironment(ROOT, process.env, config.plugins?.updater?.pubkey);
+  if (!dryRun && updaterArtifacts) assertSigningConfig(config, signingEnv, targetInfo(triple).platform, process.env.CADCAM_RELEASE === "1");
   announce(5, "build the desktop frontend and bundle the app");
   await run(["bun", "run", "--filter", "@cadcamfun/desktop", "build"]);
-  // `tauri build` also runs `beforeBuildCommand` from tauri.conf.json, which
-  // re-runs the same Vite build from apps/desktop; `--ci` keeps it non-interactive.
+  // Match nikcli's release scripts: prepare the frontend once above, then prevent Tauri from
+  // invoking beforeBuildCommand again. This also avoids Windows resolving a workspace bin shim.
   const thumbprint = process.env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT;
   if (!dryRun && process.env.CADCAM_RELEASE === "1" && targetInfo(triple).platform === "windows" && !thumbprint) throw new BuildError("Imported Windows signing certificate is required");
-  const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({ bundle: {
-    createUpdaterArtifacts: true,
-    ...(thumbprint && targetInfo(triple).platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
-  } })];
+  const tauri = ["bunx", "tauri", "build", "--ci", "--target", triple, "--config", JSON.stringify({
+    build: { beforeBuildCommand: "" },
+    bundle: {
+      createUpdaterArtifacts: updaterArtifacts,
+      ...(thumbprint && targetInfo(triple).platform === "windows" ? { windows: { certificateThumbprint: thumbprint, digestAlgorithm: "sha256", timestampUrl: "http://timestamp.digicert.com" } } : {}),
+    },
+  })];
   if (bundles !== undefined) tauri.push("--bundles", bundles);
   await run(tauri, { cwd: DESKTOP, env: signingEnv });
 }
@@ -575,6 +583,7 @@ Options:
   --skip-tests        step 2 runs the typecheck only
   --target=<triple>   Rust target triple (default: the host triple from \`rustc -vV\`)
   --bundles=<list>    forwarded to \`tauri build --bundles\` (e.g. deb,rpm,appimage)
+  --no-updater        build installers without updater archives/signatures
   --out-dir=<path>    where step 6 writes SHA256SUMS and RELEASE_NOTES.md
                       (default: apps/desktop/src-tauri/target/release-artifacts)
   --dry-run           print the plan, write nothing, change nothing
@@ -612,6 +621,7 @@ function parseOptions(argv: readonly string[]): Options {
   let skipTests = false;
   let help = false;
   let dryRun = false;
+  let updaterArtifacts = true;
   let targetTriple: string | undefined;
   let bundleList: string | undefined;
   let out = DEFAULT_OUT_DIR;
@@ -619,6 +629,7 @@ function parseOptions(argv: readonly string[]): Options {
   for (const arg of argv) {
     if (arg === "-h" || arg === "--help") help = true;
     else if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--no-updater") updaterArtifacts = false;
     else if (arg === "--skip-tests") skipTests = true;
     else if (arg === "--skip-install") skip.add("install");
     else if (arg.startsWith("--only=")) only = parseStepList(arg.slice("--only=".length), "--only");
@@ -639,6 +650,7 @@ function parseOptions(argv: readonly string[]): Options {
     steps: STEP_NAMES.filter((step) => selected.includes(step)),
     skipTests,
     skipInstall: skip.has("install"),
+    updaterArtifacts,
     dryRun,
     target: targetTriple,
     bundles: bundleList,
@@ -658,6 +670,7 @@ async function main(): Promise<void> {
   bundles = options.bundles;
   outDir = options.outDir;
   skipTests = options.skipTests;
+  updaterArtifacts = options.updaterArtifacts;
 
   say("CADCAM FUN build pipeline");
   say(`   repo   ${ROOT}`);
@@ -666,6 +679,7 @@ async function main(): Promise<void> {
   if (options.dryRun) say("   mode   dry-run: nothing is installed, built or written");
   if (options.skipInstall) say("   flags  --skip-install");
   if (options.skipTests) say("   flags  --skip-tests");
+  if (!options.updaterArtifacts) say("   flags  --no-updater");
   if (options.target !== undefined) say(`   target ${options.target}`);
   if (options.bundles !== undefined) say(`   bundles ${options.bundles}`);
   say(`   out    ${rel(outDir)}`);

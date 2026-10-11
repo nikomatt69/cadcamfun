@@ -1,5 +1,40 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "jsx": "preserve", "jsxImportSource": "solid-js", "types": ["bun", "vite/client"] },
-  "include": ["src", "test", "vite.config.ts"]
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": [
+      "bun"
+    ],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@cadcamfun/api": [
+        "../../packages/api/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "app",
+    "components",
+    "lib",
+    "modules",
+    "test",
+    "nativewind-env.d.ts",
+    "css.d.ts",
+    "metro.config.js",
+    "babel.config.js",
+    "tailwind.config.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".expo"
+  ]
 }

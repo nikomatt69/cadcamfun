@@ -7,10 +7,13 @@ const manifest = (key = "darwin-aarch64") => ({ version: "6.0.0", pub_date: date
 
 describe("release targets and flat assets", () => {
   test.each([
-    ["aarch64-apple-darwin", "bun-darwin-aarch64"],
+    ["aarch64-apple-darwin", "bun-darwin-arm64"],
     ["x86_64-apple-darwin", "bun-darwin-x64"],
+    ["aarch64-pc-windows-msvc", "bun-windows-arm64"],
     ["x86_64-pc-windows-msvc", "bun-windows-x64"],
+    ["aarch64-unknown-linux-gnu", "bun-linux-arm64"],
     ["x86_64-unknown-linux-gnu", "bun-linux-x64"],
+    ["aarch64-unknown-linux-musl", "bun-linux-arm64-musl"],
     ["x86_64-unknown-linux-musl", "bun-linux-x64-musl"],
   ])("%s maps to %s", (triple, target) => expect(targetInfo(triple).bunTarget).toBe(target));
   test("rejects unsupported triples", () => expect(() => targetInfo("i686-unknown-linux-gnu")).toThrow());

@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Puzzle, Settings, Wrench } from "lucide-solid"
+import { ChevronLeft, ChevronRight, Eye, EyeOff, LayoutGrid, Network, Puzzle, Settings, Wrench } from "lucide-solid"
 import { toast } from "../components/ui/toast.tsx"
 import { useApp } from "../state/context.ts"
 import { useCADStore } from "./store/cadStore.ts"
@@ -26,15 +26,17 @@ import WorkpieceSetup from "./components/WorkpieceSetup.tsx"
 import SnapSettings from "./components/SnapSettings.tsx"
 import UnifiedLibraryModal from "./components/UnifiedLibraryModal.tsx"
 import LibraryBrowser, { type LibraryComponent } from "./components/LibraryBrowser.tsx"
+import CustomElementsEditor from "./components/custom-elements/CustomElementsEditor.tsx"
+import AssemblyPanel from "./components/assembly/AssemblyPanel.tsx"
 import { CADAssistantButton } from "./components/CADAssistantButton.tsx"
 import { CADAssistantBridge } from "../ai/CADAssistantBridge.tsx"
 import { FIT_VIEW_EVENT } from "../ai/editor-sync.ts"
-import { toJsonSafe } from "../state/json-safe.ts"
-import { documentSettings, restoreDocumentSettings, syncDocumentSettings } from "../state/document-settings.ts"
+import { restoreDocumentSettings, syncDocumentSettings } from "../state/document-settings.ts"
+import { syncProjectContents } from "./lib/projectSnapshot.ts"
 import "../components/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
-type RightPanel = "proprieties" | "settings" | "constraints" | "modeling"
+type RightPanel = "proprieties" | "settings" | "constraints" | "modeling" | "assembly"
 
 const tabClass = (active: boolean) =>
   `flex-1 py-3 px-3 text-sm font-medium rounded-lg transition-all duration-200 ${active ? "text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-gray-700/60 shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-white/40 dark:hover:bg-gray-700/40"}`
@@ -62,6 +64,7 @@ export default function CadPage(): JSX.Element {
   const [showFloating, setShowFloating] = createSignal(true)
   const [libraryComponent, setLibraryComponent] = createSignal<string | null>(null)
   const [showLibrary, setShowLibrary] = createSignal(false)
+  const [showCustomElements, setShowCustomElements] = createSignal(false)
   // The assistant is the shell's docked AI panel (spec 06 §1): the CAD button is one more
   // entry point for it, so the panel state lives in the app and the two stay in sync.
   const showAssistant = () => app.panelOpen()
@@ -77,35 +80,53 @@ export default function CadPage(): JSX.Element {
   const [drawingName, setDrawingName] = createSignal<string | null>(null)
   const requestedDrawing = (): string | undefined =>
     location.pathname.startsWith("/drawings/") ? params.id : typeof search.drawingId === "string" ? search.drawingId : undefined
+  /** `/cad?projectId=<id>` (the CAM page and the dashboard link here) names no drawing: the project's newest one opens. */
+  const requestedProject = (): string | undefined => typeof search.projectId === "string" && search.projectId !== "" ? search.projectId : undefined
   let loadedFor: string | undefined
+  let generation = 0
   createEffect(() => {
     const id = requestedDrawing()
-    if (id === undefined || id === loadedFor) return
-    loadedFor = id
-    void app.runtime.run(app.client.drawings.get({ params: { id } })).then((row) => {
-      const stored = row.data as { elements?: unknown; settings?: unknown } | null
-      restoreDocumentSettings(app, stored?.settings)
-      const fallbackLayer = layers.activeLayer
-      const known = new Set(layers.layers.map((layer) => layer.id))
-      const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>
-        known.has(String(element["layerId"])) ? element : { ...element, layerId: fallbackLayer })
-      useElementsStore.setState({ elements: loaded as never, selectedElement: null })
-      selection.clearSelection()
-      setDrawingId(row.id)
-      setDrawingName(row.name)
-      useDocumentStore.getState().setDocument({ projectId: row.project.id, drawingId: row.id, name: row.name })
-      app.rememberProject(row.project.id, row.project.name)
-      toast.success(`Drawing "${row.name}" opened`)
-    }, () => toast.error("The drawing could not be opened"))
+    const projectId = requestedProject()
+    if (id === undefined && projectId === undefined) return
+    const current = ++generation
+    void (async () => {
+      // A named drawing wins; otherwise the project's newest one, so reopening a project is never an empty canvas.
+      let target = id
+      if (target === undefined && projectId !== undefined) {
+        const rows = await app.runtime.run(app.client.drawings.listForProject({ params: { id: projectId } })) as ReadonlyArray<{ id: string }>
+        target = rows[0]?.id
+      }
+      if (target === undefined || current !== generation) return
+      if (loadedFor === target) return
+      loadedFor = target
+      await app.runtime.run(app.client.drawings.get({ params: { id: target } })).then((row) => {
+        const stored = row.data as { elements?: unknown; settings?: unknown } | null
+        restoreDocumentSettings(app, stored?.settings)
+        const fallbackLayer = layers.activeLayer
+        const known = new Set(layers.layers.map((layer) => layer.id))
+        const loaded = (Array.isArray(stored?.elements) ? stored.elements : []).map((element: Record<string, unknown>) =>
+          known.has(String(element["layerId"])) ? element : { ...element, layerId: fallbackLayer })
+        useElementsStore.setState({ elements: loaded as never, selectedElement: null })
+        selection.clearSelection()
+        setDrawingId(row.id)
+        setDrawingName(row.name)
+        useDocumentStore.getState().setDocument({ projectId: row.project.id, drawingId: row.id, name: row.name })
+        app.rememberProject(row.project.id, row.project.name)
+        toast.success(`Drawing "${row.name}" opened`)
+      }, () => toast.error("The drawing could not be opened"))
+    })().catch(() => { if (current === generation) toast.error("The drawing could not be opened") })
   })
 
   /** Saves the open stored drawing in place; a drawing that was never stored goes through the export / save-as dialog. */
   const save = (): void => {
     const id = drawingId()
     if (id === null) { openExport(); return }
-    const { elements: current, selectedElement } = useElementsStore.getState()
-    void app.runtime.run(app.client.drawings.update({ params: { id }, payload: { data: { elements: toJsonSafe(current), selectedElement: selectedElement?.id ?? null, settings: documentSettings(app), version: "1.0" } } })).then(
-      () => toast.success(`Saved "${drawingName() ?? "drawing"}"`),
+    const projectId = useDocumentStore.getState().projectId
+    if (projectId === null) { openExport(); return }
+    void syncProjectContents(app, projectId, id, app.runtime.run as <A>(effect: unknown) => Promise<A>).then(
+      (contents) => toast.success(contents.componentIds.length > 0
+        ? `Saved "${drawingName() ?? "drawing"}" · ${contents.componentIds.length} new component(s) added to the project`
+        : `Saved "${drawingName() ?? "drawing"}"`),
       () => toast.error("The drawing could not be saved")
     )
   }
@@ -198,7 +219,7 @@ export default function CadPage(): JSX.Element {
         <EnhancedToolbar
           sidebarOpen={sidebarOpen()} setSidebarOpen={setSidebarOpen} handleSaveProject={save}
           setDialogMode={setDialogMode} setShowImportExportDialog={setShowImportExport} setShowLibraryView={() => navigate("/library")}
-          setShowUnifiedLibrary={setShowLibrary} setShowFloatingToolbar={setShowFloating} showFloatingToolbar={showFloating()}
+          setShowUnifiedLibrary={setShowLibrary} setShowCustomElements={setShowCustomElements} setShowFloatingToolbar={setShowFloating} showFloatingToolbar={showFloating()}
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}
         />
 
@@ -241,6 +262,9 @@ export default function CadPage(): JSX.Element {
                 </Motion.button>
                 <Motion.button aria-pressed={rightPanel() === "constraints"} onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label="Plugins">
                   <div class="flex items-center justify-center"><Puzzle size={16} class="mr-2" /></div>
+                </Motion.button>
+                <Motion.button aria-pressed={rightPanel() === "assembly"} onClick={() => setRightPanel("assembly")} class={tabClass(rightPanel() === "assembly")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} title={t("cad.assembly.title")}>
+                  <div class="flex items-center justify-center"><Network size={16} class="mr-2" />{t("cad.assembly.title")}</div>
                 </Motion.button>
               </div>
             </Motion.div>
@@ -296,6 +320,8 @@ export default function CadPage(): JSX.Element {
                   </div>
                 </div>
               </Show>
+
+              <Show when={rightPanel() === "assembly"}><AssemblyPanel /></Show>
             </Motion.div>
           </Motion.div>
 
@@ -315,6 +341,7 @@ export default function CadPage(): JSX.Element {
 
       <ImportExportDialog isOpen={showImportExport()} mode={dialogMode()} onClose={() => setShowImportExport(false)} canvas={canvas()} />
       <UnifiedLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)}><LibraryBrowser onSelectComponent={pickComponent} /></UnifiedLibraryModal>
+      <CustomElementsEditor isOpen={showCustomElements()} onClose={() => setShowCustomElements(false)} />
     </Motion.div>
   )
 }

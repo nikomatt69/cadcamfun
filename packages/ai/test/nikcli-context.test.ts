@@ -45,7 +45,7 @@ describe("host context management", () => {
     mapHostEvent("ses-a", { type: "message.updated", properties: { info: { sessionID: "ses-b", id: "answer", summary: true } } }, state)
     expect(mapHostEvent("ses-a", delta("answer"), state)).toEqual([{ type: "delta", sessionId: "ses-a", text: "text" }])
     // A compaction is reported as its own event, never as text.
-    expect(mapHostEvent("ses-a", { type: "session.compacted", properties: { sessionID: "ses-a" } }, state)).toEqual([{ type: "compacted", sessionId: "ses-a" }])
+    expect(mapHostEvent("ses-a", { type: "session.compacted", properties: { sessionID: "ses-a" } }, state)).toEqual([{ type: "compaction", sessionId: "ses-a", phase: "finish" }, { type: "compacted", sessionId: "ses-a" }])
     expect(mapHostEvent("ses-b", { type: "session.compacted", properties: { sessionID: "ses-a" } }, state)).toEqual([])
   })
 

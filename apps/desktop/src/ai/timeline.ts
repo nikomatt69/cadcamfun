@@ -10,6 +10,7 @@ export type TimelineSegment =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "tool"; readonly callId: string; readonly tool: string }
   | { readonly kind: "retry"; readonly attempt: number; readonly message: string }
+  | { readonly kind: "diagnostic"; readonly severity: "error" | "warning" | "info"; readonly message: string; readonly tool: string; readonly recovery?: string }
 
 export const timelineOf = (message: Pick<AiMessage, "events" | "text" | "thinking">): ReadonlyArray<TimelineSegment> => {
   const out: TimelineSegment[] = []
@@ -23,9 +24,30 @@ export const timelineOf = (message: Pick<AiMessage, "events" | "text" | "thinkin
       out.push({ kind: "tool", callId: event.callId, tool: event.tool })
     } else if (event.type === "retry") {
       out.push({ kind: "retry", attempt: event.attempt, message: event.message })
+    } else if (event.type === "tool_diagnostic") {
+      out.push({ kind: "diagnostic", severity: event.severity, message: event.message, tool: event.tool, ...(event.recovery ? { recovery: event.recovery } : {}) })
+    } else if (event.type === "permission_blocked") {
+      out.push({ kind: "diagnostic", severity: "warning", message: event.reason, tool: event.permission })
+    } else if (event.type === "turn" && (event.phase === "recovering" || event.phase === "continuing")) {
+      out.push({ kind: "diagnostic", severity: "info", message: event.reason || (event.phase === "recovering" ? "Recovering the assistant turn" : "Continuing the assistant turn"), tool: "Assistant" })
+    } else if (event.type === "compaction") {
+      out.push({ kind: "diagnostic", severity: "info", message: event.phase === "start" ? "Summarizing earlier context" : "Earlier context summarized", tool: "Context" })
     }
   }
   for (const event of message.events) add(event)
+  // Reconnection can recover a final answer after only its first deltas arrived. Preserve
+  // the tool/reasoning order, but render the authoritative answer rather than stale tokens.
+  const streamed = out.flatMap((segment) => segment.kind === "text" ? [segment.text] : []).join("")
+  if (streamed !== "" && message.text !== "" && streamed !== message.text) {
+    const lastText = out.findLastIndex((segment) => segment.kind === "text")
+    if (message.text.startsWith(streamed)) {
+      const segment = out[lastText]
+      if (segment?.kind === "text") out[lastText] = { kind: "text", text: segment.text + message.text.slice(streamed.length) }
+    } else {
+      for (let index = out.length - 1; index >= 0; index--) if (out[index]?.kind === "text") out.splice(index, 1)
+      out.push({ kind: "text", text: message.text })
+    }
+  }
   // A message that was restored or recovered has its text but not the events that made it: show the text.
   if (!out.some((s) => s.kind === "text") && message.text !== "") out.push({ kind: "text", text: message.text })
   if (!out.some((s) => s.kind === "reasoning") && message.thinking !== undefined && message.thinking !== "") out.unshift({ kind: "reasoning", text: message.thinking })

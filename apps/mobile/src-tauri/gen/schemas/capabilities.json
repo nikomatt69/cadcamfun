@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"The companion webview: IPC to our own commands and the QR scanner. No filesystem, shell or network plugin.","local":true,"windows":["main"],"permissions":["core:default","barcode-scanner:default"],"platforms":["iOS","android"]}}

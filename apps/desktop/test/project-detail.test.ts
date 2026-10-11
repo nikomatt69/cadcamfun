@@ -78,6 +78,16 @@ describe("project details page", () => {
     } finally { dispose() }
   }, 120000)
 
+  test("/cad?projectId= opens the project's newest drawing instead of an empty canvas", async () => {
+    const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
+    useElementsStore.setState({ elements: [] })
+    const { dispose } = app.visit(`/cad?projectId=${projectId}`)
+    try {
+      await app.wait(() => useElementsStore.getState().elements.some((e) => e.id === "d-cube"), 60000)
+      await find('[data-testid="cad-status-bar"]')
+    } finally { dispose() }
+  }, 120000)
+
   test("a new drawing from the modal is created in the project", async () => {
     const { dispose } = app.visit(`/projects/${projectId}`)
     try {

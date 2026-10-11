@@ -27,6 +27,8 @@ import Wrench from "lucide-solid/icons/wrench"
 import ChevronDown from "lucide-solid/icons/chevron-down"
 import KeyRound from "lucide-solid/icons/key-round"
 import Copy from "lucide-solid/icons/copy"
+import Check from "lucide-solid/icons/check"
+import Bot from "lucide-solid/icons/bot"
 import Plus from "lucide-solid/icons/plus"
 import History from "lucide-solid/icons/history"
 import Paperclip from "lucide-solid/icons/paperclip"
@@ -105,7 +107,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     const status = ai.aiStatus()
     const host = status?.host ?? "direct"
     if (drawing) {
-      return t("ai.header.subtitle", { name: drawing.name, count: entities }).replace("nikcli {host}", `nikcli ${host}`)
+      return t("ai.header.subtitle", { name: drawing.name, count: entities, host: `nikcli ${host}` })
     }
     return t("ai.header.noProject")
   }
@@ -159,6 +161,11 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   }
 
   const handleKeyDown = (event: KeyboardEvent & { currentTarget: HTMLTextAreaElement }): void => {
+    if (event.key === "Escape" && running() && draft().length === 0) {
+      event.preventDefault()
+      ai.abort()
+      return
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
       event.preventDefault()
       // Enter queues while the agent works; Ctrl/Cmd+Enter sends at once (nikcli: queue, or steer to interrupt and send now).
@@ -293,6 +300,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
       <AgentActivity />
       <AssistantQuestions />
 
+      <div class="relative flex min-h-0 flex-1 flex-col">
       <div
         ref={transcript}
         class="assistant-transcript flex-1 overflow-y-auto"
@@ -370,6 +378,22 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             )}
           </Show>
         </Show>
+      </div>
+      <Show when={!followLatest() && ai.messages().length > 0}>
+        <button
+          type="button"
+          class="assistant-jump-latest"
+          aria-label={t("ai.transcript.latest")}
+          title={t("ai.transcript.latest")}
+          data-testid="ai-jump-latest"
+          onClick={() => {
+            setFollowLatest(true)
+            if (transcript) transcript.scrollTop = transcript.scrollHeight
+          }}
+        >
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
+      </Show>
       </div>
 
       <ModelToolbar
@@ -465,7 +489,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
           <div class="assistant-compose-actions">
             <button type="button" class="assistant-icon-button" title={t("ai.attach.title")} aria-label={t("ai.attach.title")} disabled={running() || files().length >= MAX_ATTACHMENTS} onClick={() => picker?.click()}><Paperclip size={17} aria-hidden="true" /></button>
           <button type="button" class="assistant-context-chip" aria-pressed={ai.includeContext()} onClick={() => ai.setIncludeContext((current) => !current)} data-enabled={ai.includeContext()}><Layers size={13} aria-hidden="true" />{t(ai.includeContext() ? "ai.context.included" : "ai.context.excluded")}</button>
-            <span class="assistant-character-count">{t("ai.input.charCount", { count: draft().length })}</span>
+            <Show when={draft().length > 0}><span class="assistant-character-count" data-over={draft().length > MAX_PROMPT}>{t("ai.input.charCount", { count: draft().length })}</span></Show>
         <Show when={running()}>
           <button type="button" class="assistant-send assistant-stop" onClick={() => ai.abort()} data-testid="ai-stop">
             <Square size={13} aria-hidden="true" />
@@ -481,7 +505,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
         </button>
           </div>
         </div>
-        <div id={`${promptId}-hint`} class="assistant-composer-hint"><span>{t("ai.input.shortcut.hint")}</span><span>{t("ai.composer.brand")}</span></div>
+        <div id={`${promptId}-hint`} class="assistant-composer-hint"><span>{running() ? t("ai.input.stopHint") : t("ai.input.shortcut.hint")}</span><span>{t("ai.composer.brand")}</span></div>
       </form>
     </div>
   )
@@ -576,9 +600,9 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
   return (
     <div class="assistant-popover" onKeyDown={(event) => { if (event.key === "Escape") props.onSelect() }}>
       <div class="sticky top-0 z-10 space-y-1 bg-white p-2 dark:bg-gray-900">
-        <input type="search" aria-label="Search available models" placeholder="Search available models" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
-        <select aria-label="Connected provider" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
-          <option value="">All connected providers</option>
+        <input type="search" aria-label={t("ai.model.search")} placeholder={t("ai.model.search")} class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
+        <select aria-label={t("ai.model.provider")} class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
+          <option value="">{t("ai.model.allProviders")}</option>
           <For each={providers()}>{(id) => <option value={id}>{id}</option>}</For>
         </select>
       </div>
@@ -617,7 +641,7 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
           </For>
         </ul>
         <Show when={filtered().length > limit()}>
-          <button type="button" class="w-full px-3 py-2 text-xs text-blue-600" onClick={() => setLimit((value) => value + 50)}>Show more ({filtered().length - limit()})</button>
+          <button type="button" class="w-full px-3 py-2 text-xs text-blue-600" onClick={() => setLimit((value) => value + 50)}>{t("ai.model.showMore", { count: filtered().length - limit() })}</button>
         </Show>
       </Show>
     </div>
@@ -676,6 +700,12 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
             if (segment.kind === "retry") {
               return <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="ai-retry-row">↻ {t("ai.agent.retry", { n: segment.attempt })} · {segment.message}</p>
             }
+            if (segment.kind === "diagnostic") {
+              return <div class="rounded border border-current/20 px-2 py-1 text-xs" classList={{ "text-red-700 dark:text-red-300": segment.severity === "error", "text-amber-700 dark:text-amber-300": segment.severity === "warning" }} data-testid="ai-tool-diagnostic" data-tool={segment.tool} data-severity={segment.severity}>
+                <p class="font-medium">{segment.tool}</p><p class="whitespace-pre-wrap">{segment.message}</p>
+                <Show when={segment.recovery}><p class="mt-1 whitespace-pre-wrap">{segment.recovery}</p></Show>
+              </div>
+            }
             if (segment.kind === "group") {
               const titles = (): string => {
                 const counts = new Map<string, number>()
@@ -694,8 +724,8 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
           }}
         </For>
         <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
-          <p class="text-[10px] text-gray-500" data-testid="ai-turn-footer">
-            ▣ {t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {usage().outputTokens} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
+          <p class="flex flex-wrap items-center gap-x-1 text-[10px] text-gray-500" data-testid="ai-turn-footer">
+            <Bot size={10} aria-hidden="true" />{t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model?.replace(/^~/, "")}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {usage().outputTokens} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
           </p>
         </Show>
         <Show when={props.message.status === "streaming" && segments().length === 0}>
@@ -746,9 +776,10 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
           type="button"
           class="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700"
           disabled={props.message.text.length === 0}
+          title={t("ai.message.copyTitle")}
           onClick={() => props.onCopy(props.message.text, props.message.id)}
         >
-          <Copy size={10} aria-hidden="true" />
+          {props.copiedId === props.message.id ? <Check size={10} aria-hidden="true" /> : <Copy size={10} aria-hidden="true" />}
           {props.copiedId === props.message.id ? t("ai.message.copied") : t("ai.message.copy")}
         </button>
       </div>

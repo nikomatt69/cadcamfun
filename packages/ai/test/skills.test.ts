@@ -57,7 +57,7 @@ describe("cadcam skills", () => {
     const config = buildHostConfig({ providers: [], toolIds: [...TOOL_IDS], systemPrompt: "x" }) as { agent: { cadcam: { permission: Record<string, string> } } }
     const permission = config.agent.cadcam.permission
     expect(permission["skill"]).toBe("allow")
-    expect(permission["*"]).toBe("deny")
+    expect(permission["**"]).toBe("deny")
     for (const blocked of ["bash", "edit", "write", "webfetch"]) expect(permission[blocked]).toBeUndefined()
   })
 })

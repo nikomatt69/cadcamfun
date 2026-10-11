@@ -105,7 +105,7 @@ interface AssemblyStore {
 }
 
 // Create the store
-export const useAssemblyStore = create<AssemblyStore>(set => {
+export const useAssemblyStore = create<AssemblyStore>((set, get) => {
   // Update state from assembly manager
   assemblyManager.addStateChangeHandler(newState => {
     set({
@@ -124,18 +124,20 @@ export const useAssemblyStore = create<AssemblyStore>(set => {
     selectedNodeIds: assemblyManager.getState().selectedNodes,
 
     // Actions
+    // A node with no parent of its own goes under the active node, so the tree grows from the
+    // node the user last picked; `null` still asks the manager for a root when nothing is active.
     addComponent: (name, position, rotation, parentId = null, componentId, metadata) => {
-      const node = assemblyManager.addComponent(name, position, rotation, parentId, componentId ?? "", metadata);
+      const node = assemblyManager.addComponent(name, position, rotation, parentId ?? get().activeNodeId, componentId ?? "", metadata);
       return node.id;
     },
 
     addSubassembly: (name, position, rotation, parentId = null, metadata) => {
-      const node = assemblyManager.addSubassembly(name, position, rotation, parentId, metadata);
+      const node = assemblyManager.addSubassembly(name, position, rotation, parentId ?? get().activeNodeId, metadata);
       return node.id;
     },
 
     addGroup: (name, position, rotation, parentId = null, metadata) => {
-      const node = assemblyManager.addGroup(name, position, rotation, parentId, metadata);
+      const node = assemblyManager.addGroup(name, position, rotation, parentId ?? get().activeNodeId, metadata);
       return node.id;
     },
 

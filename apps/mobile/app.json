@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "CADCAMFUN",
+    "slug": "cadcamfun-mobile",
+    "version": "6.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "cadcamfun",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cadcamfun.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CADisableMinimumFrameDurationOnPhone": true,
+        "NSCameraUsageDescription": "CADCAMFUN uses the camera to scan the pairing QR code shown on your Mac.",
+        "NSLocalNetworkUsageDescription": "CADCAMFUN connects to your Mac on the local network to work with your projects.",
+        "NSFaceIDUsageDescription": "CADCAMFUN uses Face ID to unlock the app and confirm sensitive actions.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-build-properties", { "ios": { "enableSceneSupport": true } }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CADCAMFUN uses the camera to scan the pairing QR code shown on your Mac.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0A0A0C"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "android": {
+      "package": "com.cadcamfun.mobile"
+    }
+  }
+}

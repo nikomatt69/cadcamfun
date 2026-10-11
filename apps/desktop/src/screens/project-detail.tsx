@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { Check, Clock, Copy, Download, Edit, File, Grid, History, Plus, Trash2, Users, Wrench, X } from "lucide-solid"
 import { Field, Select, TextInput, Textarea } from "../components/ui/field.tsx"
+import { Modal } from "../components/ui/modal.tsx"
 import { PANEL, TOOLBAR_BUTTON, WorkspaceDetail } from "../components/WorkspacePage.tsx"
 import { useApp } from "../state/context.ts"
 import { invalidatePrefix } from "../state/query-cache.ts"
@@ -24,33 +25,6 @@ const ICON_BTN = "p-1.5 text-slate-500 dark:text-slate-400 rounded-md hover:bg-b
 const TABS: ReadonlyArray<{ readonly id: Tab; readonly label: string }> = [
   { id: "drawings", label: "Drawings" }, { id: "components", label: "Components" }, { id: "toolpaths", label: "Toolpaths" }
 ]
-
-/** The app's modal markup (as in "Save as Project"): a scrim, a card with a title and a close button, Escape closes. */
-function Modal(props: { readonly open: boolean; readonly onClose: () => void; readonly title: string; readonly size?: "sm" | "md"; readonly children: JSX.Element }): JSX.Element {
-  createEffect(() => {
-    if (!props.open) return
-    const onKey = (event: KeyboardEvent): void => { if (event.key === "Escape") props.onClose() }
-    window.addEventListener("keydown", onKey)
-    onCleanup(() => window.removeEventListener("keydown", onKey))
-  })
-  return (
-    <Show when={props.open}>
-      <div class="fixed inset-0 bg-gray-600/50 dark:bg-black/60 flex items-center justify-center z-50" onClick={() => props.onClose()}>
-        <div
-          role="dialog" aria-modal="true" aria-label={props.title}
-          class={`bg-white dark:bg-slate-900 rounded-lg shadow-xl ${props.size === "sm" ? "max-w-sm" : "max-w-md"} w-full border border-slate-200 dark:border-slate-700`}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <h3 class="text-lg font-medium text-slate-900 dark:text-white">{props.title}</h3>
-            <button type="button" class="text-slate-400 hover:text-slate-500 transition-colors duration-150" aria-label="Close" onClick={() => props.onClose()}><X size={20} /></button>
-          </div>
-          <div class="px-6 py-4 space-y-3">{props.children}</div>
-        </div>
-      </div>
-    </Show>
-  )
-}
 
 const formatDate = (iso: string | undefined): string => (iso === undefined ? "" : new Date(iso).toLocaleDateString())
 

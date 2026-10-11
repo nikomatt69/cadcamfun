@@ -1,0 +1,49 @@
+import type { ReactNode } from "react"
+import { Text, View } from "react-native"
+import { useTheme } from "@/lib/theme"
+
+type Tone = "neutral" | "accent" | "success" | "danger" | "warning" | "info"
+
+export type PillTone = Tone
+
+const toneOf = (tone: Tone, palette: ReturnType<typeof useTheme>["palette"]): string => {
+  switch (tone) {
+    case "accent":
+      return palette.accent
+    case "success":
+      return palette.success
+    case "danger":
+      return palette.danger
+    case "warning":
+      return palette.warning
+    case "info":
+      return palette.info
+    default:
+      return palette.soft
+  }
+}
+
+/**
+ * A small status chip — PR state, workflow result, AI-authored marker. Color is carried on the
+ * text and the border; the fill stays a translucent tint so the chip reads as a label, not a
+ * button (materials: light translucent surfaces draw attention; here we want calm).
+ */
+export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: Tone }) {
+  const { palette } = useTheme()
+  const color = toneOf(tone, palette)
+  return (
+    <View
+      style={{
+        alignSelf: "flex-start",
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 999,
+        borderWidth: 0.5,
+        borderColor: color,
+        backgroundColor: `${color}1F`,
+      }}
+    >
+      <Text style={{ color, fontSize: 11, lineHeight: 15, fontWeight: "600", letterSpacing: 0.03 }}>{children}</Text>
+    </View>
+  )
+}

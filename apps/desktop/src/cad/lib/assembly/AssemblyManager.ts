@@ -47,7 +47,8 @@ export class AssemblyManager {
       rootNodes: [],
       activeNode: null,
       selectedNodes: [],
-      visibleJoints: true,
+      // Joint gizmos are off until the "Show joints" switch turns them on.
+      visibleJoints: false,
       history: [],
       historyIndex: -1
     };
@@ -636,9 +637,11 @@ export class AssemblyManager {
 
     const previousState = skipHistory ? undefined : this.getState();
 
-    this.state.joints[joint.id] = { ...joint };
+    // A joint inherits the current "visible joints" setting, so the gizmo never outlives the switch.
+    const storedJoint: Joint = { ...joint, visible: this.state.visibleJoints };
+    this.state.joints[joint.id] = storedJoint;
 
-    this.jointSystem.addJointToSystem(this.state.joints[joint.id]!);
+    this.jointSystem.addJointToSystem(storedJoint);
 
     const childNode = this.state.nodes[joint.child];
     if (childNode) {

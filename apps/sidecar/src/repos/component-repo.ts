@@ -14,6 +14,8 @@ export interface ComponentPatch {
 export class ComponentRepo extends Context.Service<ComponentRepo, {
   /** Visible when the user owns the project, belongs to its organisation, or the component is public. */
   find(userId: string, id: string): Effect.Effect<typeof ComponentDetail.Type | undefined, DatabaseError>
+  /** Reusable components across every project the user can read, plus public components. */
+  listVisible(userId: string): Effect.Effect<Array<typeof ComponentDetail.Type>, DatabaseError>
   listByProject(projectId: string): Effect.Effect<ComponentRow[], DatabaseError>
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<ComponentRow, DatabaseError>
   update(id: string, patch: ComponentPatch): Effect.Effect<ComponentRow, DatabaseError>
@@ -35,6 +37,14 @@ export class ComponentRepo extends Context.Service<ComponentRepo, {
               .where(and(eq(T.id, id), or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, eq(T.isPublic, true))))
               .limit(1)
             return hit ? { ...toComponentRow(hit.c), project: hit.project } : undefined
+          }),
+        listVisible: (userId) =>
+          query("components.listVisible", async (db) => {
+            const orgIds = await orgIdsOf(db, userId)
+            const hits = await db.select({ c: T, project: { id: P.id, name: P.name, ownerId: P.ownerId } }).from(T).innerJoin(P, eq(T.projectId, P.id))
+              .where(or(eq(P.ownerId, userId), orgIds.length ? inArray(P.organizationId, orgIds) : undefined, eq(T.isPublic, true)))
+              .orderBy(desc(T.updatedAt))
+            return hits.map((hit) => ({ ...toComponentRow(hit.c), project: hit.project }))
           }),
         listByProject: (projectId) =>
           query("components.listByProject", async (db) => (await db.select().from(T).where(eq(T.projectId, projectId)).orderBy(desc(T.updatedAt))).map(toComponentRow)),

@@ -97,3 +97,5 @@ export class Api extends HttpApi.make("cadcamfun")
   .add(CompanionGroup.middleware(Authorization))
   .annotateMerge(OpenApi.annotations({ title: "CADCAMFUN sidecar API" }))
 {}
+
+export * from "./ai-events.ts"

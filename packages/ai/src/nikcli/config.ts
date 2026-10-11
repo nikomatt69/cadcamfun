@@ -82,9 +82,9 @@ export const validateCompactionSettings = (settings: HostCompactionSettings): vo
 
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {
   validateCompactionSettings(input.compaction ?? {})
-  // Rules are evaluated last-match-wins. The trailing-`*` deny makes the host treat the
-  // agent as "curated": allowed tools are active, every built-in tool is removed.
-  const permission: Record<string, "allow" | "deny" | "ask"> = { "*": "deny" }
+  // Native wildcard matching makes `**` deny every unregistered capability. Unlike
+  // the special curated `*` fallback, it preserves nikcli's deferred schema loading.
+  const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
   for (const id of input.toolIds) permission[id] = "allow"
   for (const tool of NATIVE_TOOLS) permission[tool.id] = "allow"
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.

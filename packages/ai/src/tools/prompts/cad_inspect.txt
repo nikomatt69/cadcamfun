@@ -1,11 +1,14 @@
-Inspect real stored element properties and the current editor's layers, with explicit pagination. Do not use it to guess omitted geometry or modify the document.
+Inspect real stored element properties and the current editor's layers, with explicit pagination, and search the drawing's elements by text. Do not use it to guess omitted geometry or modify the document.
 
 Parameters
-- action: elements | layers | property.
+- action: elements | layers | search | property.
 - ids: optional filter by existing element ids (at most 20); layerId: optional layer filter.
 - offset: nonnegative page index (elements) or character offset (property), default 0.
 - limit: elements per page (1 to 20, default 10).
 - elementId: target element for property reading; path: array of object keys or child-array indices (e.g. ["history","parameters"]); maxChars: property JSON characters, 1 to 20000.
+- query: search action only, the case-insensitive substring to look for (1 to 200 characters); limit: search action only, at most 50 matches returned per call, default 20.
 
 Result
-Elements include actual properties (geometry, transforms, history, visibility, layer and nested children), bounds, total and nextOffset. Large values are marked omitted with a readWith property request, never silently discarded. layers returns live layer properties with snapshot timestamp/source or explicit unavailable state. property returns exact paginated JSON text and nextOffset. Layer snapshot is editor evidence, not a geometry mutation. Read every required page before claiming a complete inspection.
+Elements include actual properties (geometry, transforms, history, visibility, layer and nested children), bounds, total and nextOffset. Large values are marked omitted with a readWith property request, never silently discarded. layers returns live layer properties with snapshot timestamp/source or explicit unavailable state. property returns exact paginated JSON text and nextOffset. search returns the matching elements total, every match's id, type, name, layer and the property paths and values the query was found in, and returns every result when there are at most limit of them, so narrow the query or filter by layerId when total exceeds limit.
+
+Search is the cheap way to find things before paging through everything with action elements: it scans ids, types, names, layer ids and scalar property values, so "M8", "cylinder" or "top face" find the elements that name them. Layer snapshot is editor evidence, not a geometry mutation. Read every required page before claiming a complete inspection.
