@@ -67,6 +67,24 @@ const resolve = (elements: ReadonlyArray<Element>, tolerance: number) => {
   return { roots, skipped, warnings }
 }
 
+/**
+ * The meshes of a selection, booleans resolved, *without* the dexel step: what a strategy that needs the
+ * surface normals (5-axis machining, `model/mesh-queries.ts`) starts from. Same resolution rules as
+ * `buildPartModel`.
+ */
+export const partMeshes = (
+  elements: ReadonlyArray<Element>,
+  options: ModelOptions = {}
+): { readonly meshes: ReadonlyArray<Mesh64>; readonly skipped: ReadonlyArray<string>; readonly warnings: ReadonlyArray<string> } | undefined => {
+  const tolerance = options.tolerance ?? 0.005
+  const { roots, skipped, warnings } = resolve(elements, tolerance)
+  const meshes: Mesh64[] = []
+  const collect = (n: (typeof roots)[number]): void => { if ("mesh" in n) meshes.push(n.mesh); else n.operands.forEach(collect) }
+  roots.forEach(collect)
+  if (meshes.length === 0) return undefined
+  return { meshes, skipped, warnings }
+}
+
 export const buildPartModel = (elements: ReadonlyArray<Element>, options: ModelOptions = {}): PartModel | undefined => {
   const tolerance = options.tolerance ?? 0.005
   const { roots, skipped, warnings } = resolve(elements, tolerance)

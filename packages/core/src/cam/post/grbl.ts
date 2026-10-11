@@ -11,6 +11,8 @@ export const grblDialect: Dialect = {
   arcModes: ["ijk", "radius"],
   dwell: "seconds",
   uppercaseComments: false,
+  /** GRBL is a 3-axis motion controller: rotary words are refused, not dropped. */
+  rotary: false,
   begin: () => [],
   setup: ["G90", "G17", "G94"],
   toolChange: (n, first) => (first ? [`(TOOL T${n})`] : [`(CHANGE TO TOOL T${n})`, "M0"]),

@@ -24,12 +24,30 @@ const NonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
 
 // ---------------------------------------------------------------- moves
 
-export const RapidSchema = Schema.TaggedStruct("Rapid", { to: Vec3Schema })
+/**
+ * Rotary axes carried **with** a move (simultaneous 5-axis): the tool tip moves
+ * to `to` while the rotaries take these angles (degrees). Unlike `Orient`, the
+ * angles change *during* the move: the machine interpolates all five axes
+ * together. Only the axes given are moved; the post writes them on the same
+ * block as the linear motion.
+ */
+export const RotarySchema = Schema.Struct({
+  a: Schema.optionalKey(Schema.Finite),
+  b: Schema.optionalKey(Schema.Finite),
+  c: Schema.optionalKey(Schema.Finite)
+})
+export type Rotary = typeof RotarySchema.Type
+
+export const RapidSchema = Schema.TaggedStruct("Rapid", {
+  to: Vec3Schema,
+  rotary: Schema.optionalKey(RotarySchema)
+})
 
 export const LinearSchema = Schema.TaggedStruct("Linear", {
   to: Vec3Schema,
   /** mm/min. */
-  feed: Positive
+  feed: Positive,
+  rotary: Schema.optionalKey(RotarySchema)
 })
 
 /** Arc in the XY plane; helical when `to.z` differs from the start Z. */
@@ -428,6 +446,22 @@ export interface MachineTravel {
   readonly maxZ: number
 }
 
+/** Allowed range of one rotary axis, degrees. */
+export interface RotaryRange {
+  readonly min: number
+  readonly max: number
+}
+
+/**
+ * Rotary axes of a 4/5-axis machine and the range each is allowed to take,
+ * degrees. An axis that is absent is not fitted to the machine.
+ */
+export interface MachineRotary {
+  readonly a?: RotaryRange
+  readonly b?: RotaryRange
+  readonly c?: RotaryRange
+}
+
 /** The subset of a machine configuration a program has to respect. */
 export interface MachineProfile {
   readonly id: string
@@ -435,6 +469,8 @@ export interface MachineProfile {
   /** Highest feed the machine accepts, mm/min. */
   readonly maxFeed?: number
   readonly maxSpindleRpm?: number
+  /** Rotary axes fitted, with the range of each, degrees. */
+  readonly rotary?: MachineRotary
   /** When present, a toolpath referencing an unknown tool is an error. */
   readonly tools?: ReadonlyArray<Pick<Tool, "id">>
 }
@@ -445,6 +481,7 @@ export type ValidationIssue =
   | { readonly _tag: "FeedLimit"; readonly message: string; readonly feed: number; readonly toolpathId: string }
   | { readonly _tag: "MissingTool"; readonly message: string; readonly toolId: string; readonly toolpathId: string }
   | { readonly _tag: "SpindleLimit"; readonly message: string; readonly spindleRpm: number; readonly toolpathId: string }
+  | { readonly _tag: "RotaryLimit"; readonly message: string; readonly axis: "A" | "B" | "C"; readonly angle: number; readonly toolpathId: string; readonly moveIndex?: number }
 
 const fmt = (n: number): string => n.toFixed(3)
 
@@ -457,6 +494,11 @@ const MachineProfileSchema = Schema.Struct({
   }),
   maxFeed: Schema.optionalKey(Positive),
   maxSpindleRpm: Schema.optionalKey(NonNegative),
+  rotary: Schema.optionalKey(Schema.Struct({
+    a: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    b: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite })),
+    c: Schema.optionalKey(Schema.Struct({ min: Schema.Finite, max: Schema.Finite }))
+  })),
   tools: Schema.optionalKey(Schema.Array(Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1)) })))
 })
 
@@ -508,6 +550,24 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
     }
     const outside = (x: number, y: number, z: number): boolean =>
       x < t.minX - 1e-9 || x > t.maxX + 1e-9 || y < t.minY - 1e-9 || y > t.maxY + 1e-9 || z < t.minZ - 1e-9 || z > t.maxZ + 1e-9
+    const ranges = machine.rotary
+    const checkRotary = (toolpathId: string, moveIndex: number, axes: ReadonlyArray<readonly ["A" | "B" | "C", number | undefined]>): void => {
+      if (ranges === undefined) return
+      for (const [axis, angle] of axes) {
+        if (angle === undefined || !Number.isFinite(angle)) continue
+        const range = ranges[axis.toLowerCase() as "a" | "b" | "c"]
+        if (range === undefined) continue
+        if (angle >= range.min - 1e-9 && angle <= range.max + 1e-9) continue
+        issues.push({
+          _tag: "RotaryLimit",
+          axis,
+          angle,
+          toolpathId,
+          moveIndex,
+          message: `Toolpath move ${moveIndex} turns ${axis}${fmt(angle)}, outside the machine range ${fmt(range.min)}..${fmt(range.max)}`
+        })
+      }
+    }
     const reported = new Set<string>()
     const check = (point: Vec3): void => {
       if (![point.x, point.y, point.z].every(Number.isFinite)) {
@@ -542,7 +602,10 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
         issues.push({ _tag: "InvalidInput", path: `toolpath.${toolpath.id}.moves[${moveIndex}]`, toolpathId: toolpath.id, moveIndex, message: `Toolpath "${toolpath.name}" move ${moveIndex}: ${message}` })
       }
       const to = moveTarget(move)
-      if (to === undefined) continue
+      if (to === undefined) {
+        if (move._tag === "Orient") checkRotary(toolpath.id, moveIndex, [["A", move.a], ["B", move.b], ["C", move.c]])
+        continue
+      }
       if (move._tag === "Cycle") {
         try {
           assertCycleSafe(move)
@@ -572,6 +635,11 @@ export const validate = (program: Program, machine: MachineProfile): ReadonlyArr
       }
       check(to)
       from = to
+      if (move._tag === "Rapid" || move._tag === "Linear") {
+        if (move.rotary !== undefined) {
+          checkRotary(toolpath.id, moveIndex, [["A", move.rotary.a], ["B", move.rotary.b], ["C", move.rotary.c]])
+        }
+      }
     }
   }
   return issues

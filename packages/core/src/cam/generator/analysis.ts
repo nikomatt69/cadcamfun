@@ -15,8 +15,10 @@ export const DEFAULT_RAPID_RATE = 5000
 
 const moveOf = (segment: GSegment): Move | undefined => {
   switch (segment.kind) {
-    case "rapid": return { _tag: "Rapid", to: segment.to }
-    case "linear": return { _tag: "Linear", to: segment.to, feed: Math.max(1, segment.feed) }
+    case "rapid": return segment.rotary === undefined
+      ? { _tag: "Rapid", to: segment.to }
+      : { _tag: "Rapid", to: segment.to, rotary: segment.rotary }
+    case "linear": return { _tag: "Linear", to: segment.to, feed: Math.max(1, segment.feed), ...(segment.rotary !== undefined ? { rotary: segment.rotary } : {}) }
     case "arc": return { _tag: "Arc", to: segment.to, center: segment.center, clockwise: segment.clockwise, feed: Math.max(1, segment.feed) }
     case "dwell": return { _tag: "Dwell", seconds: segment.seconds }
   }

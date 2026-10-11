@@ -34,7 +34,7 @@ export const DEFAULT_EXPANDED: Readonly<Record<string, boolean>> = {
 }
 
 export const MILL_OPERATIONS: ReadonlyArray<MillOperationType> =
-  ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"]
+  ["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing", "multiaxis"]
 export const LATHE_OPERATIONS: ReadonlyArray<LatheOperationType> =
   ["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]
 export const PRINTER_OPERATIONS: ReadonlyArray<PrinterOperationType> =
@@ -130,6 +130,7 @@ const OPERATION_DESCRIPTIONS: Readonly<Record<string, OperationDescription>> = {
   profile: { title: "3D Profile", description: "3D Profile - Follows a three-dimensional profile varying the working depth." },
   threading: { title: "Threading", description: "Threading - Creates internal or external threads with a milling cutter or tap." },
   "3d_surface": { title: "3D Surface", description: "3D Surface - Works on complex three-dimensional surfaces with optimized paths." },
+  multiaxis: { title: "5-Axis Surface", description: "5-Axis Surface - Simultaneous 5-axis finishing: the tool leans on the surface while the rotary table turns. Needs a 5-axis machine with a rotary table." },
   probing: { title: "Probing", description: "Probing - A touch probe or tool setter finds the work zero (surface, edge, corner, bore, boss) or a tool length and writes it to the work offset. The spindle stays off." },
   turning: { title: "Turning", description: "Turning - Creates external cylindrical surfaces by removing material radially." },
   facing: { title: "Facing", description: "Facing - Creates flat surfaces perpendicular to the axis of rotation." },

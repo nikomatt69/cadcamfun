@@ -2,6 +2,7 @@
 import { fanucPost } from "./fanuc.ts"
 import { genericPost } from "./generic.ts"
 import { grblPost } from "./grbl.ts"
+import { haasPost } from "./haas.ts"
 import type { Post, PostId } from "./types.ts"
 
 export * from "./types.ts"
@@ -10,12 +11,14 @@ export { emitProgram, formatNumber, sanitizeComment, toolNumbers } from "./emitt
 export { genericDialect, genericPost } from "./generic.ts"
 export { fanucDialect, fanucPost } from "./fanuc.ts"
 export { grblDialect, grblPost } from "./grbl.ts"
+export { haasDialect, haasPost } from "./haas.ts"
 
-/** Implemented posts by id (`linuxcnc` and `haas` are reserved ids, not implemented yet). */
+/** Implemented posts by id (`linuxcnc` is a reserved id, not implemented yet). */
 export const posts: Readonly<Partial<Record<PostId, Post>>> = {
   generic: genericPost,
   fanuc: fanucPost,
-  grbl: grblPost
+  grbl: grblPost,
+  haas: haasPost
 }
 
 export const getPost = (id: PostId): Post | undefined => posts[id]

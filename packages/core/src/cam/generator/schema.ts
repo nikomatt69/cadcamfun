@@ -17,7 +17,7 @@ const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0))
 const Percent = Schema.Finite.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100))
 
 export const MachineTypeSchema = Schema.Literals(["mill", "lathe", "3dprinter"])
-export const MillOperationSchema = Schema.Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"])
+export const MillOperationSchema = Schema.Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing", "multiaxis"])
 export const LatheOperationSchema = Schema.Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"])
 export const PrinterOperationSchema = Schema.Literals(["standard", "vase", "support", "infill", "raft", "brim"])
 export const OperationTypeSchema = Schema.Union([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema])
@@ -102,6 +102,13 @@ export const ToolpathSettingsSchema = Schema.Struct({
   useRestMachining: withDefault(Schema.Boolean, false),
   /** Diameter of the tool that already roughed the part, mm (the rest region is what its disc could not reach). */
   restToolDiameter: withDefault(Positive, 10),
+  /** `multiaxis` only (simultaneous 5-axis): the strategy, the tool axis rule and the lean (degrees). */
+  fiveAxisStrategy: withDefault(Schema.Literals(["parallel", "contour"]), "parallel"),
+  fiveAxisToolAxis: withDefault(Schema.Literals(["normal", "lead"]), "lead"),
+  fiveAxisLead: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 })), 10),
+  fiveAxisTilt: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 })), 0),
+  /** `multiaxis`: lean further wherever the cutter would otherwise cut the part. */
+  fiveAxisGouge: withDefault(Schema.Boolean, true),
   toolNumber: withDefault(PositiveInt, 1),
   /** Work offset the program runs in (the zero of the part on the machine table). G54 is the control's default and is not written. */
   workOffset: withDefault(Schema.Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
@@ -214,12 +221,42 @@ export const PrinterExtrasSchema = Schema.Struct({
 export type PrinterExtras = typeof PrinterExtrasSchema.Type
 export const DEFAULT_PRINTER_EXTRAS: PrinterExtras = Schema.decodeUnknownSync(PrinterExtrasSchema)({})
 
+// ---------------------------------------------------------------- machine for a program
+
+/**
+ * What the generator needs to know about the selected machine: its axes, its rotary table (for `multiaxis`), the zero of
+ * the rotary table, and the controller whose post writes the program. Built from the machine library entry by the caller.
+ */
+const RotaryRangeSchema = Schema.Struct({ min: Schema.Finite, max: Schema.Finite })
+export const MachineForProgramSchema = Schema.Struct({
+  id: Schema.String,
+  name: withDefault(Schema.String, ""),
+  axes: withDefault(Schema.Literals([3, 4, 5]), 3),
+  /** Post id the controller uses: `haas`, `fanuc`, `grbl`, `generic`. */
+  controller: withDefault(Schema.String, "generic"),
+  /** Rotary table of a 5-axis machine; absent on a 3-axis one. */
+  fiveAxis: Schema.optionalKey(Schema.Struct({
+    layout: Schema.Literals(["table-AC", "table-BC"]),
+    tilt: RotaryRangeSchema,
+    rotation: Schema.optionalKey(RotaryRangeSchema),
+    pivot: Schema.optionalKey(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, z: Schema.Finite })),
+    /** `control`: the controller applies the tool centre point (Haas G234); `program`: the program is in machine coordinates. */
+    tcp: withDefault(Schema.Literals(["control", "program"]), "control")
+  }))
+})
+export type MachineForProgram = typeof MachineForProgramSchema.Type
+
 // ---------------------------------------------------------------- generate
 
 export const GenerateRequestSchema = Schema.Struct({
   settings: withDefault(ToolpathSettingsSchema, DEFAULT_SETTINGS),
   geometry: withDefault(GeometrySchema, DEFAULT_GEOMETRY as never),
   printer: withDefault(PrinterExtrasSchema, DEFAULT_PRINTER_EXTRAS),
+  /**
+   * The machine the program is for. Required by `multiaxis` (it needs the rotary axes and the controller's post); the
+   * other operations ignore it, so existing requests are unchanged.
+   */
+  machine: Schema.optionalKey(MachineForProgramSchema),
   /** Injected into the header; omitted by default so the output is deterministic. */
   stamp: Schema.optionalKey(Schema.String)
 })

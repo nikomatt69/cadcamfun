@@ -8,6 +8,7 @@ export const genericDialect: Dialect = {
   arcModes: ["ijk", "radius"],
   dwell: "seconds",
   uppercaseComments: false,
+  rotary: true,
   begin: () => [],
   setup: ["G90", "G17", "G94"],
   toolChange: (n) => [`T${n} M6`],

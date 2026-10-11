@@ -5,9 +5,10 @@
  * of the emitter that produced the text.
  *
  * Supported: `G0 G1 G2 G3` (I/J or R), `G4`, `G17`, `G20/G21`, `G90`, `G98/G99`,
- * canned cycles `G73 G81 G82 G83` + `G80`, modal feed, `M` codes recorded. Anything
- * else with an effect on motion (other planes, `G91`) is reported in `errors`.
- * Output units are always millimetres.
+ * canned cycles `G73 G81 G82 G83` + `G80`, modal feed, rotary words `A/B/C`
+ * (degrees, carried on the segment they are written on), `M` codes recorded.
+ * Anything else with an effect on motion (other planes, `G91`) is reported in
+ * `errors`. Output units are always millimetres.
  */
 
 export interface P3 {
@@ -17,7 +18,7 @@ export interface P3 {
 }
 
 export type GSegment =
-  | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number }
+  | { readonly kind: "rapid" | "linear"; readonly from: P3; readonly to: P3; readonly feed: number; readonly line: number; readonly rotary?: RotaryAngles }
   | {
       readonly kind: "arc"
       readonly from: P3
@@ -30,6 +31,13 @@ export type GSegment =
       readonly line: number
     }
   | { readonly kind: "dwell"; readonly seconds: number; readonly line: number }
+
+/** Rotary-axis angles carried by a move (simultaneous 5-axis), degrees. */
+export interface RotaryAngles {
+  readonly a?: number
+  readonly b?: number
+  readonly c?: number
+}
 
 export interface InterpretOptions {
   /** Unit of `G4 P` and cycle `P` words. Default `seconds`. */
@@ -92,17 +100,22 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
     if (p.z < minZ) minZ = p.z
   }
   const dist = (a: P3, b: P3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
+  // Rotary words are modal like any other: only the axes written on a line change.
+  let rotary: RotaryAngles = {}
+  const rotaryOf = (): RotaryAngles | undefined => (Object.keys(rotary).length === 0 ? undefined : { ...rotary })
 
   const rapid = (to: P3, line: number): void => {
     if (dist(pos, to) < 1e-12) return
-    segments.push({ kind: "rapid", from: pos, to, feed, line })
+    const angles = rotaryOf()
+    segments.push(angles === undefined ? { kind: "rapid", from: pos, to, feed, line } : { kind: "rapid", from: pos, to, feed, line, rotary: angles })
     rapidLength += dist(pos, to)
     pos = to
     note(pos)
   }
   const linear = (to: P3, line: number): void => {
     if (dist(pos, to) < 1e-12) return
-    segments.push({ kind: "linear", from: pos, to, feed, line })
+    const angles = rotaryOf()
+    segments.push(angles === undefined ? { kind: "linear", from: pos, to, feed, line } : { kind: "linear", from: pos, to, feed, line, rotary: angles })
     cutLength += dist(pos, to)
     pos = to
     note(pos)
@@ -142,6 +155,9 @@ export const interpretGcode = (text: string, options: InterpretOptions = {}): In
         tools.push(Math.round(w.value))
       } else if (w.letter === "F") {
         feed = w.value * unit
+      } else if (w.letter === "A" || w.letter === "B" || w.letter === "C") {
+        // Rotary angles are degrees in both unit systems; they persist until changed.
+        rotary = { ...rotary, [w.letter.toLowerCase()]: w.value }
       }
     }
     // A G4 line is a dwell only; it carries no motion words of its own.

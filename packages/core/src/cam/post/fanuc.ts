@@ -13,6 +13,7 @@ export const fanucDialect: Dialect = {
   arcModes: ["ijk", "radius"],
   dwell: "milliseconds",
   uppercaseComments: true,
+  rotary: true,
   begin: (program) => {
     const requested = Number(program.metadata?.["programNumber"])
     const number = Number.isInteger(requested) && requested >= 1 && requested <= 9999 ? requested : 1000

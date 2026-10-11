@@ -17,6 +17,7 @@ import {
   type Move,
   type OrientMove,
   type Program,
+  type Rotary,
   type Toolpath,
   arcSweepBetween,
   expandCycle,
@@ -55,10 +56,32 @@ const CYCLE_CODE: Record<CycleMove["cycle"], string> = {
   chipBreak: "G73"
 }
 
+/** Pocket of every tool id: the override where it has a usable number, then the first free number in order of first use. */
+const numbered = (ids: ReadonlyArray<string>, override: Readonly<Record<string, number>>): Map<string, number> => {
+  const map = new Map<string, number>()
+  const taken = new Set<number>()
+  for (const id of ids) {
+    const pocket = override[id]
+    if (pocket !== undefined && Number.isInteger(pocket) && pocket > 0 && !taken.has(pocket)) {
+      map.set(id, pocket)
+      taken.add(pocket)
+    }
+  }
+  let next = 1
+  for (const id of ids) {
+    if (map.has(id)) continue
+    while (taken.has(next)) next++
+    map.set(id, next)
+    taken.add(next)
+  }
+  return map
+}
+
 /** Maps tool ids to tool numbers: numeric ids are used as is, otherwise numbers follow first use. */
-export const toolNumbers = (program: Program): Map<string, number> => {
+export const toolNumbers = (program: Program, override?: Readonly<Record<string, number>>): Map<string, number> => {
   const ids: string[] = []
   for (const tp of program.toolpaths) if (!ids.includes(tp.toolId)) ids.push(tp.toolId)
+  if (override !== undefined) return numbered(ids, override)
   const allNumeric = ids.every((id) => /^\d+$/.test(id) && Number(id) > 0)
   const map = new Map<string, number>()
   ids.forEach((id, i) => map.set(id, allNumeric ? Number(id) : i + 1))
@@ -79,6 +102,8 @@ class Writer {
   private readonly rotary: Record<string, string> = {}
   private feed: string | undefined
   private retractMode: string | undefined
+  /** Tool-centre-point control (`G234` on Haas) active over a simultaneous 5-axis section. */
+  private tcpOn = false
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
   // True IR position (mm), for arc geometry and cycle expansion.
   ir: Vec3 | undefined
@@ -161,28 +186,66 @@ class Writer {
     }
   }
 
-  rapid(to: Vec3): void {
+  rapid(to: Vec3, rotary?: Rotary): void {
     this.endCycle()
     const a = this.axes(to)
-    if (a.words.length === 0) {
+    const r = this.rotaryWords(rotary)
+    if (a.words.length === 0 && r.length === 0) {
       this.ir = { ...to }
+      this.ensureTcp(rotary !== undefined)
       return
     }
-    this.block(this.motion === "G0" ? undefined : "G0", ...a.words)
+    this.ensureTcp(rotary !== undefined)
+    this.block(this.motion === "G0" ? undefined : "G0", ...a.words, ...r)
     this.motion = "G0"
     this.commit(to, a.x, a.y, a.z)
   }
 
-  linear(to: Vec3, feed: number): void {
+  linear(to: Vec3, feed: number, rotary?: Rotary): void {
     this.endCycle()
     const a = this.axes(to)
-    if (a.words.length === 0) {
+    const r = this.rotaryWords(rotary)
+    if (a.words.length === 0 && r.length === 0) {
       this.ir = { ...to }
+      this.ensureTcp(rotary !== undefined)
       return
     }
-    this.block(this.motion === "G1" ? undefined : "G1", ...a.words, this.feedWord(feed))
+    this.ensureTcp(rotary !== undefined)
+    this.block(this.motion === "G1" ? undefined : "G1", ...a.words, ...r, this.feedWord(feed))
     this.motion = "G1"
     this.commit(to, a.x, a.y, a.z)
+  }
+
+  /** Rotary words of a move, only the axes whose rounded angle changed. */
+  private rotaryWords(rotary: Rotary | undefined): string[] {
+    if (rotary === undefined) return []
+    const words: string[] = []
+    for (const [letter, value] of [["A", rotary.a], ["B", rotary.b], ["C", rotary.c]] as const) {
+      if (value === undefined) continue
+      const text = formatNumber(value, this.options.decimals)
+      if (this.rotary[letter] === text) continue
+      this.rotary[letter] = text
+      words.push(`${letter}${text}`)
+    }
+    return words
+  }
+
+  /**
+   * Tool-centre-point control, on and off around a simultaneous 5-axis section. Haas `G234` cancels `G43`
+   * (and `G43` cancels it), so the two are never active together: the control must always have one of them.
+   * A run of rotary moves is bracketed by `G234 H<n>` … `G43 H<n>`, so a plain 3-axis section that follows
+   * still runs with tool length compensation.
+   */
+  private ensureTcp(want: boolean): void {
+    const code = this.dialect.tcp
+    if (code === undefined || want === this.tcpOn) return
+    if (want) {
+      this.block(code, `H${this.tool}`)
+      this.tcpOn = true
+    } else {
+      this.block("G43", `H${this.tool}`)
+      this.tcpOn = false
+    }
   }
 
   /** Rotary positioning (degrees, never converted to inches): only the axes that changed are written. */
@@ -346,10 +409,10 @@ class Writer {
   move(move: Move): void {
     switch (move._tag) {
       case "Rapid":
-        this.rapid(move.to)
+        this.rapid(move.to, move.rotary)
         break
       case "Linear":
-        this.linear(move.to, move.feed)
+        this.linear(move.to, move.feed, move.rotary)
         break
       case "Arc":
         this.arc(move)
@@ -372,6 +435,16 @@ class Writer {
   finishMotion(): void {
     this.endCycle()
   }
+
+  /**
+   * Closes a simultaneous 5-axis section at the end of the program: the control must not be left with
+   * tool-centre-point control active (it is cancelled at `M30` on Haas, but a reader expects to see it).
+   */
+  endTcp(): void {
+    if (!this.tcpOn) return
+    this.block("G49")
+    this.tcpOn = false
+  }
 }
 
 const resolveArcMode = (requested: ArcMode, dialect: Dialect): ArcMode => {
@@ -392,10 +465,33 @@ const feedRange = (toolpath: Toolpath): string => {
   return lo === hi ? `${Math.round(lo)}` : `${Math.round(lo)}-${Math.round(hi)}`
 }
 
+const carriesRotary = (move: Move): boolean =>
+  (move._tag === "Rapid" || move._tag === "Linear") && move.rotary !== undefined
+
+/**
+ * Fails closed on a program this dialect cannot express:
+ *  - a 3-axis dialect (grbl) must never lose rotary angles silently: the machine would cut somewhere else;
+ *  - a toolpath may not mix a positioned `Orient` (3+2, machine coordinates) with moves that carry rotary
+ *    angles (simultaneous, work coordinates): the two frames do not compose.
+ */
+const rejectUnwritable = (program: Program, dialect: Dialect): void => {
+  for (const toolpath of program.toolpaths) {
+    const simultaneous = toolpath.moves.some(carriesRotary)
+    const indexed = toolpath.moves.some((m) => m._tag === "Orient")
+    if (simultaneous && indexed) {
+      throw new RangeError(`Toolpath "${toolpath.name}" mixes positioned rotary axes (3+2) with simultaneous rotary motion: split it into two operations`)
+    }
+    if (simultaneous && !dialect.rotary) {
+      throw new RangeError(`Toolpath "${toolpath.name}" drives rotary axes, which the ${dialect.id} post cannot write: use a 5-axis post (haas) or a 3-axis operation`)
+    }
+  }
+}
+
 export const emitProgram = (program: Program, userOptions: Partial<PostOptions>, dialect: Dialect): string => {
+  rejectUnwritable(program, dialect)
   const options: PostOptions = { ...defaultPostOptions, ...userOptions }
   const w = new Writer(options, dialect, resolveArcMode(options.arcMode, dialect), program.units)
-  const numbers = toolNumbers(program)
+  const numbers = toolNumbers(program, options.toolNumbers)
 
   for (const line of dialect.begin(program)) w.raw(line)
   if (options.header) {
@@ -420,6 +516,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     const n = numbers.get(tp.toolId) ?? 1
     if (n !== w.tool) {
       w.finishMotion()
+      // A changer pulls the tool out of the spindle: it must be above the deepest point the
+      // program has already reached, not inside the previous operation's cut.
+      if (options.retractBeforeToolChange && w.ir !== undefined && w.ir.z < zMax - 1e-9) w.rapid({ x: w.ir.x, y: w.ir.y, z: zMax })
       if (w.spindleRpm > 0) {
         w.block("M5")
         w.spindleRpm = 0
@@ -454,6 +553,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
 
   w.finishMotion()
   if (w.ir !== undefined && Number.isFinite(zMax)) w.rapid({ x: w.ir.x, y: w.ir.y, z: Math.max(zMax, w.ir.z) })
+  // Leave the control with tool length compensation, never with tool-centre-point control still on
+  // (Haas cancels it at M30 too, but a clean end block is what an operator expects to read).
+  w.endTcp()
   w.block("M5")
   if (w.coolant !== "off") w.block("M9")
   w.block(dialect.end)

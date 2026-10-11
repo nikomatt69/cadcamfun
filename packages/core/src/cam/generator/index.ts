@@ -27,6 +27,7 @@ import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
 import { generateLatheGCode } from "./lathe.ts"
 import { generateMillGCode } from "./mill.ts"
+import { multiaxisProgram } from "./multiaxis.ts"
 import { generate3DPrinterGCodeForElement, type PrinterSettings } from "./printer.ts"
 import { adjustSettingsForElement, outsideStock, suggestMachiningParameters } from "./elements.ts"
 import { calculateCuttingStatistics, getCuttingFeedback, getOperationDescription, aiSuggestionsFor } from "./settings.ts"
@@ -97,11 +98,17 @@ const warningsIn = (gcode: string): string[] =>
   gcode.split("\n").filter(line => line.startsWith("; Warning:")).map(line => line.slice("; Warning:".length).trim())
 
 /** Raw text for a request, before the post passes. `error` is set when nothing can be generated. */
-const text = (request: GenerateRequest): { gcode: string; error?: string } => {
+const text = (request: GenerateRequest): { gcode: string; error?: string; warnings?: ReadonlyArray<string> } => {
   const { settings, geometry, printer } = request
   const options = request.stamp !== undefined ? { stamp: request.stamp } : {}
   switch (settings.machineType) {
-    case "mill": return { gcode: generateMillGCode(settings, geometry as GeometryInput, options) }
+    case "mill": {
+      if (settings.operationType === "multiaxis") {
+        const outcome = multiaxisProgram(settings, geometry as GeometryInput, request.machine, options)
+        return { gcode: outcome.gcode, warnings: outcome.warnings, ...(outcome.error !== undefined ? { error: outcome.error } : {}) }
+      }
+      return { gcode: generateMillGCode(settings, geometry as GeometryInput, options) }
+    }
     case "lathe": return { gcode: generateLatheGCode(settings, options) }
     case "3dprinter": {
       const element = geometry.selectedElements[0]
@@ -121,16 +128,18 @@ export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
   const { settings } = request
   const generated = text(request)
   let gcode = generated.gcode
-  if (settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
-  if (settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
+  // Multi-axis text is written by a post (rotary words, TCP codes): the text passes below would not understand B and C.
+  const multiaxis = settings.operationType === "multiaxis"
+  if (!multiaxis && settings.optimizePath) gcode = optimizeToolpath(gcode, settings.tolerance)
+  if (!multiaxis && settings.useArcFitting) gcode = convertLinesToArcs(gcode, settings.tolerance)
   // Feed that follows the path is a mill's concern: a printer or a lathe has its own feed model.
-  if (settings.useAdaptiveFeeds && settings.machineType === "mill") gcode = adaptFeeds(gcode, settings.toolDiameter)
+  if (!multiaxis && settings.useAdaptiveFeeds && settings.machineType === "mill") gcode = adaptFeeds(gcode, settings.toolDiameter)
   const analysis = analyseGcode(gcode, `${settings.machineType}-${settings.operationType}`)
   return {
     response: {
       gcode,
       cycles: detectFixedCycles(gcode),
-      warnings: warningsIn(gcode),
+      warnings: [...warningsIn(gcode), ...(generated.warnings ?? [])],
       stats: analysis.stats,
       program: analysis.program
     },
