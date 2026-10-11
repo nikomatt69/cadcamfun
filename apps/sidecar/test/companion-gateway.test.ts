@@ -123,6 +123,8 @@ describe("companion gateway", () => {
     expect(isCompanionRoute("POST", "/api/notifications/mark-all-read")).toBe(true)
     expect(isCompanionRoute("PUT", "/api/notifications/n1")).toBe(true)
     expect(isCompanionRoute("DELETE", "/api/notifications/n1")).toBe(true)
+    expect(isCompanionRoute("GET", "/api/ai/agents")).toBe(true)
+    expect(isCompanionRoute("PUT", "/api/ai/agents")).toBe(false)
     // Creating a notification is the desktop's job, never the phone's.
     expect(isCompanionRoute("POST", "/api/notifications")).toBe(false)
     // The gateway's own admin surface stays unreachable.

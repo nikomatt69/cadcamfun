@@ -1,46 +1,193 @@
+/**
+ * The four run controls that decide *how* the assistant works, as one quiet row
+ * of chips in the composer (spec 08-ai.md §3).
+ *
+ * They used to be a block of stacked selects wedged between the header and the
+ * transcript — the tallest thing on screen, always visible, rarely touched. As
+ * chips they sit with the other per-turn controls, read as one line, and give
+ * the height back to the conversation. Each keeps its label as an accessible
+ * name and the agent description as a tooltip, so nothing was lost.
+ */
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { useAiStore } from "./context.tsx"
+import Bot from "lucide-solid/icons/bot"
+import Compass from "lucide-solid/icons/compass"
+import ShieldCheck from "lucide-solid/icons/shield-check"
+import Brain from "lucide-solid/icons/brain"
+import Check from "lucide-solid/icons/check"
+import ChevronUp from "lucide-solid/icons/chevron-up"
 import { t } from "../i18n/index.ts"
+import { useAiStore } from "./context.tsx"
 import type { AiPendingQuestion } from "./types.ts"
+
+interface ControlOption {
+  readonly value: string
+  readonly label: string
+  readonly description?: string
+}
+
+/**
+ * An icon stays visible in the composer; its complete, keyboard-reachable menu
+ * opens above the control. This avoids native selects escaping below the app
+ * window and keeps four run settings on one calm line at every panel width.
+ */
+function ControlMenu(props: {
+  readonly id: string
+  readonly icon: JSX.Element
+  readonly label: string
+  readonly value: string
+  readonly title?: string
+  readonly disabled?: boolean
+  readonly open: boolean
+  readonly options: ReadonlyArray<ControlOption>
+  readonly onToggle: () => void
+  readonly onClose: () => void
+  readonly onChange: (value: string) => void
+}): JSX.Element {
+  const selected = () => props.options.find((option) => option.value === props.value)
+  return (
+    <div class="assistant-control-menu-root">
+      <button
+        type="button"
+        class="assistant-control-icon"
+        classList={{ "is-open": props.open }}
+        disabled={props.disabled}
+        aria-label={`${props.label}: ${selected()?.label ?? props.value}`}
+        aria-haspopup="listbox"
+        aria-expanded={props.open}
+        title={props.title ?? `${props.label}: ${selected()?.label ?? props.value}`}
+        data-control={props.id}
+        onClick={props.onToggle}
+      >
+        <span aria-hidden="true">{props.icon}</span>
+        <span class="assistant-control-dot" aria-hidden="true" />
+      </button>
+      <Show when={props.open}>
+        <div class="assistant-control-popover" role="listbox" aria-label={props.label}>
+          <div class="assistant-control-popover-head">
+            <span>{props.label}</span>
+            <span>{selected()?.label}</span>
+          </div>
+          <For each={props.options}>
+            {(option) => {
+              const active = () => option.value === props.value
+              return (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active()}
+                  class="assistant-control-option"
+                  classList={{ "is-active": active() }}
+                  onClick={() => {
+                    props.onChange(option.value)
+                    props.onClose()
+                  }}
+                >
+                  <span class="assistant-control-option-check">{active() ? <Check size={13} aria-hidden="true" /> : null}</span>
+                  <span>
+                    <strong>{option.label}</strong>
+                    <Show when={option.description}>{(description) => <small>{description()}</small>}</Show>
+                  </span>
+                </button>
+              )
+            }}
+          </For>
+          <ChevronUp class="assistant-control-popover-caret" size={11} aria-hidden="true" />
+        </div>
+      </Show>
+    </div>
+  )
+}
 
 export function AssistantControls(): JSX.Element {
   const ai = useAiStore()
   const running = () => ai.status() === "connecting" || ai.status() === "streaming" || ai.controlBusy()
   const selected = createMemo(() => ai.providers().find((p) => p.id === ai.model()?.provider)?.models.find((m) => m.id === ai.model()?.model))
   const variants = () => selected()?.variants ?? []
-  const changeVariant = (variant: string) => ai.setModel((current) => {
+  const agent = createMemo(() => ai.agents().find((candidate) => candidate.id === ai.agent()))
+  const [open, setOpen] = createSignal<string | undefined>()
+  const changeVariant = (variant: string): void => ai.setModel((current) => {
     if (!current) return current
     const { variant: _previous, ...model } = current
     return variant ? { ...model, variant } : model
   })
-  return <section class="assistant-disclosure assistant-settings" data-testid="ai-controls">
-    <div class="grid grid-cols-2 gap-2">
-      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.agent")}
-        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.agent()} disabled={running()} onChange={(e) => ai.setAgent(e.currentTarget.value)}>
-          <option value="cadcam">{t("ai.controls.coordinator")}</option>
-          <For each={ai.agents().filter((agent) => agent.id !== "cadcam")}>{(agent) => <option value={agent.id}>{agent.title}</option>}</For>
-        </select>
-      </label>
-      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.mode")}
-        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.mode()} disabled={running()} onChange={(e) => ai.setMode(e.currentTarget.value as ReturnType<typeof ai.mode>)}>
-          <For each={["general", "cad", "cam", "gcode", "toolpath"] as const}>{(mode) => <option value={mode}>{t(`ai.controls.mode.${mode}`)}</option>}</For>
-        </select>
-      </label>
-      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.permissions")}
-        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.permissionMode()} disabled={running()} onChange={(e) => ai.setPermissionMode(e.currentTarget.value as ReturnType<typeof ai.permissionMode>)}>
-          <For each={["auto", "ask", "approve"] as const}>{(mode) => <option value={mode}>{t(`ai.controls.permissions.${mode}`)}</option>}</For>
-        </select>
-      </label>
-      <label class="flex min-w-0 flex-col gap-1 text-xs">{t("ai.controls.thinking")}
-        <select class="w-full min-w-0 truncate rounded border bg-transparent px-2 py-1" value={ai.model()?.variant ?? ""} disabled={running() || variants().length === 0} onChange={(e) => changeVariant(e.currentTarget.value)}>
-          <option value="">{t("ai.controls.modelDefault")}</option>
-          <For each={variants()}>{(variant) => <option value={variant}>{variant}</option>}</For>
-        </select>
-      </label>
+
+  return (
+    <div class="assistant-chips" data-testid="ai-controls" aria-label={t("ai.controls.label")}>
+      <ControlMenu
+        id="agent"
+        icon={<Bot size={13} aria-hidden="true" />}
+        label={t("ai.controls.agent")}
+        title={agent()?.description}
+        value={ai.agent()}
+        disabled={running()}
+        open={open() === "agent"}
+        onToggle={() => setOpen((current) => current === "agent" ? undefined : "agent")}
+        onClose={() => setOpen(undefined)}
+        onChange={(value) => ai.setAgent(value)}
+        options={[
+          { value: "cadcam", label: t("ai.controls.coordinator") },
+          ...ai.agents().filter((candidate) => candidate.id !== "cadcam").map((candidate) => ({ value: candidate.id, label: candidate.title, description: candidate.description }))
+        ]}
+      />
+
+      <ControlMenu
+        id="mode"
+        icon={<Compass size={13} aria-hidden="true" />}
+        label={t("ai.controls.mode")}
+        value={ai.mode()}
+        disabled={running()}
+        open={open() === "mode"}
+        onToggle={() => setOpen((current) => current === "mode" ? undefined : "mode")}
+        onClose={() => setOpen(undefined)}
+        onChange={(value) => ai.setMode(value as ReturnType<typeof ai.mode>)}
+        options={(["general", "cad", "cam", "gcode", "toolpath"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.mode.${mode}`) }))}
+      />
+
+      <ControlMenu
+        id="permissions"
+        icon={<ShieldCheck size={13} aria-hidden="true" />}
+        label={t("ai.controls.permissions")}
+        value={ai.permissionMode()}
+        disabled={running()}
+        open={open() === "permissions"}
+        onToggle={() => setOpen((current) => current === "permissions" ? undefined : "permissions")}
+        onClose={() => setOpen(undefined)}
+        onChange={(value) => ai.setPermissionMode(value as ReturnType<typeof ai.permissionMode>)}
+        options={(["auto", "ask", "approve"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.permissions.${mode}`) }))}
+      />
+
+      <Show when={variants().length > 0}>
+        <ControlMenu
+          id="thinking"
+          icon={<Brain size={13} aria-hidden="true" />}
+          label={t("ai.controls.thinking")}
+          value={ai.model()?.variant ?? ""}
+          disabled={running()}
+          open={open() === "thinking"}
+          onToggle={() => setOpen((current) => current === "thinking" ? undefined : "thinking")}
+          onClose={() => setOpen(undefined)}
+          onChange={changeVariant}
+          options={[
+            { value: "", label: t("ai.controls.modelDefault") },
+            ...variants().map((variant) => ({ value: variant, label: variant }))
+          ]}
+        />
+      </Show>
     </div>
-    <Show when={ai.agents().find((agent) => agent.id === ai.agent())}>{(agent) => <p class="mt-2 text-xs">{agent().description}</p>}</Show>
-    <Show when={ai.controlError()}>{(error) => <p role="alert" class="mt-2 text-xs text-red-500">{error()}</p>}</Show>
-  </section>
+  )
+}
+
+/**
+ * The control error is the one thing that must never be hidden behind a chip:
+ * it renders as a strip above the composer for as long as it stands.
+ */
+export function AssistantControlError(): JSX.Element {
+  const ai = useAiStore()
+  return (
+    <Show when={ai.controlError()}>
+      {(error) => <p class="assistant-control-error" role="alert">{error()}</p>}
+    </Show>
+  )
 }
 
 function QuestionCard(props: { readonly request: AiPendingQuestion }): JSX.Element {

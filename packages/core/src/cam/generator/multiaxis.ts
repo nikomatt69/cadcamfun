@@ -121,6 +121,10 @@ export const multiaxisProgram = (
       Leaned: String(result.stats.leaned)
     }
   })
-  const gcode = post.emit(program, options.stamp !== undefined ? { stamp: options.stamp } : {})
-  return { gcode, warnings }
+  try {
+    const gcode = post.emit(program, options.stamp !== undefined ? { stamp: options.stamp } : {})
+    return { gcode, warnings }
+  } catch (cause) {
+    return { ...fail(cause instanceof Error ? cause.message : String(cause)), warnings }
+  }
 }

@@ -1,0 +1,29 @@
+Find anything in a large drawing by text and get the answer in one call: every parametric hit comes back with its full parameter set and revision, so searching a big project is not a search followed by N inspections.
+
+Use it
+- Before touching an unfamiliar or large project, to find the part by name, type, parameter or feature and see its parameters in the same result.
+- To answer "which part uses a 5 mm bore", "what drives the height of the bracket" or "where is fillet_r used": the query is matched against parameter names AND their values, not just names.
+- To page through many hits with offset/limit rather than guessing element ids.
+
+Do not use it
+- To read one known element's full property tree: that is cad_inspect with action:"property", which pages large values.
+- To change parameters: this tool never writes. Read the revision here, then cad_parametric action:"update" with expectedRevision.
+- To search text files or code: that is attachment_read.
+
+Parameters
+- query: 1 to 200 characters, matched case-insensitively as a substring anywhere in the element.
+- layerId: optional, restricts the search to one layer.
+- parametricOnly: optional, default false. True searches only dimension-driven parts; false also matches plain geometry and property values.
+- includeParameters: optional, default true. False returns ids only, for a cheap first pass over a very large drawing.
+- offset, limit: page window. limit 1..50, default 20.
+
+What is searched
+- id, type, name and layer of every element.
+- For parametric parts: parameter names and their values, and the feature list including sketch entities and expressions.
+- Scalar property values of plain geometry. Large arrays (vertices, faces) are skipped: they are not searchable evidence.
+
+Result (JSON)
+- ok, query, total, returned, offset, complete and nextOffset (null at the end). Each hit has id, type, name, layerId, parametric and foundIn (the paths that matched, so you know why it hit). A parametric hit also carries parameters (the full set), revision and featureIds.
+- A part whose stored history is invalid reports historyProblems instead of parameters.
+
+Nothing is changed by this tool, and it never rebuilds geometry: a search reports the stored history, so rebuild metrics (bodyCount, volumeMm3, bounds) come from cad_parametric action:"inspect". foundIn is evidence of a text match, never proof that a parameter drives the geometry you think it does: read featureIds and confirm with cad_parametric action:"inspect" before you edit. Narrow the query or filter by layerId rather than raising the limit past 50.

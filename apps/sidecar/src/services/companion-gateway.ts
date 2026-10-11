@@ -60,6 +60,7 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["DELETE"], path: /^\/api\/notifications\/[^/]+$/ },
   { methods: ["GET"], path: /^\/api\/ai\/status$/ },
   { methods: ["GET"], path: /^\/api\/ai\/models$/ },
+  { methods: ["GET"], path: /^\/api\/ai\/agents$/ },
   { methods: ["POST"], path: /^\/api\/ai\/(chat\/stream|chat\/abort|chat\/queue|permission\/reply|sessions\/state|sessions\/control)$/ },
 ]
 

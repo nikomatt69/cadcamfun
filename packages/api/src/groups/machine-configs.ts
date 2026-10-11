@@ -8,11 +8,22 @@ const id = { id: Schema.String }
 export const MachineType = Schema.Literals(["mill", "lathe", "printer", "laser"])
 
 const Positive = Schema.Number.check(Schema.isGreaterThan(0))
+const Range = Schema.Struct({ min: Schema.Number, max: Schema.Number })
 export const MachineConfigParams = Schema.Struct({
   workVolume: Schema.Struct({ x: Positive, y: Positive, z: Positive }),
   maxSpindleSpeed: Positive,
   maxFeedRate: Positive,
   controller: Schema.optional(Schema.String),
+  /** Number of controlled axes: 3 (XYZ), 4 or 5 (with a rotary table). */
+  axes: Schema.optional(Schema.Literals([3, 4, 5])),
+  /** The rotary table of a 4/5-axis machine (required when `axes` is 4 or 5, checked by the sidecar). */
+  rotary: Schema.optional(Schema.Struct({
+    layout: Schema.Literals(["table-AC", "table-BC"]),
+    tilt: Range,
+    rotation: Schema.optional(Range),
+    pivot: Schema.optional(Schema.Struct({ x: Schema.Number, y: Schema.Number, z: Schema.Number })),
+    tcp: Schema.optional(Schema.Literals(["control", "program"]))
+  })),
   additionalSettings: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
 })
 

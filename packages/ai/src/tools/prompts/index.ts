@@ -38,6 +38,8 @@ import lib_lookup_material from "./lib_lookup_material.txt" with { type: "text" 
 import lib_lookup_tool from "./lib_lookup_tool.txt" with { type: "text" }
 import memory_recall from "./memory_recall.txt" with { type: "text" }
 import memory_remember from "./memory_remember.txt" with { type: "text" }
+import project_context from "./project_context.txt" with { type: "text" }
+import cad_grep from "./cad_grep.txt" with { type: "text" }
 
 const PROMPTS = {
   cam_stock,
@@ -64,7 +66,9 @@ const PROMPTS = {
   lib_lookup_material,
   lib_lookup_tool,
   memory_recall,
-  memory_remember
+  memory_remember,
+  project_context,
+  cad_grep
 } as const
 
 export type ToolPromptId = keyof typeof PROMPTS

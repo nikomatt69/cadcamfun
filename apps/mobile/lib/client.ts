@@ -11,6 +11,14 @@ export interface AiStatusInfo {
   host?: "nikcli" | "direct"
 }
 
+export interface AssistantAgentInfo {
+  readonly id: string
+  readonly title: string
+  readonly description: string
+  readonly tools: readonly string[]
+  readonly edits: boolean
+}
+
 /** A raw HTTP response: status and text body (JSON is parsed by the caller). */
 export interface TransportResponse {
   readonly status: number
@@ -108,6 +116,7 @@ export class CompanionClient {
 
   /** Whether the paired desktop has a model key; checked before the user types. */
   aiStatus = (signal?: AbortSignal) => this.request<AiStatusInfo>("GET", "/api/ai/status", undefined, signal)
+  agents = (signal?: AbortSignal) => this.request<AssistantAgentInfo[]>("GET", "/api/ai/agents", undefined, signal)
   sessionState = (sessionId: string, signal?: AbortSignal) => this.request<typeof SessionStateReply.Type>("POST", "/api/ai/sessions/state", { sessionId }, signal)
   questionReply = (sessionId: string, requestId: string, answers: string[][]) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "answer_question", requestId, answers })
   questionReject = (sessionId: string, requestId: string) => this.request<typeof SessionControlReply.Type>("POST", "/api/ai/sessions/control", { sessionId, action: "reject_question", requestId })
@@ -126,7 +135,7 @@ export class CompanionClient {
    * never touching `main`. Passing a `sessionId` continues the same conversation as the desktop.
    */
   async *chat(
-    body: { projectId: string; message?: string; sessionId?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" },
+    body: { projectId: string; message?: string; sessionId?: string; agent?: string; mode?: "general" | "cad" | "cam" | "gcode" | "toolpath" },
     signal?: AbortSignal,
   ): AsyncGenerator<ChatEvent> {
     const parse = sseParser<ChatEvent>()

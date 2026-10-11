@@ -7,16 +7,10 @@
  */
 import { type JSX } from "solid-js"
 import { EnhancedAssistant } from "./EnhancedAssistant.tsx"
-import { ScreenHeader } from "../screens/screen-parts.tsx"
-import { t } from "../i18n/index.ts"
-
 export function AssistantPage(): JSX.Element {
   return (
-    <section class="flex h-full flex-col p-4 sm:p-6" data-testid="ai-page">
-      <ScreenHeader title={t("ai.page.title")} subtitle={t("ai.page.subtitle")} />
-      <div class="flex-1 min-h-0 mt-4">
-        <EnhancedAssistant className="h-full" />
-      </div>
+    <section class="assistant-page" data-testid="ai-page">
+      <EnhancedAssistant className="assistant-page-surface" />
     </section>
   )
 }

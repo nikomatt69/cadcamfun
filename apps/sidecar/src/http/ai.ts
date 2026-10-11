@@ -1,4 +1,4 @@
-import { projectMemoryPrefix } from "@cadcamfun/ai"
+import { projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
 import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
@@ -70,6 +70,24 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
         Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI context", error).pipe(Effect.as(undefined)))
       )
       if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
+      // The user's standing rules for this project: instructions, framed so they outrank the mode block.
+      const document = yield* kv.get(projectContextKey(payload.projectId)).pipe(
+        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load the project AI context", error).pipe(Effect.as(undefined)))
+      )
+      const rules = renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text)
+      if (rules !== "") parts.push(rules)
+      // What earlier sessions established and how this person works: data and a prior, never instructions.
+      // A project with no embedded host has no Brain and no habits file, so both blocks are simply absent.
+      if (Option.isSome(host)) {
+        const projectHost = yield* host.value.runtime.host(payload.projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (projectHost !== undefined) {
+          const files = yield* Effect.promise(() => readProjectMemoryFiles(projectHost))
+          const memoryBlock = renderProjectMemory(files.memory)
+          if (memoryBlock !== "") parts.push(memoryBlock)
+          const habitsBlock = renderUserHabits(files.habits)
+          if (habitsBlock !== "") parts.push(habitsBlock)
+        }
+      }
     }
     const memoryPrefix = `ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`
     const memory = yield* kv.list(memoryPrefix).pipe(

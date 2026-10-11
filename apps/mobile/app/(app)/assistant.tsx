@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FlatList, KeyboardAvoidingView, Platform, Text, View } from "react-native"
-import { ChevronDown, MessageCircleQuestion, Sparkles } from "lucide-react-native"
+import { FlatList, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native"
+import { Bot, ChevronDown, CircleGauge, GitPullRequest, Route, Sparkles } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
@@ -17,6 +17,24 @@ import { PermissionCard } from "@/components/chat/PermissionCard"
 import { BottomSheet } from "@/components/ui/BottomSheet"
 import { PressableScale } from "@/components/ui/PressableScale"
 import { EmptyState } from "@/components/ui/EmptyState"
+
+const QUICK_PROMPTS = [
+  {
+    label: "Inspect the project",
+    prompt: "Inspect this CADCAMFUN project and tell me the highest-priority CAD or CAM issue to address first.",
+    icon: CircleGauge,
+  },
+  {
+    label: "Verify toolpaths",
+    prompt: "Verify the project's toolpaths and explain any collision, gouge, uncut stock, or stale G-code you find.",
+    icon: Route,
+  },
+  {
+    label: "Prepare a safe change",
+    prompt: "Review the project, propose one useful improvement, make it on an ai/ branch, run the relevant checks, and open a pull request for me to review.",
+    icon: GitPullRequest,
+  },
+] as const
 
 /**
  * The Assistant tab — a chat with the AI that manages the project through pull requests and
@@ -40,6 +58,8 @@ export default function AssistantScreen() {
   const setAssistantSession = useUIStore((state) => state.setAssistantSession)
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false)
+  const [selectedAgentId, setSelectedAgentId] = useState("cadcam")
   const [log, setLog] = useState<readonly ChatRow[]>(emptyLog)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<AssistantMode>("general")
@@ -58,7 +78,13 @@ export default function AssistantScreen() {
     "assistant:projects",
   )
 
+  const agents = useResource(
+    useCallback((signal) => (client ? client.agents(signal) : Promise.reject(new Error("Not connected"))), [client]),
+    "assistant:agents",
+  )
+
   const currentProject = (projects.data ?? []).find((project) => project.id === projectId) ?? null
+  const currentAgent = (agents.data ?? []).find((agent) => agent.id === selectedAgentId) ?? agents.data?.[0] ?? null
 
   useEffect(() => {
     generation.current += 1
@@ -91,7 +117,7 @@ export default function AssistantScreen() {
 
     try {
       for await (const event of client.chat(
-        { projectId, message: text, sessionId: sessionRef.current, mode },
+        { projectId, message: text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode },
         controller.signal,
       )) {
         if (controller.signal.aborted || version !== generation.current) break
@@ -162,6 +188,25 @@ export default function AssistantScreen() {
     })
   }
 
+  const queue = async (text: string) => {
+    const sessionId = sessionRef.current
+    const version = generation.current
+    if (!client || !projectId || !sessionId || connectivity !== "online") return
+    setLog((previous) => appendChatEvent(previous, { type: "user", text }))
+    try {
+      await client.queueChat(sessionId, text, projectId, "steer")
+    } catch (error) {
+      if (version !== generation.current) return
+      haptic("error")
+      setLog((previous) => appendChatEvent(previous, {
+        type: "error",
+        sessionId,
+        code: "internal",
+        message: error instanceof Error ? error.message : "Could not steer the desktop assistant",
+      }))
+    }
+  }
+
   const replyPermission = async (requestId: string, decision: "once" | "always" | "reject") => {
     const sessionId = sessionRef.current, version = generation.current
     if (!sessionId || !client) return
@@ -218,40 +263,85 @@ export default function AssistantScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: palette.background }}>
-      {/* Project context header */}
-      <PressableScale onPress={() => { haptic("selection"); setPickerOpen(true) }} subtle>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderBottomWidth: 0.5,
-            borderBottomColor: palette.border,
-          }}
+      {/* Project + agent context: the two things that determine where and how the turn runs. */}
+      <View style={{ minHeight: 48, flexDirection: "row", alignItems: "stretch", borderBottomWidth: 0.5, borderBottomColor: palette.border }}>
+        <PressableScale
+          onPress={() => { haptic("selection"); setPickerOpen(true) }}
+          subtle
+          tint
+          accessibilityRole="button"
+          accessibilityLabel="Choose assistant project"
+          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
         >
-          <Text style={{ color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: "600" }} numberOfLines={1}>
+          <Text style={{ flexShrink: 1, color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: "600" }} numberOfLines={1}>
             {currentProject ? currentProject.name : "Choose a project"}
           </Text>
           <ChevronDown size={15} color={palette.muted} />
-        </View>
-      </PressableScale>
+        </PressableScale>
+        <View style={{ width: 0.5, marginVertical: 10, backgroundColor: palette.border }} />
+        <PressableScale
+          onPress={() => { haptic("selection"); setAgentPickerOpen(true) }}
+          subtle
+          tint
+          accessibilityRole="button"
+          accessibilityLabel="Choose CADCAMFUN agent"
+          style={{ maxWidth: "44%", minWidth: 128, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}
+        >
+          <Bot size={15} color={palette.accent} />
+          <Text style={{ flexShrink: 1, color: palette.soft, fontSize: 13, lineHeight: 18, fontWeight: "600" }} numberOfLines={1}>
+            {currentAgent?.title ?? "CAD/CAM assistant"}
+          </Text>
+          <ChevronDown size={14} color={palette.muted} />
+        </PressableScale>
+      </View>
 
       {/* Transcript */}
       {log.length === 0 ? (
-        <View style={{ flex: 1 }}>
-          <EmptyState
-            
-            title={projectId ? "Ask the assistant anything" : "Pick a project first"}
-            description={
-              projectId
-                ? '"Make the plate 20 mm wider and regenerate the pocket" — the assistant edits on an ai/ branch and opens a pull request for you to review.'
-                : "The assistant works inside one project at a time."
-            }
-          />
-        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 20, paddingVertical: 28 }}
+        >
+          {!projectId ? (
+            <EmptyState title="Pick a project first" description="The assistant works inside one CADCAMFUN project at a time." />
+          ) : (
+            <View style={{ alignItems: "center", gap: 18 }}>
+              <View style={{ width: 58, height: 58, borderRadius: 19, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: `${palette.accent}18` }}>
+                <Sparkles size={27} color={palette.accent} strokeWidth={1.9} />
+              </View>
+              <View style={{ alignItems: "center", gap: 7 }}>
+                <Text selectable style={{ color: palette.ink, fontSize: 26, lineHeight: 31, fontWeight: "700", letterSpacing: -0.55 }}>Build with CADCAMFUN</Text>
+                <Text selectable style={{ maxWidth: 340, color: palette.soft, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
+                  The same desktop agent, CAD/CAM tools, pull requests, and Actions—controlled from your iPhone.
+                </Text>
+                {ai?.tools?.length ? (
+                  <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 16 }}>{ai.tools.length} desktop tools available</Text>
+                ) : null}
+              </View>
+              <View style={{ alignSelf: "stretch", gap: 8 }}>
+                {QUICK_PROMPTS.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <PressableScale
+                      key={item.label}
+                      onPress={() => void send(item.prompt)}
+                      disabled={!aiReady || connectivity !== "online"}
+                      subtle
+                      tint
+                      accessibilityRole="button"
+                      accessibilityLabel={item.label}
+                      style={{ minHeight: 52, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderCurve: "continuous", borderWidth: 0.5, borderColor: palette.border, backgroundColor: palette.surface, paddingHorizontal: 14, paddingVertical: 10 }}
+                    >
+                      <Icon size={18} color={palette.accent} />
+                      <Text style={{ flex: 1, color: palette.ink, fontSize: 15, lineHeight: 20, fontWeight: "600" }}>{item.label}</Text>
+                    </PressableScale>
+                  )
+                })}
+              </View>
+            </View>
+          )}
+        </ScrollView>
       ) : (
         <FlatList
           ref={listRef}
@@ -276,6 +366,7 @@ export default function AssistantScreen() {
           setMode(next)
         }}
         onSend={(text) => void send(text)}
+        onQueue={(text) => void queue(text)}
         onStop={stop}
       />
 
@@ -304,6 +395,43 @@ export default function AssistantScreen() {
               <EmptyState  title="No projects on the desktop" />
             </View>
           ) : null}
+        </View>
+      </BottomSheet>
+
+      <BottomSheet open={agentPickerOpen} onClose={() => setAgentPickerOpen(false)} title="CADCAMFUN agents">
+        <View style={{ paddingHorizontal: 12, gap: 4 }}>
+          {(agents.data ?? []).map((agent) => {
+            const selected = agent.id === (currentAgent?.id ?? selectedAgentId)
+            return (
+              <PressableScale
+                key={agent.id}
+                subtle
+                tint
+                onPress={() => {
+                  haptic("selection")
+                  setSelectedAgentId(agent.id)
+                  setAgentPickerOpen(false)
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, borderRadius: 14, borderCurve: "continuous", backgroundColor: selected ? `${palette.accent}14` : "transparent", paddingHorizontal: 12, paddingVertical: 12 }}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 12, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: selected ? `${palette.accent}1F` : palette.panel }}>
+                  {agent.id === "cadcam" ? <Sparkles size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
+                </View>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                    <Text style={{ flexShrink: 1, color: palette.ink, fontSize: 16, lineHeight: 21, fontWeight: "600" }}>{agent.title}</Text>
+                    <Text style={{ color: agent.edits ? palette.warning : palette.muted, fontSize: 10, lineHeight: 13, fontWeight: "700", letterSpacing: 0.5 }}>{agent.edits ? "CAN EDIT" : "READ ONLY"}</Text>
+                  </View>
+                  <Text selectable style={{ color: palette.soft, fontSize: 13, lineHeight: 18 }}>{agent.description}</Text>
+                  {agent.tools.length > 0 ? <Text selectable style={{ color: palette.muted, fontSize: 11, lineHeight: 15 }}>{agent.tools.length} scoped tools</Text> : null}
+                </View>
+              </PressableScale>
+            )
+          })}
+          {agents.loading && !agents.data ? <Text style={{ color: palette.muted, padding: 16, textAlign: "center" }}>Loading desktop agents…</Text> : null}
+          {agents.error ? <Text selectable style={{ color: palette.danger, padding: 16, textAlign: "center" }}>{agents.error}</Text> : null}
         </View>
       </BottomSheet>
     </KeyboardAvoidingView>

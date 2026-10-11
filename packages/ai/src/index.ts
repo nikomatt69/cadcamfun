@@ -15,6 +15,7 @@ export * from "./prompts/workflows.ts"
 export * from "./service.ts"
 export * from "./tools/catalogue.ts"
 export { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime, type NikCliRuntimeOptions } from "./nikcli/runtime.ts"
+export { readProjectMemoryFiles, invalidateProjectMemoryFiles, projectMemoryFile, projectHabitsFile, type ProjectMemoryFiles } from "./nikcli/project-files.ts"
 export {
   abortHostSession,
   createHostSession,
@@ -59,3 +60,4 @@ export type { cadInspectInput } from "./tools/cad_inspect.ts"
 export type { cadComponentRelationsInput } from "./tools/cad_component_relations.ts"
 
 export * from "./project-memory.ts"
+export * from "./project-context.ts"

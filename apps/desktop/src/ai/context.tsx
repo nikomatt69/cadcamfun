@@ -15,7 +15,7 @@ import { makeCatalog, type AiCatalogService } from "./models.ts"
 import type { AiStatus, ModelInfo, ProviderId, ProviderInfo } from "./types.ts"
 import { useApp, type AppState } from "../state/context.ts"
 
-interface AiContextValue {
+export interface AiContextValue {
   readonly store: AiStore
   readonly app: AppState
   readonly aiStatus: Accessor<AiStatus | undefined>
@@ -27,6 +27,9 @@ interface AiContextValue {
   readonly saveCredentials: (provider: ProviderId, key: string, baseUrl?: string) => Promise<void>
   readonly removeCredentials: (provider: ProviderId) => Promise<void>
 }
+
+/** What every consumer of `useAiStore()` actually gets: the store plus the cached catalogue. */
+export type AiStoreAndContext = AiStore & AiContextValue
 
 const Ctx = createContext<AiContextValue>()
 
@@ -83,7 +86,7 @@ export const AiProvider = (props: { readonly children: JSX.Element }): JSX.Eleme
   })
 }
 
-export const useAiStore = (): AiStore & AiContextValue => {
+export const useAiStore = (): AiStoreAndContext => {
   const ctx = useContext(Ctx)
   if (ctx === undefined) throw new Error("useAiStore must be called inside <AiProvider>")
   return new Proxy(ctx, {
@@ -93,5 +96,5 @@ export const useAiStore = (): AiStore & AiContextValue => {
       if (typeof value === "function") return Reflect.get(target.store, prop, receiver)
       return value
     }
-  }) as AiStore & AiContextValue
+  }) as AiStoreAndContext
 }

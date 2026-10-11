@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, agentSystemPrompt, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  searchWeb, makeNikCliRuntime, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type HostToolSpec, type ProviderId, type ToolHandlersShape,
   LIBRARY_TOOL_IDS
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
@@ -254,6 +254,38 @@ const toolHandlers = Effect.gen(function*() {
         return { elements: loaded.elements, drawing: { ...describeElements(loaded.elements, 100, elementBounds), ...where(loaded) }, operations: mode === "cam" ? await handlers.listOperations(projectId) : null, ...(programRevision ? { programRevision } : {}), ...(programError ? { programError } : {}) }
       })
     },
+    grep: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      const needle = input.query.trim().toLowerCase()
+      if (needle === "") return { ok: false, error: "The query is empty after trimming." }
+      const hits = loaded.elements
+        .filter((e) => (input.layerId === undefined || e.layerId === input.layerId || e["layer"] === input.layerId))
+        .filter((e) => !input.parametricOnly || e.type === "parametric")
+        .map((e) => ({ element: e, foundIn: searchElement(e, needle) }))
+        .filter((hit) => hit.foundIn.length > 0)
+      const page = hits.slice(input.offset, input.offset + input.limit)
+      return {
+        ok: true, query: input.query, total: hits.length, returned: page.length,
+        offset: input.offset, complete: input.offset + page.length >= hits.length,
+        nextOffset: input.offset + page.length < hits.length ? input.offset + page.length : null,
+        hits: page.map(({ element, foundIn }) => {
+          const base = { id: element.id, type: element.type, name: typeof element["name"] === "string" ? element.name : null, layerId: element.layerId, parametric: element.type === "parametric", foundIn }
+          if (element.type !== "parametric") return base
+          // A grep is a text operation: it reports the stored history, it never rebuilds geometry to
+          // answer a search. Metrics come from cad_parametric inspect, which can afford the kernel run.
+          const decoded = historySchema.safeParse(element["history"])
+          if (!decoded.success) return { ...base, historyProblems: decoded.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`) }
+          return {
+            ...base,
+            ...(input.includeParameters ? { parameters: decoded.data.parameters } : {}),
+            revision: historyRevision(element["history"]),
+            featureIds: decoded.data.features.map((f) => f.id)
+          }
+        }),
+        ...where(loaded)
+      }
+    },
     parametric: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       if (input.action === "validate") return inspectParametric(input.history)
@@ -489,6 +521,15 @@ const toolHandlers = Effect.gen(function*() {
     },
     remember: async (key, value) => { await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
+    projectContext: async (projectId) => {
+      const entry = await Effect.runPromise(kv.get(projectContextKey(projectId)))
+      // An absent row is an empty document, not a failure: a project that never had rules reads as blank.
+      return entry === undefined ? { text: "" } : parseProjectContext(entry.value)
+    },
+    saveProjectContext: async (projectId, text) => {
+      const entry = await Effect.runPromise(kv.set(projectContextKey(projectId), text))
+      return parseProjectContext(entry.value)
+    },
     lookupMaterial: async (query) => (await Effect.runPromise(materials.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((m) => ({ id: m.id, name: m.name, description: m.description, properties: m.properties, updatedAt: m.updatedAt })),
     lookupTool: async (query) => (await Effect.runPromise(tools.list(acting().id, { search: query, includePublic: true }))).slice(0, 10).map((t) => ({ id: t.id, name: t.name, diameter: t.diameter, type: t.type, material: t.material, numberOfFlutes: t.numberOfFlutes, maxRPM: t.maxRPM, coolantType: t.coolantType, cuttingLength: t.cuttingLength, totalLength: t.totalLength, shankDiameter: t.shankDiameter, notes: t.notes })),
     lookupComponent: async (query) => {

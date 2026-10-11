@@ -28,6 +28,14 @@ describe("CompanionClient", () => {
     expect(t.calls[0]).toEqual({ path: "/api/health", method: "GET" })
   })
 
+  test("agent roster uses the read-only companion route", async () => {
+    const t = new FakeTransport()
+    t.handler = () => ({ status: 200, body: JSON.stringify([{ id: "machinist", title: "CAM programmer", description: "Programs and verifies machining", tools: ["cam_verify_toolpath"], edits: true }]) })
+    const agents = await client(t).agents()
+    expect(agents).toHaveLength(1)
+    expect(t.calls[0]).toEqual({ path: "/api/ai/agents", method: "GET" })
+  })
+
   test("project paths are URL-encoded", async () => {
     const t = new FakeTransport()
     await client(t).status("a b/c")

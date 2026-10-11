@@ -1,0 +1,24 @@
+Read or update this project’s standing AI context: the document the user writes so every conversation in this project starts from the same rules (work offset, material standard, finishing rule, layer naming, what to never do).
+
+It is the CAD/CAM equivalent of AGENTS.md. The model is told to follow it on every request here, so it is instructions, not a note.
+
+Use it
+- action "read": at the start of work when the context block was truncated, or to confirm what the project rules are before a long job.
+- action "update": after verified work, when the user states a durable rule ("always finish with a finishing pass", "we work in G55 on this job"), or when a confirmed setup contradicts a rule that is now wrong.
+
+Do not use it
+- For facts about the current geometry, stock or machine: that is the live context and memory_recall.
+- To record a one-off observation or a step of the current job: that is memory_remember.
+- Without confirm: true on action "update". Updating the project rules changes every later conversation.
+
+Parameters
+- action: "read" or "update".
+- heading (update only): a stable Markdown heading, 1 to 80 characters, for example "Machining" or "Naming". The section with this heading is replaced; a heading that does not exist yet is added. Reuse the same heading to correct a rule instead of adding a near-duplicate.
+- content (update only): the section body, 1 to 2000 characters, plain Markdown. Write the rule, not the incident that produced it.
+- confirm (update only): must be true. It is the user’s standing rules; ask before you change them.
+
+Result (JSON)
+- read: {ok, text, updatedAt} — the whole document, whatever the per-turn budget showed.
+- update: {ok, text, updatedAt, changed} — the document after the change.
+
+Nothing was changed when confirm is missing, when the heading or content is empty, or when the result would exceed the document limit.

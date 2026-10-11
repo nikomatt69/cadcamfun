@@ -1,13 +1,14 @@
 /**
- * Dashboard — visual parity with .reference/src/pages/index.tsx.
- *
- * Holographic hero with floating orbs, metric cards, module cards (CAD, CAM,
- * Projects), quick-access tiles. Apple design system throughout:
+ * Dashboard — hero, metric cards, module cards (CAD, CAM, Projects),
+ * quick-access tiles. Apple design system throughout:
  * - Spring entry (damping 1.0 default, no overshoot) for cards
- * - Translucent gradient surfaces (backdrop-filter) for the hero and cards
+ * - Translucent surfaces (backdrop-filter) for the hero and cards
  * - Pointer-down press feedback on every interactive card and button
  * - Optical typography (display = -0.025em tracking, body 0)
  * - Reduced-motion fallback (no orbs / no scale loop, opacity only)
+ *
+ * The hero is deliberately restrained: no emoji, no rainbow gradients, no
+ * decorative orbs. The audience is machinists and engineers.
  */
 import { For, Show, createMemo, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
@@ -20,14 +21,12 @@ import {
   Layers,
   Settings,
   Wrench,
-  Sparkles,
-  Zap,
   ArrowUpRight,
-  Plus,
-  Clock,
   TrendingUp,
   Activity,
-  Monitor
+  Monitor,
+  Target,
+  Gauge
 } from "lucide-solid"
 import { Card, InteractiveCard } from "../components/ui/card.tsx"
 import { Button, IconButton } from "../components/ui/button.tsx"
@@ -82,15 +81,15 @@ const modules = (): ReadonlyArray<ModuleCardData> => [
 ]
 
 interface FeatureChipData {
-  readonly icon: string
+  readonly icon: typeof Target
   readonly text: string
 }
 
 const features = (): ReadonlyArray<FeatureChipData> => [
-  { icon: "🎯", text: t("dashboard.feature.precision") },
-  { icon: "🤖", text: t("dashboard.feature.ai") },
-  { icon: "⚡", text: t("dashboard.feature.performance") },
-  { icon: "🛠️", text: t("dashboard.feature.cnc") }
+  { icon: Target, text: t("dashboard.feature.precision") },
+  { icon: Cpu, text: t("dashboard.feature.ai") },
+  { icon: Gauge, text: t("dashboard.feature.performance") },
+  { icon: Wrench, text: t("dashboard.feature.cnc") }
 ]
 
 interface MetricCardData {

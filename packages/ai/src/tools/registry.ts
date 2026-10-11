@@ -36,11 +36,13 @@ import { libLookupMaterial } from "./lib_lookup_material.ts"
 import { libLookupTool } from "./lib_lookup_tool.ts"
 import { memoryRecall } from "./memory_recall.ts"
 import { memoryRemember } from "./memory_remember.ts"
+import { projectContext } from "./project_context.ts"
+import { cadGrep } from "./cad_grep.ts"
 
 export const BUILT_IN_TOOLS = [
   camStock, cadComponentRelations, cadInspect, webSearch, attachmentRead, cadVision, camVision, cadParametric, cadAddEntities, cadAddElements, cadImportDrawing, cadModifyEntities, cadTransformEntities, cadGroupEntities, cadEditor, cadDeleteEntities, cadDescribeDrawing, cadCheckDesign,
   camDescribeMachine, camCreateOperation, camListOperations, camUpdateOperation, camSuggestParameters, camGenerateGcode, camAnalyzeGcode, camVerifyToolpath,
-  libLookupMaterial, libLookupTool, memoryRemember, memoryRecall
+  libLookupMaterial, libLookupTool, memoryRemember, memoryRecall, projectContext, cadGrep
 ] as const
 
 /** The built-in tool ids. */

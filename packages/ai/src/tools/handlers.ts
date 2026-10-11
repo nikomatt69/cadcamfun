@@ -5,6 +5,7 @@ import type { cadComponentRelationsInput } from "./cad_component_relations.ts"
 import type { WebSearchInput } from "../web-search.ts"
 import type { VisionCapture } from "../vision.ts"
 import type { ParametricInput } from "./cad_parametric.ts"
+import type { CadGrepInput } from "./cad_grep.ts"
 import { Context } from "effect"
 import type { cad, cam } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
@@ -32,6 +33,8 @@ export interface ToolHandlersShape {
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
   parametric?(projectId: string, input: ParametricInput): Promise<unknown>
   addEntities(projectId: string, entities: ReadonlyArray<unknown>): Promise<unknown>
+  /** Substring search over the drawing that returns each parametric hit's parameters with its revision. */
+  grep(projectId: string, input: CadGrepInput): Promise<unknown>
   /** Elements in the editor's own shape (see `element-catalog.ts`); a number in `operands` is the index of an earlier element of the batch. */
   addElements(projectId: string, elements: ReadonlyArray<Record<string, unknown>>): Promise<unknown>
   modifyEntities(projectId: string, changes: ReadonlyArray<{ id: string; changes: unknown }>): Promise<unknown>
@@ -62,6 +65,10 @@ export interface ToolHandlersShape {
   /** Persistent notes the assistant keeps between sessions (the `ai.memory.*` keys of the key-value store). */
   remember(key: string, value: string): Promise<unknown>
   recall(prefix?: string): Promise<unknown>
+  /** The project's standing AI context (`ai.projectcontext.<projectId>`): the CAD/CAM answer to `AGENTS.md`. */
+  projectContext(projectId: string): Promise<unknown>
+  /** Replaces that document; returns what the store actually kept, never what the caller intended to write. */
+  saveProjectContext(projectId: string, text: string): Promise<unknown>
   /** Components that are instantiated in the active CAD drawing. */
   listComponents(projectId: string): Promise<unknown>
   saveComponent(projectId: string, ids: ReadonlyArray<string>, name: string): Promise<unknown>

@@ -166,11 +166,7 @@ function ToastItem({ toast, depth, onDismiss }: { toast: ToastEntry; depth: numb
             overflow: "hidden",
             backgroundColor: hexToRgba(tone, isDark ? 0.18 : 0.11),
             borderColor: hexToRgba(tone, isDark ? 0.28 : 0.22),
-            shadowColor: palette.ink,
-            shadowOpacity: isDark ? 0.3 : 0.1,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 8,
+            boxShadow: isDark ? "0 6px 22px rgba(0,0,0,0.38)" : "0 6px 22px rgba(0,0,0,0.14)",
           },
           animatedStyle,
         ]}

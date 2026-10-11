@@ -15,7 +15,7 @@ describe("one definition per tool (nikcli style)", () => {
       expect(existsSync(`${dir}${id}.ts`), `${id}.ts`).toBe(true)
       expect(existsSync(`${dir}prompts/${id}.txt`), `${id}.txt`).toBe(true)
     }
-    const files = readdirSync(dir).filter((f) => /^(cad|cam|lib|memory|attachment|web)_.*\.ts$/.test(f)).map((f) => f.slice(0, -3)).sort()
+    const files = readdirSync(dir).filter((f) => /^(cad|cam|lib|memory|attachment|web|project)_.*\.ts$/.test(f)).map((f) => f.slice(0, -3)).sort()
     expect(files).toEqual([...TOOL_IDS].sort())
   })
 

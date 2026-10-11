@@ -11,7 +11,7 @@ import type { ChatEvent } from "./sse"
 export type ChatRow =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string; sessionId: string }
-  | { kind: "tool"; tool: string; ok: boolean | null; callId: string; input?: unknown; output?: string; agent?: string; diagnostic?: { message: string; severity: string; recovery?: string } }
+  | { kind: "tool"; tool: string; rawTool?: string; ok: boolean | null; callId: string; input?: unknown; output?: string; agent?: string; diagnostic?: { message: string; severity: string; recovery?: string } }
   | { kind: "question"; sessionId: string; requestId: string; questions: Extract<ChatEvent, { type: "question_request" }>["questions"]; answered: boolean }
   | { kind: "request"; sessionId: string; requestId: string; permission: string; patterns: readonly string[]; answered: boolean }
   | { kind: "error"; message: string }
@@ -53,13 +53,13 @@ export const appendChatEvent = (log: readonly ChatRow[], event: LogEvent): reado
 
     case "tool_call": {
       const call = event as Extract<ChatEvent, { type: "tool_call" }>
-      return [...log, { kind: "tool" as const, tool: toolLabel(call.tool), ok: null, callId: call.callId, input: call.input, ...(call.agent ? { agent: call.agent } : {}) }]
+      return [...log, { kind: "tool" as const, tool: toolLabel(call.tool), rawTool: call.tool, ok: null, callId: call.callId, input: call.input, ...(call.agent ? { agent: call.agent } : {}) }]
     }
 
     case "tool_result": {
       const result = event as Extract<ChatEvent, { type: "tool_result" }>
       const index = log.findIndex((row) => row.kind === "tool" && row.callId === result.callId)
-      if (index < 0) return [...log, { kind: "tool" as const, tool: toolLabel(result.tool), ok: result.ok, callId: result.callId, output: result.output, ...(result.agent ? { agent: result.agent } : {}) }]
+      if (index < 0) return [...log, { kind: "tool" as const, tool: toolLabel(result.tool), rawTool: result.tool, ok: result.ok, callId: result.callId, output: result.output, ...(result.agent ? { agent: result.agent } : {}) }]
       const row = log[index]
       if (row?.kind !== "tool") return log
       return [...log.slice(0, index), { ...row, ok: result.ok, output: result.output }, ...log.slice(index + 1)]

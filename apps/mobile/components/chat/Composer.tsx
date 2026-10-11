@@ -1,10 +1,11 @@
 import { useRef, useState } from "react"
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native"
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
 import { ArrowUp, Square } from "lucide-react-native"
-import { useTheme } from "@/lib/theme"
+import Animated from "react-native-reanimated"
+import { AdaptiveBlur } from "@/components/GlassView"
+import { hexToRgba, useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { usePressScale } from "@/lib/animation"
-import Animated from "react-native-reanimated"
 
 export type AssistantMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
 
@@ -12,15 +13,15 @@ const MODES: ReadonlyArray<{ value: AssistantMode; label: string }> = [
   { value: "general", label: "General" },
   { value: "cad", label: "CAD" },
   { value: "cam", label: "CAM" },
-  { value: "gcode", label: "G-code" },
   { value: "toolpath", label: "Toolpath" },
+  { value: "gcode", label: "G-code" },
 ]
 
 /**
- * The assistant input: mode chips (the CADCAMFUN assistant is mode-aware), the growing message
- * field and a send button that becomes Stop while a turn is running (state indication: the same
- * control flips function, so the eye never leaves the action). Send fires on the same frame as
- * the haptic.
+ * The CADCAMFUN composer follows nikcli's mobile interaction model while staying domain-specific:
+ * one floating material, a growing editor, a compact mode rail, and explicit live-turn controls.
+ * A new message typed while the desktop is working steers that same session instead of being
+ * blocked; Stop remains a separate target so the two actions can never be confused.
  */
 export function Composer({
   busy,
@@ -29,6 +30,7 @@ export function Composer({
   mode,
   onModeChange,
   onSend,
+  onQueue,
   onStop,
 }: {
   busy: boolean
@@ -37,121 +39,152 @@ export function Composer({
   mode: AssistantMode
   onModeChange: (mode: AssistantMode) => void
   onSend: (text: string) => void
+  onQueue: (text: string) => void
   onStop: () => void
 }) {
-  const { palette } = useTheme()
+  const { palette, glass, isDark } = useTheme()
   const [text, setText] = useState("")
   const inputRef = useRef<TextInput>(null)
   const sendScale = usePressScale()
+  const stopScale = usePressScale()
+  const canSubmit = text.trim().length > 0 && !disabled
 
-  const canSend = text.trim().length > 0 && !busy && !disabled
-
-  const send = () => {
+  const submit = () => {
     const value = text.trim()
-    if (!value || busy || disabled) return
+    if (!value || disabled) return
     haptic("light")
     setText("")
-    onSend(value)
+    if (busy) onQueue(value)
+    else onSend(value)
   }
 
   return (
-    <View
-      style={{
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        paddingBottom: 12,
-        borderTopWidth: 0.5,
-        borderTopColor: palette.border,
-        backgroundColor: palette.background,
-        gap: 8,
-      }}
-    >
-      {/* Mode chips — peers, no slide; a chip press is a selection tick. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingHorizontal: 4 }} keyboardShouldPersistTaps="handled">
-        {MODES.map((item) => {
-          const active = item.value === mode
-          return (
-            <Pressable
-              key={item.value}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => {
-                haptic("selection")
-                onModeChange(item.value)
-              }}
-              style={{
-                paddingHorizontal: 11,
-                paddingVertical: 5,
-                borderRadius: 999,
-                backgroundColor: active ? palette.accent : palette.panel,
-              }}
-            >
-              <Text style={{ color: active ? palette.onAccent : palette.soft, fontSize: 12, lineHeight: 16, fontWeight: "600" }}>{item.label}</Text>
-            </Pressable>
-          )
-        })}
-      </ScrollView>
-
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
-        <View
-          style={{
-            flex: 1,
-            minHeight: 40,
-            maxHeight: 120,
-            borderRadius: 20,
-            paddingHorizontal: 16,
-            paddingVertical: 9,
-            backgroundColor: palette.panel,
-            justifyContent: "center",
-          }}
-        >
-          {disabled ? (
-            <Text style={{ color: palette.muted, fontSize: 15, lineHeight: 21 }}>
-              {disabledNote ?? "Add a model key on the desktop to chat"}
-            </Text>
-          ) : (
-            <TextInput
-              ref={inputRef}
-              value={text}
-              onChangeText={setText}
-              placeholder="Ask about this project…"
-              placeholderTextColor={palette.muted}
-              multiline
-              editable={!busy}
-              style={{ color: palette.ink, fontSize: 16, lineHeight: 21, maxHeight: 100, padding: 0 }}
-              onSubmitEditing={send}
-              blurOnSubmit={false}
-            />
-          )}
+    <View style={{ paddingHorizontal: 12, paddingTop: 7, paddingBottom: 10, backgroundColor: "transparent" }}>
+      {busy ? (
+        <View style={{ minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.warning }} />
+          <Text selectable style={{ color: palette.muted, fontSize: 12, lineHeight: 16, fontWeight: "500" }}>
+            Desktop assistant working · send to steer
+          </Text>
         </View>
+      ) : null}
 
-        <Pressable
-          onPressIn={sendScale.onPressIn}
-          onPressOut={sendScale.onPressOut}
-          onPress={busy ? onStop : send}
-          accessibilityRole="button"
-          accessibilityLabel={busy ? "Stop the assistant" : "Send message"}
-          accessibilityState={{ disabled: !busy && !canSend, busy }}
-          disabled={!busy && !canSend}
-          hitSlop={6}
+      <View
+        style={{
+          overflow: "hidden",
+          borderRadius: 24,
+          borderCurve: "continuous",
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: hexToRgba(palette.ink, isDark ? 0.16 : 0.1),
+          boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.34)" : "0 10px 30px rgba(0,0,0,0.12)",
+        }}
+      >
+        <AdaptiveBlur
+          tint={isDark ? "dark" : "light"}
+          intensity={82}
+          fallbackColor={glass.shellStrong}
+          opaqueFallbackColor={palette.surface}
+          style={{ paddingTop: 5 }}
         >
-          <Animated.View
-            style={[
-              {
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: busy ? palette.danger : palette.accent,
-                opacity: !busy && !canSend ? 0.4 : 1,
-              },
-              sendScale.style,
-            ]}
+          <View style={{ minHeight: 52, flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 7 }}>
+            <View style={{ flex: 1, justifyContent: "center", paddingLeft: 6, paddingVertical: 5 }}>
+              {disabled ? (
+                <Text selectable style={{ color: palette.muted, fontSize: 15, lineHeight: 21 }}>
+                  {disabledNote ?? "Configure the assistant on the desktop"}
+                </Text>
+              ) : (
+                <TextInput
+                  ref={inputRef}
+                  value={text}
+                  onChangeText={setText}
+                  placeholder={busy ? "Steer the current turn…" : "Ask CADCAMFUN…"}
+                  placeholderTextColor={palette.muted}
+                  multiline
+                  editable
+                  accessibilityLabel="Message to CADCAMFUN assistant"
+                  style={{ color: palette.ink, fontSize: 16, lineHeight: 21, maxHeight: 112, padding: 0 }}
+                  onSubmitEditing={submit}
+                  blurOnSubmit={false}
+                />
+              )}
+            </View>
+
+            {busy ? (
+              <Pressable
+                onPressIn={stopScale.onPressIn}
+                onPressOut={stopScale.onPressOut}
+                onPress={onStop}
+                accessibilityRole="button"
+                accessibilityLabel="Stop the desktop assistant"
+                hitSlop={6}
+              >
+                <Animated.View style={[{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: hexToRgba(palette.danger, 0.14) }, stopScale.style]}>
+                  <Square size={13} color={palette.danger} fill={palette.danger} />
+                </Animated.View>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              onPressIn={sendScale.onPressIn}
+              onPressOut={sendScale.onPressOut}
+              onPress={submit}
+              accessibilityRole="button"
+              accessibilityLabel={busy ? "Steer current assistant turn" : "Send message"}
+              accessibilityState={{ disabled: !canSubmit, busy }}
+              disabled={!canSubmit}
+              hitSlop={6}
+            >
+              <Animated.View
+                style={[
+                  {
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: palette.accent,
+                    opacity: canSubmit ? 1 : 0.32,
+                  },
+                  sendScale.style,
+                ]}
+              >
+                <ArrowUp size={19} color={palette.onAccent} strokeWidth={2.6} />
+              </Animated.View>
+            </Pressable>
+          </View>
+
+          <View style={{ height: StyleSheet.hairlineWidth, marginHorizontal: 12, backgroundColor: hexToRgba(palette.ink, 0.08) }} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: 5, paddingHorizontal: 10, paddingVertical: 8 }}
           >
-            {busy ? <Square size={14} color={palette.onAccent} fill={palette.onAccent} /> : <ArrowUp size={20} color={palette.onAccent} strokeWidth={2.5} />}
-          </Animated.View>
-        </Pressable>
+            {MODES.map((item) => {
+              const active = item.value === mode
+              return (
+                <Pressable
+                  key={item.value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => {
+                    haptic("selection")
+                    onModeChange(item.value)
+                  }}
+                  style={({ pressed }) => ({
+                    minHeight: 30,
+                    justifyContent: "center",
+                    paddingHorizontal: 11,
+                    borderRadius: 999,
+                    backgroundColor: active ? hexToRgba(palette.accent, 0.14) : pressed ? hexToRgba(palette.ink, 0.06) : "transparent",
+                  })}
+                >
+                  <Text style={{ color: active ? palette.accent : palette.soft, fontSize: 12, lineHeight: 16, fontWeight: active ? "700" : "500" }}>{item.label}</Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        </AdaptiveBlur>
       </View>
     </View>
   )
