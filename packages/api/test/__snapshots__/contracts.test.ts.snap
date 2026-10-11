@@ -44281,6 +44281,108 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     },
                     "type": "object",
                   },
+                  "machine": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "axes": {
+                        "enum": [
+                          3,
+                          4,
+                          5,
+                        ],
+                        "type": "number",
+                      },
+                      "controller": {
+                        "type": "string",
+                      },
+                      "fiveAxis": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "layout": {
+                            "enum": [
+                              "table-AC",
+                              "table-BC",
+                            ],
+                            "type": "string",
+                          },
+                          "pivot": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                          "rotation": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "max": {
+                                "type": "number",
+                              },
+                              "min": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "min",
+                              "max",
+                            ],
+                            "type": "object",
+                          },
+                          "tcp": {
+                            "enum": [
+                              "control",
+                              "program",
+                            ],
+                            "type": "string",
+                          },
+                          "tilt": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "max": {
+                                "type": "number",
+                              },
+                              "min": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "min",
+                              "max",
+                            ],
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "layout",
+                          "tilt",
+                        ],
+                        "type": "object",
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                    ],
+                    "type": "object",
+                  },
                   "printer": {
                     "additionalProperties": false,
                     "properties": {
@@ -44419,6 +44521,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "string",
                       },
+                      "fiveAxisGouge": {
+                        "type": "boolean",
+                      },
+                      "fiveAxisLead": {
+                        "maximum": 85,
+                        "minimum": -85,
+                        "type": "number",
+                      },
+                      "fiveAxisStrategy": {
+                        "enum": [
+                          "parallel",
+                          "contour",
+                        ],
+                        "type": "string",
+                      },
+                      "fiveAxisTilt": {
+                        "maximum": 85,
+                        "minimum": -85,
+                        "type": "number",
+                      },
+                      "fiveAxisToolAxis": {
+                        "enum": [
+                          "normal",
+                          "lead",
+                        ],
+                        "type": "string",
+                      },
                       "flutes": {
                         "exclusiveMinimum": 0,
                         "type": "integer",
@@ -44477,6 +44606,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "threading",
                           "3d_surface",
                           "probing",
+                          "multiaxis",
                           "facing",
                           "turning",
                           "boring",
@@ -44802,6 +44932,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           ],
                                           "type": "string",
                                         },
+                                        "rotary": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {
+                                              "type": "number",
+                                            },
+                                            "b": {
+                                              "type": "number",
+                                            },
+                                            "c": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "type": "object",
+                                        },
                                         "to": {
                                           "additionalProperties": false,
                                           "properties": {
@@ -44841,6 +44986,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "feed": {
                                           "exclusiveMinimum": 0,
                                           "type": "number",
+                                        },
+                                        "rotary": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {
+                                              "type": "number",
+                                            },
+                                            "b": {
+                                              "type": "number",
+                                            },
+                                            "c": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "type": "object",
                                         },
                                         "to": {
                                           "additionalProperties": false,
@@ -45507,6 +45667,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                           ],
                                           "type": "string",
                                         },
+                                        "rotary": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {
+                                              "type": "number",
+                                            },
+                                            "b": {
+                                              "type": "number",
+                                            },
+                                            "c": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "type": "object",
+                                        },
                                         "to": {
                                           "additionalProperties": false,
                                           "properties": {
@@ -45546,6 +45721,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         "feed": {
                                           "exclusiveMinimum": 0,
                                           "type": "number",
+                                        },
+                                        "rotary": {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "a": {
+                                              "type": "number",
+                                            },
+                                            "b": {
+                                              "type": "number",
+                                            },
+                                            "c": {
+                                              "type": "number",
+                                            },
+                                          },
+                                          "type": "object",
                                         },
                                         "to": {
                                           "additionalProperties": false,
@@ -46167,6 +46357,33 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "string",
                       },
+                      "fiveAxisGouge": {
+                        "type": "boolean",
+                      },
+                      "fiveAxisLead": {
+                        "maximum": 85,
+                        "minimum": -85,
+                        "type": "number",
+                      },
+                      "fiveAxisStrategy": {
+                        "enum": [
+                          "parallel",
+                          "contour",
+                        ],
+                        "type": "string",
+                      },
+                      "fiveAxisTilt": {
+                        "maximum": 85,
+                        "minimum": -85,
+                        "type": "number",
+                      },
+                      "fiveAxisToolAxis": {
+                        "enum": [
+                          "normal",
+                          "lead",
+                        ],
+                        "type": "string",
+                      },
                       "flutes": {
                         "exclusiveMinimum": 0,
                         "type": "integer",
@@ -46225,6 +46442,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "threading",
                           "3d_surface",
                           "probing",
+                          "multiaxis",
                           "facing",
                           "turning",
                           "boring",
@@ -46523,6 +46741,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             "threading",
                             "3d_surface",
                             "probing",
+                            "multiaxis",
                             "facing",
                             "turning",
                             "boring",
@@ -46744,6 +46963,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                         ],
                                         "type": "string",
                                       },
+                                      "rotary": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "a": {
+                                            "type": "number",
+                                          },
+                                          "b": {
+                                            "type": "number",
+                                          },
+                                          "c": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "type": "object",
+                                      },
                                       "to": {
                                         "additionalProperties": false,
                                         "properties": {
@@ -46783,6 +47017,21 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "feed": {
                                         "exclusiveMinimum": 0,
                                         "type": "number",
+                                      },
+                                      "rotary": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "a": {
+                                            "type": "number",
+                                          },
+                                          "b": {
+                                            "type": "number",
+                                          },
+                                          "c": {
+                                            "type": "number",
+                                          },
+                                        },
+                                        "type": "object",
                                       },
                                       "to": {
                                         "additionalProperties": false,

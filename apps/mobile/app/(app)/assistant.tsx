@@ -4,11 +4,13 @@ import { Bot, ChevronDown, CircleGauge, GitPullRequest, Route, Sparkles } from "
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useResource } from "@/lib/use-resource"
+import { useHostResource } from "@/hooks/use-host-resource"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
 import { toast } from "@/components/ui/ToastHost"
 import { appendChatEvent, answerRequest, emptyLog, type ChatRow } from "@/lib/chat-log"
 import { CompanionError } from "@/lib/client"
+import { enqueueAssistantOp, isOfflineSendError } from "@/lib/offline-queue"
 import { Composer, type AssistantMode } from "@/components/chat/Composer"
 import { MessageBubble } from "@/components/chat/MessageBubble"
 import { ToolCallRow } from "@/components/chat/ToolCallRow"
@@ -78,9 +80,9 @@ export default function AssistantScreen() {
     "assistant:projects",
   )
 
-  const agents = useResource(
-    useCallback((signal) => (client ? client.agents(signal) : Promise.reject(new Error("Not connected"))), [client]),
-    "assistant:agents",
+  const agents = useHostResource(
+    useCallback(() => (client ? client.agents() : undefined), [client]),
+    [client],
   )
 
   const currentProject = (projects.data ?? []).find((project) => project.id === projectId) ?? null
@@ -105,7 +107,14 @@ export default function AssistantScreen() {
   }, [projectId, client])
 
   const send = async (text: string) => {
-    if (!client || !projectId || runningRef.current || stopping.current || connectivity !== "online") return
+    if (!client || !projectId || runningRef.current || stopping.current) return
+    if (connectivity !== "online") {
+      setLog((previous) => appendChatEvent(previous, { type: "user", text }))
+      await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode })
+      toast("Desktop offline — message queued", "info")
+      haptic("selection")
+      return
+    }
     const version = ++generation.current
     sessionRef.current ??= `s-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
     setAssistantSession(projectId, sessionRef.current)
@@ -163,6 +172,12 @@ export default function AssistantScreen() {
           } catch (cause) { failure = cause }
         }
         if (controller.signal.aborted || version !== generation.current) return
+        if (isOfflineSendError(failure)) {
+          await enqueueAssistantOp({ projectId, text, sessionId: sessionRef.current, agent: currentAgent?.id ?? selectedAgentId, mode })
+          haptic("selection")
+          setLog((previous) => appendChatEvent(previous, { type: "error", sessionId: sessionRef.current ?? "", code: "internal", message: "Desktop unreachable — message queued and will send on reconnect" }))
+          return
+        }
         haptic("error")
         const message = failure instanceof Error ? failure.message : "The assistant did not answer"
         setLog((previous) => appendChatEvent(previous, { type: "error", sessionId: sessionRef.current ?? "", code: "internal", message }))

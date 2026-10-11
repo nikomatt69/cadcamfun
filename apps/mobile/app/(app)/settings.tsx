@@ -1,18 +1,19 @@
 import { useState } from "react"
 import { Alert, ScrollView, Switch, Text, View } from "react-native"
 import { useRouter } from "expo-router"
-import * as LocalAuthentication from "expo-local-authentication"
 import { MonitorSmartphone, Palette, Unplug, Vibrate, Lock, Info } from "lucide-react-native"
 import { useServer } from "@/lib/server"
 import { useTheme } from "@/lib/theme"
 import { useUIStore } from "@/lib/store"
 import { haptic } from "@/lib/haptics"
+import { authenticate, biometricLabel, getBiometricCapability } from "@/lib/biometrics"
 import { toast } from "@/components/ui/ToastHost"
 import { SegmentedControl } from "@/components/ui/SegmentedControl"
 import { SurfaceCard } from "@/components/ui/SurfaceCard"
 import { ListRow } from "@/components/ui/ListRow"
 import { SectionHeader } from "@/components/ui/SectionHeader"
 import { ActionButton } from "@/components/ui/ActionButton"
+import { ConnectionStatus } from "@/components/layout/ConnectionStatus"
 import { usePrefersReducedMotion } from "@/lib/animation"
 
 /**
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const { config, connectivity, clear, recheck } = useServer()
   const { palette, colorScheme, setColorScheme } = useTheme()
   const { themeMode, haptics, security, setThemeMode, setHaptics, setSecurity } = useUIStore()
+  const offlineQueueCount = useUIStore((state) => state.offlineQueueCount)
   const router = useRouter()
   const reduced = usePrefersReducedMotion()
   const [biometricsBusy, setBiometricsBusy] = useState(false)
@@ -31,21 +33,17 @@ export default function SettingsScreen() {
   const toggleBiometrics = async (value: boolean) => {
     setBiometricsBusy(true)
     try {
-      const capability = await LocalAuthentication.hasHardwareAsync()
-      if (!capability) {
+      const capability = await getBiometricCapability()
+      if (!capability.available) {
         toast("This iPhone has no Face ID / Touch ID", "info")
         return
       }
-      const enrolled = await LocalAuthentication.isEnrolledAsync()
-      if (!enrolled) {
+      if (!capability.enrolled) {
         toast("No Face ID or passcode is set up in iOS Settings", "info")
         return
       }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Unlock CADCAMFUN with Face ID",
-        fallbackLabel: "Use passcode",
-      })
-      if (result.success) {
+      const ok = await authenticate(`Unlock CADCAMFUN with ${biometricLabel(capability.types)}`)
+      if (ok) {
         haptic("success")
         setSecurity({ biometricsEnabled: value, lockOnBackground: value ? true : security.lockOnBackground })
       }
@@ -82,9 +80,18 @@ export default function SettingsScreen() {
             leading={<MonitorSmartphone size={16} color={palette.accent} />}
             title={config?.name ?? "Not paired"}
             subtitle={config ? `${config.baseUrl} · ${config.fingerprint.slice(0, 12)}…` : undefined}
-            trailing={<Text style={{ color: palette.soft, fontSize: 13 }}>{connectivity === "online" ? "Online" : connectivity === "connecting" ? "Connecting…" : "Offline"}</Text>}
+            trailing={<ConnectionStatus connectivity={connectivity} />}
             onPress={() => void recheck()}
           />
+          {offlineQueueCount > 0 ? (
+            <>
+              <View style={{ height: 0.5, marginLeft: 16, backgroundColor: palette.border }} />
+              <ListRow
+                title="Queued messages"
+                subtitle={`${offlineQueueCount} assistant ${offlineQueueCount === 1 ? "message waits" : "messages wait"} for the desktop to come back`}
+              />
+            </>
+          ) : null}
         </SurfaceCard>
         <View style={{ paddingTop: 12 }}>
           <ActionButton label="Unpair this phone" icon={<Unplug size={16} color={palette.danger} />} fullWidth variant="danger" onPress={unpair} />

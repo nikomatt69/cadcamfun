@@ -1,6 +1,8 @@
 {
-  "platforms": ["ios"],
-  "ios": {
+  "platforms": ["apple"],
+  "apple": {
+    "podspecPath": "CompanionNet.podspec",
+    "swiftModuleName": "CompanionNet",
     "modules": ["CompanionNetModule"]
   }
 }

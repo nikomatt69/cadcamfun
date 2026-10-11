@@ -4,13 +4,28 @@ CADCAMFUN v6: native CAD/CAM desktop app. **Bun + Effect v4 (rc.112) + Drizzle (
 
 ## Read first
 
-- `specs/00-overview.md` — goal, stack decisions, repo layout, task board (WP0–WP10), parallelisation map, definition of done.
+- `specs/00-overview.md` — goal, stack decisions, repo layout, task board (WP0–WP14), parallelisation map, definition of done.
 - `specs/01-conventions.md` — Effect v4 rules, DB rules, agent workflow. Effect is pinned to `4.0.0-rc.112` workspace-wide (required by nikcli `sdk-next`); its docs are in `packages/db/node_modules/effect/ai-docs/src/` (the API differs from v3; do not rely on memory).
-- The spec of the work package you are working on (`specs/02…10`).
+- The spec of the work package you are working on (`specs/02…14`).
+- **Roadmap (when cited):** `specs/roadmap/README.md` — ordered remaining work (RM-00–RM-11). See **Roadmap** below.
+
+## Roadmap
+
+When the user, another spec, or this file cites **the roadmap**, `specs/roadmap`, or an `RM-NN` id, agents **must** follow `specs/roadmap/README.md` and `specs/roadmap/00-how-to-follow.md`. Those files win on **sequence**. Design specs (`specs/00`–`27`) still win on **contracts**.
+
+Rules:
+
+1. Read `specs/roadmap/README.md`. The current step is the first `in progress` row, else the first `pending` row.
+2. Open that step spec. Implement only its deliverables. Edit only its owner directories.
+3. Do not start a later RM step until its `depends on` rows are `done`, unless the user named that later step **and** those dependencies are already `done`.
+4. Effect v4 (`01-conventions.md` §2) and architecture vocabulary (module, interface, implementation, depth, seam, adapter, leverage, locality) apply on every RM step.
+5. After the step's Verify commands pass: mark the README row `done`, append the step spec Change log.
+
+Do not treat `20-integral-roadmap.md` or `21-integration-master-plan.md` as the sequence when the roadmap is cited.
 
 ## Rules
 
-- Edit only the directories owned by your WP (see the task board). Cross-WP changes go through the specs first.
+- Edit only the directories owned by your WP (see the task board) or by the current RM step. Cross-WP changes go through the specs first.
 - `.reference/` is the legacy Next.js/Prisma codebase: git-ignored, read-only, domain knowledge only. Never import from it.
 - Never read or print values from `.env*` files; they are legacy and unused.
 - Do not commit unless asked.
@@ -27,7 +42,7 @@ bun run db:migrate                            # apply migrations to ./data/cadca
 
 ## Current state
 
-WP0–WP10 are built to the levels recorded in `specs/00-overview.md`. WP11–WP13 (`packages/vcs`, `packages/workflow`, `apps/mobile`; spec `13-vcs-actions-mobile.md`) add git-style history, pull requests, Actions-style workflows and the iOS companion.
+WP0–WP14 are built to the levels recorded in `specs/00-overview.md`. Remaining ordered work is `specs/roadmap/README.md` (current step: RM-01 action catalogue). WP11–WP13 (`packages/vcs`, `packages/workflow`, `apps/mobile`; spec `13-vcs-actions-mobile.md`) add git-style history, pull requests, Actions-style workflows and the iOS companion.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

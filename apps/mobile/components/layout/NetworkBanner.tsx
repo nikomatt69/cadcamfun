@@ -17,11 +17,13 @@ export function NetworkBanner() {
 
   if (connectivity === "online" || connectivity === "disconnected") return null
 
-  const config: Record<Exclude<Connectivity, "online" | "disconnected">, { color: string; label: string }> = {
+  const config: Record<Exclude<Connectivity, "online" | "disconnected" | "background">, { color: string; label: string }> = {
     connecting: { color: palette.warning, label: "Connecting…" },
     offline: { color: palette.muted, label: "Desktop offline" },
     error: { color: palette.danger, label: connectionError ?? "Connection failed" },
+    "auth-required": { color: palette.danger, label: "Desktop revoked this phone — pair again" },
   }
+  if (connectivity === "background") return null
   const { color, label } = config[connectivity]
 
   return (

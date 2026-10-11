@@ -24,12 +24,17 @@ export interface UIState {
   assistantProjectId: string | null
   /** Last chat session per project — resuming it continues the same desktop conversation. */
   assistantSessions: Record<string, string>
+  /** Queued assistant prompts waiting for the desktop to come back (SecureStore-backed). */
+  offlineQueueCount: number
+  offlineQueueRevision: number
   setThemeMode: (mode: UIState["themeMode"]) => void
   setHaptics: (patch: Partial<UIState["haptics"]>) => void
   setSecurity: (patch: Partial<UIState["security"]>) => void
   setAssistantDesktop: (desktopId: string | null) => void
   setAssistantProject: (projectId: string | null) => void
   setAssistantSession: (projectId: string, sessionId: string) => void
+  setOfflineQueue: (count: number) => void
+  showToast: (message: string, kind?: "info" | "success" | "error") => void
 }
 
 let finishHydration: () => void = () => undefined
@@ -44,6 +49,8 @@ export const useUIStore = create<UIState>()(
       assistantDesktopId: null,
       assistantProjectId: null,
       assistantSessions: {},
+      offlineQueueCount: 0,
+      offlineQueueRevision: 0,
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
@@ -51,10 +58,24 @@ export const useUIStore = create<UIState>()(
       setAssistantProject: (assistantProjectId) => set({ assistantProjectId }),
       setAssistantSession: (projectId, sessionId) =>
         set((s) => ({ assistantSessions: { ...s.assistantSessions, [projectId]: sessionId } })),
+      setOfflineQueue: (offlineQueueCount) =>
+        set((s) => ({ offlineQueueCount, offlineQueueRevision: s.offlineQueueRevision + 1 })),
+      showToast: (message, kind = "info") => {
+        // ToastHost owns rendering; lazy-require avoids a store→component import cycle.
+        void import("@/components/ui/ToastHost").then(({ toast }) => toast(message, kind)).catch(() => undefined)
+      },
     }),
     {
       name: "cadcamfun.ui.v1",
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        themeMode: state.themeMode,
+        haptics: state.haptics,
+        security: state.security,
+        assistantDesktopId: state.assistantDesktopId,
+        assistantProjectId: state.assistantProjectId,
+        assistantSessions: state.assistantSessions,
+      }),
       onRehydrateStorage: () => () => finishHydration(),
     },
   ),

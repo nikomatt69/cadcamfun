@@ -10,7 +10,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner"
 
 /** Pairing URLs share the scanner's validation and never render their credentials. */
 export default function PairLinkScreen() {
-  const params = useLocalSearchParams<{ host?: string; token?: string; fp?: string; name?: string }>()
+  const params = useLocalSearchParams<{ host?: string; token?: string; fp?: string; name?: string; hosts?: string }>()
   const router = useRouter()
   const { palette } = useTheme()
   const { save, booting } = useServer()
@@ -18,13 +18,15 @@ export default function PairLinkScreen() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const supported = Platform.OS === "web" || nativeAvailable
-  const host = params.host, token = params.token, fingerprint = params.fp, name = params.name
+  const host = params.host, token = params.token, fingerprint = params.fp, name = params.name, extraHosts = params.hosts
   const connect = useCallback(async () => {
     if (!supported) throw new Error("Secure pairing requires the CADCAMFUN development build. Install it with bun run ios from apps/mobile and open it instead of Expo Go.")
     if (typeof host !== "string" || typeof token !== "string" || typeof fingerprint !== "string" || name !== undefined && typeof name !== "string") throw new Error("The pairing link is incomplete. Scan a new QR code from the desktop.")
-    const pairing = parsePairingLink(`cadcamfun://pair?${new URLSearchParams({ host, token, fp: fingerprint, name: name ?? "Desktop" })}`)
-    if (!await save(pairing)) throw new Error("The desktop did not answer. Check that its companion gateway is on, then retry.")
-  }, [supported, host, token, fingerprint, name, save])
+    const query = new URLSearchParams({ host, token, fp: fingerprint, name: name ?? "Desktop" })
+    if (typeof extraHosts === "string" && extraHosts) query.set("hosts", extraHosts)
+    const pairing = parsePairingLink(`cadcamfun://pair?${query}`)
+    if (!await save(pairing)) throw new Error("The desktop did not answer. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address, then retry.")
+  }, [supported, host, token, fingerprint, name, extraHosts, save])
   useEffect(() => {
     if (booting) return
     let active = true

@@ -53,6 +53,7 @@
 	</dict>
 	<key>NSBonjourServices</key>
 	<array>
+		<string>_cadcamfun._tcp</string>
 		<string>_expo._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
@@ -60,7 +61,7 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>CADCAMFUN uses Face ID to unlock the app and confirm sensitive actions.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>CADCAMFUN connects to your Mac on the local network to work with your projects.</string>
+	<string>CADCAMFUN connects to your Mac on the local network or Personal Hotspot to work with your projects.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
 	<key>NSUserActivityTypes</key>

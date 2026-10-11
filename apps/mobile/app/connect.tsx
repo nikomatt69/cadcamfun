@@ -7,7 +7,7 @@ import { Link2, ScanLine, X } from "lucide-react-native"
 import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated"
 import { nativeAvailable } from "@/lib/native"
 import { useServer } from "@/lib/server"
-import { parsePairingLink, type Pairing } from "@/lib/pairing"
+import { desktopLabel, parsePairingLink, type Pairing } from "@/lib/pairing"
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { ActionButton } from "@/components/ui/ActionButton"
@@ -43,7 +43,7 @@ export default function ConnectScreen() {
         const pairing: Pairing = parsePairingLink(link)
         const ok = await save(pairing)
         if (!ok) {
-          setError(`The desktop at ${pairing.name} did not answer. Is the companion gateway on?`)
+          setError(`The desktop at ${desktopLabel(pairing)} did not answer. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address. Is the companion gateway on?`)
           haptic("error")
           return
         }
@@ -62,6 +62,10 @@ export default function ConnectScreen() {
 
   const openScanner = async () => {
     haptic("selection")
+    if (!supported) {
+      setError("Open the installed CADCAMFUN app to pair securely. Expo Go cannot use the CompanionNet module.")
+      return
+    }
     try {
     if (!permission?.granted) {
       const next = await requestPermission()
@@ -76,6 +80,10 @@ export default function ConnectScreen() {
 
   const paste = async () => {
     haptic("selection")
+    if (!supported) {
+      setError("Open the installed CADCAMFUN app to pair securely. Expo Go cannot use the CompanionNet module.")
+      return
+    }
     try {
       const text = await Clipboard.getStringAsync()
       if (text.trim()) await pair(text)
@@ -101,9 +109,16 @@ export default function ConnectScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(90).duration(420)} style={{ gap: 12, marginTop: 40 }}>
-            <ActionButton label="Scan the pairing QR code" icon={<ScanLine size={19} color={palette.onAccent} />} fullWidth disabled={!supported || busy} onPress={() => void openScanner()} />
-            <ActionButton label="Paste a pairing link" icon={<Link2 size={19} color={palette.accent} />} fullWidth variant="secondary" disabled={!supported || busy} onPress={() => void paste()} />
-            <Pressable disabled={!supported || busy} onPress={() => { haptic("selection"); setManualOpen(true) }} hitSlop={8} style={{ alignSelf: "center", paddingVertical: 12 }}>
+            <ActionButton label="Scan the pairing QR code" icon={<ScanLine size={19} color={palette.onAccent} />} fullWidth disabled={busy} onPress={() => void openScanner()} />
+            <ActionButton label="Paste a pairing link" icon={<Link2 size={19} color={palette.accent} />} fullWidth variant="secondary" disabled={busy} onPress={() => void paste()} />
+            <Pressable disabled={busy} onPress={() => {
+              haptic("selection")
+              if (!supported) {
+                setError("Open the installed CADCAMFUN app to pair securely. Expo Go cannot use the CompanionNet module.")
+                return
+              }
+              setManualOpen(true)
+            }} hitSlop={8} style={{ alignSelf: "center", paddingVertical: 12 }}>
               <Text style={{ color: palette.accent, fontSize: 15, fontWeight: "500" }}>Enter the address manually</Text>
             </Pressable>
           </Animated.View>
@@ -112,7 +127,7 @@ export default function ConnectScreen() {
             {!supported ? <ErrorBanner message="Secure desktop pairing requires the CADCAMFUN development build. Expo Go does not include CompanionNet. Install the development build with bun run ios from apps/mobile, then open it instead of Expo Go." /> : null}
             {error || connectionError ? <ErrorBanner message={error ?? connectionError!} /> : null}
             <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textAlign: "center", marginTop: 24 }}>
-              On your Mac: Settings → Mobile companion → turn it on and show the QR code.
+              On your Mac: Settings → Mobile companion → turn it on and show the QR code. The phone and the Mac must share Wi-Fi, Personal Hotspot, or Tailscale — cellular 5G cannot reach the desktop.
             </Text>
           </Animated.View>
         </ScrollView>

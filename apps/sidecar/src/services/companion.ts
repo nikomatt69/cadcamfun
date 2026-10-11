@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { getLocalPort, announced } from "../startup.ts"
 import {
-  defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingLink, startGateway,
+  defaultHost, fingerprintOf, generateCertificate, hashToken, newToken, pairingHosts, pairingLink, startGateway,
   type CompanionCertificate, type Gateway, type TokenRecord,
 } from "./companion-gateway.ts"
 import { KvStore } from "./kv.ts"
@@ -133,7 +133,8 @@ export class Companion extends Context.Service<Companion, {
         const record: TokenRecord = { id, name: label, hash: hashToken(token), createdAt: new Date().toISOString(), lastSeen: null }
         yield* kv.set(`${TOKEN_PREFIX}${id}`, record).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not save the device token: ${e.operation}` })))
         const s = yield* settings
-        return { id, link: pairingLink({ host: host?.trim() || defaultHost(), port: gateway?.port ?? s.port, token, fingerprint: cert.fingerprint, name: label }) }
+        const hosts = pairingHosts(host)
+        return { id, link: pairingLink({ host: hosts[0]!, port: gateway?.port ?? s.port, token, fingerprint: cert.fingerprint, name: label, hosts }) }
       }),
       revoke: (id) => Effect.gen(function*() {
         if (!(yield* kv.delete(`${TOKEN_PREFIX}${id}`).pipe(Effect.mapError((e) => new CompanionError({ code: "unavailable", message: `Could not revoke the device token: ${e.operation}` }))))) return yield* new CompanionError({ code: "not-found", message: "Device not found" })

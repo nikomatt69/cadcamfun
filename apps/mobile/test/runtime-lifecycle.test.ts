@@ -110,10 +110,18 @@ describe("mobile pairing provider lifecycle", () => {
   mock.module("../lib/native", () => ({
     nativeAvailable: true,
     launchPairLink: async () => null,
+    warmLocalNetwork: () => undefined,
     pairingStore: { load: () => load(), save: async () => undefined, clear: async () => { clears += 1 } },
     pinnedTransport: () => ({ request: (path: string) => path === "/api/health" ? health() : Promise.resolve({ status: 200, body: JSON.stringify({ configured: false, host: "nikcli" }) }), async *stream() {} })
   }))
   mock.module("../lib/store", () => ({ uiPreferencesReady: Promise.resolve(), useUIStore: { getState: () => ({ setAssistantDesktop() {} }) } }))
+  mock.module("../lib/storage", () => ({
+    pairingStore: { load: () => load(), save: async () => undefined, clear: async () => { clears += 1 } },
+  }))
+  mock.module("../lib/offline-queue", () => ({
+    drainQueueWith: async () => undefined,
+    refreshOfflineQueueCount: async () => 0,
+  }))
 
   const provider = async () => {
     const { ServerProvider, useServer } = await import("../lib/server")

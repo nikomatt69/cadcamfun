@@ -1091,11 +1091,16 @@ export type ToolpathGeneratorVerifyPayload = {
       readonly spindleRpm: number
       readonly coolant: "off" | "flood" | "mist"
       readonly moves: ReadonlyArray<
-        | { readonly _tag: "Rapid"; readonly to: { readonly x: number; readonly y: number; readonly z: number } }
+        | {
+            readonly _tag: "Rapid"
+            readonly to: { readonly x: number; readonly y: number; readonly z: number }
+            readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
+          }
         | {
             readonly _tag: "Linear"
             readonly to: { readonly x: number; readonly y: number; readonly z: number }
             readonly feed: number
+            readonly rotary?: { readonly a?: number; readonly b?: number; readonly c?: number }
           }
         | {
             readonly _tag: "Arc"
@@ -4960,8 +4965,13 @@ export type ToolpathGeneratorParseOutput = {
       spindleRpm: number
       coolant: "off" | "flood" | "mist"
       moves: Array<
-        | { _tag: "Rapid"; to: { x: number; y: number; z: number } }
-        | { _tag: "Linear"; to: { x: number; y: number; z: number }; feed: number }
+        | { _tag: "Rapid"; to: { x: number; y: number; z: number }; rotary?: { a?: number; b?: number; c?: number } }
+        | {
+            _tag: "Linear"
+            to: { x: number; y: number; z: number }
+            feed: number
+            rotary?: { a?: number; b?: number; c?: number }
+          }
         | {
             _tag: "Arc"
             to: { x: number; y: number; z: number }

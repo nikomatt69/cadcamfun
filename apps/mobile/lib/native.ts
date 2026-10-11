@@ -1,9 +1,10 @@
 import { Platform } from "react-native"
-import * as SecureStore from "expo-secure-store"
 import CompanionNet from "@/modules/companion-net"
-import { validatePairing, type Pairing } from "./pairing"
+import type { Pairing } from "./pairing"
 import { createFetchTransport, createPinnedTransport } from "../modules/companion-net/transport"
 import type { Transport } from "./client"
+
+export { pairingStore } from "./storage"
 
 /**
  * The native side of the companion link.
@@ -17,8 +18,6 @@ import type { Transport } from "./client"
 
 export const nativeAvailable = Platform.OS === "ios" && !!CompanionNet?.request
 
-const PAIRING_KEY = "cadcamfun.pairing.v1"
-
 export const launchPairLink = async (): Promise<string | null> => {
   if (!nativeAvailable) return null
   try {
@@ -28,27 +27,19 @@ export const launchPairLink = async (): Promise<string | null> => {
   }
 }
 
-export const pairingStore = {
-  load: async (): Promise<Pairing | undefined> => {
-    const raw = Platform.OS === "web" ? globalThis.localStorage?.getItem(PAIRING_KEY) : await SecureStore.getItemAsync(PAIRING_KEY)
-    if (!raw) return undefined
-    try {
-      return validatePairing(JSON.parse(raw))
-    } catch {
-      return undefined
-    }
-  },
-  save: async (pairing: Pairing): Promise<void> => {
-    const validated = validatePairing(pairing)
-    if (Platform.OS === "web") { globalThis.localStorage?.setItem(PAIRING_KEY, JSON.stringify(validated)); return }
-    await SecureStore.setItemAsync(PAIRING_KEY, JSON.stringify(validated), {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    })
-  },
-  clear: async (): Promise<void> => {
-    if (Platform.OS === "web") { globalThis.localStorage?.removeItem(PAIRING_KEY); return }
-    await SecureStore.deleteItemAsync(PAIRING_KEY)
-  },
+/**
+ * iOS only prompts for local-network access on the first Bonjour/LAN socket.
+ * Pairing against a private IPv4 never does Bonjour, so the prompt never
+ * appears and the health check is silently dropped. A no-op `_cadcamfun._tcp`
+ * browse is enough to surface it; failures are ignored.
+ */
+export const warmLocalNetwork = (): void => {
+  if (!nativeAvailable) return
+  try {
+    CompanionNet?.warmLocalNetwork?.()
+  } catch {
+    // Native module older than this build, or Expo Go: pairing still proceeds.
+  }
 }
 
 /** Never downgrade a native device to an unpinned browser connection. */

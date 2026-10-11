@@ -19,8 +19,73 @@ export interface CompanionCertificate {
 
 export const fingerprintOf = (pem: string): string => new X509Certificate(pem).fingerprint256.replaceAll(":", "").toLowerCase()
 
-const lanAddresses = (): string[] =>
-  Object.values(networkInterfaces()).flatMap((list) => (list ?? []).filter((i) => !i.internal && i.family === "IPv4").map((i) => i.address))
+export interface NetworkAddress {
+  readonly address: string
+  readonly family: string | number
+  readonly internal: boolean
+}
+
+const isV4 = (family: string | number): boolean => family === "IPv4" || family === 4
+const isV6 = (family: string | number): boolean => family === "IPv6" || family === 6
+
+const ipv4Octets = (address: string): readonly number[] | undefined => {
+  const parts = address.split(".").map(Number)
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return undefined
+  return parts
+}
+
+/**
+ * Higher is preferred as the QR's primary host. The phone still tries every
+ * positive-score address (Wi-Fi, iPhone Personal Hotspot, Tailscale).
+ *
+ * 192.168/10 first (same Wi-Fi), then Apple's hotspot net, other RFC1918,
+ * then Tailscale CGNAT / ULA. Link-local, loopback and public addresses are
+ * excluded so a stale cellular IP never ends up in the QR.
+ */
+export const rankAddress = (address: string, family: string | number): number => {
+  if (isV4(family)) {
+    const oct = ipv4Octets(address)
+    if (!oct) return 0
+    const a = oct[0]!, b = oct[1]!, c = oct[2]!
+    if (a === 192 && b === 168) return 100
+    if (a === 10) return 90
+    // iPhone / iPad Personal Hotspot and USB tethering (Apple uses 172.20.10.0/28, sometimes /24).
+    if (a === 172 && b === 20 && c === 10) return 85
+    if (a === 172 && b >= 16 && b <= 31) return 70
+    if (a === 100 && b >= 64 && b <= 127) return 60
+    return 0
+  }
+  if (!isV6(family)) return 0
+  const lower = address.toLowerCase()
+  if (lower.startsWith("fe80:") || lower === "::1") return 0
+  if (lower.startsWith("fd7a:115c:a1e0:")) return 55
+  if (lower.startsWith("fd") || lower.startsWith("fc")) return 50
+  return 0
+}
+
+const MAX_PAIRING_HOSTS = 6
+
+/** Reachable companion addresses, best first. Pure so tests can inject interfaces. */
+export const reachableAddressesFrom = (ifs: readonly NetworkAddress[]): string[] => {
+  // The gateway binds IPv4 (`0.0.0.0`); IPv6 Tailscale ULAs are ranked but not advertised.
+  const scored = ifs
+    .filter((i) => !i.internal && isV4(i.family))
+    .map((i) => ({ address: i.address, score: rankAddress(i.address, i.family) }))
+    .filter((i) => i.score > 0)
+  scored.sort((a, b) => b.score - a.score)
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const { address } of scored) {
+    if (seen.has(address)) continue
+    seen.add(address)
+    out.push(address)
+    if (out.length >= MAX_PAIRING_HOSTS) break
+  }
+  return out
+}
+
+export const reachableAddresses = (): string[] =>
+  reachableAddressesFrom(Object.values(networkInterfaces()).flatMap((list) => list ?? []))
 
 export const generateCertificate = async (): Promise<CompanionCertificate> => {
   const pems = await generate([{ name: "commonName", value: "cadcamfun-companion" }], {
@@ -28,7 +93,7 @@ export const generateCertificate = async (): Promise<CompanionCertificate> => {
     notAfterDate: new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000),
     keyType: "ec",
     curve: "P-256",
-    extensions: [{ name: "subjectAltName", altNames: [{ type: 2, value: "localhost" }, { type: 7, ip: "127.0.0.1" }, ...lanAddresses().map((ip) => ({ type: 7 as const, ip }))] }],
+    extensions: [{ name: "subjectAltName", altNames: [{ type: 2, value: "localhost" }, { type: 7, ip: "127.0.0.1" }, ...reachableAddresses().map((ip) => ({ type: 7 as const, ip }))] }],
   })
   return { cert: pems.cert, key: pems.private, fingerprint: fingerprintOf(pems.cert) }
 }
@@ -169,8 +234,25 @@ export const startGateway = (options: GatewayOptions): Gateway => {
   return { port: server.port ?? options.port, stop: () => void server.stop(true) }
 }
 
-export const pairingLink = (input: { host: string; port: number; token: string; fingerprint: string; name: string }): string =>
-  `cadcamfun://pair?${new URLSearchParams({ host: `https://${input.host}:${input.port}`, token: input.token, fp: input.fingerprint, name: input.name })}`
+const originFor = (host: string, port: number): string => {
+  const ipv6 = host.includes(":")
+  return ipv6 ? `https://[${host}]:${port}` : `https://${host}:${port}`
+}
 
-/** The first private IPv4 address of this machine, the default host in the pairing link. */
-export const defaultHost = (): string => lanAddresses()[0] ?? "127.0.0.1"
+export const pairingLink = (input: { host: string; port: number; token: string; fingerprint: string; name: string; hosts?: readonly string[] }): string => {
+  const params = new URLSearchParams({ host: originFor(input.host, input.port), token: input.token, fp: input.fingerprint, name: input.name })
+  const extras = (input.hosts ?? []).filter((h) => h !== input.host)
+  if (extras.length > 0) params.set("hosts", extras.map((h) => originFor(h, input.port)).join(","))
+  return `cadcamfun://pair?${params}`
+}
+
+/** Best private address of this machine, the default host in the pairing link. */
+export const defaultHost = (): string => reachableAddresses()[0] ?? "127.0.0.1"
+
+/** Every private/overlay address the phone should try, best first. */
+export const pairingHosts = (preferred?: string): string[] => {
+  const listed = reachableAddresses()
+  const extra = preferred?.trim()
+  if (!extra) return listed.length > 0 ? listed : ["127.0.0.1"]
+  return [extra, ...listed.filter((h) => h !== extra)]
+}

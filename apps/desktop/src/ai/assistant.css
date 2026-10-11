@@ -740,7 +740,7 @@
 }
 
 /* --- Agent controls: four visible icons, with menus that always open upward. --- */
-.assistant-chips { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: visible; }
+.assistant-chips { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: visible; }
 .assistant-control-menu-root { position: relative; display: flex; }
 .assistant-control-icon {
   position: relative;
@@ -825,7 +825,6 @@
 .assistant-control-option > span:last-child { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .assistant-control-option strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .assistant-control-option small { overflow: hidden; color: var(--assistant-muted); font-size: 9px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-.assistant-control-popover-caret { position: absolute; bottom: -8px; left: 9px; color: var(--assistant-line); transform: rotate(180deg); }
 .assistant-chip-root { position: relative; display: flex; }
 .assistant-chip {
   display: inline-flex;

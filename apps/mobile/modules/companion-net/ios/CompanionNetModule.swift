@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import CryptoKit
 import Foundation
+import Network
 
 /**
  * Pinned-TLS HTTP client for the CADCAMFUN companion gateway.
@@ -23,7 +24,8 @@ private func sha256Hex(_ data: Data) -> String {
 private func accept(_ challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void, fingerprint: String) {
   guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
     let trust = challenge.protectionSpace.serverTrust,
-    let leaf = SecTrustGetCertificateAtIndex(trust, 0) else {
+    let certificates = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+    let leaf = certificates.first else {
     completionHandler(.cancelAuthenticationChallenge, nil)
     return
   }
@@ -75,27 +77,42 @@ private final class PinnedDelegate: NSObject, URLSessionDelegate, URLSessionData
 }
 
 enum PinnedTransport {
-  /** One-shot request: returns status, headers and the raw text body. */
+  /**
+   * One-shot request. Implemented on the data-delegate path rather than
+   * `URLSession.data(for:)` so the pin evaluator always owns the challenge.
+   * Mixing the async convenience API with a `URLSessionDataDelegate` drops
+   * the challenge on some iOS versions and pairing then fails as "did not answer".
+   */
   static func request(baseUrl: String, path: String, method: String, headers: [String: String], body: String?, fingerprint: String) async throws -> [String: Any] {
     var request = try makeRequest(baseUrl: baseUrl, path: path, method: method, headers: headers, body: body)
     request.timeoutInterval = 30
 
     let delegate = PinnedDelegate(fingerprint: fingerprint)
     let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    defer { session.finishTasksAndInvalidate() }
 
-    defer { session.invalidateAndCancel() }
-    let (data, response): (Data, URLResponse)
-    do {
-      (data, response) = try await session.data(for: request)
-    } catch {
-      throw CompanionNetError(message: friendly(error))
+    return try await withCheckedThrowingContinuation { continuation in
+      var bodyData = Data()
+      var settled = false
+      let finish: (Result<[String: Any], Error>) -> Void = { result in
+        guard !settled else { return }
+        settled = true
+        continuation.resume(with: result)
+      }
+      delegate.onData = { bodyData.append($0) }
+      delegate.onComplete = { error in
+        if let error {
+          finish(.failure(CompanionNetError(message: friendly(error))))
+          return
+        }
+        finish(.success([
+          "status": delegate.status ?? 0,
+          "headers": [:] as [String: String],
+          "body": String(decoding: bodyData, as: UTF8.self),
+        ]))
+      }
+      session.dataTask(with: request).resume()
     }
-    let http = response as? HTTPURLResponse
-    return [
-      "status": http?.statusCode ?? 0,
-      "headers": (http?.allHeaderFields as? [String: String]) ?? [:],
-      "body": String(decoding: data, as: UTF8.self),
-    ]
   }
 
   static func makeRequest(baseUrl: String, path: String, method: String, headers: [String: String], body: String?) throws -> URLRequest {
@@ -124,8 +141,8 @@ enum PinnedTransport {
     if code == NSURLErrorCancelled {
       return "Connection closed"
     }
-    if code == NSURLErrorCannotFindHost || code == NSURLErrorCannotConnectToHost {
-      return "Cannot reach the desktop"
+    if code == NSURLErrorCannotFindHost || code == NSURLErrorCannotConnectToHost || code == NSURLErrorNetworkConnectionLost || code == NSURLErrorNotConnectedToInternet || code == NSURLErrorTimedOut {
+      return "Cannot reach the desktop. Join the same Wi-Fi or Personal Hotspot as the Mac, or type a Tailscale address."
     }
     if code == NSURLErrorSecureConnectionFailed || code == NSURLErrorServerCertificateUntrusted || code == NSURLErrorServerCertificateHasBadDate || code == NSURLErrorServerCertificateNotYetValid || code == NSURLErrorServerCertificateHasUnknownRoot {
       return "Certificate does not match the pairing QR code"
@@ -265,6 +282,24 @@ public class CompanionStreamHandle: SharedObject {
   }
 }
 
+/// Holds a Bonjour browser just long enough for iOS to show the local-network permission dialog.
+private final class LocalNetworkWarmup {
+  static let shared = LocalNetworkWarmup()
+  private var browser: NWBrowser?
+
+  func start() {
+    guard browser == nil else { return }
+    let next = NWBrowser(for: .bonjour(type: "_cadcamfun._tcp", domain: nil), using: .tcp)
+    next.stateUpdateHandler = { _ in }
+    next.start(queue: .global(qos: .utility))
+    browser = next
+    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 8) { [weak self] in
+      self?.browser?.cancel()
+      self?.browser = nil
+    }
+  }
+}
+
 public class CompanionNetModule: Module {
   public func definition() -> ModuleDefinition {
     Name("CompanionNet")
@@ -294,6 +329,12 @@ public class CompanionNetModule: Module {
         return nil
       }
       return args[index + 1]
+    }
+
+    // First LAN/hotspot HTTPS never triggers the local-network prompt on its own.
+    // A Bonjour browse of our unused service type is enough; iOS shows the dialog.
+    Function("warmLocalNetwork") {
+      LocalNetworkWarmup.shared.start()
     }
 
     Class(CompanionStreamHandle.self) {

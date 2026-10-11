@@ -24,6 +24,7 @@ export type CompanionNetNative = {
   request(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null, fingerprint: string): Promise<PinnedResponse>
   streamStart(baseUrl: string, path: string, method: string, headers: Record<string, string>, body: string | null, fingerprint: string): Promise<CompanionStreamHandle>
   launchPairLink(): string | null
+  warmLocalNetwork?(): void
 }
 
 export default requireOptionalNativeModule<CompanionNetNative>("CompanionNet")

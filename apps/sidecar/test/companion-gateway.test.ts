@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { generateCertificate, hashToken, isCompanionRoute, newToken, pairingLink, startGateway, fingerprintOf, type Gateway, type CompanionCertificate, type TokenRecord } from "../src/services/companion-gateway.ts"
+import { generateCertificate, hashToken, isCompanionRoute, newToken, pairingHosts, pairingLink, rankAddress, reachableAddressesFrom, startGateway, fingerprintOf, type Gateway, type CompanionCertificate, type TokenRecord } from "../src/services/companion-gateway.ts"
 
 let upstream: ReturnType<typeof Bun.serve>
 let gateway: Gateway
@@ -55,6 +55,30 @@ describe("companion gateway", () => {
     expect(fingerprintOf(cert.cert)).toBe(cert.fingerprint)
     const link = pairingLink({ host: "192.168.1.20", port: 8443, token: valid, fingerprint: cert.fingerprint, name: "Studio" })
     expect(link.startsWith("cadcamfun://pair?host=https%3A%2F%2F192.168.1.20%3A8443")).toBe(true)
+  })
+
+  test("ranks Wi-Fi above Personal Hotspot above Tailscale and drops public/cellular", () => {
+    expect(rankAddress("192.168.1.20", "IPv4")).toBeGreaterThan(rankAddress("172.20.10.4", "IPv4"))
+    expect(rankAddress("172.20.10.4", "IPv4")).toBeGreaterThan(rankAddress("100.64.96.71", "IPv4"))
+    expect(rankAddress("10.0.0.5", 4)).toBeGreaterThan(rankAddress("100.64.96.71", 4))
+    expect(rankAddress("8.8.8.8", "IPv4")).toBe(0)
+    expect(rankAddress("fe80::1", "IPv6")).toBe(0)
+    const hosts = reachableAddressesFrom([
+      { address: "100.64.96.71", family: "IPv4", internal: false },
+      { address: "172.20.10.4", family: "IPv4", internal: false },
+      { address: "192.168.1.20", family: "IPv4", internal: false },
+      { address: "127.0.0.1", family: "IPv4", internal: true },
+      { address: "fd7a:115c:a1e0::1", family: "IPv6", internal: false },
+    ])
+    expect(hosts).toEqual(["192.168.1.20", "172.20.10.4", "100.64.96.71"])
+  })
+
+  test("the pairing link lists every private address so the phone can race them", () => {
+    const link = pairingLink({ host: "192.168.1.20", port: 8443, token: valid, fingerprint: cert.fingerprint, name: "Studio", hosts: ["192.168.1.20", "172.20.10.4", "100.64.96.71"] })
+    const url = new URL(link)
+    expect(url.searchParams.get("host")).toBe("https://192.168.1.20:8443")
+    expect(url.searchParams.get("hosts")).toBe("https://172.20.10.4:8443,https://100.64.96.71:8443")
+    expect(pairingHosts("172.20.10.4")[0]).toBe("172.20.10.4")
   })
 
   test("rejects missing and wrong tokens, never forwarding them", async () => {

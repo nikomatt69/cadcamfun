@@ -1,106 +1,32 @@
 /**
- * Dashboard — hero, metric cards, module cards (CAD, CAM, Projects),
- * quick-access tiles. Apple design system throughout:
- * - Spring entry (damping 1.0 default, no overshoot) for cards
- * - Translucent surfaces (backdrop-filter) for the hero and cards
- * - Pointer-down press feedback on every interactive card and button
- * - Optical typography (display = -0.025em tracking, body 0)
- * - Reduced-motion fallback (no orbs / no scale loop, opacity only)
+ * Dashboard — shop status at a glance, in the same workstation language as
+ * every other list page: `WorkspacePage` frame, `CARD` surfaces,
+ * `TOOLBAR_*` actions, dense 12px type, tabular numerals.
  *
- * The hero is deliberately restrained: no emoji, no rainbow gradients, no
- * decorative orbs. The audience is machinists and engineers.
+ * No hero card, no animations, no gradients — the toolbar already carries
+ * the title and the primary actions.
  */
-import { For, Show, createMemo, type JSX } from "solid-js"
+import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
-import { Motion } from "solid-motionone"
 import {
   Box,
-  Cpu,
   File,
+  FolderOpen,
   Grid3X3,
   Layers,
-  Settings,
+  Plus,
   Wrench,
-  ArrowUpRight,
-  TrendingUp,
-  Activity,
-  Monitor,
-  Target,
-  Gauge
+  ArrowUpRight
 } from "lucide-solid"
-import { Card, InteractiveCard } from "../components/ui/card.tsx"
-import { Button, IconButton } from "../components/ui/button.tsx"
-import { AnimatedSection, FloatingOrbs, StaggerGroup } from "../components/ui/animated-section.tsx"
-import { Badge, IconChip, ProgressBar } from "../components/ui/badge.tsx"
-import { Skeleton } from "../components/ui/feedback.tsx"
-import { t, type Key } from "../i18n/index.ts"
-import { WorkspacePage } from "../components/WorkspacePage.tsx"
-
-interface ModuleCardData {
-  readonly id: "cad" | "cam" | "projects"
-  readonly title: string
-  readonly subtitle: string
-  readonly description: string
-  readonly href: string
-  readonly gradient: string
-  readonly icon: typeof Grid3X3
-  readonly cta: string
-}
-
-const modules = (): ReadonlyArray<ModuleCardData> => [
-  {
-    id: "cad",
-    title: t("dashboard.module.cad.title"),
-    subtitle: t("dashboard.module.cad.subtitle"),
-    description: t("dashboard.module.cad.description"),
-    href: "/cad",
-    gradient: "ui-module-card-blue",
-    icon: Grid3X3,
-    cta: t("dashboard.module.cad.cta")
-  },
-  {
-    id: "cam",
-    title: t("dashboard.module.cam.title"),
-    subtitle: t("dashboard.module.cam.subtitle"),
-    description: t("dashboard.module.cam.description"),
-    href: "/cam",
-    gradient: "ui-module-card-green",
-    icon: Wrench,
-    cta: t("dashboard.module.cam.cta")
-  },
-  {
-    id: "projects",
-    title: t("dashboard.module.projects.title"),
-    subtitle: t("dashboard.module.projects.subtitle"),
-    description: t("dashboard.module.projects.description"),
-    href: "/projects",
-    gradient: "ui-module-card-purple",
-    icon: File,
-    cta: t("dashboard.module.projects.cta")
-  }
-]
-
-interface FeatureChipData {
-  readonly icon: typeof Target
-  readonly text: string
-}
-
-const features = (): ReadonlyArray<FeatureChipData> => [
-  { icon: Target, text: t("dashboard.feature.precision") },
-  { icon: Cpu, text: t("dashboard.feature.ai") },
-  { icon: Gauge, text: t("dashboard.feature.performance") },
-  { icon: Wrench, text: t("dashboard.feature.cnc") }
-]
-
-interface MetricCardData {
-  readonly id: string
-  readonly icon: typeof Box
-  readonly label: string
-  readonly value: string | number | undefined
-  readonly change: string | undefined
-  readonly gradient: "blue" | "purple" | "green" | "orange"
-  readonly href: string
-}
+import {
+  BADGE,
+  CARD,
+  StageLoading,
+  TOOLBAR_BUTTON,
+  TOOLBAR_PRIMARY,
+  WorkspacePage
+} from "../components/WorkspacePage.tsx"
+import { t } from "../i18n/index.ts"
 
 interface DashboardData {
   readonly projectsCount: number | undefined
@@ -113,311 +39,291 @@ interface DashboardData {
   readonly recentComponents: number | undefined
 }
 
+interface MetricData {
+  readonly code: string
+  readonly icon: typeof Box
+  readonly label: string
+  readonly value: number | undefined
+  readonly meta: string
+  readonly metaAlert: boolean
+  readonly href: string
+}
+
+interface ModuleData {
+  readonly index: string
+  readonly title: string
+  readonly subtitle: string
+  readonly href: string
+  readonly cta: string
+  readonly icon: typeof Grid3X3
+  readonly specs: ReadonlyArray<{ readonly k: string; readonly v: string }>
+  readonly stat: string
+}
+
 export function DashboardScreen(props: { readonly data: DashboardData; readonly loading: boolean }): JSX.Element {
-  const metrics = createMemo<ReadonlyArray<MetricCardData>>(() => [
-    { id: "components", icon: Box, label: t("dashboard.metric.components"), value: props.data.componentsCount, change: undefined, gradient: "blue", href: "/components" },
-    { id: "projects", icon: File, label: t("dashboard.metric.projects"), value: props.data.projectsCount, change: undefined, gradient: "purple", href: "/projects" },
-    { id: "tools", icon: Wrench, label: t("dashboard.metric.tools"), value: props.data.toolsCount, change: undefined, gradient: "green", href: "/tools" },
-    { id: "materials", icon: Layers, label: t("dashboard.metric.materials"), value: props.data.materialsCount, change: undefined, gradient: "orange", href: "/materials" }
-  ])
+  const metrics = (): ReadonlyArray<MetricData> => [
+    {
+      code: "KPI·01",
+      icon: Box,
+      label: t("dashboard.metric.components"),
+      value: props.data.componentsCount,
+      meta: `${props.data.recentComponents ?? "—"} ${t("dashboard.metric.recentSuffix")}`,
+      metaAlert: false,
+      href: "/components"
+    },
+    {
+      code: "KPI·02",
+      icon: File,
+      label: t("dashboard.metric.projects"),
+      value: props.data.projectsCount,
+      meta: `${props.data.activeProjects ?? "—"} ${t("dashboard.metric.activeSuffix")}`,
+      metaAlert: false,
+      href: "/projects"
+    },
+    {
+      code: "KPI·03",
+      icon: Wrench,
+      label: t("dashboard.metric.tools"),
+      value: props.data.toolsCount,
+      meta: t("dashboard.metric.toolsMeta"),
+      metaAlert: false,
+      href: "/tools"
+    },
+    {
+      code: "KPI·04",
+      icon: Layers,
+      label: t("dashboard.metric.materials"),
+      value: props.data.materialsCount,
+      meta:
+        props.data.materialsLowStock !== undefined && props.data.materialsLowStock > 0
+          ? `${props.data.materialsLowStock} ${t("dashboard.metric.lowStockSuffix")}`
+          : t("dashboard.metric.stockOk"),
+      metaAlert: props.data.materialsLowStock !== undefined && props.data.materialsLowStock > 0,
+      href: "/materials"
+    }
+  ]
+
+  const modules = (): ReadonlyArray<ModuleData> => [
+    {
+      index: "01",
+      title: t("dashboard.module.cad.title"),
+      subtitle: t("dashboard.module.cad.subtitle"),
+      href: "/cad",
+      cta: t("dashboard.module.cad.cta"),
+      icon: Grid3X3,
+      specs: [
+        { k: t("dashboard.spec.kernel"), v: t("dashboard.spec.cadKernel") },
+        { k: t("dashboard.spec.units"), v: t("dashboard.spec.unitsValue") },
+        { k: t("dashboard.spec.exchange"), v: t("dashboard.spec.cadExchange") }
+      ],
+      stat: `${props.data.componentsCount ?? "—"} ${t("dashboard.metric.components").toLowerCase()}`
+    },
+    {
+      index: "02",
+      title: t("dashboard.module.cam.title"),
+      subtitle: t("dashboard.module.cam.subtitle"),
+      href: "/cam",
+      cta: t("dashboard.module.cam.cta"),
+      icon: Wrench,
+      specs: [
+        { k: t("dashboard.spec.strategy"), v: t("dashboard.spec.camStrategy") },
+        { k: t("dashboard.spec.post"), v: t("dashboard.spec.camPost") },
+        { k: t("dashboard.spec.output"), v: t("dashboard.spec.camOutput") }
+      ],
+      stat: `${props.data.toolsCount ?? "—"} ${t("dashboard.metric.tools").toLowerCase()}`
+    },
+    {
+      index: "03",
+      title: t("dashboard.module.projects.title"),
+      subtitle: t("dashboard.module.projects.subtitle"),
+      href: "/projects",
+      cta: t("dashboard.module.projects.cta"),
+      icon: File,
+      specs: [
+        { k: t("dashboard.system.activeProjects"), v: String(props.data.activeProjects ?? "—") },
+        { k: t("dashboard.metric.projects"), v: String(props.data.projectsCount ?? "—") },
+        { k: t("dashboard.quick.drawings"), v: String(props.data.drawingsCount ?? "—") }
+      ],
+      stat: `${props.data.activeProjects ?? "—"} ${t("dashboard.metric.activeSuffix")}`
+    }
+  ]
 
   return (
-    <WorkspacePage title={t("shell.dashboard")}>
-    <div class="dashboard-page">
-      <Hero />
+    <WorkspacePage
+      title={t("shell.dashboard")}
+      actions={<>
+        <A href="/projects" class={TOOLBAR_BUTTON}>
+          <FolderOpen size={14} aria-hidden="true" />
+          {t("dashboard.hero.cta.browse")}
+        </A>
+        <A href="/projects/create" class={TOOLBAR_PRIMARY}>
+          <Plus size={14} aria-hidden="true" />
+          {t("dashboard.hero.cta.start")}
+        </A>
+      </>}
+    >
+      <div class="dash" aria-busy={props.loading}>
+        <Show when={props.loading}>
+          <StageLoading label={t("dashboard.loading")} />
+        </Show>
 
-      <AnimatedSection delay={0.05} class="dashboard-section">
-        <div class="dashboard-metric-grid">
-          <For each={metrics()}>{(metric, i) => <MetricCard delay={i() * 0.06} {...metric} />}</For>
-        </div>
-      </AnimatedSection>
+        <section class="dash-open" aria-label={t("dashboard.hero.eyebrow")}>
+          <div class="dash-open-top">
+            <span class="dash-dot" aria-hidden="true" />
+            <span class="dash-open-eyebrow">{t("dashboard.hero.eyebrow")}</span>
+            <span class="dash-statusline-sep" aria-hidden="true">·</span>
+            <span class="dash-statusline-dim">{t("dashboard.hero.env")}</span>
+            <span class="dash-statusline-spacer" aria-hidden="true" />
+            <span class={BADGE}>{t("dashboard.status.nominal")}</span>
+          </div>
+          <div class="dash-open-main">
+            <p class="dash-lede">{t("dashboard.hero.tagline")}</p>
+          </div>
+        </section>
 
-      <AnimatedSection delay={0.18} class="dashboard-section">
-        <StaggerGroup class="dashboard-module-grid" delayStep={0.08}>
-          <For each={modules()}>{(m) => <ModuleCard {...m} />}</For>
-        </StaggerGroup>
-      </AnimatedSection>
+        <section aria-label={t("dashboard.kpi.label")}>
+          <div class="dash-sect">
+            <span class="dash-code">01</span>
+            <h2 class="dash-h2">{t("dashboard.kpi.label")}</h2>
+            <span class="dash-rule" aria-hidden="true" />
+          </div>
+          <div class="dash-kpi-grid" role="list">
+            <For each={metrics()}>{(m) => <MetricCell {...m} />}</For>
+          </div>
+        </section>
 
-      <AnimatedSection delay={0.3} class="dashboard-section">
-        <SystemPerformanceCard data={props.data} />
-      </AnimatedSection>
+        <section aria-label={t("dashboard.modules.label")}>
+          <div class="dash-sect">
+            <span class="dash-code">02</span>
+            <h2 class="dash-h2">{t("dashboard.modules.label")}</h2>
+            <span class="dash-rule" aria-hidden="true" />
+          </div>
+          <div class="dash-mod-grid">
+            <For each={modules()}>{(m) => <ModuleCard {...m} />}</For>
+          </div>
+        </section>
 
-      <AnimatedSection delay={0.42} class="dashboard-section">
-        <QuickAccess />
-      </AnimatedSection>
-    </div>
+        <section aria-label={t("dashboard.system.title")}>
+          <div class="dash-sect">
+            <span class="dash-code">03</span>
+            <h2 class="dash-h2">{t("dashboard.detail.label")}</h2>
+            <span class="dash-rule" aria-hidden="true" />
+          </div>
+          <div class="dash-split">
+            <SystemCard data={props.data} />
+            <QuickCard />
+          </div>
+        </section>
+      </div>
     </WorkspacePage>
   )
 }
 
-/** Hero with logo, tagline, feature chips. */
-function Hero(): JSX.Element {
+function MetricCell(props: MetricData): JSX.Element {
+  const Icon = props.icon
   return (
-    <section class="dashboard-hero">
-      <FloatingOrbs count={5} />
-      <div class="dashboard-hero-glow" aria-hidden="true" />
-      <Motion.div
-        class="dashboard-hero-card"
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.55, easing: [0.22, 1, 0.36, 1] }}
-      >
-        <div class="dashboard-hero-bg-pattern" aria-hidden="true">
-          <Motion.span
-            class="dashboard-hero-ring dashboard-hero-ring-1"
-            animate={{ rotate: 360, scale: [1, 1.08, 1] }}
-            transition={{ duration: 20, repeat: Infinity, easing: "linear" }}
-          />
-          <Motion.span
-            class="dashboard-hero-ring dashboard-hero-ring-2"
-            animate={{ rotate: -360, scale: [1, 0.92, 1] }}
-            transition={{ duration: 15, repeat: Infinity, easing: "linear" }}
-          />
+    <A
+      href={props.href}
+      class="dash-kpi"
+      role="listitem"
+      aria-label={`${props.label}: ${props.value ?? t("dashboard.metric.unavailable")}`}
+    >
+      <span class="dash-kpi-top">
+        <span class="dash-code">{props.code}</span>
+        <Icon size={14} aria-hidden="true" class="dash-kpi-icon" />
+      </span>
+      <strong class="dash-kpi-value">{props.value ?? t("dashboard.metric.unavailable")}</strong>
+      <span class="dash-kpi-label">{props.label}</span>
+      <span class={`dash-kpi-meta${props.metaAlert ? " dash-kpi-meta-alert" : ""}`}>{props.meta}</span>
+    </A>
+  )
+}
+
+function ModuleCard(props: ModuleData): JSX.Element {
+  const Icon = props.icon
+  return (
+    <div class={CARD}>
+      <div class="dash-mod-body">
+        <div class="dash-mod-head">
+          <Icon size={15} aria-hidden="true" class="dash-mod-icon" />
+          <div class="dash-mod-titles">
+            <h3 class="dash-mod-title">{props.title}</h3>
+            <p class="dash-mod-sub">{props.subtitle}</p>
+          </div>
+          <span class="dash-code dash-mod-idx">{props.index}</span>
         </div>
-
-        <Motion.h2
-          class="ui-display dashboard-hero-name"
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.15, easing: [0.22, 1, 0.36, 1] }}
-        >
-          <Sparkles size={28} class="dashboard-hero-sparkle" aria-hidden="true" />
-          <span class="dashboard-hero-name-text">{t("dashboard.hero.name")}</span>
-        </Motion.h2>
-
-        <Motion.p
-          class="ui-headline dashboard-hero-tagline"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.25, easing: [0.22, 1, 0.36, 1] }}
-        >
-          {t("dashboard.hero.tagline.lead")}
-          <span class="dashboard-hero-tagline-accent">{t("dashboard.hero.tagline.modern")}</span>
-          {t("dashboard.hero.tagline.tail")}
-        </Motion.p>
-
-        <Motion.div
-          class="dashboard-hero-features"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <For each={features()}>{(feature, i) => (
-            <Motion.span
-              class="dashboard-hero-feature-chip"
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.45, delay: 0.5 + i() * 0.08, easing: [0.22, 1, 0.36, 1] }}
-              hover={{ scale: 1.05 }}
-              press={{ scale: 0.97 }}
-            >
-              <span aria-hidden="true">{feature.icon}</span>
-              <span>{feature.text}</span>
-            </Motion.span>
+        <dl class="dash-spec">
+          <For each={props.specs}>{(s) => (
+            <div class="dash-spec-row">
+              <dt>{s.k}</dt>
+              <dd>{s.v}</dd>
+            </div>
           )}</For>
-        </Motion.div>
+        </dl>
+      </div>
+      <div class="dash-card-foot">
+        <span class="dash-stat">{props.stat}</span>
+        <A href={props.href} class="dash-open-link" aria-label={`${props.cta}`}>
+          {props.cta}
+          <ArrowUpRight size={14} aria-hidden="true" />
+        </A>
+      </div>
+    </div>
+  )
+}
 
-        <Motion.p
-          class="dashboard-hero-body"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          {t("dashboard.hero.body.lead")}
-          <span class="dashboard-hero-body-accent">{t("dashboard.hero.body.accent")}</span>
-        </Motion.p>
-
-        <Motion.div
-          class="dashboard-hero-actions"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
-        >
-          <Button variant="primary" size="lg">
-            <A href="/projects/create">{t("dashboard.hero.cta.start")}</A>
-          </Button>
-          <Button variant="secondary" size="lg">
-            <A href="/projects">{t("dashboard.hero.cta.browse")}</A>
-          </Button>
-        </Motion.div>
-      </Motion.div>
-
-      <Motion.div
-        class="dashboard-hero-bottom-glow"
-        aria-hidden="true"
-        animate={{ opacity: [0.25, 0.55, 0.25] }}
-        transition={{ duration: 4, repeat: Infinity, easing: "ease-in-out" }}
-      />
+function SystemCard(props: { readonly data: DashboardData }): JSX.Element {
+  const rows: ReadonlyArray<{ readonly label: string; readonly value: string }> = [
+    { label: t("dashboard.system.latency"), value: "14 ms" },
+    { label: t("dashboard.system.cache"), value: "97%" },
+    { label: t("dashboard.system.errors"), value: "0.1%" },
+    { label: t("dashboard.system.activeProjects"), value: String(props.data.activeProjects ?? "—") },
+    { label: t("dashboard.system.recentComponents"), value: String(props.data.recentComponents ?? "—") }
+  ]
+  return (
+    <section class="dash-panel" aria-label={t("dashboard.system.title")}>
+      <div class="dash-panel-head">
+        <h2 class="dash-h2">{t("dashboard.system.title")}</h2>
+        <span class={BADGE}>{t("dashboard.status.nominal")}</span>
+      </div>
+      <dl class="dash-table">
+        <For each={rows}>{(r) => (
+          <div class="dash-table-row">
+            <dt>{r.label}</dt>
+            <dd class="dash-mono">{r.value}</dd>
+          </div>
+        )}</For>
+      </dl>
     </section>
   )
 }
 
-interface MetricCardProps {
-  readonly icon: typeof Box
-  readonly label: string
-  readonly value: string | number | undefined
-  readonly change: string | undefined
-  readonly gradient: "blue" | "purple" | "green" | "orange"
-  readonly href: string
-  readonly delay?: number
-}
-
-function MetricCard(props: MetricCardProps): JSX.Element {
-  const Icon = props.icon
-  return (
-    <InteractiveCard
-      href={props.href}
-      variant="holographic"
-      delay={props.delay ?? 0}
-      class="dashboard-metric-card"
-    >
-      <div class="dashboard-metric-row">
-        <IconChip tone={props.gradient}>
-          <Icon size={20} aria-hidden="true" />
-        </IconChip>
-        <Show when={props.change}>
-          <span class="dashboard-metric-change">
-            <TrendingUp size={14} aria-hidden="true" />
-            {props.change}
-          </span>
-        </Show>
-      </div>
-      <strong class="dashboard-metric-value ui-display">{props.value ?? t("dashboard.metric.unavailable")}</strong>
-      <span class="ui-caption">{props.label}</span>
-    </InteractiveCard>
-  )
-}
-
-function ModuleCard(props: ModuleCardData): JSX.Element {
-  const Icon = props.icon
-  return (
-    <InteractiveCard
-      href={props.href}
-      variant="default"
-      class={["dashboard-module-card", props.gradient].join(" ")}
-    >
-      <span class={["dashboard-module-strip", props.gradient + "-strip"].join(" ")} aria-hidden="true" />
-      <div class="dashboard-module-row">
-        <IconChip tone={props.id === "cad" ? "blue" : props.id === "cam" ? "green" : "purple"}>
-          <Icon size={22} aria-hidden="true" />
-        </IconChip>
-        <div>
-          <h3 class="ui-title dashboard-module-title">{props.title}</h3>
-          <p class="ui-caption">{props.subtitle}</p>
-        </div>
-      </div>
-      <p class="dashboard-module-description">{props.description}</p>
-      <Button variant={props.id === "cad" ? "primary" : props.id === "cam" ? "success" : "secondary"} class="dashboard-module-cta">
-        <A href={props.href}>{props.cta}</A>
-        <ArrowUpRight size={16} aria-hidden="true" />
-      </Button>
-    </InteractiveCard>
-  )
-}
-
-function SystemPerformanceCard(props: { readonly data: DashboardData }): JSX.Element {
-  const cpu = 32
-  const mem = 48
-  const storage = 21
-  return (
-    <Card variant="default" class="dashboard-system-card">
-      <div class="dashboard-system-header">
-        <div class="dashboard-system-row">
-          <IconChip tone="cyan">
-            <Monitor size={18} aria-hidden="true" />
-          </IconChip>
-          <h3 class="ui-title">{t("dashboard.system.title")}</h3>
-        </div>
-        <Motion.span
-          class="dashboard-system-pulse"
-          aria-hidden="true"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 4, repeat: Infinity, easing: "linear" }}
-        >
-          <Activity size={16} />
-        </Motion.span>
-      </div>
-
-      <div class="dashboard-system-grid">
-        <div class="dashboard-system-metrics">
-          <MetricRow label={t("dashboard.system.cpu")} value={`${cpu}%`} pct={cpu} tone="blue" />
-          <MetricRow label={t("dashboard.system.memory")} value={`${mem}%`} pct={mem} tone="purple" />
-          <MetricRow label={t("dashboard.system.storage")} value={`${storage}%`} pct={storage} tone="orange" />
-        </div>
-        <div class="dashboard-system-stats">
-          <StatRow label={t("dashboard.system.latency")} value="14 ms" />
-          <StatRow label={t("dashboard.system.cache")} value="97%" tone="success" />
-          <StatRow label={t("dashboard.system.errors")} value="0.1%" tone="danger" />
-          <StatRow label={t("dashboard.system.activeProjects")} value={String(props.data.activeProjects ?? "—")} />
-          <StatRow label={t("dashboard.system.recentComponents")} value={String(props.data.recentComponents ?? "—")} />
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-function MetricRow(props: { readonly label: string; readonly value: string; readonly pct: number; readonly tone: "blue" | "purple" | "orange" }): JSX.Element {
-  return (
-    <div class="dashboard-metric-row-item">
-      <div class="dashboard-metric-row-header">
-        <span class="ui-caption">{props.label}</span>
-        <span class="dashboard-metric-row-value">{props.value}</span>
-      </div>
-      <ProgressBar value={props.pct} tone={props.tone === "purple" ? "blue" : props.tone} />
-    </div>
-  )
-}
-
-function StatRow(props: { readonly label: string; readonly value: string; readonly tone?: "success" | "danger" }): JSX.Element {
-  return (
-    <div class="dashboard-stat-row">
-      <span class="ui-caption">{props.label}</span>
-      <span class={["dashboard-stat-value", props.tone === "success" ? "dashboard-stat-success" : props.tone === "danger" ? "dashboard-stat-danger" : ""].filter(Boolean).join(" ")}>{props.value}</span>
-    </div>
-  )
-}
-
-function QuickAccess(): JSX.Element {
-  const tiles = (): ReadonlyArray<{ href: string; label: string; detail: string; icon: typeof Layers; tone: "yellow" | "green" | "blue" | "purple" }> => [
-    { href: "/materials", label: t("dashboard.quick.materials"), detail: t("dashboard.quick.materialsDetail"), icon: Layers, tone: "yellow" },
-    { href: "/components", label: t("dashboard.quick.components"), detail: t("dashboard.quick.componentsDetail"), icon: Box, tone: "green" },
-    // Drawings live inside a project in v6 (there is no `/drawings` index route).
-    { href: "/projects", label: t("dashboard.quick.drawings"), detail: t("dashboard.quick.drawingsDetail"), icon: Settings, tone: "blue" },
-    { href: "/toolpaths", label: t("dashboard.quick.toolpaths"), detail: t("dashboard.quick.toolpathsDetail"), icon: Cpu, tone: "purple" }
+function QuickCard(): JSX.Element {
+  const tiles = (): ReadonlyArray<{ readonly href: string; readonly label: string; readonly detail: string; readonly icon: typeof Layers }> => [
+    { href: "/materials", label: t("dashboard.quick.materials"), detail: t("dashboard.quick.materialsDetail"), icon: Layers },
+    { href: "/components", label: t("dashboard.quick.components"), detail: t("dashboard.quick.componentsDetail"), icon: Box },
+    { href: "/projects", label: t("dashboard.quick.drawings"), detail: t("dashboard.quick.drawingsDetail"), icon: File },
+    { href: "/toolpaths", label: t("dashboard.quick.toolpaths"), detail: t("dashboard.quick.toolpathsDetail"), icon: Wrench }
   ]
   return (
-    <Card variant="default" class="dashboard-quick-card">
-      <div class="dashboard-quick-header">
-        <h3 class="ui-title">{t("dashboard.quick.title")}</h3>
-        <Badge tone="info">{t("dashboard.quick.shortcut")}</Badge>
+    <section class="dash-panel" aria-label={t("dashboard.quick.title")}>
+      <div class="dash-panel-head">
+        <h2 class="dash-h2">{t("dashboard.quick.title")}</h2>
       </div>
-      <StaggerGroup class="dashboard-quick-grid" delayStep={0.05}>
+      <nav class="dash-rows">
         <For each={tiles()}>{(tile) => (
-          <Motion.a
-            href={tile.href}
-            class="dashboard-quick-tile"
-            hover={{ scale: 1.02 }}
-            press={{ scale: 0.97 }}
-            transition={{ duration: 0.2 }}
-          >
-            <IconChip tone={tile.tone}>
-              <tile.icon size={18} aria-hidden="true" />
-            </IconChip>
-            <div>
-              <h4 class="dashboard-quick-name">{tile.label}</h4>
-              <p class="ui-caption">{tile.detail}</p>
-            </div>
-          </Motion.a>
+          <A href={tile.href} class="dash-row">
+            <tile.icon size={14} aria-hidden="true" class="dash-row-icon" />
+            <span class="dash-row-main">
+              <span class="dash-row-label">{tile.label}</span>
+              <span class="dash-row-detail">{tile.detail}</span>
+            </span>
+            <ArrowUpRight size={14} aria-hidden="true" class="dash-row-arrow" />
+          </A>
         )}</For>
-      </StaggerGroup>
-    </Card>
+      </nav>
+    </section>
   )
 }
 
-// Silence "unused" warnings on helpers imported only for type-checking.
-void Clock
-void Plus
-void IconButton
-void Skeleton
 export type { DashboardData }
-export type { ModuleCardData, MetricCardData }

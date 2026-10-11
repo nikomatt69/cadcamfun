@@ -14,9 +14,9 @@ import Compass from "lucide-solid/icons/compass"
 import ShieldCheck from "lucide-solid/icons/shield-check"
 import Brain from "lucide-solid/icons/brain"
 import Check from "lucide-solid/icons/check"
-import ChevronUp from "lucide-solid/icons/chevron-up"
 import { t } from "../i18n/index.ts"
 import { useAiStore } from "./context.tsx"
+import { agentLabel } from "./ToolRow.tsx"
 import type { AiPendingQuestion } from "./types.ts"
 
 interface ControlOption {
@@ -91,7 +91,6 @@ function ControlMenu(props: {
               )
             }}
           </For>
-          <ChevronUp class="assistant-control-popover-caret" size={11} aria-hidden="true" />
         </div>
       </Show>
     </div>
@@ -126,7 +125,7 @@ export function AssistantControls(): JSX.Element {
         onChange={(value) => ai.setAgent(value)}
         options={[
           { value: "cadcam", label: t("ai.controls.coordinator") },
-          ...ai.agents().filter((candidate) => candidate.id !== "cadcam").map((candidate) => ({ value: candidate.id, label: candidate.title, description: candidate.description }))
+          ...ai.agents().filter((candidate) => candidate.id !== "cadcam").map((candidate) => ({ value: candidate.id, label: agentLabel(candidate.id), description: candidate.description }))
         ]}
       />
 

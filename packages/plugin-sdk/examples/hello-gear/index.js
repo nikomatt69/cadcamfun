@@ -6074,10 +6074,19 @@ var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible"
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
-var RapidSchema = TaggedStruct("Rapid", { to: Vec3Schema });
+var RotarySchema = Struct({
+  a: optionalKey2(Finite),
+  b: optionalKey2(Finite),
+  c: optionalKey2(Finite)
+});
+var RapidSchema = TaggedStruct("Rapid", {
+  to: Vec3Schema,
+  rotary: optionalKey2(RotarySchema)
+});
 var LinearSchema = TaggedStruct("Linear", {
   to: Vec3Schema,
-  feed: Positive
+  feed: Positive,
+  rotary: optionalKey2(RotarySchema)
 });
 var ArcSchema2 = TaggedStruct("Arc", {
   to: Vec3Schema,
@@ -6144,6 +6153,11 @@ var MachineProfileSchema = Struct({
   }),
   maxFeed: optionalKey2(Positive),
   maxSpindleRpm: optionalKey2(NonNegative),
+  rotary: optionalKey2(Struct({
+    a: optionalKey2(Struct({ min: Finite, max: Finite })),
+    b: optionalKey2(Struct({ min: Finite, max: Finite })),
+    c: optionalKey2(Struct({ min: Finite, max: Finite }))
+  })),
   tools: optionalKey2(ArraySchema(Struct({ id: String4.check(isMinLength(1)) })))
 });
 var validateProgramInput = decodeUnknownSync(ProgramSchema, { errors: "all" });
@@ -6319,6 +6333,31 @@ class ThreadParams extends Class3("cam/ThreadParams")(Struct({
   tolerance: withDefault2(NonNegative3, 0.01)
 }).check(heightsOrdered)) {
 }
+// packages/core/src/cam/operations/multiaxis.ts
+var MultiaxisStrategySchema = Literals(["parallel", "contour"]);
+var ToolAxisSchema = Literals(["normal", "lead"]);
+var Degrees = Finite.check(isBetween({ minimum: -85, maximum: 85 }));
+
+class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
+  ...OperationFields,
+  strategy: withDefault2(MultiaxisStrategySchema, "parallel"),
+  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 30),
+  scallop: withDefault2(NonNegative3, 0),
+  angle: withDefault2(Finite, 0),
+  oneWay: withDefault2(Boolean3, false),
+  toolAxis: withDefault2(ToolAxisSchema, "normal"),
+  lead: withDefault2(Degrees, 10),
+  tilt: withDefault2(Degrees, 0),
+  gouge: withDefault2(Boolean3, true),
+  gougeAngle: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 85 })), 30),
+  gougeClearance: withDefault2(NonNegative3, 0.02),
+  maxRotaryStep: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 180 })), 30),
+  sampling: withDefault2(Positive3, 0.5),
+  tolerance: withDefault2(Positive3, 0.01),
+  flute: withDefault2(Finite.check(isBetween({ minimum: 0.5, maximum: 6 })), 2)
+}).check(heightsOrdered)) {
+}
+var RAD2 = Math.PI / 180;
 // packages/core/src/cam/generator/cycles.ts
 var FixedCycleType = {
   DRILLING: "drilling",
@@ -6393,7 +6432,7 @@ var Num2 = Finite;
 var PositiveInt = Int.check(isGreaterThan2(0));
 var Percent = Finite.check(isGreaterThan2(0), isLessThanOrEqualTo2(100));
 var MachineTypeSchema = Literals(["mill", "lathe", "3dprinter"]);
-var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing"]);
+var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing", "multiaxis"]);
 var LatheOperationSchema = Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]);
 var PrinterOperationSchema = Literals(["standard", "vase", "support", "infill", "raft", "brim"]);
 var OperationTypeSchema = Union2([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema]);
@@ -6460,6 +6499,11 @@ var ToolpathSettingsSchema = Struct({
   useAdaptiveFeeds: withDefault2(Boolean3, false),
   useRestMachining: withDefault2(Boolean3, false),
   restToolDiameter: withDefault2(Positive3, 10),
+  fiveAxisStrategy: withDefault2(Literals(["parallel", "contour"]), "parallel"),
+  fiveAxisToolAxis: withDefault2(Literals(["normal", "lead"]), "lead"),
+  fiveAxisLead: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 10),
+  fiveAxisTilt: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 0),
+  fiveAxisGouge: withDefault2(Boolean3, true),
   toolNumber: withDefault2(PositiveInt, 1),
   workOffset: withDefault2(Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
   probeCycle: withDefault2(Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
@@ -6530,10 +6574,25 @@ var PrinterExtrasSchema = Struct({
   printOrientation: withDefault2(Literals(["original", "auto-optimal"]), "original")
 });
 var DEFAULT_PRINTER_EXTRAS = decodeUnknownSync(PrinterExtrasSchema)({});
+var RotaryRangeSchema = Struct({ min: Finite, max: Finite });
+var MachineForProgramSchema = Struct({
+  id: String4,
+  name: withDefault2(String4, ""),
+  axes: withDefault2(Literals([3, 4, 5]), 3),
+  controller: withDefault2(String4, "generic"),
+  fiveAxis: optionalKey2(Struct({
+    layout: Literals(["table-AC", "table-BC"]),
+    tilt: RotaryRangeSchema,
+    rotation: optionalKey2(RotaryRangeSchema),
+    pivot: optionalKey2(Struct({ x: Finite, y: Finite, z: Finite })),
+    tcp: withDefault2(Literals(["control", "program"]), "control")
+  }))
+});
 var GenerateRequestSchema = Struct({
   settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
   geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY),
   printer: withDefault2(PrinterExtrasSchema, DEFAULT_PRINTER_EXTRAS),
+  machine: optionalKey2(MachineForProgramSchema),
   stamp: optionalKey2(String4)
 });
 var GcodeStatsSchema = Struct({

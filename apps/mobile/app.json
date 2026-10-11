@@ -15,7 +15,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CADisableMinimumFrameDurationOnPhone": true,
         "NSCameraUsageDescription": "CADCAMFUN uses the camera to scan the pairing QR code shown on your Mac.",
-        "NSLocalNetworkUsageDescription": "CADCAMFUN connects to your Mac on the local network to work with your projects.",
+        "NSLocalNetworkUsageDescription": "CADCAMFUN connects to your Mac on the local network or Personal Hotspot to work with your projects.",
+        "NSBonjourServices": ["_cadcamfun._tcp"],
         "NSFaceIDUsageDescription": "CADCAMFUN uses Face ID to unlock the app and confirm sensitive actions.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true

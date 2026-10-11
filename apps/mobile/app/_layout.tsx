@@ -6,8 +6,10 @@ import { StatusBar } from "expo-status-bar"
 import { Stack } from "expo-router"
 import { ThemeProvider, useTheme } from "@/lib/theme"
 import { ServerProvider, useServer } from "@/lib/server"
+import { setupOfflineDrainOnForeground } from "@/lib/offline-queue"
 import { ToastHost } from "@/components/ui/ToastHost"
 import { AppLockCoordinator } from "@/components/layout/AppLockCoordinator"
+import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary"
 import "@/global.css"
 
 /**
@@ -32,12 +34,19 @@ function Gate() {
   return null
 }
 
+function OfflineDrain() {
+  const { config } = useServer()
+  useEffect(() => setupOfflineDrainOnForeground(() => config), [config])
+  return null
+}
+
 function ThemedStack() {
   const { palette, colorScheme } = useTheme()
   return (
     <>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       <Gate />
+      <OfflineDrain />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: palette.background },
@@ -71,9 +80,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <ServerProvider>
-            <ThemedStack />
-          </ServerProvider>
+          <GlobalErrorBoundary>
+            <ServerProvider>
+              <ThemedStack />
+            </ServerProvider>
+          </GlobalErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

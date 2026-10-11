@@ -2388,6 +2388,7 @@ type Endpoint27_0Input = {
   readonly settings: Endpoint27_0Request["payload"]["settings"]
   readonly geometry: Endpoint27_0Request["payload"]["geometry"]
   readonly printer: Endpoint27_0Request["payload"]["printer"]
+  readonly machine?: Endpoint27_0Request["payload"]["machine"]
   readonly stamp?: Endpoint27_0Request["payload"]["stamp"]
 }
 const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_0Input) =>
@@ -2396,6 +2397,7 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
       settings: input["settings"],
       geometry: input["geometry"],
       printer: input["printer"],
+      machine: input["machine"],
       stamp: input["stamp"],
     },
   }).pipe(Effect.mapError(mapClientError))

@@ -42,6 +42,10 @@ apps/
 
 Dependency direction (no cycles): `core` ← `api` ← `sidecar`; `db` ← `sidecar`; `ai`, `plugin-sdk` ← `sidecar`; `api` (types only) ← `desktop`. `core` and `api` must not import `db`.
 
+## 3b. Remaining work (roadmap)
+
+**Sequence of remaining work** lives in `specs/roadmap/README.md` (RM-00–RM-11). When an agent is told to follow **the roadmap**, that folder plus `AGENTS.md` § Roadmap override the older phase lists in `20-integral-roadmap.md` / `21-integration-master-plan.md` for **order only**. Design contracts stay in `specs/02`–`27`.
+
 ## 4. Task board
 
 Each work package (WP) owns a directory. **An agent edits only files inside its own WP directory** plus the explicit shared files listed in its spec. Cross-WP needs go through the contracts in the specs; if a contract must change, edit the spec first and note it under "Change log" at the bottom of that spec.
@@ -100,3 +104,4 @@ Agents in the same wave never touch the same directory, so they can run concurre
 - v1: initial specs.
 - v2: WP13–WP13 done; WP11/WP12 core + sidecar + API in place.
 - v3: added WP14 (multi-operation setups: one setup → many operations → many programs, with a tool table and tool changes) and its spec `14-multi-op-setup.md`.
+- v4: remaining work sequenced in `specs/roadmap/` (RM-00–RM-11); `AGENTS.md` requires following it when the roadmap is cited.
