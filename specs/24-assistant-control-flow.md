@@ -20,6 +20,17 @@ Change log: 2026-10-11 — agreed integrated processor/session/stream lifecycle 
 
 ## Ownership and flow
 
+### Project workspace refinement (2026-10-13)
+
+Explicit user scope: WP8 `packages/ai`, WP4 AI HTTP/acting-user adapters and matching tests, WP3 existing AI wire schemas/generated client, WP6 `apps/desktop/src/features/ai` and i18n. This is a refinement of the named assistant, not completion of later roadmap steps or a new CAD/CAM kernel.
+
+- One application-owned `NikCliRuntime` holds the SDK import, credentials, catalogue, skills and bounded scheduler. Its cached directory-scoped project clients match nikcli's Instance map: one scratch workspace per project, never one shared mutable document or a second agent engine. Concurrent admission and shutdown must preserve that ownership.
+- Continue a stored native session only when its directory matches the requested project workspace. Keep client/native identity bindings for the runtime lifetime; desktop saves the native identity as soon as it is observed so a restart retains real model/tool history. Session reads and aborts must not fall back to a different workspace.
+- Project switching detaches the old view without aborting the host's turn. Conversations, pending decisions and editor-result application stay project scoped. Opening another project's local conversation is refused; each project restores its last local conversation. Preparation failures fail closed rather than selecting a replacement document on arbitrary HTTP errors.
+- `includeContext:false` disables optional automatic workspace, notes, Brain and habits injection on the server; explicit user context remains. Project prompts exclude legacy unscoped/global notes and other projects' notes. Explicit inaccessible projects are rejected before loading context or creating a host.
+- Chat uses the existing timeline and controls, adds readable Markdown with safe links/code, and preserves bounded completed tool/plan/diagnostic evidence on this device. Restoring evidence is presentation only: it must never execute or mirror stored mutations. No fabricated commercial CAD/CAM equivalence, precision, verification or token telemetry.
+- Verification crosses service, real embedded-host, HTTP and SolidJS store/UI interfaces with offline/scripted providers. No paid provider request, dependency install, DB migration, external bridge or physical machine actuation is required.
+
 WP8 owns `packages/ai`: typed prompt loaders, native/custom tool registry, role selection, model variants, host context and session controls. WP3 owns `packages/api`: schema-first endpoints and generated clients. WP4 owns `apps/sidecar/src/http/ai.ts` and `src/services/ai.ts`: delegation to the service. WP6 owns `apps/desktop/src/ai` and `src/i18n`: assistant controls and interactive questions. Existing unrelated changes are retained.
 
 The flow is UI session + project -> AiService identity binding -> nikcli session -> registered role/tool permissions -> validated handler -> real project -> correlated stream result -> editor/context reconciliation. Main and child agents share project evidence and explicit briefs, not fabricated shared conversation. Child results stay scoped to the parent; question replies and cancellations use that same owner. No second agent loop, token estimator or independent compaction engine is introduced.

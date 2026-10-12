@@ -62,14 +62,14 @@ describe("one document for the editor and the tools", () => {
     expect((await handlers.describeDrawing(doc.projectId) as { total: number }).total).toBe(3)
   })
 
-  test("a remembered document that no longer exists is replaced, not an obstacle", async () => {
+  test("an inaccessible remembered document fails closed and preserves unsaved geometry", async () => {
     useDocumentStore.getState().setDocument({ projectId: "gone", drawingId: "gone-too", name: "Deleted" })
     useElementsStore.getState().addElement({ type: "cube", name: "Block", x: 0, y: 0, z: 0, width: 5, height: 5, depth: 5 })
-    const doc = await prepareWorkspace(app.state)
-    expect(doc.drawingId).not.toBe("gone-too")
-    expect(useDocumentStore.getState().drawingId).toBe(doc.drawingId)
-    const stored = (await app.sidecar.call(`/api/projects/${doc.projectId}/drawings`)).body[0].data.elements as Array<{ name: string }>
-    expect(stored.map((e) => e.name)).toEqual(["Block"])
+    const before = (await app.sidecar.call("/api/projects")).body.length
+    await expect(prepareWorkspace(app.state)).rejects.toBeDefined()
+    expect(useDocumentStore.getState()).toMatchObject({ projectId: "gone", drawingId: "gone-too" })
+    expect(useElementsStore.getState().elements.map((e) => e.name)).toEqual(["Block"])
+    expect((await app.sidecar.call("/api/projects")).body).toHaveLength(before)
   })
 
   test("a tool result adopts its drawing when the editor had none", () => {
@@ -303,4 +303,3 @@ describe("the assistant lays out, groups and organises what it built", () => {
     expect(useElementsStore.getState().elements.find((e) => e.id === id)!.layerId).toBe(housing.id)
   })
 })
-

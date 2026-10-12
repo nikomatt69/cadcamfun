@@ -78,6 +78,20 @@ const PROGRESS = new Set(["step", "tool_progress", "reasoning", "todo", "retry",
 const content = (events: ReadonlyArray<AiEvent>) => events.filter((e) => !PROGRESS.has(e.type))
 
 describe("embedded nikcli host", () => {
+  test("one runtime single-flights project clients and rejects cross-workspace worker parents", async () => {
+    const peers = await Effect.runPromise(Effect.all([runtime.host("workspace-single"), runtime.host("workspace-single"), runtime.host("workspace-other")], { concurrency: "unbounded" }))
+    expect(peers[0]).toBe(peers[1])
+    expect(peers[0]?.directory).not.toBe(peers[2]?.directory)
+    const a = peers[0], b = peers[2]
+    if (!a || !b) throw new Error("Missing project host")
+    const session = await a.client.session.create({ title: "Workspace continuity" })
+    expect((await a.client.session.get({ sessionID: session.id })).directory).toBe(a.directory)
+    await expect(Effect.runPromise(runtime.worker({ projectId: b.projectId, parentSessionId: session.id }))).rejects.toThrow("different project workspace")
+    const worker = await Effect.runPromise(runtime.worker({ projectId: a.projectId, parentSessionId: session.id }))
+    expect((await worker.client.session.get({ sessionID: worker.workerSessionId })).parentID).toBe(session.id)
+    await worker.client.session.remove({ sessionID: worker.workerSessionId })
+    await a.client.session.remove({ sessionID: session.id })
+  })
   test("domain schemas load on demand through the native registry and remain session-scoped", async () => {
     const host = await Effect.runPromise(runtime.host("project-discovery"))
     const before = fake.requests.length

@@ -13,7 +13,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { startVisionBridge } from "../lib/vision.ts"
 import { streamChat, type StreamHandle } from "../lib/stream.ts"
 import { buildSuggestions, type Suggestion } from "../lib/suggestions.ts"
-import { loadPersisted, savePersisted } from "./persisted.ts"
+import { loadAiState, savePersisted } from "./persisted.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
@@ -26,7 +26,7 @@ import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "
 import type { ChatAttachment } from "../lib/attachments.ts"
 import { contextTokensOf } from "../lib/context-metrics.ts"
 import { mirrorCamResult } from "../lib/cam-sync.ts"
-import { mirrorToolResult, reconcileFromStored } from "../lib/editor-sync.ts"
+import { captureEditorOwner, mirrorToolResult, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
 import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "../lib/types.ts"
 
 export type PendingDelivery = "queue" | "steer"
@@ -107,6 +107,7 @@ interface Persisted {
   readonly model: ChatModel | undefined
   readonly includeContext: boolean
   readonly sessions: ReadonlyArray<AiSession>
+  readonly activeByProject?: Readonly<Record<string, string>>
 }
 
 const emptyStats = (): AiStats => ({
@@ -130,11 +131,12 @@ export const createAiStore = (): AiStore => {
   const store = createRoot((disposeRoot) => {
   disposeStore = disposeRoot
   const app = useApp()
-  const persistedInitial = loadPersisted<Persisted>(initial())
+  const persistedInitial = loadAiState()
+   let activeByProject: Record<string, string> = { ...persistedInitial.activeByProject }
   const [modelSig, setModelSig] = createSignal<ChatModel | undefined>(persistedInitial.model)
   const [includeContextSig, setIncludeContextSig] = createSignal<boolean>(persistedInitial.includeContext)
   const [sessionsSig, setSessionsSig] = createSignal<ReadonlyArray<AiSession>>(persistedInitial.sessions)
-  const persist = (next: Persisted): void => savePersisted(next)
+  const persist = (next: Persisted): void => savePersisted({ ...next, activeByProject })
 
   const [status, setStatus] = createSignal<"idle" | "connecting" | "streaming" | "error">("idle")
   const [error, setError] = createSignal<string | undefined>()
@@ -172,7 +174,7 @@ export const createAiStore = (): AiStore => {
     setIncludeContextSig(() => resolved)
     persist({ model: modelSig(), includeContext: resolved, sessions: sessionsSig() })
   }
-  const sessions: Accessor<ReadonlyArray<AiSession>> = sessionsSig
+  const sessions: Accessor<ReadonlyArray<AiSession>> = () => sessionsSig().filter((s) => s.projectId === projectId())
 
   const setSessionsPersisted = (next: ReadonlyArray<AiSession>): void => {
     setSessionsSig(() => next)
@@ -192,6 +194,7 @@ export const createAiStore = (): AiStore => {
   let activeAssistantId: string | undefined
   let conversationGeneration = 0
   let turnGeneration = 0
+   let adoptingPreparedDocument = false
   let streamedUsage = { inputTokens: 0, outputTokens: 0 }
   const thinkingCounted = new Set<number>()
 
@@ -213,7 +216,14 @@ export const createAiStore = (): AiStore => {
     setMessages((current) => current.map((m) => m.id === id ? patch(m) : m))
   }
 
-  const projectId = (): string | undefined => appProjectId(app)
+  const projectId = (): string | undefined => useDocumentStore().projectId ?? app.recents()[0]?.id
+   const rememberActive = (): void => {
+     const project = projectId() ?? ""
+     const id = sessionId()
+     if (id === undefined) delete activeByProject[project]
+     else activeByProject[project] = id
+     persist({ model: modelSig(), includeContext: includeContextSig(), sessions: sessionsSig() })
+   }
 
   /** Merge what a task tool answered (one task or a list) into the task list, so the chat shows it before the next poll. */
   const noteTasks = (output: string): void => {
@@ -236,6 +246,7 @@ export const createAiStore = (): AiStore => {
   let watchingGeneration: number | undefined
   const activeTask = (list: ReadonlyArray<AiTask>): boolean => list.some((t) => t.status === "queued" || t.status === "running")
   const watchTasks = async (initialBusy = false): Promise<void> => {
+    const editorOwner = captureEditorOwner()
     const generation = conversationGeneration
     if (watchingGeneration === generation) return
     watchingGeneration = generation
@@ -283,7 +294,7 @@ export const createAiStore = (): AiStore => {
             saveTranscript()
           }
           // What the agent changed after the report is in the stored drawing, not in this editor yet.
-          void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+          void reconcileFromStored(app, editorOwner).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
           woken = false
           if (owed.length === 0) return
           continue
@@ -295,7 +306,7 @@ export const createAiStore = (): AiStore => {
     }
   }
 
-  const applyEvent = (event: AiEvent): void => {
+  const applyEvent = (event: AiEvent, editorOwner: EditorOwner): void => {
     const idForEvent = activeAssistantId ?? `${event.sessionId}:assistant`
     if (event.type === "turn" || event.type === "session_status" || event.type === "permission_resolved" || event.type === "permission_blocked" || event.type === "tool_diagnostic" || event.type === "compaction" || event.type === "context_snapshot") {
       if (event.type === "permission_resolved") setPermissions((current) => current.filter((item) => item.requestId !== event.requestId))
@@ -346,7 +357,7 @@ export const createAiStore = (): AiStore => {
       }
       return
     }
-    if (event.type === "todo") { setPlan(event.todos); return }
+    if (event.type === "todo") { setPlan(event.todos); patchMessage(idForEvent, (prev) => ({ ...prev, events: [...prev.events, event] })); return }
     if (event.type === "goal") { setGoal(event.goal ?? undefined); return }
     if (event.type === "retry") {
       setActivity((a) => ({ ...a, retry: { attempt: event.attempt, message: event.message } }))
@@ -376,10 +387,10 @@ export const createAiStore = (): AiStore => {
     }
     if (event.type === "tool_result") {
       // The CAD tools ran in the sidecar: show their result in the editor the user has open.
-      try { mirrorToolResult(event.tool, event.ok, event.output) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
+      try { mirrorToolResult(event.tool, event.ok, event.output, editorOwner) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
       // Whatever the tool answered, the stored drawing is the truth: bring the editor in line with it.
-      if (event.ok && (event.tool.includes("cad_") || event.tool.endsWith("cam_stock"))) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
-      if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output)
+      if (event.ok && (event.tool.includes("cad_") || event.tool.endsWith("cam_stock"))) void reconcileFromStored(app, editorOwner).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+      if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output, editorOwner)
       if (event.tool === "agent_task" || event.tool === "agent_tasks" || event.tool === "agent_task_read" || event.tool === "agent_task_cancel") noteTasks(event.output)
       const id = idForEvent
       setToolCalls((current) => {
@@ -415,10 +426,10 @@ export const createAiStore = (): AiStore => {
         totalInputTokens: s.totalInputTokens + Math.max(0, (event.usage?.inputTokens ?? 0) - streamedUsage.inputTokens),
         totalOutputTokens: s.totalOutputTokens + Math.max(0, (event.usage?.outputTokens ?? 0) - streamedUsage.outputTokens)
       }))
-      touchSession(event.sessionId, new Date().toISOString(), 1)
+      touchSession(sessionId() ?? event.sessionId, new Date().toISOString(), 1)
       saveTranscript()
       // The tool results of a recovered turn never reached us: the stored drawing is the truth, so the editor catches up with it.
-      if (event.recovered === true) void reconcileFromStored(app).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+      if (event.recovered === true) void reconcileFromStored(app, editorOwner).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
       return
     }
     if (event.type === "error") {
@@ -511,13 +522,18 @@ export const createAiStore = (): AiStore => {
       await enqueue(text, delivery)
       return
     }
-    const sid = sessionId() ?? newSessionId()
+    let sid = sessionId() ?? newSessionId()
+    const originalId = sid
+    let ownerProject = projectId()
+    const ownerConversation = conversationGeneration
     const generation = ++turnGeneration
+    let editorOwner = captureEditorOwner()
     streamedUsage = { inputTokens: 0, outputTokens: 0 }
     const at = new Date().toISOString()
     if (!sessionId()) {
       setSessionId(sid)
       upsertSession(sid, text.slice(0, 60), at, projectId())
+      rememberActive()
     }
     const userId = nextMessageId()
     appendMessage({ id: userId, role: "user", text, createdAt: at, events: [], status: "done", ...(attachments.length > 0 ? { attachments: attachments.map((a) => a.name) } : {}) })
@@ -531,36 +547,68 @@ export const createAiStore = (): AiStore => {
       setError(undefined)
       setActivity({ step: 0, compacted: false })
     })
-    // One document for the editor and the tools: make sure it exists and holds what is on screen. Never a reason to refuse
-    // the message: if the sidecar is slow the tools still create what they need.
+    // Preparation must succeed before admission; a failed write is not permission to use another workspace.
     let activeProjectId = projectId()
     try {
-      const workspace = await prepareWorkspace(app)
-      if (disposed || generation !== turnGeneration || sessionId() !== sid) return
+      const workspace = await prepareWorkspace(app, (document, apply) => {
+        if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || !editorOwner.current()) throw new Error("Workspace changed during preparation")
+        adoptingPreparedDocument = true
+        try {
+          ownerProject = document.projectId
+          apply()
+          editorOwner = captureEditorOwner()
+          setSessionsPersisted(sessionsSig().map((s) => s.id === sid ? { ...s, projectId: document.projectId } : s))
+          delete activeByProject[""]
+          rememberActive()
+        } finally { adoptingPreparedDocument = false }
+      })
+      if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || sessionId() !== sid || projectId() !== ownerProject || !editorOwner.current()) return
       activeProjectId = workspace.projectId
       if (includeContext()) {
         await persistDrawingContext(app, workspace.projectId)
         setProjectContextRevision((revision) => revision + 1)
       }
     } catch (cause) {
-      console.error("Could not prepare the workspace for the assistant", cause)
+        if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || !editorOwner.current()) return
+      const message = cause instanceof Error ? cause.message : String(cause)
+      patchMessage(assistantId, (prev) => ({ ...prev, status: "error", error: message }))
+      setError(message); setStatus("error"); saveTranscript()
+      return
     }
-    if (disposed || generation !== turnGeneration || sessionId() !== sid) return
+    if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || sessionId() !== sid || projectId() !== ownerProject || !editorOwner.current()) return
     const m = modelSig()
     handle = streamChat({
       client: app.client,
       runtime: app.runtime,
-      onEvent: (event) => { if (!disposed && generation === turnGeneration) applyEvent(event) },
+      onEvent: (event) => {
+         if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || projectId() !== activeProjectId || sessionId() !== sid || !editorOwner.current()) return
+         const child = "agent" in event && event.agent !== undefined
+         if (!child && event.sessionId !== sid) {
+           // Early setup failures can still carry the original client identity.
+           if (event.sessionId === originalId && sid !== originalId) { applyEvent(event, editorOwner); return }
+           if (sid !== originalId || event.type === "error") return
+           const nativeId = event.sessionId
+           if (sessionsSig().some((s) => s.id === nativeId && s.projectId !== activeProjectId)) return
+           transcripts = { ...transcripts, [nativeId]: transcripts[sid] ?? [] }
+           delete transcripts[sid]
+           setSessionsPersisted(sessionsSig().map((s) => s.id === sid ? { ...s, id: nativeId } : s).filter((s, index, all) => all.findIndex((other) => other.id === s.id) === index))
+           sid = nativeId
+           setSessionId(sid)
+           rememberActive(); saveTranscript()
+         }
+         applyEvent(event, editorOwner)
+       },
       onError: (message) => {
-        if (disposed || generation !== turnGeneration) return
+        if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || projectId() !== activeProjectId || !editorOwner.current()) return
         patchMessage(activeAssistantId ?? assistantId, (prev) => ({ ...prev, status: "error", error: message, finishedAt: new Date().toISOString() }))
         setError(message)
         setStatus("error")
         saveTranscript()
       },
-      onDone: () => { if (!disposed && generation === turnGeneration) finishStream(error() !== undefined ? "error" : "idle") }
+      onDone: () => { if (!disposed && generation === turnGeneration && ownerConversation === conversationGeneration && projectId() === activeProjectId && editorOwner.current()) finishStream(error() !== undefined ? "error" : "idle") }
     }, {
       message: text,
+      includeContext: includeContext(),
       sessionId: sid,
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(activeProjectId ? { projectId: activeProjectId } : {}),
@@ -584,7 +632,7 @@ export const createAiStore = (): AiStore => {
     saveTranscript()
     // The host stops the background tasks of the conversation with the turn: show that now, then take the host's own record.
     setTasks((current) => current.map((t) => t.status === "queued" || t.status === "running" ? { ...t, status: "cancelled" as const } : t))
-    void app.runtime.run(app.client.ai.chatAbort({ payload: { sessionId: sid } })).then(() => { if (!disposed && sessionId() === sid) void refreshControls() }).catch(() => undefined)
+    void app.runtime.run(app.client.ai.chatAbort({ payload: { sessionId: sid, ...(projectId() ? { projectId: projectId()! } : {}) } })).then(() => { if (!disposed && sessionId() === sid) void refreshControls() }).catch(() => undefined)
     setStatus("idle")
   }
 
@@ -595,12 +643,35 @@ export const createAiStore = (): AiStore => {
   }
 
   const newSession: AiStore["newSession"] = () => {
-    if (status() === "streaming" || status() === "connecting") abort()
+    detachStream()
     resetConversation()
     setSessionId(undefined)
+    rememberActive()
   }
 
-  const resetConversation = (): void => {
+  const detachStream = (): void => {
+     turnGeneration += 1
+     handle?.abort()
+     handle = undefined
+     if (activeAssistantId !== undefined) patchMessage(activeAssistantId, (m) => m.status === "streaming" ? { ...m, status: "done" } : m)
+     saveTranscript()
+   }
+   const restoreTranscript = (id: string): void => {
+     const restored = (transcripts[id] ?? []).map((m) => ({ ...m, events: m.events ?? [] }))
+     setMessages(restored)
+     // Presentation only: never use applyEvent, which mirrors live mutations.
+     const calls: Record<string, import("../lib/types.ts").AiToolCall> = {}
+     for (const message of restored) for (const event of message.events) {
+       if (event.type === "tool_call") calls[event.callId] = { tool: event.tool, input: event.input, sessionId: event.sessionId, status: "running", ...("agent" in event ? { agent: event.agent } : {}) }
+       if (event.type === "tool_result") {
+         const call = calls[event.callId]
+         calls[event.callId] = { ...(call ?? { tool: event.tool, input: {}, sessionId: event.sessionId }), status: event.ok ? "ok" : "error", output: event.output }
+       }
+       if (event.type === "todo") setPlan(event.todos)
+     }
+     setToolCalls(calls)
+   }
+   const resetConversation = (): void => {
     conversationGeneration += 1
     turnGeneration += 1
     activeAssistantId = undefined
@@ -625,16 +696,17 @@ export const createAiStore = (): AiStore => {
   }
 
   const openSession: AiStore["openSession"] = (id) => {
-    if (id === sessionId() || !sessionsSig().some((s) => s.id === id)) return
-    if (status() === "streaming" || status() === "connecting") abort()
+    if (id === sessionId() || !sessions().some((s) => s.id === id)) return
+    detachStream()
     handle = undefined
     activeAssistantId = undefined
     resetConversation()
     batch(() => {
       setSessionId(id)
       setStatus("idle")
-      setMessages((transcripts[id] ?? []).map((m) => ({ ...m, events: [] })))
+      restoreTranscript(id)
     })
+    rememberActive()
   }
 
   const renameSession: AiStore["renameSession"] = (id, title) => {
@@ -691,7 +763,32 @@ export const createAiStore = (): AiStore => {
   const cancelTask = (taskId: string) => control("cancel_task", { taskId })
   const replyQuestion = (requestId: string, answers?: ReadonlyArray<ReadonlyArray<string>>) => control(answers ? "answer_question" : "reject_question", { requestId, ...(answers ? { answers } : {}) })
 
-  let controlsGeneration = 0
+  let observedProject = projectId()
+   const selectProject = (): void => {
+     if (adoptingPreparedDocument) return
+     detachStream()
+     resetConversation()
+     const id = activeByProject[projectId() ?? ""]
+     setSessionId(undefined)
+     if (id && sessions().some((s) => s.id === id)) { setSessionId(id); restoreTranscript(id) }
+   }
+   let observedDrawing = liveDocument.drawingId
+   const stopProjectSubscription = useDocumentStore.subscribe(() => {
+     const next = projectId()
+     const drawing = useDocumentStore.getState().drawingId
+     if (next === observedProject && drawing === observedDrawing) return
+     observedProject = next
+     observedDrawing = drawing
+     selectProject()
+   })
+   const restoredId = activeByProject[projectId() ?? ""]
+   if (restoredId && sessions().some((s) => s.id === restoredId)) { setSessionId(restoredId); restoreTranscript(restoredId) }
+   createEffect(() => {
+     const next = projectId()
+     if (next !== observedProject) { observedProject = next; untrack(selectProject) }
+   })
+
+   let controlsGeneration = 0
   createEffect(() => {
     const sid = sessionId()
     projectId()
@@ -725,6 +822,7 @@ export const createAiStore = (): AiStore => {
     disposed = true
     controlsGeneration++
     stopVisionBridge()
+    stopProjectSubscription()
     handle?.abort()
     handle = undefined
   })

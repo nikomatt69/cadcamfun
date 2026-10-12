@@ -15,6 +15,36 @@ const run = async (client: unknown): Promise<AiEvent[]> => {
 }
 
 describe("stream recovery", () => {
+  test("explicit context opt-out is forwarded without dropping false", async () => {
+    let payload: unknown
+    const client = { ai: { chatStream: (input: { payload: unknown }) => {
+      payload = input.payload
+      return Effect.succeed(sse({ type: "done", sessionId: "s1", text: "Done" }))
+    } } }
+    await Effect.runPromise(Stream.runCollect(streamChatEffect(client as never, { message: "Check", sessionId: "s1", includeContext: false })))
+    expect(payload).toMatchObject({ includeContext: false })
+  })
+
+  test("recovery keeps captured aliases and excludes unrelated session results", async () => {
+    let release!: (value: { busy: boolean; text: string; events: object[] }) => void
+    const deferred = new Promise<{ busy: boolean; text: string; events: object[] }>((resolve) => { release = resolve })
+    let lookup: unknown
+    const pending = run({ ai: {
+      chatStream: () => Effect.succeed(sse({ type: "delta", sessionId: "native-1", text: "Working" })),
+      sessionState: (input: unknown) => { lookup = input; return Effect.promise(() => deferred) }
+    } })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(lookup).toMatchObject({ payload: { sessionId: "native-1", projectId: "p1" } })
+    release({ busy: false, text: "Recovered", events: [
+      { type: "tool_result", sessionId: "other-session", callId: "wrong", tool: "cad_describe_drawing", ok: true, output: "{}" },
+      { type: "tool_result", sessionId: "native-1", callId: "right", tool: "cad_describe_drawing", ok: true, output: "{}" }
+    ] })
+    const events = await pending
+    expect(events.some((event) => "callId" in event && event.callId === "wrong")).toBe(false)
+    expect(events.filter((event) => event.type === "tool_result")).toHaveLength(1)
+    expect(events.at(-1)).toMatchObject({ type: "done", sessionId: "s1", recovered: true, text: "Recovered" })
+  })
+
   test("heartbeats are dropped, the rest of the answer is untouched", async () => {
     const events = await run({
       ai: {

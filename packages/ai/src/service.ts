@@ -1,5 +1,5 @@
 import { hostAgentWithPermissions, type PermissionMode } from "./nikcli/permission-modes.ts"
-import { Context, Effect, Layer, Option, Ref, Schema, Stream } from "effect"
+import { Context, Effect, Layer, Option, Ref, Schema, Semaphore, Stream } from "effect"
 import { AiConfig } from "./ai-config.ts"
 import { AiCredentials } from "./credentials.ts"
 import { DirectModel } from "./direct-model.ts"
@@ -83,7 +83,7 @@ export interface ChatInput {
   readonly agent?: string
   readonly mode?: string
   /** Trusted application admission hook, invoked before the host can execute tools. */
-  readonly admitSession?: (projectId: string, sessionId: string) => boolean
+  readonly admitSession?: (projectId: string, sessionId: string) => boolean | Promise<boolean>
 }
 
 export interface ModelEntry extends ModelInfo {
@@ -129,7 +129,7 @@ export class AiService extends Context.Service<AiService, {
   readonly optimizeGcode: (input: { gcode: string; material?: string; machineType?: string; constraints?: string; model?: ModelSelector }) => Effect.Effect<OptimizeGcodeOutput, AiError>
   readonly summarizeDesignSuggestions: (input: { elements: string; currentOperation?: string; currentTool?: string; model?: ModelSelector }) => Effect.Effect<DesignSuggestionsSummary, AiError>
   readonly analyzeGcode: (input: { gcode: string; machine?: MachineProfile }) => Effect.Effect<GcodeReport>
-  readonly abort: (sessionId: string) => Effect.Effect<void>
+  readonly abort: (sessionId: string, projectId?: string) => Effect.Effect<void, AiError>
   /** Resolve client identity, stop and join children, then remove the host session. */
   readonly removeSession: (sessionId: string, projectId?: string) => Effect.Effect<boolean>
   /** Where a conversation stands, for a client that lost its connection mid-turn (`busy: false` when there is no host session). */
@@ -149,6 +149,7 @@ export class AiService extends Context.Service<AiService, {
       const controllers = yield* Ref.make(new Map<string, AbortController>())
       /** Client session id (owned by the UI) → the host session it actually talks to. */
       const sessionMap = yield* Ref.make(new Map<string, { host: ProjectHost; sessionId: string }>())
+      const sessionAdmission = yield* Semaphore.make(1)
 
       const configured = Effect.gen(function* () {
         const status = yield* credentials.status
@@ -240,10 +241,11 @@ export class AiService extends Context.Service<AiService, {
         projectHost: ProjectHost,
         clientSessionId: string | undefined
       ): Effect.Effect<{ host: ProjectHost; sessionId: string }, AiConfigError> =>
-        Effect.gen(function* () {
+        sessionAdmission.withPermit(Effect.gen(function* () {
           if (clientSessionId !== undefined) {
             const mapped = (yield* Ref.get(sessionMap)).get(clientSessionId)
             if (mapped !== undefined) {
+              if (mapped.host.projectId !== projectHost.projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
               if (yield* sessionExists(mapped.host, mapped.sessionId)) return mapped
               yield* Ref.update(sessionMap, (map) => {
                 for (const [id, binding] of map) {
@@ -251,6 +253,12 @@ export class AiService extends Context.Service<AiService, {
                 }
                 return map
               })
+            }
+            // Desktop-owned legacy aliases are not native IDs and fail the host's request schema.
+            if (clientSessionId.startsWith("ses_") && (yield* sessionExists(projectHost, clientSessionId))) {
+              const restored = { host: projectHost, sessionId: clientSessionId }
+              yield* Ref.update(sessionMap, (map) => map.set(clientSessionId, restored))
+              return restored
             }
           }
           const sessionId = yield* createHostSession(projectHost, "CADCAMFUN chat")
@@ -261,7 +269,7 @@ export class AiService extends Context.Service<AiService, {
             return map
           })
           return target
-        })
+        }))
 
       /**
        * One structured workflow call: render a `PromptTemplate`, ask the model for the
@@ -306,7 +314,10 @@ export class AiService extends Context.Service<AiService, {
               }
               const projectHost = yield* host.value.runtime.host(projectId)
               const target = yield* ensureSession(projectHost, input.sessionId)
-              if (input.admitSession && !input.admitSession(projectId, target.sessionId)) {
+               if (input.admitSession && !(yield* Effect.tryPromise({
+                 try: () => Promise.resolve(input.admitSession!(projectId, target.sessionId)),
+                 catch: () => new AiConfigError({ message: "Unable to establish the authenticated conversation owner." })
+               }))) {
                 return yield* new AiConfigError({ message: "This conversation belongs to a different authenticated actor." })
               }
               const agent = input.agent === undefined || input.agent === CADCAM_AGENT ? CADCAM_AGENT : isSubagentId(input.agent) ? SUBAGENTS[input.agent].host : undefined
@@ -329,6 +340,10 @@ export class AiService extends Context.Service<AiService, {
 
             // No embedded host: a stateless one-shot stream through the AI SDK.
             const sessionId = input.sessionId ?? crypto.randomUUID()
+            if (input.admitSession && !(yield* Effect.tryPromise({
+              try: () => Promise.resolve(input.admitSession!(input.projectId ?? "default", sessionId)),
+              catch: () => new AiConfigError({ message: "Unable to establish the authenticated conversation owner." })
+            }))) return yield* new AiConfigError({ message: "This conversation belongs to a different authenticated actor." })
             let text = ""
             return direct.streamText({ prompt: message, files: attached.parts, system, model: input.model ?? { provider: resolved.provider, model: resolved.modelId } }).pipe(
               Stream.flatMap((part): Stream.Stream<AiEvent> => {
@@ -478,9 +493,11 @@ export class AiService extends Context.Service<AiService, {
         queue: ({ sessionId, projectId, message, delivery }) =>
           Effect.gen(function* () {
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
-            if (mapped === undefined) return yield* new AiConfigError({ message: "There is no running conversation to add this message to." })
-            if (projectId !== undefined && mapped.host.projectId !== projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
-            yield* queueHostMessage(mapped.host, mapped.sessionId, message, delivery ?? "queue")
+            if (mapped !== undefined && projectId !== undefined && mapped.host.projectId !== projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
+            if (Option.isNone(host)) return yield* new AiConfigError({ message: "There is no running conversation to add this message to." })
+            const target = mapped ?? { host: yield* host.value.runtime.host(projectId ?? "default"), sessionId }
+            if (!(yield* sessionExists(target.host, target.sessionId))) return yield* new AiConfigError({ message: "The conversation no longer exists in the host." })
+            yield* queueHostMessage(target.host, target.sessionId, message, delivery ?? "queue")
           }),
         removeSession: Effect.fn("AiService.removeSession")(function* (sessionId: string, projectId?: string) {
           if (Option.isNone(host)) return false
@@ -494,6 +511,7 @@ export class AiService extends Context.Service<AiService, {
               Effect.map((projectHost) => ({ host: projectHost, sessionId })), Effect.option)
           if (Option.isNone(target)) return false
           const resolved = target.value
+          if (!(yield* sessionExists(resolved.host, resolved.sessionId).pipe(Effect.orElseSucceed(() => false)))) return false
           if (Option.isSome(background)) {
             yield* background.value.cancelForParent({ projectId: resolved.host.projectId, parentSessionId: resolved.sessionId })
           }
@@ -507,14 +525,14 @@ export class AiService extends Context.Service<AiService, {
           })
           return removed
         }),
-        abort: (sessionId) =>
-          Effect.gen(function* () {
+        abort: Effect.fn("AiService.abort")(function* (sessionId: string, projectId?: string) {
             const map = yield* Ref.get(controllers)
             map.get(sessionId)?.abort()
             if (Option.isNone(host)) return
             // Abort the host session this client session is bound to; the id the
             // UI knows is not the host's own id, so resolve it through the map.
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+            if (mapped !== undefined && projectId !== undefined && mapped.host.projectId !== projectId) return yield* new AiConfigError({ message: "This conversation belongs to a different project." })
             // Stopping a turn stops the work it started: the background tasks of this conversation are linked to it. They are only
             // stopped, not retired, so the next turn can start new ones.
             if (mapped !== undefined) {
@@ -522,10 +540,10 @@ export class AiService extends Context.Service<AiService, {
               yield* Effect.promise(() => host.value.scheduler.stopParent({ projectId: mapped.host.projectId, parentSessionId: mapped.sessionId }))
               return
             }
-            const projectHost = yield* host.value.runtime.host("default").pipe(Effect.option)
-            if (Option.isSome(projectHost)) {
-              yield* abortHostSession(projectHost.value, sessionId)
-              yield* Effect.promise(() => host.value.scheduler.stopParent({ projectId: projectHost.value.projectId, parentSessionId: sessionId }))
+            const projectHost = yield* host.value.runtime.host(projectId ?? "default")
+            if (yield* sessionExists(projectHost, sessionId)) {
+              yield* abortHostSession(projectHost, sessionId)
+              yield* Effect.promise(() => host.value.scheduler.stopParent({ projectId: projectHost.projectId, parentSessionId: sessionId }))
             }
           })
       })

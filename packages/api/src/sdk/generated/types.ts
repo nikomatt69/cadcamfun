@@ -490,6 +490,7 @@ export type AiChatStreamPayload = {
   readonly sessionId?: string | undefined
   readonly projectId?: string | undefined
   readonly context?: string | undefined
+  readonly includeContext?: boolean | undefined
   readonly model?:
     | {
         readonly provider?: string | undefined
@@ -507,7 +508,7 @@ export type AiChatQueuePayload = {
   readonly delivery?: "queue" | "steer" | undefined
 }
 
-export type AiChatAbortPayload = { readonly sessionId?: string | undefined }
+export type AiChatAbortPayload = { readonly sessionId?: string | undefined; readonly projectId?: string | undefined }
 
 export type AiPermissionReplyPayload = {
   readonly sessionId: string
@@ -2103,6 +2104,7 @@ export type AiChatStreamInput = {
   readonly sessionId?: AiChatStreamPayload["sessionId"]
   readonly projectId?: AiChatStreamPayload["projectId"]
   readonly context?: AiChatStreamPayload["context"]
+  readonly includeContext?: AiChatStreamPayload["includeContext"]
   readonly model?: AiChatStreamPayload["model"]
 }
 
@@ -2204,7 +2206,10 @@ export type AiChatQueueInput = {
 
 export type AiChatQueueOutput = { message: string }
 
-export type AiChatAbortInput = { readonly sessionId?: AiChatAbortPayload["sessionId"] }
+export type AiChatAbortInput = {
+  readonly sessionId?: AiChatAbortPayload["sessionId"]
+  readonly projectId?: AiChatAbortPayload["projectId"]
+}
 
 export type AiChatAbortOutput = { message: string }
 

@@ -14,6 +14,7 @@ import { makeToolpathGenerator, type VerifyResponse } from "../../cam/api/genera
 import { useCamStore } from "../../cam/store/camStore.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
+import { captureEditorOwner, type EditorOwner } from "./editor-sync.ts"
 
 const CAM_TOOLS = ["cam_create_operation", "cam_update_operation", "cam_generate_gcode", "cam_verify_toolpath"] as const
 type CamTool = (typeof CAM_TOOLS)[number]
@@ -42,11 +43,13 @@ interface OperationRow {
 }
 
 /** Reads the operation back and mirrors it into the CAM stores. Best effort: a failure leaves the page as it was. */
-export async function mirrorCamResult(app: AppState, tool: string, input: unknown, output: string): Promise<boolean> {
+export async function mirrorCamResult(app: AppState, tool: string, input: unknown, output: string, owner: EditorOwner = captureEditorOwner()): Promise<boolean> {
+  if (!owner.current()) return false
   if (tool.endsWith("cam_stock")) {
     const result = parse(output)
     if (result["ok"] !== true || result["action"] !== "set") return false
     const stock = Schema.decodeUnknownSync(coreCam.generator.StockSchema)(result["stock"])
+    if (!owner.current()) return false
     useCADStore.getState().setWorkpiece({ ...useCADStore.getState().workpiece, ...stock, configured: true, material: stock.material ?? "", elementId: stock.elementId })
     useCamStore.getState().setWorkpiece({ x: stock.width, y: stock.height, z: stock.depth })
     useCamStore.getState().setStockAllowance(stock.allowance)
@@ -60,10 +63,16 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
   const kind = toolOf(tool)
   if (kind === undefined) return false
   const id = operationIdOf(tool, input, output)
-  if (id === undefined) return false
+  if (id === undefined || !owner.current()) return false
   try {
     const row = await app.runtime.run(app.client.toolpaths.get({ params: { id } })) as unknown as OperationRow
+    if (!owner.current()) return false
     const settings = row.data?.request?.settings
+    const gcode = row.gcode ?? ""
+    const parsesProgram = kind !== "cam_create_operation" && kind !== "cam_update_operation" && gcode.trim() !== ""
+    const parsed = parsesProgram ? await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode)) : undefined
+    const report = row.data?.verification?.report
+    if (!owner.current()) return false
     // Set directly: the panel's own `replaceSettings` would re-apply material presets over the assistant's values.
     if (settings !== undefined) useGeneratorStore.setState({ settings })
     const cam = useCamStore.getState()
@@ -75,13 +84,10 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
       useVerifyStore.getState().reset()
       return settings !== undefined
     }
-    const gcode = row.gcode ?? ""
     if (gcode.trim() === "") return settings !== undefined
     cam.setGcode(gcode)
     useGeneratorStore.getState().setResult(gcode, [])
-    const parsed = await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode))
-    cam.setProgram(parsed.program as never)
-    const report = row.data?.verification?.report
+    if (parsed !== undefined) cam.setProgram(parsed.program as never)
     if (kind === "cam_verify_toolpath" && report !== undefined) {
       useVerifyStore.getState().finish(report, gcode)
       cam.setRightTab("verify")

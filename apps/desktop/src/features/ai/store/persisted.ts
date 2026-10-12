@@ -7,6 +7,25 @@
  * sessions). `try/catch` keeps the desktop boot path safe when the window has no
  * `localStorage` (Tauri tests, node-side unit tests).
  */
+import { decodeEvent } from "../lib/stream.ts"
+import type { AiEvent, AiSession, ChatModel } from "../lib/types.ts"
+
+export interface PersistedState {
+  readonly model: ChatModel | undefined
+  readonly includeContext: boolean
+  readonly sessions: ReadonlyArray<AiSession>
+  readonly activeByProject?: Readonly<Record<string, string>>
+}
+const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+export const loadAiState = (): PersistedState => {
+  const value = loadPersisted<unknown>({})
+  if (!record(value)) return { model: undefined, includeContext: true, sessions: [] }
+  const sessions = (Array.isArray(value.sessions) ? value.sessions : []).filter((s): s is AiSession => record(s) && typeof s.id === "string" && typeof s.title === "string" && typeof s.startedAt === "string" && typeof s.updatedAt === "string" && typeof s.exchanges === "number" && Number.isFinite(s.exchanges) && (s.projectId === undefined || typeof s.projectId === "string")).slice(0, 50)
+  const model = record(value.model) && typeof value.model.provider === "string" && typeof value.model.model === "string" ? { provider: value.model.provider, model: value.model.model, ...(typeof value.model.variant === "string" ? { variant: value.model.variant } : {}) } : undefined
+  const activeByProject = Object.fromEntries(record(value.activeByProject) ? Object.entries(value.activeByProject).filter((entry): entry is [string, string] => typeof entry[1] === "string" && sessions.some((s) => s.id === entry[1] && (s.projectId ?? "") === entry[0])) : [])
+  return { model, includeContext: value.includeContext !== false, sessions, activeByProject }
+}
+
 export const loadPersisted = <A,>(fallback: A): A => {
   if (typeof localStorage === "undefined") return fallback
   try {
@@ -29,7 +48,7 @@ export const savePersisted = (value: unknown): void => {
 
 /**
  * The text of each conversation, kept so a session can be reopened after a restart. Only what is needed to read it again
- * (role, text, time, attached file names): tool traffic and streaming state are not kept. Bounded in sessions, messages
+ * (role, text, time, attached file names and completed tool evidence): pending decisions and streaming state are not kept. Bounded in sessions, messages
  * and size, oldest sessions first out.
  */
 export interface StoredMessage {
@@ -40,19 +59,39 @@ export interface StoredMessage {
   readonly status: "done" | "error"
   readonly error?: string
   readonly attachments?: ReadonlyArray<string>
+  readonly events?: ReadonlyArray<AiEvent>
 }
 
 export const MAX_TRANSCRIPTS = 20
 export const MAX_TRANSCRIPT_MESSAGES = 60
 export const MAX_STORED_TEXT = 20_000
 const TRANSCRIPTS_KEY = "cadcamfun/ai/transcripts-v1"
+const MAX_EVENTS = 100
+const MAX_EVENT_SIZE = 20_000
+const evidence = (values: ReadonlyArray<unknown>): ReadonlyArray<AiEvent> => {
+  const decoded = values.slice(-MAX_EVENTS).flatMap((value) => {
+    try {
+      const json = JSON.stringify(value)
+      if (json.length > MAX_EVENT_SIZE) return []
+      const event = decodeEvent(json)
+      return event.type === "tool_call" || event.type === "tool_result" || event.type === "tool_diagnostic" || event.type === "todo" ? [event] : []
+    } catch { return [] }
+  })
+  const completed = new Set(decoded.flatMap((e) => e.type === "tool_result" ? [e.callId] : []))
+  return decoded.filter((e) => e.type !== "tool_call" || completed.has(e.callId))
+}
 
 export const loadTranscripts = (): Readonly<Record<string, ReadonlyArray<StoredMessage>>> => {
   if (typeof localStorage === "undefined") return {}
   try {
     const raw = localStorage.getItem(TRANSCRIPTS_KEY)
     const parsed = raw === null ? {} : JSON.parse(raw)
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, ReadonlyArray<StoredMessage>> : {}
+    if (!record(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).slice(0, MAX_TRANSCRIPTS).map(([id, values]) => [id, (Array.isArray(values) ? values : []).slice(-MAX_TRANSCRIPT_MESSAGES).flatMap((m) => {
+      if (!record(m) || typeof m.id !== "string" || !["user", "assistant", "system"].includes(String(m.role)) || typeof m.text !== "string" || typeof m.createdAt !== "string" || (m.status !== "done" && m.status !== "error")) return []
+      const message: StoredMessage = { id: m.id, role: m.role as StoredMessage["role"], text: m.text.slice(0, MAX_STORED_TEXT), createdAt: m.createdAt, status: m.status, events: evidence(Array.isArray(m.events) ? m.events : []), ...(typeof m.error === "string" ? { error: m.error.slice(0, MAX_STORED_TEXT) } : {}), ...(Array.isArray(m.attachments) ? { attachments: m.attachments.filter((a): a is string => typeof a === "string").slice(0, 20) } : {}) }
+      return [message]
+    })]))
   } catch {
     return {}
   }
@@ -74,11 +113,11 @@ export const saveTranscripts = (all: Readonly<Record<string, ReadonlyArray<Store
 }
 
 /** Only finished messages, text clipped. */
-export const toStored = (message: { readonly id: string; readonly role: "user" | "assistant" | "system"; readonly text: string; readonly createdAt: string; readonly status: string; readonly error?: string; readonly attachments?: ReadonlyArray<string> }): StoredMessage | undefined =>
+export const toStored = (message: { readonly id: string; readonly role: "user" | "assistant" | "system"; readonly text: string; readonly createdAt: string; readonly status: string; readonly error?: string; readonly attachments?: ReadonlyArray<string>; readonly events?: ReadonlyArray<AiEvent> }): StoredMessage | undefined =>
   message.status === "done" || message.status === "error"
     ? {
         id: message.id, role: message.role, text: message.text.slice(0, MAX_STORED_TEXT), createdAt: message.createdAt,
-        status: message.status, ...(message.error !== undefined ? { error: message.error } : {}),
+        status: message.status, events: evidence(message.events ?? []), ...(message.error !== undefined ? { error: message.error.slice(0, MAX_STORED_TEXT) } : {}),
         ...(message.attachments !== undefined ? { attachments: message.attachments } : {})
       }
     : undefined

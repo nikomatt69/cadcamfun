@@ -1347,6 +1347,7 @@ export function make(options: ClientOptions) {
               sessionId: input?.["sessionId"],
               projectId: input?.["projectId"],
               context: input?.["context"],
+              includeContext: input?.["includeContext"],
               model: input?.["model"],
             },
             successStatus: 200,
@@ -1377,7 +1378,7 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/ai/chat/abort`,
-            body: { sessionId: input?.["sessionId"] },
+            body: { sessionId: input?.["sessionId"], projectId: input?.["projectId"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

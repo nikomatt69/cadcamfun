@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
+import { ProjectRepo } from "../repos/project-repo.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -35,6 +36,24 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const { query } = yield* Database
   const kv = yield* KvStore
   const appConfig = yield* AppConfigService
+  const projects = yield* ProjectRepo
+  actingUser.configureDirectory(join(appConfig.dataDir, "ai", "session-owners"))
+  const checkProject = Effect.fn("AiHttp.checkProject")(function*(projectId?: string) {
+    const actor = yield* CurrentUser
+    if (projectId === undefined || projectId === "default") return
+    if (projectId.trim() === "") return yield* new BadRequest({ message: "projectId is required" })
+    const access = yield* projects.find(actor.id, projectId).pipe(Effect.mapError(() => new InternalError({ message: "Unable to verify project access" })))
+    if (!access) return yield* new BadRequest({ message: "Project not found or inaccessible" })
+  })
+  const controlProject = Effect.fn("AiHttp.controlProject")(function*(sessionId: string, projectId?: string) {
+    const actor = yield* CurrentUser
+    const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(sessionId), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
+    if (!owner || owner.userId !== actor.id || (projectId !== undefined && owner.projectId !== projectId)) {
+      return yield* new BadRequest({ message: "Session not found or inaccessible" })
+    }
+    yield* checkProject(owner.projectId)
+    return owner.projectId
+  })
   const skillStore = createUserSkillStore(join(appConfig.dataDir, "ai", "skills"))
   const skillInfos = Effect.promise(async () => {
     const user = await skillStore.list()
@@ -60,11 +79,12 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const catalogue = ai.providers.pipe(Effect.mapError((e) => new InternalError({ message: e.message })))
   /**
    * What the assistant knows before the first word: the caller's context, the project context the UI keeps in the
-   * key-value store (`ai.context.<projectId>`) and the notes it saved itself (`ai.memory.*`).
+   * key-value store and notes belonging only to that project.
    */
-  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined }) => Effect.gen(function*() {
+  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
     const parts: string[] = []
     if (payload.context?.trim()) parts.push(payload.context.trim())
+    if (payload.includeContext === false) return parts.join("\n\n")
     if (payload.projectId) {
       const stored = yield* kv.get(`ai.context.${payload.projectId}`).pipe(
         Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI context", error).pipe(Effect.as(undefined)))
@@ -93,16 +113,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     const memory = yield* kv.list(memoryPrefix).pipe(
       Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI notes", error).pipe(Effect.as([])))
     )
-    // Notes stored without a project namespace (`ai.memory.<key>`) are global and apply to every conversation.
-    const globalMemory = payload.projectId === undefined
-      ? []
-      : yield* kv.list("ai.memory.").pipe(
-        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load global AI notes", error).pipe(Effect.as([])))
-      )
-    const notes = renderNotes([
-      ...memory.map((m) => ({ key: m.key.slice(memoryPrefix.length), value: m.value })),
-      ...globalMemory.map((m) => ({ key: m.key.slice("ai.memory.".length), value: m.value }))
-    ].reverse())
+    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice(memoryPrefix.length), value: m.value })).reverse())
     if (notes !== "") parts.push(notes)
     return parts.join("\n\n")
   })
@@ -112,7 +123,10 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
 
   return handlers
     .handle("agents", () => Effect.succeed(ai.agents))
-    .handle("sessionControl", ({ payload }) => ai.controlSession(payload).pipe(Effect.mapError((error) => new BadRequest({ message: error.message }))))
+    .handle("sessionControl", ({ payload }) => Effect.gen(function*() {
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      return yield* ai.controlSession({ ...payload, projectId }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+    }))
     .handle("setCredentials", ({ payload }) => Effect.gen(function*() {
       const provider = payload.provider
       if (provider === undefined || provider.trim() === "") return yield* new BadRequest({ message: "Unknown provider" })
@@ -207,6 +221,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
       // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
       const actor = yield* CurrentUser
+      yield* checkProject(payload.projectId)
+      if (payload.sessionId) {
+        const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(payload.sessionId!), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
+        if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
+      }
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
@@ -226,14 +245,17 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }))
     .handle("sessionState", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
-      const state = yield* ai.sessionState(payload.sessionId, payload.projectId).pipe(
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      const state = yield* ai.sessionState(payload.sessionId, projectId).pipe(
         Effect.mapError((e) => new InternalError({ message: e.message }))
       )
       return { busy: state.busy, text: state.text, ...(state.error !== undefined ? { error: state.error } : {}), ...(state.tasks !== undefined ? { tasks: state.tasks } : {}), ...(state.events !== undefined ? { events: state.events } : {}), ...(state.usage !== undefined ? { usage: state.usage } : {}) }
     }))
     .handle("removeSession", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
-      const removed = yield* ai.removeSession(payload.sessionId, payload.projectId)
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      const removed = yield* ai.removeSession(payload.sessionId, projectId)
+      if (removed) yield* Effect.tryPromise({ try: () => actingUser.forget(payload.sessionId), catch: () => new InternalError({ message: "Unable to remove session owner" }) })
       return { removed }
     }))
     .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))
@@ -264,22 +286,22 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatQueue", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
       if (!payload.message || payload.message.trim() === "") return yield* new BadRequest({ message: "message is required" })
-      yield* ai.queue({ sessionId: payload.sessionId, message: payload.message, ...(payload.projectId !== undefined ? { projectId: payload.projectId } : {}), ...(payload.delivery ? { delivery: payload.delivery } : {}) }).pipe(
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      yield* ai.queue({ sessionId: payload.sessionId, message: payload.message, projectId, ...(payload.delivery ? { delivery: payload.delivery } : {}) }).pipe(
         Effect.mapError((e) => new BadRequest({ message: e.message }))
       )
       return { message: "Queued" }
     }))
     .handle("chatAbort", ({ payload }) => Effect.gen(function*() {
       if (!payload.sessionId) return yield* new BadRequest({ message: "sessionId is required" })
-      yield* ai.abort(payload.sessionId)
-      // Abort the current chat turn but leave background workers running: the
-      // user may just have wanted to stop a long streaming reply, not every
-      // delegated investigation. They can cancel tasks individually with the
-      // `agent_task_cancel` tool or wait for them to finish.
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      yield* ai.abort(payload.sessionId, projectId).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      // Explicit stop joins this conversation's workers; losing the stream does not.
       return { message: "Aborted" }
     }))
     .handle("permissionReply", ({ payload }) => Effect.gen(function*() {
-      yield* ai.controlSession({ sessionId: payload.sessionId, ...(payload.projectId ? { projectId: payload.projectId } : {}), action: "reply_permission", requestId: payload.requestId, decision: payload.decision }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      const projectId = yield* controlProject(payload.sessionId, payload.projectId)
+      yield* ai.controlSession({ sessionId: payload.sessionId, projectId, action: "reply_permission", requestId: payload.requestId, decision: payload.decision }).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
       return { message: "Permission reply sent" }
     }))
     .handle("completion", ({ payload }) => Effect.gen(function*() {

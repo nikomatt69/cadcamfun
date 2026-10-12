@@ -63,6 +63,7 @@ export interface StreamInput {
   readonly sessionId: string
   readonly projectId?: string
   readonly context?: string
+  readonly includeContext?: boolean
   readonly attachments?: ReadonlyArray<ChatAttachment>
   readonly model?: { readonly provider: ProviderId; readonly model: string; readonly tier?: Tier; readonly variant?: string }
   readonly permissionMode?: "auto" | "ask" | "approve"
@@ -95,6 +96,7 @@ export const streamChatEffect = (
        *  a `tool_result` without a preceding `tool_call` gets the call synthesised
        *  so the store always sees the start of a tool. */
       const calls: CallState = { started: new Set<string>(), finished: new Set<string>() }
+      let nativeSessionId = input.sessionId
 
       /**
        * The turn belongs to the host session, so a dropped connection does not end it. Ask the host how the conversation stands until
@@ -108,10 +110,12 @@ export const streamChatEffect = (
         let plan = ""
         while (!controller.signal.aborted && Date.now() < until) {
           try {
-            const state = await Effect.runPromise(client.ai.sessionState({ payload: { sessionId: input.sessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
+            const state = await Effect.runPromise(client.ai.sessionState({ payload: { sessionId: nativeSessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
             misses = 0
             for (const raw of state.events ?? []) {
               const event = decodeEvent(JSON.stringify(raw))
+              if (!("agent" in event && event.agent !== undefined) && event.type !== "error" && nativeSessionId === input.sessionId) nativeSessionId = event.sessionId
+              if (!("agent" in event && event.agent !== undefined) && event.sessionId !== input.sessionId && event.sessionId !== nativeSessionId) continue
               if (event.type === "tool_call" && calls.started.has(event.callId)) continue
               if (event.type === "tool_diagnostic") {
                 const key = JSON.stringify(event)
@@ -128,7 +132,7 @@ export const streamChatEffect = (
             // Pending native decisions can outlive their SSE connection. Restore them while the turn waits.
             if (state.busy && typeof client.ai.sessionControl === "function") {
               try {
-                const controls = await Effect.runPromise(client.ai.sessionControl({ payload: { action: "status", sessionId: input.sessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
+                const controls = await Effect.runPromise(client.ai.sessionControl({ payload: { action: "status", sessionId: nativeSessionId, ...(input.projectId !== undefined ? { projectId: input.projectId } : {}) } }), { signal: controller.signal })
                 for (const question of controls.questions) {
                   if (requests.has(question.requestId)) continue
                   requests.add(question.requestId)
@@ -164,6 +168,7 @@ export const streamChatEffect = (
             sessionId: input.sessionId,
             ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
             ...(input.context !== undefined ? { context: input.context } : {}),
+            ...(input.includeContext !== undefined ? { includeContext: input.includeContext } : {}),
             ...(input.attachments !== undefined && input.attachments.length > 0 ? { attachments: input.attachments } : {}),
             ...(input.model !== undefined ? { model: input.model } : {}),
             ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
@@ -173,10 +178,13 @@ export const streamChatEffect = (
           await Effect.runPromise(stream.pipe(
             Stream.filter((item) => !isIgnoredEvent(item)),
             Stream.mapEffect(decodeEventSafely),
+            Stream.filter((event) => "agent" in event && event.agent !== undefined || nativeSessionId === input.sessionId || event.sessionId === input.sessionId || event.sessionId === nativeSessionId),
             Stream.takeUntil((event) => event.type === "done" || event.type === "error"),
             Stream.runForEach((decoded) => Effect.sync(() => {
             if (controller.signal.aborted || ended) return
+            if (!("agent" in decoded && decoded.agent !== undefined) && nativeSessionId !== input.sessionId && decoded.sessionId !== input.sessionId && decoded.sessionId !== nativeSessionId) return
             for (const event of dispatch(decoded, calls)) {
+              if (!("agent" in event && event.agent !== undefined) && event.type !== "error" && nativeSessionId === input.sessionId) nativeSessionId = event.sessionId
               if (event.type === "done" || event.type === "error") ended = true
               offer(event)
             }

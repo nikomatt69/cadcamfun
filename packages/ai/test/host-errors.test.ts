@@ -27,7 +27,7 @@ describe("host failure messages", () => {
 
   test("sessionExists answers false for an id the host never created", async () => {
     const host = {
-      client: { session: { get: async () => { throw new Error("not found") } } }
+      client: { session: { get: async () => { throw clientError("UnexpectedStatus", 404) } } }
     } as unknown as ProjectHost
     expect(await Effect.runPromise(sessionExists(host, "s-client-generated"))).toBe(false)
   })

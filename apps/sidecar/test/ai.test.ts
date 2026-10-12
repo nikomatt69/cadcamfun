@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { simulateReadableStream } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { makeApp } from "./helpers.ts"
+import { projectContextKey, projectMemoryPrefix } from "@cadcamfun/ai"
 
 const usage = {
   inputTokens: { total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined },
@@ -136,20 +137,70 @@ describe("/api/ai/chat/stream", () => {
 
   test("the assistant starts with the stored project context and its saved notes", async () => {
     await configure()
-    await app.call("/api/kv/ai.context.proj-1", { method: "PUT", json: { value: "Part: 80x40 aluminium bracket" } })
+    const project = await post("/api/projects", { name: "AI context fixture" })
+    const projectId: string = project.body.id
+    await app.call(`/api/kv/ai.context.${projectId}`, { method: "PUT", json: { value: "Part: 80x40 aluminium bracket" } })
     await app.call("/api/kv/ai.memory.units", { method: "PUT", json: { value: "Always millimetres" } })
+    await app.call(`/api/kv/ai.memory.${projectMemoryPrefix(projectId)}units`, { method: "PUT", json: { value: "Project millimetres" } })
+    await app.call(`/api/kv/ai.memory.${projectMemoryPrefix("other-project")}secret`, { method: "PUT", json: { value: "Other project secret" } })
     streams.length = 0
-    await app.call("/api/ai/chat/stream", { method: "POST", json: { message: "hi", projectId: "proj-1", context: "Selected: 2 holes" } })
+    const response = await post("/api/ai/chat/stream", { message: "hi", projectId, context: "Selected: 2 holes" })
+    expect(response.status).toBe(200)
     const call = streams.at(-1)!.doStreamCalls[0]!
     const system = JSON.stringify(call.prompt)
     expect(system).toContain("Selected: 2 holes")
     expect(system).toContain("Part: 80x40 aluminium bracket")
-    expect(system).toContain("units: Always millimetres")
+    expect(system).toContain("units: Project millimetres")
+    expect(system).not.toContain("Always millimetres")
+    expect(system).not.toContain("Other project secret")
+  })
+
+  test("includeContext false keeps explicit context in the final model prompt but excludes automatic context", async () => {
+    await configure()
+    const projectId: string = (await post("/api/projects", { name: "No automatic context" })).body.id
+    for (const [key, value] of [
+      [`ai.context.${projectId}`, "AUTOMATIC_SNAPSHOT"],
+      [projectContextKey(projectId), { text: "AUTOMATIC_RULES" }],
+      [`ai.memory.${projectMemoryPrefix(projectId)}note`, "AUTOMATIC_NOTE"]
+    ] as const) await app.call(`/api/kv/${key}`, { method: "PUT", json: { value } })
+    streams.length = 0
+    expect((await post("/api/ai/chat/stream", { message: "hi", projectId, includeContext: false, context: "EXPLICIT_CONTEXT" })).status).toBe(200)
+    const prompt = JSON.stringify(streams.at(-1)?.doStreamCalls[0]?.prompt)
+    expect(prompt).toContain("EXPLICIT_CONTEXT")
+    for (const excluded of ["AUTOMATIC_SNAPSHOT", "AUTOMATIC_RULES", "AUTOMATIC_NOTE", "Always millimetres", "Other project secret"]) expect(prompt).not.toContain(excluded)
+  })
+
+  test("inaccessible explicit projects fail before a model call, including with context disabled", async () => {
+    await app.call("/api/kv/ai.context.missing-project", { method: "PUT", json: { value: "PRIVATE_SNAPSHOT" } })
+    streams.length = 0
+    for (const includeContext of [true, false]) {
+      const response = await post("/api/ai/chat/stream", { message: "hi", projectId: "missing-project", includeContext })
+      expect(response.status).toBe(400)
+      expect(JSON.stringify(response.body)).not.toContain("PRIVATE_SNAPSHOT")
+    }
+    expect(streams).toHaveLength(0)
+  })
+
+  test("session controls and aborts reject a different project and unknown authority", async () => {
+    await configure()
+    const projectId: string = (await post("/api/projects", { name: "Session owner" })).body.id
+    const otherId: string = (await post("/api/projects", { name: "Other session project" })).body.id
+    const response = await post("/api/ai/chat/stream", { message: "hi", projectId })
+    const events = String(response.body).split("\n").filter((line) => line.startsWith("data:")).map((line) => JSON.parse(line.slice(5)))
+    const sessionId: string = events.find((event) => event.sessionId)?.sessionId
+    expect(sessionId).toBeString()
+    for (const path of ["sessions/state", "sessions/remove", "sessions/control", "chat/queue", "chat/abort", "permission/reply"]) {
+      const payload = { sessionId, projectId: otherId, action: "status", message: "queued", requestId: "permission", decision: "reject" }
+      expect((await post(`/api/ai/${path}`, payload)).status).toBe(400)
+      expect((await post(`/api/ai/${path}`, { ...payload, sessionId: "unknown", projectId })).status).toBe(400)
+    }
+    expect((await post("/api/ai/chat/abort", { sessionId, projectId })).status).toBe(200)
+    expect((await post("/api/ai/chat/abort", { sessionId })).status).toBe(200)
   })
 
   test("a missing message is rejected", async () => {
     expect((await post("/api/ai/chat/stream", {})).body.message).toBe("Message is required")
     expect((await post("/api/ai/chat/abort", {})).body.message).toBe("sessionId is required")
-    expect((await post("/api/ai/chat/abort", { sessionId: "s" })).body.message).toBe("Aborted")
+    expect((await post("/api/ai/chat/abort", { sessionId: "s" })).status).toBe(400)
   })
 })

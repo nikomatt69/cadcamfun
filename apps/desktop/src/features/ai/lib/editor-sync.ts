@@ -14,6 +14,30 @@ import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
 import { mergeSection } from "../../cad/lib/section.ts"
 
+export interface EditorOwner {
+  readonly projectId: string | null
+  readonly drawingId: string | null
+  readonly generation: number
+  readonly current: () => boolean
+}
+
+let navigationGeneration = 0
+useDocumentStore.subscribe((document, previous) => {
+  if (document.projectId !== previous.projectId || document.drawingId !== previous.drawingId) navigationGeneration++
+})
+
+export const captureEditorOwner = (): EditorOwner => {
+  const { projectId, drawingId } = useDocumentStore.getState()
+  const generation = navigationGeneration
+  return {
+    projectId, drawingId, generation,
+    current: () => {
+      const document = useDocumentStore.getState()
+      return generation === navigationGeneration && document.projectId === projectId && document.drawingId === drawingId
+    }
+  }
+}
+
 export type SyncOp =
   | { readonly kind: "add"; readonly elements: ReadonlyArray<Record<string, unknown>> }
   | { readonly kind: "update"; readonly elements: ReadonlyArray<Record<string, unknown>> }
@@ -177,10 +201,20 @@ const applyOpsNow = (ops: ReadonlyArray<SyncOp>): { readonly added: number; read
 }
 
 /** One call for the chat store: apply a finished tool call to the open editor. */
-export const mirrorToolResult = (tool: string, ok: boolean, output: string): ReturnType<typeof applyOps> | undefined => {
-  if (!ok) return undefined
-  rememberDocument(output)
-  return applyOps(opsFor(tool, output))
+export const mirrorToolResult = (tool: string, ok: boolean, output: string, owner: EditorOwner = captureEditorOwner()): ReturnType<typeof applyOps> | undefined => {
+  if (!ok || !owner.current()) return undefined
+  let result: { projectId?: unknown; drawingId?: unknown }
+  try { result = JSON.parse(output) } catch { return undefined }
+  if (!owner.current() || result === null || typeof result !== "object") return undefined
+  if (typeof result.projectId === "string" && owner.projectId !== null && result.projectId !== owner.projectId) return undefined
+  if (typeof result.drawingId === "string" && owner.drawingId !== null && result.drawingId !== owner.drawingId) return undefined
+  const ops = opsFor(tool, output)
+  if (!owner.current()) return undefined
+  const document = useDocumentStore.getState()
+  if (document.drawingId === null && typeof result.projectId === "string" && typeof result.drawingId === "string") {
+    document.setDocument({ projectId: result.projectId, drawingId: result.drawingId })
+  }
+  return applyOps(ops)
 }
 
 /** A CAD tool says which stored drawing it changed; the editor adopts it when it has none yet, so both agree. */
@@ -198,14 +232,15 @@ export const rememberDocument = (output: string): void => {
 // Reconciling with the stored drawing: the source of truth whatever shape a tool answered in.
 
 /** What the stored drawing held when the editor last wrote it (id -> JSON), to tell the assistant's changes from the user's. */
-const pushed = new Map<string, string>()
+const pushedByDrawing = new Map<string | null, Map<string, string>>()
 
 /** Remembers the elements just written to the stored drawing. */
-export const rememberPushed = (elements: ReadonlyArray<Record<string, unknown>>): void => {
-  pushed.clear()
+export const rememberPushed = (elements: ReadonlyArray<Record<string, unknown>>, drawingId: string | null = useDocumentStore.getState().drawingId): void => {
+  const pushed = new Map<string, string>()
   for (const element of elements) pushed.set(String(element["id"]), JSON.stringify(element))
+  pushedByDrawing.set(drawingId, pushed)
 }
-export const forgetPushed = (): void => pushed.clear()
+export const forgetPushed = (): void => pushedByDrawing.clear()
 
 interface Point { readonly x?: number; readonly y?: number; readonly z?: number }
 const num = (value: unknown, fallback = 0): number => (typeof value === "number" && Number.isFinite(value) ? value : fallback)
@@ -274,21 +309,26 @@ export const diffAgainstStored = (
  * stored shapes (`elements`, or the older `entities`); deletions only follow an `elements` list, so an older sidecar
  * that dropped them can never empty the editor.
  */
-export async function reconcileFromStored(app: { readonly client: unknown; readonly runtime: { readonly run: (effect: never) => Promise<unknown> } }): Promise<{ readonly added: number; readonly updated: number; readonly removed: number }> {
+export async function reconcileFromStored(app: { readonly client: unknown; readonly runtime: { readonly run: (effect: never) => Promise<unknown> } }, owner: EditorOwner = captureEditorOwner()): Promise<{ readonly added: number; readonly updated: number; readonly removed: number }> {
   const none = { added: 0, updated: 0, removed: 0 }
-  const { drawingId } = useDocumentStore.getState()
-  if (drawingId === null) return none
+  const { drawingId } = owner
+  if (drawingId === null || !owner.current()) return none
   const client = app.client as { drawings: { get: (input: { params: { id: string } }) => unknown } }
   const row = await app.runtime.run(client.drawings.get({ params: { id: drawingId } }) as never) as { data: unknown }
+  if (!owner.current()) return none
   const data = row.data !== null && typeof row.data === "object" ? (row.data as { elements?: unknown; entities?: unknown; layers?: unknown }) : {}
   const layers = Array.isArray(data.layers) ? (data.layers as Array<{ id?: string; name?: string }>) : []
   const name = (id: string): string | undefined => layers.find((layer) => layer.id === id)?.name
   const fromElements = Array.isArray(data.elements) ? (data.elements.filter(isElement) as Record<string, unknown>[]) : []
   const fromEntities = Array.isArray(data.entities) ? entitiesToElements(data.entities, name) : []
   const stored = [...fromElements, ...fromEntities]
+  if (!owner.current()) return none
+  const pushed = pushedByDrawing.get(drawingId) ?? new Map<string, string>()
   const live = useElementsStore.getState().elements as unknown as ReadonlyArray<Record<string, unknown>>
   const ops = diffAgainstStored(live, stored, pushed, Array.isArray(data.elements))
+  if (!owner.current()) return none
   const result = applyOps(ops)
+  pushedByDrawing.set(drawingId, pushed)
   for (const element of stored) pushed.set(String(element["id"]), JSON.stringify(useElementsStore.getState().elements.find((candidate) => candidate.id === element["id"]) ?? element))
   for (const op of ops) if (op.kind === "delete") for (const id of op.ids) pushed.delete(id)
   return result

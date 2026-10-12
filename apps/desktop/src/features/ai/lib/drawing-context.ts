@@ -15,8 +15,7 @@ import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
 import { useSelectionStore } from "../../cad/store/selectorStore.ts"
 import { useCamStore } from "../../cam/store/camStore.ts"
-import { toJsonSafe } from "../../../shared/state/json-safe.ts"
-import { forgetPushed, rememberPushed } from "./editor-sync.ts"
+import { captureEditorOwner, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { drawingPayload } from "../../cad/lib/projectSnapshot.ts"
@@ -106,56 +105,61 @@ const run = (app: AppState): Run => app.runtime.run as unknown as Run
  * user has (or a new "Untitled project") and its newest drawing (or a new one holding the live elements), and
  * remembers the choice so every later call agrees.
  */
-export async function ensureDocument(app: AppState): Promise<{ projectId: string; drawingId: string }> {
+export async function ensureDocument(app: AppState, adopt?: (document: { projectId: string; drawingId: string }, apply: () => void) => void): Promise<{ projectId: string; drawingId: string }> {
+  const owner = captureEditorOwner()
   const current = useDocumentStore.getState()
   if (current.projectId !== null && current.drawingId !== null) return { projectId: current.projectId, drawingId: current.drawingId }
   const elements = useElementsStore.getState().elements
-  let projectId = app.recents()[0]?.id
+  let projectId = current.projectId ?? app.recents()[0]?.id
+  let createdProject: { id: string; name: string } | undefined
   if (projectId !== undefined) {
-    try { await run(app)(app.client.projects.get({ params: { id: projectId } })) } catch { projectId = undefined }
+    await run(app)(app.client.projects.get({ params: { id: projectId } }))
   }
   if (projectId === undefined) {
     const project = await run(app)<{ id: string; name: string }>(app.client.projects.create({ payload: { name: "Untitled project", description: null, organizationId: null, isPublic: false } }))
     projectId = project.id
-    app.rememberProject(project.id, project.name)
+    createdProject = project
   }
   const existing = (await run(app)<ReadonlyArray<{ id: string; name: string }>>(app.client.drawings.listForProject({ params: { id: projectId } })))[0]
   const drawing = existing ?? await run(app)<{ id: string; name: string }>(app.client.drawings.createForProject({
     params: { id: projectId }, payload: { name: "Drawing 1", data: { elements, version: "1.0" } }
   }))
-  useDocumentStore.getState().setDocument({ projectId, drawingId: drawing.id, name: drawing.name })
+  if (!owner.current()) throw new Error("Workspace changed during preparation")
+  const document = { projectId, drawingId: drawing.id }
+  const apply = () => useDocumentStore.getState().setDocument({ ...document, name: drawing.name })
+  if (adopt) adopt(document, apply)
+  else apply()
+  if (createdProject) app.rememberProject(createdProject.id, createdProject.name)
   return { projectId, drawingId: drawing.id }
 }
 
 /** Writes the live elements into the stored drawing, which also makes it the newest one the tools will pick. */
 export async function pushLiveDrawing(app: AppState, drawingId: string): Promise<void> {
-  const elements = toJsonSafe(useElementsStore.getState().elements) as ReadonlyArray<Record<string, unknown>>
+  const payload = drawingPayload(app)
+  const elements = payload["elements"] as ReadonlyArray<Record<string, unknown>>
   const row = await run(app)<{ readonly data?: unknown }>(app.client.drawings.get({ params: { id: drawingId } }))
   const stored = row.data !== null && typeof row.data === "object" ? row.data as Record<string, unknown> : {}
   await run(app)(app.client.drawings.update({
     params: { id: drawingId },
     // Keep server-owned drawing fields (most importantly an AI-set stock) when this page has not loaded them yet.
-    payload: { data: { ...stored, ...drawingPayload(app) } }
+    payload: { data: { ...stored, ...payload } }
   }))
-  rememberPushed(elements)
+  rememberPushed(elements, drawingId)
 }
 
 /**
- * Makes the document exist and match the editor; returns where the assistant should work. A remembered document that
- * is gone (its drawing was deleted, another database) is dropped and replaced, never an obstacle.
+ * Fail closed: a failed read/write must never clear or replace the user's document.
  */
-export async function prepareWorkspace(app: AppState): Promise<{ projectId: string; drawingId: string }> {
-  const document = await ensureDocument(app)
-  try {
-    await pushLiveDrawing(app, document.drawingId)
-    return document
-  } catch (cause) {
-    useDocumentStore.getState().clear()
-    forgetPushed()
-    const replacement = await ensureDocument(app)
-    await pushLiveDrawing(app, replacement.drawingId)
-    return replacement
-  }
+export async function prepareWorkspace(app: AppState, adopt?: Parameters<typeof ensureDocument>[1]): Promise<{ projectId: string; drawingId: string }> {
+  let owner = captureEditorOwner()
+  const document = await ensureDocument(app, (document, apply) => {
+    if (adopt) adopt(document, apply)
+    else apply()
+    owner = captureEditorOwner()
+  })
+  if (!owner.current()) throw new Error("Workspace changed during preparation")
+  await pushLiveDrawing(app, document.drawingId)
+  return document
 }
 
 export function appProjectId(app: AppState): string | undefined {

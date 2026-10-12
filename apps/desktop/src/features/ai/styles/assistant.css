@@ -52,6 +52,28 @@
 }
 .dark .assistant-page { background: #141414; }
 
+.assistant-markdown { line-height: 1.7; overflow-wrap: anywhere; }
+.assistant-markdown > :first-child { margin-top: 0; }
+.assistant-markdown > :last-child { margin-bottom: 0; }
+.assistant-markdown p, .assistant-markdown ul, .assistant-markdown ol,
+.assistant-markdown blockquote, .assistant-markdown pre { margin: .7em 0; }
+.assistant-markdown h1, .assistant-markdown h2, .assistant-markdown h3,
+.assistant-markdown h4, .assistant-markdown h5, .assistant-markdown h6 {
+  margin: 1em 0 .4em; font-size: 1em; font-weight: 650; line-height: 1.4;
+}
+.assistant-markdown ul { list-style: disc; padding-left: 1.4em; }
+.assistant-markdown ol { list-style: decimal; padding-left: 1.4em; }
+.assistant-markdown li + li { margin-top: .2em; }
+.assistant-markdown a { color: var(--assistant-accent); text-decoration: underline; text-underline-offset: 3px; }
+.assistant-markdown code { font-family: "SFMono-Regular", Consolas, monospace; font-size: .88em; background: var(--assistant-raised); border-radius: 4px; padding: .12em .35em; }
+.assistant-markdown pre { max-width: 100%; overflow-x: auto; padding: 12px; border: 1px solid var(--assistant-line); border-radius: 8px; background: var(--assistant-raised); line-height: 1.6; white-space: pre; }
+.assistant-markdown pre code { background: none; padding: 0; }
+.assistant-markdown blockquote { padding-left: 12px; border-left: 2px solid var(--assistant-line); color: var(--assistant-muted); }
+.assistant-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: .92em; margin: .7em 0; }
+.assistant-markdown th, .assistant-markdown td { padding: 6px 10px; border: 1px solid var(--assistant-line); text-align: left; }
+.assistant-markdown th { background: var(--assistant-raised); font-weight: 650; }
+.assistant-markdown hr { border: 0; border-top: 1px solid var(--assistant-line); margin: 1em 0; }
+
 /* The header is a stable wayfinding anchor: identity left, state and actions right. */
 .assistant-bar {
   position: relative;

@@ -15,6 +15,7 @@ import { installHostLogFilter, type HostLogSink } from "./logs.ts"
 import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
 import { bootstrapStep, describeBootstrapFailure } from "./bootstrap-errors.ts"
 import { HostToolRegistry } from "./tool-registry.ts"
+import { findHostSession } from "./chat.ts"
 
 /** A tool exposed to the model. `execute` receives already zod-validated input. */
 export interface HostToolSpec {
@@ -223,25 +224,52 @@ export const makeNikCliRuntime = (
       }
       await bootstrapStep("configuration", () => writeConfig(projectId))
       const sdk = await bootstrapStep("SDK import", getSdk)
+      assertOpen()
       const client = await bootstrapStep("client creation", () => Effect.runPromise(sdk.NikCli.create({ directory })))
-      const specs = toolRegistry.tools(projectId)
-      const defined = specs.map((spec) =>
+      try {
+        assertOpen()
+        const specs = toolRegistry.tools(projectId)
+        const defined = specs.map((spec) =>
         sdk.Tool.define(spec.id, async () => ({
           description: spec.description,
           parameters: spec.parameters,
           ...(spec.formatValidationError ? { formatValidationError: spec.formatValidationError } : {}),
           execute: async (args: never, ctx: ToolExecuteContext) => {
+            assertOpen()
             await ctx.ask({ permission: spec.id, patterns: [`project:${projectId}`], always: [`project:${projectId}`], metadata: { input: args } })
+            assertOpen()
             const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
             const result = spec.executeWithFiles ? await spec.executeWithFiles(args, call) : { output: await spec.execute(args, call) }
             return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
           }
         }))
-      )
-      await bootstrapStep("tool registration", () => Effect.runPromise(client.tools.register(...defined)))
-      // Keys set before this host existed.
-      for (const [providerId, key] of pendingKeys) await bootstrapStep(`credential replay for ${providerId}`, () => client.provider.api({ providerID: providerId, key }))
-      return { projectId, directory, client }
+        )
+        await bootstrapStep("tool registration", () => Effect.runPromise(client.tools.register(...defined)))
+        assertOpen()
+        // Keys set before this host existed.
+        for (const [providerId, key] of pendingKeys) {
+          assertOpen()
+          await bootstrapStep(`credential replay for ${providerId}`, () => client.provider.api({ providerID: providerId, key }))
+        }
+        assertOpen()
+        return { projectId, directory, client }
+      } catch (cause) {
+        for (const providerId of liveKeys) await client.provider.removeAuth({ providerID: providerId }).catch(() => undefined)
+        await client["top-level"].dispose().catch(() => undefined)
+        throw cause
+      }
+    }
+
+    const getHost = (projectId: string): Promise<ProjectHost> => {
+      assertOpen()
+      let existing = hosts.get(projectId)
+      if (existing === undefined) {
+        existing = createHost(projectId)
+        const pending = existing
+        hosts.set(projectId, pending)
+        pending.catch(() => { if (hosts.get(projectId) === pending) hosts.delete(projectId) })
+      }
+      return existing
     }
 
     const runtime: NikCliRuntime = {
@@ -253,16 +281,7 @@ export const makeNikCliRuntime = (
       },
       host: (projectId) =>
         Effect.tryPromise({
-          try: () => {
-            assertOpen()
-            let existing = hosts.get(projectId)
-            if (existing === undefined) {
-              existing = createHost(projectId)
-              hosts.set(projectId, existing)
-              existing.catch(() => hosts.delete(projectId))
-            }
-            return existing
-          },
+          try: () => getHost(projectId),
           catch: toConfigError("Failed to start the embedded nikcli host")
         }),
       setProviderKey: (providerId, key) =>
@@ -273,6 +292,7 @@ export const makeNikCliRuntime = (
             liveKeys.add(providerId)
             for (const promise of hosts.values()) {
               const host = await promise
+              assertOpen()
               await host.client.provider.api({ providerID: providerId, key })
             }
           },
@@ -319,24 +339,19 @@ export const makeNikCliRuntime = (
       worker: ({ projectId, parentSessionId, title }) =>
         Effect.gen(function* () {
           const projectHost = yield* Effect.tryPromise({
-            try: () => {
-              assertOpen()
-              let existing = hosts.get(projectId)
-              if (existing === undefined) {
-                existing = createHost(projectId)
-                hosts.set(projectId, existing)
-                existing.catch(() => hosts.delete(projectId))
-              }
-              return existing
-            },
+            try: () => getHost(projectId),
             catch: toConfigError("Failed to start the embedded nikcli host")
           })
+          const parent = yield* findHostSession(projectHost, parentSessionId)
+          if (!parent) return yield* new AiConfigError({ message: "The parent conversation no longer exists in this workspace." })
           const session = yield* Effect.tryPromise({
-            try: () =>
-              projectHost.client.session.create({
+            try: () => {
+              assertOpen()
+              return projectHost.client.session.create({
                 parentID: parentSessionId,
                 title: title ?? `worker for ${parentSessionId}`
-              }),
+              })
+            },
             catch: toConfigError("Failed to open a worker session")
           })
           return { ...projectHost, workerSessionId: session.id }

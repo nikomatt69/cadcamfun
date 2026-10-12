@@ -54,6 +54,8 @@ import "../styles/assistant.css"
 import { toolTitle } from "../lib/tools.ts"
 import { ToolRow } from "./ToolRow.tsx"
 import { groupExploration, timelineOf } from "../lib/timeline.ts"
+import { renderAssistantMarkdown } from "../lib/markdown.ts"
+import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { CommandHelp } from "./CommandHelp.tsx"
 import { CommandPalette } from "./CommandPalette.tsx"
 import {
@@ -98,6 +100,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   const registeredTools = createMemo(() => ai.aiStatus()?.tools ?? [])
   const app = useApp()
   const document = useDocumentStore()
+  const elements = useElementsStore()
   const [draft, setDraft] = createSignal("")
   const [files, setFiles] = createSignal<ReadonlyArray<ChatAttachment>>([])
   const [fileProblems, setFileProblems] = createSignal<ReadonlyArray<string>>([])
@@ -131,11 +134,10 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   const headerMeta = (): string => {
     const drawing = app.drawing()
     const name = document.name ?? drawing.name
-    return t("ai.header.meta", { name, count: drawing.entities.length })
+     return t("ai.header.meta", { name, count: elements.elements.length })
   }
   const elementCount = (): number => {
-    const drawing = app.drawing()
-    return drawing ? drawing.entities.length : 0
+     return elements.elements.length
   }
 
   const scrollToLatest = (): void => {
@@ -468,7 +470,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
           <h3>{t("ai.context.title")}</h3>
           <p>{t("ai.context.hint")}</p>
           <dl class="assistant-context-facts">
-            <div><dt>{t("ai.context.workspace")}</dt><dd>{app.drawing()?.name ?? t("ai.header.noProject")}</dd></div>
+            <div><dt>{t("ai.context.workspace")}</dt><dd>{document.name ?? app.drawing()?.name ?? t("ai.header.noProject")}</dd></div>
             <div><dt>{t("ai.header.elements")}</dt><dd>{elementCount()}</dd></div>
             <div><dt>{t("ai.context.messages")}</dt><dd>{ai.messages().length}</dd></div>
             <div><dt>{t("ai.stats.usage")}</dt><dd>{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</dd></div>
@@ -1110,8 +1112,10 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
             }
             if (segment.kind === "text") {
               return (
-                <div class="assistant-message-body text-sm whitespace-pre-wrap break-words">
-                  {segment.text}
+                 <div class="assistant-message-body text-sm break-words" classList={{ "whitespace-pre-wrap": isUser() }}>
+                   <Show when={!isUser()} fallback={segment.text}>
+                     <div class="assistant-markdown" data-testid="ai-markdown" innerHTML={renderAssistantMarkdown(segment.text)} />
+                   </Show>
                   <Show when={streaming() && last()}>
                     <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
                   </Show>

@@ -1,6 +1,6 @@
 /// <reference path="./sdk-next.d.ts" />
 import { Effect, Queue, Stream } from "effect"
-import type { HostPromptResult } from "@nikcli-ai/sdk-next"
+import type { HostPromptResult, HostSession } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import type { AiEvent } from "../events.ts"
 import { isContextOverflowError } from "../provider-error.ts"
@@ -114,14 +114,33 @@ export const createHostSession = (host: ProjectHost, title: string): Effect.Effe
  * another project). Checking before prompting turns a bare `UnexpectedStatus`
  * into a transparent recovery.
  */
-export const sessionExists = (host: ProjectHost, sessionId: string): Effect.Effect<boolean> =>
-  Effect.tryPromise({
+export const findHostSession = Effect.fn("NikCli.findHostSession")(function* (
+  host: ProjectHost,
+  sessionId: string
+): Effect.fn.Return<HostSession | undefined, AiConfigError> {
+  const session = yield* Effect.tryPromise({
     try: async () => {
-      await host.client.session.get({ sessionID: sessionId })
-      return true
+      try {
+        return await host.client.session.get({ sessionID: sessionId })
+      } catch (cause) {
+        if (cause !== null && typeof cause === "object" && "cause" in cause) {
+          const response = cause.cause
+          if (response !== null && typeof response === "object" && "status" in response && response.status === 404) return undefined
+        }
+        throw cause
+      }
     },
-    catch: () => false
-  }).pipe(Effect.orElseSucceed(() => false))
+    catch: (cause) => new AiConfigError({ message: `Failed to resolve the conversation: ${describeHostFailure(cause)}` })
+  })
+  // The SDK's session database is shared: a successful GET does not establish directory ownership.
+  if (session !== undefined && session.directory !== host.directory) {
+    return yield* new AiConfigError({ message: "This conversation belongs to a different project workspace." })
+  }
+  return session
+})
+
+export const sessionExists = (host: ProjectHost, sessionId: string): Effect.Effect<boolean, AiConfigError> =>
+  findHostSession(host, sessionId).pipe(Effect.map((session) => session !== undefined))
 
 /**
  * The generated client throws `ClientError(reason, { cause })` and drops the

@@ -78,9 +78,9 @@ export const StreamChatBody = Schema.Struct({
   agent: opt(Schema.String), mode: opt(Schema.Literals(["general", "cad", "cam", "gcode", "toolpath"])),
   attachments: opt(Schema.Array(ChatAttachment)),
   message: opt(Schema.String), sessionId: opt(Schema.String), projectId: opt(Schema.String),
-  context: opt(Schema.String), model: opt(AiModelSelector)
+  context: opt(Schema.String), includeContext: opt(Schema.Boolean), model: opt(AiModelSelector)
 })
-export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String) })
+export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String), projectId: opt(Schema.String) })
 export const PermissionReplyBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String), requestId: Schema.String, decision: Schema.Literals(["once", "always", "reject"]) })
 
 export const CompletionBody = Schema.Struct({

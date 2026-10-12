@@ -556,6 +556,7 @@ type Endpoint6_19Input = {
   readonly sessionId?: Endpoint6_19Request["payload"]["sessionId"]
   readonly projectId?: Endpoint6_19Request["payload"]["projectId"]
   readonly context?: Endpoint6_19Request["payload"]["context"]
+  readonly includeContext?: Endpoint6_19Request["payload"]["includeContext"]
   readonly model?: Endpoint6_19Request["payload"]["model"]
 }
 const Endpoint6_19 = (raw: RawClient["ai"]) => (input?: Endpoint6_19Input) =>
@@ -570,6 +571,7 @@ const Endpoint6_19 = (raw: RawClient["ai"]) => (input?: Endpoint6_19Input) =>
         sessionId: input?.["sessionId"],
         projectId: input?.["projectId"],
         context: input?.["context"],
+        includeContext: input?.["includeContext"],
         model: input?.["model"],
       },
     }).pipe(
@@ -596,9 +598,14 @@ const Endpoint6_20 = (raw: RawClient["ai"]) => (input: Endpoint6_20Input) =>
   }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint6_21Request = Parameters<RawClient["ai"]["chatAbort"]>[0]
-type Endpoint6_21Input = { readonly sessionId?: Endpoint6_21Request["payload"]["sessionId"] }
+type Endpoint6_21Input = {
+  readonly sessionId?: Endpoint6_21Request["payload"]["sessionId"]
+  readonly projectId?: Endpoint6_21Request["payload"]["projectId"]
+}
 const Endpoint6_21 = (raw: RawClient["ai"]) => (input?: Endpoint6_21Input) =>
-  raw["chatAbort"]({ payload: { sessionId: input?.["sessionId"] } }).pipe(Effect.mapError(mapClientError))
+  raw["chatAbort"]({ payload: { sessionId: input?.["sessionId"], projectId: input?.["projectId"] } }).pipe(
+    Effect.mapError(mapClientError),
+  )
 
 type Endpoint6_22Request = Parameters<RawClient["ai"]["permissionReply"]>[0]
 type Endpoint6_22Input = {

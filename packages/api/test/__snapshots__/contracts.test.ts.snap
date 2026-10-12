@@ -1949,6 +1949,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "sessionId": {
                     "anyOf": [
                       {
@@ -2213,6 +2223,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     "anyOf": [
                       {
                         "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "includeContext": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
                       },
                       {
                         "type": "null",
