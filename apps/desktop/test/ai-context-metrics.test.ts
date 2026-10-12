@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { contextWindowFor, contextMetrics, contextTokensOf, formatTokenCount, usableWindow } from "../src/ai/context-metrics.ts"
-import type { ModelInfo, ProviderInfo } from "../src/ai/types.ts"
+import { contextWindowFor, contextMetrics, contextTokensOf, formatTokenCount, usableWindow } from "../src/features/ai/lib/context-metrics.ts"
+import type { ModelInfo, ProviderInfo } from "../src/features/ai/lib/types.ts"
 
 const provider = (id: string, models: ReadonlyArray<{ id: string; contextWindow: number }>): ProviderInfo => ({
   id, name: id, source: "models.dev", auth: ["api"], configured: true,

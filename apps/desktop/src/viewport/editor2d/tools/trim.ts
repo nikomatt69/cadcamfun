@@ -14,8 +14,8 @@ import {
   type PolylineEntity,
   type Vec2
 } from "@cadcamfun/core"
-import { batch, type Command } from "../../../state/commands.ts"
-import { updateEntity, removeEntities } from "../../../state/commands.ts"
+import { batch, type Command } from "../../../shared/state/commands.ts"
+import { updateEntity, removeEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolContext, type ToolFactory } from "./tool.ts"
 
 interface TrimState {

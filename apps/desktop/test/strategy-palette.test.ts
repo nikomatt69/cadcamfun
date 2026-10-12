@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test"
 import {
   STRATEGY_CATEGORIES,
   paletteToCoreOperation
-} from "../src/cam/components/generator/StrategyPalette.data.ts"
+} from "../src/features/cam/components/generator/StrategyPalette.data.ts"
 
 describe("machining strategy palette", () => {
   test("categories are split by machine family and cover the Fusion-class families", () => {

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { baseEntity, emptyDrawing, isEntity, type Entity } from "@cadcamfun/core"
-import { createHistory } from "../../../state/history.ts"
+import { createHistory } from "../../../shared/state/history.ts"
 import { gestureTool, type GestureToolId } from "./annotation-transform.ts"
 import { noModifiers } from "./tool.ts"
 

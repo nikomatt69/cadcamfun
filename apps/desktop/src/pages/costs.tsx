@@ -1,1 +1,1 @@
-export { CostsScreen as default } from "../screens/costs.tsx"
+export { CostsScreen as default } from "../features/costs/screens/costs.tsx"

@@ -1,1 +1,1 @@
-export { default } from "../cad/CadPage.tsx"
+export { default } from "../features/cad/screens/CadPage.tsx"

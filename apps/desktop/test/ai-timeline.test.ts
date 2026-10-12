@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { timelineOf } from "../src/ai/timeline.ts"
-import type { AiEvent } from "../src/ai/types.ts"
+import { timelineOf } from "../src/features/ai/lib/timeline.ts"
+import type { AiEvent } from "../src/features/ai/lib/types.ts"
 
 test("recovered final text extends streamed text without losing tool order", () => {
   const events: AiEvent[] = [

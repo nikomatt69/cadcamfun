@@ -31,13 +31,13 @@ This ledger records static source observations on 2026-10-12. Concurrency/securi
 | Accessible project lookup precedes direct drawing saves | [handlers](../apps/sidecar/src/services/ai.ts) | Verify write rights independently of read visibility |
 | Reviewer has verification/workflow tools; verification saves regenerated NC | [agents](../packages/ai/src/nikcli/agents.ts), [verifyOperation](../apps/sidecar/src/services/ai.ts) | Split inspection from writes and verify identified actual artifacts |
 | Context assembly lists generic memory; handlers expose generic memory keys | [contextFor](../apps/sidecar/src/http/ai.ts), [memory handlers](../apps/sidecar/src/services/ai.ts) | Authorized actor/project namespaces and provenance |
-| UI mirrors suffix-named results and performs local undo; snapshot pushes overwrite stored data | [editor-sync](../apps/desktop/src/ai/editor-sync.ts), [drawing-context](../apps/desktop/src/ai/drawing-context.ts) | Document-scoped revision receipts and conflict-aware persistence |
-| Failed snapshot push can replace document regardless of error category | [prepareWorkspace](../apps/desktop/src/ai/drawing-context.ts) | Only confirmed absence permits explicit replacement; errors fail closed |
-| Stream and task recovery already poll session state | [stream](../apps/desktop/src/ai/stream.ts), [store](../apps/desktop/src/ai/store.ts) | Deduplicated push/replay with polling fallback |
+| UI mirrors suffix-named results and performs local undo; snapshot pushes overwrite stored data | [editor-sync](../apps/desktop/src/features/ai/lib/editor-sync.ts), [drawing-context](../apps/desktop/src/features/ai/lib/drawing-context.ts) | Document-scoped revision receipts and conflict-aware persistence |
+| Failed snapshot push can replace document regardless of error category | [prepareWorkspace](../apps/desktop/src/features/ai/lib/drawing-context.ts) | Only confirmed absence permits explicit replacement; errors fail closed |
+| Stream and task recovery already poll session state | [stream](../apps/desktop/src/features/ai/lib/stream.ts), [store](../apps/desktop/src/features/ai/store/store.ts) | Deduplicated push/replay with polling fallback |
 | Constraints, parametric histories and tolerance tessellation already exist | [parametric](../packages/ai/src/parametric.ts), [history](../packages/core/src/cad/history.ts), [catalogue](../packages/ai/src/element-catalog.ts) | Prefer deterministic editable construction over invented mesh coordinates |
 | Variant tests check body count/volume, not full dimensional intent | [parametric tests implementation](../apps/sidecar/src/services/ai-parametric.ts) | Independent feature/dimension acceptance and quality evidence |
 | Feature bodies use mesh CSG and Float32 positions; tessellation has caps | [history](../packages/core/src/cad/history.ts), [tolerance](../packages/core/src/cad/tolerance.ts) | Report achieved versus requested accuracy; no exact B-rep claim |
-| History angles and editor rotations include degrees despite canonical radian convention | [history](../packages/core/src/cad/history.ts), [workspace snapshot](../apps/desktop/src/ai/drawing-context.ts) | Versioned legacy decoding and explicit conversions |
+| History angles and editor rotations include degrees despite canonical radian convention | [history](../packages/core/src/cad/history.ts), [workspace snapshot](../apps/desktop/src/features/ai/lib/drawing-context.ts) | Versioned legacy decoding and explicit conversions |
 
 ## 4. Modules, interfaces and real seams
 

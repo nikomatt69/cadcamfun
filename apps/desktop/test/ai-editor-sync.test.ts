@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { resetStores } from "./helpers/reset-stores.ts"
-import { applyOps, mirrorToolResult, opsFor } from "../src/ai/editor-sync.ts"
-import { useElementsStore } from "../src/cad/store/elementsStore.ts"
-import { useLayerStore } from "../src/cad/store/layerStore.ts"
-import { useCADStore } from "../src/cad/store/cadStore.ts"
+import { applyOps, mirrorToolResult, opsFor } from "../src/features/ai/lib/editor-sync.ts"
+import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
+import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
+import { useCADStore } from "../src/features/cad/store/cadStore.ts"
 import { plateTemplate } from "@cadcamfun/core"
 
 const json = (value: unknown) => JSON.stringify(value)

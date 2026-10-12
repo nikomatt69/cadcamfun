@@ -4,10 +4,10 @@
  * decoder, the persisted-store helpers, and the proactive-suggestion builder.
  */
 import { describe, expect, test } from "bun:test"
-import { decodeEvent, dispatch } from "../src/ai/stream.ts"
-import { buildSuggestions } from "../src/ai/suggestions.ts"
-import { loadPersisted, savePersisted } from "../src/ai/persisted.ts"
-import { TOOL_IDS, TOOL_SUMMARIES } from "../src/ai/tools.ts"
+import { decodeEvent, dispatch } from "../src/features/ai/lib/stream.ts"
+import { buildSuggestions } from "../src/features/ai/lib/suggestions.ts"
+import { loadPersisted, savePersisted } from "../src/features/ai/store/persisted.ts"
+import { TOOL_IDS, TOOL_SUMMARIES } from "../src/features/ai/lib/tools.ts"
 
 describe("AI SSE event decoder", () => {
   test("decodes a delta event", () => {

@@ -15,7 +15,7 @@ Effect `4.0.0-rc.112` and `@nikcli-ai/sdk-next@1.428.0` are mandatory. Read inst
 - `apps/sidecar/src/services/acting-user.ts`: layer-wide last-turn user and prompt cell. Overlapping turns can consume another turn's identity; this is a static risk, not a reproduced exploit.
 - `apps/sidecar/src/http/ai.ts`, `apps/sidecar/src/services/ai.ts`: chat/control admission and repository execution need a single immutable trusted actor binding.
 - `apps/sidecar/src/services/live-events.ts`: replay of twenty events but unbounded PubSub delivery. A bounded replay window is not bounded subscriber memory.
-- `apps/desktop/src/ai/stream.ts`, `store.ts`: state recovery, native decision restoration and specialist polling already exist. Deepen them rather than claim recovery is absent.
+- `apps/desktop/src/features/ai/lib/stream.ts`, `store.ts`: state recovery, native decision restoration and specialist polling already exist. Deepen them rather than claim recovery is absent.
 - `specs/23-ai-runtime-architecture.md`: adopted teardown invariants and separately pending durability, task events and measured SDK isolation; historical test results are dated evidence, not results of this publication.
 - `packages/db/src/schema.ts`, `packages/db/src/database.test.ts`, `specs/01-conventions.md`: DB ownership, generated migrations and in-memory SQLite test conventions.
 
@@ -35,7 +35,7 @@ RM-07's 2026-10-12 amendment includes WP0 persistence and WP3/WP4/WP6 consumers 
 | WP0 | `packages/db/src/`, `packages/db/drizzle/` | Schema, generated SQL/metadata, migration and DB tests |
 | WP4 amendment | `apps/sidecar/src/services/`, `apps/sidecar/src/repos/`, `apps/sidecar/src/http/`, `apps/sidecar/test/`; shared `apps/sidecar/src/layers.ts` | Actor binding, task repository, controls and live-event implementation |
 | WP3 amendment | `packages/api/src/groups/`, `packages/api/src/schemas/`, `packages/api/src/sdk/generated/`; shared `packages/api/src/index.ts` | Typed events, control errors and generated consumers |
-| WP6 amendment | `apps/desktop/src/ai/`, `apps/desktop/test/` | Task push, deduplication and authoritative resync |
+| WP6 amendment | `apps/desktop/src/features/ai/`, `apps/desktop/test/` | Task push, deduplication and authoritative resync |
 
 Contracts to amend first: `specs/23-ai-runtime-architecture.md`, `specs/05-api-sidecar.md`, `specs/02-database.md`, `specs/08-ai.md`, `specs/06-desktop-ui.md`, and RM-07 owners/deliverables. These are required future amendments, not edits authorized by this publication. No Tauri, mobile, kernel or dependency-manifest changes here. Any absent proposed directory is created only under its approved owner.
 

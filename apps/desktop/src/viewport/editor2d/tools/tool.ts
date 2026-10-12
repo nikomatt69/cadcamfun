@@ -8,7 +8,7 @@
  * no Solid.
  */
 import type { Entity, Snap, Vec2 } from "@cadcamfun/core"
-import type { Command } from "../../../state/commands.ts"
+import type { Command } from "../../../shared/state/commands.ts"
 
 /** A pointer event in world coordinates, already snapped by the editor. */
 export interface PointerEvent {

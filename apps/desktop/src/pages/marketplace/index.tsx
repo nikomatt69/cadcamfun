@@ -1,1 +1,1 @@
-export { MarketplaceScreen as default } from "../../screens/marketplace.tsx"
+export { MarketplaceScreen as default } from "../../features/marketplace/screens/marketplace.tsx"

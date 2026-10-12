@@ -12,7 +12,7 @@ Effect `4.0.0-rc.112` and `@nikcli-ai/sdk-next@1.428.0` stay pinned. Use `Contex
 
 - `packages/ai/src/analytics.ts`: existing `AiAnalytics` and bounded in-memory ring; broad metadata and aggregate averages are not a revisioned quality baseline.
 - `packages/ai/src/nikcli/runtime.ts`, `packages/ai/test/assistant-controls.test.ts`, `session-state.test.ts`: native host settings/control and readback foundations. Do not implement a second compaction algorithm.
-- `apps/desktop/src/ai/stream.ts`, `apps/desktop/test/ai-context-metrics.test.ts`: recovery and context presentation need truthful provenance.
+- `apps/desktop/src/features/ai/lib/stream.ts`, `apps/desktop/test/ai-context-metrics.test.ts`: recovery and context presentation need truthful provenance.
 - `packages/ai/test/nikcli-host.test.ts`, `specialists-host.test.ts`, `analytics.test.ts`, `fixtures/`, `helpers/`: offline host wiring and fixture assets exist, not evidence of real-model dimensional competence.
 - `apps/sidecar/test/ai-parametric.test.ts`, `apps/desktop/test/cam-verify.test.ts`, `packages/core/src/cad/history.test.ts`: deterministic geometry/manufacturing test surfaces supply evidence for an evaluation harness.
 - `specs/23-ai-runtime-architecture.md`: dated verification and explicitly unmeasured native/SDK performance. Preserve dates and limitations; no fabricated performance baseline.
@@ -29,7 +29,7 @@ Deletion test: removing depth would distribute recovered usage deduplication, un
 | Owner | Allowed directories / explicit shared files | Purpose |
 | --- | --- | --- |
 | WP8 current | `packages/ai/src/`, `packages/ai/test/` including `fixtures/` | Usage, host compaction adapter, redacted traces, versioned offline evaluation harness |
-| WP6 current, narrowed | `apps/desktop/src/ai/`, `apps/desktop/src/screens/`, `apps/desktop/test/` | Existing settings/costs/chat views and truthful recovery/quality UI |
+| WP6 current, narrowed | `apps/desktop/src/features/ai/`, `apps/desktop/src/features/*/screens/`, `apps/desktop/test/` | Existing settings/costs/chat views and truthful recovery/quality UI |
 | WP3 conditional amendment | `packages/api/src/groups/`, `packages/api/src/schemas/`, `packages/api/src/sdk/generated/`; shared `packages/api/src/index.ts` | Missing typed trace/run/policy readback contracts |
 | WP4 conditional amendment | `apps/sidecar/src/services/`, `apps/sidecar/src/http/`, `apps/sidecar/test/`; shared `apps/sidecar/src/layers.ts` | Correlation at execute, authorized readback and event plumbing |
 

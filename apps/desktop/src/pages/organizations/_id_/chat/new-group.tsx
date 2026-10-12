@@ -1,2 +1,2 @@
-import { LegacyChat } from "../../../../screens/legacy-chat.tsx"
+import { LegacyChat } from "../../../../features/chat/screens/legacy-chat.tsx"
 export default function Page() { return <LegacyChat mode="group" /> }

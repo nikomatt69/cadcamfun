@@ -66,7 +66,7 @@ Each work package (WP) owns a directory. **An agent edits only files inside its 
 | WP11 | Git-style history + GitHub mirror | `packages/vcs` (+ `GitRepo/GitObject/GitRef/PullRequest*` tables, sidecar `vcs` services) | `13-vcs-actions-mobile.md` | WP0, WP4 | **done** core + sidecar + API; desktop panels and GitHub routes pending |
 | WP12 | Workflows (Actions-style) | `packages/workflow` | `13-vcs-actions-mobile.md` | WP11 | **done** engine + runner; only `project/*` steps registered |
 | WP13 | iOS companion | `apps/mobile` | `13-vcs-actions-mobile.md` | WP11, WP12 | **Expo migration integrated** — gateway + pairing + pinned local native module + assistant/resources; 48 tests, typecheck and JS export pass; current native Release/device validation in progress; TestFlight pending |
-| WP14 | Multi-operation setups (many tools, many programs) | `packages/core/src/cam/program` (+ `post`, `analysis`), `packages/api/src/groups/cam-setup.ts`, `apps/sidecar/src/http/cam-setup.ts`, `apps/desktop/src/cam/{lib,store}/setup*` | `14-multi-op-setup.md` | WP1, WP2, WP3 | **in progress** — `cam.program` contracts, plan/generate, post tool-number override, multi-tool parsing done; desktop setup store and persistence pending |
+| WP14 | Multi-operation setups (many tools, many programs) | `packages/core/src/cam/program` (+ `post`, `analysis`), `packages/api/src/groups/cam-setup.ts`, `apps/sidecar/src/http/cam-setup.ts`, `apps/desktop/src/features/cam/{lib,store}/setup*` | `14-multi-op-setup.md` | WP1, WP2, WP3 | **in progress** — `cam.program` contracts, plan/generate, post tool-number override, multi-tool parsing done; desktop setup store and persistence pending |
 
 ### Parallelisation map
 

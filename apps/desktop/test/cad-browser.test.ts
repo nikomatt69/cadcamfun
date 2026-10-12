@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { bulkNext, classify, isolate, partition, renamed, showAll } from "../src/cad/lib/browser.ts"
+import { bulkNext, classify, isolate, partition, renamed, showAll } from "../src/features/cad/lib/browser.ts"
 
 const item = (id: string, type: string, layerId = "l1") => ({ id, type, layerId })
 

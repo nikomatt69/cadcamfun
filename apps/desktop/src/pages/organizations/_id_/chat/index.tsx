@@ -1,1 +1,1 @@
-export { LegacyChat as default } from "../../../../screens/legacy-chat.tsx"
+export { LegacyChat as default } from "../../../../features/chat/screens/legacy-chat.tsx"

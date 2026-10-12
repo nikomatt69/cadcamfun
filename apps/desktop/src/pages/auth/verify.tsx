@@ -1,1 +1,1 @@
-export { VerifyScreen as default } from "../../screens/auth.tsx"
+export { VerifyScreen as default } from "../../features/auth/screens/auth.tsx"

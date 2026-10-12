@@ -3,9 +3,9 @@
  */
 import { describe, expect, test } from "bun:test"
 import { Effect, Stream } from "effect"
-import { sanitizeError } from "../src/ai/errors.ts"
-import { streamChatEffect } from "../src/ai/stream.ts"
-import type { AiEvent } from "../src/ai/types.ts"
+import { sanitizeError } from "../src/features/ai/lib/errors.ts"
+import { streamChatEffect } from "../src/features/ai/lib/stream.ts"
+import type { AiEvent } from "../src/features/ai/lib/types.ts"
 
 const sse = (...events: object[]) => Stream.fromIterable(events.map((e) => JSON.stringify(e)))
 

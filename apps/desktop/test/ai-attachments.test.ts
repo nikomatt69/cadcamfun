@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { ACCEPT, MAX_FILE_BYTES, readAttachment } from "../src/ai/attachments.ts"
-import { opsFor } from "../src/ai/editor-sync.ts"
+import { ACCEPT, MAX_FILE_BYTES, readAttachment } from "../src/features/ai/lib/attachments.ts"
+import { opsFor } from "../src/features/ai/lib/editor-sync.ts"
 
 describe("chat attachments (desktop)", () => {
   test("a DXF is read as text, an image as base64", async () => {

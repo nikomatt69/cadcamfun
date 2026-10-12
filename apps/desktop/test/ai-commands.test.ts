@@ -19,8 +19,8 @@ import {
   searchCommands,
   type CommandHost,
   type CommandOutcome
-} from "../src/ai/commands.ts"
-import { transcriptMarkdown } from "../src/ai/transcript-markdown.ts"
+} from "../src/features/ai/lib/commands.ts"
+import { transcriptMarkdown } from "../src/features/ai/lib/transcript-markdown.ts"
 
 /** Records what a command did, so a test can assert on the store, not on the UI. */
 interface Recorder {

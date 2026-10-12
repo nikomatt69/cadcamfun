@@ -1,1 +1,1 @@
-export { MaterialDetailScreen as default } from "../../resources/ResourceDetailScreens.tsx"
+export { MaterialDetailScreen as default } from "../../features/library/screens/ResourceDetailScreens.tsx"

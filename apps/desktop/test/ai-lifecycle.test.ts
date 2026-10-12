@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Effect, Stream } from "effect"
 import { bootLiveApp } from "./helpers/live-app.ts"
-import type { AiStore } from "../src/ai/store.ts"
+import type { AiStore } from "../src/features/ai/store/store.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
 beforeAll(async () => { app = await bootLiveApp() }, 60000)
@@ -14,8 +14,8 @@ const gate = <T>() => {
 }
 const mount = async () => {
   const { render } = await import("solid-js/web")
-  const { AppProvider } = await import("../src/state/context.ts")
-  const { createAiStore } = await import("../src/ai/store.ts")
+  const { AppProvider } = await import("../src/shared/state/context.ts")
+  const { createAiStore } = await import("../src/features/ai/store/store.ts")
   let store!: AiStore
   const root = document.createElement("div")
   document.body.replaceChildren(root)

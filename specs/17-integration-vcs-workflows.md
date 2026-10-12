@@ -169,7 +169,7 @@ These rules are baked into tests (`packages/vcs/test/*`, `packages/workflow/test
 3. **Large binary assets (STL/DXF imports)** as git blobs (`packages/vcs/test` does not exercise them yet).
 4. **Commit-graph caching** if projects grow past thousands of commits (`13-vcs-actions-mobile.md` §8 step 6).
 5. **Drawn commit-graph view** in the editor (`13-vcs-actions-mobile.md` §8 step 2).
-6. **Actions UI on desktop** for the version control screen (`apps/desktop/src/screens`).
+6. **Actions UI on desktop** for the version control screen (`apps/desktop/src/features/*/screens`).
 7. **Permissions for push-trigger workflows** that post to `notify/*`.
 
 ## 6. Change log

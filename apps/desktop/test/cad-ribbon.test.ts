@@ -4,9 +4,9 @@ import { installDom } from "./helpers/dom.ts"
 test("CAD ribbon opens modeling operations and keeps section controls in sync", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: Ribbon } = await import("../src/cad/components/CadRibbon.tsx")
-  const { useCADStore } = await import("../src/cad/store/cadStore.ts")
-  const { DEFAULT_SECTION } = await import("../src/cad/lib/section.ts")
+  const { default: Ribbon } = await import("../src/features/cad/components/CadRibbon.tsx")
+  const { useCADStore } = await import("../src/features/cad/store/cadStore.ts")
+  const { DEFAULT_SECTION } = await import("../src/features/cad/lib/section.ts")
   useCADStore.setState({ section: DEFAULT_SECTION, viewMode: "2d" })
   const root = document.createElement("div")
   document.body.append(root)
@@ -40,10 +40,10 @@ test("CAD ribbon opens modeling operations and keeps section controls in sync", 
 test("boolean ribbon actions require two selected unlocked elements", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: Ribbon } = await import("../src/cad/components/CadRibbon.tsx")
-  const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
-  const { useSelectionStore } = await import("../src/cad/store/selectorStore.ts")
-  const { useLayerStore } = await import("../src/cad/store/layerStore.ts")
+  const { default: Ribbon } = await import("../src/features/cad/components/CadRibbon.tsx")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  const { useSelectionStore } = await import("../src/features/cad/store/selectorStore.ts")
+  const { useLayerStore } = await import("../src/features/cad/store/layerStore.ts")
   const elements = useElementsStore.getState()
   const layerId = useLayerStore.getState().activeLayer
   const selection = useSelectionStore.getState()
@@ -76,10 +76,10 @@ test("boolean ribbon actions require two selected unlocked elements", async () =
 test("ribbon clipboard actions respect selection and the destination layer lock", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: Ribbon } = await import("../src/cad/components/CadRibbon.tsx")
-  const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
-  const { useSelectionStore } = await import("../src/cad/store/selectorStore.ts")
-  const { useLayerStore } = await import("../src/cad/store/layerStore.ts")
+  const { default: Ribbon } = await import("../src/features/cad/components/CadRibbon.tsx")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  const { useSelectionStore } = await import("../src/features/cad/store/selectorStore.ts")
+  const { useLayerStore } = await import("../src/features/cad/store/layerStore.ts")
   const elements = useElementsStore.getState()
   const before = [...elements.elements]
   const layer = useLayerStore.getState().activeLayer

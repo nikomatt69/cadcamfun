@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { applyGlass, removeGlass, type GlassHost } from "../src/app/glass.ts"
-import { DEFAULT_SETTINGS, decodeSettings } from "../src/state/settings.ts"
+import { DEFAULT_SETTINGS, decodeSettings } from "../src/shared/state/settings.ts"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 const host = (patch: Partial<GlassHost> = {}) => {

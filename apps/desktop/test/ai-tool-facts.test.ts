@@ -1,7 +1,7 @@
 /** The summaries the chat shows for version-control and delegation tools, and that the tools the sidecar adds are not rejected. */
 import { describe, expect, test } from "bun:test"
-import { toolFacts } from "../src/ai/tool-facts.ts"
-import { HOST_TOOLS } from "../src/ai/stream.ts"
+import { toolFacts } from "../src/features/ai/lib/tool-facts.ts"
+import { HOST_TOOLS } from "../src/features/ai/lib/stream.ts"
 
 const task = { id: "11111111-1111-4111-8111-111111111111", agent: "editor", description: "Make the hole 8 mm", status: "completed", background: false, text: "Done: hole-1 radius 3 -> 4." }
 

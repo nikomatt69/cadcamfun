@@ -1,2 +1,2 @@
-import { MagicLinkVerifyScreen } from "../../../screens/auth.tsx"
+import { MagicLinkVerifyScreen } from "../../../features/auth/screens/auth.tsx"
 export default function Page() { return <MagicLinkVerifyScreen /> }

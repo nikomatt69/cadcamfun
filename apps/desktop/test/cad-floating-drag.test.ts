@@ -4,7 +4,7 @@ import { installDom } from "./helpers/dom.ts"
 test("floating tools remain visible when dragging beyond the canvas and resizing", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: FloatingToolbar } = await import("../src/cad/components/FloatingToolbar.tsx")
+  const { default: FloatingToolbar } = await import("../src/features/cad/components/FloatingToolbar.tsx")
   const host = document.createElement("div")
   document.body.append(host)
   let width = 600

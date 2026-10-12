@@ -25,7 +25,7 @@ import {
   toolpathByElementId,
   updateToolpathGCode,
   type MultiToolpathState
-} from "../src/cam/lib/multiToolpath.ts"
+} from "../src/features/cam/lib/multiToolpath.ts"
 
 const settings = cam.generator.DEFAULT_SETTINGS
 const withThree = (): MultiToolpathState => {
@@ -174,7 +174,7 @@ describe("the store", () => {
   })
 
   test("actions drive the reducers and persist toolpaths + global settings (not the selection) under the legacy key", async () => {
-    const { useMultiToolpathStore, STORAGE_KEY } = await import("../src/cam/store/multiToolpathStore.ts")
+    const { useMultiToolpathStore, STORAGE_KEY } = await import("../src/features/cam/store/multiToolpathStore.ts")
     const store = useMultiToolpathStore
     const first = store.getState().addToolpath("el-1", "circle", "Hole", settings)
     const second = store.getState().addToolpath("el-2", "rectangle", "Plate", settings)

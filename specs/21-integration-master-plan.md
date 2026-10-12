@@ -144,7 +144,7 @@ Each `done` tool ships with a `tools/prompts/<id>.txt`. The contract test `tool-
 | 8.2 | Renderer budget enforcement; trimmed sections say "N not shown" | `done` | 19 §3 | `workspace-context.ts:106-130` | unit test |
 | 8.3 | Defensive `str/num/rec/arr` helpers; no invented fields | `done` | 19 §3 | `workspace-context.ts:15-18` | unit test |
 | 8.4 | `renderNotes(memory, maxChars)` newest-first for `memory_recall` | `done` | 19 §10 | `workspace-context.ts:138-149` | unit test |
-| 8.5 | `WorkspaceSnapshot` schema written by the desktop editor | `done` | 19 §2 | `apps/desktop/src/state/ai.snapshot.ts` | UI |
+| 8.5 | `WorkspaceSnapshot` schema written by the desktop editor | `done` | 19 §2 | `apps/desktop/src/shared/state/ai.snapshot.ts` | UI |
 | 8.6 | Snapshot augmented with `lastGcodeChangedAt`, `lastVerifiedAt`, `stockBox`, machine limits | `pending` | 20 §P3.1 | not yet | Phase 3.1 |
 | 8.7 | Renderer adds "next machining decision" hint per `verification.state` | `pending` | 20 §P3.2 | not yet | Phase 3.2 |
 | 8.8 | Renderer includes active toolpath's material/tool/machine summary | `pending` | 20 §P3.3 | not yet | Phase 3.3 |

@@ -1,6 +1,6 @@
 /** The generator panel follows the machine: its origins, its tools, its operations, and the probe. */
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
-import { useGeneratorStore } from "../src/cam/store/generatorStore.ts"
+import { useGeneratorStore } from "../src/features/cam/store/generatorStore.ts"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"
 

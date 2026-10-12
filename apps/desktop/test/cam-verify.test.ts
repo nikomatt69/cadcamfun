@@ -3,7 +3,7 @@
  * fields, the stale marker and the pure helpers behind them.
  */
 import { afterAll, beforeAll, describe, expect, test, afterEach } from "bun:test"
-import { buildVerifyRequest, DEFAULT_HOLDER, heightColour, sortedIssues, toolOverrides } from "../src/cam/lib/verifyJob.ts"
+import { buildVerifyRequest, DEFAULT_HOLDER, heightColour, sortedIssues, toolOverrides } from "../src/features/cam/lib/verifyJob.ts"
 import { cam } from "@cadcamfun/core"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"

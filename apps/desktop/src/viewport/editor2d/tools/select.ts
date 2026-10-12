@@ -6,8 +6,8 @@
  * hence the spatial index in the `hits` of the pointer event rather than a scan.
  */
 import type { Vec2 } from "@cadcamfun/core"
-import type { Command } from "../../../state/commands.ts"
-import { removeEntities } from "../../../state/commands.ts"
+import type { Command } from "../../../shared/state/commands.ts"
+import { removeEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolFactory } from "./tool.ts"
 
 export interface SelectState {

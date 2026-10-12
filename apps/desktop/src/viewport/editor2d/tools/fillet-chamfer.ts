@@ -16,9 +16,9 @@ import {
   type PolylineEntity,
   type Vec2
 } from "@cadcamfun/core"
-import { addEntities } from "../../../state/commands.ts"
-import type { Command } from "../../../state/commands.ts"
-import { removeEntities } from "../../../state/commands.ts"
+import { addEntities } from "../../../shared/state/commands.ts"
+import type { Command } from "../../../shared/state/commands.ts"
+import { removeEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolContext, type ToolFactory } from "./tool.ts"
 
 type Mode = "fillet" | "chamfer"

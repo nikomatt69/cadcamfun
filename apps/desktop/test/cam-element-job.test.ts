@@ -10,8 +10,8 @@ import {
   requestForElement,
   settingsForElement,
   type ElementAssignment
-} from "../src/cam/lib/elementJob.ts"
-import { effectiveSettings } from "../src/cam/lib/elementGenerate.ts"
+} from "../src/features/cam/lib/elementJob.ts"
+import { effectiveSettings } from "../src/features/cam/lib/elementGenerate.ts"
 
 const base = cam.generator.DEFAULT_SETTINGS
 const plate = { id: "r1", type: "rectangle", name: "Plate", x: 0, y: 0, width: 40, height: 20 }

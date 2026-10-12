@@ -2,9 +2,9 @@ import { expect, test } from "bun:test"
 import * as THREE from "three"
 import { plateTemplate } from "@cadcamfun/core"
 import { ELEMENT_SPECS, ELEMENT_TYPES, normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
-import { applyDragDelta, buildElementObject, commitDrag, type DragStart } from "../src/cad/lib/sceneHelpers.ts"
-import { useElementsStore } from "../src/cad/store/elementsStore.ts"
-import { useLayerStore } from "../src/cad/store/layerStore.ts"
+import { applyDragDelta, buildElementObject, commitDrag, type DragStart } from "../src/features/cad/lib/sceneHelpers.ts"
+import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
+import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
 
 const center = (object: THREE.Object3D): THREE.Vector3 => new THREE.Box3().setFromObject(object).getCenter(new THREE.Vector3())
 

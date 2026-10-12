@@ -1,10 +1,10 @@
 import { createSignal } from "solid-js"
 import { Effect } from "effect"
-import { ApiClient, type Client } from "../state/client.ts"
-import { useQuery as stateQuery } from "../state/queries.ts"
-import { invalidatePrefix } from "../state/query-cache.ts"
-import type { ClientEffect, QueryOptions, QueryRuntime } from "../state/queries.ts"
-import type { QueryCache } from "../state/query-cache.ts"
+import { ApiClient, type Client } from "../shared/state/client.ts"
+import { useQuery as stateQuery } from "../shared/state/queries.ts"
+import { invalidatePrefix } from "../shared/state/query-cache.ts"
+import type { ClientEffect, QueryOptions, QueryRuntime } from "../shared/state/queries.ts"
+import type { QueryCache } from "../shared/state/query-cache.ts"
 
 export const useQuery = <T,>(endpoint: string, params: Readonly<Record<string, unknown>> | undefined, read: (client: Client) => ClientEffect<T>, runtime: QueryRuntime, options?: QueryOptions) =>
   // `state/queries` binds the client through the ApiClient service itself, so the

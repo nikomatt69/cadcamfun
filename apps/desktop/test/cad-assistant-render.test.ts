@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import { ELEMENT_SPECS, ELEMENT_TYPES, normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
 import { plateTemplate } from "@cadcamfun/core"
-import { buildElementObject } from "../src/cad/lib/sceneHelpers.ts"
-import { useElementsStore } from "../src/cad/store/elementsStore.ts"
+import { buildElementObject } from "../src/features/cad/lib/sceneHelpers.ts"
+import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
 
 // What the assistant creates must be drawable: each element type, as the catalogue normalises it, builds a Three object.
 test("every element the assistant can create is drawn in the 3D view", () => {

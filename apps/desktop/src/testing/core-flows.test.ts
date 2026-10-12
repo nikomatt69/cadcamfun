@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect"
 import { cam, emptyDrawing } from "@cadcamfun/core"
 import { createFakeApi } from "./fake-api.ts"
 import { runtimeForClient, readClient } from "../app/client.ts"
-import { decodeForm } from "../components/schema-form.ts"
+import { decodeForm } from "../shared/components/schema-form.ts"
 
 describe("core desktop flows", () => {
   test("managed runtime uses the typed fake API for project lifecycle", async () => {

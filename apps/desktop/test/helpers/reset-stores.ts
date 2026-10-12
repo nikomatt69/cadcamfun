@@ -1,12 +1,12 @@
 /** Puts the global editor stores back to empty, so a test never leaves state for the next file in the same process. */
-import { useCADStore } from "../../src/cad/store/cadStore.ts"
-import { useElementsStore } from "../../src/cad/store/elementsStore.ts"
-import { useSelectionStore } from "../../src/cad/store/selectorStore.ts"
-import { useVerifyStore } from "../../src/cam/store/verifyStore.ts"
-import { useCamStore } from "../../src/cam/store/camStore.ts"
-import { useDocumentStore } from "../../src/cad/store/documentStore.ts"
-import { DEFAULT_SECTION } from "../../src/cad/lib/section.ts"
-import { forgetPushed } from "../../src/ai/editor-sync.ts"
+import { useCADStore } from "../../src/features/cad/store/cadStore.ts"
+import { useElementsStore } from "../../src/features/cad/store/elementsStore.ts"
+import { useSelectionStore } from "../../src/features/cad/store/selectorStore.ts"
+import { useVerifyStore } from "../../src/features/cam/store/verifyStore.ts"
+import { useCamStore } from "../../src/features/cam/store/camStore.ts"
+import { useDocumentStore } from "../../src/features/cad/store/documentStore.ts"
+import { DEFAULT_SECTION } from "../../src/features/cad/lib/section.ts"
+import { forgetPushed } from "../../src/features/ai/lib/editor-sync.ts"
 
 export const resetStores = (): void => {
   useSelectionStore.getState().clearSelection()

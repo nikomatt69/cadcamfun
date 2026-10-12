@@ -81,7 +81,7 @@ PostOptions = { decimals: number /*3*/, lineNumbers?: { start: number; step: num
 ## 6. Acceptance tests (must exist)
 
 - Golden-file tests per post (`generic`, `fanuc`, `grbl`) for: square profile outside/inside, rectangular pocket with an island, 4-hole peck drill, face mill. Goldens live in `packages/core/test/golden/*.nc`; regenerate only with `bun test --update-snapshots` and review the diff.
-- Geometry checks independent of text: parse the emitted G-code with a small reference interpreter (`gcode-interpreter.ts`, test-only helper in `src/cam/testing/`) and assert: final Z never below `-totalDepth`, no cutting move below clearance outside the stock bounds, every `Arc` radius at start equals radius at end within 1e-6, total path length equals `toolpathLength(ir)`.
+- Geometry checks independent of text: parse the emitted G-code with a small reference interpreter (`gcode-interpreter.ts`, test-only helper in `features/cam/testing/`) and assert: final Z never below `-totalDepth`, no cutting move below clearance outside the stock bounds, every `Arc` radius at start equals radius at end within 1e-6, total path length equals `toolpathLength(ir)`.
 - Regression tests for each bug in §5.
 - Determinism: generating the same program twice yields byte-identical text.
 - Property test: for random closed polygons, an outside `Profile` toolpath never enters the polygon (min distance from path to polygon ≥ tool radius − 1e-6).
@@ -94,7 +94,7 @@ Material removal simulation and collision checking (a later WP; the IR is design
 
 ### 8.1 Layout and exports
 
-`packages/core/src/index.ts` exports this layer as `cam` (`import { cam } from "@cadcamfun/core"`, or `src/cam/index.ts` directly).
+`packages/core/src/index.ts` exports this layer as `cam` (`import { cam } from "@cadcamfun/core"`, or `features/cam/index.ts` directly).
 
 | File | Contents |
 | --- | --- |
@@ -185,7 +185,7 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - v1: initial spec incl. legacy bug list.
 - v2: WP2 implemented; status set to done. Added the as-built section: IR `Cycle` extension, operations, posts (`generic`, `fanuc`, `grbl`), reference interpreter, goldens (`UPDATE_GOLDEN=1` instead of `--update-snapshots`), regression tests per legacy bug, and the deviations listed above (`linuxcnc`/`haas` not implemented, `useCannedCycles` defaults to true, `emit` takes partial options).
 - v3: Safety audit: document fail-closed arc/cycle emission, bounded peck expansion, R-plane positioning, repeated-hole execution and modal dwell reset before implementation. Regression tests stay inside the WP2-owned source directory.
-- v3 verification: `bun test packages/core` passed (573 tests, 0 failures, 275451 assertions); `bunx tsc -p packages/core/tsconfig.json --noEmit` exited 0. Existing test assertions and all golden files remain unchanged; `src/cam/safety.test.ts` adds 11 targeted safety tests. No cross-WP edits.
+- v3 verification: `bun test packages/core` passed (573 tests, 0 failures, 275451 assertions); `bunx tsc -p packages/core/tsconfig.json --noEmit` exited 0. Existing test assertions and all golden files remain unchanged; `features/cam/safety.test.ts` adds 11 targeted safety tests. No cross-WP edits.
 - v4: Added §10 toolpath verification (`cam.verify`): height-field stock removal, rapid / shank / holder / fixture / below-stock findings, gouge and uncut stock against `target.solids`, a display preview, and the generator bridge. Exposed as `POST /api/toolpaths/verify`, the AI tool `cam_verify_toolpath` and the desktop "Verify" tab.
 - v5: Added §11 machines, axes and zeros (kinematics table, axis consistency check, probing cycles, work offsets, per-machine origins) and the design-space counterpart; corrected the lathe axis senses, the lathe spindle word and the printer placement.
 - v6.1: Added §13 (rest finishing, thread milling replacing the contour fallback, indexed 3+2 with the `Orient` move).

@@ -1,1 +1,1 @@
-export { ToolsScreen as default } from "../../resources/ResourcesScreen.tsx"
+export { ToolsScreen as default } from "../../features/library/screens/ResourcesScreen.tsx"

@@ -1,1 +1,1 @@
-export { ToolpathsScreen as default } from "../../toolpaths/ToolpathsScreen.tsx"
+export { ToolpathsScreen as default } from "../../features/toolpaths/screens/ToolpathsScreen.tsx"

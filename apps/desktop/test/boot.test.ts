@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { Effect, Exit } from "effect"
-import { ApiClient, BOOT_TIMEOUT_MS, connect, createRuntime, messageOf, withTimeout } from "../src/state/client.ts"
+import { ApiClient, BOOT_TIMEOUT_MS, connect, createRuntime, messageOf, withTimeout } from "../src/shared/state/client.ts"
 import { startStubApi, type StubServer } from "./helpers/stub-server.ts"
 
 /** `projects.list()` resolved against the runtime's own client service. */

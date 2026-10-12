@@ -4,9 +4,9 @@ import { installDom } from "./helpers/dom.ts"
 test("the CAD canvas mounts without WebGL and keeps its overlays usable", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: CADCanvas } = await import("../src/cad/components/CADCanvas.tsx")
-  const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
-  const { useSelectionStore } = await import("../src/cad/store/selectorStore.ts")
+  const { default: CADCanvas } = await import("../src/features/cad/components/CADCanvas.tsx")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  const { useSelectionStore } = await import("../src/features/cad/store/selectorStore.ts")
   const root = document.createElement("div")
   document.body.append(root)
   const dispose = render(() => CADCanvas({}), root)

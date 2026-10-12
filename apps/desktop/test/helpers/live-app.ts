@@ -18,7 +18,7 @@ export async function bootLiveApp() {
   resetStores()
   const { render } = await import("solid-js/web")
   const { AppRoutes } = await import("../../src/app/App.tsx")
-  const { createAppState } = await import("../../src/state/context.ts")
+  const { createAppState } = await import("../../src/shared/state/context.ts")
   const runtime = runtimeForLayer(clientLayer({ baseUrl: "http://sidecar.test", token: "test-token" }, sidecar.transport))
   const client = await readClient(runtime)
   const state = createAppState({ client, runtime, sidecar: "ready" })

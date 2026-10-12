@@ -1,10 +1,10 @@
 # WP14 — Multi-operation setups (many tools, many programs)
 
-Status: **in progress**. Owner dirs: `packages/core/src/cam/program` (+ `post`, `analysis`), `packages/api/src/groups/cam-setup.ts`, `apps/sidecar/src/http/cam-setup.ts`, `apps/desktop/src/cam/{lib/setup.ts,store/setupStore.ts}`. Depends on WP2 (operations, posts, verifier) and WP3 (API contract).
+Status: **in progress**. Owner dirs: `packages/core/src/cam/program` (+ `post`, `analysis`), `packages/api/src/groups/cam-setup.ts`, `apps/sidecar/src/http/cam-setup.ts`, `apps/desktop/src/features/cam/{lib/setup.ts,store/setupStore.ts}`. Depends on WP2 (operations, posts, verifier) and WP3 (API contract).
 
 ## 1. The problem
 
-The v6 generator takes one operation per request (`POST /api/toolpaths/generate` → `GenerateRequest { settings, geometry }`), and the desktop multi-toolpath panel stitches the resulting texts together (`combineGCode`, `apps/desktop/src/cam/lib/multiToolpath.ts`). Concatenating full programs is not a program: each block carries its own header, `G21`, `M30` and `%`, no tool change is emitted, and no pocket number is assigned. The machine cannot run it.
+The v6 generator takes one operation per request (`POST /api/toolpaths/generate` → `GenerateRequest { settings, geometry }`), and the desktop multi-toolpath panel stitches the resulting texts together (`combineGCode`, `apps/desktop/src/features/cam/lib/multiToolpath.ts`). Concatenating full programs is not a program: each block carries its own header, `G21`, `M30` and `%`, no tool change is emitted, and no pocket number is assigned. The machine cannot run it.
 
 ## 2. The model
 

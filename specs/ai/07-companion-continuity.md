@@ -14,7 +14,7 @@ Effect `4.0.0-rc.112` and `@nikcli-ai/sdk-next@1.428.0` remain mandatory at appl
 - The same file's VCS route comment records that broad matching still admits restore/commit/checkout despite intended desktop-only restriction. This is a known contract gap, not evidence of enforced denial.
 - `apps/mobile/test/pairing.test.ts`, `transport.test.ts`, `sse.test.ts`, `offline-queue.test.ts`, `runtime-lifecycle.test.ts`: existing continuity regression locations.
 - `apps/sidecar/test/companion-gateway.test.ts`, `companion-chat-e2e.test.ts`, `companion-e2e.test.ts`: gateway/assistant integration foundations.
-- `apps/desktop/src/ai/stream.ts`: existing session-state and native decision recovery is the semantic reference, not a claim of complete mobile parity.
+- `apps/desktop/src/features/ai/lib/stream.ts`: existing session-state and native decision recovery is the semantic reference, not a claim of complete mobile parity.
 - `specs/13-vcs-actions-mobile.md`, `specs/23-ai-runtime-architecture.md`, `specs/27-everything-via-nikcli.md`: pairing, lifetime and unchanged companion restrictions. External nikcli transport is not authority for phone expansion.
 
 ## Module, Interface and Implementation

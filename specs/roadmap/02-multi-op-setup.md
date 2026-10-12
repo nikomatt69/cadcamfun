@@ -6,7 +6,7 @@ Status: **pending**. Depends on: RM-01 for new AI actions; RM-03 for persisted s
 
 `combineGCode` concatenates full programs (headers, `M30`, `%`) with no tool change. That is a shallow pass-through: complexity leaks into every caller (viewport, verifier, AI, post). A **Setup** module with `planPrograms` / `generateSetup` concentrates ordering, pockets, and one-emit-per-program (**depth**, **locality**).
 
-Current tree: `packages/core/src/cam/setup.ts` exists; `cam/index.ts` does **not** export `cam.program`; there is no `packages/api/src/groups/cam-setup.ts`, no `apps/sidecar/src/http/cam-setup.ts`, no `apps/desktop/src/cam/store/setupStore.ts`.
+Current tree: `packages/core/src/cam/setup.ts` exists; `cam/index.ts` does **not** export `cam.program`; there is no `packages/api/src/groups/cam-setup.ts`, no `apps/sidecar/src/http/cam-setup.ts`, no `apps/desktop/src/features/cam/store/setupStore.ts`.
 
 ## Interface (test surface)
 
@@ -32,7 +32,7 @@ Desktop store is an **adapter** over that HTTP interface, not a second planner.
 1. `packages/core/src/cam/program/{op,setup,tooltable,plan,programs}.ts` exported as `cam.program` from `cam/index.ts`. Goldens of `04-core-cam.md` stay byte-identical when WP14 options are off.
 2. `packages/api/src/groups/cam-setup.ts` + register in `packages/api/src/index.ts`.
 3. `apps/sidecar/src/http/cam-setup.ts` + `layers.ts` (small Edit).
-4. `apps/desktop/src/cam/{lib/setup.ts,store/setupStore.ts}` — replace `combineGCode` as the multi-op path; keep the old helper only if a test still needs it, marked deprecated.
+4. `apps/desktop/src/features/cam/{lib/setup.ts,store/setupStore.ts}` — replace `combineGCode` as the multi-op path; keep the old helper only if a test still needs it, marked deprecated.
 5. After RM-03 is done: persist project-scoped setup JSON using its authoritative document revision/receipt implementation. Existing project/drawing storage or KvStore is acceptable only if it participates in the same authorized, expected-revision, atomic write and receipt semantics; it is not a bypass. No new cloud table. Any required revision/receipt schema change is contract-first WP0 work in RM-03 (`01-conventions.md` §3), not a second migration here. RM-03 delivers and tests the persistence module without waiting for RM-02 consumers; RM-02 then integrates setup/artifact identities and invalidation through that interface.
 6. After RM-01: `cam_edit` actions `setup_plan` / `setup_generate` (or equivalent) — not a new per-verb tool file.
 

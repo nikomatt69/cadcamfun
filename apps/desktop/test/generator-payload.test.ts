@@ -4,9 +4,9 @@
  */
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { makeToolpathGenerator } from "../src/cam/api/generator.ts"
-import { geometryOf } from "../src/cam/lib/job.ts"
-import { toJsonSafe, toJsonSafeRecord } from "../src/state/json-safe.ts"
+import { makeToolpathGenerator } from "../src/features/cam/api/generator.ts"
+import { geometryOf } from "../src/features/cam/lib/job.ts"
+import { toJsonSafe, toJsonSafeRecord } from "../src/shared/state/json-safe.ts"
 import { bootLiveApp } from "./helpers/live-app.ts"
 import { resetStores } from "./helpers/reset-stores.ts"
 

@@ -11,7 +11,7 @@ import {
   machinableSelection,
   nextSelection,
   selectionSummary
-} from "../src/cam/lib/explorer.ts"
+} from "../src/features/cam/lib/explorer.ts"
 
 const elements = [
   { id: "g1", type: "group", layerId: "l1", name: "Bracket", childrenIds: ["c1"] },

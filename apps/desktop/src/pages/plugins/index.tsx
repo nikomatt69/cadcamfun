@@ -1,1 +1,1 @@
-export { PluginsScreen as default } from "../../screens/plugins.tsx"
+export { PluginsScreen as default } from "../../features/plugins/screens/plugins.tsx"

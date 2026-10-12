@@ -53,8 +53,8 @@ describe("project details page", () => {
   }, 120000)
 
   test("a drawing opens in the CAD page, with its elements on a real layer and one bottom bar", async () => {
-    const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
-    const { useLayerStore } = await import("../src/cad/store/layerStore.ts")
+    const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+    const { useLayerStore } = await import("../src/features/cad/store/layerStore.ts")
     const { dispose } = app.visit(`/cad?drawingId=${drawingId}`)
     try {
       await app.wait(() => useElementsStore.getState().elements.some((e) => e.id === "d-cube"), 60000)
@@ -69,7 +69,7 @@ describe("project details page", () => {
   }, 120000)
 
   test("/drawings/:id is the same CAD page", async () => {
-    const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
+    const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
     useElementsStore.setState({ elements: [] })
     const { dispose } = app.visit(`/drawings/${drawingId}`)
     try {
@@ -79,7 +79,7 @@ describe("project details page", () => {
   }, 120000)
 
   test("/cad?projectId= opens the project's newest drawing instead of an empty canvas", async () => {
-    const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
+    const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
     useElementsStore.setState({ elements: [] })
     const { dispose } = app.visit(`/cad?projectId=${projectId}`)
     try {

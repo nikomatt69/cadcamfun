@@ -4,13 +4,13 @@
  * these cases cover both "Save" and "Save as Project".
  */
 import { beforeEach, describe, expect, test } from "bun:test"
-import { createProjectWithContents, drawingPayload, syncProjectContents } from "../src/cad/lib/projectSnapshot.ts"
-import type { AppState } from "../src/state/context.ts"
-import { useElementsStore } from "../src/cad/store/elementsStore.ts"
-import { useLayerStore } from "../src/cad/store/layerStore.ts"
-import { useLocalComponentsLibraryStore, type LocalComponent } from "../src/cad/store/localComponentsLibraryStore.ts"
-import { useCADStore } from "../src/cad/store/cadStore.ts"
-import type { ComponentClient } from "../src/cad/lib/projectSnapshot.ts"
+import { createProjectWithContents, drawingPayload, syncProjectContents } from "../src/features/cad/lib/projectSnapshot.ts"
+import type { AppState } from "../src/shared/state/context.ts"
+import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
+import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
+import { useLocalComponentsLibraryStore, type LocalComponent } from "../src/features/cad/store/localComponentsLibraryStore.ts"
+import { useCADStore } from "../src/features/cad/store/cadStore.ts"
+import type { ComponentClient } from "../src/features/cad/lib/projectSnapshot.ts"
 
 const now = "2026-01-01T00:00:00.000Z"
 

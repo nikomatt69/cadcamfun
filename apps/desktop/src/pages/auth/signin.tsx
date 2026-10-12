@@ -1,2 +1,2 @@
-import { SignInScreen } from "../../screens/signin.tsx"
+import { SignInScreen } from "../../features/auth/screens/signin.tsx"
 export default function Page() { return <SignInScreen /> }

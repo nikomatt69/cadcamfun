@@ -34,7 +34,7 @@ Deletion test: deleting the deep module would duplicate schemas, effect classifi
 | WP4 | `apps/sidecar/src/http/`, `apps/sidecar/src/services/`, `apps/sidecar/src/repos/`, `apps/sidecar/test/`; shared `apps/sidecar/src/layers.ts` | HTTP execute/auth/scoped token issuance and revocation |
 | WP9 | `packages/plugin-sdk/src/`, `packages/plugin-sdk/test/`, `packages/plugin-sdk/examples/`, `apps/sidecar/src/plugins/` | Contribution manifest/host RPC and capability tests |
 | WP8 conditional amendment | `packages/nikcli-plugin/` | Proposed isolated standalone plugin package, only after compatibility gate and explicit RM-11 package ownership |
-| WP6 conditional amendment | `apps/desktop/src/screens/`, `apps/desktop/test/` | Only if existing token-grant/revocation UI cannot expose external-agent records |
+| WP6 conditional amendment | `apps/desktop/src/features/*/screens/`, `apps/desktop/test/` | Only if existing token-grant/revocation UI cannot expose external-agent records |
 
 Amend RM-11 exact owners and `specs/27-everything-via-nikcli.md`, `specs/26-tool-consolidation.md`, `specs/08-ai.md`, `specs/05-api-sidecar.md`, `specs/09-plugins.md`, `specs/13-vcs-actions-mobile.md` before incompatible contracts change. Shared package manifests/lockfile are integrating-owner only; no new dependency is authorized by this publication. New token persistence requiring schema changes must first obtain WP0 `packages/db/src/` and `packages/db/drizzle/` ownership and generated migration contract; absent scope fields may not be improvised in unowned DB files. Companion allow-list widening is never an amendment implied by this spec.
 

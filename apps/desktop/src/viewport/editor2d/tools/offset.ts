@@ -16,7 +16,7 @@ import {
   type RectangleEntity,
   type Vec2
 } from "@cadcamfun/core"
-import { addEntities } from "../../../state/commands.ts"
+import { addEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolContext, type ToolFactory } from "./tool.ts"
 
 const MIN_OFFSET = 1e-3
@@ -177,7 +177,7 @@ export const offsetTool = (context: () => ToolContext): ToolFactory => {
       },
       onKey: (key) => (key === "Escape" ? withState(initial) : withState(state)),
       preview,
-      command: (): import("../../../state/commands.ts").Command | undefined => {
+      command: (): import("../../../shared/state/commands.ts").Command | undefined => {
         const entity = preview()[0]
         return entity === undefined ? undefined : addEntities([entity], "offset")
       }

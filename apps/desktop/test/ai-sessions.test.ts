@@ -3,7 +3,7 @@
  * The persisted store is seeded before the app boots, the way it looks after a restart.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { loadTranscripts } from "../src/ai/persisted.ts"
+import { loadTranscripts } from "../src/features/ai/store/persisted.ts"
 import { bootLiveApp } from "./helpers/live-app.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>

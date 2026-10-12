@@ -1175,7 +1175,7 @@ html.dark .ui-alert-error { color: rgb(252, 165, 165); }
 
 /* ========================================================================
    Refined primitives — tooltip, tabs, dropdown, accordion, slider, checkbox,
-   error fallback, theme toggle. (See apps/desktop/src/components/ui/*)
+   error fallback, theme toggle. (See apps/desktop/src/shared/ui/*)
    ======================================================================== */
 
 /* ---- Tooltip ---- */

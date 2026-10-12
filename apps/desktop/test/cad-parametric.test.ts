@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { formDefaults } from "../src/cad/lib/formDefaults.ts"
-import { getFieldsForElementType } from "../src/cad/lib/propertyFields.ts"
+import { formDefaults } from "../src/features/cad/lib/formDefaults.ts"
+import { getFieldsForElementType } from "../src/features/cad/lib/propertyFields.ts"
 
 test("the Parametric tool creates a plate with a feature history that builds a solid", () => {
   const element: Record<string, unknown> = { ...formDefaults("parametric"), type: "parametric" }
@@ -16,8 +16,8 @@ test("a parametric element's property fields are placement and look, not primiti
 })
 
 test("a Boolean consumes its operands only when it forms a solid", async () => {
-  const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
-  const { booleanFormed } = await import("../src/cad/lib/createThreeObject.ts")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  const { booleanFormed } = await import("../src/features/cad/lib/createThreeObject.ts")
   const store = useElementsStore.getState()
   const a = store.addElement({ type: "cube", x: 0, y: 0, z: 0, width: 20, height: 20, depth: 20 })
   const b = store.addElement({ type: "cylinder", x: 0, y: 0, z: 0, radius: 4, height: 40 })
@@ -28,7 +28,7 @@ test("a Boolean consumes its operands only when it forms a solid", async () => {
 })
 
 test("the canvas draws every element except those hidden by themselves or by an existing hidden layer", async () => {
-  const { isDrawn } = await import("../src/cad/lib/sceneHelpers.ts")
+  const { isDrawn } = await import("../src/features/cad/lib/sceneHelpers.ts")
   const layers = [{ id: "a", visible: true }, { id: "b", visible: false }]
   expect(isDrawn({ layerId: "a" }, layers)).toBe(true)
   expect(isDrawn({ layerId: "b" }, layers)).toBe(false)

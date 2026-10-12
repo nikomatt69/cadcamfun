@@ -181,7 +181,7 @@ Per the dependency lists and the source (`@cadcamfun/desktop` `package.json`,
 
 - `monaco-editor` removed from `apps/desktop/package.json` (zero references in
   source; estimated ~10 MB uninstalled plus its transitive `monaco-editor-*`
-  language packs). The stale `apps/desktop/src/styles/gcode-editor.css` file
+  language packs). The stale `apps/desktop/src/features/cam/styles/gcode-editor.css` file
   also stays untouched — removing it is not the responsibility of this pass.
 
 ### 4.3 Performance budget the new code must respect

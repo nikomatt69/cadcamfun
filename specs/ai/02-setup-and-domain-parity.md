@@ -25,7 +25,7 @@ Evidence is static; historical coverage figures and post results are not current
 - RM-02 WP2: `packages/core/src/cam/` and CAM fixtures in `packages/core/test/`.
 - RM-02 WP3: `packages/api/src/groups/`, explicit registration in `packages/api/src/index.ts`, and `packages/api/test/`.
 - RM-02 WP4: `apps/sidecar/src/http/`, `apps/sidecar/src/repos/`, explicit wiring in `apps/sidecar/src/layers.ts`, and `apps/sidecar/test/`.
-- RM-02 WP6: `apps/desktop/src/cam/` and `apps/desktop/test/` for setup bindings only.
+- RM-02 WP6: `apps/desktop/src/features/cam/` and `apps/desktop/test/` for setup bindings only.
 - RM-03 WP3/WP4: `packages/api/` and `apps/sidecar/` for parity, authoritative mutation execution and receipt delivery.
 - Required RM-03 WP0 amendment: `packages/db/src/schema.ts`, `packages/db/drizzle/`, `packages/db/src/` migration tests; WP0 owns revision/receipt storage and generated SQL.
 - Required WP8 amendment for new setup actions: `packages/ai/src/actions/`, `packages/ai/src/tools/`, `packages/ai/test/`, after RM-01.

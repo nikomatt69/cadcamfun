@@ -4,9 +4,9 @@
  */
 import { describe, expect, test } from "bun:test"
 import * as THREE from "three"
-import { clipPlaneFor, keeps, type SectionState } from "../src/cad/lib/section.ts"
-import { createSectionHelper } from "../src/cad/lib/sectionHelper.ts"
-import { createThreeObject } from "../src/cad/lib/createThreeObject.ts"
+import { clipPlaneFor, keeps, type SectionState } from "../src/features/cad/lib/section.ts"
+import { createSectionHelper } from "../src/features/cad/lib/sectionHelper.ts"
+import { createThreeObject } from "../src/features/cad/lib/createThreeObject.ts"
 import { normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
 
 const planeOf = (s: Pick<SectionState, "axis" | "position" | "inverted">) => {

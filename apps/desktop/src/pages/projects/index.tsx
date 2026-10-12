@@ -1,1 +1,1 @@
-export { ProjectsScreen as default } from "../../screens/projects.tsx"
+export { ProjectsScreen as default } from "../../features/projects/screens/projects.tsx"

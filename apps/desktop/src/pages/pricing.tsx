@@ -1,2 +1,2 @@
-import { PricingScreen } from "../screens/pricing-screen.tsx"
+import { PricingScreen } from "../features/billing/screens/pricing-screen.tsx"
 export default function Page() { return <PricingScreen /> }

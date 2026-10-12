@@ -13,8 +13,8 @@ import {
   translateEntities,
   updateEntity,
   updateLayer
-} from "../src/state/commands.ts"
-import { MAX_HISTORY, createHistory } from "../src/state/history.ts"
+} from "../src/shared/state/commands.ts"
+import { MAX_HISTORY, createHistory } from "../src/shared/state/history.ts"
 
 const doc = (): Drawing => emptyDrawing("d1", "Part")
 

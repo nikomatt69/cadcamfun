@@ -7,8 +7,8 @@ import { installDom } from "./helpers/dom.ts"
 test("the custom element editor mounts with its code tab and live preview", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
-  const { default: CustomElementsEditor } = await import("../src/cad/components/custom-elements/CustomElementsEditor.tsx")
-  const { useCustomElementsStore } = await import("../src/cad/store/customElementsStore.ts")
+  const { default: CustomElementsEditor } = await import("../src/features/cad/components/custom-elements/CustomElementsEditor.tsx")
+  const { useCustomElementsStore } = await import("../src/features/cad/store/customElementsStore.ts")
 
   const host = document.createElement("div")
   document.body.append(host)

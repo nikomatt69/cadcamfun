@@ -2,8 +2,8 @@ import { Effect, Layer, ManagedRuntime } from "effect"
 import { FetchHttpClient, HttpClientRequest } from "effect/unstable/http"
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { Api, Authorization } from "@cadcamfun/api"
-import { ApiClient, type AppRuntime, type Client } from "../state/client.ts"
-import { withSessionToken } from "../state/session.ts"
+import { ApiClient, type AppRuntime, type Client } from "../shared/state/client.ts"
+import { withSessionToken } from "../shared/state/session.ts"
 import type { Endpoint } from "./sidecar.ts"
 
 export { ApiClient }

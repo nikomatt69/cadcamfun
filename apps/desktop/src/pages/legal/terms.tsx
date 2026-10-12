@@ -1,2 +1,2 @@
-import { TermsScreen } from "../../screens/legal-screens.tsx"
+import { TermsScreen } from "../../features/legal/screens/legal-screens.tsx"
 export default function Page() { return <TermsScreen /> }

@@ -7,8 +7,8 @@
  * one place instead of four.
  */
 import { baseEntity, type Entity, type Vec2 } from "@cadcamfun/core"
-import type { Command } from "../../../state/commands.ts"
-import { addEntities } from "../../../state/commands.ts"
+import type { Command } from "../../../shared/state/commands.ts"
+import { addEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolFactory, type ToolId } from "./tool.ts"
 
 /** Minimum drag length before a tool commits, in mm. */

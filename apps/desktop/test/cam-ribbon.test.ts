@@ -10,7 +10,7 @@ import {
   RIBBON_ROUTES,
   RIBBON_TABS,
   type RibbonTabId
-} from "../src/cam/components/CamRibbon.data.ts"
+} from "../src/features/cam/components/CamRibbon.data.ts"
 
 const ALL_TABS: ReadonlyArray<RibbonTabId> = ["home", "setup", "machining", "simulation", "post", "tools"]
 

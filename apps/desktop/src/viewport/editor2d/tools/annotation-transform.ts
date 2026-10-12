@@ -1,5 +1,5 @@
 import { baseEntity, mirror, rotateEntity, scaleUniform, translate, type Entity, type Vec2 } from "@cadcamfun/core"
-import { addEntities, batch, updateEntity } from "../../../state/commands.ts"
+import { addEntities, batch, updateEntity } from "../../../shared/state/commands.ts"
 import type { Tool, ToolContext, ToolFactory } from "./tool.ts"
 
 export type GestureToolId = "text" | "dimension" | "move" | "rotate" | "scale" | "mirror"

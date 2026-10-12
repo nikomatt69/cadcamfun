@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { meshAttachment } from "../src/ai/mesh-attachment.ts"
+import { meshAttachment } from "../src/features/ai/lib/mesh-attachment.ts"
 import { normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
 test("real OBJ loader preserves vertex coordinates and valid triangles for the existing CAD renderer", async () => {
   const file = new File(["o panel\nv 10 20 30\nv 11 20 30\nv 10 21 30\nf 1 2 3\n"], "panel.obj")

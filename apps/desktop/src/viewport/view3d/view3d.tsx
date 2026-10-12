@@ -1,6 +1,6 @@
-import { FrameScheduler } from "../../cad/lib/frame-scheduler.ts"
+import { FrameScheduler } from "../../features/cad/lib/frame-scheduler.ts"
 import { MeshWorkerQueue } from "./mesh-jobs.ts"
-import { registerViewportCapture } from "../../ai/viewport-capture.ts"
+import { registerViewportCapture } from "../../features/ai/lib/viewport-capture.ts"
 import { Show, createEffect, createSignal, onCleanup, onMount, untrack } from "solid-js"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"

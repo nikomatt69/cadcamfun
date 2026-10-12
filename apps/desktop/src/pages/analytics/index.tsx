@@ -1,1 +1,1 @@
-export { AnalyticsScreen as default } from "../../screens/analytics.tsx"
+export { AnalyticsScreen as default } from "../../features/analytics/screens/analytics.tsx"

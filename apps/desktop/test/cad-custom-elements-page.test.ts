@@ -42,7 +42,7 @@ test("add to scene places the authored element on the canvas", async () => {
     addToScene?.click()
     await new Promise((resolve) => setTimeout(resolve, 300))
 
-    const { useElementsStore } = await import("../src/cad/store/elementsStore.ts")
+    const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
     const placed = useElementsStore.getState().elements.filter((element) => element.type === "custom")
     expect(placed.length, "a custom element was added to the drawing").toBeGreaterThan(0)
     expect(placed[0]?.name).toBe("New Custom Element")

@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { useGeneratorStore, withSettingsEffects } from "../src/cam/store/generatorStore.ts"
+import { useGeneratorStore, withSettingsEffects } from "../src/features/cam/store/generatorStore.ts"
 
 const g = cam.generator
 

@@ -1,1 +1,1 @@
-export { ProfileScreen as default } from "../../screens/profile.tsx"
+export { ProfileScreen as default } from "../../features/profile/screens/profile.tsx"

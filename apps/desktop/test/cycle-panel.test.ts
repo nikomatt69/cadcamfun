@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { panelCycles } from "../src/cam/lib/cyclePanel.ts"
+import { panelCycles } from "../src/features/cam/lib/cyclePanel.ts"
 
 describe("panelCycles", () => {
   test("lists the G81 lines of a program with their parameters", () => {

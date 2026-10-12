@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 import createOcct, { type OcctModule } from "occt-import-js"
-import { decodeCadFile } from "../src/ai/cad-file-decoder.ts"
+import { decodeCadFile } from "../src/features/ai/lib/cad-file-decoder.ts"
 import { normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
 const require = createRequire(import.meta.url)
 const root = dirname(dirname(require.resolve("occt-import-js")))

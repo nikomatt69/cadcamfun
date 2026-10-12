@@ -1,7 +1,7 @@
 import { Effect, Layer, Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import { ApiClient as Service, clientLayer } from "../app/client.ts"
-import type { Client } from "../state/client.ts"
+import type { Client } from "../shared/state/client.ts"
 
 export type ApiClient = Client
 type Row = Record<string, unknown> & { id: string; name: string }

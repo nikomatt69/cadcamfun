@@ -1,1 +1,1 @@
-export { CreateOrganizationScreen as default } from "../../screens/organizations.tsx"
+export { CreateOrganizationScreen as default } from "../../features/organizations/screens/organizations.tsx"

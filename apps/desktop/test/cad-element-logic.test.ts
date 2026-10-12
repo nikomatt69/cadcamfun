@@ -2,8 +2,8 @@ import { expect, test } from "bun:test"
 import * as THREE from "three"
 import { cam, plateTemplate } from "@cadcamfun/core"
 import { ELEMENT_SPECS, ELEMENT_TYPES, normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
-import { buildElementObject } from "../src/cad/lib/sceneHelpers.ts"
-import { useLayerStore } from "../src/cad/store/layerStore.ts"
+import { buildElementObject } from "../src/features/cad/lib/sceneHelpers.ts"
+import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
 
 /** Every type the assistant can create. The types that cannot be defaulted take the catalogue's own sample of the field they need. */
 const needs: Record<string, Record<string, unknown>> = {

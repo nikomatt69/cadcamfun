@@ -14,16 +14,16 @@ RM-04 implements receipt review UI; new precision geometric preview/measurement 
 ## Source evidence
 
 - [Approved plan](../../.nikcli/plans/1791820593388-shiny-garden.md), AI-03, calls for receipt reduction and honest review.
-- [Editor sync](../../apps/desktop/src/ai/editor-sync.ts) interprets tool-name suffixes and performs local persistent-looking undo.
-- [Drawing context](../../apps/desktop/src/ai/drawing-context.ts) pushes snapshots and has broad replacement fallback.
-- [Stream](../../apps/desktop/src/ai/stream.ts) and [store](../../apps/desktop/src/ai/store.ts) already recover via session/task polling.
-- [Persisted state](../../apps/desktop/src/ai/persisted.ts) and [document store](../../apps/desktop/src/cad/store/documentStore.ts) are existing implementations to deepen.
+- [Editor sync](../../apps/desktop/src/features/ai/lib/editor-sync.ts) interprets tool-name suffixes and performs local persistent-looking undo.
+- [Drawing context](../../apps/desktop/src/features/ai/lib/drawing-context.ts) pushes snapshots and has broad replacement fallback.
+- [Stream](../../apps/desktop/src/features/ai/lib/stream.ts) and [store](../../apps/desktop/src/features/ai/store/store.ts) already recover via session/task polling.
+- [Persisted state](../../apps/desktop/src/features/ai/store/persisted.ts) and [document store](../../apps/desktop/src/features/cad/store/documentStore.ts) are existing implementations to deepen.
 Static inspection identifies risks; native responsiveness and regression success still need implementation evidence.
 
 ## Owners and contract-first amendments
 
-- WP6: `apps/desktop/src/ai/`, `apps/desktop/src/cad/store/`, `apps/desktop/src/cad/lib/`, `apps/desktop/src/cam/store/`, `apps/desktop/src/cam/lib/`, `apps/desktop/test/`.
-- Existing RM-04 screen scope remains `apps/desktop/src/app/` and `apps/desktop/src/screens/` when the touched vertical requires it.
+- WP6: `apps/desktop/src/features/ai/`, `apps/desktop/src/features/cad/store/`, `apps/desktop/src/features/cad/lib/`, `apps/desktop/src/features/cam/store/`, `apps/desktop/src/features/cam/lib/`, `apps/desktop/test/`.
+- Existing RM-04 screen scope remains `apps/desktop/src/app/` and `apps/desktop/src/features/*/screens/` when the touched vertical requires it.
 - WP7 `apps/desktop/src/viewport/` is excluded unless RM-04 explicitly assigns a needed overlay integration first.
 - WP3/WP4 receipt schema and execution remain RM-03-owned `packages/api/` and `apps/sidecar/`; WP0 persistence stays `packages/db/` under AI-02's amendment.
 Amend RM-04 deliverables and affected UI contracts before adding review behaviour; missing backend contracts return to RM-03 owners first.

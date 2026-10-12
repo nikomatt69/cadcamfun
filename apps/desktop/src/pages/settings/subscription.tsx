@@ -1,1 +1,1 @@
-export { SubscriptionScreen as default } from "../../screens/subscription.tsx"
+export { SubscriptionScreen as default } from "../../features/billing/screens/subscription.tsx"

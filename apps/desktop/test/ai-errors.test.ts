@@ -1,12 +1,12 @@
 /**
- * Tests for `sanitizeError` (apps/desktop/src/ai/errors.ts).
+ * Tests for `sanitizeError` (apps/desktop/src/features/ai/lib/errors.ts).
  *
  * Locks the security contract: provider error text must not leak auth
  * header names, request ids, URLs, or raw JSON envelopes into the UI
  * transcript. Every test below should fail if any of those leak through.
  */
 import { describe, expect, test } from "bun:test"
-import { sanitizeError } from "../src/ai/errors.ts"
+import { sanitizeError } from "../src/features/ai/lib/errors.ts"
 
 const FORBIDDEN = [
   "X-Api-Key",

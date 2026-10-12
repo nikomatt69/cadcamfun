@@ -90,7 +90,7 @@ The desktop calls `settle_session` when the user starts a new conversation or cl
 | `packages/ai/src/project-context.ts`, `nikcli/project-files.ts`, `tools/project_context.ts` + prompt, `prompts/system.ts`, `nikcli/agents.ts`, `skills/index.ts`, `service.ts` lifecycle | WP8 |
 | `packages/api/src/groups/ai.ts` schemas and endpoints, generated clients | WP3 |
 | `apps/sidecar/src/http/ai.ts` (`contextFor`, new handlers), `src/services/ai.ts` (`ToolHandlersShape.projectContext`) | WP4 |
-| `apps/desktop/src/ai/*` (store, `ProjectContextPanel.tsx`, `AssistantControls`), i18n | WP6 |
+| `apps/desktop/src/features/ai/*` (store, `ProjectContextPanel.tsx`, `AssistantControls`), i18n | WP6 |
 
 ## 4. Non-goals
 

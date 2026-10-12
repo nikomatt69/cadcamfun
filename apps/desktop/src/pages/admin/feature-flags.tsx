@@ -5,7 +5,7 @@
  * it goes straight to the heading plus the panel (which applies its own admin gate).
  */
 import type { JSX } from "solid-js"
-import { AdminFeatureFlagsPanel } from "../../components/admin/feature-flags-panel.tsx"
+import { AdminFeatureFlagsPanel } from "../../features/admin/components/feature-flags-panel.tsx"
 import { t } from "../../i18n/index.ts"
 
 export default function Page(): JSX.Element {

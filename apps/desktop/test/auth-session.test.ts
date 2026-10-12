@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { bootLiveApp } from "./helpers/live-app.ts"
-import { endSession, getSessionToken } from "../src/state/session.ts"
+import { endSession, getSessionToken } from "../src/shared/state/session.ts"
 
 let app: Awaited<ReturnType<typeof bootLiveApp>>
 beforeAll(async () => { app = await bootLiveApp() }, 60000)

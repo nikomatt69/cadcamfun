@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { FrameScheduler } from "../src/cad/lib/frame-scheduler.ts"
+import { FrameScheduler } from "../src/features/cad/lib/frame-scheduler.ts"
 
 const harness = (draw: () => boolean) => {
   let id = 0

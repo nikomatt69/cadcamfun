@@ -11,25 +11,25 @@
 
 ## Reading the legacy code
 
-`.reference/` is read-only, git-ignored, never imported. Sources: `src/components/**`, `src/pages/**`, `src/store/**` (zustand), `src/hooks/**`, `src/contexts/**`, `src/lib/**`, `src/plugins/**`, `public/locales`.
+`.reference/` is read-only, git-ignored, never imported. Sources: `shared/components/**`, `src/pages/**`, `src/store/**` (zustand), `src/hooks/**`, `src/contexts/**`, `src/lib/**`, `src/plugins/**`, `public/locales`.
 
 ## React → Solid mapping
 
 | Legacy | New |
 | --- | --- |
 | React components/hooks | Solid components; `useState` → `createSignal`; `useEffect` → `createEffect`/`onMount`/`onCleanup`; `useMemo` → `createMemo`; `useRef` → `let ref`; never destructure props |
-| zustand stores (`src/store/*`) | Solid stores/signals under `src/state/<name>.ts` with the **same action names and state shape** |
+| zustand stores (`src/store/*`) | Solid stores/signals under `shared/state/<name>.ts` with the **same action names and state shape** |
 | `lucide-react`, `react-feather` | `lucide-solid` |
 | `framer-motion` | `solid-motionone` (or CSS transitions when equivalent) |
 | `@headlessui/react`, `@radix-ui/*`, `@nextui-org`, `@chakra-ui` | `@kobalte/core` or hand-written equivalents that render the same DOM/classes |
-| `react-hot-toast` | `src/components/ui/toast.tsx` (same look) |
+| `react-hot-toast` | `shared/ui/toast.tsx` (same look) |
 | `react-hook-form`, `zod` | signals + Effect `Schema` (core/api schemas first) |
 | `@react-three/fiber`, `drei` | plain `three` (0.180) in Solid components, as `src/viewport/view3d` does |
 | `recharts`, `chart.js` | `chart.js` directly on a `<canvas>` |
 | `@monaco-editor/react` | `monaco-editor` directly |
 | `react-markdown` | `marked` + sanitised HTML |
 | `next/router`, `next/link`, `next/image`, `next/head` | `@solidjs/router` (`useNavigate`, `A`, `useParams`, `useSearchParams`), `<img>`, `document.title` |
-| `fetch('/api/...')`, SWR, hooks in `src/hooks/use*.ts` | `useApp().client` + `app.runtime.run(...)` / `useRead` / `useQuery` / `useMutation` (see `src/app/queries.ts`, `src/state/queries.ts`); responses are decoded by the contract Schemas |
+| `fetch('/api/...')`, SWR, hooks in `src/hooks/use*.ts` | `useApp().client` + `app.runtime.run(...)` / `useRead` / `useQuery` / `useMutation` (see `src/app/queries.ts`, `shared/state/queries.ts`); responses are decoded by the contract Schemas |
 | `next-i18next` / `public/locales` | `t()` from `src/i18n` with typed keys. Add keys **only to your vertical's table** (`en.<vertical>.json`). Keep the legacy wording verbatim |
 | `next-auth`/Better Auth session | the single local profile (`CurrentUser`); `signin`/`signup` pages keep their UI and drive the legacy auth routes |
 | WASM modules in `hooks/wasm`, `lib/wasm` | keep behaviour with the pure TS in `packages/core` where it exists, otherwise a plain TS port |
@@ -49,7 +49,7 @@ Each vertical owns the **frontend and the backend** for its pages so nothing wai
 | 1 | UI kit, shell, static pages, auth, settings, profile, notifications, subscription | `components/ui`, `components/layout`, `components/auth`, `components/settings`, `components/notifications`, `components/subscription`, `app/Shell.tsx`, `components/{title-bar,status-bar,command-palette,boot-screen}.tsx`; pages `index`, `pricing`, `legal/*`, `third-party-licenses`, `404`, `500`, `offline`, `auth/*`, `settings/index`, `settings/subscription`, `profile/*` | auth leftovers (`get-session`, `signin-direct`, `signup`, `test-direct-create`, `verify-magic-link`, two-factor), `user/*`, `users/*`, `subscription(s)/*`, `webhooks/*`, `cron/*`, `push-subscription`, `desktop/*`, `app-control/*`, `download`, misc root routes | `en.shell.json` |
 | 2 | Library, materials, tools, machines, components, marketplace | `components/{library,materials,tools,components,marketplace}`, pages `library`, `materials/*`, `tools/*`, `machine/*`, `components/*`, `marketplace/*` | library/material/tool/machine leftovers, `components/:id/{versions,comments,relationships}`, `marketplace/*`, `og*` routes | `en.library.json` |
 | 3 | Organizations, chat, invitations, admin, analytics, plugins | `components/{organizations,chat,admin,analytics,plugins}`, pages `organizations/*`, `invitations/*`, `admin/*`, `analytics/*`, `plugins/*` | `conversation*`, `invitations/*`, `admin/*`, remaining `analytics/*`, organizations leftovers, `ml/*` | `en.org.json` |
-| 4 | CAD (2D + 3D) | `components/cad`, `src/viewport/**`, `src/state/{commands,history,editor,context}.ts` and the legacy `cadStore`/`assemblyStore`/canvas hooks, pages `cad`, `drawings/*`, `projects/*`, `screens/{cad,projects}.tsx` | drawings/projects/components leftovers | `en.cad.json` |
+| 4 | CAD (2D + 3D) | `components/cad`, `src/viewport/**`, `shared/state/{commands,history,editor,context}.ts` and the legacy `cadStore`/`assemblyStore`/canvas hooks, pages `cad`, `drawings/*`, `projects/*`, `screens/{cad,projects}.tsx` | drawings/projects/components leftovers | `en.cad.json` |
 | 5 | CAM, simulation, production costs | `components/{cam,simulation,production-costs}`, `screens/{cam}.tsx`, `screens/costs.tsx`, pages `cam`, `toolpaths/*`, `costs` | toolpaths/production-costs leftovers (G-code generate/post/simulate via `packages/core`) | `en.cam.json` |
 | 6 | AI, MCP | `components/ai`, root-level `AIChatWithMCP`, `MCP*`, `CADModelAnalyzer`, `DocumentAnalyzer` etc., `components/ai-panel.tsx`, pages `ai/*`, `mcp/*`, `settings/mcp/*` | `ai/*`, `mcp*`, `openai/*`, `websocket`, `mcp-agent` routes on top of `packages/ai` (nikcli), SSE wire format as legacy | `en.ai.json` |
 

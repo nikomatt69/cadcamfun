@@ -1,1 +1,1 @@
-export { MagicLinkScreen as default } from "../../screens/auth.tsx"
+export { MagicLinkScreen as default } from "../../features/auth/screens/auth.tsx"

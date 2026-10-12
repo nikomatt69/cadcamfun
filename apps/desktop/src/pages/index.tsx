@@ -6,7 +6,7 @@
  * counters the metric cards and the system card show.
  */
 import type { JSX } from "solid-js"
-import { DashboardScreen, type DashboardData } from "../screens/dashboard.tsx"
+import { DashboardScreen, type DashboardData } from "../features/dashboard/screens/dashboard.tsx"
 import { useRead } from "../app/queries.ts"
 
 const EMPTY: DashboardData = {

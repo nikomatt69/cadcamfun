@@ -7,8 +7,8 @@
  * committed.
  */
 import { baseEntity, type Entity, type Vec2 } from "@cadcamfun/core"
-import type { Command } from "../../../state/commands.ts"
-import { addEntities } from "../../../state/commands.ts"
+import type { Command } from "../../../shared/state/commands.ts"
+import { addEntities } from "../../../shared/state/commands.ts"
 import { type PointerEvent, type Tool, type ToolFactory } from "./tool.ts"
 
 interface PolylineState {

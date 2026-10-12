@@ -107,7 +107,7 @@ The saving comes from stating the shared conventions once per tool instead of on
 | --- | --- |
 | `packages/ai/src/tools/action.ts`, the 12 consolidated tools and prompts, `registry.ts`, `project-tools.ts`, `nikcli/agents.ts`, `nikcli/background-tools.ts`, `prompts/system.ts`, `prompts/modes/*`, `skills/index.ts` | WP8 |
 | `apps/sidecar/src/services/ai.ts` (`libraryToolSpecs`, `partsToolSpecs`, `libraryWriteToolSpecs`), `ai-vcs-tools.ts` (`vcsToolSpecs` → `vcs`, `vcs_edit`) | WP4 |
-| `apps/desktop/src/ai/{tools,tool-schemas,tool-facts,cam-sync,editor-sync,store,timeline,ask}.ts` and the chat transcript rows | WP6 |
+| `apps/desktop/src/features/ai/{tools,tool-schemas,tool-facts,cam-sync,editor-sync,store,timeline,ask}.ts` and the chat transcript rows | WP6 |
 
 ## 5. Non-goals
 

@@ -1,1 +1,1 @@
-export { ProjectDetailScreen as default } from "../../screens/project-detail.tsx"
+export { ProjectDetailScreen as default } from "../../features/projects/screens/project-detail.tsx"

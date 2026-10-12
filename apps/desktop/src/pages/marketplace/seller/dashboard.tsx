@@ -1,2 +1,2 @@
-import { MarketplaceScreen } from "../../../screens/marketplace.tsx"
+import { MarketplaceScreen } from "../../../features/marketplace/screens/marketplace.tsx"
 export default function Page() { return <MarketplaceScreen view="seller" /> }

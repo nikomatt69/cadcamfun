@@ -15,7 +15,7 @@ RM-06 specifies dimension intent; new geometric acceptance/precision preview imp
 
 - [Approved plan](../../.nikcli/plans/1791820593388-shiny-garden.md), AI-05, calls for typed intent and isolated notes.
 - [Workspace renderer](../../packages/ai/src/workspace-context.ts) already budgets sections at 6,000 characters and labels omitted data.
-- [Project context](../../packages/ai/src/project-context.ts) and [drawing snapshot](../../apps/desktop/src/ai/drawing-context.ts) are existing implementations to deepen.
+- [Project context](../../packages/ai/src/project-context.ts) and [drawing snapshot](../../apps/desktop/src/features/ai/lib/drawing-context.ts) are existing implementations to deepen.
 - [Sidecar context assembly](../../apps/sidecar/src/http/ai.ts) and [memory handlers](../../apps/sidecar/src/services/ai.ts) expose generic memory scope risks.
 - [Parametric module](../../packages/ai/src/parametric.ts) and [element catalogue](../../packages/ai/src/element-catalog.ts) already provide supported modelling facts and limits.
 Static risks are not reproduced leaks; dimension correctness and scope isolation require regression fixtures.
@@ -24,7 +24,7 @@ Static risks are not reproduced leaks; dimension correctness and scope isolation
 
 - WP8: `packages/ai/src/workspace-context.ts`, `packages/ai/src/project-context.ts`, `packages/ai/src/parametric.ts`, `packages/ai/src/element-catalog.ts`, `packages/ai/src/skills/`, `packages/ai/test/`.
 - WP8 typed memory implementation: `packages/ai/src/project-memory.ts`, `packages/ai/src/actions/` and `packages/ai/src/tools/` only for scoped remember/recall actions.
-- WP6: `apps/desktop/src/ai/drawing-context.ts`, `apps/desktop/src/ai/store.ts`, `apps/desktop/test/` for snapshot and context-off consumers.
+- WP6: `apps/desktop/src/features/ai/lib/drawing-context.ts`, `apps/desktop/src/features/ai/store/store.ts`, `apps/desktop/test/` for snapshot and context-off consumers.
 - WP11: `packages/vcs/`, `apps/sidecar/src/services/project-vcs.ts` and `apps/sidecar/src/services/ai-vcs-tools.ts` for authorized recent-history facts only.
 - Required WP3 amendment: `packages/api/src/` and `packages/api/test/` for versioned intent/snapshot/memory wire schemas.
 - Required WP4 amendment: `apps/sidecar/src/http/ai.ts`, `apps/sidecar/src/services/ai.ts`, `apps/sidecar/src/repos/`, `apps/sidecar/test/` for scope authorization and authoritative assembly.

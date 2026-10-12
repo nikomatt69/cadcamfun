@@ -26,7 +26,7 @@ Static documentation/source evidence is not proof of completed versioning, permi
 - WP3: `packages/api/src/groups/`, `packages/api/src/` shared library schemas, explicit `packages/api/src/index.ts` registration, `packages/api/test/`.
 - WP4: `apps/sidecar/src/repos/`, `apps/sidecar/src/http/`, `apps/sidecar/src/services/`, `apps/sidecar/test/` for library execution/evidence only.
 - WP8: `packages/ai/src/actions/`, `packages/ai/src/tools/`, `packages/ai/src/nikcli/`, `packages/ai/test/` for catalogue exposure.
-- WP6: `apps/desktop/src/screens/`, `apps/desktop/src/app/`, `apps/desktop/test/` only for library CRUD and evidence display.
+- WP6: `apps/desktop/src/features/*/screens/`, `apps/desktop/src/app/`, `apps/desktop/test/` only for library CRUD and evidence display.
 - WP11 VCS integration remains `packages/vcs/` and sidecar VCS implementation; add it to RM-05 explicitly if snapshot contracts must change.
 Amend controlling RM-05 and affected library/DB/shared contracts before cross-WP edits, including any holder evidence persistence.
 WP2 `packages/core/src/cam/` is not implicitly owned; request contract-first amendment if deterministic constraints need core changes.

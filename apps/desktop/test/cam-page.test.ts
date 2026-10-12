@@ -158,7 +158,7 @@ describe("CAM page", () => {
     localStorage.setItem("toolToLoadInCAM", JSON.stringify({ id: "t-1", name: "Flat 8", type: "endmill", diameter: 8, numberOfFlutes: 3, maxRPM: 9000 }))
     const second = app.visit("/cam?loadTool=t-1")
     try {
-      const { useGeneratorStore } = await import("../src/cam/store/generatorStore.ts")
+      const { useGeneratorStore } = await import("../src/features/cam/store/generatorStore.ts")
       await app.wait(() => useGeneratorStore.getState().selectedLibraryTool?.name === "Flat 8", 30000)
       expect(useGeneratorStore.getState().settings.toolDiameter).toBe(8)
       await app.wait(() => localStorage.getItem("toolToLoadInCAM") === null)

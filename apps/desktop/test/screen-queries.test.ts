@@ -6,8 +6,8 @@
  * through this helper).
  */
 import { describe, expect, test } from "bun:test"
-import { fakeRuntime } from "../src/state/client.ts"
-import { createQueryCache } from "../src/state/query-cache.ts"
+import { fakeRuntime } from "../src/shared/state/client.ts"
+import { createQueryCache } from "../src/shared/state/query-cache.ts"
 import { useMutation, useQuery } from "../src/app/screen-queries.ts"
 
 /** Polls until `done` resolves or the deadline passes; the reads settle over the in-memory transport. */

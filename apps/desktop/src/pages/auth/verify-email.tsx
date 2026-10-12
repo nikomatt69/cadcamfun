@@ -1,1 +1,1 @@
-export { VerifyEmailScreen as default } from "../../screens/auth.tsx"
+export { VerifyEmailScreen as default } from "../../features/auth/screens/auth.tsx"

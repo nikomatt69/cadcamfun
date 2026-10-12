@@ -128,7 +128,7 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 - No shell/file tools for the agent: `bash`, `edit`, `write`, `read`, `glob`, `grep` stay out of the allow-list (spec 16 §2.5, acceptance §8.1 of spec 16).
 - No fork of nikcli, no unpinning of `effect@4.0.0-rc.112` (AGENTS.md, spec 08 §6.3).
 - No change to the AI SDK v7 direct path (`packages/ai/src/direct-model.ts`) — it remains the stateless/one-shot fallback.
-- No new dispatch system for the UI: the desktop command pattern (`apps/desktop/src/state/commands.ts`) is the editor's, not the agent's.
+- No new dispatch system for the UI: the desktop command pattern (`apps/desktop/src/shared/state/commands.ts`) is the editor's, not the agent's.
 
 ## 9. Phases and ownership
 

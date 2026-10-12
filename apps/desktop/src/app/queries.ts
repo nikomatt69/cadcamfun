@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js"
-import { useApp } from "../state/context.ts"
-import type { Client } from "../state/client.ts"
+import { useApp } from "../shared/state/context.ts"
+import type { Client } from "../shared/state/client.ts"
 import type { Effect } from "effect"
 
 export function useRead<A>(read: (client: Client) => Effect.Effect<A, unknown>) {

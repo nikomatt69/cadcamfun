@@ -25,7 +25,7 @@ These are static observations, not reproduced exploits or claims that tests pass
 - Existing WP4 scope: `apps/sidecar/src/services/ai.ts` only, as RM-01's handler adapter.
 - Required WP4 amendment: `apps/sidecar/src/services/acting-user.ts`, `apps/sidecar/src/http/ai.ts`, `apps/sidecar/src/services/ai-vcs-tools.ts`, `apps/sidecar/test/` for immutable admission and adapter safety.
 - Required WP3 amendment: `packages/api/src/` and `packages/api/test/` for shared wire contracts; dependency wiring is separately explicit.
-- Required WP6 amendment: `apps/desktop/src/ai/` and `apps/desktop/test/` only for tool-ID decoding compatibility, not receipt UI implementation.
+- Required WP6 amendment: `apps/desktop/src/features/ai/` and `apps/desktop/test/` only for tool-ID decoding compatibility, not receipt UI implementation.
 Before cross-WP implementation, amend RM-01 owner/deliverable lists and the affected WP contracts first.
 These proposed scopes are not permission to edit unlisted directories or manifests; publication owns only this file.
 

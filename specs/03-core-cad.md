@@ -78,7 +78,7 @@ Rendering, hit-testing in screen space, command history/undo (UI state, WP6/WP7)
 
 `packages/core/src/index.ts` exports the CAD API **flat** (`export * from "./cad/index.ts"`) and as a namespace (`export * as cad`); the CAM layer (WP2) is exported only as `export * as cam from "./cam/index.ts"` because both layers define generic names (`Move`, `Path`, ...). Add further layers the same way.
 
-### 7.2 Public exports of `src/cad/index.ts` (by file)
+### 7.2 Public exports of `features/cad/index.ts` (by file)
 
 | File | Exports |
 | --- | --- |

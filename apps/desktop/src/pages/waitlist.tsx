@@ -1,1 +1,1 @@
-export { WaitlistScreen as default } from "../screens/waitlist.tsx"
+export { WaitlistScreen as default } from "../features/auth/screens/waitlist.tsx"

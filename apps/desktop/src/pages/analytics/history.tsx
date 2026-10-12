@@ -1,1 +1,1 @@
-export { AnalyticsHistoryScreen as default } from "../../screens/analytics-history.tsx"
+export { AnalyticsHistoryScreen as default } from "../../features/analytics/screens/analytics-history.tsx"

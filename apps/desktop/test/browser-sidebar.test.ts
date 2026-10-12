@@ -15,10 +15,10 @@ const find = <T extends Element = HTMLElement>(selector: string): Promise<T> => 
 const click = async (el: Element | null | undefined): Promise<void> => { (el as HTMLElement).click(); await settle() }
 const byLabel = (label: string): HTMLElement => document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!
 const stores = async () => ({
-  elements: (await import("../src/cad/store/elementsStore.ts")).useElementsStore,
-  layers: (await import("../src/cad/store/layerStore.ts")).useLayerStore,
-  selection: (await import("../src/cad/store/selectorStore.ts")).useSelectionStore,
-  cad: (await import("../src/cad/store/cadStore.ts")).useCADStore
+  elements: (await import("../src/features/cad/store/elementsStore.ts")).useElementsStore,
+  layers: (await import("../src/features/cad/store/layerStore.ts")).useLayerStore,
+  selection: (await import("../src/features/cad/store/selectorStore.ts")).useSelectionStore,
+  cad: (await import("../src/features/cad/store/cadStore.ts")).useCADStore
 })
 const names = (): string[] => [...document.querySelectorAll("[data-testid^='browser-section-'] [title='Double-click to rename']")].map((el) => el.textContent ?? "")
 

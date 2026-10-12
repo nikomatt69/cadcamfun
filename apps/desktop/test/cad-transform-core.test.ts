@@ -2,10 +2,10 @@ import { expect, test } from "bun:test"
 import * as THREE from "three"
 import { plateTemplate, cad, cam } from "@cadcamfun/core"
 import { ELEMENT_TYPES, normalizeElement } from "../../../packages/ai/src/element-catalog.ts"
-import { buildElementObject, commitDrag, type DragStart } from "../src/cad/lib/sceneHelpers.ts"
-import { useElementsStore } from "../src/cad/store/elementsStore.ts"
+import { buildElementObject, commitDrag, type DragStart } from "../src/features/cad/lib/sceneHelpers.ts"
+import { useElementsStore } from "../src/features/cad/store/elementsStore.ts"
 import { UNRELIABLE_PIVOT } from "../../sidecar/src/services/ai-transform.ts"
-import { useLayerStore } from "../src/cad/store/layerStore.ts"
+import { useLayerStore } from "../src/features/cad/store/layerStore.ts"
 
 const needs: Record<string, Record<string, unknown>> = {
   component: { elements: [{ type: "cube" }, { type: "cylinder", x: 30 }] }, group: { elements: [{ type: "sphere" }] }, parametric: { history: plateTemplate() }

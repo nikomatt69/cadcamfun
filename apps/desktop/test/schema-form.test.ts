@@ -15,7 +15,7 @@ import {
   describeSchema,
   validateForm,
   type FormDescription
-} from "../src/components/schema-form.ts"
+} from "../src/shared/components/schema-form.ts"
 
 const fieldOf = (description: FormDescription, key: string) => {
   const field = description.fields.find((f) => f.key === key)

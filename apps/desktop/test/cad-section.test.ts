@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { resetStores } from "./helpers/reset-stores.ts"
-import { DEFAULT_SECTION, clipPlaneFor, keeps, mergeSection } from "../src/cad/lib/section.ts"
-import { mirrorToolResult, opsFor } from "../src/ai/editor-sync.ts"
-import { useCADStore } from "../src/cad/store/cadStore.ts"
+import { DEFAULT_SECTION, clipPlaneFor, keeps, mergeSection } from "../src/features/cad/lib/section.ts"
+import { mirrorToolResult, opsFor } from "../src/features/ai/lib/editor-sync.ts"
+import { useCADStore } from "../src/features/cad/store/cadStore.ts"
 
 afterEach(() => resetStores())
 
