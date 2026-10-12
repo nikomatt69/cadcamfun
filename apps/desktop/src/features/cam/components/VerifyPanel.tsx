@@ -100,7 +100,7 @@ export default function VerifyPanel(): JSX.Element {
 
       <button
         type="button"
-        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={verify.running || cam.gcode.trim().length === 0}
         onClick={() => void run()}
       >
@@ -131,7 +131,7 @@ export default function VerifyPanel(): JSX.Element {
                 <Sparkles size={16} />{t("cam.verify.askAssistant")}
               </button>
             </Show>
-            <Show when={stale()}><p class="text-xs text-yellow-700" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
+            <Show when={stale()}><p class="text-xs text-yellow-700 dark:text-yellow-300" data-testid="verify-stale">{t("cam.verify.stale")}</p></Show>
 
             <ul class="space-y-1" data-testid="verify-issues">
               <For each={sortedIssues(report().issues)}>
@@ -155,7 +155,7 @@ export default function VerifyPanel(): JSX.Element {
 
             <div>
               <p class="text-xs text-gray-500 mb-1">{t("cam.verify.map")}</p>
-              <canvas ref={canvas} class="w-full border border-gray-300 rounded" style={{ "image-rendering": "pixelated" }} data-testid="verify-map" />
+              <canvas ref={canvas} role="img" aria-label={t("cam.verify.map")} class="w-full border border-gray-300 rounded" style={{ "image-rendering": "pixelated" }} data-testid="verify-map" />
             </div>
             <p class="text-xs text-gray-500">{t("cam.verify.caveat")}</p>
           </div>

@@ -82,6 +82,8 @@ export interface ChatInput {
   readonly permissionMode?: PermissionMode
   readonly agent?: string
   readonly mode?: string
+  /** Trusted application admission hook, invoked before the host can execute tools. */
+  readonly admitSession?: (projectId: string, sessionId: string) => boolean
 }
 
 export interface ModelEntry extends ModelInfo {
@@ -304,6 +306,9 @@ export class AiService extends Context.Service<AiService, {
               }
               const projectHost = yield* host.value.runtime.host(projectId)
               const target = yield* ensureSession(projectHost, input.sessionId)
+              if (input.admitSession && !input.admitSession(projectId, target.sessionId)) {
+                return yield* new AiConfigError({ message: "This conversation belongs to a different authenticated actor." })
+              }
               const agent = input.agent === undefined || input.agent === CADCAM_AGENT ? CADCAM_AGENT : isSubagentId(input.agent) ? SUBAGENTS[input.agent].host : undefined
               if (agent === undefined) return yield* new AiConfigError({ message: `Unknown assistant agent: ${input.agent}` })
               const variant = input.model?.variant

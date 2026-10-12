@@ -93,24 +93,33 @@ const toolHandlers = Effect.gen(function*() {
   const acting = () => actingCell.get(local)
 
   /**
-   * The drawing the assistant works on. `projectId` is what the UI last opened (or "default"); when it names no
-   * project, or a project without a drawing, the assistant gets one instead of an error: the user's newest
-   * project (a new "Untitled project" if there is none) and its newest drawing (a new empty "Drawing 1").
+   * Reads never provision a workspace. Only an authorized write may create the default project or drawing.
    */
-  const load = async (projectId: string): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean }> => {
-    let project: { id: string } | undefined = (await Effect.runPromise(projects.find(acting().id, projectId)))?.project
+  const assertWrite = async (projectId: string) => {
+    actingCell.assertActive()
+    const actor = acting()
+    const access = await Effect.runPromise(projects.find(actor.id, projectId))
+    if (!access || (access.project.ownerId !== actor.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) throw new Error("You do not have permission to write this project.")
+    actingCell.assertActive()
+  }
+  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean }> => {
+    const actor = acting()
+    let project: { id: string } | undefined = (await Effect.runPromise(projects.find(actor.id, projectId)))?.project
     let created = false
     if (!project) {
       if (projectId !== "default") throw new Error("Project not found or not accessible; no other workspace was modified.")
       const own = (await Effect.runPromise(projects.list(acting().id))).find((candidate) => candidate.ownerId === acting().id)
-      project = own ?? await Effect.runPromise(projects.create(acting().id, { name: "Untitled project" }))
+      if (!own && !write) throw new Error("Open a project before inspecting the workspace.")
+      project = own ?? await Effect.runPromise(projects.create(actor.id, { name: "Untitled project" }))
       created = own === undefined
     }
+    if (write) await assertWrite(project.id)
     const rows = await Effect.runPromise(drawings.listByProject(project.id))
     const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
     // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project.
     let row = (snapshot?.projectId === project.id && typeof snapshot.drawingId === "string" ? rows.find((drawing) => drawing.id === snapshot.drawingId) : undefined) ?? rows[0]
     if (!row) {
+      if (!write) throw new Error("The project has no drawing. Create a drawing before inspection.")
       row = await Effect.runPromise(drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } }))
       created = true
     }
@@ -118,6 +127,9 @@ const toolHandlers = Effect.gen(function*() {
     return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created }
   }
   const save = async (id: string, data: Record<string, unknown>, elements: ReadonlyArray<Element>) => {
+    const drawing = await Effect.runPromise(drawings.find(acting().id, id))
+    if (!drawing) throw new Error("Drawing no longer exists.")
+    await assertWrite(drawing.project.id)
     await Effect.runPromise(drawings.update(id, { data: { ...data, elements, version: "1.0" } }))
   }
   /** What the UI needs to mirror a change in the open editor: where it went and the resulting elements. */
@@ -148,7 +160,7 @@ const toolHandlers = Effect.gen(function*() {
   const handlers: ToolHandlersShape = {
     stock: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, input.action === "set")
       /** The raw piece as the CAD scene draws it, when the drawing holds one. */
       const workpieceOf = (elements: ReadonlyArray<Element>, id?: string) => {
         const own = elements.filter((e) => e["type"] === "workpiece")
@@ -309,7 +321,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), report: changed.report, ...where(loaded) }
     },
     addEntities: async (projectId, entities) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const created = newElements(entities as Array<Record<string, unknown> & { type: string }>, "default", () => crypto.randomUUID())
       await save(loaded.id, loaded.data, [...loaded.elements, ...created])
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
@@ -321,7 +333,7 @@ const toolHandlers = Effect.gen(function*() {
       const problems = checked.flatMap((result, index) => (result.ok ? [] : [`elements[${index}]: ${result.error}`]))
       if (problems.length > 0) return { ok: false, error: "Nothing was added.", problems }
       raw = checked.flatMap((result) => (result.ok ? [result.element] : []))
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const settings = loaded.data["settings"] as { tolerance?: unknown } | undefined
       const drawingTolerance = typeof settings?.tolerance === "number" ? settings.tolerance : 0
       const created: Element[] = raw.map((input) => withDefaultTolerance(input, drawingTolerance).element).map((fields) => ({ ...fields, id: crypto.randomUUID(), layerId: typeof fields["layer"] === "string" ? fields["layer"] : typeof fields["layerId"] === "string" ? fields["layerId"] : "default" }) as Element)
@@ -339,7 +351,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
     modifyEntities: async (projectId, changes) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const missing = changes.filter((c) => !loaded.elements.some((e) => e.id === c.id)).map((c) => c.id)
       if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}. Use cad_describe_drawing to list the ids.`, ...where(loaded) }
       const updated: Element[] = []
@@ -362,13 +374,13 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, modified: updated.length, elements: updated, ...where(loaded) }
     },
     deleteEntities: async (projectId, ids) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const elements = loaded.elements.filter((e) => !ids.includes(e.id))
       await save(loaded.id, loaded.data, elements)
       return { ok: true, deleted: loaded.elements.length - elements.length, ids: loaded.elements.filter((e) => ids.includes(e.id)).map((e) => e.id), ...where(loaded) }
     },
     transformEntities: async (projectId, input) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const result = transformElements(loaded.elements, input, () => crypto.randomUUID())
       if (!result.ok) return { ok: false, error: result.error, ...where(loaded) }
       const elements = result.copied
@@ -378,7 +390,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, mode: result.copied ? "copied" : "transformed", copied: result.copied, ids: result.elements.map((e) => e.id), elements: result.elements, ...where(loaded) }
     },
     groupEntities: async (projectId, input) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const result = groupElements(loaded.elements, input, () => crypto.randomUUID())
       if (!result.ok) return { ok: false, error: result.error, ...where(loaded) }
       const elements = [...loaded.elements.filter((e) => !result.removed.includes(e.id)), ...result.added]
@@ -403,7 +415,7 @@ const toolHandlers = Effect.gen(function*() {
       }
     },
     createOperation: async (drawingId, operation) => {
-      const { id, projectId, elements, data } = await load(drawingId)
+      const { id, projectId, elements, data } = await load(drawingId, true)
       const params = operation.params !== null && typeof operation.params === "object" ? operation.params : {}
       const split = splitPrinter(params as Record<string, unknown>)
       const settings = cam.generator.decodeSettings({ ...split.rest, operationType: operation.type })
@@ -435,7 +447,7 @@ const toolHandlers = Effect.gen(function*() {
       })
     },
     updateOperation: async (drawingId, operationId, params) => {
-      const { id, projectId } = await load(drawingId)
+      const { id, projectId } = await load(drawingId, true)
       const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
       if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const stored = found.row.data as { request?: { settings?: Record<string, unknown>; geometry?: unknown; printer?: unknown } } | null
@@ -481,14 +493,17 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, mutated: false, candidates: results, note: "Real generated-path and stock-heightfield comparisons. Material physical properties are source evidence; cutting family remains explicit in settings. No cutting-force or material-suitability certification.", ...where(loaded) }
     },
     generateGcode: async (drawingId, operationId) => {
+      await assertWrite(drawingId)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { gcode: "", stats: { error: found.error } }
       const { response, error } = cam.generator.generateToolpath(found.request as never)
       if (error) return { gcode: "", stats: { error } }
+      await assertWrite(drawingId)
       await Effect.runPromise(toolpaths.update(found.id, { data: { request: found.request, response }, gcode: response.gcode }))
       return { gcode: response.gcode, stats: response.stats }
     },
     verifyOperation: async (drawingId, operationId, options) => {
+      await assertWrite(drawingId)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { ok: false, error: found.error }
       const { response, error } = cam.generator.generateToolpath(found.request as never)
@@ -506,6 +521,7 @@ const toolHandlers = Effect.gen(function*() {
       // Keep the full report (with the height map) and the program it is about on the operation: the CAM page shows it.
       const row = await Effect.runPromise(toolpaths.find(acting().id, found.id))
       const previous = row?.row.data !== null && typeof row?.row.data === "object" ? (row!.row.data as Record<string, unknown>) : {}
+      await assertWrite(drawingId)
       await Effect.runPromise(toolpaths.update(found.id, { data: { ...previous, request: found.request, response, verification: { report, request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures }, at: new Date().toISOString() } }, gcode: response.gcode }))
       // The height field is for the UI; the model gets the verdict, the numbers and where it went wrong.
       return {
@@ -519,7 +535,7 @@ const toolHandlers = Effect.gen(function*() {
         note: "A passing report covers only what is modelled; it is not a machine certification."
       }
     },
-    remember: async (key, value) => { await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
+    remember: async (key, value) => { actingCell.assertActive(); await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },
     recall: async (prefix) => (await Effect.runPromise(kv.list(`ai.memory.${prefix ?? ""}`))).map((e) => ({ key: e.key.slice("ai.memory.".length), value: e.value })),
     projectContext: async (projectId) => {
       const entry = await Effect.runPromise(kv.get(projectContextKey(projectId)))
@@ -527,6 +543,7 @@ const toolHandlers = Effect.gen(function*() {
       return entry === undefined ? { text: "" } : parseProjectContext(entry.value)
     },
     saveProjectContext: async (projectId, text) => {
+      await assertWrite(projectId)
       const entry = await Effect.runPromise(kv.set(projectContextKey(projectId), text))
       return parseProjectContext(entry.value)
     },
@@ -548,6 +565,7 @@ const toolHandlers = Effect.gen(function*() {
         const found = kind === "material" ? await Effect.runPromise(materials.find(acting().id, id)) : await Effect.runPromise(tools.find(acting().id, id))
         if (!found) return { ok: false, error: `Unknown ${kind} id: ${id}.` }
         if (!found.canWrite) return { ok: false, error: `The acting user may not delete this ${kind}.` }
+        actingCell.assertActive()
         await Effect.runPromise(kind === "material" ? materials.remove(id) : tools.remove(id))
         return { ok: true, kind, id, note: "Toolpaths that referenced it keep their stored parameters; re-check them with cam_verify_toolpath." }
       }
@@ -555,6 +573,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!found) return { ok: false, error: `Unknown machine config id: ${id}.` }
       if (!found.permission.isOwner) return { ok: false, error: "Only the owner may delete this machine config." }
       if (found.usageCount > 0) return { ok: false, error: `This machine config is still used by ${found.usageCount} toolpath(s); reassign or delete them first.` }
+      actingCell.assertActive()
       await Effect.runPromise(machines.remove(id))
       return { ok: true, kind, id }
     },
@@ -571,7 +590,7 @@ const toolHandlers = Effect.gen(function*() {
         }))
     },
     saveComponent: async (projectId, ids, name) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const chosen = loaded.elements.filter((e) => ids.includes(e.id))
       const missing = ids.filter((id) => !loaded.elements.some((e) => e.id === id))
       if (missing.length > 0) return { ok: false, error: `Unknown element ids: ${missing.join(", ")}.` }
@@ -582,11 +601,12 @@ const toolHandlers = Effect.gen(function*() {
       const children = chosen.map((e) => { const { id: _id, layerId: _layerId, layer: _layer, ...child } = e as Record<string, unknown>; return cad.shiftElement(child, { x: -originX, y: -originY, z: 0 }) })
       const component = { id: crypto.randomUUID(), type: "component", name, x: originX, y: originY, z: typeof first["z"] === "number" ? first["z"] : 0, elements: children, layerId: first.layerId } as Element
       const data = { name, type: "custom", version: "1.0", elements: [component], geometry: { type: "custom", elements: [component] }, metadata: { createdAt: new Date().toISOString() }, properties: {} }
+      await assertWrite(loaded.projectId)
       const created = await Effect.runPromise(components.create(loaded.projectId, { name, data }))
       return { ok: true, componentId: created.id, name: created.name, children: chosen.length, ...where(loaded) }
     },
     insertComponent: async (projectId, componentId, transform) => {
-      const loaded = await load(projectId)
+      const loaded = await load(projectId, true)
       const found = await Effect.runPromise(components.find(acting().id, componentId))
       if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
       const data = found.data as { elements?: ReadonlyArray<Record<string, unknown>> } | null
@@ -606,16 +626,23 @@ const toolHandlers = Effect.gen(function*() {
     deleteComponent: async (componentId) => {
       const found = await Effect.runPromise(components.find(acting().id, componentId))
       if (!found) return { ok: false, error: `Unknown component id: ${componentId}.` }
+      const access = await Effect.runPromise(projects.find(acting().id, found.projectId))
+      if (!access || (access.project.ownerId !== acting().id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) return { ok: false, error: "You do not have permission to delete this component." }
+      actingCell.assertActive()
       await Effect.runPromise(components.remove(componentId))
       return { ok: true, deleted: componentId }
     },
     upsertMaterial: async (input) => {
+      actingCell.assertActive()
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       const name = String(input["name"])
       const properties = (input["properties"] !== null && typeof input["properties"] === "object" ? input["properties"] : {}) as Record<string, unknown>
       if (id !== undefined) {
         const existing = await Effect.runPromise(materials.find(acting().id, id))
+        if (!existing) return { ok: false, error: "Material not found or not accessible; no replacement was created." }
         if (existing) {
+          if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this material." }
+          actingCell.assertActive()
           const row = await Effect.runPromise(materials.update(id, { name, properties, ...(typeof input["description"] === "string" ? { description: input["description"] } : {}), ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }))
           return { ok: true, id: row.id, created: false }
         }
@@ -624,6 +651,7 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: row.id, created: true }
     },
     upsertTool: async (input) => {
+      actingCell.assertActive()
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       const fields = { name: String(input["name"]), type: String(input["type"]), diameter: Number(input["diameter"]), material: String(input["material"]),
         numberOfFlutes: typeof input["numberOfFlutes"] === "number" ? input["numberOfFlutes"] : null, maxRPM: typeof input["maxRPM"] === "number" ? input["maxRPM"] : null,
@@ -632,7 +660,10 @@ const toolHandlers = Effect.gen(function*() {
         notes: typeof input["notes"] === "string" ? input["notes"] : null, ...(typeof input["isPublic"] === "boolean" ? { isPublic: input["isPublic"] } : {}) }
       if (id !== undefined) {
         const existing = await Effect.runPromise(tools.find(acting().id, id))
+        if (!existing) return { ok: false, error: "Tool not found or not accessible; no replacement was created." }
         if (existing) {
+          if (!existing.canWrite) return { ok: false, error: "You do not have permission to update this tool." }
+          actingCell.assertActive()
           const row = await Effect.runPromise(tools.update(id, fields))
           return { ok: true, id: row.id, created: false }
         }
@@ -641,13 +672,17 @@ const toolHandlers = Effect.gen(function*() {
       return { ok: true, id: row.id, created: true }
     },
     upsertMachineConfig: async (input) => {
+      actingCell.assertActive()
       const id = typeof input["id"] === "string" ? input["id"] : undefined
       const config = { kinematics: input["kinematics"] ?? {}, postProcessor: input["postProcessor"], workOffsets: input["workOffsets"] ?? ["G54", "G55", "G56", "G57", "G58", "G59"],
         ...(input["probing"] !== undefined ? { probing: input["probing"] } : {}), ...(typeof input["maxRPM"] === "number" ? { maxRPM: input["maxRPM"] } : {}), ...(typeof input["maxFeed"] === "number" ? { maxFeed: input["maxFeed"] } : {}) }
       const type = String(input["kind"])
       if (id !== undefined) {
         const existing = await Effect.runPromise(machines.find(acting().id, id))
+        if (!existing) return { ok: false, error: "Machine config not found or not accessible; no replacement was created." }
         if (existing) {
+          if (!existing.permission.isOwner) return { ok: false, error: "Only the owner may update this machine config." }
+          actingCell.assertActive()
           const res = await Effect.runPromise(machines.update(id, { name: String(input["name"]), description: typeof input["description"] === "string" ? input["description"] : null, type, config, isPublic: input["isPublic"] === true }))
           return { ok: true, id: res.view.id, created: false }
         }
@@ -657,7 +692,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     setProjectDefault: async (input) => {
       // Defaults are project-scoped notes, like the memory keys; resolved from the open project, or the newest one.
-      const loaded = await load(input.projectId ?? "default")
+      const loaded = await load(input.projectId ?? "default", true)
       const { projectId: _ignored, ...defaults } = input
       await Effect.runPromise(kv.set(`ai.defaults.${loaded.projectId}`, defaults))
       return { ok: true, projectId: loaded.projectId, defaults }
@@ -762,7 +797,11 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
       ...libraryToolSpecs(handlers),
       ...vcsToolSpecs({ vcs, runner, projects: projectsRepo, actor }),
       ...backgroundToolSpecs(scheduler)
-    ]
+    ].map((spec): HostToolSpec => ({
+      ...spec,
+      execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal).catch(() => JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." })),
+      ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})
+    }))
   })
   yield* credentials.attach({
     apply: (change) => change._tag === "set"

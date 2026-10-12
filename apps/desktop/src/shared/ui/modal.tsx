@@ -37,7 +37,7 @@ export function Modal(props: ModalProps): JSX.Element {
 
   // Capture the trigger before moving focus, then move focus into the dialog
   // (first control, dialog itself as fallback) — same pattern as the hand-rolled
-  // dialogs in screens/plugins.tsx and screens/cad.tsx, here once for all.
+  // dialogs in screens/plugins.tsx, here once for all.
   const onDialogRef = (element: HTMLDivElement): void => {
     dialog = element
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined

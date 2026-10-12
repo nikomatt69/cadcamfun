@@ -26,6 +26,7 @@ export {
 } from "./nikcli/chat.ts"
 export { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 export { defaultProviderSpecs } from "./nikcli/config.ts"
+export { childAgent, adoptChildSession } from "./nikcli/agents.ts"
 export * from "./attachments.ts"
 export * from "./skills/user.ts"
 export { CADCAM_SKILLS } from "./skills/index.ts"

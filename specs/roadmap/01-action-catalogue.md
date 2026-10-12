@@ -1,6 +1,6 @@
 # RM-01 — Action catalogue (deepen the tool seam)
 
-Status: **pending**. Current step. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/ai` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
+Status: **in progress**. Current step. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/ai` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
 
 ## Why this is first
 
@@ -69,6 +69,12 @@ Required integration checks through the caller-facing interface (add tests where
 These are future implementation acceptance requirements, not results of this documentation amendment.
 
 ## Change log
+
+- 2026-10-12: added dependency-safe shared invocation/failure/conflict/receipt Effect contracts in `packages/api` and a JSON-schema-derived nikcli zod adapter with bounds/discriminator/optional-field equivalence fixtures. Existing destructive/replacement tool IDs now use native ask in default roles; auto mode still uses the existing native auto evaluator. Registry consolidation and actual action-result migration remain pending.
+
+- 2026-10-12: added trusted host-session admission and async-local actor capture for host invocations, including child lookup; VCS captures actors per call, enforces project write rights and propagates cancellation. CAD/CAM writes now check project authority; read inspections no longer create missing drawings. Library replacements enforce existing resource write rights and refuse inaccessible explicit IDs instead of creating replacements. Full catalogue/shared-schema/native-permission integration and durable control ownership remain unfinished; RM-01 is not done.
+
+- 2026-10-12: started implementation with read-only reviewer permission/prompt corrections and an Effect action-tool adapter. Focused adapter/role regressions and AI typecheck pass; catalogue wiring, authoritative shared schemas, immutable admission and cross-workspace acceptance remain pending. No completion gate claimed.
 
 - v1: first remaining step — deepen tools into one catalogue.
 - 2026-10-12: published AI-01 contract amendments and narrow cross-WP scopes; cad_grep registration already exists. Implementation and Verify remain pending.

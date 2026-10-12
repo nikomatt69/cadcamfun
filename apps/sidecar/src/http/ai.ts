@@ -206,10 +206,11 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
       // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
-      actingUser.set(yield* CurrentUser, payload.message)
+      const actor = yield* CurrentUser
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
+        admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message),
         ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
         ...(payload.agent ? { agent: payload.agent } : {}),
         ...(payload.mode ? { mode: payload.mode } : {}),

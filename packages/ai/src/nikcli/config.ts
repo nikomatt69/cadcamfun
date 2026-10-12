@@ -1,4 +1,4 @@
-import { permissionAgents } from "./permission-modes.ts"
+import { NATIVE_APPROVAL_TOOL_IDS, permissionAgents } from "./permission-modes.ts"
 import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
@@ -86,6 +86,9 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   // the special curated `*` fallback, it preserves nikcli's deferred schema loading.
   const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
   for (const id of input.toolIds) permission[id] = "allow"
+  for (const id of NATIVE_APPROVAL_TOOL_IDS) {
+    if (input.toolIds.includes(id)) permission[id] = "ask"
+  }
   for (const tool of NATIVE_TOOLS) permission[tool.id] = "allow"
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.

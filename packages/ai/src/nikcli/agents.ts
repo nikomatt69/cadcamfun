@@ -10,6 +10,7 @@
 
 import { specialistPrompt } from "./prompts/index.ts"
 import { SPECIALIST_NATIVE_TOOLS } from "./tool-registry.ts"
+import { NATIVE_APPROVAL_TOOL_IDS } from "./permission-modes.ts"
 import { LIBRARY_READ_ALL, LIBRARY_READ_TOOL_IDS, CHAIN_TOOL_IDS, COMPONENT_TOOL_IDS, LIBRARY_WRITE_TOOL_IDS } from "../tools/project-tools.ts"
 
 export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer"] as const
@@ -43,8 +44,7 @@ const CHAIN_READ = CHAIN_TOOL_IDS
 /**
  * Version control, read-only: where the project stands (branch, uncommitted files, open pull requests) and what changed.
  * Starting a change, committing and opening the pull request stay with the main agent, which owns the change as a whole;
- * a specialist's edits land on the branch it was started on. `actions_run` (the project's workflows) belongs to the CAM
- * specialist, which checks its G-code with them.
+ * a specialist's edits land on the branch it was started on. Write-capable workflows belong to the CAM specialist.
  */
 const VCS_READ = ["vcs_status", "vcs_diff", "vcs_list_pull_requests"] as const
 
@@ -106,7 +106,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     description: "CAM programmer: creates and updates machining operations for existing geometry, generates G-code, analyses it and simulates the toolpath.",
     prompt: specialistPrompt("machinist"),
     // The CAM specialist owns the libraries: it reads them, and may add a cutter, a material or a machine the shop
-    // actually has, or remove one that is gone. Deleting one needs `confirm: true`, like every destructive tool.
+    // actually has, or remove one that is gone. Model confirmation is not native human approval.
     tools: [
       "cam_stock", "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cam_vision", "cad_describe_drawing", "cad_check_design", "cam_describe_machine", "cam_create_operation", "cam_list_operations",
       "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
@@ -124,9 +124,9 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     description: "Reviews a pull request: reads the diff, the workflow runs and the verification reports, then writes a verdict. Read-only.",
     prompt: specialistPrompt("reviewer"),
     tools: [
-      "vcs_status", "vcs_diff", "vcs_list_pull_requests", "cam_list_operations", "cam_verify_toolpath",
+      "vcs_status", "vcs_diff", "vcs_list_pull_requests", "cam_list_operations",
       "cam_analyze_gcode", "cad_describe_drawing", "cad_check_design", "cam_describe_machine",
-      ...LIBRARY_READ, ...CHAIN_READ, "memory_recall", "actions_run"
+      ...LIBRARY_READ, ...CHAIN_READ, "memory_recall"
     ],
     edits: false,
     background: true,
@@ -141,9 +141,12 @@ export const isSubagentId = (value: unknown): value is SubagentId =>
 export const subagentById = (id: string | undefined): SubagentSpec => SUBAGENTS[isSubagentId(id) ? id : "researcher"]
 
 /** A specialist's permission block: deny everything, allow its tools (those the project registered) and the playbooks. */
-export const subagentPermission = (spec: SubagentSpec, registeredToolIds: ReadonlyArray<string>): Record<string, "allow" | "deny"> => {
-  const permission: Record<string, "allow" | "deny"> = { "**": "deny" }
+export const subagentPermission = (spec: SubagentSpec, registeredToolIds: ReadonlyArray<string>): Record<string, "allow" | "deny" | "ask"> => {
+  const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
   for (const id of spec.tools) if (registeredToolIds.includes(id)) permission[id] = "allow"
+  for (const id of NATIVE_APPROVAL_TOOL_IDS) {
+    if (permission[id] === "allow") permission[id] = "ask"
+  }
   for (const id of SPECIALIST_NATIVE_TOOLS) permission[id] = "allow"
   // The confined program runner sees only the tools allowed above.
   permission["code_mode"] = "allow"

@@ -45,6 +45,9 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
+    "macOS": {
+      "infoPlist": "Info.plist"
+    },
     "shortDescription": "CAD/CAM desktop application",
     "icon": [
       "icons/32x32.png",

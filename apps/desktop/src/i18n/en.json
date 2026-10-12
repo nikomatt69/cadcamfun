@@ -46,6 +46,8 @@
   "status.units": "Units",
   "status.snap": "Snap",
   "status.snapOff": "Off",
+  "status.tolerance": "Tol",
+  "status.toleranceTitle": "Drawing tolerance",
   "status.cursor": "Cursor",
   "status.sidecar": "Sidecar",
   "status.sidecarStarting": "Starting",

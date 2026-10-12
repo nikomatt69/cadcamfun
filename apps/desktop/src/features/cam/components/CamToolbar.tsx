@@ -5,7 +5,7 @@
  * costs, AI copilot and dark-mode toggles. Right side: the four workspace tabs and the chat-panel toggle. The
  * toolbar owns no data: the page passes state and callbacks, the tab lives in the CAM store.
  */
-import { For, Show, createSignal, type JSX } from "solid-js"
+import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import {
@@ -13,6 +13,8 @@ import {
 } from "lucide-solid"
 import { useCamStore, type ActiveTab } from "../store/camStore.ts"
 import { t } from "../../../i18n/index.ts"
+import { useApp } from "../../../shared/state/context.ts"
+import { prefersDark } from "../../../shared/state/settings.ts"
 
 export interface CamToolbarProps {
   /** Whether there is G-code to save (the save button is disabled otherwise). */
@@ -42,18 +44,16 @@ const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.preview
   { id: "post", label: "cam.postTab", icon: (size) => <Settings size={size} class="mr-1" /> }
 ]
 
-const readInitialDark = (): boolean =>
-  typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-
 export default function CamToolbar(props: CamToolbarProps): JSX.Element {
   const cam = useCamStore()
-  const [dark, setDark] = createSignal(readInitialDark())
+  const app = useApp()
+  const dark = (): boolean => {
+    const theme = app.settings.settings().theme
+    return theme === "dark" || (theme === "system" && prefersDark())
+  }
 
   const toggleDarkMode = (): void => {
-    const next = !dark()
-    setDark(next)
-    document.documentElement.classList.toggle("dark", next)
-    try { localStorage.setItem("theme", next ? "dark" : "light") } catch { /* storage may be disabled */ }
+    app.settings.update({ theme: dark() ? "light" : "dark" })
   }
 
   return (
@@ -128,8 +128,8 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             aria-pressed={props.aiEnhanced}
             title={t(props.aiEnhanced ? "cam.aiDisable" : "cam.aiEnable")}
           >
-            <Show when={props.aiEnhanced} fallback={<Zap class="h-3 w-3 sm:h-4 sm:w-4" />}>
-              <Brain class="h-3 w-3 sm:h-4 sm:w-4" />
+            <Show when={props.aiEnhanced} fallback={<Zap size={16} />}>
+              <Brain size={16} />
             </Show>
           </button>
           <button
@@ -138,8 +138,8 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             aria-label={t("cam.toggleTheme")}
             aria-pressed={dark()}
           >
-            <Show when={dark()} fallback={<Moon class="h-3 w-3 sm:h-4 sm:w-4" />}>
-              <Sun class="h-3 w-3 sm:h-4 sm:w-4" />
+            <Show when={dark()} fallback={<Moon size={16} />}>
+              <Sun size={16} />
             </Show>
           </button>
         </div>

@@ -122,7 +122,7 @@ const legacyInitial = {
   preserveGeometry: true
 }
 
-/** Sensible defaults — pulled from the original screens/cam.tsx so behaviour is unchanged. */
+/** Sensible defaults for the raw piece and the program. */
 const initialWorkpiece: Workpiece = { x: 300, y: 180, z: 10 }
 const initialProgram = cam.makeProgram("untitled", [], {})
 

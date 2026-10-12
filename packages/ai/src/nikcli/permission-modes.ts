@@ -1,5 +1,9 @@
 /** UI names mapped to native Nikcli agent modes and permission rules. */
 export type PermissionMode = "auto" | "ask" | "approve"
+export const NATIVE_APPROVAL_TOOL_IDS: ReadonlyArray<string> = [
+  "cad_delete_entities", "cad_component_delete", "lib_delete", "vcs_restore_paths", "project_context",
+  "lib_upsert_material", "lib_upsert_tool", "lib_upsert_machine_config"
+]
 export const hostAgentWithPermissions = (agent: string, mode: PermissionMode = "approve"): string => mode === "approve" ? agent : `${agent}-${mode}`
 export const inheritedPermissionMode = (agent?: string): PermissionMode => agent?.endsWith("-auto") ? "auto" : agent?.endsWith("-ask") ? "ask" : "approve"
 export const permissionAgents = (agents: Record<string, Record<string, unknown>>, registered: ReadonlyArray<string>): Record<string, Record<string, unknown>> => {

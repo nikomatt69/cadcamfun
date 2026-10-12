@@ -19,7 +19,7 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | # | Id | Spec | Status | Depends on | Owners |
 | --- | --- | --- | --- | --- | --- |
 | 0 | RM-00 | `00-how-to-follow.md` | **done** (rules) | — | agents |
-| 1 | RM-01 | `01-action-catalogue.md` | **pending** | — | WP8 `packages/ai`, WP4 AI handler adapters, WP3 shared action schemas, WP6 AI tool consumers (scopes in step spec) |
+| 1 | RM-01 | `01-action-catalogue.md` | **in progress** | — | WP8 `packages/ai`, WP4 AI handler adapters, WP3 shared action schemas, WP6 AI tool consumers (scopes in step spec) |
 | 2 | RM-02 | `02-multi-op-setup.md` | **pending** | RM-01 for AI actions; RM-03 for persisted setup integration/completion (pure work may run in parallel) | WP2 `packages/core/src/cam`, WP3 `packages/api`, WP4 `apps/sidecar`, WP6 `apps/desktop/src/cam`, WP8 setup action bindings only |
 | 3 | RM-03 | `03-api-parity.md` | **pending** | — (parallel with RM-02 on disjoint groups; AI execution uses RM-01) | WP3 `packages/api`, WP4 `apps/sidecar`, WP0 revision/receipt migration only |
 | 4 | RM-04 | `04-desktop-parity.md` | **pending** | RM-03 for each vertical's routes | WP6 `apps/desktop` |

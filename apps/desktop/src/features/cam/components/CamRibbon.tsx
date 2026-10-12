@@ -32,7 +32,6 @@ import {
   Wand2,
   Wrench
 } from "lucide-solid"
-import { useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore } from "../store/generatorStore.ts"
 import { paletteToCoreOperation } from "./generator/StrategyPalette.data.ts"
 import { t, type Key } from "../../../i18n/index.ts"
@@ -68,6 +67,8 @@ export interface CamRibbonProps {
   readonly onSelectActiveTab?: (tab: "preview" | "editor" | "toolpath" | "post") => void
   /** Receives a request to switch the right inspector to the named tab. */
   readonly onSelectRightTab?: (tab: "generator" | "cycles" | "verify") => void
+  /** Receives a request to show a sidebar tab; workpiece and origin live in the machine tab. */
+  readonly onSelectSidebarTab?: (tab: "explorer" | "settings" | "machine") => void
   /** Receives the post-processor type the user picked in the ribbon. */
   readonly onSelectPostProcessor?: (next: "fanuc" | "heidenhain" | "gcode") => void
   readonly postProcessor?: "fanuc" | "heidenhain" | "gcode"
@@ -105,7 +106,6 @@ const groupLabelClass: Readonly<Record<RibbonAction["accent"], string>> = {
 }
 
 export default function CamRibbon(props: CamRibbonProps): JSX.Element {
-  const camStore = useCamStore()
   const gen = useGeneratorStore()
   const [tab, setTab] = createSignal<RibbonTabId>("machining")
 
@@ -151,13 +151,13 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
           {
             titleKey: "cam.ribbon.group.workpiece",
             actions: [
-              { id: "open-workpiece", labelKey: "cam.ribbon.workpiece", icon: (s, k) => <Folder size={s} class={k} />, accent: "blue", onClick: () => { camStore.setSidebarTab("workpiece") } }
+              { id: "open-workpiece", labelKey: "cam.ribbon.workpiece", icon: (s, k) => <Folder size={s} class={k} />, accent: "blue", onClick: () => props.onSelectSidebarTab?.("machine") }
             ]
           },
           {
             titleKey: "cam.ribbon.group.origin",
             actions: [
-              { id: "open-origin", labelKey: "cam.ribbon.origin", icon: (s, k) => <Library size={s} class={k} />, accent: "blue", onClick: () => { camStore.setRightTab("generator") } }
+              { id: "open-origin", labelKey: "cam.ribbon.origin", icon: (s, k) => <Library size={s} class={k} />, accent: "blue", onClick: () => props.onSelectSidebarTab?.("machine") }
             ]
           }
         ]
@@ -241,18 +241,18 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
 
   return (
     <Motion.div
-      class="cam-ribbon flex flex-col w-full border-b border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm"
+      class="cam-ribbon flex flex-col w-full"
       data-testid="cam-ribbon"
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div class="flex w-full items-stretch border-b border-gray-100 dark:border-gray-800">
+      <div class="flex w-full items-stretch border-b border-[color:var(--workspace-border)]">
         <For each={TABS}>
           {(entry) => (
             <button
               type="button"
-              class={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border-r border-gray-100 dark:border-gray-800 transition-colors ${
+              class={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border-r border-[color:var(--workspace-border)] transition-colors ${
                 tab() === entry.id
                   ? "bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-b-2 border-b-blue-500"
                   : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -270,8 +270,8 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
       <div class="flex w-full items-stretch overflow-x-auto" data-testid={`cam-ribbon-${tab()}`}>
         <For each={groups()}>
           {(group, groupIndex) => (
-            <div class={`flex flex-col px-3 py-2 ${groupIndex() < groups().length - 1 ? "border-r border-gray-100 dark:border-gray-800" : ""}`}>
-              <div class={`text-[10px] font-semibold uppercase tracking-wide mb-1.5 ${groupLabelClass[group.actions[0]!.accent]}`}>
+            <div class={`flex flex-col px-[10px] pt-[5px] pb-[6px] ${groupIndex() < groups().length - 1 ? "border-r border-[color:var(--workspace-border)]" : ""}`}>
+              <div class={`text-[10px] leading-[12px] font-semibold uppercase tracking-[.035em] mb-1 ${groupLabelClass[group.actions[0]!.accent]}`}>
                 {t(group.titleKey)}
               </div>
               <div class="flex flex-wrap gap-1">
@@ -282,7 +282,7 @@ export default function CamRibbon(props: CamRibbonProps): JSX.Element {
                       <button
                         type="button"
                         data-ribbon-action={action.id}
-                        class={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition-colors ${chipClass(action.accent)} ${active ? "ring-2 ring-blue-300 dark:ring-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-white/40 dark:bg-gray-800/40"}`}
+                        class={`flex items-center gap-[5px] min-h-[26px] px-[7px] py-[3px] rounded-[5px] text-[11px] leading-[18px] font-medium border transition-colors ${chipClass(action.accent)} ${active ? "ring-2 ring-blue-300 dark:ring-blue-700 bg-blue-50 dark:bg-blue-900/30" : "bg-[var(--workspace-panel)]"}`}
                         onClick={action.onClick}
                         title={t(action.labelKey)}
                         aria-pressed={active}

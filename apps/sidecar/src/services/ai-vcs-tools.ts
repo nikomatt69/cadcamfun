@@ -21,24 +21,34 @@ const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").
  * to `main` or merge (`ProjectVcs` refuses AI actors there), so a person always reviews on desktop or phone.
  */
 export const vcsToolSpecs = (deps: VcsToolDeps): ReadonlyArray<HostToolSpec> => {
-  const actor: Actor = { ...deps.actor, kind: "ai" }
-  const run = <A>(self: Effect.Effect<A, unknown>): Promise<string> =>
+  const run = <A>(self: Effect.Effect<A, unknown>, signal: AbortSignal): Promise<string> =>
     Effect.runPromise(
       self.pipe(
         Effect.map((value) => JSON.stringify({ ok: true, value })),
         Effect.catch((e) => Effect.succeed(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : (e as { message?: string }).message ?? String(e) }))),
-      ),
+      ), { signal }
     )
   /** `projectId` is whatever the UI last opened; only a real, accessible project is accepted. */
-  const project = (projectId: string) =>
-    deps.projects.find(deps.actor.userId, projectId).pipe(
-      Effect.flatMap((found) => (found ? Effect.succeed(found.project.id) : Effect.fail(new Error("No such project: open a project first")))),
+  const project = (projectId: string, actor: Actor, write: boolean) =>
+    deps.projects.find(actor.userId, projectId).pipe(
+      Effect.flatMap((found) => {
+        if (!found) return Effect.fail(new Error("No such project: open a project first"))
+        if (write && found.project.ownerId !== actor.userId && found.orgRole !== "ADMIN" && found.orgRole !== "MANAGER") {
+          return Effect.fail(new Error("You do not have permission to write this project"))
+        }
+        return Effect.succeed(found.project.id)
+      }),
     )
-  const tool = <S extends z.ZodType>(id: string, description: string, parameters: S, execute: (projectId: string, input: z.infer<S>) => Effect.Effect<unknown, unknown>): HostToolSpec => ({
+  const reads = new Set(["vcs_status", "vcs_diff", "vcs_list_pull_requests"])
+  const tool = <S extends z.ZodType>(id: string, description: string, parameters: S, execute: (projectId: string, input: z.infer<S>, actor: Actor) => Effect.Effect<unknown, unknown>): HostToolSpec => ({
     id,
     description,
     parameters,
-    execute: (input, ctx) => run(project(ctx.projectId).pipe(Effect.flatMap((id) => execute(id, parameters.parse(input) as z.infer<S>)))),
+    execute: (input, ctx) => {
+      if (ctx.signal.aborted) return Promise.resolve(JSON.stringify({ ok: false, error: "Tool execution cancelled." }))
+      const actor: Actor = Object.freeze({ ...deps.actor, kind: "ai" })
+      return run(project(ctx.projectId, actor, !reads.has(id)).pipe(Effect.flatMap((projectId) => execute(projectId, parameters.parse(input) as z.infer<S>, actor))), ctx.signal)
+    },
   })
   const { vcs, runner } = deps
 
@@ -48,18 +58,18 @@ export const vcsToolSpecs = (deps: VcsToolDeps): ReadonlyArray<HostToolSpec> => 
         const { current, branches } = yield* vcs.branches(id)
         return { branch: current, dirty: yield* vcs.status(id), branches: Object.keys(branches), openPullRequests: (yield* vcs.listPullRequests(id, "open")).map((p) => ({ number: p.number, title: p.title, head: p.head })) }
       })),
-    tool("vcs_start_change", "Start a reviewable change: creates an `ai/<topic>` branch from main and checks it out. Do this BEFORE editing with cad_*/cam_* tools. Fails if the user has uncommitted changes.", z.object({ topic: z.string().min(1).max(80) }), (id, { topic }) =>
+    tool("vcs_start_change", "Start a reviewable change: creates an `ai/<topic>` branch from main and checks it out. Do this BEFORE editing with cad_*/cam_* tools. Fails if the user has uncommitted changes.", z.object({ topic: z.string().min(1).max(80) }), (id, { topic }, actor) =>
       Effect.gen(function*() {
         const name = `ai/${slug(topic)}`
         yield* vcs.createBranch(id, name, "main").pipe(Effect.catchIf((e) => e instanceof Error && /already exists/.test(e.message), () => Effect.void))
         yield* vcs.checkout(id, name, actor)
         return { branch: name }
       })),
-    tool("vcs_commit", "Record the current edits as a commit on the checked-out ai/* branch. Use a short imperative message that says what changed and why. Cannot commit on main.", z.object({ message: z.string().min(1).max(200) }), (id, { message }) =>
+    tool("vcs_commit", "Record the current edits as a commit on the checked-out ai/* branch. Use a short imperative message that says what changed and why. Cannot commit on main.", z.object({ message: z.string().min(1).max(200) }), (id, { message }, actor) =>
       vcs.commit(id, { message }, actor).pipe(Effect.map((oid) => ({ commit: oid })))),
     tool("vcs_diff", "Entity-level changes between two revisions (branch, tag or commit id). `from` defaults to main.", z.object({ from: z.string().optional(), to: z.string().default("HEAD") }), (id, { from, to }) =>
       vcs.diff(id, from ?? "main", to).pipe(Effect.map((changes) => changes.map((c) => ({ path: c.path, name: c.name, status: c.status, changes: c.changes.slice(0, 20) }))))),
-    tool("vcs_open_pull_request", "Open a pull request from the checked-out ai/* branch into main so a person can review and merge it. Describe the change and anything to double-check.", z.object({ title: z.string().min(1).max(120), body: z.string().max(4000).default("") }), (id, { title, body }) =>
+    tool("vcs_open_pull_request", "Open a pull request from the checked-out ai/* branch into main so a person can review and merge it. Describe the change and anything to double-check.", z.object({ title: z.string().min(1).max(120), body: z.string().max(4000).default("") }), (id, { title, body }, actor) =>
       Effect.gen(function*() {
         const { current } = yield* vcs.branches(id)
         const pr = yield* vcs.openPullRequest(id, { title, body, head: current }, actor)
@@ -71,17 +81,17 @@ export const vcsToolSpecs = (deps: VcsToolDeps): ReadonlyArray<HostToolSpec> => 
         const list = yield* vcs.listPullRequests(id, state)
         return yield* Effect.forEach(list, (p) => vcs.pullRequest(id, p.number).pipe(Effect.map((d) => ({ number: p.number, title: p.title, head: p.head, authorKind: p.authorKind, reviews: d.reviews.map((r) => ({ verdict: r.verdict, body: r.body })) }))))
       })),
-    tool("vcs_restore_paths", "Roll the named ids back to an earlier commit on the checked-out ai/* branch. Destructive. Refused on main.", z.object({ paths: z.array(z.string().min(1)).min(1).max(200), from: z.string().min(1) }), (id, { paths, from }) =>
+    tool("vcs_restore_paths", "Roll the named ids back to an earlier commit on the checked-out ai/* branch. Destructive. Refused on main.", z.object({ paths: z.array(z.string().min(1)).min(1).max(200), from: z.string().min(1) }), (id, { paths, from }, actor) =>
       Effect.gen(function*() {
         const oid = yield* vcs.restore(id, from, actor, paths)
         const { current } = yield* vcs.branches(id)
         return { commit: oid, branch: current, paths }
       })),
-    tool("actions_run", "Run the project's workflows (.cadcamfun/workflows/*.yml) on the checked-out branch and report their status. Default trigger is manual; use pull-request or push to dispatch the workflows of that event.", z.object({ trigger: z.enum(["manual", "pull-request", "push"]).default("manual") }), (id, { trigger }) =>
+    tool("actions_run", "Run the project's workflows (.cadcamfun/workflows/*.yml) on the checked-out branch and report their status. Default trigger is manual; use pull-request or push to dispatch the workflows of that event.", z.object({ trigger: z.enum(["manual", "pull-request", "push"]).default("manual") }), (id, { trigger }, actor) =>
       Effect.gen(function*() {
         const { current } = yield* vcs.branches(id)
         const event = trigger === "manual" ? { type: "manual" as const } : trigger === "push" ? { type: "push" as const, branch: current, changedPaths: [] as string[] } : { type: "pull-request" as const, base: "main" }
-        return (yield* runner.trigger(id, current, event)).map((r) => ({ workflow: r.workflow, status: r.status }))
+        return (yield* runner.trigger(id, current, event, { actor })).map((r) => ({ workflow: r.workflow, status: r.status }))
       })),
   ]
 }
