@@ -350,7 +350,7 @@
   padding: clamp(18px, 3vw, 34px) clamp(16px, 4vw, 52px) 28px;
   min-height: 100px;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   background:
     radial-gradient(ellipse at 50% 15%, color-mix(in srgb, var(--assistant-accent) 4%, transparent), transparent 46%),
     var(--assistant-bg);
@@ -981,7 +981,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 500;
 }
-.assistant-palette-scroll { min-height: 0; padding: 6px; overflow-y: auto; scrollbar-width: thin; }
+.assistant-palette-scroll { min-height: 0; padding: 6px; overflow-y: auto; scrollbar-width: none; }
 .assistant-palette-group + .assistant-palette-group { margin-top: 7px; }
 .assistant-palette-group-label,
 .assistant-cmd-help-group {

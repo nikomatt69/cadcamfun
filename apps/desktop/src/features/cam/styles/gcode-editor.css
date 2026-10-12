@@ -42,29 +42,16 @@
   color: #9cdcfe !important;
 }
 
-/* Custom scrollbar for editor components */
+/* Editor scrollbars are hidden app-wide; the editor keeps scrolling. */
 .editor-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .editor-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.editor-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.editor-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 4px;
-  border: 2px solid transparent;
-}
-
-.editor-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(155, 155, 155, 0.7);
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* AI Agent Panel Styles */

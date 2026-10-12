@@ -1843,44 +1843,19 @@ input:checked + .toggle-slider:before {
 
 /* =================================================================== */
 /* UNIFIED SCROLLBAR STYLES - SINGLE DEFINITION */
+/* Scrollbars are hidden app-wide; every scrollable area keeps scrolling */
+/* (wheel, touch, keyboard, ribbon arrows) with no visible bar. */
 /* =================================================================== */
 
-/* Webkit browsers (Chrome, Safari, Edge) */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: var(--ui-radius-sm);
-}
-
-/* Dark mode scrollbars */
-.dark ::-webkit-scrollbar-track {
-  background: rgb(31 41 55);
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: rgb(75 85 99);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgb(107 114 128);
-}
-
-/* Firefox */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.dark * {
-  scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* =================================================================== */

@@ -148,7 +148,7 @@ export function ElementForm(props: ElementFormProps): JSX.Element {
       class="bg-[#F8FBFF] dark:bg-gray-800 dark:text-white shadow-xl overflow-y-auto rounded-md p-4 w-[320px] max-h-[480px] border border-gray-200 dark:border-gray-600"
       style={{
         ...(props.formPosition ? { position: "fixed", top: `${props.formPosition.y}px`, left: `${props.formPosition.x}px`, "z-index": "2147483647", isolation: "isolate" } : {}),
-        "scrollbar-width": "thin", "scrollbar-color": "rgba(155, 155, 155, 0.5) transparent"
+        "scrollbar-width": "none"
       }}
     >
       <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Add {props.type.charAt(0).toUpperCase() + props.type.slice(1)}</h4>
