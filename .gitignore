@@ -105,3 +105,11 @@ apps/mobile/dist/
 
 # Local updater signing credentials
 /tauri-signing.json
+
+# Local working artifacts: kept on disk, not versioned
+/recovery-ai-catalogue.patch
+/redesign-area-superiore-chat-ai-assistant.json
+/session-ses_*.md
+/out/
+/.nikcli/
+apps/desktop/tmpprobe/
