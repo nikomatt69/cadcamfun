@@ -159,6 +159,24 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     return count;
   }
 
+  /**
+   * Stops every queued or running task of the parent and waits (at most `timeoutMs`) for the runners to wind down; returns how many
+   * were stopped. Unlike a retiring cancel the parent can start new tasks afterwards: this is what stopping a turn or compacting a
+   * conversation does, since a task belongs to the conversation that started it and must not outlive its intent.
+   */
+  async stopParent(owner: BackgroundTaskOwner, timeoutMs = 10_000): Promise<number> {
+    const active = this.list(owner).filter((task) => task.status === "queued" || task.status === "running");
+    if (active.length === 0) return 0;
+    this.cancelParent(owner);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.all(active.map((task) => this.wait(owner, task.id))),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); })
+    ]);
+    if (timer !== undefined) clearTimeout(timer);
+    return active.length;
+  }
+
   /** Aborts immediately; resolves only when all occupied runner slots settle. */
   dispose(): Promise<void> {
     if (this.disposal) return this.disposal;

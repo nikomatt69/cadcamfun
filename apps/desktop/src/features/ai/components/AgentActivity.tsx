@@ -58,7 +58,10 @@ export function AgentActivity(): JSX.Element {
         </Show>
         <Show when={ai.tasks().length > 0}>
           <details open class="mt-1" data-testid="ai-tasks">
-            <summary class="cursor-pointer font-semibold">{t("ai.tasks.title")} {ai.tasks().filter((x) => x.status === "completed").length}/{ai.tasks().length}</summary>
+            <summary class="cursor-pointer font-semibold" title={t("ai.tasks.linkedHint")}>{t("ai.tasks.title")} {ai.tasks().filter((x) => x.status === "completed").length}/{ai.tasks().length}</summary>
+            <Show when={ai.tasks().some((x) => x.status === "queued" || x.status === "running")}>
+              <button type="button" class="mt-1 rounded border px-2 py-1" data-testid="ai-tasks-stop" disabled={ai.controlBusy()} onClick={async () => { for (const task of ai.tasks().filter((x) => x.status === "queued" || x.status === "running")) await ai.cancelTask(task.id) }}>{t("ai.tasks.stopAll")}</button>
+            </Show>
             <ul class="mt-1 space-y-1">
               <For each={ai.tasks()}>{(task) => (
                 <li data-testid="ai-task" data-status={task.status} data-agent={task.agent}>

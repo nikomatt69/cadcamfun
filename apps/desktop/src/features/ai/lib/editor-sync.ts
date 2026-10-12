@@ -41,9 +41,12 @@ export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
   let result: { ok?: unknown; elements?: unknown; ids?: unknown }
   try { result = JSON.parse(output) } catch { return [] }
   if (result === null || typeof result !== "object" || result.ok !== true) return []
-  const elements = Array.isArray(result.elements) ? result.elements.filter(isElement) : []
+  // A recipe that also created its part reports the editor elements under `created`.
+  const created = (result as { created?: unknown }).created
+  const source: { elements?: unknown; mutation?: unknown } = Array.isArray(result.elements) || typeof created !== "object" || created === null ? result : (created as { elements?: unknown; mutation?: unknown })
+  const elements = Array.isArray(source.elements) ? source.elements.filter(isElement) : []
   if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements") || tool.endsWith("cad_import_drawing")) return elements.length > 0 ? [{ kind: "add", elements }] : []
-  if (tool.endsWith("cad_parametric")) return elements.length > 0 ? [{ kind: (result as { mutation?: unknown }).mutation === "add" ? "add" : "update", elements }] : []
+  if (tool.endsWith("cad_parametric")) return elements.length > 0 ? [{ kind: source.mutation === "add" ? "add" : "update", elements }] : []
   if (tool.endsWith("cad_modify_entities")) return elements.length > 0 ? [{ kind: "update", elements }] : []
   if (tool.endsWith("cad_transform_entities")) {
     if (elements.length === 0) return []

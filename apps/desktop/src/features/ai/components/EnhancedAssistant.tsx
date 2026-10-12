@@ -474,9 +474,10 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             <div><dt>{t("ai.stats.usage")}</dt><dd>{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</dd></div>
           </dl>
           <p>{t("ai.context.usageHint")}</p>
-          <button data-testid="ai-compact" type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !ai.sessionId() || ai.tasks().some((task) => task.status === "queued" || task.status === "running")} onClick={() => void ai.compact()}>{t(ai.controlBusy() ? "ai.controls.compacting" : "ai.controls.compact")}</button>
+          <button data-testid="ai-compact" type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !ai.sessionId()} onClick={() => void ai.compact()}>{t(ai.controlBusy() ? "ai.controls.compacting" : "ai.controls.compact")}</button>
+          <Show when={ai.tasks().filter((task) => task.status === "queued" || task.status === "running").length}>{(count) => <p class="mt-1 text-xs" data-testid="ai-compact-hint">{t("ai.controls.compactStopsTasks", { count: count() })}</p>}</Show>
           <Show when={ai.hostContext()}>{(context) => <p class="mt-2 text-xs">{t("ai.controls.contextPolicy", { threshold: context().compactAt?.toLocaleString() ?? t("ai.context.gauge.unknown"), output: context().requestOutput?.toLocaleString() ?? t("ai.context.gauge.unknown") })}</p>}</Show>
-          <Show when={ai.hostContext()?.memory}>{(memory) => <div class="mt-2"><p class="text-xs">{t("ai.controls.memoryPolicy", { hours: memory().minHours, sessions: memory().minSessions, count: memory().sessionsSinceLastBrain })}</p><button type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !memory().enabled || ai.tasks().some((task) => task.status === "queued" || task.status === "running")} onClick={() => void ai.consolidateMemory()}>{t("ai.controls.learnMemory")}</button></div>}</Show>
+          <Show when={ai.hostContext()?.memory}>{(memory) => <div class="mt-2"><p class="text-xs">{t("ai.controls.memoryPolicy", { hours: memory().minHours, sessions: memory().minSessions, count: memory().sessionsSinceLastBrain })}</p><button type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !memory().enabled} onClick={() => void ai.consolidateMemory()}>{t("ai.controls.learnMemory")}</button></div>}</Show>
         </section>
       </Show>
       <Show when={showHelp()}>

@@ -223,6 +223,35 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
         </div>
       ) }
   },
+  cad_parametric: ({ input, data }) => {
+    const d = rec(data)
+    const action = str(input["action"]) ?? "inspect"
+    const listed = (value: unknown): Rec[] => arr(value).flatMap((i) => (rec(i) ? [rec(i)!] : []))
+    if (action === "dfm") {
+      const issues = listed(d?.["issues"])
+      const metrics = rec(d?.["metrics"])
+      return { icon: "✓", pending: "Checking the design rules...", title: `Design rules (${str(d?.["process"]) ?? str(input["process"]) ?? "mill"}, cutter Ø${mm(d?.["toolDiameter"] ?? input["toolDiameter"] ?? 6)} mm): ${issues.length === 0 ? "no findings" : issueCounts(issues) || plural(issues.length, "finding")}`,
+        tone: d?.["ok"] === false ? "error" : issues.some((i) => i["severity"] === "warning") ? "warn" : "ok",
+        detail: () => <><Pair rows={[["Solids", num(metrics?.["bodies"]) === undefined ? undefined : String(metrics?.["bodies"])], ["Volume", num(metrics?.["volumeMm3"]) === undefined ? undefined : `${mm(num(metrics?.["volumeMm3"])! / 1000)} cm³`], ["Thinnest wall", num(metrics?.["minWallMm"]) === undefined ? undefined : `${mm(metrics?.["minWallMm"])} mm`]]} />{issues.length > 0 ? <Issues issues={issues} /> : <p class="text-gray-500">The part meets the rules for this process.</p>}</> }
+    }
+    if (action === "recipe") {
+      const report = rec(d?.["report"])
+      const issues = listed(report?.["issues"])
+      const derived = Object.entries(rec(d?.["derived"]) ?? {}).map(([k, v]) => [k, String(v)] as const)
+      return { icon: "◆", pending: "Generating the part...", title: `${str(input["create"] === true ? "Recipe created" : "Recipe") ?? "Recipe"} ${str(d?.["recipe"]) ?? str(input["recipe"]) ?? ""}: ${str(d?.["summary"]) ?? ""}`, tone: issues.some((i) => i["severity"] === "error") ? "error" : "ok",
+        detail: () => <><Pair rows={derived} /><Lines lines={arr(d?.["rules"]).map(String)} />{issues.length > 0 ? <Issues issues={issues} /> : null}</> }
+    }
+    if (action === "fastener") {
+      const thread = rec(d?.["thread"])
+      return { icon: "⌗", pending: "Looking up the fastener...", title: thread !== undefined ? `Fastener ${str(thread["name"]) ?? ""}: tap drill ${mm(thread["tapDrill"])} mm` : str(input["shaftDiameter"]) !== undefined || num(input["shaftDiameter"]) !== undefined ? `Keyway for Ø${mm(input["shaftDiameter"])} mm` : "Fastener table",
+        detail: thread !== undefined ? () => <Pair rows={[["Pitch", `${mm(thread["pitch"])} mm`], ["Clearance fine / medium / coarse", ["fine", "medium", "coarse"].map((k) => mm(rec(thread["clearance"])?.[k])).join(" / ")], ["Counterbore", `Ø${mm(thread["counterboreDiameter"])} x ${mm(thread["counterboreDepth"])} mm`], ["Countersink", `Ø${mm(thread["countersinkDiameter"])} mm`]]} /> : undefined }
+    }
+    const issues = listed(d?.["issues"])
+    const titles: Readonly<Record<string, string>> = { inspect: "Parametric part read", validate: "Parametric history validated", create: "Parametric part created", update: "Parametric part updated", test: "Parametric variants tested" }
+    return { icon: "◇", pending: "Working on the parametric part...", title: `${titles[action] ?? "Parametric"}${num(d?.["bodyCount"]) !== undefined ? ` · ${plural(num(d?.["bodyCount"])!, "solid")}` : ""}${num(d?.["volumeMm3"]) !== undefined ? ` · ${mm(num(d?.["volumeMm3"])! / 1000)} cm³` : ""}`,
+      tone: issues.some((i) => i["severity"] === "error") ? "error" : issues.length > 0 ? "warn" : "ok",
+      detail: issues.length > 0 ? () => <Issues issues={issues.map((i) => ({ ...i, code: str(i["feature"]) }))} /> : undefined }
+  },
   cad_check_design: ({ data }) => {
     const d = rec(data)
     const issues = arr(d?.["issues"]).flatMap((i) => (rec(i) ? [rec(i)!] : []))

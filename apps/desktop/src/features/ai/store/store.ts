@@ -582,7 +582,9 @@ export const createAiStore = (): AiStore => {
     // The answer that was being written ends here, marked as stopped.
     if (activeAssistantId !== undefined) patchMessage(activeAssistantId, (prev) => prev.status === "streaming" ? { ...prev, status: "done", interrupted: true, finishedAt: new Date().toISOString() } : prev)
     saveTranscript()
-    app.runtime.runVoid(app.client.ai.chatAbort({ payload: { sessionId: sid } }))
+    // The host stops the background tasks of the conversation with the turn: show that now, then take the host's own record.
+    setTasks((current) => current.map((t) => t.status === "queued" || t.status === "running" ? { ...t, status: "cancelled" as const } : t))
+    void app.runtime.run(app.client.ai.chatAbort({ payload: { sessionId: sid } })).then(() => { if (!disposed && sessionId() === sid) void refreshControls() }).catch(() => undefined)
     setStatus("idle")
   }
 

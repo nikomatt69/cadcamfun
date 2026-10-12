@@ -50,7 +50,7 @@ export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
   { id: "cad_component_relations", category: "cad", title: "Component relationships", description: "Inspect nominal distances, bounds, parameter definitions and dependencies between two components." },
   { id: "web_search", category: "research", title: "Web search", description: "Search live technical sources and return URLs and bounded excerpts." },
   { id: "attachment_read", category: "research", title: "Read attached code and drawings", description: "Read real project attachments in bounded pages." },
-  { id: "cad_parametric", category: "cad", title: "Parametric model and tests", description: "Inspect feature dependencies, update dimensions in place and test variants without changing the drawing." },
+  { id: "cad_parametric", category: "cad", title: "Parametric model, recipes and design rules", description: "Inspect, update and test dimension-driven parts (sketch, extrude with draft, revolve, sweep with pipe bends, loft, shell, fillet), generate standard parts (flange, bracket, shaft, plate, enclosure, pipe, duct), look up fastener sizes and check manufacturability." },
   { id: "cad_vision", category: "cad", title: "CAD Vision", description: "Capture the actual CAD viewport and add the image and scene evidence to model context." },
   { id: "cam_vision", category: "cam", title: "CAM Vision", description: "Capture the actual CAM preview with operation and verification context." },
   { id: "cad_add_entities", category: "cad", title: "Add entities", description: "Append 2D entities (mm, radians) to the active drawing." },

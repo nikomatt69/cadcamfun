@@ -363,11 +363,15 @@ export class AiService extends Context.Service<AiService, {
         const modelID = input.model?.model ?? lastModel?.modelID
         const selected = flattenCatalog(catalog).find((m) => m.provider === providerID && m.id === modelID)
         if (input.action === "compact") {
-          if (state.busy || host.value.scheduler.list(owner).some((task) => task.status === "running" || task.status === "queued")) return yield* new AiConfigError({ message: "Wait for the current turn and background tasks to finish before compacting." })
+          // A turn that is still running cannot be compacted. Background tasks belong to this conversation: with the turn over, the ones
+          // still queued or running are stopped (and show as cancelled) rather than blocking the compaction for good.
+          if (state.busy) return yield* new AiConfigError({ message: "Wait for the current turn to finish before compacting." })
+          yield* Effect.promise(() => host.value.scheduler.stopParent(owner))
           if (!providerID || !modelID || !selected) return yield* new AiConfigError({ message: "Select an available model before compacting." })
           yield* compactHostSession(projectHost, sessionId, { providerID, modelID })
         } else if (input.action === "consolidate_memory") {
-          if (state.busy || host.value.scheduler.list(owner).some((task) => task.status === "running" || task.status === "queued")) return yield* new AiConfigError({ message: "Wait for turns and background tasks before consolidating memory." })
+          if (state.busy) return yield* new AiConfigError({ message: "Wait for the current turn to finish before consolidating memory." })
+          yield* Effect.promise(() => host.value.scheduler.stopParent(owner))
           const learned = yield* Effect.tryPromise({ try: () => projectHost.client.brain.trigger({ force: true, sessionID: sessionId }), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
           if (!learned.success || !learned.sessionID || learned.sessionID === "brain-session-not-created") return yield* new AiProviderError({ message: learned.error ?? "The host did not complete a memory consolidation session." })
           const evidence = yield* Effect.tryPromise({ try: () => projectHost.client.session.messages({ sessionID: learned.sessionID! }), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
@@ -511,12 +515,18 @@ export class AiService extends Context.Service<AiService, {
             // Abort the host session this client session is bound to; the id the
             // UI knows is not the host's own id, so resolve it through the map.
             const mapped = (yield* Ref.get(sessionMap)).get(sessionId)
+            // Stopping a turn stops the work it started: the background tasks of this conversation are linked to it. They are only
+            // stopped, not retired, so the next turn can start new ones.
             if (mapped !== undefined) {
               yield* abortHostSession(mapped.host, mapped.sessionId)
+              yield* Effect.promise(() => host.value.scheduler.stopParent({ projectId: mapped.host.projectId, parentSessionId: mapped.sessionId }))
               return
             }
             const projectHost = yield* host.value.runtime.host("default").pipe(Effect.option)
-            if (Option.isSome(projectHost)) yield* abortHostSession(projectHost.value, sessionId)
+            if (Option.isSome(projectHost)) {
+              yield* abortHostSession(projectHost.value, sessionId)
+              yield* Effect.promise(() => host.value.scheduler.stopParent({ projectId: projectHost.value.projectId, parentSessionId: sessionId }))
+            }
           })
       })
     })

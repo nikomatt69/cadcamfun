@@ -30,16 +30,33 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
       add("offset", "offset along the normal", f.offset)
       f.sketch.constraints.forEach((c, i) => { if ("value" in c) add(`sketch.constraints.${i}.value`, constraintLabel(c), c.value as Dimension) })
       break
-    case "extrude": add("depth", "depth", f.depth); break
+    case "extrude":
+      add("depth", "depth", f.depth)
+      add("edge.size", `edge ${f.edge?.style ?? ""} size`, f.edge?.size)
+      add("corner.size", `corner ${f.corner?.style ?? ""} size`, f.corner?.size)
+      add("taper", "draft angle (deg)", f.taper)
+      break
     case "revolve": add("angle", "angle (deg)", f.angle); break
     case "hole":
       add("offset", "offset along the normal", f.offset)
       add("at.0", "centre u", f.at[0]); add("at.1", "centre v", f.at[1])
       add("diameter", "diameter", f.diameter); add("depth", "depth", f.depth)
+      add("headDiameter", f.kind === "countersink" ? "countersink diameter" : "counterbore diameter", f.headDiameter)
+      add("headDepth", "counterbore depth", f.headDepth)
+      add("angle", "countersink angle (deg)", f.angle)
       break
+    case "mirror": add("offset", "mirror plane offset", f.offset); break
+    case "shell": add("thickness", "shell thickness", f.thickness); break
+    case "fillet": add("radius", f.style === "chamfer" ? "chamfer size" : "fillet radius", f.radius); add("edges.minLength", "shortest edge", f.edges?.minLength); break
+    case "sweep": add("bendRadius", "bend radius", f.bendRadius); break
+    case "loft": break
     case "pattern":
       add("count", "count", f.count)
-      if (f.kind === "linear") { f.step?.forEach((s, i) => add(`step.${i}`, `step ${"xyz"[i]}`, s)) }
+      if (f.kind === "grid") {
+        f.step?.forEach((s, i) => add(`step.${i}`, `step ${"xyz"[i]}`, s))
+        add("countB", "rows", f.countB)
+        f.stepB?.forEach((s, i) => add(`stepB.${i}`, `row step ${"xyz"[i]}`, s))
+      } else if (f.kind === "linear") { f.step?.forEach((s, i) => add(`step.${i}`, `step ${"xyz"[i]}`, s)) }
       else { f.centre?.forEach((c, i) => add(`centre.${i}`, `centre ${"xy"[i]}`, c)); add("span", "span (deg)", f.span) }
       break
   }
@@ -122,9 +139,9 @@ export const removeParameter = (history: History, name: string): History => {
   return { ...history, parameters }
 }
 
-/** Ids of the features that need `id` to exist: a sketch used by an extrude or revolve, an extrude / revolve / hole copied by a pattern. */
+/** Ids of the features that need `id` to exist: a sketch used by an extrude or revolve, an extrude / revolve / hole copied by a pattern or a mirror, a sketch used by a sweep or loft, an extrusion hollowed by a shell. */
 export const dependentsOf = (history: History, id: string): ReadonlyArray<string> =>
-  history.features.filter((f) => ((f.type === "extrude" || f.type === "revolve") && f.sketch === id) || (f.type === "pattern" && f.feature === id)).map((f) => f.id)
+  history.features.filter((f) => ((f.type === "extrude" || f.type === "revolve") && f.sketch === id) || ((f.type === "pattern" || f.type === "mirror" || f.type === "shell") && f.feature === id) || (f.type === "sweep" && (f.profile === id || f.path === id)) || (f.type === "loft" && f.sections.includes(id))).map((f) => f.id)
 
 /** A feature removed together with everything that cannot exist without it (the extrusions of a sketch, the patterns of those, ...). */
 export const removeFeature = (history: History, id: string): History => {

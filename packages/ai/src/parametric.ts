@@ -34,23 +34,61 @@ const constraint = z.discriminatedUnion("type", [
   z.object({ ...named, type: z.literal("tangentCircles"), a: id, b: id, internal: z.boolean().optional() })
 ])
 const targets = z.array(id).min(1).max(40).optional()
+/** Features whose tool a pattern or a mirror may copy. */
+const TOOL_SOURCES: ReadonlyArray<string> = ["extrude", "revolve", "hole", "sweep", "loft", "mirror"]
+const BODY_FEATURES: ReadonlyArray<string> = ["extrude", "revolve", "sweep", "loft"]
+const treatmentStyle = z.enum(["chamfer", "fillet"])
+const edgeTreatment = z.object({ style: treatmentStyle, size: dimensionSchema, ends: z.enum(["top", "bottom", "both"]).optional(), holes: z.boolean().optional() })
+  .describe("Break the edges round the end faces of the extrusion: chamfer (straight bevel) or fillet (quarter-round of radius size). ends defaults to both; holes also breaks the rim of the holes.")
+const cornerTreatment = z.object({ style: treatmentStyle, size: dimensionSchema })
+  .describe("Round (fillet) or bevel (chamfer) the sharp vertical corners of the sketch profile before extruding. Size is the radius or the setback in mm.")
 const feature = z.discriminatedUnion("type", [
   z.object({ id, type: z.literal("sketch"), plane, offset: dimensionSchema.optional(), sketch: z.object({ entities: z.array(entity).min(1).max(200), constraints: z.array(constraint).max(200) }) }),
-  z.object({ id, type: z.literal("extrude"), sketch: id, depth: dimensionSchema, direction: z.enum(["up", "down", "symmetric"]).optional(), operation, targets }),
+  z.object({ id, type: z.literal("extrude"), sketch: id, depth: dimensionSchema, direction: z.enum(["up", "down", "symmetric"]).optional(), operation, targets, edge: edgeTreatment.optional(), corner: cornerTreatment.optional(), taper: dimensionSchema.optional() }),
   z.object({ id, type: z.literal("revolve"), sketch: id, axis: z.union([z.enum(["x", "y"]), z.object({ line: id })]), angle: dimensionSchema.optional(), operation, targets }),
-  z.object({ id, type: z.literal("hole"), plane, offset: dimensionSchema.optional(), at: pair, diameter: dimensionSchema, depth: dimensionSchema, targets }),
-  z.object({ id, type: z.literal("pattern"), feature: id, kind: z.enum(["linear", "circular"]), count: dimensionSchema, step: triple.optional(), centre: pair.optional(), span: dimensionSchema.optional() })
+  z.object({
+    id, type: z.literal("hole"), plane, offset: dimensionSchema.optional(), at: pair, diameter: dimensionSchema, depth: dimensionSchema, targets,
+    kind: z.enum(["simple", "counterbore", "countersink"]).optional().describe("simple (default), counterbore (flat recess for a screw head: needs headDiameter and headDepth) or countersink (cone for a flat head: needs headDiameter; angle is the included cone angle, default 90)."),
+    headDiameter: dimensionSchema.optional(), headDepth: dimensionSchema.optional(), angle: dimensionSchema.optional()
+  }),
+  z.object({
+    id, type: z.literal("pattern"), feature: id, kind: z.enum(["linear", "circular", "grid"]), count: dimensionSchema, step: triple.optional(), centre: pair.optional(), span: dimensionSchema.optional(),
+    countB: dimensionSchema.optional().describe("grid only: the number of rows (count is the number along step)."), stepB: triple.optional().describe("grid only: the offset between two rows [dx,dy,dz].")
+  }),
+  z.object({ id, type: z.literal("sweep"), profile: id, path: id, operation, targets, bendRadius: dimensionSchema.optional() })
+    .describe("Sweep the closed profile of an earlier sketch along the path of another sketch (ONE open chain of lines/arcs, or one closed loop). The centre of the profile rides the start of the path; loops inside loops are holes (a hollow tube is two circles)."),
+  z.object({ id, type: z.literal("loft"), sections: z.array(id).min(2).max(12), smooth: z.boolean().optional(), operation, targets })
+    .describe("Loft a solid through the largest closed loop of two or more earlier sketches, in order. Sections are resampled to the same number of points; smooth passes a curve through them instead of straight spans."),
+  z.object({ id, type: z.literal("shell"), feature: id, thickness: dimensionSchema, open: z.enum(["none", "top", "bottom", "both"]).optional(), targets })
+    .describe("Hollow out an earlier extrude, full revolve or sweep with uniform walls of thickness mm; open leaves the end faces open (a cup, a tube). Not for tapered extrudes or Boolean results."),
+  z.object({
+    id, type: z.literal("fillet"), radius: dimensionSchema, style: z.enum(["fillet", "chamfer"]).optional(), targets,
+    edges: z.object({
+      parallel: z.enum(["x", "y", "z"]).optional(), kind: z.enum(["convex", "concave", "both"]).optional(), minLength: dimensionSchema.optional(), curved: z.boolean().optional(),
+      within: z.object({ min: triple, max: triple }).optional()
+    }).optional().describe("Which edges: parallel to an axis, convex/concave (default convex), longer than minLength, wholly inside the box within {min,max}; curved:true also takes rims of curved surfaces (slow, off by default). No selection = every convex edge.")
+  }).describe("Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. Read the issues: a size wider than the faces is refused."),
+  z.object({ id, type: z.literal("mirror"), feature: id, plane, offset: dimensionSchema.optional() }).describe("Mirror the tool of an earlier extrude, revolve, hole or mirror through a plane: XY reflects Z, YZ reflects X, ZX reflects Y, at offset along the plane normal.")
 ])
 
 export const parameterSchema = z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/), dimensionSchema).refine((p) => Object.keys(p).length <= 80, "At most 80 parameters")
-export const historySchema = z.object({ parameters: parameterSchema, features: z.array(feature).min(1).max(80) }).describe("JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve references.").superRefine((history, ctx) => {
+export const historySchema = z.object({ parameters: parameterSchema, features: z.array(feature).min(1).max(80) }).describe("JSON object, never a JSON-encoded string. Features and constraints use type; sketch entities use kind. Sketch features must precede extrude/revolve/sweep/loft references; shell needs an earlier extrude; fillet acts on the bodies built so far.").superRefine((history, ctx) => {
   const seen = new Map<string, z.infer<typeof feature>>()
   const issue = (index: number, message: string) => ctx.addIssue({ code: "custom", path: ["features", index], message })
   history.features.forEach((f, index) => {
     if (seen.has(f.id)) issue(index, `Duplicate feature id '${f.id}'`)
     if ((f.type === "extrude" || f.type === "revolve") && seen.get(f.sketch)?.type !== "sketch") issue(index, `Sketch '${f.sketch}' must precede this feature`)
-    if (f.type === "pattern" && f.kind === "linear" && f.step === undefined) issue(index, "Linear patterns need step [dx,dy,dz]")
-    if (f.type === "pattern" && !["extrude", "revolve", "hole"].includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve or hole`)
+    if (f.type === "pattern" && (f.kind === "linear" || f.kind === "grid") && f.step === undefined) issue(index, `${f.kind === "grid" ? "Grid" : "Linear"} patterns need step [dx,dy,dz]`)
+    if (f.type === "pattern" && f.kind === "grid" && (f.countB === undefined || f.stepB === undefined)) issue(index, "Grid patterns need countB (rows) and stepB [dx,dy,dz]")
+    if (f.type === "pattern" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft or mirror`)
+    if (f.type === "mirror" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft or mirror`)
+    if (f.type === "sweep") for (const [role, ref] of [["profile", f.profile], ["path", f.path]] as const) if (seen.get(ref)?.type !== "sketch") issue(index, `Sweep ${role} '${ref}' must be an earlier sketch`)
+    if (f.type === "sweep" && f.profile === f.path) issue(index, "A sweep needs two different sketches: the profile and the path")
+    if (f.type === "loft") for (const ref of f.sections) if (seen.get(ref)?.type !== "sketch") issue(index, `Loft section '${ref}' must be an earlier sketch`)
+    if (f.type === "shell" && !["extrude", "revolve", "sweep"].includes(seen.get(f.feature)?.type ?? "")) issue(index, `Shell source '${f.feature}' must be an earlier extrude, revolve or sweep`)
+    if (f.type === "fillet" && !BODY_FEATURES.some((type) => [...seen.values()].some((e) => e.type === type))) issue(index, "A fillet needs a body built before it (extrude, revolve, sweep or loft)")
+    if (f.type === "hole" && f.kind === "counterbore" && (f.headDiameter === undefined || f.headDepth === undefined)) issue(index, "A counterbore hole needs headDiameter and headDepth")
+    if (f.type === "hole" && f.kind === "countersink" && f.headDiameter === undefined) issue(index, "A countersink hole needs headDiameter")
     if ("targets" in f && f.targets?.some((t) => !seen.has(t))) issue(index, "Targets must name earlier body features")
     if (f.type === "sketch") {
       const entities = new Map(f.sketch.entities.map((e) => [e.id, e]))

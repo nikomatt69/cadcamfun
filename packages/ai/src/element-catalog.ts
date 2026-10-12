@@ -65,7 +65,7 @@ export const ELEMENT_SPECS = {
   parametric: {
     defaults: { ...at, history: { parameters: {}, features: [] } },
     required: ["history"],
-    doc: "dimension-driven part: history OBJECT {parameters:{name:number|\"expression\"},features:[...]}. Validate with cad_parametric first. Every feature has id/type: sketch {plane:XY|YZ|ZX,offset?,sketch:{entities:[...],constraints:[]}}, extrude {sketch:earlierId,depth,operation:new|union|subtract|intersect,direction?:up|down|symmetric}, revolve {sketch,axis:x|y|{line},operation,angle? (deg)}, hole {plane,at:[u,v],diameter,depth}, pattern {feature,kind:linear|circular,count,step|centre,span?}. Entities use kind, not type: point {id,kind:point,x,y}; line {id,kind:line,p1,p2}; circle {id,kind:circle,center,radius}; arc {id,kind:arc,center,start,end}. References are point IDs. Constraints use type. Parameter expressions only in dimension fields"
+    doc: "dimension-driven part: history OBJECT {parameters:{name:number|\"expr\"},features:[...]}. Validate with cad_parametric first. Features have id/type: sketch {plane:XY|YZ|ZX,offset?,sketch:{entities:[...],constraints:[]}}, extrude {sketch:earlierId,depth,operation:new|union|subtract|intersect,direction?:up|down|symmetric}, revolve {sketch,axis:x|y|{line},operation,angle? (deg)}, hole {plane,at:[u,v],diameter,depth}, pattern {feature,kind:linear|circular|grid,count,step|centre,span?,countB?,stepB?}, mirror {feature,plane,offset?}, sweep/loft/shell/fillet (see cad_parametric). Entities use kind, not type: point {id,kind:point,x,y}; line {id,kind:line,p1,p2}; circle {id,kind:circle,center,radius}; arc {id,kind:arc,center,start,end}. References are point IDs. Constraints use type."
   },
   // ---- containers
   component: {

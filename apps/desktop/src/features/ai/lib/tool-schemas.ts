@@ -74,7 +74,23 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
     Schema.Struct({ action: Schema.Literal("validate"), history: record }),
     Schema.Struct({ action: Schema.Literal("create"), history: record, name: nonEmptyString, x: Schema.optional(Schema.Number), y: Schema.optional(Schema.Number), z: Schema.optional(Schema.Number), layer: Schema.optional(nonEmptyString) }),
     Schema.Struct({ action: Schema.Literal("update"), elementId: nonEmptyString, parameters: record, expectedRevision: nonEmptyString }),
-    Schema.Struct({ action: Schema.Literal("test"), elementId: nonEmptyString, cases: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(12)) })
+    Schema.Struct({ action: Schema.Literal("test"), elementId: nonEmptyString, cases: Schema.Array(record).check(Schema.isMinLength(1), Schema.isMaxLength(12)) }),
+    Schema.Struct({
+      action: Schema.Literal("recipe"), recipe: nonEmptyString, params: Schema.optional(record), create: Schema.optional(Schema.Boolean), name: Schema.optional(nonEmptyString),
+      x: Schema.optional(Schema.Number), y: Schema.optional(Schema.Number), z: Schema.optional(Schema.Number), layer: Schema.optional(nonEmptyString)
+    }),
+    Schema.Struct({
+      action: Schema.Literal("dfm"), elementId: Schema.optional(nonEmptyString), history: Schema.optional(record),
+      process: Schema.optional(Schema.Union([Schema.Literal("mill"), Schema.Literal("turn"), Schema.Literal("print")])),
+      toolDiameter: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))),
+      material: Schema.optional(Schema.Union([Schema.Literal("metal"), Schema.Literal("cast"), Schema.Literal("plastic")])),
+      minWall: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0))), envelope: Schema.optional(record)
+    }),
+    Schema.Struct({
+      action: Schema.Literal("fastener"), size: Schema.optional(nonEmptyString),
+      fit: Schema.optional(Schema.Union([Schema.Literal("fine"), Schema.Literal("medium"), Schema.Literal("coarse")])),
+      shaftDiameter: Schema.optional(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThan(0)))
+    })
   ]),
   cad_vision: Schema.Struct({ focus: Schema.optional(Schema.String) }),
   cam_vision: Schema.Struct({ focus: Schema.optional(Schema.String) }),

@@ -4,7 +4,7 @@ import type { cadInspectInput } from "./cad_inspect.ts"
 import type { cadComponentRelationsInput } from "./cad_component_relations.ts"
 import type { WebSearchInput } from "../web-search.ts"
 import type { VisionCapture } from "../vision.ts"
-import type { ParametricInput } from "./cad_parametric.ts"
+import type { ParametricHandlerInput } from "./cad_parametric.ts"
 import type { CadGrepInput } from "./cad_grep.ts"
 import { Context } from "effect"
 import type { cad, cam } from "@cadcamfun/core"
@@ -31,7 +31,7 @@ export interface ToolHandlersShape {
   cadComponentRelations?(projectId: string, input: cadComponentRelationsInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
-  parametric?(projectId: string, input: ParametricInput): Promise<unknown>
+  parametric?(projectId: string, input: ParametricHandlerInput): Promise<unknown>
   addEntities(projectId: string, entities: ReadonlyArray<unknown>): Promise<unknown>
   /** Substring search over the drawing that returns each parametric hit's parameters with its revision. */
   grep(projectId: string, input: CadGrepInput): Promise<unknown>

@@ -219,7 +219,7 @@ A part the user will iterate on ("in three sizes", "depending on the part family
 A parametric element holds \`history: { parameters, features }\`.
 
 - \`parameters\`: named dimensions, numbers or expressions of each other (\`"half": "width / 2"\`). Cycles are rejected.
-- \`features\` run in order: \`sketch\`, \`extrude\`, \`revolve\`, \`hole\`, \`pattern\` (linear or circular). A dimension is a parameter name or an expression.
+- \`features\` run in order: \`sketch\`, \`extrude\` (optional \`edge\` chamfer/fillet round the end faces, \`corner\` rounding of the profile and \`taper\` draft angle), \`revolve\`, \`hole\` (\`kind\`: simple, counterbore, countersink), \`pattern\` (linear, circular or grid), \`mirror\`, \`sweep\` (profile along a path sketch, optional \`bendRadius\` for pipe bends), \`loft\` (through sketch sections), \`shell\` (hollow an extrude, full revolve or sweep, optionally open) and \`fillet\` (round or chamfer edges between planar faces). A dimension is a parameter name or an expression.
 - History is a JSON object, never a string. Features and constraints use \`type\`; sketch entities use \`kind: point|line|circle|arc\`. Lines use point IDs in \`p1/p2\`; circles use a point ID in \`center\`. Read the complete \`cad_parametric\` validate example instead of inventing a rectangle entity.
 
 ## Workflow
@@ -230,6 +230,11 @@ A parametric element holds \`history: { parameters, features }\`.
 4. Add features that reference parameter names, then call \`cad_parametric\` validate. Repair the reported paths and rebuild errors before create; switching to \`cad_add_elements\` cannot bypass the same history schema.
 5. End with \`cad_check_design\`. On \`RebuildFailed\`, read the cause, fix it, repeat.
 6. Save on an \`ai/<topic>\` branch with \`vcs_commit\` (see the version-control-cadcam skill).
+
+## Standard parts and design rules
+
+- \`cad_parametric\` \`action: "recipe"\` generates mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend (long-radius bend by default, \`bendRadius\` 0 = mitred) or duct_transition from design inputs (fastener size, diameters, bolt count); holes follow ISO 273, counterbores ISO 4762 / DIN 974, keyways DIN 6885, and edge distance and spacing rules are enforced. Edit its parameters afterwards.
+- \`action: "fastener"\` returns thread, tap drill, clearance and counterbore sizes. \`action: "dfm"\` returns the manufacturability findings for a process, cutter and material; fix errors before CAM.
 
 ## Editing later
 
@@ -244,7 +249,7 @@ A parametric element holds \`history: { parameters, features }\`.
 
 ## Limitations
 
-- No fillet, shell or pattern-along-path features yet. Use mesh chamfers (\`cad_add_elements\`, \`chamferBox\`) separately.`
+- Not available in a history: fillets against curved faces, variable-radius fillets, shell of a Boolean result, loft guide rails and tangency, pattern along a path. Say so instead of faking them.`
 
 const COMPOSED_CAM = `# Composing CAM programs
 

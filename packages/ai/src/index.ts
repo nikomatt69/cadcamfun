@@ -54,7 +54,7 @@ export {
 export { backgroundToolSpecs, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
 
 export * from "./parametric.ts"
-export type { ParametricInput } from "./tools/cad_parametric.ts"
+export type { ParametricInput, ParametricHandlerInput } from "./tools/cad_parametric.ts"
 export * from "./vision.ts"
 export * from "./web-search.ts"
 export type { cadInspectInput } from "./tools/cad_inspect.ts"
