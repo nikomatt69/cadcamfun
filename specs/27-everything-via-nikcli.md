@@ -8,11 +8,22 @@ The agent already drives a rich slice of the product: the embedded host register
 
 Three gaps keep "every action" from being true:
 
-1. **No single source of truth.** The same capabilities are declared three times — tool files (`packages/ai/src/tools/`), inline sidecar specs (`libraryToolSpecs`, `ai-vcs-tools.ts`) and HTTP routes (`packages/api/src/groups/*` → `apps/sidecar/src/http/*`) — with no parity guard between them. The drift is real: `packages/ai/src/tools/cad_grep.ts` is wired in `handlers.ts` but missing from `registry.ts`, so the model cannot call it.
+1. **No single source of truth.** The same capabilities are declared three times — tool files (`packages/ai/src/tools/`), inline sidecar specs (`libraryToolSpecs`, `ai-vcs-tools.ts`) and HTTP routes (`packages/api/src/groups/*` → `apps/sidecar/src/http/*`) — with no parity guard between them. The historical missing `cad_grep` registration claim is stale: source inspection on 2026-10-12 confirms it is registered. Catalogue consistency still needs a derived parity guard.
 2. **The extension hook is unused.** `buildTools(handlers, projectId, extensions)` accepts `ToolDefinition`s "from outside this package" (`packages/ai/src/tools/registry.ts:52-65`), but no production caller passes any; `packages/plugin-sdk` contributions (`packages/plugin-sdk/src/manifest.ts:64`: `commands`, `panels`, `postProcessors`, `operations`) have no AI-tool surface.
 3. **Nothing outside the sidecar can act.** A standalone `nikcli` (terminal, another machine, CI) cannot describe a drawing, create an operation or verify a toolpath on a running cadcamfun instance. And there is no MCP server to fall back on: "v6 ships no MCP SDK, SSE connector or stdio process manager" (`apps/sidecar/src/http/mcp.ts:20-23`).
 
-Note also that `26-tool-consolidation.md` is specified as implemented but the tree still registers the per-verb catalogue (no `packages/ai/src/tools/action.ts`; `registry.ts` lists 31 per-verb built-ins). Landing spec 26 is phase 0 of this plan; the catalogue below is the contract both implementations serve.
+Spec 26 is now correctly labelled implementation pending: the tree still registers the per-verb catalogue. Consolidation is RM-01; the external bridge is RM-11. This document's phases are design subdivisions, not an alternative implementation sequence.
+
+### Contract amendments (2026-10-12)
+
+[Spec 28](28-native-ai-architecture.md) and [AI-10](ai/10-nikcli-and-plugin-adapters.md) sharpen these proposals without changing the ordered [RM roadmap](roadmap/README.md):
+
+- Shared authoritative wire schemas are Effect schemas in `packages/api`, with an equivalence-tested zod adapter for nikcli. The pseudocode below is illustrative, not permission to import AI or DB into API contracts or maintain two independent schemas.
+- The action interface includes typed results/effects, trusted actor/owner/document context, cancellation and expected revisions. Embedded execution remains in-process; HTTP is a second adapter to the same execution, not an internal network hop.
+- Mod loading remains optional and compatibility/isolation gated. No proposed hook or `ctx.ask` path is assumed available without checking the pinned SDK. Baseline safety uses proven native permissions: destructive groups remain `ask` until action escalation is demonstrated; `confirm:true` never authorizes a write.
+- Scope external tokens independently of the sidecar's existing local authorization adapter; do not assume a `requireAuth` helper provides project/write rights. Server authorization and verifiable native confirmation are mandatory. Companion allow-lists do not widen.
+- Report persistence and workflow triggering are writes. Reviewers inspect existing artifacts/reports; verifying actual NC references its hash and revision, not a silently regenerated replacement.
+- Contract-first WP0-owned revision/receipt/task migrations belong to RM-03/RM-07. This bridge itself does not authorize unrelated DB changes.
 
 ## 2. Decision: B + C, through the nikcli extension SDK — no fork
 
@@ -95,8 +106,8 @@ A small package `@cadcamfun/nikcli-plugin` (built on `@nikcli-ai/plugin`'s `./to
 
 ## 5. Via C — the HttpApi bridge
 
-- **Contract.** `packages/api` owns the schemas; the cadcam parity group makes every catalogue action reachable over HTTP with the same zod parameters. Clients are regenerated with the existing codegen (`packages/httpapi-codegen`, `bun run --filter @cadcamfun/api coverage` stays meaningful).
-- **Auth.** Routes sit behind the existing `requireAuth` + per-route authorization (`apps/sidecar/src/http/authorization.ts`); destructive actions additionally require a `write`-scoped token. The companion gateway allow-list (`apps/sidecar/src/services/companion-gateway.ts`, spec 13 §6) stays as-is: the phone's surface is unchanged by this spec.
+- **Contract.** `packages/api` owns authoritative Effect wire schemas; catalogue adapters use an equivalence-tested nikcli zod representation. Reuse existing routes where appropriate, declare in-process-only exceptions explicitly, and regenerate clients through installed codegen scripts.
+- **Auth.** New external-agent authorization validates revocable project/read-write scope plus resource rights; the existing local bearer/session adapter is not sufficient evidence of external scope. Destructive actions additionally require verifiable native confirmation evidence, not a model flag. Companion allow-lists remain unchanged.
 - **Tokens for external nikcli.** A paired token (same issuance path as the mobile companion) scopes an external agent to one project and to the same permission classes as the in-app agent; tokens are revocable and visible in the same settings surface.
 - **In-process tools do not hop HTTP.** The embedded host and the kernel share the process; their tools call `ToolHandlers` directly. The bridge exists for out-of-process nikcli, for contract parity (which is what makes the drift test possible) and for the mobile/companion surfaces.
 
@@ -124,7 +135,7 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 | Phase | Work | Owner | Depends on |
 | --- | --- | --- | --- |
 | 0 | Land spec 26 in code: `defineActionTool`, 12 consolidated tools + prompts, registry/UI renames | WP8 (+WP4, WP6) | — |
-| 1 | `packages/ai/src/actions/` catalogue derived from the 12 tools; parity test tool↔catalogue; wire `cad_grep` drift | WP8 | 0 |
+| 1 | `packages/ai/src/actions/` catalogue and derived tool parity; preserve already registered `cad_grep` coverage | WP8 | 0 |
 | 2 | Catalogue→HTTP parity map + missing routes in `packages/api`/`apps/sidecar/src/http`; regenerated clients; parity test catalogue↔routes | WP3, WP4 | 1 |
 | 3 | `contributes.aiTools` in plugin-sdk; first production `extensions` caller in `toolsFor` | WP9, WP8 | 1 |
 | 4 | App-owned mod (audit, destructive escalation, prompt context) — gated on the pinned bundle (§4.3) | WP8 | 0 |
@@ -132,9 +143,9 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 
 ## 10. Acceptance criteria
 
-1. A parity test derives, from the catalogue: (a) every tool id the host registers, (b) every HTTP route, and fails on drift in either direction; it would currently fail on `cad_grep`.
+1. A parity test derives host registrations and HTTP route mappings or explicit in-process-only exceptions from the catalogue, failing on drift. Preserve already registered `cad_grep` reachability, parameter/result schemas and read-only authorization through RM-01 consolidation and RM-11 bridge exposure; test any explicit in-process-only exception. This is preservation coverage, not a reproduced current missing-registration failure. Source inspection on 2026-10-12 confirms the `cadGrep` import and inclusion in `BUILT_IN_TOOLS` in `packages/ai/src/tools/registry.ts`.
 2. Every consolidated tool prompt documents every action and every parameter of every action (spec 26 §6.3, restated over catalogue actions); catalogue prompt cost stays under 24 000 characters.
-3. `kind: "destructive"` actions require an explicit confirmation in-process (`ask`) and a `write`-scoped token over HTTP; a `read` token is refused with the same typed error shape.
+3. Destructive actions require verifiable native confirmation in-process and over HTTP, alongside authorized project/write scope. Grouped tools use stricter native `ask` until proven action escalation; a model flag/write token alone is not confirmation. Read tokens fail before execute.
 4. External round-trip: with a paired token, a real embedded host plus `@cadcamfun/nikcli-plugin` performs describe → add elements → create operation → generate G-code → verify against a running sidecar, without any provider key (fake model, as in spec 16 acceptance §6).
 5. Isolation unchanged: the sentinel `~/.config/nikcli` test passes; only the app-owned mod loads; user/project mods and plugin auto-install remain disabled.
 6. `bunx tsc -p packages/{ai,api}/tsconfig.json`, the sidecar and desktop typechecks, and `bun test packages apps` are clean; generated clients are regenerated where ids appear.
@@ -142,3 +153,5 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 ## 11. Change log
 
 - v1 (2026-10-11): B+C decision recorded; catalogue-as-single-source, plugin AI-tool contribution, app-owned mod (gated), HTTP parity and external agent plugin specified against the inspected tree (`sdk-next@1.428.0` pinned, spec 26 not yet landed, no MCP).
+- 2026-10-12: corrected cad_grep drift claim; reconciled schema ownership, optional mods, native confirmation and external authorization with spec 28. RM-01/RM-11 remain pending; no runtime gate claimed.
+- 2026-10-12: confirmed cadGrep registration directly and specified preservation of reachability, schemas and read-only authorization across consolidation and the second adapter. Documentation only; no acceptance claim.

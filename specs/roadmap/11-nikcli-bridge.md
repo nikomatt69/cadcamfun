@@ -19,7 +19,7 @@ MCP remains **rejected** (`27` §2). Plugin AI-tool contributions (`plugin-sdk` 
 1. Parity test: every catalogue action exists on both faces or is explicitly `in-process only` in the catalogue.
 2. `buildTools(..., extensions)` used in production (plugin contributions).
 3. Standalone plugin package or documented path under `packages/` — only after the compatibility gate.
-4. Register `cad_grep` (and any other handler-only tools) through the catalogue so they cannot drift again.
+4. Preserve the already registered `cad_grep` capability through RM-01 consolidation and both catalogue adapters (or a justified explicit in-process-only declaration). Source inspection on 2026-10-12 confirms the `cadGrep` import and inclusion in `BUILT_IN_TOOLS` in `packages/ai/src/tools/registry.ts`; do not re-register it or call it handler-only.
 
 ## Out of scope
 
@@ -36,6 +36,11 @@ bun test packages/ai apps/sidecar
 
 Plus the spec-27 compatibility gate against the pinned sdk-next.
 
+Catalogue-derived parity checks preserve `cad_grep` reachability, parameter/result schemas and read-only authorization through consolidation and bridge exposure; test any explicit in-process-only exception rather than silently dropping coverage.
+
 ## Change log
 
+- 2026-10-12: [AI-10](../ai/10-nikcli-and-plugin-adapters.md) adds typed parity, scoped revocable tokens and plugin capability/isolated-mod compatibility gates under [spec 28](../28-native-ai-architecture.md). Embedded execution remains in-process; baseline authorization/permissions do not depend on optional mods. Implementation pending.
+
 - v1: second adapter on the RM-01 catalogue.
+- 2026-10-12: replaced stale missing cad_grep registration work with preservation/consolidation and two-adapter parity coverage, confirmed against registry.ts. Documentation only; implementation pending.

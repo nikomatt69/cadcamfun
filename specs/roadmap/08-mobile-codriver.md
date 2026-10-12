@@ -28,4 +28,6 @@ bun test apps/sidecar
 
 ## Change log
 
+- 2026-10-12: [AI-07](../ai/07-companion-continuity.md) maps shared owner/revision/replay and outstanding native decisions to existing companion owners/allow-lists; RM-07 remains prerequisite. Implementation pending.
+
 - v1: companion UI + notifications on the existing gateway seam.

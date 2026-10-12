@@ -1,6 +1,17 @@
 # 26 — Tool consolidation: fewer tools, more actions
 
-Status: specified, then implemented across WP8 (`packages/ai`), WP4 (`apps/sidecar`), WP6 (`apps/desktop`). Extends `08-ai.md` §3, `16-cadcam-agent-blueprint.md`, `22-gaps-and-fixes.md` §3. No database migration, no new dependency, no change to the host isolation contract.
+Status: **specified; implementation pending** across WP8 (`packages/ai`), WP4 (`apps/sidecar`), WP6 (`apps/desktop`). Source inspection on 2026-10-12 confirms the per-verb registry remains; the former implemented label is not supported by the current tree. Extends `08-ai.md` §3, `16-cadcam-agent-blueprint.md`, `22-gaps-and-fixes.md` §3. No new dependency or change to host isolation for consolidation itself.
+
+## Current contract amendments
+
+[Spec 28](28-native-ai-architecture.md) and [AI-01](ai/01-actions-and-execution.md) deepen this design under [RM-01](roadmap/01-action-catalogue.md). Counts, savings and any historical verification below are design/historical evidence, not current passing implementation results. Measure the actual catalogue before claiming the 12-application-tool / 24,000-character target is satisfied.
+
+- `cad_grep` is already registered; preserve its capability in the action inventory.
+- Classify effects from the implementation, not the tool name: current verification persists regenerated NC; workflows and memory writes are not read-only. Split read inspection from writes before deriving specialist permissions.
+- Native permissions are keyed by tool ID. A destructive action in a grouped tool requires stricter native `ask` for that group unless pinned-SDK action escalation is proved. `confirm:true` is not human approval. Read-only specialists cannot receive mixed-effect groups.
+- Shared wire inputs/results use authoritative Effect schemas in dependency-safe `packages/api`, with an equivalence-tested nikcli zod adapter; do not duplicate independent schema sources or introduce an API-to-AI import.
+- Immutable trusted actor/context and repository write authorization land with action execution. Full task/control ownership follows RM-07; baseline safety cannot wait for an optional mod.
+- Revision/receipt persistence is a separate WP0-scoped RM-03 amendment, not an implicit consolidation migration. Precision backend additions follow RM-09.
 
 ## 1. Why
 
@@ -43,9 +54,9 @@ A single `cad` tool with every verb would hand the read-only `researcher` the ab
 
 So each domain is cut on the boundary the existing safety tests already police (`packages/ai/test/agents.test.ts`: *"only the editors can change the document"*, `MUTATING = /^(cad_(add|modify|…)|cam_(create|…))`):
 
-- `cad` and `cam` are **read-only** and are given to every specialist.
+- `cad` and `cam` must be **read-only** before they are given to read-only specialists; current persisted verification is moved to a write action or split from report inspection.
 - `cad_edit`, `cam_edit`, `parts`, `library_edit` and `vcs_edit` are **writes** and are given only to the roles that already had them.
-- `library`, `vcs` and `memory` are reads plus, where the role already had them, non-destructive side effects.
+- `library`, `vcs` and `memory` must not grant write-capable workflows or memory edits to read-only specialists. Move those actions into write groups; final group/action mapping is derived from effect inventory, not historical names.
 
 The read/write cut also survives the permission *modes*: `permissionAgents` copies a tool's `"allow"` into `"ask"` for the `-ask` variants, so a merged write tool is one ask, not five.
 
@@ -65,7 +76,7 @@ It produces a `z.discriminatedUnion("action", …)` validated through the same `
 
 Each tool keeps one `tools/<id>.ts` and one `tools/prompts/<id>.txt`; the prompt documents every action and every parameter of every action, and a test asserts that **every action name appears in its prompt** and that **every parameter of every action is documented** — the same guarantee the per-tool prompts gave, now enforced per action.
 
-### 2.4 What the catalogue costs now
+### 2.4 Catalogue cost target (not a current measurement)
 
 | | before | after |
 | --- | --- | --- |
@@ -77,7 +88,7 @@ The saving comes from stating the shared conventions once per tool instead of on
 
 ## 3. Renames the UI depends on
 
-`apps/desktop` keys several behaviours on tool ids, and all of them are updated:
+`apps/desktop` keys several behaviours on tool ids; the implementation must update them:
 
 | Behaviour | Before | After |
 | --- | --- | --- |
@@ -88,7 +99,7 @@ The saving comes from stating the shared conventions once per tool instead of on
 | Read-only tools in the timeline (`timeline.ts`) | 16 ids | the read tools `cad`, `cam`, `library`, `vcs`, `memory`, `research` |
 | Prompt guidance (`system.ts`, `modes/*.txt`, `skills/index.ts`) | 60+ id references | the 12 new ids |
 
-`tool-schemas.ts` on the desktop mirrors the parameter shapes at the SSE boundary; it now mirrors one discriminated union per merged tool, so a malformed `tool_call` still becomes a typed `tool_result { ok: false }` instead of a crash.
+`tool-schemas.ts` must consume the shared contract for each merged tool at the SSE seam, so malformed events are diagnosed without inventing a successful result or crashing. Independent manually mirrored schemas are retired after equivalence tests pass.
 
 ## 4. Ownership
 
@@ -100,15 +111,15 @@ The saving comes from stating the shared conventions once per tool instead of on
 
 ## 5. Non-goals
 
-- No change to what a tool *does*: handlers, Effect validation, the drift guards and the result shapes are untouched.
+- Preserve domain behaviour and findings while explicitly separating inspection from persistence and enforcing authorization. Typed shared results may require versioned consumer migration; do not silently alter stored documents.
 - No new tool. The catalogue shrinks; it does not grow.
 - No change to nikcli's native capabilities (`todowrite`, `skill`, `code_mode`, `question`, `invalid`, `search_tools`, and the three goal tools). They are the host's, not ours.
-- No change to the specialists' *prompts* beyond the tool ids they name: a specialist's job is unchanged.
+- Preserve specialist domain roles; update prompts where truthful read/write classification requires clarifying inspection versus regeneration.
 - No action-level permissions inside a tool. The host has none, and inventing one in application code would be a second, weaker permission system beside the real one.
 
 ## 6. Acceptance criteria
 
-1. `TOOL_IDS` (the application tools) has 12 entries; `TOOL_IDS ∪ SIDECAR_TOOL_IDS ∪ NATIVE_TOOLS` has 22.
+1. Target 12 application tools / 22 including the historically listed native capabilities. Derive the final count from actual effects and pinned host registrations. Amend the grouping contract before any necessary count change; counts never override faithful read/write separation or native confirmation.
 2. Every verb of the previous catalogue is reachable: a test maps each retired id to the tool and action that replaced it, and asserts the union covers the old set with no gaps.
 3. Every tool has exactly one `tools/<id>.ts` and one `tools/prompts/<id>.txt`; every action name and every parameter of every action is documented in its prompt; every prompt still carries "Do not use it" where a neighbouring action could be confused with it.
 4. `cad`, `cam`, `library`, `vcs`, `memory` and `research` contain **no action that mutates the document, the operations or the libraries**; `cad_edit`, `cam_edit`, `parts`, `library_edit` and `vcs_edit` contain **no read that a specialist already had read-only**. A test derives both halves from the tool definitions, not from a hand-written list.
@@ -119,3 +130,4 @@ The saving comes from stating the shared conventions once per tool instead of on
 ## 7. Change log
 
 - v1 (2026-10-11): contract for the 12-tool catalogue, the read/write capability boundary it is cut on, and `defineActionTool`. Verb parity with the 63-tool catalogue is an acceptance criterion, not an aspiration.
+- 2026-10-12: corrected unsupported implementation label; added spec 28 authority, shared Effect contracts, real effect classification and native grouped-tool safety. Existing counts are targets/historical evidence, not freshly verified results.

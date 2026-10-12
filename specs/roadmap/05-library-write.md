@@ -35,4 +35,6 @@ bun test apps/sidecar packages/ai
 
 ## Change log
 
+- 2026-10-12: [AI-04](../ai/04-engineering-libraries.md) specifies engineering provenance, unit/limit validation, write authority and derived-evidence invalidation within existing owners; no invented shop equipment or unverified machining recommendations. Implementation pending.
+
 - v1: versioned library writes behind one module.

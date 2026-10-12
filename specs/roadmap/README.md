@@ -2,7 +2,7 @@
 
 Status: **active**. This folder is the **single ordered index** of remaining work after WP0–WP14. When anyone cites **the roadmap**, this file is the source of order.
 
-Design specs (`specs/00`–`27`) still own contracts. This folder owns **sequence**: what to do next, in which order, with which owner directories, and when a step is done.
+Design specs (`specs/00` through `28`, plus `specs/ai/`) own contracts. This folder owns **sequence**: what to do next, in which order, with which owner directories, and when a step is done. [Native AI contracts](../ai/README.md) are design increments mapped to these rows, not a second task board. Their publication does not change implementation statuses.
 
 ## How to follow
 
@@ -19,19 +19,19 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | # | Id | Spec | Status | Depends on | Owners |
 | --- | --- | --- | --- | --- | --- |
 | 0 | RM-00 | `00-how-to-follow.md` | **done** (rules) | — | agents |
-| 1 | RM-01 | `01-action-catalogue.md` | **pending** | — | WP8 `packages/ai`, WP4 `apps/sidecar/src/services/ai.ts` |
-| 2 | RM-02 | `02-multi-op-setup.md` | **pending** | RM-01 (tools only after catalogue) | WP2 `packages/core/src/cam`, WP3 `packages/api`, WP4 `apps/sidecar`, WP6 `apps/desktop/src/cam` |
-| 3 | RM-03 | `03-api-parity.md` | **pending** | — (parallel with RM-02 on disjoint groups) | WP3 `packages/api`, WP4 `apps/sidecar` |
+| 1 | RM-01 | `01-action-catalogue.md` | **pending** | — | WP8 `packages/ai`, WP4 AI handler adapters, WP3 shared action schemas, WP6 AI tool consumers (scopes in step spec) |
+| 2 | RM-02 | `02-multi-op-setup.md` | **pending** | RM-01 for AI actions; RM-03 for persisted setup integration/completion (pure work may run in parallel) | WP2 `packages/core/src/cam`, WP3 `packages/api`, WP4 `apps/sidecar`, WP6 `apps/desktop/src/cam`, WP8 setup action bindings only |
+| 3 | RM-03 | `03-api-parity.md` | **pending** | — (parallel with RM-02 on disjoint groups; AI execution uses RM-01) | WP3 `packages/api`, WP4 `apps/sidecar`, WP0 revision/receipt migration only |
 | 4 | RM-04 | `04-desktop-parity.md` | **pending** | RM-03 for each vertical's routes | WP6 `apps/desktop` |
 | 5 | RM-05 | `05-library-write.md` | **pending** | RM-01, WP0 | WP0 `packages/db`, WP3, WP4, WP8, WP6 |
-| 6 | RM-06 | `06-context-awareness.md` | **pending** | RM-01 | WP8, WP6, WP11 |
-| 7 | RM-07 | `07-ai-lifecycle.md` | **pending** | RM-01 | WP8, WP0 (persisted tasks only) |
+| 6 | RM-06 | `06-context-awareness.md` | **pending** | RM-01 | WP8, WP6, WP11, WP3 snapshot/intent contracts, WP4 authorized context assembly |
+| 7 | RM-07 | `07-ai-lifecycle.md` | **pending** | RM-01, RM-03 receipts for write recovery | WP8, WP0 task persistence, WP3 event/control contracts, WP4 owner binding, WP6 recovery consumers |
 | 8 | RM-08 | `08-mobile-codriver.md` | **pending** | RM-07 stream recovery | WP13 `apps/mobile`, WP4 companion gateway |
-| 9 | RM-09 | `09-cad-cam-depth.md` | **pending** | RM-02 | WP1 `packages/core/src/cad`, WP2 `packages/core/src/cam` |
+| 9 | RM-09 | `09-cad-cam-depth.md` | **pending** | RM-02 for pure-core work; RM-03 and RM-06 additionally for precision integration | WP1 CAD, WP2 CAM, WP8 quality/action exposure, WP3/WP4/WP6 after core gates (scopes in step spec) |
 | 10 | RM-10 | `10-observability.md` | **pending** | RM-07 | WP8, WP6 |
 | 11 | RM-11 | `11-nikcli-bridge.md` | **pending** | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
 
-Parallelisation: RM-01 is first because every later AI change hits the tool **seam**. RM-02 and RM-03 may run in parallel after RM-01 if they do not share files (`packages/ai` vs `packages/api` + sidecar HTTP groups). RM-04 waits on the routes it ports.
+Parallelisation: RM-01 is first because every later AI change hits the tool **seam**. After RM-01, RM-02 pure planning/generation, stateless contracts/adapters and non-persisting desktop work may run alongside RM-03 only on explicitly disjoint files; both steps own parts of `packages/api` and `apps/sidecar`, so workspace names alone do not prove disjointness. RM-03 owns document revision/receipt persistence and its WP0 migration first, with no dependency on RM-02. RM-02 persisted setup integration and completion wait for RM-03 to be done; RM-03 must not wait for RM-02 consumers. This scoped parallel allowance is not permission to bypass the persistence gate. RM-04 waits on the routes it ports. After RM-02, RM-09 pure-core work is independent of RM-03/RM-06; precision integration waits for both rows to be done and its core tests to pass.
 
 ## Already shipped (do not re-open)
 
@@ -52,7 +52,7 @@ See `specs/00-overview.md` §4. Snapshot as of this file:
 | WP13 Mobile | Expo companion; TestFlight pending |
 | WP14 Multi-op setup | `cam/setup.ts` exists; `cam.program` namespace **not** exported from `packages/core/src/cam/index.ts`; no `packages/api` `camSetup` group; no desktop `setupStore` |
 
-Design specs this roadmap sequences (do not duplicate them): `11-api-parity-brief.md`, `12-frontend-clone-brief.md`, `12-professional-cad-cam.md`, `14-multi-op-setup.md`, `14-cad-cam-parity-roadmap.md`, `20-integral-roadmap.md`, `21-integration-master-plan.md`, `22-gaps-and-fixes.md`, `23-ai-runtime-architecture.md`, `26-tool-consolidation.md`, `27-everything-via-nikcli.md`.
+Design specs this roadmap sequences (do not duplicate them): `11-api-parity-brief.md`, `12-frontend-clone-brief.md`, `12-professional-cad-cam.md`, `14-multi-op-setup.md`, `14-cad-cam-parity-roadmap.md`, `20-integral-roadmap.md`, `21-integration-master-plan.md`, `22-gaps-and-fixes.md`, `23-ai-runtime-architecture.md`, `26-tool-consolidation.md`, `27-everything-via-nikcli.md`, [28-native-ai-architecture.md](../28-native-ai-architecture.md) and [AI design contracts](../ai/README.md).
 
 ## Architecture (every step)
 
@@ -87,3 +87,5 @@ Same as `00-overview.md` §5, plus:
 ## Change log
 
 - v1: created `specs/roadmap/`; ordered RM-00–RM-11 from current tree (API 121/195, spec 26 not landed, WP14 persistence missing) and architecture/Effect rules.
+- 2026-10-12: linked approved spec 28 and AI design increments; scoped cross-WP contract amendments for safe execution, receipts, context, durability and precision. Sequence and pending statuses unchanged; no implementation gate claimed.
+- 2026-10-12: reconciled RM-02 persistence behind independent RM-03 and explicitly gated RM-09 precision integration on RM-03/RM-06, with scoped pure-work parallelism. Documentation only; statuses unchanged.

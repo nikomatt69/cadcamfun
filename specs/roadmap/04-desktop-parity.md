@@ -43,4 +43,6 @@ bun run --filter @cadcamfun/desktop build
 
 ## Change log
 
+- 2026-10-12: [AI-03](../ai/03-native-workspace-review.md) specifies document-scoped receipts, revision conflicts, native review and persistent undo semantics; depends on RM-03 revision/receipt implementation. Geometry candidate backend remains RM-09. Existing WP6 scope includes AI consumers; implementation pending.
+
 - v1: replace fake screens after their HTTP groups exist.

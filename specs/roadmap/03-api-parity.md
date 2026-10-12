@@ -1,6 +1,6 @@
 # RM-03 — HTTP contract parity (remaining families)
 
-Status: **pending**. May run in parallel with RM-02 on **disjoint** files. Design: `11-api-parity-brief.md`, `specs/api-inventory.md`. Owners: WP3 `packages/api`, WP4 `apps/sidecar`.
+Status: **pending**. May run in parallel with RM-02 on **disjoint** files. Design: `11-api-parity-brief.md`, `specs/api-inventory.md`, [AI-02](../ai/02-setup-and-domain-parity.md), [spec 28](../28-native-ai-architecture.md). Owners: WP3 `packages/api`, WP4 `apps/sidecar`; WP0 `packages/db/src/schema.ts` and generated migration directory for document revisions/action receipts only, with DB contract changes before generation. AI execution integration uses RM-01; no duplicate dispatcher.
 
 ## Problem
 
@@ -27,6 +27,10 @@ Port one family per change, in this order (user-visible CAD/CAM first; cloud las
 
 Append Done/Deviations to `11-api-parity-brief.md`. Do not tick `api-inventory.md`.
 
+Native AI consistency amendment: before RM-04 consumes receipts, add authoritative document revisions, expected-revision writes, idempotent invocation receipts, typed conflict errors and derived-artifact invalidation. HTTP and AI call the same application execute, not each other. Authorize document and write rights; validate a batch before atomic commit. Generated migration preserves legacy documents and explicit unit versions. Verify stale/duplicate/conflicting writes, cancellation before commit, and artifact/NC-hash identity. WP0 persistence tests are part of this gate, not deferred to the UI.
+
+Persistence sequencing: this revision/receipt module and WP0 migration also precede RM-02 persisted setup integration and RM-09 precision acceptance. RM-03 has no dependency on RM-02: test the persistence interface with document/setup-shaped fixtures without requiring its planner, generated programs or desktop consumers. RM-02 integrates only after RM-03 is done. Parallel pure/stateless RM-02 work must use disjoint files; coordinate shared contract/handler files rather than assuming different HTTP groups are sufficient.
+
 ## Out of scope
 
 - Solid page ports (RM-04).
@@ -35,10 +39,10 @@ Append Done/Deviations to `11-api-parity-brief.md`. Do not tick `api-inventory.m
 ## Verify
 
 ```bash
-bun run --filter @cadcamfun/api coverage
-bunx tsc -p packages/api/tsconfig.json
-bunx tsc -p apps/sidecar/tsconfig.json
-bun test packages/api apps/sidecar
+bun --no-env-file run --filter @cadcamfun/api coverage
+bun --no-env-file run --filter @cadcamfun/api typecheck
+bun --no-env-file run --filter @cadcamfun/sidecar typecheck
+bun --no-env-file test packages/api apps/sidecar
 ```
 
 Gate: coverage rises per family; `--strict` is green only when 195/195. Handler parity is HTTP tests, not the coverage script.
@@ -46,3 +50,5 @@ Gate: coverage rises per family; `--strict` is green only when 195/195. Handler 
 ## Change log
 
 - v1: remaining 74 route files, CAD/CAM-adjacent families first.
+- 2026-10-12: scoped AI-02 revision/receipt prerequisite for RM-04 and WP0 generated migration ownership; runtime implementation pending.
+- 2026-10-12: made RM-03 the independent persistence prerequisite for RM-02 consumers and RM-09 acceptance, without a reverse RM-02 dependency. Documentation only; no gate claimed.

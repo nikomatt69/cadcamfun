@@ -25,4 +25,6 @@ bun test packages/ai apps/desktop
 
 ## Change log
 
+- 2026-10-12: [AI-09](../ai/09-evaluation-and-observability.md) adds redacted quality/effect correlation and per-part acceptance scorecards. Fixtures ship with earlier increments; stochastic/live-provider, native packaging and machine gates remain distinct. No fabricated baseline or runtime result; implementation pending.
+
 - v1: visible cost and honest compact/recovery.
