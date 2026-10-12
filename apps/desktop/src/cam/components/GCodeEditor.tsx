@@ -31,10 +31,11 @@ export default function GCodeEditor(props: GCodeEditorProps): JSX.Element {
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">{t("cam.editor")}</h3>
           <span class="text-xs text-gray-500 dark:text-gray-400">
-            {lineCount()} {t("cam.lines", { count: lineCount() }).replace(`${lineCount()} `, "")}
+            {t("cam.lines", { count: lineCount() })}
           </span>
         </div>
         <textarea
+          aria-label={t("cam.editor")}
           class="form-textarea flex-1 font-mono text-xs leading-5"
           value={props.value}
           spellcheck={false}

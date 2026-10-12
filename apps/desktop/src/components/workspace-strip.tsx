@@ -92,7 +92,7 @@ export function ShellSegs(): JSX.Element {
   return (
     <>
       <Seg label="Units" value={UNIT_TABLE[settings().units].label} tone="amber" testId="status-units" />
-      <Seg label="Tol" value={formatLength(settings().tolerance, settings().units, settings().decimals)} tone="cyan" title="Drawing tolerance" testId="status-tolerance" />
+      <Seg label={t("status.tolerance")} value={formatLength(settings().tolerance, settings().units, settings().decimals)} tone="cyan" title={t("status.toleranceTitle")} testId="status-tolerance" />
       <Seg label={t("status.snap")} value={settings().snapEnabled ? t("shell.snapOn") : t("status.snapOff")} tone={settings().snapEnabled ? "green" : "muted"} hideBelow="md" testId="status-snap" />
       <Seg label={t("status.sidecar")} value={t(sidecarKey(app.sidecar()))} tone={ready() ? "green" : "red"} testId="status-sidecar" />
     </>

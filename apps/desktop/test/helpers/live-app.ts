@@ -17,11 +17,16 @@ export async function bootLiveApp() {
   // `prepareWorkspace` would otherwise see that stale state.
   resetStores()
   const { render } = await import("solid-js/web")
+  const { createEffect, createRoot } = await import("solid-js")
   const { AppRoutes } = await import("../../src/app/App.tsx")
   const { createAppState } = await import("../../src/state/context.ts")
+  const { watchSystemTheme } = await import("../../src/state/settings.ts")
   const runtime = runtimeForLayer(clientLayer({ baseUrl: "http://sidecar.test", token: "test-token" }, sidecar.transport))
   const client = await readClient(runtime)
   const state = createAppState({ client, runtime, sidecar: "ready" })
+  // The theme is applied by `App`, which this harness does not mount: wire the same effect here.
+  const theme = watchSystemTheme()
+  createRoot(() => createEffect(() => theme.apply(state.settings.settings().theme)))
 
   const wait = async <T>(read: () => T | null | undefined | false, timeoutMs = 4000): Promise<T> => {
     const until = Date.now() + timeoutMs
@@ -40,6 +45,6 @@ export async function bootLiveApp() {
     const dispose = render(() => AppRoutes({ state }), root)
     return { root, dispose }
   }
-  const dispose = async () => { state.dispose(); await sidecar.dispose() }
+  const dispose = async () => { theme.dispose(); state.dispose(); await sidecar.dispose() }
   return { sidecar, client, state, visit, wait, dispose }
 }

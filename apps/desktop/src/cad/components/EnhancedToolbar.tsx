@@ -2,12 +2,14 @@ import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
 import { A, useNavigate } from "@solidjs/router"
 import { Motion } from "solid-motionone"
-import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Ruler, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
+import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../components/ui/toast.tsx"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
 import { t } from "../../i18n/index.ts"
+import { useApp } from "../../state/context.ts"
+import { prefersDark } from "../../state/settings.ts"
 import CADCanvas from "./CADCanvas.tsx"
 
 export interface EnhancedToolbarProps {
@@ -43,15 +45,16 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
   const cad = useCADStore()
   const selection = useSelectionStore()
   const [showElementsPopup, setShowElementsPopup] = createSignal(false)
-  const [isDarkMode, setIsDarkMode] = createSignal(typeof document !== "undefined" && document.documentElement.classList.contains("dark"))
+  const app = useApp()
   const [simulationPosition, setSimulationPosition] = createSignal<{ x: number; y: number } | null>(null)
   let popup: HTMLDivElement | undefined
 
+  const isDarkMode = (): boolean => {
+    const theme = app.settings.settings().theme
+    return theme === "dark" || (theme === "system" && prefersDark())
+  }
   const toggleDarkMode = () => {
-    const dark = !isDarkMode()
-    setIsDarkMode(dark)
-    document.documentElement.classList.toggle("dark", dark)
-    try { localStorage.setItem("theme", dark ? "dark" : "light") } catch { /* storage unavailable */ }
+    app.settings.update({ theme: isDarkMode() ? "light" : "dark" })
   }
 
   const selectedElements = () => elements.elements.filter((element) => selection.selectedElementIds.includes(element.id))
@@ -111,19 +114,19 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
       >
         <Motion.button
           class="mr-2 p-3 rounded-xl hover:bg-white/80 dark:hover:bg-gray-700/80 focus:outline-none transition-all duration-200 border border-white/40 dark:border-gray-600/40 shadow-sm"
-          onClick={() => props.setSidebarOpen(!props.sidebarOpen)} hover={hover} press={press} aria-label="Toggle sidebar"
+          onClick={() => props.setSidebarOpen(!props.sidebarOpen)} hover={hover} press={press} aria-label={t("cad.toggleSidebar")}
         >
           <Menu size={20} class="text-gray-600 dark:text-gray-400" />
         </Motion.button>
 
         <div class="ml-6 flex items-center space-x-3">
-          <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title="Save Project" hover={hover} press={press}>
+          <Motion.button onClick={props.handleSaveProject} class={GLASS_BUTTON} title={t("cad.saveProject")} hover={hover} press={press}>
             <Save size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
-          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title="Import Project" hover={hover} press={press}>
+          <Motion.button onClick={() => { props.setDialogMode("import"); props.setShowImportExportDialog(true) }} class={GLASS_BUTTON} title={t("cad.importProject")} hover={hover} press={press}>
             <Upload size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
-          <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title="Unified Library" hover={hover} press={press}>
+          <Motion.button onClick={() => props.setShowUnifiedLibrary(true)} class={GLASS_BUTTON} title={t("cad.unifiedLibrary")} hover={hover} press={press}>
             <BookOpen size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
           <Motion.button onClick={() => props.setShowCustomElements(true)} class={GLASS_BUTTON} title={t("cad.customElements.open")} hover={hover} press={press}>
@@ -143,18 +146,18 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           </Show>
 
           <div class="h-6 border-l border-white/40 dark:border-gray-600/40 mx-3" />
-          <Motion.button title="Undo" onClick={() => elements.undo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCcw size={18} /></Motion.button>
-          <Motion.button title="Redo" onClick={() => elements.redo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCw size={18} /></Motion.button>
+          <Motion.button title={t("cad.undo")} onClick={() => elements.undo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCcw size={18} /></Motion.button>
+          <Motion.button title={t("cad.redo")} onClick={() => elements.redo()} class={ICON_BUTTON} hover={hover} press={press}><RotateCw size={18} /></Motion.button>
           <div class="h-5 border-l border-gray-300 dark:border-gray-700 mx-1" />
 
-          <button onClick={() => cad.toggleDimensions()} class={`p-1.5 border shadow-sm rounded-md flex items-center ${cad.showDimensions ? TOGGLE_ON : TOGGLE_OFF}`} title={cad.showDimensions ? "Hide Dimensions" : "Show Dimensions"}>
+          <button onClick={() => cad.toggleDimensions()} class={`p-1.5 border shadow-sm rounded-md flex items-center ${cad.showDimensions ? TOGGLE_ON : TOGGLE_OFF}`} title={cad.showDimensions ? t("cad.hideDimensions") : t("cad.showDimensions")}>
             <Maximize size={16} />
           </button>
-          <button onClick={() => props.setShowFloatingToolbar(!props.showFloatingToolbar)} class={`p-1.5 border shadow-sm rounded-md flex items-center ml-1 ${props.showFloatingToolbar ? TOGGLE_ON : TOGGLE_OFF}`} title={props.showFloatingToolbar ? "Hide Floating Toolbar" : "Show Floating Toolbar"}>
+          <button onClick={() => props.setShowFloatingToolbar(!props.showFloatingToolbar)} class={`p-1.5 border shadow-sm rounded-md flex items-center ml-1 ${props.showFloatingToolbar ? TOGGLE_ON : TOGGLE_OFF}`} title={props.showFloatingToolbar ? t("cad.hideFloatingToolbar") : t("cad.showFloatingToolbar")}>
             <Wrench size={16} />
           </button>
-          <button onClick={toggleDarkMode} class={`p-1.5 border shadow-sm rounded-md flex items-center ${isDarkMode() ? TOGGLE_ON : TOGGLE_OFF}`} aria-label="Toggle dark mode">
-            <Show when={isDarkMode()} fallback={<Moon class="h-3 w-3 sm:h-4 sm:w-4" />}><Sun class="h-3 w-3 sm:h-4 sm:w-4" /></Show>
+          <button onClick={toggleDarkMode} class={`p-1.5 border shadow-sm rounded-md flex items-center ${isDarkMode() ? TOGGLE_ON : TOGGLE_OFF}`} aria-label={t("cad.toggleTheme")}>
+            <Show when={isDarkMode()} fallback={<Moon size={16} />}><Sun size={16} /></Show>
           </button>
 
           <button
@@ -164,14 +167,9 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           >
             <Activity size={16} />
           </button>
-          <A href="/technical">
-            <button class={`p-1.5 border shadow-sm rounded-md flex items-center ${isDarkMode() ? TOGGLE_ON : TOGGLE_OFF}`}><Ruler size={16} class="mr-1.5" /></button>
-          </A>
-          <A href="/cam">
-            <button class="p-1.5 flex items-center bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 text-white hover:from-green-600 hover:via-emerald-600 hover:to-green-600 border-0 shadow-md rounded-md" title="Switch to CAM Editor">
-              <Wrench size={16} />
-              <span class="ml-1.5 text-sm font-medium">CAM</span>
-            </button>
+          <A href="/cam" class="p-1.5 flex items-center bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 text-white hover:from-green-600 hover:via-emerald-600 hover:to-green-600 border-0 shadow-md rounded-md" title={t("cad.switchCam")}>
+            <Wrench size={16} />
+            <span class="ml-1.5 text-sm font-medium">{t("cad.cam")}</span>
           </A>
           <Show when={props.pluginButtons}>
             <div class="h-5 border-l border-gray-300 dark:border-gray-700 mx-1" />

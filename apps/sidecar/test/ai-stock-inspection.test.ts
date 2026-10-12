@@ -4,7 +4,22 @@ import { plateTemplate } from "@cadcamfun/core"
 import { makeApp } from "./helpers.ts"
 let app: Awaited<ReturnType<typeof makeApp>>, handlers: ToolHandlersShape, project: string
 const run = async (id: string, input: unknown) => JSON.parse(await buildTools(handlers, project).find((t) => t.id === id)!.execute(input, { sessionId: "s", projectId: "untrusted", signal: new AbortController().signal }))
-beforeAll(async () => { app = await makeApp(); handlers = await app.toolHandlers(); project = (await app.call("/api/projects", { method: "POST", json: { name: "Evidence" } })).body.id })
+beforeAll(async () => {
+  app = await makeApp()
+  handlers = await app.toolHandlers()
+  project = (await app.call("/api/projects", { method: "POST", json: { name: "Evidence" } })).body.id
+  await app.call(`/api/projects/${project}/drawings`, { method: "POST", json: { name: "Evidence drawing", data: { elements: [] } } })
+})
+
+test("read-only inspection does not create a missing drawing", async () => {
+  const empty = (await app.call("/api/projects", { method: "POST", json: { name: "Empty" } })).body.id
+  const spec = buildTools(handlers, empty).find((tool) => tool.id === "cad_describe_drawing")!
+  const result = JSON.parse(await spec.execute({}, { sessionId: "s", projectId: empty, signal: new AbortController().signal }))
+  expect(result.ok).toBe(false)
+  expect(result.error).toContain("no drawing")
+  const drawings = await app.call(`/api/projects/${empty}/drawings`)
+  expect(drawings.body).toEqual([])
+})
 afterAll(async () => { await app.dispose() })
 test("an explicit inaccessible project never redirects a mutation to the active project", async () => {
   const before = await handlers.describeDrawing(project)

@@ -29,6 +29,8 @@ import { CompanionGroup } from "./groups/companion.ts"
 import { EventsGroup } from "./groups/events.ts"
 
 export * from "./errors.ts"
+export * from "./ai-actions.ts"
+export * from "./ai-inspection.ts"
 export * from "./auth.ts"
 export * from "./client.ts"
 export * from "./projects.ts"

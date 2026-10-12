@@ -10,6 +10,35 @@ import { TOOL_IDS } from "../src/tools/registry.ts"
 const REGISTERED = [...TOOL_IDS, ...SIDECAR_TOOL_IDS]
 
 describe("specialist roster", () => {
+  test("destructive and replacement tools require native approval in default and ask roles", () => {
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    for (const name of ["cadcam", "cadcam-ask", "cadcam-editor", "cadcam-editor-ask"]) {
+      expect(config.agent[name]!.permission["cad_delete_entities"]).toBe("ask")
+    }
+    for (const name of ["cadcam", "cadcam-ask", "cadcam-machinist", "cadcam-machinist-ask"]) {
+      expect(config.agent[name]!.permission["lib_delete"]).toBe("ask")
+      expect(config.agent[name]!.permission["lib_upsert_tool"]).toBe("ask")
+    }
+    expect(config.agent["cadcam-reviewer"]!.permission["lib_delete"]).toBeUndefined()
+  })
+  test("read-only specialists cannot persist verification or launch write-capable workflows", () => {
+    for (const id of ["researcher", "reviewer"] as const) {
+      expect(SUBAGENTS[id].edits).toBe(false)
+      for (const tool of ["cam_verify_toolpath", "actions_run", "memory_remember"]) {
+        expect(SUBAGENTS[id].tools).not.toContain(tool)
+      }
+    }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    for (const id of ["researcher", "reviewer"] as const) {
+      for (const suffix of ["", "-auto", "-ask"]) {
+        const permission = config.agent[`${SUBAGENTS[id].host}${suffix}`]!.permission
+        expect(permission["**"]).toBe("deny")
+        expect(permission["cam_verify_toolpath"]).toBeUndefined()
+        expect(permission["actions_run"]).toBeUndefined()
+      }
+    }
+  })
+
   test("every tool a specialist names exists, and only the editors can change the document", () => {
     for (const id of SUBAGENT_IDS) {
       for (const tool of SUBAGENTS[id].tools) expect(REGISTERED).toContain(tool)
@@ -47,7 +76,7 @@ describe("specialist roster", () => {
       const agent = config.agent[SUBAGENTS[id].host]!
       expect(agent.mode).toBe("subagent")
       expect(agent.permission["**"]).toBe("deny")
-      const allowed = Object.keys(agent.permission).filter((k) => agent.permission[k] === "allow" && k !== "skill" && k !== "code_mode").sort()
+      const allowed = Object.keys(agent.permission).filter((k) => ["allow", "ask"].includes(agent.permission[k]!) && k !== "skill" && k !== "code_mode").sort()
       expect(allowed).toEqual([...SUBAGENTS[id].tools, "invalid", "search_tools", "question"].sort())
       expect(agent.permission["task"]).toBeUndefined()
     }

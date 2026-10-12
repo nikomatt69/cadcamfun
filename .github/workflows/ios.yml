@@ -62,7 +62,7 @@ jobs:
           mkdir -p "$CADCAMFUN_DATA_DIR" simulator-out
           # The sidecar exits when its stdin closes (the Tauri shell's lifeline), so keep a pipe open.
           (tail -f /dev/null | bun apps/sidecar/src/main.ts > simulator-out/sidecar.out 2> simulator-out/sidecar.err) &
-          for i in $(seq 1 60); do grep -q '"event":"ready"' simulator-out/sidecar.out 2>/dev/null && break; sleep 1; done
+          for _ in $(seq 1 60); do grep -q '"event":"ready"' simulator-out/sidecar.out 2>/dev/null && break; sleep 1; done
           PORT=$(python3 -c 'import json; print(json.loads(open("simulator-out/sidecar.out").readline())["port"])')
           echo "sidecar on $PORT"
           api() { curl -fsS -H "authorization: Bearer $CADCAMFUN_TOKEN" -H 'content-type: application/json' "$@"; }
@@ -84,14 +84,14 @@ jobs:
 
           # The desktop's view: the device token was accepted (lastSeen is set only after a pinned-TLS request authenticated).
           SEEN=""
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             SEEN=$(api "http://127.0.0.1:$PORT/api/companion" | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print((d[0]["lastSeen"] or "") if d else "")')
             [ -n "$SEEN" ] && break
             sleep 2
           done
           echo "device last seen: ${SEEN:-never}"
           LISTED=""
-          for i in $(seq 1 20); do
+          for _ in $(seq 1 20); do
             # Only a GET counts: the script's own POST to create the project logs the same URL.
             if grep -B1 '"http.url": "/api/projects"' simulator-out/sidecar.err | grep -q '"http.method": "GET"'; then LISTED=yes; break; fi
             sleep 2

@@ -255,12 +255,12 @@ export default function CadPage(): JSX.Element {
             <Motion.div class="cad-workspace__tabs w-full p-2 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
               <div class="flex justify-center w-full text-center">
                 <Motion.button aria-pressed={rightPanel() === "proprieties" || rightPanel() === "modeling"} onClick={() => setRightPanel("proprieties")} class={tabClass(rightPanel() === "proprieties" || rightPanel() === "modeling")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
-                  <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />{rightPanel() === "modeling" ? t("cad.ribbon.surface") : "Properties"}</div>
+                  <div class="flex items-center justify-center"><Wrench size={16} class="mr-2" />{rightPanel() === "modeling" ? t("cad.ribbon.surface") : t("cad.properties")}</div>
                 </Motion.button>
                 <Motion.button aria-pressed={rightPanel() === "settings"} onClick={() => setRightPanel("settings")} class={tabClass(rightPanel() === "settings")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }}>
-                  <div class="flex items-center justify-center"><Settings size={16} class="mr-2" />Settings</div>
+                  <div class="flex items-center justify-center"><Settings size={16} class="mr-2" />{t("cad.settings")}</div>
                 </Motion.button>
-                <Motion.button aria-pressed={rightPanel() === "constraints"} onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label="Plugins">
+                <Motion.button aria-pressed={rightPanel() === "constraints"} onClick={() => setRightPanel("constraints")} class={tabClass(rightPanel() === "constraints")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} aria-label={t("cad.plugins")}>
                   <div class="flex items-center justify-center"><Puzzle size={16} class="mr-2" /></div>
                 </Motion.button>
                 <Motion.button aria-pressed={rightPanel() === "assembly"} onClick={() => setRightPanel("assembly")} class={tabClass(rightPanel() === "assembly")} hover={{ scale: 1.02 }} press={{ scale: 0.98 }} title={t("cad.assembly.title")}>
@@ -275,25 +275,25 @@ export default function CadPage(): JSX.Element {
 
               <Show when={rightPanel() === "settings"}>
                 <Motion.div class="backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white shadow-xl border border-white/30 dark:border-gray-600/30 rounded-2xl p-6 max-h-[calc(100vh-100px)] overflow-y-auto text-center w-full" {...rise} transition={{ duration: 0.5 }}>
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">View Settings</h3>
+                  <h3 class="text-lg font-medium text-gray-900 mb-4">{t("cad.viewSettings")}</h3>
                   <div class="space-y-4">
                     <div>
-                      <label class="text-sm font-medium text-gray-700 mb-1 block">View Mode</label>
+                      <label class="text-sm font-medium text-gray-700 mb-1 block">{t("cad.viewMode")}</label>
                       <div class="flex space-x-2 justify-center">
                         <For each={["2d", "3d"] as const}>{(mode) =>
-                          <button onClick={() => cad.setViewMode(mode)} class={`px-3 py-2 rounded-md text-sm ${cad.viewMode === mode ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>{mode.toUpperCase()} View</button>}
+                          <button onClick={() => cad.setViewMode(mode)} class={`px-3 py-2 rounded-md text-sm ${cad.viewMode === mode ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>{mode === "2d" ? t("cad.view2d") : t("cad.view3d")}</button>}
                         </For>
                       </div>
                     </div>
                     <div>
-                      <label class="text-sm font-medium text-gray-700 mb-1 block">Display Options</label>
+                      <label class="text-sm font-medium text-gray-700 mb-1 block">{t("cad.displayOptions")}</label>
                       <div class="space-y-2">
                         <button onClick={() => cad.toggleGrid()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
-                          <span class="flex items-center"><LayoutGrid size={16} class="mr-2" />Show Grid</span>
+                          <span class="flex items-center"><LayoutGrid size={16} class="mr-2" />{t("cad.showGrid")}</span>
                           <span class={toggleTrack(cad.gridVisible)}><span class={toggleThumb(cad.gridVisible)} /></span>
                         </button>
                         <button onClick={() => cad.toggleAxis()} class="w-full flex items-center dark:text-blue-400 justify-between px-3 py-2 rounded-md text-sm bg-gray-100 hover:bg-gray-200">
-                          <span class="flex items-center"><Show when={cad.axisVisible} fallback={<EyeOff size={16} class="mr-2" />}><Eye size={16} class="mr-2" /></Show>Show Axis</span>
+                          <span class="flex items-center"><Show when={cad.axisVisible} fallback={<EyeOff size={16} class="mr-2" />}><Eye size={16} class="mr-2" /></Show>{t("cad.showAxis")}</span>
                           <span class={toggleTrack(cad.axisVisible)}><span class={toggleThumb(cad.axisVisible)} /></span>
                         </button>
                       </div>
@@ -315,7 +315,7 @@ export default function CadPage(): JSX.Element {
                   <div class="flex-1 p-4 overflow-auto">
                     <Show when={sidebarPlugins().find((plugin) => plugin.id === pluginId())}>{(plugin) => <p class="text-sm text-gray-600 dark:text-gray-300">{plugin().description}</p>}</Show>
                     <Show when={sidebarPlugins().length === 0}>
-                      <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">No plugins with sidebar UI are enabled</div>
+                      <div class="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">{t("cad.noSidebarPlugins")}</div>
                     </Show>
                   </div>
                 </div>
@@ -328,7 +328,7 @@ export default function CadPage(): JSX.Element {
           <Motion.button
             class="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 backdrop-blur-md bg-white/90 dark:bg-gray-800/90 dark:text-white p-3 rounded-l-2xl shadow-xl border border-white/30 dark:border-gray-600/30 hover:bg-white/95 dark:hover:bg-gray-700/95 transition-all duration-200"
             onClick={() => setRightOpen(!rightOpen())} hover={{ scale: 1.05, x: -2 }} press={{ scale: 0.95 }}
-            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 1.2 }} aria-label="Toggle properties sidebar"
+            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 1.2 }} aria-label={t("cad.toggleProperties")}
           >
             <Motion.div animate={{ rotate: rightOpen() ? 0 : 180 }} transition={{ duration: 0.3 }}>
               <Show when={rightOpen()} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}><ChevronRight size={20} class="text-gray-600 dark:text-gray-300" /></Show>

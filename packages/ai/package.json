@@ -9,15 +9,16 @@
     "typecheck": "tsgo -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "effect": "4.0.0-rc.112",
-    "ai": "7.0.127",
     "@ai-sdk/anthropic": "4.0.71",
+    "@ai-sdk/gateway": "4.0.103",
     "@ai-sdk/openai": "4.0.83",
     "@ai-sdk/openai-compatible": "3.0.62",
-    "@ai-sdk/gateway": "4.0.103",
-    "zod": "^4.1.8",
+    "@cadcamfun/api": "workspace:*",
     "@cadcamfun/core": "workspace:*",
-    "@nikcli-ai/sdk-next": "1.428.0"
+    "@nikcli-ai/sdk-next": "1.428.0",
+    "ai": "7.0.127",
+    "effect": "4.0.0-rc.112",
+    "zod": "^4.1.8"
   },
   "devDependencies": {}
 }

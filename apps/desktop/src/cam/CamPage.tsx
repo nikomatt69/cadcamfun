@@ -114,14 +114,14 @@ export default function CamPage(): JSX.Element {
     const id = search.loadToolpath
     if (typeof id !== "string") return
     const data = loadFromStorage("toolpathToLoadInCAM")
-    if (!data) { toast.error("Toolpath data not found"); clearParam("loadToolpath", "toolpathToLoadInCAM"); return }
-    if (!data.id || data.id !== id) { toast.error("Invalid toolpath data"); return }
+    if (!data) { toast.error(t("cam.toast.toolpathNotFound")); clearParam("loadToolpath", "toolpathToLoadInCAM"); return }
+    if (!data.id || data.id !== id) { toast.error(t("cam.toast.toolpathInvalid")); return }
     if (data.gcode) {
       setGcode(data.gcode)
       camStore.setActiveTab("editor")
-      setTimeout(() => toast.success('Switch to the "Toolpath" tab to view the toolpath visualization'), 1500)
+      setTimeout(() => toast.success(t("cam.toast.switchToToolpath")), 1500)
     }
-    toast.success(`Toolpath '${data.name}' loaded successfully`)
+    toast.success(t("cam.toast.toolpathLoaded", { name: data.name ?? "" }))
     clearParam("loadToolpath", "toolpathToLoadInCAM")
   })
 
@@ -130,18 +130,18 @@ export default function CamPage(): JSX.Element {
     const id = search.loadTool
     if (typeof id !== "string") return
     const data = loadFromStorage("toolToLoadInCAM")
-    if (!data) { toast.error("Tool data not found"); clearParam("loadTool", "toolToLoadInCAM"); return }
-    if (!data.id || data.id !== id) { toast.error("Invalid tool data"); return }
+    if (!data) { toast.error(t("cam.toast.toolNotFound")); clearParam("loadTool", "toolToLoadInCAM"); return }
+    if (!data.id || data.id !== id) { toast.error(t("cam.toast.toolInvalid")); return }
     gen.selectLibraryTool(data as LibraryTool)
     camStore.setRightTab("generator")
-    toast.success(`Tool '${data.name}' loaded successfully`)
+    toast.success(t("cam.toast.toolLoaded", { name: data.name ?? "" }))
     clearParam("loadTool", "toolToLoadInCAM")
   })
 
   const importGCode = (file: File): void => {
     void file.text().then(
       (text) => setGcode(text),
-      () => toast.error("Failed to read the file")
+      () => toast.error(t("cam.toast.readFailed"))
     )
   }
 
@@ -162,7 +162,7 @@ export default function CamPage(): JSX.Element {
   const toggleSimulation = (): void => {
     const next = !camStore.playing
     if (next && camStore.program.toolpaths.length === 0) {
-      toast.error("Nothing to simulate yet: generate or import G-code first")
+      toast.error(t("cam.toast.nothingToSimulate"))
       return
     }
     camStore.setPlaying(next)
@@ -175,7 +175,7 @@ export default function CamPage(): JSX.Element {
       (parsed) => {
         camStore.setProgram(parsed.program as never)
         for (const warning of parsed.warnings) toast(warning)
-        toast.success(`${parsed.program.toolpaths.length} toolpath(s) parsed`)
+        toast.success(t("cam.toast.parsed", { count: parsed.program.toolpaths.length }))
       },
       (cause) => toast.error(cause instanceof Error ? cause.message : String(cause))
     )
@@ -256,6 +256,10 @@ export default function CamPage(): JSX.Element {
           onOpenCosts={() => setShowCosts(true)}
           onSelectActiveTab={(next) => camStore.setActiveTab(next)}
           onSelectRightTab={(next) => camStore.setRightTab(next)}
+          onSelectSidebarTab={(next) => {
+            setSidebarTab(next)
+            if (!camStore.sidebarOpen) camStore.toggleSidebar()
+          }}
           onSelectPostProcessor={(next) => {
             setSelectedPostProcessor(next === "heidenhain" ? "heidenhain" : next === "gcode" ? "generic" : "fanuc")
           }}
@@ -329,8 +333,8 @@ export default function CamPage(): JSX.Element {
           >
             <div class="cam-workspace__tabs w-full flex justify-center">
               <div class={camStore.rightOpen ? "flex justify-center w-full text-center" : "flex flex-col w-full"}>
-                {rightTabButton("generator", "Generator", (size) => <Wrench size={size} />)}
-                {rightTabButton("cycles", "Cycles", (size) => <Box size={size} />)}
+                {rightTabButton("generator", t("cam.generatorPanel"), (size) => <Wrench size={size} />)}
+                {rightTabButton("cycles", t("cam.cycles"), (size) => <Box size={size} />)}
                 {rightTabButton("verify", t("cam.verify"), (size) => <ShieldCheck size={size} />)}
               </div>
             </div>
@@ -361,7 +365,7 @@ export default function CamPage(): JSX.Element {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 1.4 }}
-            aria-label="Toggle generator sidebar"
+            aria-label={t("cam.toggleProperties")}
           >
             <Motion.div animate={{ rotate: camStore.rightOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
               <Show when={camStore.rightOpen} fallback={<ChevronLeft size={20} class="text-gray-600 dark:text-gray-300" />}>

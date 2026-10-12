@@ -22,6 +22,9 @@ These are static observations, not reproduced exploits or claims that tests pass
 ## Owners and contract-first amendments
 
 - WP8: `packages/ai/src/tools/`, `packages/ai/src/actions/`, `packages/ai/src/nikcli/`, `packages/ai/src/prompts/`, `packages/ai/test/`.
+- WP8 admission amendment: `packages/ai/src/service.ts` may notify trusted application code when a host session is resolved, before prompting. This hook carries no model-supplied authority and does not replace RM-07 lifecycle durability.
+- WP8 export amendment: `packages/ai/src/index.ts` exposes existing child-session ownership lookup for sidecar invocation admission and its interface tests; it does not expose SDK internals.
+- Dependency wiring amendment: `packages/ai/package.json` and the workspace lock may add the existing `@cadcamfun/api` workspace dependency so execution consumes authoritative wire schemas without reverse imports or new external packages.
 - Existing WP4 scope: `apps/sidecar/src/services/ai.ts` only, as RM-01's handler adapter.
 - Required WP4 amendment: `apps/sidecar/src/services/acting-user.ts`, `apps/sidecar/src/http/ai.ts`, `apps/sidecar/src/services/ai-vcs-tools.ts`, `apps/sidecar/test/` for immutable admission and adapter safety.
 - Required WP3 amendment: `packages/api/src/` and `packages/api/test/` for shared wire contracts; dependency wiring is separately explicit.

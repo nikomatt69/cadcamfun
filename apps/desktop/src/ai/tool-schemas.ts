@@ -10,6 +10,7 @@
  * layer guards the UI's `tool_call` reducer (see spec 08-ai.md §3).
  */
 import { Schema } from "effect"
+import { CadInspectionInput } from "@cadcamfun/api"
 import type { ToolId } from "./tools.ts"
 
 const nonEmptyString = Schema.String.check(Schema.isMinLength(1))
@@ -64,11 +65,7 @@ const memoryKey = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]{1,80}$/)
  */
 export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
   cam_stock: Schema.Union([Schema.Struct({ action: Schema.Literal("inspect") }), Schema.Struct({ action: Schema.Literal("set"), stock: record })]),
-  cad_inspect: Schema.Union([
-    Schema.Struct({ action: Schema.Literal("layers") }),
-    Schema.Struct({ action: Schema.Literal("elements"), ids: Schema.optional(Schema.Array(nonEmptyString)), layerId: Schema.optional(nonEmptyString), offset: Schema.optional(intNonNegative), limit: Schema.optional(intPositive) }),
-    Schema.Struct({ action: Schema.Literal("property"), elementId: nonEmptyString, path: Schema.Array(nonEmptyString), offset: Schema.optional(intNonNegative), maxChars: Schema.optional(intPositive) })
-  ]),
+  cad_inspect: CadInspectionInput,
   cad_component_relations: Schema.Struct({ firstId: nonEmptyString, secondId: nonEmptyString }),
   web_search: Schema.Struct({ query: nonEmptyString, numResults: Schema.optional(intPositive.check(Schema.isLessThanOrEqualTo(8))) }),
   attachment_read: Schema.Struct({ attachment: nonEmptyString, offset: Schema.optional(intNonNegative), maxChars: Schema.optional(intPositive.check(Schema.isLessThanOrEqualTo(20000))) }),

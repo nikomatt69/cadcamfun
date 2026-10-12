@@ -329,6 +329,7 @@ describe("library and chain tools (spec 22 §3)", () => {
       const h = await fresh.toolHandlers()
       const source = (await fresh.call("/api/projects", { method: "POST", json: { name: "Source library" } })).body.id as string
       const target = (await fresh.call("/api/projects", { method: "POST", json: { name: "Target assembly" } })).body.id as string
+      await fresh.call(`/api/projects/${target}/drawings`, { method: "POST", json: { name: "Assembly", data: { elements: [] } } })
       const added = await h.addElements(source, [{ type: "cube", name: "Reusable jaw", width: 30, height: 12, depth: 8, z: 4 }]) as { ids: string[] }
       const saved = await h.saveComponent(source, added.ids, "Reusable vise jaw") as { ok: boolean; componentId: string }
       expect(saved.ok).toBe(true)

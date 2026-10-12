@@ -4,6 +4,7 @@ import { Motion } from "solid-motionone"
 import {
   Box, ChevronLeft, ChevronRight, Circle, Layers, List, Wrench
 } from "lucide-solid"
+import { t } from "../../i18n/index.ts"
 import ToolPanel from "./ToolPanel.tsx"
 import LayerManager from "./LayerManager.tsx"
 import CADElementExplorer from "./CADElementExplorer.tsx"
@@ -39,24 +40,30 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
     </Show>
   )
 
+  /** A collapsed tool icon has no action of its own: it opens the sidebar on the Tools panel where the tool lives. */
+  const openTools = () => {
+    props.setActiveSidebarTab("tools")
+    props.setIsOpen(true)
+  }
+
   const collapsedContent = () => (
     <div class="py-4 px-2 rounded-xl flex flex-col overflow-y-auto scrollbar items-center">
       <Show when={props.activeSidebarTab === "tools"}>
         <div class="space-y-4 w-full flex flex-col items-center">
           <div class="flex flex-col items-center">
-            <button class="p-2 rounded-md hover:bg-gray-100" title="Line"><div class="transform rotate-45"><Box size={20} /></div></button>
-            <button class="p-2 rounded-md hover:bg-gray-100" title="Rectangle"><Box size={20} /></button>
-            <button class="p-2 rounded-md hover:bg-gray-100" title="Circle"><Circle size={20} class="text-gray-600" /></button>
-            <button class="p-2 rounded-md hover:bg-gray-100" title="Cube"><Box size={20} class="text-gray-600" /></button>
-            <button class="p-2 rounded-md hover:bg-gray-100" title="Sphere"><Circle size={20} class="text-gray-600" /></button>
+            <button class="p-2 rounded-md hover:bg-gray-100" title={t("cad.ribbon.line")} aria-label={t("cad.ribbon.line")} onClick={openTools}><div class="transform rotate-45"><Box size={20} /></div></button>
+            <button class="p-2 rounded-md hover:bg-gray-100" title={t("cad.ribbon.rectangle")} aria-label={t("cad.ribbon.rectangle")} onClick={openTools}><Box size={20} /></button>
+            <button class="p-2 rounded-md hover:bg-gray-100" title={t("cad.ribbon.circle")} aria-label={t("cad.ribbon.circle")} onClick={openTools}><Circle size={20} class="text-gray-600" /></button>
+            <button class="p-2 rounded-md hover:bg-gray-100" title={t("cad.ribbon.box")} aria-label={t("cad.ribbon.box")} onClick={openTools}><Box size={20} class="text-gray-600" /></button>
+            <button class="p-2 rounded-md hover:bg-gray-100" title={t("cad.ribbon.sphere")} aria-label={t("cad.ribbon.sphere")} onClick={openTools}><Circle size={20} class="text-gray-600" /></button>
           </div>
         </div>
       </Show>
       <Show when={props.activeSidebarTab === "layers"}>
-        <div class="text-center text-xs text-gray-500 mt-4"><Layers size={20} class="mx-auto mb-2" />Open sidebar<br />to manage layers</div>
+        <div class="text-center text-xs text-gray-500 mt-4"><Layers size={20} class="mx-auto mb-2" />{t("cad.openSidebarLayers")}</div>
       </Show>
       <Show when={props.activeSidebarTab === "explorer"}>
-        <div class="text-center text-xs text-gray-500 mt-4"><List size={20} class="mx-auto mb-2" />Open sidebar<br />to view elements</div>
+        <div class="text-center text-xs text-gray-500 mt-4"><List size={20} class="mx-auto mb-2" />{t("cad.openSidebarElements")}</div>
       </Show>
     </div>
   )
@@ -71,9 +78,9 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
         {...rise} transition={{ duration: 0.6, delay: 0.2 }}
       >
         <div class={props.isOpen ? "flex justify-center w-full text-center gap-1 p-2" : "flex flex-col w-full gap-1 p-2"}>
-          <TabButton id="tools" label="Tools" title="Tools" icon={(size) => <Wrench size={size} />} />
-          <TabButton id="explorer" label="Explorer" title="Element Explorer" icon={(size) => <List size={size} />} />
-          <TabButton id="layers" label="Layers" title="Layers" icon={(size) => <Layers size={size} />} />
+          <TabButton id="tools" label={t("cad.tools")} title={t("cad.tools")} icon={(size) => <Wrench size={size} />} />
+          <TabButton id="explorer" label={t("cad.explorer")} title={t("cad.elementExplorer")} icon={(size) => <List size={size} />} />
+          <TabButton id="layers" label={t("cad.layers")} title={t("cad.layers")} icon={(size) => <Layers size={size} />} />
         </div>
       </Motion.div>
 
@@ -92,7 +99,7 @@ export default function EnhancedSidebarCad(props: EnhancedSidebarProps): JSX.Ele
       <Motion.div class="border-t border-white/30 dark:border-gray-600/30 p-3 flex justify-center" {...rise} transition={{ duration: 0.6, delay: 0.8 }}>
         <Motion.button
           class="p-3 rounded-xl hover:bg-white/60 dark:hover:bg-gray-700/60 transition-all duration-200 backdrop-blur-sm border border-white/40 dark:border-gray-600/40 shadow-sm"
-          onClick={() => props.setIsOpen(!props.isOpen)} title={props.isOpen ? "Collapse sidebar" : "Expand sidebar"}
+          onClick={() => props.setIsOpen(!props.isOpen)} title={props.isOpen ? t("cad.collapseSidebar") : t("cad.expandSidebar")}
           hover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)", x: 2 }} press={{ scale: 0.98 }}
         >
           <Motion.div animate={{ rotate: props.isOpen ? 0 : 180 }} transition={{ duration: 0.3 }}>
