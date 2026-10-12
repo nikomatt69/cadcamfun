@@ -19,8 +19,13 @@ export async function bootLiveApp() {
   const { render } = await import("solid-js/web")
   const { createEffect, createRoot } = await import("solid-js")
   const { AppRoutes } = await import("../../src/app/App.tsx")
+<<<<<<< HEAD
   const { createAppState } = await import("../../src/shared/state/context.ts")
   const { watchSystemTheme } = await import("../../src/shared/state/settings.ts")
+=======
+  const { createAppState } = await import("../../src/state/context.ts")
+  const { watchSystemTheme } = await import("../../src/state/settings.ts")
+>>>>>>> origin/main
   const runtime = runtimeForLayer(clientLayer({ baseUrl: "http://sidecar.test", token: "test-token" }, sidecar.transport))
   const client = await readClient(runtime)
   const state = createAppState({ client, runtime, sidecar: "ready" })

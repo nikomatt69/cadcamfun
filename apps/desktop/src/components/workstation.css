@@ -1,0 +1,437 @@
+.cad-workspace,
+.cam-workspace {
+  --workspace-panel: #fff;
+  --workspace-border: #d5dde5;
+  --workstation-radius: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+html.dark .cad-workspace,
+html.dark .cam-workspace {
+  --workspace-panel: #1b232c;
+  --workspace-border: #35414d;
+}
+
+:is(.cad-workspace, .cam-workspace) .workstation-toolbar {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 8px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--workspace-border);
+  background: var(--workspace-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workstation-toolbar > div {
+  min-width: 0;
+  max-width: 100%;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow-x: auto;
+}
+
+.workstation-toolbar > div > .flex {
+  margin-left: 0;
+  gap: 4px;
+}
+
+.workstation-toolbar :is(button, a, label.btn) {
+  flex-shrink: 0;
+  min-height: 30px;
+  padding: 5px 8px;
+  margin-left: 0;
+  margin-right: 0;
+  border-radius: var(--workstation-radius);
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.workstation-toolbar .text-sm { font-size: 12px; }
+
+:is(.cad-workspace__body, .cam-workspace__body) {
+  position: relative;
+  gap: 4px;
+  padding: 4px;
+}
+
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar,
+    .cad-workspace__inspector, .cam-workspace__inspector) {
+  min-height: 0;
+  margin: 0;
+  border-radius: var(--workstation-radius);
+  box-shadow: none;
+  scrollbar-gutter: auto;
+}
+
+.cad-workspace__sidebar > .overflow-y-auto {
+  scrollbar-gutter: auto;
+}
+
+.cad-workspace__sidebar .workstation-panel-content {
+  margin-inline: auto;
+}
+
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar,
+    .cad-workspace__inspector, .cam-workspace__inspector),
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar,
+    .cad-workspace__inspector, .cam-workspace__inspector) * {
+  scrollbar-width: none;
+  scrollbar-gutter: auto;
+}
+
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar,
+    .cad-workspace__inspector, .cam-workspace__inspector)::-webkit-scrollbar,
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar,
+    .cad-workspace__inspector, .cam-workspace__inspector) *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar)[data-open="true"] {
+  width: clamp(240px, 19vw, 272px);
+}
+
+:is(.cad-workspace__sidebar, .cam-workspace__sidebar)[data-open="false"] {
+  width: 44px;
+}
+
+:is(.cad-workspace__inspector, .cam-workspace__inspector)[data-open="true"] {
+  width: clamp(272px, 21vw, 312px);
+}
+
+.cad-workspace__inspector[data-open="false"] { width: 0; border: 0; }
+.cam-workspace__inspector[data-open="false"] { width: 44px; }
+
+:is(.cad-workspace__stage, .cam-workspace__stage) {
+  min-height: 0;
+  margin: 0;
+  border-radius: var(--workstation-radius);
+  box-shadow: none;
+}
+
+:is(.cad-workspace__tabs, .cam-workspace__tabs) {
+  flex-shrink: 0;
+  padding: 3px;
+  background: var(--workspace-panel);
+}
+
+:is(.cad-workspace__tabs, .cam-workspace__tabs) > div { padding: 0; gap: 2px; }
+
+:is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button {
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: 5px 5px 0 0;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 16px;
+  transition: background-color 120ms ease, color 120ms ease;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  color: #6b7280;
+  background: transparent;
+  backdrop-filter: blur(8px);
+}
+
+:is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"] {
+  color: #007acc;
+  background: rgba(239, 246, 255, 0.8);
+  border-bottom-color: #007acc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 3px rgba(30, 45, 60, 0.08);
+}
+html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"] {
+  color: #60a5fa;
+  background: rgba(30, 58, 138, 0.3);
+  border-bottom-color: #60a5fa;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]) { color: #9ca3af; }
+:is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):focus-visible {
+  background: rgba(75, 85, 99, 0.12);
+  border-color: rgba(107, 114, 128, 0.45);
+  border-radius: 5px 5px 0 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"]:hover {
+    border-radius: 5px 5px 0 0;
+    border-color: rgba(148, 163, 184, 0.35);
+    border-bottom-color: #007acc;
+    background: rgba(239, 246, 255, 0.8);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  html.dark :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button[aria-pressed="true"]:hover {
+    background: rgba(30, 58, 138, 0.3);
+    border-bottom-color: #60a5fa;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 30px rgba(0, 0, 0, 0.4);
+  }
+  :is(.cad-workspace__tabs, .cam-workspace__tabs, .workstation-workspace-tabs) button:not([aria-pressed="true"]):hover {
+    background: rgba(75, 85, 99, 0.12);
+    border-color: rgba(107, 114, 128, 0.45);
+    border-radius: 5px 5px 0 0;
+  }
+}
+
+.workstation-navigation { flex-shrink: 0; max-height: 35%; padding: 6px; overflow-y: auto; }
+.workstation-navigation > button { padding: 6px; border-radius: 4px; }
+.workstation-navigation a { border-radius: 4px; }
+.workstation-navigation .group { width: 100%; justify-content: flex-start; border-radius: 4px; font-size: 12px; }
+.workstation-navigation .group > div:first-child { flex: 1; }
+
+:is(.cad-workspace__tabs, .cam-workspace__tabs) button svg { flex-shrink: 0; }
+:is(.cad-workspace__tabs, .cam-workspace__tabs) button .mr-2 { margin-right: 4px; }
+:is(.cad-workspace__tabs, .cam-workspace__tabs) button .ml-2 { margin-left: 4px; }
+
+.workstation-panel-content { min-height: 0; padding: 8px; gap: 8px; }
+.workstation-panel-content > * { width: 100%; min-width: 0; }
+.workstation-panel-content > * + * { margin-top: 8px; }
+
+.workstation-properties {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workstation-properties > .flex:first-child { flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.workstation-properties h3 { font-size: 13px; line-height: 20px; }
+.workstation-properties .space-y-4 > * + * { margin-top: 10px; }
+
+:is(.workstation-panel-content, .workstation-properties, .workstation-generator) :is(input:not([type="checkbox"]):not([type="color"]), select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  box-shadow: none;
+}
+
+:is(.workstation-panel-content, .workstation-generator) .text-sm { font-size: 12px; line-height: 18px; }
+:is(.workstation-panel-content, .workstation-generator) .text-lg { font-size: 13px; line-height: 20px; }
+:is(.workstation-panel-content, .workstation-generator) :is(.rounded-xl, .rounded-2xl) { border-radius: var(--workstation-radius); }
+:is(.workstation-panel-content, .workstation-generator) :is(.shadow-md, .shadow-xl) { box-shadow: none; }
+
+.workstation-section { margin-bottom: 8px; }
+.workstation-section__header { padding: 8px; border-radius: 4px; }
+.workstation-section__header > div { gap: 8px; }
+.workstation-section__header > div > div { padding: 4px; border-radius: 3px; }
+.workstation-section__header h3 { font-size: 13px; }
+.workstation-section__header svg { width: 16px; height: 16px; }
+.workstation-section__body { margin-top: 4px; padding: 8px; border-radius: 4px; }
+.workstation-section__body > * + * { margin-top: 10px; }
+
+.workstation-browser-toolbar { padding: 8px; }
+.workstation-browser-toolbar select { min-width: 0; }
+.workstation-browser-toolbar select[aria-label="Move selection to layer"] { flex: 1 1 100%; }
+.workstation-row-actions { flex-shrink: 0; }
+.workstation-row-actions:focus-within button { opacity: 1; }
+
+.workstation-browser-row--cad {
+  display: grid;
+  grid-template-columns: 16px 16px minmax(0, 1fr) auto;
+  column-gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.workstation-browser-row--cad > button { grid-row: 1 / span 2; margin: 0; }
+.workstation-browser-row--cad > div:nth-child(2) { grid-row: 1 / span 2; margin: 0; }
+.workstation-browser-row--cad > :is(span:not(.workstation-browser-type), input) { grid-column: 3; }
+.workstation-browser-type { grid-column: 3; grid-row: 2; font-size: 10px; line-height: 12px; }
+.workstation-browser-row--cad > .workstation-row-actions { grid-column: 4; grid-row: 1 / span 2; }
+
+:is(.cad-workspace, .cam-workspace) :is(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+@media (hover: none) {
+  .workstation-row-actions button { opacity: 1; }
+}
+
+/* On narrow windows, panels share a scrollable row rather than squeezing the stage to zero. */
+@media (max-width: 1000px) {
+  :is(.cad-workspace__body, .cam-workspace__body) { overflow-x: auto; }
+  :is(.cad-workspace__stage, .cam-workspace__stage) { min-width: 320px; margin: 0; }
+  :is(.cad-workspace__sidebar, .cam-workspace__sidebar)[data-open="true"] { width: 240px; }
+  :is(.cad-workspace__inspector, .cam-workspace__inspector)[data-open="true"] { width: 272px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.cad-workspace, .cam-workspace) .workstation-toolbar,
+  :is(.cad-workspace__frame, .cam-workspace__frame, .cad-workspace__body, .cam-workspace__body,
+      .cad-workspace__stage, .cam-workspace__stage) {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ---- Machining strategy palette (Fusion 360 / Hypermill style) ------------------- */
+.strategy-palette { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.strategy-palette__head { display: flex; flex-direction: column; gap: 2px; padding: 0 2px; }
+.strategy-palette__body { display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; padding-right: 2px; }
+.strategy-palette__body--compact { max-height: 200px; }
+.strategy-palette__cat { display: flex; flex-direction: column; gap: 4px; }
+.strategy-palette__cat-head { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.strategy-palette__cat-bar { display: inline-block; width: 3px; height: 12px; border-radius: 2px; background: #007acc; }
+.strategy-palette__cat-bar[data-accent="purple"] { background: #9333ea; }
+.strategy-palette__cat-bar[data-accent="cyan"]   { background: #0891b2; }
+.strategy-palette__cat-bar[data-accent="amber"]  { background: #d97706; }
+.strategy-palette__cat-bar[data-accent="orange"] { background: #ea580c; }
+.strategy-palette__cat-bar[data-accent="green"]  { background: #059669; }
+.strategy-palette__cat-bar[data-accent="red"]    { background: #dc2626; }
+.strategy-palette__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 0;
+}
+.strategy-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--workspace-border, #d5dde5);
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 56px;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+html.dark .strategy-cell { background: rgba(20, 28, 38, 0.55); border-color: #35414d; }
+.strategy-cell:hover { background: rgba(239, 246, 255, 0.9); border-color: #93c5fd; }
+html.dark .strategy-cell:hover { background: rgba(30, 58, 138, 0.45); border-color: #60a5fa; }
+.strategy-cell--active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.10));
+  border-color: #3b82f6;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.4), 0 1px 4px rgba(59, 130, 246, 0.18);
+}
+html.dark .strategy-cell--active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.35), rgba(99, 102, 241, 0.18));
+  border-color: #60a5fa;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.4), 0 1px 4px rgba(96, 165, 250, 0.25);
+}
+.strategy-cell--mapped {
+  border-style: dashed;
+  border-color: #93c5fd;
+}
+html.dark .strategy-cell--mapped { border-color: #60a5fa; }
+.strategy-cell__icon { display: inline-flex; align-items: center; justify-content: center; }
+.strategy-cell__label { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.strategy-palette__detail {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(239, 246, 255, 0.85);
+  border: 1px solid #bfdbfe;
+  border-left-width: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.strategy-palette__detail[data-accent="purple"] { background: rgba(245, 243, 255, 0.85); border-color: #d8b4fe; }
+.strategy-palette__detail[data-accent="cyan"]   { background: rgba(236, 254, 255, 0.85); border-color: #a5f3fc; }
+.strategy-palette__detail[data-accent="amber"]  { background: rgba(255, 251, 235, 0.85); border-color: #fcd34d; }
+.strategy-palette__detail[data-accent="orange"] { background: rgba(255, 247, 237, 0.85); border-color: #fed7aa; }
+.strategy-palette__detail[data-accent="green"]  { background: rgba(236, 253, 245, 0.85); border-color: #a7f3d0; }
+.strategy-palette__detail[data-accent="red"]    { background: rgba(254, 242, 242, 0.85); border-color: #fecaca; }
+html.dark .strategy-palette__detail { background: rgba(15, 23, 42, 0.7); border-color: #475569; }
+.strategy-palette__detail-title { font-size: 12px; font-weight: 600; color: #1d4ed8; }
+.strategy-palette__detail[data-accent="purple"] .strategy-palette__detail-title { color: #7c3aed; }
+.strategy-palette__detail[data-accent="cyan"]   .strategy-palette__detail-title { color: #0e7490; }
+.strategy-palette__detail[data-accent="amber"]  .strategy-palette__detail-title { color: #b45309; }
+.strategy-palette__detail[data-accent="orange"] .strategy-palette__detail-title { color: #c2410c; }
+.strategy-palette__detail[data-accent="green"]  .strategy-palette__detail-title { color: #047857; }
+.strategy-palette__detail[data-accent="red"]    .strategy-palette__detail-title { color: #b91c1c; }
+.strategy-palette__detail-desc { font-size: 11px; color: #4b5563; line-height: 1.4; margin: 0; }
+html.dark .strategy-palette__detail-desc { color: #cbd5e1; }
+.strategy-palette__detail-hint { font-size: 10px; color: #6b7280; margin-top: 2px; font-style: italic; }
+html.dark .strategy-palette__detail-hint { color: #94a3b8; }
+
+/* Capabilities overview panel */
+.capabilities-overview { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.capabilities-overview__group { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--workspace-border, #d5dde5); background: rgba(255,255,255,0.55); }
+html.dark .capabilities-overview__group { background: rgba(20, 28, 38, 0.55); border-color: #35414d; }
+.capabilities-overview__title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #1d4ed8; }
+.capabilities-overview__title[data-accent="purple"] { color: #7c3aed; }
+.capabilities-overview__title[data-accent="cyan"]   { color: #0e7490; }
+.capabilities-overview__title[data-accent="amber"]  { color: #b45309; }
+.capabilities-overview__title[data-accent="orange"] { color: #c2410c; }
+.capabilities-overview__title[data-accent="green"]  { color: #047857; }
+.capabilities-overview__title[data-accent="red"]    { color: #b91c1c; }
+.capabilities-overview__items { font-size: 11px; line-height: 1.5; color: #374151; }
+html.dark .capabilities-overview__items { color: #cbd5e1; }
+.capabilities-overview__items + .capabilities-overview__items { margin-top: 4px; }
+
+/* CAM ribbon (Fusion/Hypermill-style tabbed top bar) */
+.cam-ribbon { flex-shrink: 0; min-width: 0; background: var(--workspace-panel); border-bottom: 1px solid var(--workspace-border); }
+.cam-ribbon button[type="button"] { font-size: 11px; line-height: 14px; white-space: nowrap; }
+.cam-ribbon[data-compact="true"] .cam-ribbon__group-children { flex-wrap: wrap; }
+@media (max-width: 980px) {
+  .cam-ribbon > :nth-child(2) { overflow-x: auto; }
+}
+
+/* Compact CAD operation ribbon: viewport-independent height and overflow. */
+.cad-ribbon { display: flex; flex-shrink: 0; min-width: 0; max-width: 100%; overflow-x: auto; align-items: stretch; background: var(--workspace-panel); border-bottom: 1px solid var(--workspace-border); }
+.cad-ribbon-group { flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 5px 10px 6px; border-right: 1px solid var(--workspace-border); }
+.cad-ribbon-group:last-child { border-right: 0; }
+.cad-ribbon-heading { color: #2563eb; font-size: 10px; line-height: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .035em; }
+.cad-ribbon-actions { display: flex; align-items: center; gap: 4px; }
+.cad-ribbon-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 26px; padding: 3px 7px; border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-panel); color: #374151; font-size: 11px; line-height: 18px; white-space: nowrap; }
+.cad-ribbon-action svg { flex-shrink: 0; }
+.cad-ribbon-action[aria-pressed="true"] { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
+.cad-ribbon-action:disabled { opacity: .45; cursor: not-allowed; }
+.cad-ribbon-actions :is(input, select) { min-height: 26px; padding: 3px 5px; border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-panel); color: inherit; font-size: 11px; }
+.cad-ribbon-position { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+.cad-ribbon-position input { width: 70px; }
+html.dark .cad-ribbon-heading { color: #60a5fa; }
+html.dark .cad-ribbon-action { color: #e2e8f0; }
+html.dark .cad-ribbon-action[aria-pressed="true"] { color: #93c5fd; background: #1e3a5f; border-color: #3b82f6; }
+@media (hover: hover) and (pointer: fine) { .cad-ribbon-action:hover:not(:disabled) { border-color: #60a5fa; background: #eff6ff; color: #1d4ed8; } html.dark .cad-ribbon-action:hover:not(:disabled) { background: #1e3a5f; color: #bfdbfe; } }
+
+/* Cycle cards respond to the inspector width, not the window's breakpoint. */
+.machine-cycles { min-width: 0; container-type: inline-size; }
+.machine-cycles-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; }
+.machine-cycles-layout > div { min-width: 0; }
+.machine-cycle-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 6px; }
+.machine-cycle-choice { display: flex; flex-direction: row; align-items: center; gap: 8px; min-width: 0; padding: 8px; text-align: left; }
+.machine-cycle-choice > div { width: 22px; height: 22px; flex-shrink: 0; margin: 0; }
+.machine-cycle-choice svg { width: 22px; height: 22px; }
+.machine-cycle-choice > span { min-width: 0; white-space: normal; overflow-wrap: break-word; font-size: 11px; line-height: 15px; }
+@container (min-width: 640px) { .machine-cycles-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* The tool window stays inside the canvas; only its content scrolls. */
+.cad-floating-toolbar { display: flex; flex-direction: column; width: min(340px, calc(100% - 16px)); max-height: min(440px, calc(100% - 16px)); min-width: 0; overflow: hidden; border: 1px solid var(--workspace-border); border-radius: 8px; background: var(--workspace-panel); color: inherit; box-shadow: 0 4px 16px #0002; }
+.cad-floating-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; min-height: 32px; padding: 4px 6px; border-bottom: 1px solid var(--workspace-border); touch-action: none; user-select: none; }
+.cad-floating-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.cad-floating-tabs { display: flex; gap: 3px; padding: 5px; flex-shrink: 0; border-bottom: 1px solid var(--workspace-border); }
+.cad-floating-tabs button { min-width: 0; padding: 5px 6px; font-size: 11px; border-radius: 5px; }
+.cad-floating-content { overflow-y: auto; overscroll-behavior: contain; min-height: 0; padding: 8px; }
+.cad-floating-content > div { max-height: none; overflow: visible; padding: 0; background: transparent; box-shadow: none; }
+.cad-floating-content h4 { font-size: 10px; line-height: 14px; margin-bottom: 5px; }
+.cad-floating-content .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.cad-floating-content .grid-cols-4 button { aspect-ratio: auto; min-height: 52px; border: 1px solid var(--workspace-border); background: var(--workspace-panel); border-radius: 5px; }
+.cad-floating-content .grid-cols-4 button > span { white-space: normal; overflow-wrap: break-word; }
+.cad-floating-transforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.cad-floating-transforms button { min-height: 46px; box-shadow: none; border: 1px solid var(--workspace-border); }
+.cad-floating-header:focus-visible { outline: 2px solid #3b82f6; outline-offset: -2px; }
