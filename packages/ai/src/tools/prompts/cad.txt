@@ -1,10 +1,10 @@
-Read the open drawing. Nothing here changes it, so every read-only specialist may have this whole tool.
+Read the open drawing. All actions are read-only.
 
 Actions
 - describe: the whole drawing, its counts, bounds and layers. Start here.
-- check: design-space and model checks (sizes, rotation typed in radians, booleans without operands, duplicates, parts that float). Run it after modelling and fix what it reports.
-- relations: nominal bounds, placement, distance and parameter dependencies between two existing ids. Equal parameter names are not shared bindings.
-- grep: substring search over the drawing (ids, names, layers, property values) that returns each parametric hit's revision. Use it when you have no ids.
+- check: model checks for sizes, rotations, missing Boolean operands, duplicates and floating parts. Fix findings after modelling.
+- relations: nominal bounds, placement, distances and parameter dependencies; equal names do not bind parameters.
+- grep: search ids, names, layers and properties; includes each parametric hit's revision.
 - vision: the real CAD viewport plus scene evidence as an image.
 - inspect_elements: full properties and bounds of elements, in pages.
 - inspect_layers: the layers of the workspace snapshot, and which one is active.
@@ -12,11 +12,12 @@ Actions
 - inspect_property: one property of one element by path, in pages of characters.
 - parametric_validate: rebuild a parametric history and report what it cannot build. Read only.
 - parametric_inspect: the history, parameters and report of one parametric part.
+- drawing: technical sheet from exactly one elementId or history; optional options (size A4|A3|A2, projection first|third, title, drawingNumber, material, revision, author, date, notes, views front/top/right, iso, scale, section {axis,at,from,parent,letter}, detail {view,centre:{x,y,z},radius,factor,letter}, flatness {value,view}). Returns SVG, dimensions, callouts and warnings; failed rebuilds produce no sheet. Coordinates are local model mm; mesh edges are approximate. Read-only artifact; no persistence.
 - parametric_test: run a list of parameter variants and report bodies and volumes; nothing is written.
 - parametric_dfm: manufacturability findings for a history or an existing part.
 - parametric_fastener: thread, tap drill, clearance and counterbore sizes for a metric size.
 - parametric_recipe: build a standard part and return its history. `recipe` is one of mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend, duct_transition. Use cad_edit.parametric_recipe_create to put it in the drawing.
-- parametric_from_element: the parametric history of an element already in the drawing (any catalogue solid, a flat shape with a depth, a component of them): its measures become named parameters and the solid is the same. Nothing is created; cad_edit.parametric_convert stores it.
+- parametric_from_element: convert an existing catalogue solid, flat shape or component into a history with named parameters. Reads only; cad_edit.parametric_convert stores it.
 
 Parameters (mm, radians; ids are read, never invented)
 - describe, check, inspect_layers: none.
@@ -42,4 +43,4 @@ Do not use it
 - To machine: cam and cam_edit, not this tool.
 
 After it
-- Report ids, positions and bounds rather than prose, then check or verify what you claim is done.
+- Report ids, positions and bounds; check or verify claims.

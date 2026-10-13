@@ -15,6 +15,7 @@ import { applyOriginOffset, f3 } from "./common.ts"
 import { flattenElements, isContainer, orderForMachining, outsideStock, shiftElement, topOf } from "./elements.ts"
 import type { CadElement, GeometryInput, Stock, ToolpathSettings } from "./schema.ts"
 import { isSolidElement, surfaceProgram } from "./surface.ts"
+import { parametricDrillPoints, parametricOperation } from "./history-features.ts"
 import { splitUnifiedMembers, unifiedGcode } from "./unified-geometry.ts"
 
 /** Operations that follow the element's outline: a `component` runs them as one unified geometry (legacy `generateComponentToolpath`). */
@@ -150,6 +151,14 @@ export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string
     if (limited.warning) out += `; Warning: ${limited.warning}\n`
     if (stock && stock.depth - below <= 0) return
     if (s0.operationType === "drill") {
+      // A parametric part is drilled at its hole features, each to its own depth (no deeper than the stock under it).
+      const parametric = parametricDrillPoints(placed)
+      if (parametric !== undefined) {
+        for (const note of parametric.notes) out += `; Note: ${note}\n`
+        const stockBottom = stock ? stock.topZ - stock.depth : -Infinity
+        holes.push(...parametric.points.map((p) => ({ ...p, depth: Math.max(0, Math.min(p.depth, (p.top ?? 0) - stockBottom)) })).filter((p) => p.depth > 0))
+        return
+      }
       out += drillWarning(placed, limited.settings)
       try {
         holes.push(...drillPointsOf(placed, limited.settings.depth))
@@ -161,7 +170,8 @@ export const selectedToolpath = (s0: ToolpathSettings, g: GeometryInput): string
     // One element the generator cannot machine (missing coordinates, an unknown shape) must never stop the whole job:
     // it is skipped, and the program says so.
     try {
-      out += elementOperation(placed, limited.settings, g)
+      // A parametric part is machined from its feature history; anything else keeps the element's own path.
+      out += parametricOperation(placed, limited.settings) ?? elementOperation(placed, limited.settings, g)
     } catch (cause) {
       out += `; Warning: ${label} skipped: ${cause instanceof Error ? cause.message : String(cause)}\n`
     }

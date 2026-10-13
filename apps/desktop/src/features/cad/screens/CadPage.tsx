@@ -13,6 +13,7 @@ import { useSelectionStore } from "../store/selectorStore.ts"
 import StatusBar from "../components/StatusBar.tsx"
 import FloatingToolbar from "../components/FloatingToolbar.tsx"
 import EnhancedToolbar from "../components/EnhancedToolbar.tsx"
+import DrawingPanel from "../components/DrawingPanel.tsx"
 import CadRibbon from "../components/CadRibbon.tsx"
 import SurfacingPanel, { type SurfacingOp } from "../components/SurfacingPanel.tsx"
 import { t } from "../../../i18n/index.ts"
@@ -36,7 +37,7 @@ import { syncProjectContents } from "../lib/projectSnapshot.ts"
 import "../../../styles/workstation.css"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
-type RightPanel = "proprieties" | "settings" | "constraints" | "modeling" | "assembly"
+type RightPanel = "proprieties" | "settings" | "constraints" | "modeling" | "assembly" | "drawing"
 
 const tabClass = (active: boolean) =>
   `flex-1 py-3 px-3 text-sm font-medium rounded-lg transition-all duration-200 ${active ? "text-blue-600 dark:text-blue-400 bg-white/60 dark:bg-gray-700/60 shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-white/40 dark:hover:bg-gray-700/40"}`
@@ -223,7 +224,7 @@ export default function CadPage(): JSX.Element {
           selectedLibraryComponent={libraryComponent()} setSelectedLibraryComponent={setLibraryComponent} setIsPlacingComponent={() => undefined}
         />
 
-        <CadRibbon ready={canvas() !== undefined} operation={rightPanel() === "modeling" ? surfaceOperation() : undefined}
+        <CadRibbon onDrawing={() => { setRightPanel("drawing"); setRightOpen(true) }} ready={canvas() !== undefined} operation={rightPanel() === "modeling" ? surfaceOperation() : undefined}
           onSurface={operation => { setSurfaceOperation(operation); setRightPanel("modeling"); setRightOpen(true) }}
           onBoolean={operation => canvas()?.boolean(operation)} />
 
@@ -270,6 +271,7 @@ export default function CadPage(): JSX.Element {
             </Motion.div>
 
             <Motion.div class="workstation-panel-content flex flex-col" {...rise} transition={{ duration: 0.6, delay: 1 }}>
+              <Show when={rightPanel() === "drawing"}><DrawingPanel /></Show>
               <Show when={rightPanel() === "proprieties"}><PropertyPanel /></Show>
               <Show when={rightPanel() === "modeling"}><SurfacingPanel operation={surfaceOperation()} onOperationChange={setSurfaceOperation} /></Show>
 

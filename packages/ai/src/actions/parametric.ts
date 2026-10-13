@@ -7,7 +7,7 @@
  * are different actions even though the same function answers both.
  */
 import { z } from "zod"
-import { analyzeManufacturability, buildRecipe, keywayFor, METRIC_THREADS, recipeNames, requireThread, type History } from "@cadcamfun/core"
+import { analyzeManufacturability, buildRecipe, drawing, keywayFor, METRIC_THREADS, recipeNames, requireThread, type History } from "@cadcamfun/core"
 import { historySchema, parameterSchema, parametricReport } from "../parametric.ts"
 import type { ActionContext } from "./action.ts"
 
@@ -41,6 +41,22 @@ export const parametricCreateSchema = z.object({ history: historySchema, ...name
 export const parametricUpdateSchema = z.object({ elementId, parameters: parameterSchema, expectedRevision: z.string().min(1).max(100) })
 /** Reading the conversion builds the history; nothing is created. */
 export const parametricFromElementSchema = z.object({ elementId, depth: length.optional() })
+const principal = z.enum(["front", "top", "right"])
+const sheetText = z.string().max(120)
+export const parametricDrawingSchema = z.object({
+  elementId: elementId.optional(), history: historySchema.optional(),
+  options: z.object({
+    size: z.enum(["A4", "A3", "A2"]).optional(), projection: z.enum(["first", "third"]).optional(),
+    title: sheetText.optional(), drawingNumber: sheetText.optional(), material: sheetText.optional(),
+    colour: sheetText.optional(), finish: sheetText.optional(), standard: sheetText.optional(), revision: sheetText.optional(),
+    sheet: sheetText.optional(), date: sheetText.optional(), author: sheetText.optional(),
+    notes: z.array(sheetText).max(8).optional(), views: z.array(principal).min(1).max(3).optional(), iso: z.boolean().optional(),
+    scale: z.number().finite().min(0.02).max(50).optional(),
+    section: z.object({ axis: z.enum(["x", "y", "z"]), at: z.number().finite(), from: z.enum(["+", "-"]).optional(), letter: z.string().max(2).optional(), parent: principal.optional() }).optional(),
+    detail: z.object({ view: principal.optional(), centre: z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }), radius: length.max(10000), factor: length.max(20), letter: z.string().max(2).optional() }).optional(),
+    flatness: z.object({ value: length, view: principal.optional() }).optional()
+  }).optional()
+})
 export const parametricConvertSchema = z.object({ elementId, depth: length.optional(), name: z.string().min(1).max(100).optional() })
 export const parametricRecipeCreateSchema = z.object({ recipe: z.enum(recipes), params: z.record(z.string().min(1).max(80), z.unknown()).optional(), name: z.string().min(1).max(100).optional(), ...placement })
 
@@ -120,6 +136,29 @@ const of = <T extends ParametricHandlerInput>(input: T, context: ActionContext) 
 
 export const runParametricInspect = (input: z.infer<typeof parametricInspectSchema>, context: ActionContext) => of({ action: "inspect", elementId: input.elementId }, context)
 export const runParametricTest = (input: z.infer<typeof parametricTestSchema>, context: ActionContext) => of({ action: "test", elementId: input.elementId, cases: input.cases }, context)
+
+/** A sheet is a read-only derived artifact, never a new drawing or a change to the part. */
+export const runParametricDrawing = async (input: z.infer<typeof parametricDrawingSchema>, context: ActionContext) => {
+  if ((input.elementId === undefined) === (input.history === undefined)) return { ok: false, error: "Send exactly one of elementId or history." }
+  let history = input.history
+  let revision: unknown
+  let projectId: unknown
+  let drawingId: unknown
+  if (input.elementId !== undefined) {
+    const inspected = asRecord(await of({ action: "inspect", elementId: input.elementId }, context))
+    if (inspected === undefined || inspected["ok"] === false) return inspected ?? unavailable
+    const decoded = historySchema.safeParse(inspected["history"])
+    if (!decoded.success) return { ok: false, error: "The part has no readable parametric history." }
+    history = decoded.data
+    revision = inspected["revision"]; projectId = inspected["projectId"]; drawingId = inspected["drawingId"]
+  }
+  try {
+    const sheet = drawing.generateSheet(history!, input.options ?? {})
+    return { ok: true, mutated: false, ...sheet, elementId: input.elementId, revision, projectId, drawingId }
+  } catch (cause) {
+    return { ok: false, error: cause instanceof Error ? cause.message : "The drawing could not be generated." }
+  }
+}
 export const runParametricCreate = (input: z.infer<typeof parametricCreateSchema>, context: ActionContext) =>
   of({
     action: "create", history: input.history, name: input.name,

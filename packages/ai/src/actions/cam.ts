@@ -20,6 +20,12 @@ export const setupCandidateParameters = z.object({
 })
 export type SetupCandidate = z.infer<typeof setupCandidateParameters>
 
+export const machiningPlanSchema = z.object({
+  operations: z.array(z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()) })).min(1).max(8),
+  expectedRevision: z.string().min(1).max(100).optional()
+})
+export type MachiningPlanInput = z.infer<typeof machiningPlanSchema>
+
 const vision = async (input: z.infer<typeof visionInputSchema>, context: ActionContext) => {
   if (context.handlers.vision === undefined) return { ok: false, error: "Viewport capture is unavailable in this host." }
   const result = await context.handlers.vision(context.projectId, "cam", input.focus, context.signal)
@@ -28,6 +34,14 @@ const vision = async (input: z.infer<typeof visionInputSchema>, context: ActionC
 }
 
 export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
+  defineAction({
+    id: "cam.plan_check", kind: "read", parameters: machiningPlanSchema,
+    run: (input, { handlers, projectId }) => handlers.validateMachiningPlan?.(projectId, input) ?? { ok: false, error: "Plan validation is unavailable in this host." }
+  }),
+  defineAction({
+    id: "cam.review", kind: "read", parameters: z.object({ operationId: z.string().min(1) }),
+    run: ({ operationId }, { handlers, projectId }) => handlers.reviewOperation?.(projectId, operationId) ?? { ok: false, error: "Saved review is unavailable in this host." }
+  }),
   defineAction({
     id: "cam.machine", kind: "read", replaces: "cam_describe_machine",
     parameters: z.object({ machineType }),
@@ -52,8 +66,18 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   }),
   defineAction({
     id: "cam.analyze", kind: "read", replaces: "cam_analyze_gcode",
-    parameters: z.object({ gcode: z.string().min(1), machineType: machineType.optional() }),
-    run: async ({ gcode, machineType: kind }, { handlers, projectId }) => {
+    // The program text, or the operation whose stored program is read: `cam_edit.generate` answers with a preview only, so the
+    // whole program the machine would run is reachable only by its operation.
+    parameters: z.object({ gcode: z.string().min(1).optional(), operationId: z.string().min(1).optional(), machineType: machineType.optional() }),
+    run: async ({ gcode: text, operationId, machineType: kind }, { handlers, projectId }) => {
+      if ((text === undefined) === (operationId === undefined)) return { ok: false, error: "Send exactly one of gcode (a program text) or operationId (an operation whose program was generated)." }
+      let gcode = text ?? ""
+      if (operationId !== undefined) {
+        if (handlers.operationProgram === undefined) return { ok: false, error: "Stored programs are not available in this host: send the program text as gcode." }
+        const program = await handlers.operationProgram(projectId, operationId)
+        if (!program.ok) return program
+        gcode = program.gcode
+      }
       const report = analyzeGcode(gcode, await handlers.machine?.(projectId))
       if (kind === undefined) return report
       // The checks of the line scanner plus the ones that follow from the machine's own axes and what rotates.

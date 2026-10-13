@@ -1,0 +1,951 @@
+/**
+ * Exact B-rep Booleans (SMLib's SmApiBoolean pipeline): intersect → imprint → classify → sew.
+ *
+ * 1. Intersect. Edges of each solid against the faces of the other (exact points by Newton), edges lying on the
+ *    other solid's surfaces (coplanar/coincident faces) and their crossings with that face's boundary, and the
+ *    intersection curves of every pair of non-coincident faces (refined onto both surfaces, recognised as lines and
+ *    circles, otherwise fitted as cubic B-splines within the fit tolerance).
+ * 2. Imprint. Every intersection point becomes a vertex (one registry for both solids, so touching corners merge);
+ *    edges are split at those vertices; each face is cut by the curves lying on it through a planar arrangement in
+ *    its (u, v) domain, giving face fragments bounded by edge pieces.
+ * 3. Classify. A point inside each fragment is located against the other solid (exact closest point and
+ *    pseudo-normal): in, out, or on with the same or the opposite orientation.
+ * 4. Sew. Fragments are kept by the operation's rules, the second solid's are flipped for a difference, pieces that
+ *    coincide are one edge, coplanar neighbours are merged and the result is validated.
+ *
+ * A result that does not validate as a closed manifold solid is an error (`BooleanError`), never returned.
+ */
+import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
+import { curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface } from "./geom.ts"
+import { interpolateCurve } from "./nurbs.ts"
+import { compactBrep, edgeUses, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
+import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
+import { brepLocator, type BrepLocator } from "./classify.ts"
+import { Cdt } from "./cdt.ts"
+import {
+  edgeEdgeHits,
+  edgeOnSurface,
+  edgeSurfaceHits,
+  meshIntersectionPolylines,
+  refineSsiPolyline,
+  refineSurfaceSurface,
+  TriBvh,
+  triSetOfFace,
+  type SsiPoint,
+  type TriSet
+} from "./intersect.ts"
+import { validateBrep, type BrepIssue } from "./validate.ts"
+
+export type BooleanOp = "union" | "subtract" | "intersect"
+
+export class BooleanError extends Error {
+  constructor(message: string, readonly issues: ReadonlyArray<BrepIssue> = []) {
+    super(message)
+  }
+}
+
+export interface BooleanOptions {
+  /** Coincidence tolerance, mm (default 1e-8 × model size, at least 1e-7). */
+  readonly tol?: number
+  /** Max deviation of fitted intersection curves, mm (default 1e-6 × model size, at least 1e-6). */
+  readonly fitTol?: number
+  /** Diagnostics hook: receives each stage's data (intersections, arrangements, classification). */
+  readonly debug?: (stage: string, data: unknown) => void
+}
+
+export interface BooleanStats {
+  readonly intersectionCurves: number
+  readonly splitPoints: number
+  readonly fragments: number
+  readonly keptFaces: number
+}
+
+export interface BooleanResult {
+  readonly brep: Brep
+  readonly warnings: ReadonlyArray<string>
+  readonly stats: BooleanStats
+}
+
+const TAU = Math.PI * 2
+
+// ================================================================ registries
+
+class VertexRegistry {
+  readonly pts: Vec3[] = []
+  constructor(readonly tol: number) {}
+  add(p: Vec3): number {
+    for (let i = 0; i < this.pts.length; i++) if (dist3(this.pts[i]!, p) <= this.tol) return i
+    this.pts.push(p)
+    return this.pts.length - 1
+  }
+}
+
+class UnionFind {
+  private readonly p = new Map<string, string>()
+  find(x: string): string {
+    let r = x
+    while (this.p.has(r) && this.p.get(r) !== r) r = this.p.get(r)!
+    // Path compression.
+    let y = x
+    while (this.p.has(y) && this.p.get(y) !== r) { const n = this.p.get(y)!; this.p.set(y, r); y = n }
+    return r
+  }
+  union(a: string, b: string): void {
+    const ra = this.find(a), rb = this.find(b)
+    if (ra !== rb) this.p.set(rb, ra)
+  }
+}
+
+/** A piece of curve between two registry vertices: the unit of edge identity in the result. */
+interface Piece {
+  readonly key: string
+  readonly curve: Curve3
+  /** Parameter range, t0 < t1; v0 at t0. */
+  readonly t0: number
+  readonly t1: number
+  readonly v0: number
+  readonly v1: number
+}
+
+interface SolidData {
+  readonly brep: Brep
+  readonly fb: FaceBoundaries
+  readonly loc: BrepLocator
+  readonly tri: ReadonlyArray<TriSet | undefined>
+  readonly bvh: ReadonlyArray<TriBvh | undefined>
+  /** Registry id of each vertex. */
+  readonly vid: number[]
+  /** Split points per edge. */
+  readonly splits: Array<Array<{ readonly t: number; readonly vid: number }>>
+  /** Faces of the other solid on whose surface each edge lies. */
+  readonly onFaces: Array<number[]>
+  readonly faceBox: ReadonlyArray<{ readonly lo: Vec3; readonly hi: Vec3 }>
+  readonly edgeBox: ReadonlyArray<{ readonly lo: Vec3; readonly hi: Vec3 }>
+}
+
+const boxOverlap = (a: { lo: Vec3; hi: Vec3 }, b: { lo: Vec3; hi: Vec3 }, pad: number): boolean =>
+  a.lo.x - pad <= b.hi.x && b.lo.x - pad <= a.hi.x && a.lo.y - pad <= b.hi.y && b.lo.y - pad <= a.hi.y && a.lo.z - pad <= b.hi.z && b.lo.z - pad <= a.hi.z
+
+const boxOf = (pts: Iterable<Vec3>): { lo: Vec3; hi: Vec3 } => {
+  let lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
+  for (const p of pts) {
+    lo = { x: Math.min(lo.x, p.x), y: Math.min(lo.y, p.y), z: Math.min(lo.z, p.z) }
+    hi = { x: Math.max(hi.x, p.x), y: Math.max(hi.y, p.y), z: Math.max(hi.z, p.z) }
+  }
+  return { lo, hi }
+}
+
+// ================================================================ curve fitting
+
+interface FittedCurve {
+  readonly curve: Curve3
+  readonly t0: number
+  readonly t1: number
+  /** Curve parameter of each input point. */
+  readonly params: ReadonlyArray<number>
+}
+
+/** Line, circle, or interpolating cubic B-spline through exact points of a curve. */
+const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number): FittedCurve => {
+  const n = pts.length
+  const P0 = pts[0]!, Pn = closed ? pts[0]! : pts[n - 1]!
+  // Line.
+  if (!closed) {
+    const d = sub3(Pn, P0)
+    const L = length3(d)
+    if (L > tol) {
+      const u = scale3(d, 1 / L)
+      let ok = true
+      for (const p of pts) { const r = sub3(p, P0); if (length3(sub3(r, scale3(u, dot3(r, u)))) > tol) { ok = false; break } }
+      if (ok) return { curve: { kind: "line", origin: P0, dir: u }, t0: 0, t1: L, params: pts.map((p) => dot3(sub3(p, P0), u)) }
+    }
+  }
+  // Circle through three well-spread points.
+  if (n >= 3) {
+    const a = pts[0]!, b = pts[Math.floor(n / 3)]!, c = pts[Math.floor((2 * n) / 3)]!
+    const ab = sub3(b, a), ac = sub3(c, a)
+    const nrm = cross3(ab, ac)
+    const nn = dot3(nrm, nrm)
+    if (nn > 1e-24) {
+      const center = add3(a, scale3(add3(scale3(cross3(nrm, ab), dot3(ac, ac)), scale3(cross3(ac, nrm), dot3(ab, ab))), 1 / (2 * nn)))
+      const R = dist3(center, a)
+      const z = normalize3(nrm)
+      let ok = R > tol
+      for (const p of pts) if (Math.abs(dist3(p, center) - R) > tol || Math.abs(dot3(sub3(p, center), z)) > tol) { ok = false; break }
+      if (ok) {
+        // Orient the frame so the points run counter-clockwise.
+        const x = normalize3(sub3(P0, center))
+        let fr: Frame = { origin: center, x, y: cross3(z, x), z }
+        const ang = (p: Vec3) => Math.atan2(dot3(sub3(p, center), fr.y), dot3(sub3(p, center), fr.x))
+        if (ang(pts[1]!) < 0) { const z2 = scale3(z, -1); fr = { origin: center, x, y: cross3(z2, x), z: z2 } }
+        const params: number[] = [0]
+        let acc = 0
+        for (let i = 1; i < n; i++) {
+          let d = ang(pts[i]!) - ang(pts[i - 1]!)
+          while (d < 0) d += TAU
+          while (d >= TAU) d -= TAU
+          acc += d
+          params.push(acc)
+        }
+        let t1 = acc
+        if (closed) t1 = TAU
+        else { let d = ang(Pn) - ang(pts[n - 2]!); while (d < 0) d += TAU; t1 = acc; void d }
+        return { curve: { kind: "circle", frame: fr, radius: R }, t0: 0, t1, params }
+      }
+    }
+  }
+  // Cubic B-spline interpolation (closed curves repeat the first point).
+  const data = closed ? [...pts, pts[0]!] : pts
+  const { curve, params } = interpolateCurve(data.map((p) => [p.x, p.y, p.z]), 3)
+  return { curve: { kind: "nurbs", data: curve }, t0: 0, t1: 1, params: closed ? params.slice(0, n) : params }
+}
+
+// ================================================================ the Boolean
+
+export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOptions = {}): BooleanResult => {
+  const warnings: string[] = []
+  const allBox = boxOf([...A.vertices.map((v) => v.point), ...B.vertices.map((v) => v.point), ...[A, B].flatMap((b) => b.edges.map((e) => curvePoint(e.curve, (e.t0 + e.t1) / 2)))])
+  const size = Math.max(1e-3, dist3(allBox.lo, allBox.hi))
+  const tol = options.tol ?? Math.max(1e-7, size * 1e-8)
+  const fitTol = options.fitTol ?? Math.max(1e-6, size * 1e-6)
+  const seedChord = size / 600
+  const reg = new VertexRegistry(Math.max(tol * 10, 1e-7))
+
+  // ------------------------------------------------ preparation
+  const prepare = (b: Brep): SolidData => {
+    const opts = { chordTol: seedChord, angleTolDeg: 10 }
+    const fb = faceBoundaries(b, opts)
+    const tess = tessellateBrep(b, opts)
+    const tri: Array<TriSet | undefined> = b.faces.map(() => undefined)
+    const bvh: Array<TriBvh | undefined> = b.faces.map(() => undefined)
+    for (const fm of tess.faces) { tri[fm.face] = triSetOfFace(fm); bvh[fm.face] = new TriBvh(tri[fm.face]!, tol) }
+    const faceBox = b.faces.map((_, fi) => {
+      const t = tri[fi]
+      if (t === undefined) return { lo: allBox.lo, hi: allBox.hi }
+      const ps: Vec3[] = []
+      for (const [a, c, d] of t.tris) ps.push(t.pos(a), t.pos(c), t.pos(d))
+      const bx = boxOf(ps)
+      const pad = seedChord * 2
+      return { lo: { x: bx.lo.x - pad, y: bx.lo.y - pad, z: bx.lo.z - pad }, hi: { x: bx.hi.x + pad, y: bx.hi.y + pad, z: bx.hi.z + pad } }
+    })
+    const edgeBox = b.edges.map((e, ei) => {
+      const bx = boxOf(fb.edges[ei]!.points.map((g) => fb.point(g)))
+      const pad = seedChord * 2
+      void e
+      return { lo: { x: bx.lo.x - pad, y: bx.lo.y - pad, z: bx.lo.z - pad }, hi: { x: bx.hi.x + pad, y: bx.hi.y + pad, z: bx.hi.z + pad } }
+    })
+    return {
+      brep: b,
+      fb,
+      loc: brepLocator(b, fb),
+      tri,
+      bvh,
+      vid: b.vertices.map((v) => reg.add(v.point)),
+      splits: b.edges.map(() => []),
+      onFaces: b.edges.map(() => []),
+      faceBox,
+      edgeBox
+    }
+  }
+  const S = [prepare(A), prepare(B)] as const
+
+  const coincidentSurfaces = (sa: Surface, sb: Surface, sdB: SolidData, fbi: number): boolean => {
+    // Every sampled point of face fb lies on surface sa.
+    const t = sdB.tri[fbi]
+    if (t === undefined) return false
+    const step = Math.max(1, Math.floor(t.tris.length / 12))
+    for (let i = 0; i < t.tris.length; i += step) {
+      const tr = t.tris[i]!
+      const c = scale3(add3(add3(t.pos(tr[0]), t.pos(tr[1])), t.pos(tr[2])), 1 / 3)
+      const q = surfaceProject(sb, c)
+      const p = surfacePoint(sb, q.u, q.v)
+      const qa = surfaceProject(sa, p)
+      if (dist3(surfacePoint(sa, qa.u, qa.v), p) > tol * 10) return false
+    }
+    return true
+  }
+
+  // ------------------------------------------------ 1a. edges × faces of the other solid
+  const edgePoints = (sd: SolidData, ei: number): Vec3[] => sd.fb.edges[ei]!.points.map((g) => sd.fb.point(g))
+  for (const s of [0, 1] as const) {
+    const me = S[s], other = S[1 - s]!
+    me.brep.edges.forEach((e, ei) => {
+      other.brep.faces.forEach((f, fi) => {
+        if (!boxOverlap(me.edgeBox[ei]!, other.faceBox[fi]!, 0)) return
+        if (edgeOnSurface(e, f.surface, tol * 10)) {
+          me.onFaces[ei]!.push(fi)
+          return
+        }
+        const t = other.tri[fi], bv = other.bvh[fi]
+        if (t === undefined || bv === undefined) return
+        for (const h of edgeSurfaceHits(e, me.fb.edges[ei]!.params, edgePoints(me, ei), f.surface, t, bv, tol * 10)) {
+          if (!other.loc.insideFace(fi, h.u, h.v)) continue
+          const v = reg.add(h.point)
+          me.splits[ei]!.push({ t: h.t, vid: v })
+          // A hit on the face's boundary also splits that boundary edge.
+          for (const l of f.loops) for (const c of l.coedges) {
+            const e2 = other.brep.edges[c.edge]!
+            const t2 = curveProject(e2.curve, h.point, e2.t0, e2.t1)
+            if (dist3(curvePoint(e2.curve, t2), h.point) <= tol * 10) other.splits[c.edge]!.push({ t: t2, vid: v })
+          }
+        }
+      })
+    })
+  }
+  // ------------------------------------------------ 1b. edges lying on the other solid's faces: crossings with its boundary
+  for (const s of [0, 1] as const) {
+    const me = S[s], other = S[1 - s]!
+    me.brep.edges.forEach((e, ei) => {
+      for (const fi of me.onFaces[ei]!) {
+        for (const l of other.brep.faces[fi]!.loops) for (const c of l.coedges) {
+          const e2 = other.brep.edges[c.edge]!
+          if (!boxOverlap(me.edgeBox[ei]!, other.edgeBox[c.edge]!, 0)) continue
+          const hits = edgeEdgeHits(e, me.fb.edges[ei]!.params, edgePoints(me, ei), e2, other.fb.edges[c.edge]!.params, edgePoints(other, c.edge), seedChord * 4, tol * 10)
+          for (const h of hits) {
+            const v = reg.add(h.point)
+            me.splits[ei]!.push({ t: h.t, vid: v })
+            other.splits[c.edge]!.push({ t: h.s, vid: v })
+          }
+        }
+      }
+    })
+  }
+
+  // ------------------------------------------------ 1c. face × face intersection curves
+  interface Ssi {
+    readonly fa: number
+    readonly fb: number
+    pts: SsiPoint[]
+    readonly closed: boolean
+  }
+  const ssis: Ssi[] = []
+  const onEdgeOf = (sd: SolidData, fi: number, pts: ReadonlyArray<SsiPoint>): boolean => {
+    for (const l of sd.brep.faces[fi]!.loops) for (const c of l.coedges) {
+      const e = sd.brep.edges[c.edge]!
+      if (pts.every((q) => dist3(curvePoint(e.curve, curveProject(e.curve, q.p, e.t0, e.t1)), q.p) <= tol * 100)) return true
+    }
+    return false
+  }
+  A.faces.forEach((fa, ia) => {
+    B.faces.forEach((fbF, ib) => {
+      if (!boxOverlap(S[0].faceBox[ia]!, S[1].faceBox[ib]!, 0)) return
+      if (coincidentSurfaces(fa.surface, fbF.surface, S[1], ib)) return
+      const ta = S[0].tri[ia], tb = S[1].tri[ib], bvb = S[1].bvh[ib]
+      if (ta === undefined || tb === undefined || bvb === undefined) return
+      for (const pl of meshIntersectionPolylines(ta, tb, bvb, fa.surface, fbF.surface)) {
+        const refined = refineSsiPolyline(fa.surface, fbF.surface, pl.pts, pl.closed, tol, fitTol)
+        if (refined === undefined) { warnings.push(`face ${ia}×${ib}: intersection curve could not be refined`); continue }
+        if (onEdgeOf(S[0], ia, refined) || onEdgeOf(S[1], ib, refined)) continue
+        ssis.push({ fa: ia, fb: ib, pts: refined, closed: pl.closed })
+      }
+    })
+  })
+
+  // Snap open SSI ends to registry vertices; split SSI curves at vertices they pass through.
+  interface SsiPiece extends Piece { readonly ssi: number; readonly uvA: Vec2[]; readonly uvB: Vec2[]; readonly params: number[] }
+  const ssiPieces: SsiPiece[] = []
+  const snapR = seedChord * 6
+  const projectToSsi = (q: SsiPoint, p: Vec3, sa: Surface, sb: Surface): SsiPoint => {
+    const a = surfaceProject(sa, p, { u: q.ua, v: q.va })
+    const b = surfaceProject(sb, p, { u: q.ub, v: q.vb })
+    return { p, ua: a.u, va: a.v, ub: b.u, vb: b.v }
+  }
+  ssis.forEach((c, ci) => {
+    const sa = A.faces[c.fa]!.surface, sb = B.faces[c.fb]!.surface
+    let pts = c.pts
+    // Vertices on this curve: registry points that lie on both surfaces and near the polyline.
+    const onCurve: Array<{ readonly vid: number; readonly seg: number; readonly f: number }> = []
+    reg.pts.forEach((P, vid) => {
+      let best = -1, bestD = Infinity, bestF = 0
+      const nseg = c.closed ? pts.length : pts.length - 1
+      for (let i = 0; i < nseg; i++) {
+        const a = pts[i]!.p, b = pts[(i + 1) % pts.length]!.p
+        const d = sub3(b, a)
+        const l2 = dot3(d, d)
+        const f = l2 === 0 ? 0 : Math.max(0, Math.min(1, dot3(sub3(P, a), d) / l2))
+        const dd = dist3(add3(a, scale3(d, f)), P)
+        if (dd < bestD) { bestD = dd; best = i; bestF = f }
+      }
+      if (best < 0 || bestD > snapR) return
+      const qa = surfaceProject(sa, P), qb = surfaceProject(sb, P)
+      if (dist3(surfacePoint(sa, qa.u, qa.v), P) > tol * 10 || dist3(surfacePoint(sb, qb.u, qb.v), P) > tol * 10) return
+      onCurve.push({ vid, seg: best, f: bestF })
+    })
+    if (!c.closed) {
+      // Ends must be vertices.
+      const endVid = (end: SsiPoint): number | undefined => {
+        let best: number | undefined, bd = Infinity
+        for (const o of onCurve) { const d = dist3(reg.pts[o.vid]!, end.p); if (d < bd) { bd = d; best = o.vid } }
+        return bd <= snapR ? best : undefined
+      }
+      const v0 = endVid(pts[0]!), v1 = endVid(pts[pts.length - 1]!)
+      if (v0 === undefined || v1 === undefined) {
+        warnings.push(`intersection curve of faces ${c.fa}×${c.fb} ends away from any boundary point`)
+        return
+      }
+      pts = [projectToSsi(pts[0]!, reg.pts[v0]!, sa, sb), ...pts.slice(1, -1), projectToSsi(pts[pts.length - 1]!, reg.pts[v1]!, sa, sb)]
+    }
+    // Ordered vertices along the curve (by segment, then position).
+    const along = onCurve
+      .map((o) => ({ ...o, pos: o.seg + o.f }))
+      .sort((x, y) => x.pos - y.pos)
+      .filter((o, i, arr) => i === 0 || o.vid !== arr[i - 1]!.vid)
+    // Insert interior vertices as exact points.
+    type Mark = { readonly q: SsiPoint; readonly vid?: number }
+    const marks: Mark[] = pts.map((q) => ({ q }))
+    const firstVid = c.closed ? undefined : along.find((o) => dist3(reg.pts[o.vid]!, pts[0]!.p) <= tol * 100)?.vid
+    const lastVid = c.closed ? undefined : along.find((o) => dist3(reg.pts[o.vid]!, pts[pts.length - 1]!.p) <= tol * 100)?.vid
+    if (!c.closed) {
+      marks[0] = { q: marks[0]!.q, vid: firstVid! }
+      marks[marks.length - 1] = { q: marks[marks.length - 1]!.q, vid: lastVid! }
+    }
+    const inserts = along.filter((o) => o.vid !== firstVid && o.vid !== lastVid)
+    // Insert from the back so segment indices stay valid.
+    for (const o of [...inserts].reverse()) {
+      const q0 = marks[o.seg]!.q
+      const at: Mark = { q: projectToSsi(q0, reg.pts[o.vid]!, sa, sb), vid: o.vid }
+      if (dist3(q0.p, at.q.p) <= tol * 10) marks[o.seg] = { q: at.q, vid: o.vid }
+      else if (o.seg + 1 < marks.length && dist3(marks[o.seg + 1]!.q.p, at.q.p) <= tol * 10) marks[o.seg + 1] = { q: at.q, vid: o.vid }
+      else marks.splice(o.seg + 1, 0, at)
+    }
+    // A closed curve with no vertex gets one.
+    let ring = marks
+    if (c.closed) {
+      const k = ring.findIndex((m) => m.vid !== undefined)
+      if (k < 0) {
+        const vid = reg.add(ring[0]!.q.p)
+        ring = [{ q: ring[0]!.q, vid }, ...ring.slice(1)]
+      } else ring = [...ring.slice(k), ...ring.slice(0, k)]
+      ring = [...ring, ring[0]!]
+    }
+    // Pieces between consecutive vertices.
+    let start = 0
+    for (let i = 1; i < ring.length; i++) {
+      if (ring[i]!.vid === undefined) continue
+      const seg = ring.slice(start, i + 1)
+      const v0 = seg[0]!.vid!, v1 = seg[seg.length - 1]!.vid!
+      const pieceClosed = v0 === v1
+      const ptsP = seg.map((m) => m.q)
+      if (ptsP.length >= 2 && !(ptsP.length === 2 && v0 === v1)) {
+        const fit = fitCurve(pieceClosed ? ptsP.slice(0, -1).map((q) => q.p) : ptsP.map((q) => q.p), pieceClosed, Math.max(tol * 10, fitTol / 10))
+        const params = pieceClosed ? [...fit.params, fit.t1] : [...fit.params]
+        ssiPieces.push({
+          key: `C${ci}.${ssiPieces.length}`,
+          ssi: ci,
+          curve: fit.curve,
+          t0: fit.t0,
+          t1: fit.t1,
+          v0,
+          v1,
+          uvA: ptsP.map((q) => ({ x: q.ua, y: q.va })),
+          uvB: ptsP.map((q) => ({ x: q.ub, y: q.vb })),
+          params
+        })
+      }
+      start = i
+    }
+  })
+
+  options.debug?.("intersections", {
+    ssis: ssis.map((c) => ({ fa: c.fa, fb: c.fb, closed: c.closed, n: c.pts.length, first: c.pts[0]?.p, last: c.pts[c.pts.length - 1]?.p })),
+    ssiPieces: ssiPieces.map((p) => ({ key: p.key, v0: p.v0, v1: p.v1, kind: p.curve.kind })),
+    vertices: reg.pts,
+    splits: S.map((sd) => sd.splits.map((l) => l.map((x) => x.vid))),
+    onFaces: S.map((sd) => sd.onFaces)
+  })
+  // ------------------------------------------------ 2a. split edges into pieces
+  const edgePieces: Array<Array<Piece[]>> = [[], []]
+  for (const s of [0, 1] as const) {
+    const sd = S[s]
+    sd.brep.edges.forEach((e, ei) => {
+      const ends = [{ t: e.t0, vid: sd.vid[e.v0]! }, { t: e.t1, vid: sd.vid[e.v1]! }]
+      const span = e.t1 - e.t0
+      const inner = sd.splits[ei]!
+        .filter((x) => x.t > e.t0 + 1e-9 * span && x.t < e.t1 - 1e-9 * span && x.vid !== ends[0]!.vid && x.vid !== ends[1]!.vid)
+        .sort((a, b) => a.t - b.t)
+        .filter((x, i, arr) => i === 0 || (x.vid !== arr[i - 1]!.vid && x.t - arr[i - 1]!.t > 1e-9 * span))
+      // A closed edge split by vertices keeps its seam vertex as an end.
+      const marks = [ends[0]!, ...inner, ends[1]!]
+      const pieces: Piece[] = []
+      for (let k = 0; k + 1 < marks.length; k++) {
+        pieces.push({ key: `E${s}.${ei}.${k}`, curve: e.curve, t0: marks[k]!.t, t1: marks[k + 1]!.t, v0: marks[k]!.vid, v1: marks[k + 1]!.vid })
+      }
+      edgePieces[s]![ei] = pieces
+    })
+  }
+
+  // ------------------------------------------------ 2b. identity of coincident pieces
+  const uf = new UnionFind()
+  const pieceByKey = new Map<string, Piece>()
+  const allPieces: Piece[] = [...edgePieces[0]!.flat(), ...edgePieces[1]!.flat(), ...ssiPieces]
+  for (const p of allPieces) pieceByKey.set(p.key, p)
+  const midOf = (p: Piece): Vec3 => curvePoint(p.curve, (p.t0 + p.t1) / 2)
+  const byEnds = new Map<string, Piece[]>()
+  for (const p of allPieces) {
+    const k = p.v0 < p.v1 ? `${p.v0}_${p.v1}` : `${p.v1}_${p.v0}`
+    const l = byEnds.get(k) ?? []
+    l.push(p)
+    byEnds.set(k, l)
+  }
+  for (const group of byEnds.values()) {
+    for (let i = 0; i < group.length; i++) for (let j = i + 1; j < group.length; j++) {
+      const a = group[i]!, b = group[j]!
+      if (dist3(midOf(a), midOf(b)) > tol * 100) continue
+      // Closed pieces must also agree at a second point.
+      if (a.v0 === a.v1 && dist3(curvePoint(a.curve, a.t0 + (a.t1 - a.t0) * 0.25), curvePoint(b.curve, b.t0 + (b.t1 - b.t0) * 0.25)) > tol * 100 && dist3(curvePoint(a.curve, a.t0 + (a.t1 - a.t0) * 0.25), curvePoint(b.curve, b.t0 + (b.t1 - b.t0) * 0.75)) > tol * 100) continue
+      // Prefer original edges as representatives.
+      if (a.key.startsWith("C") && !b.key.startsWith("C")) uf.union(b.key, a.key)
+      else uf.union(a.key, b.key)
+    }
+  }
+  /** +1 when piece p runs the same way as its representative. */
+  const senseToRep = (p: Piece): number => {
+    const r = pieceByKey.get(uf.find(p.key))!
+    if (r === p) return 1
+    if (r.v0 !== r.v1) return r.v0 === p.v0 ? 1 : -1
+    const tp = curveTangentAt(p.curve, (p.t0 + p.t1) / 2)
+    const m = midOf(p)
+    const tr = curveTangentAt(r.curve, curveProject(r.curve, m, r.t0, r.t1))
+    return dot3(tp, tr) >= 0 ? 1 : -1
+  }
+
+  // ------------------------------------------------ 3. arrangements and fragments
+  interface HalfEdge {
+    readonly from: number // node
+    readonly to: number
+    readonly uv: Vec2[] // scaled-free raw (u, v)
+    readonly piece: string | undefined // undefined: pole line
+    /** +1 when travelling along the piece's parameter direction. */
+    readonly dir: number
+    twin: number
+  }
+  interface Fragment {
+    readonly solid: 0 | 1
+    readonly face: number
+    readonly loops: Array<Array<{ readonly piece: string; readonly dir: number }>>
+    readonly sample: Vec3
+    readonly normal: Vec3
+  }
+  const fragments: Fragment[] = []
+
+  for (const s of [0, 1] as const) {
+    const sd = S[s], other = S[1 - s]!
+    sd.brep.faces.forEach((face, fi) => {
+      if (sd.fb.synthetic[fi]) throw new BooleanError(`face ${fi} of operand ${s === 0 ? "A" : "B"} has a loop wrapping a period without a seam edge (not supported)`)
+      const surf = face.surface
+      const per = surfacePeriods(surf)
+      const rings = sd.fb.rings[fi] ?? []
+      // Metric scale for angles.
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity
+      for (const r of rings) for (const p of r) { u0 = Math.min(u0, p.u); u1 = Math.max(u1, p.u); v0 = Math.min(v0, p.v); v1 = Math.max(v1, p.v) }
+      const dc = surfaceDerivs(surf, (u0 + u1) / 2, (v0 + v1) / 2)
+      const su = Math.max(length3(dc.su), 1e-9), sv = Math.max(length3(dc.sv), 1e-9)
+      const eps = 1e-7 * Math.max(1, (u1 - u0) * su, (v1 - v0) * sv)
+      // Nodes: (registry vertex, uv position).
+      const nodes: Array<{ readonly vid: number; readonly u: number; readonly v: number }> = []
+      const node = (vid: number, u: number, v: number): number => {
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i]!
+          if (n.vid === vid && Math.hypot((n.u - u) * su, (n.v - v) * sv) <= Math.max(eps, 1e-6 * Math.max(su, sv))) return i
+        }
+        nodes.push({ vid, u, v })
+        return nodes.length - 1
+      }
+      const hes: HalfEdge[] = []
+      const addHe = (from: number, to: number, uv: Vec2[], piece: string | undefined, dir: number): number => {
+        hes.push({ from, to, uv, piece, dir, twin: -1 })
+        return hes.length - 1
+      }
+      // --- boundary: rings with split vertices inserted, cut into pieces at vertices.
+      for (const ring of rings) {
+        // Expand: each step i → i+1 runs along `out` of sample i (undefined: a pole line). Split vertices of that edge
+        // are inserted between the two samples.
+        type RS = { u: number; v: number; vid?: number; out?: number; tOut?: number; tIn?: number }
+        const ex: RS[] = []
+        const n = ring.length
+        for (let i = 0; i < n; i++) {
+          const a = ring[i]!, b = ring[(i + 1) % n]!
+          const isVertex = a.g < sd.brep.vertices.length && (a.edge !== undefined || a.inEdge !== undefined)
+          ex.push({ u: a.u, v: a.v, vid: isVertex ? sd.vid[a.g]! : undefined, out: a.edge, tOut: a.t, tIn: a.inT })
+          if (a.edge !== undefined && b.inEdge === a.edge && a.t !== undefined && b.inT !== undefined) {
+            const ta = a.t, tb = b.inT
+            const lo = Math.min(ta, tb), hi = Math.max(ta, tb)
+            // The split vertices are the inner ends of the edge's pieces (deduplicated there).
+            const inner = edgePieces[s]![a.edge]!
+              .slice(0, -1)
+              .map((p) => ({ t: p.t1, vid: p.v1 }))
+              .filter((x) => x.t > lo && x.t < hi)
+              .sort((x, y) => (tb > ta ? x.t - y.t : y.t - x.t))
+            for (const x of inner) {
+              const P = reg.pts[x.vid]!
+              const q = surfaceProject(surf, P, { u: a.u, v: a.v })
+              const uu = per.u !== undefined ? unwrapNear(q.u, a.u, per.u) : q.u
+              const vv = per.v !== undefined ? unwrapNear(q.v, a.v, per.v) : q.v
+              ex.push({ u: uu, v: vv, vid: x.vid, out: a.edge, tOut: x.t, tIn: x.t })
+            }
+          }
+        }
+        const cutIdx = ex.map((p, i) => (p.vid !== undefined ? i : -1)).filter((i) => i >= 0)
+        if (cutIdx.length === 0) throw new BooleanError(`face ${fi}: boundary ring without vertices`)
+        for (let k = 0; k < cutIdx.length; k++) {
+          const i0 = cutIdx[k]!, i1 = cutIdx[(k + 1) % cutIdx.length]!
+          const seg: RS[] = []
+          for (let i = i0; ; i = (i + 1) % ex.length) { seg.push(ex[i]!); if (i === i1 && seg.length > 1) break }
+          const a = seg[0]!, b = seg[seg.length - 1]!
+          const from = node(a.vid!, a.u, a.v), to = node(b.vid!, b.u, b.v)
+          const uv = seg.map((p) => ({ x: p.u, y: p.v }))
+          // Between two vertices every step runs along one edge, or all along a pole line.
+          const ed = a.out
+          if (ed === undefined || seg.slice(0, -1).some((p) => p.out !== ed)) {
+            if (seg.slice(0, -1).some((p) => p.out !== undefined)) throw new BooleanError(`face ${fi}: boundary piece mixes edges`)
+            addHe(from, to, uv, undefined, 1)
+            continue
+          }
+          const tA = a.tOut!, tB = b.tIn!
+          const mid = (tA + tB) / 2
+          const pc = edgePieces[s]![ed]!.find((p) => p.t0 <= mid && mid <= p.t1)
+          if (pc === undefined) throw new BooleanError(`face ${fi}: no piece of edge ${ed} at t=${mid}`)
+          addHe(from, to, uv, pc.key, tB > tA ? 1 : -1)
+        }
+      }
+      // --- cut curves: SSI pieces on this face, and the other solid's edge pieces lying on it.
+      const cutsUv: Array<{ readonly uv: Vec2[]; readonly piece: Piece; readonly v0: number; readonly v1: number }> = []
+      // A cut that is the same edge as a piece of this face's boundary adds nothing.
+      const ownReps = new Set(hes.filter((h) => h.piece !== undefined).map((h) => uf.find(h.piece!)))
+      for (const p of ssiPieces) {
+        const c = ssis[p.ssi]!
+        if ((s === 0 && c.fa !== fi) || (s === 1 && c.fb !== fi)) continue
+        if (ownReps.has(uf.find(p.key))) continue
+        cutsUv.push({ uv: s === 0 ? p.uvA : p.uvB, piece: p, v0: p.v0, v1: p.v1 })
+      }
+      other.brep.edges.forEach((e2, ei2) => {
+        if (!other.onFaces[ei2]!.includes(fi)) return
+        for (const p of edgePieces[1 - s]![ei2]!) {
+          if (ownReps.has(uf.find(p.key))) continue
+          const K = 16
+          const uv: Vec2[] = []
+          let hint: { u: number; v: number } | undefined
+          for (let k = 0; k <= K; k++) {
+            const P = k === 0 ? reg.pts[p.v0]! : k === K ? reg.pts[p.v1]! : curvePoint(e2.curve, p.t0 + ((p.t1 - p.t0) * k) / K)
+            const q = surfaceProject(surf, P, hint)
+            hint = q
+            uv.push({ x: q.u, y: q.v })
+          }
+          cutsUv.push({ uv, piece: p, v0: p.v0, v1: p.v1 })
+        }
+      })
+      for (const c of cutsUv) {
+        // Unwrap continuously, then shift by whole periods so the middle lies inside the face.
+        const uv = c.uv.map((q) => ({ ...q }))
+        for (let i = 1; i < uv.length; i++) {
+          if (per.u !== undefined) uv[i]!.x = unwrapNear(uv[i]!.x, uv[i - 1]!.x, per.u)
+          if (per.v !== undefined) uv[i]!.y = unwrapNear(uv[i]!.y, uv[i - 1]!.y, per.v)
+        }
+        // Middle of the central segment (never an end point, which lies on the boundary).
+        const km = Math.max(1, Math.floor(uv.length / 2))
+        const m = { x: (uv[km - 1]!.x + uv[km]!.x) / 2, y: (uv[km - 1]!.y + uv[km]!.y) / 2 }
+        const shifts: Array<readonly [number, number]> = []
+        for (const ku of per.u !== undefined ? [0, -1, 1, -2, 2] : [0]) for (const kv of per.v !== undefined ? [0, -1, 1] : [0]) shifts.push([ku * (per.u ?? 0), kv * (per.v ?? 0)])
+        const inside = shifts.find(([du, dv]) => windingUv(rings, m.x + du, m.y + dv) !== 0)
+        if (inside === undefined) continue
+        for (const q of uv) { q.x += inside[0]; q.y += inside[1] }
+        const a = uv[0]!, b = uv[uv.length - 1]!
+        const from = node(c.v0, a.x, a.y), to = node(c.v1, b.x, b.y)
+        const h1 = addHe(from, to, uv, c.piece.key, 1)
+        const h2 = addHe(to, from, [...uv].reverse(), c.piece.key, -1)
+        hes[h1]!.twin = h2
+        hes[h2]!.twin = h1
+      }
+      options.debug?.("arrangement", { solid: s, face: fi, nodes, hes: hes.map((h) => ({ from: h.from, to: h.to, piece: h.piece, dir: h.dir, n: h.uv.length, a: h.uv[0], b: h.uv[h.uv.length - 1], uv: h.uv })) })
+      // --- traverse: left faces.
+      const out = new Map<number, number[]>()
+      hes.forEach((h, i) => { const l = out.get(h.from) ?? []; l.push(i); out.set(h.from, l) })
+      const dirAngle = (pts: ReadonlyArray<Vec2>): number => {
+        const a = pts[0]!
+        for (let k = 1; k < pts.length; k++) {
+          const b = pts[k]!
+          const dx = (b.x - a.x) * su, dy = (b.y - a.y) * sv
+          if (Math.hypot(dx, dy) > 1e-12 * Math.max(1, Math.abs(a.x * su), Math.abs(a.y * sv))) return Math.atan2(dy, dx)
+        }
+        return 0
+      }
+      const outAngle = hes.map((h) => dirAngle(h.uv))
+      const inAngle = hes.map((h) => dirAngle([...h.uv].reverse()))
+      const next = (hi: number): number => {
+        const h = hes[hi]!
+        const cands = out.get(h.to) ?? []
+        let best = -1, bestD = Infinity
+        for (const c of cands) {
+          let d = inAngle[hi]! - outAngle[c]!
+          while (d <= 1e-12) d += TAU
+          while (d > TAU + 1e-12) d -= TAU
+          if (c === h.twin) d = TAU + 1 // dead end only
+          if (d < bestD) { bestD = d; best = c }
+        }
+        return best
+      }
+      const used = new Array<boolean>(hes.length).fill(false)
+      const cycles: Array<{ readonly hes: number[]; readonly area: number }> = []
+      for (let i = 0; i < hes.length; i++) {
+        if (used[i]) continue
+        const cyc: number[] = []
+        let h = i
+        let guard = 0
+        while (h >= 0 && !used[h] && guard++ < 100000) {
+          used[h] = true
+          cyc.push(h)
+          h = next(h)
+        }
+        if (h !== i) { warnings.push(`face ${fi}: open cycle in the arrangement`); continue }
+        let area = 0
+        for (const k of cyc) {
+          const pts = hes[k]!.uv
+          for (let j = 0; j + 1 < pts.length; j++) area += (pts[j]!.x * su) * (pts[j + 1]!.y * sv) - (pts[j + 1]!.x * su) * (pts[j]!.y * sv)
+        }
+        cycles.push({ hes: cyc, area: area / 2 })
+      }
+      const polyOf = (c: { hes: number[] }): Vec2[] => c.hes.flatMap((k) => hes[k]!.uv.slice(0, -1))
+      const outers = cycles.filter((c) => c.area > eps * eps)
+      const holes = cycles.filter((c) => c.area < -eps * eps)
+      const groups = outers.map((o) => ({ outer: o, holes: [] as typeof holes }))
+      for (const h of holes) {
+        // Test point just to the left of the hole's boundary (the material side), never on another cycle's boundary.
+        const hp = polyOf(h)
+        let k0 = 0, bestLen = -1
+        for (let k = 0; k < hp.length; k++) {
+          const a = hp[k]!, b = hp[(k + 1) % hp.length]!
+          const len = Math.hypot((b.x - a.x) * su, (b.y - a.y) * sv)
+          if (len > bestLen) { bestLen = len; k0 = k }
+        }
+        const a0 = hp[k0]!, b0 = hp[(k0 + 1) % hp.length]!
+        const off = Math.min(bestLen * 1e-3, eps * 100)
+        const tx = ((b0.x - a0.x) * su) / bestLen, ty = ((b0.y - a0.y) * sv) / bestLen
+        const p = { x: (a0.x + b0.x) / 2 + (-ty * off) / su, y: (a0.y + b0.y) / 2 + (tx * off) / sv }
+        let best: (typeof groups)[number] | undefined
+        for (const g of groups) if (windingPoly(polyOf(g.outer), p.x, p.y) !== 0 && (best === undefined || g.outer.area < best.outer.area)) best = g
+        if (best === undefined) { warnings.push(`face ${fi}: hole cycle outside every outer cycle`); continue }
+        best.holes.push(h)
+      }
+      options.debug?.("cycles", { solid: s, face: fi, cycles: cycles.map((c) => ({ area: c.area, hes: c.hes })) })
+      for (const g of groups) {
+        // Interior sample: the centroid of the largest triangle of the fragment's triangulation.
+        const polys = [polyOf(g.outer), ...g.holes.map(polyOf)]
+        const sample = interiorSample(polys, su, sv)
+        const P = surfacePoint(surf, sample.x, sample.y)
+        const n0 = surfaceNormal(surf, sample.x, sample.y)
+        const toLoop = (c: { hes: number[] }) =>
+          c.hes.filter((k) => hes[k]!.piece !== undefined).map((k) => ({ piece: hes[k]!.piece!, dir: hes[k]!.dir }))
+        fragments.push({
+          solid: s,
+          face: fi,
+          loops: [toLoop(g.outer), ...g.holes.map(toLoop)].filter((l) => l.length > 0),
+          sample: P,
+          normal: face.reversed ? scale3(n0, -1) : n0
+        })
+      }
+    })
+  }
+
+  // ------------------------------------------------ 4. classify and select
+  type Cls = "in" | "out" | "onSame" | "onOpposite"
+  const keep = (s: 0 | 1, c: Cls): { readonly keep: boolean; readonly flip: boolean } => {
+    if (op === "union") return { keep: s === 0 ? c === "out" || c === "onSame" : c === "out", flip: false }
+    if (op === "intersect") return { keep: s === 0 ? c === "in" || c === "onSame" : c === "in", flip: false }
+    return s === 0 ? { keep: c === "out" || c === "onOpposite", flip: false } : { keep: c === "in", flip: true }
+  }
+  const kept: Array<{ readonly fr: Fragment; readonly flip: boolean }> = []
+  for (const fr of fragments) {
+    const other = S[1 - fr.solid]!
+    const cp = other.loc.closest(fr.sample)
+    let cls: Cls
+    if (cp.distance <= Math.max(tol * 100, fitTol)) cls = dot3(cp.normal, fr.normal) > 0 ? "onSame" : "onOpposite"
+    else cls = dot3(sub3(fr.sample, cp.point), cp.normal) < 0 ? "in" : "out"
+    const k = keep(fr.solid, cls)
+    options.debug?.("classify", { solid: fr.solid, face: fr.face, cls, keep: k.keep, sample: fr.sample, loops: fr.loops })
+    if (k.keep) kept.push({ fr, flip: k.flip })
+  }
+
+  // ------------------------------------------------ 5. sew
+  const edgeIndex = new Map<string, number>()
+  const vertices: Array<{ point: Vec3; tol: number }> = reg.pts.map((p) => ({ point: p, tol: reg.tol }))
+  const edges: Edge[] = []
+  const edgeOfPiece = (key: string): { readonly edge: number; readonly sense: number } => {
+    const rep = uf.find(key)
+    let ei = edgeIndex.get(rep)
+    if (ei === undefined) {
+      const p = pieceByKey.get(rep)!
+      edges.push({ curve: p.curve, t0: p.t0, t1: p.t1, v0: p.v0, v1: p.v1, tol: Math.max(reg.tol, fitTol) })
+      ei = edges.length - 1
+      edgeIndex.set(rep, ei)
+    }
+    return { edge: ei, sense: senseToRep(pieceByKey.get(key)!) }
+  }
+  const faces: Face[] = kept.map(({ fr, flip }) => {
+    const orig = S[fr.solid].brep.faces[fr.face]!
+    let loops: Loop[] = fr.loops.map((l) => ({
+      coedges: l.map((h): Coedge => {
+        const { edge, sense } = edgeOfPiece(h.piece)
+        return { edge, reversed: h.dir * sense < 0 }
+      })
+    }))
+    const reversed = flip ? !orig.reversed : orig.reversed
+    // Arrangements use the surface's natural orientation, including for reversed input faces. Restore the
+    // outward loop orientation when sewing; a subtraction's flip is already included in `reversed`.
+    if (reversed) loops = loops.map((l) => ({ coedges: [...l.coedges].reverse().map((c) => ({ edge: c.edge, reversed: !c.reversed })) }))
+    return orig.name === undefined ? { surface: orig.surface, reversed, loops } : { surface: orig.surface, reversed, loops, name: orig.name }
+  })
+  let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
+  result = mergeCoplanarFaces(result)
+  result = compactBrep(result)
+  const report = validateBrep(result)
+  if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues)
+  return {
+    brep: result,
+    warnings,
+    stats: { intersectionCurves: ssis.length, splitPoints: reg.pts.length, fragments: fragments.length, keptFaces: faces.length }
+  }
+}
+
+// ================================================================ helpers
+
+const curveTangentAt = (c: Curve3, t: number): Vec3 => {
+  const h = 1e-6
+  return normalize3(sub3(curvePoint(c, t + h), curvePoint(c, t - h)))
+}
+
+/** Parameter of an edge end matching a registry vertex (for pieces whose end sample carries a different edge). */
+const edgeEndParam = (e: Edge, vid: ReadonlyArray<number>, a: number, b: number, first: boolean): number => {
+  const target = first ? a : b
+  if (vid[e.v0] === target && vid[e.v1] !== target) return e.t0
+  if (vid[e.v1] === target && vid[e.v0] !== target) return e.t1
+  return first ? e.t0 : e.t1
+}
+
+const windingPoly = (poly: ReadonlyArray<Vec2>, u: number, v: number): number => {
+  let w = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!, b = poly[(i + 1) % poly.length]!
+    if (a.y <= v) {
+      if (b.y > v && (b.x - a.x) * (v - a.y) - (u - a.x) * (b.y - a.y) > 0) w++
+    } else if (b.y <= v && (b.x - a.x) * (v - a.y) - (u - a.x) * (b.y - a.y) < 0) w--
+  }
+  return w
+}
+
+const windingUv = (rings: ReadonlyArray<ReadonlyArray<UvSample>>, u: number, v: number): number => {
+  let w = 0
+  for (const r of rings) w += windingPoly(r.map((p) => ({ x: p.u, y: p.v })), u, v)
+  return w
+}
+
+/** A point well inside a polygon with holes: the centroid of the largest triangle of its constrained triangulation. */
+const interiorSample = (polys: ReadonlyArray<ReadonlyArray<Vec2>>, su: number, sv: number): Vec2 => {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const p of polys) for (const q of p) { minX = Math.min(minX, q.x * su); minY = Math.min(minY, q.y * sv); maxX = Math.max(maxX, q.x * su); maxY = Math.max(maxY, q.y * sv) }
+  const cdt = new Cdt({ minX, minY, maxX, maxY })
+  try {
+    for (const p of polys) {
+      const ids = p.map((q) => cdt.addPoint(q.x * su, q.y * sv))
+      for (let i = 0; i < ids.length; i++) cdt.addConstraint(ids[i]!, ids[(i + 1) % ids.length]!)
+    }
+    cdt.markRegions()
+    const r = cdt.result()
+    let best: Vec2 | undefined, bestA = -1
+    for (const [a, b, c] of r.triangles) {
+      const A = Math.abs((r.xs[b]! - r.xs[a]!) * (r.ys[c]! - r.ys[a]!) - (r.ys[b]! - r.ys[a]!) * (r.xs[c]! - r.xs[a]!))
+      if (A > bestA) { bestA = A; best = { x: (r.xs[a]! + r.xs[b]! + r.xs[c]!) / 3 / su, y: (r.ys[a]! + r.ys[b]! + r.ys[c]!) / 3 / sv } }
+    }
+    if (best !== undefined) return best
+  } catch {
+    // Degenerate fragment: fall back to the vertex average.
+  }
+  const all = polys[0]!
+  return { x: all.reduce((s, q) => s + q.x, 0) / all.length, y: all.reduce((s, q) => s + q.y, 0) / all.length }
+}
+
+/** Shells = connected components of faces through shared edges; all closed. */
+const shellsByConnectivity = (b: Brep): Brep => {
+  const uses = edgeUses({ ...b, shells: [{ faces: b.faces.map((_, i) => i), closed: true }] })
+  const comp = new Array<number>(b.faces.length).fill(-1)
+  let nc = 0
+  for (let f0 = 0; f0 < b.faces.length; f0++) {
+    if (comp[f0]! >= 0) continue
+    const stack = [f0]
+    comp[f0] = nc
+    while (stack.length > 0) {
+      const f = stack.pop()!
+      for (const l of b.faces[f]!.loops) for (const c of l.coedges) for (const u of uses[c.edge]!) if (comp[u.face]! < 0) { comp[u.face] = nc; stack.push(u.face) }
+    }
+    nc++
+  }
+  const shells = Array.from({ length: nc }, (_, k) => ({ faces: b.faces.map((_, i) => i).filter((i) => comp[i] === k), closed: true }))
+  return { ...b, shells }
+}
+
+const samePlane = (a: Face, b: Face): boolean => {
+  if (a.surface.kind !== "plane" || b.surface.kind !== "plane") return false
+  const na = cross3(a.surface.frame.x, a.surface.frame.y), nb = cross3(b.surface.frame.x, b.surface.frame.y)
+  const sa = a.reversed ? -1 : 1, sb = b.reversed ? -1 : 1
+  if (dot3(na, nb) * sa * sb < 1 - 1e-12) return false
+  return Math.abs(dot3(sub3(b.surface.frame.origin, a.surface.frame.origin), na)) < 1e-9 * (1 + length3(a.surface.frame.origin))
+}
+
+/**
+ * Merges faces on the same plane (same orientation) that share edges: the shared edges disappear and the remaining
+ * coedges are re-chained into loops.
+ */
+const mergeCoplanarFaces = (b: Brep): Brep => {
+  const uses = edgeUses({ ...b, shells: [{ faces: b.faces.map((_, i) => i), closed: true }] })
+  const parent = b.faces.map((_, i) => i)
+  const find = (x: number): number => { while (parent[x] !== x) x = parent[x] = parent[parent[x]!]!; return x }
+  b.edges.forEach((_, ei) => {
+    const u = uses[ei]!
+    if (u.length !== 2 || u[0]!.face === u[1]!.face) return
+    const fa = b.faces[u[0]!.face]!, fb = b.faces[u[1]!.face]!
+    if (samePlane(fa, fb)) parent[find(u[1]!.face)] = find(u[0]!.face)
+  })
+  const groups = new Map<number, number[]>()
+  b.faces.forEach((_, i) => { const r = find(i); const l = groups.get(r) ?? []; l.push(i); groups.set(r, l) })
+  if ([...groups.values()].every((g) => g.length === 1)) return b
+  const faces: Face[] = []
+  const faceMap = new Map<number, number>()
+  for (const [root, g] of groups) {
+    if (g.length === 1) { faceMap.set(root, faces.length); faces.push(b.faces[root]!); continue }
+    const inGroup = new Set(g)
+    const all: Coedge[] = g.flatMap((fi) => b.faces[fi]!.loops.flatMap((l) => l.coedges))
+    // Internal edges: used by two faces of the group.
+    const internal = new Set<number>()
+    for (const c of all) { const u = uses[c.edge]!; if (u.length === 2 && inGroup.has(u[0]!.face) && inGroup.has(u[1]!.face)) internal.add(c.edge) }
+    const rest = all.filter((c) => !internal.has(c.edge))
+    const startOf = (c: Coedge) => (c.reversed ? b.edges[c.edge]!.v1 : b.edges[c.edge]!.v0)
+    const endOf = (c: Coedge) => (c.reversed ? b.edges[c.edge]!.v0 : b.edges[c.edge]!.v1)
+    const usedC = new Array<boolean>(rest.length).fill(false)
+    const loops: Loop[] = []
+    for (let i = 0; i < rest.length; i++) {
+      if (usedC[i]) continue
+      const loop: Coedge[] = []
+      let k = i
+      while (k >= 0 && !usedC[k]) {
+        usedC[k] = true
+        loop.push(rest[k]!)
+        const e = endOf(rest[k]!)
+        k = rest.findIndex((c, j) => !usedC[j] && startOf(c) === e)
+      }
+      loops.push({ coedges: loop })
+    }
+    // Outer loop first: the one of largest extent.
+    const ext = (l: Loop) => {
+      let lo = Infinity, hi = -Infinity
+      for (const c of l.coedges) { const p = b.vertices[startOf(c)]!.point; lo = Math.min(lo, p.x + p.y + p.z); hi = Math.max(hi, p.x + p.y + p.z) }
+      return hi - lo
+    }
+    loops.sort((x, y) => ext(y) - ext(x))
+    const base = b.faces[root]!
+    for (const fi of g) faceMap.set(fi, faces.length)
+    faces.push({ ...base, loops })
+  }
+  const shells = b.shells.map((s) => ({ closed: s.closed, faces: [...new Set(s.faces.map((f) => faceMap.get(f)!))] }))
+  return { ...b, faces, shells }
+}
+
+void refineSurfaceSurface

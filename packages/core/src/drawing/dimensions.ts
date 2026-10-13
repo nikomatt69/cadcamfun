@@ -199,6 +199,12 @@ export const planDimensions = (history: History, result: RebuildResult): Dimensi
       }
     }
   }
+  // Until annotation frames track each target through transforms, dimensions of the original features would be misleading.
+  if (history.features.some((f) => ["move", "mirror", "scale", "mate", "split"].includes(f.type))) {
+    notes.push("Transformed feature annotations are unsupported: only overall sizes are dimensioned")
+    sites.clear()
+    circles.length = 0
+  }
   const holes: HoleGroup[] = [...sites.values()].map((s) => {
     const p = s.proto
     const d = `Ø${fmt(p.diameter)}${p.tolerance === undefined ? "" : toleranceText(p.tolerance)}`
@@ -218,6 +224,7 @@ export const planDimensions = (history: History, result: RebuildResult): Dimensi
   // Radii: the corner fillet of an extrusion, and fillet features.
   const radii: RadiusNote[] = []
   for (const f of history.features) {
+    if (notes.some((n) => n.startsWith("Transformed feature"))) break
     if (f.type === "extrude" && f.corner?.style === "fillet") { const r = num(f.corner.size); if (r !== undefined && r > 0) radii.push({ feature: f.id, radius: r, text: `R${fmt(r)}` }) }
     else if (f.type === "fillet" && (f.style ?? "fillet") === "fillet") { const r = num(f.radius); if (r !== undefined && r > 0) radii.push({ feature: f.id, radius: r, text: `R${fmt(r)}` }) }
   }

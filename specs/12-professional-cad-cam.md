@@ -48,6 +48,10 @@ Still missing for the kernel gate in step 1 above: an exact B-rep (fillets again
 
 ## Technical drawings from the 3D model (`packages/core/src/drawing/`)
 
+Integration contract (2026-10-13): WP1 owns drawing projection/layout; WP8 exposes read-only `cad.drawing` alongside the parametric actions; WP4 resolves the active accessible part through its existing parametric handler; WP6 owns a CAD ribbon entry and drawing preview/export panel. Matching tests are in those workspaces. No document persistence or new route is required. `cad.drawing` accepts exactly one `elementId` or validated `history`, plus bounded sheet options, and returns SVG, dimensions, callouts, scale and warnings without creating geometry. The desktop uses the same core generator for a selected parametric part in its local model coordinates. SVG is vector; PDF export is a single landscape page at its declared millimetre size, rasterised at 300 dpi with the browser's fonts to preserve Unicode drawing symbols. Both exports retain all reported layout warnings. These adapters must reject invalid options and failed rebuilds.
+
+Drawing limits: feature dimensions cover principal-plane holes and their supported patterns; arbitrary work-plane holes, transformed feature annotations, complete GD&T, assembly drawings/BOM, associative drawing editing and guaranteed collision-free layout remain unsupported. Mesh projections are approximate, hidden-line visibility is sampled, and the PDF contains an image rather than searchable/vector entities. Exact B-rep/STEP round trips require the kernel selection gate below. Threads on existing cylinders, curved-face push/pull and draft, and non-rigid parametric joints remain separate kernel work; a sheet export does not implement them.
+
 Target (user, 2026-10-13): a Fusion-style production sheet generated from the model, as in `specs/assets/reference-drawing-liquid-mixer.png`
 ("Liquid mixer v2": front / top / side / isometric views, detail A (2:1), section B-B with hatching, dimensions with tolerances, hole
 callouts, flatness frame, title block, notes, zone grid). Written before the code; the acceptance test below is what "done" means.

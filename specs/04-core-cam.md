@@ -2,6 +2,10 @@
 
 Status: **done; targeted cycle/arc safety hardening verified** (IR, five operations, `generic`/`fanuc`/`grbl` posts with modal emission, reference interpreter, goldens and a regression test per legacy bug; `linuxcnc` and `haas` are reserved ids, not implemented). Owner dir: `packages/core/src/cam`. Depends on WP1 types (`Vec2`, `Vec3`, `Entity`, `tessellate`, `offsetPolyline`) — import them from `../cad/index.ts`; until WP1 lands, code against the interfaces in `03-core-cad.md`.
 
+## Parametric machining continuation contract (2026-10-13)
+
+WP2 derives drilling, contour, pocket, thread and external turning paths from WP1 feature history. Selected turning uses the revolution envelope in diameter X / negative axial Z, grows inferred stock to contain the part, and retracts radially before axial travel. Unsupported selected turning profiles fail explicitly. Mill program clearance follows the stock top. Surface roughing preserves its reachable regions and ramp-angle limits while avoiding entry on near-collapsed offset loops. WP8 exposes deterministic plan validation and revision-bound review through existing CAM actions; WP4 owns project reads and persisted verification evidence. No CAD kernel changes, commits or roadmap completion are included.
+
 Pure and I/O-free, same rules as WP1.
 
 Legacy reference (domain knowledge only; **do not port verbatim**): `.reference/src/lib/gcodeGenerator.ts`, `.reference/src/lib/cam/{unifiedGcodeGenerator,geometryProcessor,geometryToolpathIntegrator}.ts`, `.reference/src/lib/{fanucGcodeGenerator,fanucOptimizer,advanced-post-processor,gCodeGenerationUtils,cncControllers}.ts`.
@@ -179,6 +183,11 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - **Indexed (3+2)** (`indexing.ts`, `Orient` move in the IR, emitted as a rotary `G0 A.. B.. C..`): an operation is made on a tilted `WorkFrame`; `indexToolpath` turns the frame's z axis into trunnion-table angles (`table-AC`: C about Z then A tilt about X; `table-BC`: C then B about Y; each normal has two solutions, the smaller tilt inside the limits is taken) and carries every point from the work frame through the part to machine coordinates (`R (part - pivot) + pivot`). Because R lays the work plane horizontal, arcs stay arcs in G17, helices stay helices and a drilling cycle still runs down machine Z. Not covered: a head that tilts (the pivot then moves with the tool length), tilted-plane controller cycles (G68.2, CYCLE800), RTCP, and simultaneous 5-axis; `cam.verify` skips `Orient`, so a verification must be given the stock in machine coordinates.
 
 ## 9. Change log
+
+- 2026-10-13: integrated the parametric-machining worktree with the current named work-plane history contract.
+  Turning feature extraction explicitly reports unsupported custom work planes instead of indexing the three
+  principal-plane frames with an arbitrary plane reference. A regression crosses `historyFeatures` with a
+  real tilted-plane revolution. Existing local CAD/drawing changes are preserved.
 
 - Manufacturing setup contract: `setup.ts` defines rigid right-handed work frames, revisioned stock/fixtures/tool assemblies and pure world/work point conversions. `validateSetup` reports finite geometry, orthonormal frame, unique tool/fixture identifiers and clearance-envelope errors. All geometry uses mm; the frame maps work coordinates to world coordinates. This is setup validation, not collision certification. Public functions are exported through the CAM barrel.
 

@@ -15,6 +15,8 @@ export interface VerifyOverrides {
   readonly target?: VerifyRequest["target"]
   readonly resolution?: number
   readonly tolerance?: number
+  /** Actual initial tool tip, when known; otherwise generator replay assumes X0 Y0 at stock top + 10 mm. */
+  readonly start?: VerifyRequest["start"]
 }
 
 export type VerifyRequestResult =
@@ -76,6 +78,7 @@ export const verifyRequestFor = (request: GenerateRequest, gcode: string, overri
       stock,
       tool,
       fixtures: overrides.fixtures ?? [],
+      start: overrides.start ?? { x: 0, y: 0, z: stock.maxZ + 10 },
       ...(overrides.target !== undefined ? { target: overrides.target } : {}),
       ...(overrides.resolution !== undefined ? { resolution: overrides.resolution } : {}),
       tolerance: overrides.tolerance ?? 0.05

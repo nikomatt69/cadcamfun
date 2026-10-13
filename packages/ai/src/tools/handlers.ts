@@ -1,4 +1,4 @@
-import type { SetupCandidate } from "../actions/cam.ts"
+import type { SetupCandidate, MachiningPlanInput } from "../actions/cam.ts"
 import type { CadGrepInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -20,6 +20,7 @@ export interface VerifyToolOptions {
   readonly stock?: cam.verify.VerifyBounds
   readonly resolution?: number
   readonly tolerance?: number
+  readonly start?: { readonly x: number; readonly y: number; readonly z: number }
 }
 
 /**
@@ -27,6 +28,8 @@ export interface VerifyToolOptions {
  * returns JSON-safe results (no secrets, no filesystem paths).
  */
 export interface ToolHandlersShape {
+  validateMachiningPlan?(projectId: string, input: MachiningPlanInput): Promise<unknown>
+  reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
   cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>
@@ -48,10 +51,12 @@ export interface ToolHandlersShape {
   describeDrawing(projectId: string): Promise<unknown>
   /** Design-space and model checks (`cad.checkModel`) of the open drawing. */
   checkDesign(projectId: string): Promise<unknown>
-  createOperation(projectId: string, operation: { type: string; params: unknown }): Promise<unknown>
+  createOperation(projectId: string, operation: { type: string; params: unknown; expectedRevision?: string }): Promise<unknown>
   generateGcode(projectId: string, operationId?: string): Promise<{ gcode: string; stats?: unknown }>
+  /** The program last generated for an operation, as it is stored (nothing is regenerated); an error when there is none yet. */
+  operationProgram?(projectId: string, operationId: string): Promise<{ ok: true; operationId: string; gcode: string } | { ok: false; error: string }>
   listOperations(projectId: string): Promise<unknown>
-  updateOperation(projectId: string, operationId: string, params: Record<string, unknown>): Promise<unknown>
+  updateOperation(projectId: string, operationId: string, params: Record<string, unknown>, expectedRevision?: string): Promise<unknown>
   suggestParameters(projectId: string, params: Record<string, unknown>): Promise<unknown>
   /** Replays an operation's G-code against its stock: removal, collisions, gouges (`cam.verify`). */
   verifyOperation(projectId: string, operationId: string, options: VerifyToolOptions): Promise<unknown>

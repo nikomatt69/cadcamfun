@@ -4,7 +4,7 @@ import { generateSheet } from "./sheet.ts"
 import { liquidMixerHistory, liquidMixerSheetOptions } from "./liquid-mixer.ts"
 import { rebuild } from "../cad/history.ts"
 
-const sheet = generateSheet(liquidMixerHistory(), liquidMixerSheetOptions as never)
+const sheet = generateSheet(liquidMixerHistory(), liquidMixerSheetOptions)
 
 describe("the Liquid mixer sheet against the reference drawing", () => {
   test("the part builds without errors and the sheet has the six views", () => {
@@ -32,8 +32,18 @@ describe("the Liquid mixer sheet against the reference drawing", () => {
     expect(s.hatch.every((h) => insideLoops((h.a.x + h.b.x) / 2, (h.a.y + h.b.y) / 2, s.loops))).toBe(true)
   })
 
-  test("the SVG is written", async () => {
+  test("the exported SVG contains the full physical sheet and escaped callouts", () => {
     expect(sheet.svg.startsWith("<svg")).toBe(true)
-    await Bun.write("../../data/drawings/liquid-mixer.svg", sheet.svg)
+    expect(sheet.svg).toContain('width="420mm" height="297mm"')
+    expect(sheet.svg).toContain("G1/2&quot;")
+  })
+
+  test("short chain labels do not overlap and pitch-circle dimensions belong to the detail", () => {
+    expect(sheet.warnings.filter((w) => w === "Text overlaps: '10.0' and '26.0'" || w === "Text overlaps: '26.0' and '10.0'")).toEqual([])
+    const pitch = sheet.dimensions.filter((d) => d.kind === "diameter" || d.kind === "angular")
+    expect(pitch).toEqual([
+      { view: "detail", kind: "diameter", text: "Ø24.0", value: 24 },
+      { view: "detail", kind: "angular", text: "120.0°", value: 120 }
+    ])
   })
 })

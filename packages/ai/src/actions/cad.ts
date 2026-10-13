@@ -11,8 +11,8 @@ import { ToolMediaResult } from "../tools/define.ts"
 import { defineAction, type ActionContext, type ActionParameters, type ActionSpec } from "./action.ts"
 import type { CadInspectionInput as CadInspectionInputWire } from "@cadcamfun/api"
 import {
-  parametricDfmSchema, parametricFastenerSchema, parametricFromElementSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
-  runParametricDfm, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
+  parametricDfmSchema, parametricDrawingSchema, parametricFastenerSchema, parametricFromElementSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
+  runParametricDfm, runParametricDrawing, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
 } from "./parametric.ts"
 
 /** A leaf's own parameters: the wire schema without its `action` literal, which the tool adds as the discriminator. */
@@ -109,6 +109,11 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.inspect_property", kind: "read", replaces: "cad_inspect",
     parameters: leaf(nikcliWireSchema(CadInspectionProperty)),
     run: inspect("property")
+  }),
+  defineAction({
+    id: "cad.drawing", kind: "read",
+    parameters: parametricDrawingSchema,
+    run: (input, context) => runParametricDrawing(input, context)
   }),
   defineAction({
     id: "cad.parametric_validate", kind: "read", replaces: "cad_parametric",

@@ -123,3 +123,26 @@ test("ribbon clipboard actions respect selection and the destination layer lock"
     useElementsStore.setState({ elements: before, clipboard: null, selectedElement: null })
   }
 }, 60000)
+
+
+test("drawing ribbon action opens the derived sheet panel for an existing parametric part", async () => {
+  installDom("http://localhost/cad")
+  const { render } = await import("solid-js/web")
+  const { default: Ribbon } = await import("../src/features/cad/components/CadRibbon.tsx")
+  const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
+  const { plateTemplate } = await import("@cadcamfun/core")
+  const elements = useElementsStore.getState()
+  const before = [...elements.elements]
+  useElementsStore.setState({ elements: [] })
+  const root = document.createElement("div"); document.body.append(root)
+  let opened = false
+  const dispose = render(() => Ribbon({ ready: true, onSurface: () => {}, onBoolean: () => {}, onDrawing: () => { opened = true } }), root)
+  try {
+    const button = () => root.querySelector<HTMLButtonElement>('button[title="Drawing"]')!
+    expect(button().disabled).toBe(true)
+    elements.addElement({ type: "parametric", history: plateTemplate(), x: 0, y: 0, z: 0 })
+    await Promise.resolve()
+    expect(button().disabled).toBe(false)
+    button().click(); expect(opened).toBe(true)
+  } finally { dispose(); root.remove(); useElementsStore.setState({ elements: before, selectedElement: null }) }
+}, 60000)

@@ -23,4 +23,7 @@ Do not use it
 - To claim a program is safe: verify reports only what it modelled.
 
 After it
+- For a checked plan, send expectedRevision on create/update. A stale refusal requires fresh plan_check.
+- verify accepts start {x,y,z} for the actual initial tool tip. Without it, replay assumes X0 Y0 at stock top + 10 mm and reports that assumption.
+- Read cam review after verification. Failed operations have at most three refinements at one drawing/stock revision; stop at refinement_limit and report the unresolved cause.
 - Generate, analyse, verify, fix by cause, regenerate and verify again. After three rounds on the same finding, report the blocker.

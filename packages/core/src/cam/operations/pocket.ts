@@ -31,7 +31,7 @@ import {
   regionOf,
 } from "../geometry.ts"
 import { OperationFields, Positive, NonNegative, heightsOrdered, levelsOf, withDefault, type Levels } from "../params.ts"
-import { type Path, longestSegmentMidpoint, pathFromPoints, rotateClosedPath, startTangent } from "../path.ts"
+import { type Path, longestSegmentMidpoint, pathFromPoints, pathLength, rotateClosedPath, startTangent } from "../path.ts"
 import { MoveBuilder, approach, descendAlong, finish, followPath, helixDown, liftTo } from "./common.ts"
 
 export const PocketEntrySchema = Schema.Literals(["plunge", "ramp", "helix"])
@@ -244,7 +244,12 @@ export const generatePocket = (
     b.comment("nothing to cut: the pocket is narrower than the tool")
     return done()
   }
-  const ordered = params.order === "insideOut" ? [...byLevel].reverse() : byLevel
+  let ordered = params.order === "insideOut" ? [...byLevel].reverse() : byLevel
+  // Surface regions can collapse to a sub-millimetre loop at their innermost offset. Enter on the outer loop instead:
+  // its ramp retains the angle limit, then the small loops are swept at depth without thousands of entry laps.
+  if (params.toolCentre && params.order === "insideOut" && ordered[0]?.some((c) => pathLength(toPath(c, params.climb)) < tool.diameter)) {
+    ordered = byLevel
+  }
 
   // Fixed XY sequence reused by every depth pass.
   const seq: Path[] = []

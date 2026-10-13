@@ -13,7 +13,7 @@ import { emptyDrawing, type Drawing, type Entity } from "../cad/entities.ts"
 import { rebuild, type History, type RebuildResult } from "../cad/history.ts"
 import { meshBounds, type Mesh } from "../cad/solid.ts"
 import type { Vec2 } from "../cad/vec.ts"
-import { fmt, planDimensions, type DimensionPlan, type HoleGroup } from "./dimensions.ts"
+import { fmt, planDimensions, type CircleNote, type DimensionPlan, type HoleGroup } from "./dimensions.ts"
 import { edgesOf, projectView, viewFrame, type ProjectedView, type Seg2, type V3, type ViewName } from "./project.ts"
 import { detailView, sectionView, type Axis, type SectionView } from "./section.ts"
 import { drawingToSvg } from "./svg.ts"
@@ -159,6 +159,7 @@ const MARGIN = 26 // room for two stacked dimensions on every side of a view, mm
 
 /** Generates the sheet for a history (its body and its features) or for a bare mesh (no feature-driven dimensions). */
 export const generateSheet = (source: History | { readonly mesh: Mesh }, options: SheetOptions = {}): DrawingSheet => {
+  validateSheetOptions(options)
   const warnings: string[] = []
   let result: RebuildResult | undefined
   let plan: DimensionPlan
@@ -170,7 +171,7 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   } else {
     result = rebuild(source)
     const errors = result.issues.filter((i) => i.severity === "error")
-    if (errors.length > 0) warnings.push(...errors.map((e) => `${e.feature}: ${e.message}`))
+    if (errors.length > 0) throw new RangeError(`The part failed to rebuild: ${errors.map((e) => `${e.feature}: ${e.message}`).join("; ")}`)
     if (result.bodies.length === 0) throw new RangeError(`The history builds no body to draw${errors.length > 0 ? `: ${errors[0]!.message}` : ""}`)
     mesh = result.bodies.length === 1 ? result.bodies[0]!.mesh : mergeBodies(result.bodies.map((b) => b.mesh))
     plan = planDimensions(source, result)
@@ -182,7 +183,7 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   const names = options.views ?? ["front", "top", "right"]
   const principal = new Map<PrincipalName, ProjectedView>()
   for (const n of names) principal.set(n, projectView(mesh, n, { edges }))
-  const iso = options.iso === false ? undefined : projectView(mesh, "iso", { edges })
+  const iso = options.iso === false ? undefined : projectView(mesh, "iso", { edges, hidden: false })
 
   // The area the views may use: inside the frame, above the title block and notes.
   const area = { x0: 20, y0: 58, x1: W - 20, y1: H - 20 }
@@ -248,7 +249,7 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
       const parent = principal.get(options.detail.view ?? "top") ?? [...principal.values()][0]!
       const c2 = parent.toView(options.detail.centre)
       const dv = detailView(parent, c2, options.detail.radius, options.detail.factor)
-      const dim = options.detail.radius * options.detail.factor * s * 2 + 2 * 13
+      const dim = options.detail.radius * options.detail.factor * s * 2 + 2 * 24
       const letter = options.detail.letter ?? "A"
       const shell: ProjectedView = { name: "detail", frame: parent.frame, visible: dv.visible, hidden: dv.hidden, bounds: { minX: -options.detail.radius * options.detail.factor, minY: -options.detail.radius * options.detail.factor, maxX: options.detail.radius * options.detail.factor, maxY: options.detail.radius * options.detail.factor }, toView: parent.toView }
       extras.push({ kind: "detail", name: "detail", label: `${letter} (${scaleText(s * options.detail.factor)})`, view: shell, scale: s, w: dim, h: dim })
@@ -294,7 +295,21 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
 
   // Dimensions on the principal views.
   const placedPrincipal = arranged.placed.filter((p) => p.kind === "principal")
-  for (const p of placedPrincipal) drawViewDimensions(cv, p, groupsFor(p.name), plan, dimensions, callouts, warnings, scale)
+  const detail = options.detail
+  const detailPanel = arranged.placed.find((p) => p.kind === "detail")
+  const detailCircle = detail === undefined ? undefined : plan.circles.find((c) =>
+    c.axis === AXIS_OF_VIEW[detail.view ?? "top"] &&
+    Math.hypot(c.centre.x - detail.centre.x, c.centre.y - detail.centre.y) + c.diameter / 2 <= detail.radius)
+  // A representative detail dimensions equal patterns once; their locations remain in the principal chains.
+  const principalPlan = detailCircle === undefined ? plan : { ...plan, circles: plan.circles.filter((c) =>
+    c.diameter !== detailCircle.diameter || c.angle !== detailCircle.angle || c.count !== detailCircle.count) }
+  for (const p of placedPrincipal) drawViewDimensions(cv, p, groupsFor(p.name), principalPlan, dimensions, callouts, warnings, scale)
+  if (detail !== undefined && detailPanel !== undefined && detailCircle !== undefined) {
+    const parent = principal.get(detail.view ?? "top")!
+    const c = parent.toView(detailCircle.centre), origin = parent.toView(detail.centre)
+    const ctr = place(detailPanel, { x: (c.x - origin.x) * detail.factor, y: (c.y - origin.y) * detail.factor })
+    drawCircleDimensions(cv, detailPanel, detailCircle, ctr, scale * detail.factor, dimensions, detail.radius * scale * detail.factor + 4)
+  }
   if (options.flatness !== undefined) {
     const target = placedPrincipal.find((p) => p.name === (options.flatness!.view ?? "right")) ?? placedPrincipal[0]
     if (target !== undefined) drawFlatness(cv, target, options.flatness.value, dimensions)
@@ -409,8 +424,11 @@ const hdim = (cv: Canvas, x1: number, x2: number, yLine: number, yFeature: numbe
   for (const x of [x1, x2]) cv.line("dim", { x, y: yFeature + dir * 1 }, { x, y: yLine + dir * 1.5 })
   const [a, b] = x1 <= x2 ? [x1, x2] : [x2, x1]
   cv.line("dim", { x: a, y: yLine }, { x: b, y: yLine })
-  if (b - a > 6) { cv.arrow({ x: a, y: yLine }, { x: -1, y: 0 }); cv.arrow({ x: b, y: yLine }, { x: 1, y: 0 }); cv.text({ x: (a + b) / 2, y: yLine + 1 }, text, TEXT, { align: "center" }) }
-  else { cv.arrow({ x: a, y: yLine }, { x: 1, y: 0 }); cv.arrow({ x: b, y: yLine }, { x: -1, y: 0 }); cv.line("dim", { x: b, y: yLine }, { x: b + 3, y: yLine }); cv.text({ x: b + 3.5, y: yLine - TEXT / 2 }, text, TEXT, {}) }
+  const fits = b - a > text.length * TEXT * 0.58 + 5
+  cv.arrow({ x: a, y: yLine }, { x: fits ? -1 : 1, y: 0 })
+  cv.arrow({ x: b, y: yLine }, { x: fits ? 1 : -1, y: 0 })
+  // Short dimensions keep their text above their own span, so they cannot run into the next label in a chain.
+  cv.text({ x: (a + b) / 2, y: yLine + (fits ? 1 : 5) }, text, TEXT, { align: "center" })
 }
 const vdim = (cv: Canvas, y1: number, y2: number, xLine: number, xFeature: number, text: string): void => {
   const dir = xLine >= xFeature ? 1 : -1
@@ -494,22 +512,25 @@ const drawViewDimensions = (cv: Canvas, p: Placed, groups: ReadonlyArray<HoleGro
     cv.text({ x: text.x + 1, y: text.y - 1.5 }, rad.text, TEXT, {})
     report.push({ view: p.name, kind: "radius", text: rad.text, value: rad.radius })
   }
-  // Circular patterns: the pitch circle, its diameter and the angle between copies.
-  if (axis === "z") for (const c of plan.circles) {
-    const ctr = place(p, p.view.toView(c.centre)), r = (c.diameter / 2) * scale
-    cv.circle("centre", ctr, r, "center")
-    const leaderEnd = { x: ctr.x - r * Math.SQRT1_2, y: ctr.y - r * Math.SQRT1_2 }
-    const tx = { x: leaderEnd.x - 10, y: leaderEnd.y - 10 }
-    cv.line("dim", leaderEnd, tx)
-    cv.arrow(leaderEnd, { x: leaderEnd.x - tx.x, y: leaderEnd.y - tx.y })
-    cv.text({ x: tx.x - 1, y: tx.y - 4 }, `Ø${fmt(c.diameter)}`, TEXT, { align: "right" })
-    report.push({ view: p.name, kind: "diameter", text: `Ø${fmt(c.diameter)}`, value: c.diameter })
-    const a0 = 0, a1 = (c.angle * Math.PI) / 180
-    cv.arc("dim", ctr, r + 4, a0, a1)
-    const mid = (a0 + a1) / 2
-    cv.text({ x: ctr.x + (r + 8) * Math.cos(mid), y: ctr.y + (r + 8) * Math.sin(mid) }, `${fmt(c.angle)}°`, TEXT, { align: "left" })
-    report.push({ view: p.name, kind: "angular", text: `${fmt(c.angle)}°`, value: c.angle })
-  }
+  if (axis === "z") for (const c of plan.circles) drawCircleDimensions(cv, p, c, place(p, p.view.toView(c.centre)), scale, report)
+}
+
+const drawCircleDimensions = (cv: Canvas, p: Placed, c: CircleNote, ctr: Vec2, scale: number, report: DimensionReport[], arcRadius?: number): void => {
+  const r = c.diameter / 2 * scale
+  cv.circle("centre", ctr, r, "center")
+  const leaderEnd = { x: ctr.x - r * Math.SQRT1_2, y: ctr.y - r * Math.SQRT1_2 }
+  const outer = arcRadius ?? r + 4
+  const tx = { x: ctr.x - outer - 3, y: ctr.y - outer - 3 }
+  cv.line("dim", leaderEnd, tx)
+  cv.arrow(leaderEnd, { x: leaderEnd.x - tx.x, y: leaderEnd.y - tx.y })
+  cv.text({ x: tx.x - 1, y: tx.y - 4 }, `Ø${fmt(c.diameter)}`, TEXT, { align: "right" })
+  report.push({ view: p.name, kind: "diameter", text: `Ø${fmt(c.diameter)}`, value: c.diameter })
+  const a0 = 0, a1 = c.angle * Math.PI / 180
+  cv.arc("dim", ctr, outer, a0, a1)
+  for (const a of [a0, a1]) cv.line("dim", { x: ctr.x + r * Math.cos(a), y: ctr.y + r * Math.sin(a) }, { x: ctr.x + (outer + 1) * Math.cos(a), y: ctr.y + (outer + 1) * Math.sin(a) })
+  const mid = a1 / 2
+  cv.text({ x: ctr.x + (outer + 4) * Math.cos(mid), y: ctr.y + (outer + 4) * Math.sin(mid) }, `${fmt(c.angle)}°`, TEXT, { align: "left" })
+  report.push({ view: p.name, kind: "angular", text: `${fmt(c.angle)}°`, value: c.angle })
 }
 
 const drawFlatness = (cv: Canvas, p: Placed, value: number, report: DimensionReport[]): void => {
@@ -540,5 +561,24 @@ const drawCuttingPlane = (cv: Canvas, p: Placed, s: NonNullable<SheetOptions["se
     cv.line("section", end, tip, "continuous", 0.5)
     cv.arrow(tip, toward, 3)
     cv.text({ x: tip.x + toward.x * 3 - 1.4, y: tip.y + toward.y * 3 - 1.8 }, letter, 4, { track: false })
+  }
+}
+
+/** Validate direct callers as well as the host; non-finite dimensions cannot enter layout or SVG. */
+export const validateSheetOptions = (o: SheetOptions): void => {
+  const positive = (n: number | undefined, name: string): void => {
+    if (n !== undefined && (!Number.isFinite(n) || n <= 0)) throw new RangeError(`${name} must be positive and finite`)
+  }
+  if (o.size !== undefined && !Object.hasOwn(SIZES, o.size)) throw new RangeError("Unsupported sheet size")
+  if (o.projection !== undefined && o.projection !== "first" && o.projection !== "third") throw new RangeError("Unsupported projection")
+  if (o.views !== undefined && (o.views.length === 0 || o.views.some((v) => !["front", "top", "right"].includes(v)) || new Set(o.views).size !== o.views.length)) throw new RangeError("Choose unique principal views")
+  positive(o.scale, "Scale")
+  positive(o.flatness?.value, "Flatness")
+  if (o.section !== undefined && (!Number.isFinite(o.section.at) || !["x", "y", "z"].includes(o.section.axis))) throw new RangeError("Invalid section plane")
+  if (o.detail !== undefined) {
+    positive(o.detail.radius, "Detail radius")
+    positive(o.detail.factor, "Detail factor")
+    if (!Object.values(o.detail.centre).every(Number.isFinite)) throw new RangeError("Invalid detail centre")
+    if (!(o.views ?? ["front", "top", "right"]).includes(o.detail.view ?? "top")) throw new RangeError("The detail parent must be a principal view on the sheet")
   }
 }

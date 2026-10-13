@@ -42,8 +42,13 @@ export interface NikCliRuntimeOptions {
   readonly dataDir: string
   readonly providers: ReadonlyArray<HostProviderSpec>
   readonly systemPrompt: string
-  /** Builds the tool set for one project (closing over its project id). */
+  /** Builds the tool set for one project (closing over its project id); the central `ToolRegistry`'s `snapshot` in the app. */
   readonly toolsFor: (projectId: string) => ReadonlyArray<HostToolSpec>
+  /**
+   * Called with a listener that must run whenever `toolsFor` would answer differently (`ToolRegistry.subscribe`); returns
+   * the unsubscribe. Every live host then gets the new permission map and the new or replaced tools, without a restart.
+   */
+  readonly toolChanges?: (listener: () => void) => () => void
   readonly isolation?: IsolationOptions
   /** Whether the one-shot models.dev seed may touch the network. Default: never (tests stay offline). */
   readonly catalogue?: { readonly network?: boolean }
@@ -92,6 +97,8 @@ export interface NikCliRuntime {
   updateProviders(providers: ReadonlyArray<HostProviderSpec>): Effect.Effect<void, AiConfigError>
   /** Rewrite the skills (built-in + the user's) into the host config and make live hosts see them. */
   reloadSkills(): Effect.Effect<void, AiConfigError>
+  /** Publish the current tool set to every live host (what `toolChanges` triggers): permission map, registrations, reload. */
+  reloadTools(): Effect.Effect<void, AiConfigError>
   /**
    * Open a child session under the given `parentSessionId` using the read-only
    * `cadcam-worker` agent. The child inherits the parent's project directory but
@@ -226,23 +233,15 @@ export const makeNikCliRuntime = (
       }))
     )
 
-    const createHost = async (projectId: string): Promise<ProjectHost> => {
+    /**
+     * Registers the project's tools on its host. The host keeps the last registration of an id (nikcli `lastWins`), so
+     * calling this again replaces changed tools and adds new ones; a tool that left the set is denied by the permission
+     * map `writeConfig` publishes, which also hides it from `search_tools`.
+     */
+    const registerTools = (sdk: Sdk, client: NikCliHostInstance, projectId: string): Promise<void> => {
       assertOpen()
-      const scratch = projectScratchDir(paths, projectId)
-      mkdirSync(scratch, { recursive: true })
-      const directory = realpathSync(scratch)
-      // A restored external-provider chat can arrive before the model browser.
-      if ([...pendingKeys.keys()].some((id) => !providers.some((provider) => provider.id === id))) {
-        await bootstrapStep("model catalogue", ensureCatalogue)
-      }
-      await bootstrapStep("configuration", () => writeConfig(projectId))
-      const sdk = await bootstrapStep("SDK import", getSdk)
-      assertOpen()
-      const client = await bootstrapStep("client creation", () => Effect.runPromise(sdk.NikCli.create({ directory })))
-      try {
-        assertOpen()
-        const specs = toolRegistry.tools(projectId)
-        const defined = specs.map((spec) =>
+      const specs = toolRegistry.tools(projectId)
+      const defined = specs.map((spec) =>
         sdk.Tool.define(spec.id, async () => ({
           description: spec.description,
           parameters: spec.parameters,
@@ -264,8 +263,26 @@ export const makeNikCliRuntime = (
             return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
           }
         }))
-        )
-        await bootstrapStep("tool registration", () => Effect.runPromise(client.tools.register(...defined)))
+      )
+      return Effect.runPromise(client.tools.register(...defined))
+    }
+
+    const createHost = async (projectId: string): Promise<ProjectHost> => {
+      assertOpen()
+      const scratch = projectScratchDir(paths, projectId)
+      mkdirSync(scratch, { recursive: true })
+      const directory = realpathSync(scratch)
+      // A restored external-provider chat can arrive before the model browser.
+      if ([...pendingKeys.keys()].some((id) => !providers.some((provider) => provider.id === id))) {
+        await bootstrapStep("model catalogue", ensureCatalogue)
+      }
+      await bootstrapStep("configuration", () => writeConfig(projectId))
+      const sdk = await bootstrapStep("SDK import", getSdk)
+      assertOpen()
+      const client = await bootstrapStep("client creation", () => Effect.runPromise(sdk.NikCli.create({ directory })))
+      try {
+        assertOpen()
+        await bootstrapStep("tool registration", () => registerTools(sdk, client, projectId))
         assertOpen()
         // Keys set before this host existed.
         for (const [providerId, key] of pendingKeys) {
@@ -291,6 +308,32 @@ export const makeNikCliRuntime = (
         pending.catch(() => { if (hosts.get(projectId) === pending) hosts.delete(projectId) })
       }
       return existing
+    }
+
+    // One publication at a time, and a change that lands during one is published after it (never dropped, never doubled).
+    let publishing: Promise<void> = Promise.resolve()
+    const publishTools = (): Promise<void> => {
+      const next = publishing.catch(() => undefined).then(async () => {
+        if (closed) return
+        toolRegistry.invalidate()
+        const sdk = sdkReady === undefined ? undefined : await sdkReady
+        for (const [projectId, promise] of hosts) {
+          const host = await promise.catch(() => undefined)
+          if (host === undefined || sdk === undefined || closed) continue
+          await writeConfig(projectId)
+          await registerTools(sdk, host.client, projectId)
+          await host.client["config-management"].reload()
+          for (const [providerId, key] of pendingKeys) await host.client.provider.api({ providerID: providerId, key })
+        }
+      })
+      publishing = next
+      return next
+    }
+    if (options.toolChanges) {
+      const unsubscribe = options.toolChanges(() => {
+        publishTools().catch((cause: unknown) => Effect.runFork(Effect.logWarning(`nikcli host: the new tool set was not published: ${describeBootstrapFailure(cause)}`)))
+      })
+      yield* Effect.addFinalizer(() => Effect.sync(unsubscribe))
     }
 
     const runtime: NikCliRuntime = {
@@ -342,6 +385,11 @@ export const makeNikCliRuntime = (
             }
           },
           catch: toConfigError("Failed to reload the skills")
+        }),
+      reloadTools: () =>
+        Effect.tryPromise({
+          try: () => publishTools(),
+          catch: toConfigError("Failed to publish the tool set to the host")
         }),
       updateProviders: (next) =>
         Effect.tryPromise({

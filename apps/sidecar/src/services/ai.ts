@@ -2,12 +2,12 @@ import { inspectProperties, readProperty, componentParameters } from "./ai-inspe
 import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
-  ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
+  ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
   CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
-import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
-import { Context, Effect, Layer, Redacted, Schema } from "effect"
+import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
+import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
 import type { SessionUser } from "@cadcamfun/api"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
@@ -50,6 +50,23 @@ const elementBounds = (element: Record<string, unknown>, all?: ReadonlyArray<Ele
     const b = cam.generator.elementBounds(element as never)
     return Number.isFinite(b.min.x) && Number.isFinite(b.max.z) ? { min: b.min, max: b.max } : undefined
   } catch { return undefined }
+}
+
+const record = (value: unknown): Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
+const identity = (value: unknown): string => {
+  const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical) : v !== null && typeof v === "object"
+    ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, canonical(child)])) : v
+  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex")
+}
+const drawingRevision = (loaded: { id: string; elements: ReadonlyArray<Element>; data: Record<string, unknown> }): string =>
+  identity({ drawingId: loaded.id, elements: loaded.elements, stock: loaded.data["stock"] ?? null })
+
+const settingsForOperation = (params: Record<string, unknown>, type?: string) => {
+  const settings = cam.generator.decodeSettings({ ...params, ...(type !== undefined ? { operationType: type } : {}) })
+  const allowed = settings.machineType === "mill" ? cam.generator.MillOperationSchema : settings.machineType === "lathe" ? cam.generator.LatheOperationSchema : cam.generator.PrinterOperationSchema
+  Schema.decodeUnknownSync(allowed)(settings.operationType)
+  if (settings.depth / settings.stepdown > 1_000) throw new RangeError("The operation would require more than 1000 depth passes")
+  return settings.machineType === "lathe" && settings.operationType === "turning" ? { ...settings, toolType: "turning" as const } : settings
 }
 
 /**
@@ -160,6 +177,59 @@ const toolHandlers = Effect.gen(function*() {
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
   const handlers: ToolHandlersShape = {
+    validateMachiningPlan: async (projectId, input) => {
+      const loaded = await load(projectId)
+      const revision = drawingRevision(loaded)
+      if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", revision, error: "The drawing or stock changed. Inspect and validate the plan again." }
+      const results: unknown[] = []
+      let passed = true
+      for (const proposed of input.operations) {
+        try {
+          const split = splitPrinter(proposed.params)
+          const settings = settingsForOperation(split.rest, proposed.type)
+          const elements = loaded.elements.filter((e) => e.type !== "workpiece")
+          const issues: Array<{ severity: string; code: string; message: string }> = []
+          if (settings.machineType === "mill" && settings.operationType !== "probing" && loaded.data["stock"] === undefined) issues.push({ severity: "error", code: "MISSING_STOCK", message: "Configure explicit stock before planning milling." })
+          if (settings.machineType !== "lathe" && settings.operationType !== "probing" && elements.length === 0) issues.push({ severity: "error", code: "MISSING_GEOMETRY", message: "There is no part to machine." })
+          for (const element of elements) {
+            if (element.type !== "parametric") continue
+            const history = historySchema.parse(element["history"]) as History
+            const dfm = cad.analyzeManufacturability(history, { process: settings.machineType === "lathe" ? "turn" : settings.machineType === "3dprinter" ? "print" : "mill", toolDiameter: settings.toolDiameter })
+            issues.push(...dfm.issues)
+          }
+          const geometry = Schema.decodeUnknownSync(cam.generator.GeometrySchema)({ geometryType: "selected", selectedElements: elements, ...(loaded.data["stock"] !== undefined ? { stock: loaded.data["stock"] } : {}) })
+          const generated = issues.some((i) => i.severity === "error") ? undefined : cam.generator.generateToolpath({ settings, geometry, printer: decodePrinter(split.printer) })
+          if (generated?.error) issues.push({ severity: "error", code: "GENERATION", message: generated.error })
+          for (const message of generated?.response.warnings ?? []) issues.push({ severity: "error", code: "GENERATION_FINDING", message })
+          if (generated !== undefined && generated.response.stats.cutLength <= 0) issues.push({ severity: "error", code: "EMPTY_PATH", message: "The proposal produces no cutting moves." })
+          const machine = await handlers.machine?.(projectId)
+          if (machine?.maxSpindleSpeed !== undefined && settings.rpm > machine.maxSpindleSpeed) issues.push({ severity: "error", code: "SPINDLE_OVER_LIMIT", message: "The proposal exceeds the active machine's spindle limit." })
+          if (machine?.maxFeedRate !== undefined && settings.feedrate > machine.maxFeedRate) issues.push({ severity: "error", code: "FEED_OVER_LIMIT", message: "The proposal exceeds the active machine's feed limit." })
+          const ok = !issues.some((i) => i.severity === "error")
+          passed &&= ok
+          results.push({ type: proposed.type, ok, settings, issues, ...(generated ? { stats: generated.response.stats } : {}) })
+        } catch (cause) {
+          passed = false
+          results.push({ type: proposed.type, ok: false, error: cause instanceof Error ? cause.message : "Invalid operation proposal." })
+        }
+      }
+      if (drawingRevision(await load(projectId)) !== revision) return { ok: false, status: "stale", revision, mutated: false, error: "The drawing changed while the plan was checked. Validate again." }
+      return { ok: passed, status: passed ? "pass" : "failed", revision, mutated: false, operations: results, note: "Schema, DFM and generation checks only. Generate, analyze and verify each saved operation before acceptance." }
+    },
+    reviewOperation: async (projectId, operationId) => {
+      const loaded = await load(projectId)
+      const found = await operation(projectId, operationId)
+      if ("error" in found) return { ok: false, error: found.error }
+      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      const data = record(stored?.row.data)
+      const evidence = record(data["verification"])
+      const revision = drawingRevision(loaded)
+      const report = record(evidence["report"])
+      const status = evidence["revision"] === undefined ? "unverified" : evidence["revision"] !== revision || evidence["requestRevision"] !== identity(found.request) || evidence["programRevision"] !== identity(stored?.row.gcode) ? "stale" : report["ok"] === true ? "pass" : "failed"
+      const refinement = record(data["refinement"])
+      const rounds = refinement["revision"] === revision && typeof refinement["rounds"] === "number" ? refinement["rounds"] : 0
+      return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: evidence["revision"] ?? null, refinements: { used: rounds, remaining: Math.max(0, 3 - rounds) }, ...(status === "pass" || status === "failed" ? { issues: report["issues"], stats: report["stats"], modelled: evidence["modelled"], start: record(evidence["request"])["start"] } : {}), note: "A pass covers only the saved simulation model at this drawing and program revision." }
+    },
     stock: async (projectId, input) => {
       if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
       const loaded = await load(projectId, input.action === "set")
@@ -436,10 +506,12 @@ const toolHandlers = Effect.gen(function*() {
       }
     },
     createOperation: async (drawingId, operation) => {
-      const { id, projectId, elements, data } = await load(drawingId, true)
+      const loaded = await load(drawingId, true)
+      const { id, projectId, elements, data } = loaded
+      if (operation.expectedRevision !== undefined && operation.expectedRevision !== drawingRevision(loaded)) return { ok: false, status: "stale", error: "The drawing changed since plan validation. Validate the plan again." }
       const params = operation.params !== null && typeof operation.params === "object" ? operation.params : {}
       const split = splitPrinter(params as Record<string, unknown>)
-      const settings = cam.generator.decodeSettings({ ...split.rest, operationType: operation.type })
+      const settings = settingsForOperation(split.rest, operation.type)
       const printer = decodePrinter(split.printer)
       // A lathe works from its stock size and a probe from the machine, so only drawing-based operations need elements.
       const needsElements = settings.machineType !== "lathe" && settings.operationType !== "probing"
@@ -467,18 +539,29 @@ const toolHandlers = Effect.gen(function*() {
         }
       })
     },
-    updateOperation: async (drawingId, operationId, params) => {
-      const { id, projectId } = await load(drawingId, true)
+    updateOperation: async (drawingId, operationId, params, expectedRevision) => {
+      const loaded = await load(drawingId, true)
+      const { id, projectId } = loaded
+      const revision = drawingRevision(loaded)
+      if (expectedRevision !== undefined && expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed since plan validation. Validate the plan again." }
       const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
       if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
       const stored = found.row.data as { request?: { settings?: Record<string, unknown>; geometry?: unknown; printer?: unknown } } | null
       if (!stored?.request) return { ok: false, error: "Operation has no generation settings" }
+      const previous = record(found.row.data)
+      const evidence = record(previous["verification"])
+      const previousRefinement = record(previous["refinement"])
+      const failed = evidence["revision"] === revision && record(evidence["report"])["ok"] === false
+      const refining = failed || previousRefinement["revision"] === revision
+      const rounds = previousRefinement["revision"] === revision && typeof previousRefinement["rounds"] === "number" ? previousRefinement["rounds"] : 0
+      if (refining && rounds >= 3) return { ok: false, status: "refinement_limit", revision, error: "Three refinements failed or remain unverified at this drawing revision. Stop and report the findings before changing the plan." }
       const split = splitPrinter(params)
-      const settings = cam.generator.decodeSettings({ ...(stored.request.settings ?? {}), ...split.rest })
+      const settings = settingsForOperation({ ...(stored.request.settings ?? {}), ...split.rest })
       const printer = decodePrinter({ ...(stored.request.printer !== null && typeof stored.request.printer === "object" ? stored.request.printer as Record<string, unknown> : {}), ...split.printer })
       const request = { ...stored.request, settings, printer }
       // The stored G-code no longer matches the settings: drop it so nothing exports a stale program.
-      await Effect.runPromise(toolpaths.update(operationId, { data: { request }, gcode: null, operationType: settings.operationType }))
+      const { verification: _verification, response: _response, refinement: _refinement, ...metadata } = previous
+      await Effect.runPromise(toolpaths.update(operationId, { data: { ...metadata, request, ...(refining ? { refinement: { revision, rounds: rounds + 1 } } : {}) }, gcode: null, operationType: settings.operationType }))
       return { ok: true, operationId, settings: { operationType: settings.operationType, toolDiameter: settings.toolDiameter, depth: settings.depth, stepdown: settings.stepdown, feedrate: settings.feedrate }, note: "Generate G-code again, then verify it." }
     },
     suggestParameters: async (drawingId, params) => {
@@ -520,11 +603,25 @@ const toolHandlers = Effect.gen(function*() {
       const { response, error } = cam.generator.generateToolpath(found.request as never)
       if (error) return { gcode: "", stats: { error } }
       await assertWrite(drawingId)
-      await Effect.runPromise(toolpaths.update(found.id, { data: { request: found.request, response }, gcode: response.gcode }))
+      const previous = record((await Effect.runPromise(toolpaths.find(acting().id, found.id)))?.row.data)
+      const { verification: _verification, ...metadata } = previous
+      await Effect.runPromise(toolpaths.update(found.id, { data: { ...metadata, request: found.request, response }, gcode: response.gcode }))
       return { gcode: response.gcode, stats: response.stats }
+    },
+    operationProgram: async (drawingId, operationId) => {
+      const { id, projectId } = await load(drawingId)
+      const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
+      if (!found.row.gcode) return { ok: false, error: "The operation has no program yet (or its settings changed since): run cam_edit generate first." }
+      const current = await operation(drawingId, operationId)
+      if ("error" in current) return { ok: false, error: current.error }
+      if (identity(record(found.row.data)["request"]) !== identity(current.request)) return { ok: false, error: "The drawing or stock changed since generation. Generate and verify the operation again." }
+      return { ok: true, operationId, gcode: found.row.gcode }
     },
     verifyOperation: async (drawingId, operationId, options) => {
       await assertWrite(drawingId)
+      const loaded = await load(drawingId)
+      const revision = drawingRevision(loaded)
       const found = await operation(drawingId, operationId)
       if ("error" in found) return { ok: false, error: found.error }
       const { response, error } = cam.generator.generateToolpath(found.request as never)
@@ -535,7 +632,8 @@ const toolHandlers = Effect.gen(function*() {
         ...(options.fixtures !== undefined ? { fixtures: options.fixtures } : {}),
         ...(options.targetSolids !== undefined ? { target: { solids: options.targetSolids } } : {}),
         ...(options.resolution !== undefined ? { resolution: options.resolution } : {}),
-        ...(options.tolerance !== undefined ? { tolerance: options.tolerance } : {})
+        ...(options.tolerance !== undefined ? { tolerance: options.tolerance } : {}),
+        ...(options.start !== undefined ? { start: options.start } : {})
       })
       if (!built.ok) return { ok: false, error: built.error }
       const report = cam.verify.verifyToolpath(built.request)
@@ -543,16 +641,16 @@ const toolHandlers = Effect.gen(function*() {
       const row = await Effect.runPromise(toolpaths.find(acting().id, found.id))
       const previous = row?.row.data !== null && typeof row?.row.data === "object" ? (row!.row.data as Record<string, unknown>) : {}
       await assertWrite(drawingId)
-      await Effect.runPromise(toolpaths.update(found.id, { data: { ...previous, request: found.request, response, verification: { report, request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures }, at: new Date().toISOString() } }, gcode: response.gcode }))
+      if (drawingRevision(await load(drawingId)) !== revision) return { ok: false, status: "stale", error: "The drawing changed during verification. Generate and verify again." }
+      const modelled = { holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined, fixtures: built.request.fixtures.length, target: built.request.target !== undefined }
+      const { refinement: previousRefinement, ...metadata } = previous
+      await Effect.runPromise(toolpaths.update(found.id, { data: { ...metadata, ...(!report.ok && previousRefinement !== undefined ? { refinement: previousRefinement } : {}), request: found.request, response, verification: { report, revision, requestRevision: identity(found.request), programRevision: identity(response.gcode), modelled, request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures, start: built.request.start }, at: new Date().toISOString() } }, gcode: response.gcode }))
       // The height field is for the UI; the model gets the verdict, the numbers and where it went wrong.
       return {
-        ok: report.ok, issues: report.issues.slice(0, 20), stats: report.stats,
+        ok: report.ok, status: report.ok ? "pass" : "failed", revision, issues: report.issues.slice(0, 20), stats: report.stats, start: built.request.start, startSource: options.start !== undefined ? "explicit tool pose" : "assumed generator clearance pose",
         stock: built.request.stock, tool: built.request.tool,
         stockSource: options.stock !== undefined ? "verification override" : (found.request.geometry as Record<string, unknown>)["stock"] !== undefined ? "configured drawing stock" : "inferred from geometry/toolpath",
-        modelled: {
-          holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined,
-          fixtures: built.request.fixtures.length, target: built.request.target !== undefined
-        },
+        modelled,
         note: "A passing report covers only what is modelled; it is not a machine certification."
       }
     },
@@ -796,6 +894,34 @@ const contributionGuard = (contributions: Readonly<Record<string, ActionContribu
 }
 
 /**
+ * The central tool registry of the application (`ToolRegistry`, nikcli's `ToolRegistry.Service`): the catalogue's tools with
+ * the implementations the application owns (libraries, version control) and the switched-on plugins. The embedded host and
+ * the HTTP bridge both read it, so the two faces cannot drift; the host adds delegation with `contributeScoped`.
+ */
+const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
+  const handlers = yield* ToolHandlers
+  const vcs = yield* ProjectVcs
+  const runner = yield* WorkflowRunner
+  const projectsRepo = yield* ProjectsForVcs
+  const { user: local } = yield* LocalProfile
+  const acting = yield* ActingUser
+  const plugins = yield* AiPlugins
+  // Read when a tool runs, so the version-control tools act as the account that is chatting.
+  const actor = {
+    get userId() { return acting.get(local).id },
+    get name() { return acting.get(local).name ?? "User" },
+    get email() { return acting.get(local).email ?? "unknown@cadcamfun.local" },
+    // The message that opened the current turn, cited on an AI commit (see `project-vcs.ts`).
+    get lastPrompt() { return acting.lastPrompt() }
+  }
+  return makeToolRegistry({
+    handlers,
+    contributions: { ...libraryContributions(handlers), ...vcsContributions({ vcs, runner, projects: projectsRepo, actor }) },
+    contributed: () => plugins.tools()
+  })
+}))
+
+/**
  * The catalogue's second face (RM-11): what an outside client (a standalone nikcli with `@cadcamfun/nikcli-plugin`) calls over HTTP.
  * It runs the very tool definitions the embedded host registers, through the same admission (`ActingUser`): the call acts as the
  * account that holds the token, in a session bound to that account and project, and cannot reach another account's work. It needs
@@ -809,25 +935,12 @@ export class AiActions extends Context.Service<AiActions, {
 }>()("cadcamfun/AiActions") {}
 
 export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
-  const handlers = yield* ToolHandlers
-  const vcs = yield* ProjectVcs
-  const runner = yield* WorkflowRunner
-  const projectsRepo = yield* ProjectsForVcs
-  const { user: local } = yield* LocalProfile
   const acting = yield* ActingUser
   const { policies = [] } = yield* AiConfig
   const plugins = yield* AiPlugins
-  const actor = {
-    get userId() { return acting.get(local).id },
-    get name() { return acting.get(local).name ?? "User" },
-    get email() { return acting.get(local).email ?? "unknown@cadcamfun.local" },
-    get lastPrompt() { return acting.lastPrompt() }
-  }
-  // Delegation (`agent`) is in-process only, so the background contributions are not part of this face.
-  const contributions: Readonly<Record<string, ActionContribution>> = {
-    ...libraryContributions(handlers),
-    ...vcsContributions({ vcs, runner, projects: projectsRepo, actor })
-  }
+  // The same registry the embedded host registers from; delegation (`agent`) is refused by `bridgeAdmission`, so the
+  // host's background contributions being in it changes nothing here.
+  const registry = yield* ToolRegistry
   /** The tools of the plugins the operator switched on, as the bridge lists them: read tools only (a write tool needs a person's approval). */
   const pluginBridge = (): ReadonlyArray<BridgeTool> => plugins.listing().filter((entry) => entry.kind === "read").map((entry) => {
     const id = pluginToolId(entry.pluginId, entry.id)
@@ -846,8 +959,9 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
           })()
         : bridgeAdmission(tool, input, policies, mode)
       if (!admission.ok) return yield* Effect.fail({ message: admission.error })
-      const spec = buildTools(handlers, projectId, plugins.tools(), contributions).find((candidate) => candidate.id === tool)
-      if (spec === undefined) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })
+      const found = yield* registry.tool(projectId, tool)
+      if (Option.isNone(found)) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })
+      const spec = found.value
       // One session per account and project: the owner file and the in-memory binding make a second account's call fail closed.
       const sessionId = `bridge:${projectId}:${user.id}`
       const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`))
@@ -866,34 +980,18 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
 /** The embedded nikcli host (the primary path); skipped with `CADCAMFUN_AI_HOST=direct`. */
 const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const config = yield* AppConfigService
-  const handlers = yield* ToolHandlers
   const credentials = yield* AiCredentials
-  const vcs = yield* ProjectVcs
-  const runner = yield* WorkflowRunner
-  const projectsRepo = yield* ProjectsForVcs
-  const { user: local } = yield* LocalProfile
   const actingCell = yield* ActingUser
-  const plugins = yield* AiPlugins
-  // Read when a tool runs, so the version-control tools act as the account that is chatting.
-  const actor = {
-    get userId() { return actingCell.get(local).id },
-    get name() { return actingCell.get(local).name ?? "User" },
-    get email() { return actingCell.get(local).email ?? "unknown@cadcamfun.local" },
-    // The message that opened the current turn, cited on an AI commit (see `project-vcs.ts`).
-    get lastPrompt() { return actingCell.lastPrompt() }
-  }
+  const registry = yield* ToolRegistry
   // Runtime-wide scheduler: instantiated before the host so `toolsFor` can
   // hand its four `agent_task*` tool specs to every project's host. The same
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
   // it (no second scheduler, no second scheduler across projects).
   const scheduler = new BackgroundTaskManager({})
-  // Every implementation the application owns, keyed by catalogue action id; the guard keeps the two sides in step.
-  const contributions: Readonly<Record<string, ActionContribution>> = {
-    ...libraryContributions(handlers),
-    ...vcsContributions({ vcs, runner, projects: projectsRepo, actor }),
-    ...backgroundToolContributionsFor(scheduler)
-  }
-  contributionGuard(contributions)
+  // Delegation is the host's to implement, for as long as the host lives; with it the registry holds every implementation
+  // the catalogue names, and the guard keeps the two sides in step.
+  yield* registry.contributeScoped(backgroundToolContributionsFor(scheduler))
+  contributionGuard(yield* registry.contributions)
   const policies = yield* readPolicyFile(policyFile(config.dataDir))
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
@@ -905,7 +1003,9 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     // what turns "the four providers we declare" into the whole catalogue. Offline tests
     // set the flag and the seed answers "skipped" without touching the network.
     catalogue: { network: !config.aiOffline },
-    toolsFor: (projectId) => buildTools(handlers, projectId, plugins.tools(), contributions).map((spec): HostToolSpec => ({
+    // The registry's tools, each run as the account that is chatting; a change of the registry reaches the live hosts.
+    toolChanges: registry.subscribe,
+    toolsFor: (projectId) => registry.snapshot(projectId).map((spec): HostToolSpec => ({
       ...spec,
       execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal).catch(() => JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." })),
       ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})
@@ -946,7 +1046,8 @@ export const AiLive = Layer.unwrap(Effect.gen(function*() {
   // Keys are kept in <data dir>/ai/credentials.json (owner-only), so they are not asked for again after a restart.
   const base = Layer.mergeAll(ActingUser.layer, AiCredentials.layerPersisted(jsonFileCredentials(`${config.dataDir}/ai/credentials.json`)), AiConfigLive)
   const withDirect = DirectModel.layerWith(config.aiModelFactory ?? defaultModelFactory).pipe(Layer.provideMerge(base))
-  const withHandlers = AiActionsLive.pipe(Layer.provideMerge(ToolHandlersLive.pipe(Layer.provideMerge(AiPluginsLive.pipe(Layer.provideMerge(withDirect))))))
+  const withRegistry = AiToolRegistryLive.pipe(Layer.provideMerge(ToolHandlersLive.pipe(Layer.provideMerge(AiPluginsLive.pipe(Layer.provideMerge(withDirect))))))
+  const withHandlers = AiActionsLive.pipe(Layer.provideMerge(withRegistry))
   const withHost = config.aiHost === "direct" ? withHandlers : AiHostLive.pipe(Layer.provideMerge(withHandlers))
   // Build the background runner from the live host once the host is in scope,
   // so the worker's `runner` always closes over the same scheduler the host

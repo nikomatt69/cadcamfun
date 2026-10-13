@@ -144,6 +144,13 @@ export interface DrillPoint extends V3 {
   /** Depth for this hole (stock-limited), mm, positive. */
   readonly depth: number
   readonly source: string
+  /**
+   * Z of the face the hole starts on. Absent, the face is Z0 (the stock top of the panel's convention); a parametric part's
+   * holes give theirs, so the R plane and the bottom follow the part wherever its top lies.
+   */
+  readonly top?: number
+  /** Diameter the model gives the hole, mm (for the tool check). */
+  readonly diameter?: number
 }
 
 /** One canned cycle per point, nearest first, a single `G80` at the end. */
@@ -151,10 +158,13 @@ export const drillPoints = (points: ReadonlyArray<DrillPoint>, s: ToolpathSettin
   const ordered = orderPoints(points) as DrillPoint[]
   let gcode = `; Drilling ${ordered.length} point(s) from ${label} - depth ${s.depth}mm${s.stepdown < s.depth ? `, peck ${s.stepdown}mm` : ""}\n`
   const first = ordered[0]
-  if (first) gcode += `G0 X${f3(first.x)} Y${f3(first.y)} Z${f3(10)} ; Move above first hole\n`
+  const highest = Math.max(0, ...ordered.map((p) => p.top ?? 0))
+  if (first) gcode += `G0 X${f3(first.x)} Y${f3(first.y)} Z${f3(highest + 10)} ; Move above first hole\n`
   for (const p of ordered) {
     const peck = s.stepdown < p.depth
-    gcode += `${peck ? "G83" : "G81"} X${f3(p.x)} Y${f3(p.y)} Z${f3(-p.depth)} R${f3(2)}${peck ? ` Q${f3(s.stepdown)}` : ""} F${s.plungerate} ; ${peck ? "Peck drilling" : "Drilling"}\n`
+    const top = p.top ?? 0
+    if (p.diameter !== undefined && s.toolDiameter > p.diameter + 1e-9) gcode += `; Warning: tool Ø${s.toolDiameter}mm is larger than hole ${p.source} Ø${f3(p.diameter)}mm\n`
+    gcode += `${peck ? "G83" : "G81"} X${f3(p.x)} Y${f3(p.y)} Z${f3(top - p.depth)} R${f3(top + 2)}${peck ? ` Q${f3(s.stepdown)}` : ""} F${s.plungerate} ; ${peck ? "Peck drilling" : "Drilling"}\n`
   }
   gcode += "G80 ; Cancel fixed cycle\n"
   return gcode

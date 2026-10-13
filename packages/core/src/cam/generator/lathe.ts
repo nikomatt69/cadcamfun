@@ -1,6 +1,29 @@
 /** Lathe operations (facing, turning, boring, threading, grooving, parting, knurling). */
 import { cutLevels, f3, type GenerateOptions } from "./common.ts"
 import type { LatheOperationType, ToolpathSettings } from "./schema.ts"
+import type { TurnedProfile } from "./history-features.ts"
+
+/** The free end of the revolution is Z0; the chuck end is negative Z, and X is diameter. */
+const profileTurning = (s: ToolpathSettings, profile: TurnedProfile): string => {
+  const points = [...profile.points].reverse().map((p) => ({ x: 2 * p.r, z: p.t - profile.end }))
+  const safeX = s.stockDiameter! + 2
+  const minimum = Math.min(...points.map((p) => p.x))
+  const allowance = s.finishingPass ? s.finishingAllowance * 2 : 0
+  let out = "\n; Turning the selected revolution profile (X diameter, Z towards the chuck)\n"
+  const pass = (diameter: number, label: string) => {
+    out += `; ${label}\nG0 X${f3(safeX)}\nG0 Z2\n`
+    const first = points[0]!
+    out += `G1 X${f3(Math.max(first.x, diameter))} F${s.plungerate}\nG1 Z0 F${s.feedrate}\n`
+    for (const p of points.slice(1)) out += `G1 X${f3(Math.max(p.x, diameter))} Z${f3(p.z)} F${s.feedrate}\n`
+    out += `G0 X${f3(safeX)} ; Radial retract before axial travel\nG0 Z2\n`
+  }
+  const target = Math.min(s.stockDiameter!, minimum + allowance)
+  const passes = Math.ceil((s.stockDiameter! - target) / (2 * s.stepdown))
+  if (passes > 10_000) throw new RangeError("Turning would require more than 10000 roughing passes")
+  for (let i = 1; i <= passes; i++) pass(Math.max(target, s.stockDiameter! - 2 * s.stepdown * i), `Roughing pass ${i}`)
+  pass(0, "Finishing pass: following the model envelope")
+  return out
+}
 
 // -- lathe program -------------------------------------------------------------------------------
 
@@ -137,7 +160,8 @@ export const shiftLatheZ = (gcode: string, dz: number): string =>
     return code.replace(/\bZ(-?\d+(?:\.\d+)?)/g, (_, z: string) => `Z${f3(Number(z) + dz)}`) + rest
   }).join("\n")
 
-export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions = {}): string => {
+export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions = {}, profile?: TurnedProfile): string => {
+  if (profile !== undefined) s = { ...s, stockDiameter: Math.max(s.stockDiameter ?? 0, profile.maxDiameter), stockLength: Math.max(s.stockLength ?? 0, profile.end - profile.start), toolType: "turning" }
   let gcode = ""
   gcode += "; CAD/CAM SYSTEM - Generated Lathe G-code with AI assistance\n"
   gcode += `; Operation: ${s.operationType}\n`
@@ -158,9 +182,10 @@ export const generateLatheGCode = (s: ToolpathSettings, options: GenerateOptions
   }
   const op = ops[s.operationType as LatheOperationType]
   let body = ""
-  if (op) body += op(s)
+  if (profile !== undefined) body += profileTurning(s, profile)
+  else if (op) body += op(s)
   body += "\n; End of program\n"
-  body += "G0 X50 Z50 ; Retract to safe position\n"
+  body += profile !== undefined ? `G0 X${f3(s.stockDiameter! + 2)}\nG0 Z50 ; Retract to safe position\n` : "G0 X50 Z50 ; Retract to safe position\n"
   if (s.latheZero === "chuck") {
     gcode += `; Z zero is the chuck face: Z grows towards the front face of the ${f3(s.stockLength!)} mm stock\n`
     body = shiftLatheZ(body, s.stockLength!)

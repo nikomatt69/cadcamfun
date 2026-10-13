@@ -36,6 +36,9 @@ export class HostToolRegistry {
     return snapshot
   }
 
+  /** Forgets the snapshots, so the next read builds them again (the central `ToolRegistry` changed). */
+  invalidate(): void { this.#projects.clear() }
+
   ids(projectId: string): ReadonlyArray<string> { return this.tools(projectId).map((tool) => tool.id) }
   /** The tools the host asks about before every call (see `HostToolSpec.approval`). */
   approvalIds(projectId: string): ReadonlyArray<string> { return this.tools(projectId).filter((tool) => tool.approval === true).map((tool) => tool.id) }

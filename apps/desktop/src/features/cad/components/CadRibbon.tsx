@@ -1,5 +1,5 @@
 import { For, Show, createSignal, type JSX } from "solid-js"
-import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench } from "lucide-solid"
+import { Box, Circle, Minus, Square, Triangle, Copy, Clipboard, CopyPlus, FlipHorizontal2, Layers, Scissors, Wrench, FileText } from "lucide-solid"
 import { t } from "../../../i18n/index.ts"
 import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore } from "../store/elementsStore.ts"
@@ -15,6 +15,7 @@ interface Props {
   readonly ready: boolean
   readonly operation?: SurfacingOp
   readonly onSurface: (operation: SurfacingOp) => void
+  readonly onDrawing?: () => void
   readonly onBoolean: (operation: BooleanOperation) => void
 }
 
@@ -97,6 +98,7 @@ export default function CadRibbon(props: Props): JSX.Element {
     <div class="cad-ribbon-group" role="group" aria-label={t("cad.ribbon.create")}>
       <span class="cad-ribbon-heading">{t("cad.ribbon.create")}</span>
       <div class="cad-ribbon-actions">
+        <Action label={t("cad.drawing.title")} icon={<FileText size={13} />} disabled={!props.ready || !elements.elements.some(e => e.type === "parametric")} onClick={() => props.onDrawing?.()} />
         <Action label={t("cad.ribbon.parametric")} icon={<Box size={13} />} disabled={creationBlocked()} onClick={() => setCreatePart("parametric")} />
       </div>
     </div>

@@ -130,7 +130,40 @@ Added after v6.0, each with tests; all pure, in `cad/`:
 - **`history.ts`** — a parametric feature history: a parameter table and an ordered list of features (sketch on XY / YZ / ZX with an offset, extrude, revolve, hole, linear and circular pattern), replayed from the top by `rebuild`. Dimensions are numbers or expressions, so `withParameter(history, "width", 60)` re-solves every sketch and rebuilds every solid and Boolean after it. Bodies are meshes; `cam/model` turns them into a part model (`buildPartModelFromMeshes`). A feature that cannot be built is an entry in `issues` and is skipped.
 - **Not covered:** fillet, chamfer, shell, draft, sweep, loft; sketch constraints between entities of different sketches (projection); an editor UI for the sketch and the timeline.
 
+## 7c. Native B-rep kernel (application integration pending)
+
+`cad/brep/index.ts` is the kernel interface, integrated from the `exact-brep` worktree. It exposes plain JSON-serializable
+`Brep` topology (`vertices`, `edges`, `faces`, `shells`) and exact analytic/rational geometry, primitive
+constructors, `extrudeProfile` / `revolveProfile`, `transformBrep`, `tessellateBrep` / `brepToMesh`,
+`massProperties`, `validateBrep`, `readStepBreps` / `writeStepBreps`, and `booleanBrep`.
+
+`booleanBrep(A, B, "union" | "subtract" | "intersect", options)` intersects, imprints, classifies and
+sews trimmed surfaces. Analytic intersection curves are recognized; other intersection curves are fitted
+as cubic B-splines using `fitTol`. This is a numerical tolerance contract, not a claim of symbolic exactness
+for arbitrary surface intersections. Invalid sewn topology raises `BooleanError` with validator issues.
+`options.debug(stage, data)` exposes diagnostics without changing result validation.
+
+The arrangements follow the natural surface orientation. Sewing restores outward coedge orientation
+according to the resulting face's `reversed` flag, including when an operand is a prior Boolean result
+or an imported/reflected solid. Applying the subtraction flip alone loses the orientation of existing
+cavity walls; the chained-Boolean regression covers this case.
+
+The module is not yet exported from the app's CAD barrel or used by `history.ts`. Existing bodies,
+viewport rendering, CAM and AI still use the mesh implementation described in §7b. Integration must
+preserve the exact topology as the model and use tessellation only as the rendering/CAM adapter;
+unsupported exact features must remain explicit. The coordinator must be notified before editing
+`cad/index.ts` or `history.ts`. General B-rep fillets/chamfers, persistent naming and exact B-rep 2D drafting remain
+pending, so the professional kernel acceptance gate is not claimed complete.
+
+Verification: `bun --no-env-file test packages/core/src/cad/brep`,
+`bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
+
 ## 8. Change log
+
+- 2026-10-13: documented the native B-rep worktree interface and its integration limits. Fixed sewing of
+  reversed input faces in chained Booleans; added watertight chained-hole/pocket assertions, cavity
+  union/intersection/subtraction in both operand positions, and a STEP-imported reflected plate drilled
+  again. Application integration remains pending.
 
 - Current drawing migration direct-decodes complete tagged documents, preserving every entity kind, recursive blocks, transforms and metadata. Legacy lower-case documents and sparse early tagged exports retain migration compatibility. Import reporting no longer counts preserved current entities as dropped. Invalid current drawings and future versions still fail with `DrawingMigrationError`.
 

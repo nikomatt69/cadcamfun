@@ -47,7 +47,7 @@ export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options
   if (s.workOffset !== "G54") gcode += `${s.workOffset} ; Work offset\n`
   gcode += `M3 S${s.rpm} ; Start spindle\n`
   if (s.coolant) gcode += "M8 ; Coolant on\n"
-  gcode += "G0 Z10 ; Move to safe height\n\n"
+  gcode += `G0 Z${g.stock ? f3(g.stock.topZ + 10) : "10"} ; Move to safe height\n\n`
 
   if (s.useHighSpeedMode) {
     gcode += "; High Speed Machining mode enabled\n"
@@ -87,7 +87,7 @@ export const generateMillGCode = (s: ToolpathSettings, g: GeometryInput, options
   }
 
   gcode += "\n; End of program\n"
-  gcode += "G0 Z30 ; Move to safe height\n"
+  gcode += `G0 Z${g.stock ? f3(Math.max(30, g.stock.topZ + 10)) : "30"} ; Move to safe height\n`
   if (s.coolant) gcode += "M9 ; Coolant off\n"
   gcode += "M5 ; Stop spindle\n"
   gcode += "M30 ; Program end\n"

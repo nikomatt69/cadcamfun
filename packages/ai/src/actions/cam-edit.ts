@@ -14,13 +14,13 @@ const bounds = z.object({ minX: z.number(), maxX: z.number(), minY: z.number(), 
 export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineAction({
     id: "cam_edit.create", kind: "write", replaces: "cam_create_operation",
-    parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()).optional() }),
-    run: ({ type, params }, { handlers, projectId }) => handlers.createOperation(projectId, { type, params: params ?? {} })
+    parameters: z.object({ type: z.string().min(1), params: z.record(z.string(), z.unknown()).optional(), expectedRevision: z.string().min(1).max(100).optional() }),
+    run: ({ type, params, expectedRevision }, { handlers, projectId }) => handlers.createOperation(projectId, { type, params: params ?? {}, ...(expectedRevision !== undefined ? { expectedRevision } : {}) })
   }),
   defineAction({
     id: "cam_edit.update", kind: "write", replaces: "cam_update_operation",
-    parameters: z.object({ operationId: z.string().min(1), params: z.record(z.string(), z.unknown()) }),
-    run: ({ operationId, params }, { handlers, projectId }) => handlers.updateOperation(projectId, operationId, params)
+    parameters: z.object({ operationId: z.string().min(1), params: z.record(z.string(), z.unknown()), expectedRevision: z.string().min(1).max(100).optional() }),
+    run: ({ operationId, params, expectedRevision }, { handlers, projectId }) => handlers.updateOperation(projectId, operationId, params, expectedRevision)
   }),
   defineAction({
     id: "cam_edit.generate", kind: "write", replaces: "cam_generate_gcode",
@@ -42,9 +42,10 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       fixtures: z.array(z.object({ id: z.string().min(1), bounds })).max(50).optional(),
       targetSolids: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
       stock: bounds.optional(),
-      resolution: z.number().positive().optional(), tolerance: z.number().min(0).optional()
+      resolution: z.number().positive().optional(), tolerance: z.number().min(0).optional(),
+      start: z.object({ x: z.number().finite(), y: z.number().finite(), z: z.number().finite() }).optional()
     }),
-    run: ({ operationId, tool, fixtures, targetSolids, stock, resolution, tolerance }, { handlers, projectId }) =>
+    run: ({ operationId, tool, fixtures, targetSolids, stock, resolution, tolerance, start }, { handlers, projectId }) =>
       // The handler gets Effect-validated shapes, so zod and Effect cannot drift apart silently.
       handlers.verifyOperation(projectId, operationId, {
         ...(tool !== undefined ? { tool } : {}),
@@ -52,7 +53,8 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
         ...(targetSolids !== undefined ? { targetSolids: validated(Schema.Array(cad.SolidSchema), targetSolids) } : {}),
         ...(stock !== undefined ? { stock: validated(cam.verify.BoundsSchema, stock) } : {}),
         ...(resolution !== undefined ? { resolution } : {}),
-        ...(tolerance !== undefined ? { tolerance } : {})
+        ...(tolerance !== undefined ? { tolerance } : {}),
+        ...(start !== undefined ? { start } : {})
       })
   }),
   defineAction({

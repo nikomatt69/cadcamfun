@@ -26,6 +26,7 @@ import { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
 import { generateLatheGCode } from "./lathe.ts"
+import { turnedProfileOf } from "./history-features.ts"
 import { generateMillGCode } from "./mill.ts"
 import { multiaxisProgram } from "./multiaxis.ts"
 import { generate3DPrinterGCodeForElement, type PrinterSettings } from "./printer.ts"
@@ -110,7 +111,14 @@ const text = (request: GenerateRequest): { gcode: string; error?: string; warnin
       }
       return { gcode: generateMillGCode(settings, geometry as GeometryInput, options) }
     }
-    case "lathe": return { gcode: generateLatheGCode(settings, options) }
+    case "lathe": {
+      if (settings.operationType === "turning" && settings.turningOperation === "external" && geometry.selectedElements.length > 0) {
+        const profile = geometry.selectedElements.length === 1 ? turnedProfileOf(geometry.selectedElements as never) : undefined
+        if (profile === undefined) return { gcode: "", error: "External turning requires one untransformed parametric part with a full revolution profile." }
+        return { gcode: generateLatheGCode(settings, options, profile) }
+      }
+      return { gcode: generateLatheGCode(settings, options) }
+    }
     case "3dprinter": {
       const element = geometry.selectedElements[0]
       if (!element) return { gcode: "; Error: No element selected for 3D printing\n", error: "Please select a CAD element for 3D printing." }
