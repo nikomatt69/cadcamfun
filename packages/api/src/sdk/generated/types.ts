@@ -362,6 +362,13 @@ export type AiInvokeActionPayload = {
   readonly input: { readonly [x: string]: any }
 }
 
+export type AiIssueBridgeTokenPayload = {
+  readonly name?: string | undefined
+  readonly projectId: string
+  readonly mode: "read" | "write"
+  readonly days?: number | undefined
+}
+
 export type AiSessionControlPayload = {
   readonly sessionId: string
   readonly projectId?: string | undefined
@@ -1816,6 +1823,40 @@ export type AiInvokeActionInput = {
 }
 
 export type AiInvokeActionOutput = { tool: string; action: string; result: unknown }
+
+export type AiIssueBridgeTokenInput = {
+  readonly name?: AiIssueBridgeTokenPayload["name"]
+  readonly projectId: AiIssueBridgeTokenPayload["projectId"]
+  readonly mode: AiIssueBridgeTokenPayload["mode"]
+  readonly days?: AiIssueBridgeTokenPayload["days"]
+}
+
+export type AiIssueBridgeTokenOutput = {
+  info: {
+    id: string
+    name: string
+    projectId: string
+    mode: "read" | "write"
+    userId: string
+    createdAt: string
+    expiresAt: string
+  }
+  token: string
+}
+
+export type AiBridgeTokensOutput = Array<{
+  id: string
+  name: string
+  projectId: string
+  mode: "read" | "write"
+  userId: string
+  createdAt: string
+  expiresAt: string
+}>
+
+export type AiRevokeBridgeTokenInput = { readonly id: { readonly id: string }["id"] }
+
+export type AiRevokeBridgeTokenOutput = { message: string }
 
 export type AiAgentsOutput = Array<{
   id: string

@@ -2030,6 +2030,329 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/ai/bridge/tokens": {
+      "get": {
+        "operationId": "ai.bridgeTokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "createdAt": {
+                        "type": "string",
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                      },
+                      "id": {
+                        "type": "string",
+                      },
+                      "mode": {
+                        "enum": [
+                          "read",
+                          "write",
+                        ],
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "projectId": {
+                        "type": "string",
+                      },
+                      "userId": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "projectId",
+                      "mode",
+                      "userId",
+                      "createdAt",
+                      "expiresAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+      "post": {
+        "operationId": "ai.issueBridgeToken",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "days": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "mode": {
+                    "enum": [
+                      "read",
+                      "write",
+                    ],
+                    "type": "string",
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "projectId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "projectId",
+                  "mode",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "info": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "createdAt": {
+                          "type": "string",
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                        },
+                        "id": {
+                          "type": "string",
+                        },
+                        "mode": {
+                          "enum": [
+                            "read",
+                            "write",
+                          ],
+                          "type": "string",
+                        },
+                        "name": {
+                          "type": "string",
+                        },
+                        "projectId": {
+                          "type": "string",
+                        },
+                        "userId": {
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "projectId",
+                        "mode",
+                        "userId",
+                        "createdAt",
+                        "expiresAt",
+                      ],
+                      "type": "object",
+                    },
+                    "token": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "info",
+                    "token",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/bridge/tokens/{id}": {
+      "delete": {
+        "operationId": "ai.revokeBridgeToken",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "message",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/chat": {
       "post": {
         "operationId": "ai.chat",

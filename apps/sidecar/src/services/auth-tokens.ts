@@ -13,6 +13,8 @@ export interface TokenClaims {
   readonly exp: number
   /** Random id of this token, the key under which it is revoked. */
   readonly token: string
+  /** What a scoped token may do (a bridge token's project and mode); absent on session and e-mail-link tokens. */
+  readonly scope?: unknown
 }
 
 const b64 = (value: string | Buffer) => Buffer.from(value).toString("base64url")
@@ -24,10 +26,12 @@ const ISSUER = "cadcamfun"
  * issued before a restart still verifies afterwards.
  */
 export class AuthTokens extends Context.Service<AuthTokens, {
-  sign(claims: { userId: string; email: string; type: string }, expiresInSeconds: number): string
+  sign(claims: { userId: string; email: string; type: string; scope?: unknown }, expiresInSeconds: number): string
   verify(token: string): Effect.Effect<TokenClaims, TokenFailure>
   /** Ends a token before its expiry (sign-out); a revoked token verifies as `invalid`. Unknown or forged tokens are ignored. */
   revoke(token: string): Effect.Effect<void>
+  /** Ends a token by its id (`TokenClaims.token`) when the token itself is no longer at hand; `exp` is its expiry, in seconds. */
+  revokeId(id: string, exp: number): Effect.Effect<void>
 }>()("cadcamfun/AuthTokens") {
   static readonly layer = Layer.effect(AuthTokens, Effect.gen(function*() {
     const config = yield* AppConfigService
@@ -44,6 +48,13 @@ export class AuthTokens extends Context.Service<AuthTokens, {
     const revoked = new Map<string, number>(Object.entries(yield* Effect.sync((): Record<string, number> => {
       try { return JSON.parse(readFileSync(revokedPath, "utf8")) } catch { return {} }
     })))
+    const persist = (id: string, exp: number) => {
+      const now = Date.now()
+      revoked.set(id, exp)
+      for (const [known, until] of revoked) if (until * 1000 <= now) revoked.delete(known)
+      mkdirSync(config.dataDir, { recursive: true })
+      writeFileSync(revokedPath, JSON.stringify(Object.fromEntries(revoked)), { mode: 0o600 })
+    }
     const mac = (data: string) => createHmac("sha256", secret).update(data).digest()
     const decode = (token: string): TokenClaims | TokenFailure => {
       const parts = token.split(".")
@@ -77,12 +88,9 @@ export class AuthTokens extends Context.Service<AuthTokens, {
       revoke: (token) => Effect.sync(() => {
         const claims = decode(token)
         if (typeof claims === "string") return
-        const now = Date.now()
-        revoked.set(claims.token, claims.exp)
-        for (const [id, exp] of revoked) if (exp * 1000 <= now) revoked.delete(id)
-        mkdirSync(config.dataDir, { recursive: true })
-        writeFileSync(revokedPath, JSON.stringify(Object.fromEntries(revoked)), { mode: 0o600 })
-      })
+        persist(claims.token, claims.exp)
+      }),
+      revokeId: (id, exp) => Effect.sync(() => persist(id, exp))
     })
   }))
 }

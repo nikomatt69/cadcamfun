@@ -15,16 +15,16 @@ the token, in the project you name.
 { "plugin": [["file:///path/to/packages/nikcli-plugin/src/index.ts", { "url": "http://127.0.0.1:43111", "token": "<launch token>", "projectId": "<project id>" }]] }
 ```
 
-or `CADCAMFUN_URL`, `CADCAMFUN_TOKEN` and `CADCAMFUN_PROJECT` in the environment. The token is the one the application was launched
-with (the same bearer the windows use).
+or `CADCAMFUN_URL`, `CADCAMFUN_TOKEN` and `CADCAMFUN_PROJECT` in the environment. Create the token in the application (Settings → AI → Standalone nikcli): it is for the open project, read-only or read-write, opens only
+the action bridge, expires, and can be revoked there. (The application's own launch token also works and opens everything; prefer a scoped one.)
 
 ## What it will not do
 
 - **Delete or replace work** (`cad_edit` `delete`, `library_edit` `delete`, `vcs_edit` `restore`, ...): in the application the host asks
   a person first, an outside client has no such prompt, and a `confirm: true` in the arguments is not an approval. The refusal says so.
 - **Delegate** to the specialist agents (`agent`): they run model sessions inside the application.
-- **Scope a token** to a project or to read-only: the token is the application's own bearer. Revocable, scoped tokens for external
-  agents are the open part of RM-11 (`specs/roadmap/11-nikcli-bridge.md`).
+- **Go beyond its scope**: a bridge token is for one project and, when read-only, reaches only read actions. The operator can narrow
+  further with nikcli policy statements in `<data dir>/ai/policy.json` (`bridge.use`, `tool.use`).
 
 ## Compatibility
 

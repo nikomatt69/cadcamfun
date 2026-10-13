@@ -204,6 +204,13 @@ export const BridgeTool = Schema.Struct({
 export const BridgeTools = Schema.Struct({ tools: Schema.Array(BridgeTool) })
 export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
 export const BridgeInvokeReply = Schema.Struct({ tool: Schema.String, action: Schema.String, result: Schema.Unknown })
+/** RM-11: scoped, revocable tokens for a standalone nikcli (one project, read-only or read-write). Issued with the application's own token. */
+export const BridgeMode = Schema.Literals(["read", "write"])
+export const BridgeTokenInfo = Schema.Struct({ id: Schema.String, name: Schema.String, projectId: Schema.String, mode: BridgeMode, userId: Schema.String, createdAt: Schema.String, expiresAt: Schema.String })
+export const BridgeTokenBody = Schema.Struct({ name: opt(Schema.String), projectId: Schema.String, mode: BridgeMode, days: opt(Schema.Number) })
+/** `token` is shown once; only its id is kept. */
+export const BridgeTokenIssued = Schema.Struct({ info: BridgeTokenInfo, token: Schema.String })
+const bridgeTokenParam = { id: Schema.String }
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Union([AiStreamEventSchema, Schema.Struct({ type: Schema.Literal("heartbeat") })])
@@ -212,6 +219,9 @@ export class AiGroup extends HttpApiGroup.make("ai")
   .add(
     HttpApiEndpoint.get("actions", "/api/ai/actions", { success: BridgeTools, error: [InternalError] }),
     HttpApiEndpoint.post("invokeAction", "/api/ai/actions/invoke", { payload: BridgeInvokeBody, success: BridgeInvokeReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("issueBridgeToken", "/api/ai/bridge/tokens", { payload: BridgeTokenBody, success: BridgeTokenIssued, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("bridgeTokens", "/api/ai/bridge/tokens", { success: Schema.Array(BridgeTokenInfo), error: [InternalError] }),
+    HttpApiEndpoint.delete("revokeBridgeToken", "/api/ai/bridge/tokens/:id", { params: bridgeTokenParam, success: message, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("agents", "/api/ai/agents", { success: Schema.Array(AssistantAgent), error: [InternalError] }),
     HttpApiEndpoint.post("sessionControl", "/api/ai/sessions/control", { payload: SessionControlBody, success: SessionControlReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),

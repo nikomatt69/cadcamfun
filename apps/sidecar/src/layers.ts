@@ -43,6 +43,7 @@ import { WaitlistHandlers } from "./http/waitlist.ts"
 import { AuthHandlers } from "./http/auth.ts"
 import { AuthRepo } from "./repos/auth-repo.ts"
 import { AuthTokens } from "./services/auth-tokens.ts"
+import { BridgeTokens } from "./services/bridge-tokens.ts"
 import { PaymentProvider } from "./services/payments.ts"
 import { FilesHandlers } from "./http/files.ts"
 import { FileRepo } from "./repos/file-repo.ts"
@@ -107,7 +108,7 @@ const VcsServices = WorkflowServiceStepsLive.pipe(
 const RepoServices = Layer.mergeAll(ProjectRepo.layer, MaterialRepo.layer, ToolRepo.layer, DrawingRepo.layer, ComponentRepo.layer, ToolpathRepo.layer, ToolpathLibrary.layer, LibraryRepo.layer, MachineConfigRepo.layer, StorageService.layer, ProductionCostRepo.layer, CostService.layer, OrganizationRepo.layer, NotificationRepo.layer, AnalyticsRepo.layer, AuthRepo.layer, AuthTokens.layer, FileRepo.layer, PluginRegistryRepo.layer, UserRepo.layer, BillingRepo.layer, PaymentProvider.layer, MiscRepo.layer, KvStore.layer, McpRepo.layer, VcsServices, LiveEvents.layer, Companion.layer.pipe(Layer.provide(KvStore.layer)))
 
 /** Repositories plus the AI layer (credentials, direct model, optional nikcli host, tool handlers). */
-export const Services = AiLive.pipe(Layer.provideMerge(RepoServices))
+export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(Layer.provideMerge(RepoServices))))
 
 /** HTTP routes for the whole API, with auth + services wired; still needs `Database` and `AppConfigService`. */
 // Contract-only groups must not make the implemented server require absent handlers.

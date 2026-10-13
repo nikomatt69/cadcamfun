@@ -124,3 +124,38 @@ describe("user-loadable skills (Settings → AI)", () => {
     } finally { dispose() }
   }, 60000)
 })
+
+describe("standalone nikcli tokens (Settings → AI)", () => {
+  test("needs an open project, issues a token shown once, lists it, and revokes it", async () => {
+    const { useDocumentStore } = await import("../src/features/cad/store/documentStore.ts")
+    const { dispose } = await openAiSettings()
+    try {
+      await app.wait(() => query('[data-testid="ai-bridge"]'))
+      useDocumentStore.getState().clear()
+      query<HTMLButtonElement>('[data-testid="ai-bridge-issue"]')!.click()
+      await app.wait(() => query('[data-testid="ai-bridge-problem"]'))
+      expect(query('[data-testid="ai-bridge-problem"]')!.textContent).toContain("Open a project first")
+
+      const created = await app.state.runtime.run(app.state.client.projects.create({ payload: { name: "Bridge settings" } })) as { id: string }
+      useDocumentStore.getState().setDocument({ projectId: created.id, drawingId: "d-1" })
+      type(query<HTMLInputElement>('[data-testid="ai-bridge-name"]')!, "my laptop")
+      const mode = query<HTMLSelectElement>('[data-testid="ai-bridge-mode"]')!
+      mode.value = "read"
+      mode.dispatchEvent(new window.Event("change", { bubbles: true }))
+      await flush()
+      query<HTMLButtonElement>('[data-testid="ai-bridge-issue"]')!.click()
+      const secret = await app.wait(() => query<HTMLInputElement>('[data-testid="ai-bridge-secret"]'))
+      expect(secret.value.split(".")).toHaveLength(3)
+      const row = await app.wait(() => query('[data-testid="ai-bridge-token"]'))
+      expect(row.textContent).toContain("my laptop")
+      expect(row.getAttribute("data-mode")).toBe("read")
+      // The list never carries the secret, and "done" removes it from the screen.
+      expect(query('[data-testid="ai-bridge-list"]')!.textContent).not.toContain(secret.value)
+      query<HTMLButtonElement>('[data-testid="ai-bridge-fresh"] button')!.click()
+      await app.wait(() => (query('[data-testid="ai-bridge-fresh"]') === null ? true : undefined))
+
+      query<HTMLButtonElement>('[data-testid="ai-bridge-revoke"]')!.click()
+      await app.wait(() => (query('[data-testid="ai-bridge-token"]') === null ? true : undefined))
+    } finally { dispose(); useDocumentStore.getState().clear() }
+  }, 60000)
+})

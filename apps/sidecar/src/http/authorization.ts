@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto"
 import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
+import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { LocalProfile } from "../services/local-profile.ts"
 
 /** Header carrying the session JWT issued by sign-in / magic-link verification. */
@@ -27,6 +28,7 @@ export const AuthorizationLive = Layer.effect(
   Effect.gen(function*() {
     const config = yield* AppConfigService
     const tokens = yield* AuthTokens
+    const bridge = yield* BridgeTokens
     const repo = yield* AuthRepo
     const { user: local } = yield* LocalProfile
 
@@ -43,7 +45,15 @@ export const AuthorizationLive = Layer.effect(
     return Authorization.of({
       bearer: Effect.fn("Authorization.bearer")(function*(httpEffect, { credential }) {
         if (!safeEqual(Redacted.value(credential), Redacted.value(config.token))) {
-          return yield* new Unauthorized({ message: "Unauthorized" })
+          // Not the application's own token: a scoped bridge token opens the two action-bridge routes and nothing else.
+          const grant = yield* bridge.grantOf(Redacted.value(credential))
+          if (grant === undefined) return yield* new Unauthorized({ message: "Unauthorized" })
+          const request = yield* HttpServerRequest.HttpServerRequest
+          const path = request.url.split("?")[0]
+          const allowed = (request.method === "GET" && path === "/api/ai/actions") || (request.method === "POST" && path === "/api/ai/actions/invoke")
+          if (!allowed) return yield* new Unauthorized({ message: "This token only opens the action bridge" })
+          const row = yield* repo.findById(grant.info.userId).pipe(Effect.orElseSucceed(() => undefined))
+          return yield* Effect.provideService(httpEffect, CurrentUser, row ? new SessionUser({ id: row.id, email: row.email, name: row.name }) : local)
         }
         return yield* Effect.provideService(httpEffect, CurrentUser, yield* sessionUser())
       })

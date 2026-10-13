@@ -66,6 +66,11 @@ import type {
   AiActionsOutput,
   AiInvokeActionInput,
   AiInvokeActionOutput,
+  AiIssueBridgeTokenInput,
+  AiIssueBridgeTokenOutput,
+  AiBridgeTokensOutput,
+  AiRevokeBridgeTokenInput,
+  AiRevokeBridgeTokenOutput,
   AiAgentsOutput,
   AiSessionControlInput,
   AiSessionControlOutput,
@@ -1109,6 +1114,40 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/ai/actions/invoke`,
             body: { projectId: input["projectId"], tool: input["tool"], input: input["input"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      issueBridgeToken: (input: AiIssueBridgeTokenInput, requestOptions?: RequestOptions) =>
+        request<AiIssueBridgeTokenOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/bridge/tokens`,
+            body: { name: input["name"], projectId: input["projectId"], mode: input["mode"], days: input["days"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      bridgeTokens: (requestOptions?: RequestOptions) =>
+        request<AiBridgeTokensOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/bridge/tokens`,
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      revokeBridgeToken: (input: AiRevokeBridgeTokenInput, requestOptions?: RequestOptions) =>
+        request<AiRevokeBridgeTokenOutput>(
+          {
+            method: "DELETE",
+            path: `/api/ai/bridge/tokens/${encodeURIComponent(input.id)}`,
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

@@ -68,4 +68,4 @@ export { EDITOR_ACTIONS, entityZod } from "./actions/cad-edit.ts"
 
 export * from "./project-memory.ts"
 export * from "./project-context.ts"
-export { describeBridge, bridgeAdmission, bridgeAllowed, scopeBridge, BRIDGE_EXCLUDED_TOOLS, type BridgeTool, type BridgeAction, type BridgeAdmission } from "./actions/bridge.ts"
+export { describeBridge, bridgeAdmission, bridgeAllowed, scopeBridge, BRIDGE_EXCLUDED_TOOLS, type BridgeTool, type BridgeAction, type BridgeMode, type BridgeAdmission } from "./actions/bridge.ts"

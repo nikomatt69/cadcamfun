@@ -4,7 +4,7 @@ import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
-  CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, type BridgeTool
+  CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Context, Effect, Layer, Redacted, Schema } from "effect"
@@ -784,8 +784,8 @@ const contributionGuard = (contributions: Readonly<Record<string, ActionContribu
  */
 export class AiActions extends Context.Service<AiActions, {
   /** The catalogue as the operator's policy leaves it (`bridge.use`, `tool.use`). */
-  readonly list: () => ReadonlyArray<BridgeTool>
-  readonly invoke: (call: { readonly projectId: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
+  readonly list: (mode?: BridgeMode) => ReadonlyArray<BridgeTool>
+  readonly invoke: (call: { readonly projectId: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly mode?: BridgeMode; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
 }>()("cadcamfun/AiActions") {}
 
 export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
@@ -808,9 +808,9 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
     ...vcsContributions({ vcs, runner, projects: projectsRepo, actor })
   }
   return AiActions.of({
-    list: () => scopeBridge(describeBridge(), policies),
-    invoke: ({ projectId, tool, input, user, signal }) => Effect.gen(function*() {
-      const admission = bridgeAdmission(tool, input, policies)
+    list: (mode) => scopeBridge(describeBridge(), policies, mode),
+    invoke: ({ projectId, tool, input, user, mode, signal }) => Effect.gen(function*() {
+      const admission = bridgeAdmission(tool, input, policies, mode)
       if (!admission.ok) return yield* Effect.fail({ message: admission.error })
       const spec = buildTools(handlers, projectId, [], contributions).find((candidate) => candidate.id === tool)
       if (spec === undefined) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })

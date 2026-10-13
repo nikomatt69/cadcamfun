@@ -12,6 +12,8 @@ import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
 import { AiActions } from "../services/ai.ts"
+import { BridgeTokens } from "../services/bridge-tokens.ts"
+import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
 
 const fail = (message: string) => (e: unknown) =>
@@ -35,6 +37,13 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const actingUser = yield* ActingUser
   const host = yield* Effect.serviceOption(AiHost)
   const actions = yield* AiActions
+  const bridgeTokens = yield* BridgeTokens
+  /** The scoped grant of the bearer on this request, or undefined for the application's own token. */
+  const bridgeGrant = Effect.gen(function*() {
+    const request = yield* HttpServerRequest.HttpServerRequest
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers["authorization"] ?? "")?.[1]
+    return bearer === undefined ? undefined : yield* bridgeTokens.grantOf(bearer)
+  })
   const { query } = yield* Database
   const kv = yield* KvStore
   const appConfig = yield* AppConfigService
@@ -219,13 +228,31 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return { reply: result.text || "No response generated", hasMcpData: mcpData !== undefined }
     }).pipe(Effect.catchIf((e): e is Exclude<typeof e, AiBadRequest | AiNotFound | AiFailure> => !(e instanceof AiBadRequest || e instanceof AiNotFound || e instanceof AiFailure),
       (e) => Effect.fail(new AiFailure({ error: aiError(e as never) })))))
-    // RM-11: the action catalogue for a standalone nikcli. Same bearer token as every other route; project access is checked per call.
-    .handle("actions", () => Effect.sync(() => ({ tools: actions.list() })))
+    // RM-11: the action catalogue for a standalone nikcli. The application's own token opens everything; a scoped bridge token (issued below,
+    // one project, read-only or read-write, revocable) opens only these two routes and only inside its scope.
+    .handle("actions", () => Effect.gen(function*() {
+      const grant = yield* bridgeGrant
+      return { tools: actions.list(grant?.scope.mode) }
+    }))
     .handle("invokeAction", ({ payload }) => Effect.gen(function*() {
       const actor = yield* CurrentUser
       if (payload.projectId.trim() === "" || payload.projectId === "default") return yield* new BadRequest({ message: "projectId is required: a standalone client always names its project" })
+      const grant = yield* bridgeGrant
+      if (grant !== undefined && grant.scope.projectId !== payload.projectId) return yield* new BadRequest({ message: "This token is for another project." })
       yield* checkProject(payload.projectId)
-      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
+      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor, ...(grant ? { mode: grant.scope.mode } : {}) }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
+    }))
+    .handle("issueBridgeToken", ({ payload }) => Effect.gen(function*() {
+      const actor = yield* CurrentUser
+      if (payload.projectId.trim() === "" || payload.projectId === "default") return yield* new BadRequest({ message: "projectId is required: a bridge token is for one project" })
+      yield* checkProject(payload.projectId)
+      return yield* bridgeTokens.issue({ name: payload.name ?? "", projectId: payload.projectId, mode: payload.mode, userId: actor.id, email: actor.email, ...(payload.days !== undefined ? { days: payload.days } : {}) })
+    }))
+    .handle("bridgeTokens", () => bridgeTokens.list.pipe(Effect.map((tokens) => [...tokens])))
+    .handle("revokeBridgeToken", ({ params }) => Effect.gen(function*() {
+      const revoked = yield* bridgeTokens.revoke(params.id)
+      if (!revoked) return yield* new BadRequest({ message: "No such bridge token" })
+      return { message: "Revoked" }
     }))
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })

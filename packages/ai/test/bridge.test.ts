@@ -85,3 +85,19 @@ describe("the operator's policy narrows the bridge (nikcli's policy statements)"
     expect((bridgeAdmission("vcs_edit", { action: "commit" }, policy) as { error: string }).error).toContain("AI policy")
   })
 })
+
+describe("read-only scope", () => {
+  test("the listing keeps only read actions, and a change is refused with what to do", () => {
+    const readOnly = scopeBridge(describeBridge(), [], "read")
+    expect(readOnly.length).toBeGreaterThan(0)
+    for (const tool of readOnly) for (const action of tool.actions) expect(action.kind, action.id).toBe("read")
+    expect(readOnly.map((tool) => tool.id)).toContain("cad")
+    expect(readOnly.map((tool) => tool.id)).not.toContain("cad_edit")
+    expect(bridgeAdmission("cad", { action: "describe" }, [], "read")).toMatchObject({ ok: true })
+    const refused = bridgeAdmission("cad_edit", { action: "add" }, [], "read") as { ok: false; error: string }
+    expect(refused.ok).toBe(false)
+    expect(refused.error).toContain("read-only")
+    // Write mode is the default and changes nothing.
+    expect(bridgeAdmission("cad_edit", { action: "add" }, [], "write")).toMatchObject({ ok: true })
+  })
+})
