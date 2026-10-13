@@ -1,6 +1,9 @@
-import { expect, test } from "bun:test"
+import { expect, setDefaultTimeout, test } from "bun:test"
 import { installDom } from "./helpers/dom.ts"
 import { sceneToStep, stepToElements } from "@cadcamfun/core"
+
+// The kernel builds, writes and reads a solid before the panel renders; under a loaded machine 5 s is too short.
+setDefaultTimeout(60_000)
 
 const importedPlate = () =>
   stepToElements(

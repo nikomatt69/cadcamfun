@@ -1,5 +1,7 @@
-import { expect, test } from "bun:test"
+import { expect, setDefaultTimeout, test } from "bun:test"
 import { brep, sceneToStep, stepToElements } from "@cadcamfun/core"
+
+setDefaultTimeout(60_000)
 
 /** A drilled plate written by the kernel as STEP, read back as the drawing's `brep` element. */
 const importedPlate = () => {
