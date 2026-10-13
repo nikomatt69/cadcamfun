@@ -1,4 +1,4 @@
-import { cam, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
+import { cam, creasedNormals, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
 import { useCustomElementsStore } from "../store/customElementsStore.ts";
@@ -10,16 +10,18 @@ interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: A
 
 /** A solid mesh in scene coordinates as a Three mesh (the drawing's origin offset is added; smooth normals are not wanted on a CAD solid). */
 const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: number; z: number }): THREE.Mesh => {
-  const positions = new Float32Array(mesh.positions.length);
+  // Smooth across the facets of a curved face, sharp along a real edge (a crease angle of 30 degrees).
+  const shaded = creasedNormals({ positions: Float32Array.from(mesh.positions), indices: Uint32Array.from(mesh.indices) });
+  const positions = shaded.positions;
   for (let i = 0; i < positions.length; i += 3) {
-    positions[i] = mesh.positions[i]! + offset.x;
-    positions[i + 1] = mesh.positions[i + 1]! + offset.y;
-    positions[i + 2] = mesh.positions[i + 2]! + offset.z;
+    positions[i] = positions[i]! + offset.x;
+    positions[i + 1] = positions[i + 1]! + offset.y;
+    positions[i + 2] = positions[i + 2]! + offset.z;
   }
   const geometry = new THREE.BufferGeometry();
-  geometry.setIndex(Array.from(mesh.indices));
+  geometry.setIndex(new THREE.BufferAttribute(shaded.indices, 1));
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
+  geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3));
   const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false });
   return new THREE.Mesh(geometry, material);
 };

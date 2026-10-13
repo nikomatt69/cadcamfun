@@ -266,7 +266,7 @@ export const overhangArea = (mesh: Mesh, angle: number): { readonly total: numbe
 
 const meshArea = (mesh: Mesh): number => overhangArea(mesh, 90).total
 
-interface HoleSite {
+export interface HoleSite {
   readonly feature: string
   readonly plane: PlaneName
   readonly offset: number
@@ -274,6 +274,8 @@ interface HoleSite {
   readonly v: number
   readonly diameter: number
   readonly depth: number
+  /** The id of the hole feature this site comes from (a pattern copy keeps its source's id). */
+  readonly source: string
 }
 
 /** The numeric value of a dimension, or undefined when it cannot be evaluated (the rebuild reports why). */
@@ -283,14 +285,16 @@ const value = (d: Dimension | undefined, parameters: Readonly<Record<string, num
 }
 
 /** Every hole of the history in plane coordinates, with the copies the patterns make. */
-const holeSites = (history: History, parameters: Readonly<Record<string, number>>): HoleSite[] => {
+export const holeSites = (history: History, parameters: Readonly<Record<string, number>>): HoleSite[] => {
   const base = new Map<string, HoleSite>()
   const sites: HoleSite[] = []
   for (const f of history.features) {
     if (f.type === "hole") {
+      // Holes on a work plane (not XY, YZ or ZX) are outside this check: it measures in the three base planes.
+      if (!Object.hasOwn(FRAME_UV, f.plane)) continue
       const u = value(f.at[0], parameters), v = value(f.at[1], parameters), diameter = value(f.diameter, parameters), depth = value(f.depth, parameters)
       if (u === undefined || v === undefined || diameter === undefined || depth === undefined) continue
-      const site = { feature: f.id, plane: f.plane, offset: value(f.offset, parameters) ?? 0, u, v, diameter, depth }
+      const site: HoleSite = { feature: f.id, source: f.id, plane: f.plane as PlaneName, offset: value(f.offset, parameters) ?? 0, u, v, diameter, depth }
       base.set(f.id, site)
       sites.push(site)
     } else if (f.type === "pattern") {

@@ -1,6 +1,6 @@
 import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import {
-  RECIPES, analyzeManufacturability, buildRecipe, dimensionValue, dimensionsOf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
+  RECIPES, analyzeManufacturability, buildRecipe, runModelScript, dimensionValue, dimensionsOf, historyVolume, meshBounds, moveFeature, rebuild, removeFeature, removeParameter, renameParameter, resolveParameters, setDimension, setParameter, usesOf,
   type DfmMaterial, type DfmProcess, type DfmReport, type Feature, type History, type RecipeResult
 } from "@cadcamfun/core"
 import { useElementsStore, type Element } from "../store/elementsStore.ts"
@@ -18,6 +18,15 @@ const STATUS: Readonly<Record<string, { readonly text: string; readonly tone: st
 
 const SELECT = "w-full px-1 py-1 border border-gray-300 rounded-md text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 const SEVERITY_TONE: Readonly<Record<string, string>> = { error: "text-red-700", warning: "text-amber-700", info: "text-gray-600 dark:text-gray-300" }
+
+const SCRIPT_STARTER = `// A bracket: parameters, a sketch, an extrusion, a hole pattern, a rib and a chamfer.
+m.param("width", 60).param("depth", 40).param("thick", 8)
+m.extrude(m.sketch("XY").rectangle([0, 0], "width", "depth"), { depth: "thick" })
+const hole = m.hole({ plane: "XY", offset: "thick", at: [10, 10], diameter: 6, depth: "thick" })
+m.pattern({ feature: hole, kind: "linear", count: 3, step: [20, 0, 0] })
+m.rib(m.sketch("XY", "thick").path([[10, 30], [50, 30]]), { thickness: 3, depth: 10 })
+m.chamfer({ size: 1, edges: { parallel: "z" } })
+`
 
 const format = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(4).replace(/\.?0+$/, ""))
 
@@ -72,6 +81,14 @@ export default function ParametricPanel(props: { readonly element: Element; read
       case "scale": return Array.isArray(feature.factor) ? "scale along x, y, z" : "scale"
       case "split": return `split by ${feature.plane}, keep ${feature.keep}`
       case "combine": return `${feature.operation} ${feature.tools.join(", ")} ${feature.operation === "join" ? "into" : feature.operation === "cut" ? "from" : "with"} ${feature.target}`
+      case "rib": return `rib on ${feature.sketch}`
+      case "sheet": return `sheet-metal strip from ${feature.sketch}${feature.bendRadius !== undefined ? `, bends R${String(feature.bendRadius)}` : ""}`
+      case "thread": return `${feature.kind} thread M${String(feature.diameter)} x ${String(feature.pitch)}`
+      case "text": return `text "${feature.text.length > 24 ? `${feature.text.slice(0, 24)}…` : feature.text}" ${feature.operation}`
+      case "plane": return feature.from.kind === "offset" ? `work plane ${String(feature.from.distance)} mm from ${feature.from.base}` : feature.from.kind === "angle" ? `work plane ${String(feature.from.angle)}° from ${feature.from.base}` : feature.from.kind === "points" ? "work plane through 3 points" : "work plane on a face"
+      case "draft": return `draft ${String(feature.angle)}° on the face near (${feature.near.map(String).join(", ")})`
+      case "mate": return `mate ${feature.body} to ${feature.to.body}${feature.offset !== undefined ? `, gap ${String(feature.offset)}` : ""}`
+      case "pushpull": return `press/pull ${String(feature.distance)} mm`
       case "fillet": return `${feature.style ?? "fillet"} of ${feature.edges?.parallel ? `${feature.edges.parallel}-parallel` : feature.edges?.within ? "boxed" : "all"} ${feature.edges?.kind ?? "convex"} edges`
     }
   }
@@ -195,6 +212,25 @@ export default function ParametricPanel(props: { readonly element: Element; read
       if (edit(() => result.history)) { setRecipeResult(result); setReport(undefined) }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
+
+  // Script: the part written as code against the model builder (core `cad/script.ts`), replayed into a history.
+  const [script, setScript] = createSignal(SCRIPT_STARTER)
+  const [scriptNote, setScriptNote] = createSignal("")
+  const runScript = () => {
+    try {
+      const next = runModelScript(script())
+      const result = rebuild(next)
+      if (!window.confirm(`Replace the history of this part with the script's ${next.features.length} features?`)) return
+      if (edit(() => next)) {
+        setReport(undefined)
+        setScriptNote(`${next.features.length} features, ${result.bodies.length} body(ies), ${result.issues.filter((i) => i.severity === "error").length} error(s)`)
+      }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause)
+      setScriptNote("")
+      setError(cause instanceof EvalError || /unsafe-eval|Content Security Policy/i.test(message) ? "Scripts need the app to allow script evaluation (CSP 'unsafe-eval'); this build does not." : message)
     }
   }
 
@@ -434,6 +470,17 @@ export default function ParametricPanel(props: { readonly element: Element; read
             <ul class="list-disc pl-4"><For each={r().rules}>{(rule) => <li>{rule}</li>}</For></ul>
           </div>}
         </Show>
+      </div>
+
+      <div data-testid="script-section">
+        <h5 class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Script</h5>
+        <p class="text-xs text-gray-500">JavaScript against <code>m</code>: <code>m.param</code>, <code>m.sketch(plane).rectangle/circle/polygon/slot/path</code>, <code>m.extrude/revolve/sweep/loft/hole/pattern/fillet/chamfer/shell/rib/sheet/thread/text/pushPull</code>. Runs with your privileges: only code you wrote or read.</p>
+        <textarea class={`${INPUT} mt-1 h-40`} spellcheck={false} aria-label="Model script" disabled={props.locked} value={script()} onInput={(event) => setScript(event.currentTarget.value)} />
+        <div class="mt-1 flex items-center gap-2">
+          <button type="button" class={SMALL} disabled={props.locked} onClick={runScript}>Run script</button>
+          <button type="button" class={SMALL} disabled={props.locked} onClick={() => setScript(SCRIPT_STARTER)}>Starter</button>
+          <Show when={scriptNote()}><span class="text-xs text-gray-600 dark:text-gray-300" data-testid="script-result">{scriptNote()}</span></Show>
+        </div>
       </div>
 
       <Show when={(built()?.issues.length ?? 0) > 0}>

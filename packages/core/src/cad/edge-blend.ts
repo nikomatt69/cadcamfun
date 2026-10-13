@@ -303,8 +303,12 @@ const blendVertices = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: numb
     // The three cylinders, along the three edge directions through the ball centre.
     const axes: Array<[P3, P3, P3]> = [[n1, n2, n3], [n2, n1, n3], [n3, n1, n2]]
     for (const [axis, u, v] of axes) {
-      const sides = 24
-      const circle = Array.from({ length: sides }, (_, k) => ({ x: r * Math.cos((2 * Math.PI * k) / sides), y: r * Math.sin((2 * Math.PI * k) / sides) }))
+      // The region must hold everything of the body in the corner cube outside the ball, so its cylinders lie wholly outside the
+      // filleted faces (whatever their facets): 48 sides, circumscribed with 0.4 % to spare. Faces on the body's own, or dipping
+      // under them between vertices, would leave fins and tunnels of no thickness along the fillets.
+      const sides = 48
+      const rc = (r * 1.004) / Math.cos(Math.PI / sides)
+      const circle = Array.from({ length: sides }, (_, k) => ({ x: rc * Math.cos((2 * Math.PI * k) / sides), y: rc * Math.sin((2 * Math.PI * k) / sides) }))
       // The edge direction (cross of the other two normals) is parallel to `axis`: n1 x n2 = +-n3 for a right-angled frame.
       const start = sub(centre, mul(axis, 2 * r))
       const cyl = slab(circle.map((c) => add(add(start, mul(u, c.x)), mul(v, c.y))), circle, start, axis, 4 * r)
@@ -312,7 +316,10 @@ const blendVertices = (mesh: Mesh, edges: ReadonlyArray<BlendEdge>, radius: numb
     }
     // The ball is turned off-axis so none of its vertices lies on a plane of the corner cube (coincident planes make the Boolean
     // crawl), and it is meshed coarsely: the sliver it leaves is a few cubic millimetres, so a 0.05 mm chord is far below any effect.
-    const ball = rotateMesh(meshOf({ _tag: "Sphere", center: centre, radius: r, rings: 16 } as never, 0.05), { x: 1, y: 2, z: 3 }, 0.37, centre)
+    // It is circumscribed: the faces of a meshed sphere sink up to about 0.5 % of the radius below it (24 rings), and a ball that
+    // dips under the region's cylinders along the circles where it should touch them cuts the corner into fins of no thickness.
+    // 2 % larger, the ball covers them there and leaves a clean corner; it removes 2 % of r less at the very corner.
+    const ball = rotateMesh(meshOf({ _tag: "Sphere", center: centre, radius: r * 1.02, rings: 24 } as never, 0.05), { x: 1, y: 2, z: 3 }, 0.37, centre)
     region = booleanMesh(region, ball, "subtract")
     regions.push(region)
     count++

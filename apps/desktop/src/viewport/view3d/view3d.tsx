@@ -6,7 +6,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { TransformControls } from "three/addons/controls/TransformControls.js"
 import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
-import { isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
+import { creasedNormals, isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
 import { buildPlayback, positionAt, type Playback } from "./playback.ts"
@@ -268,7 +268,9 @@ export function View3D(props: View3DProps) {
     }
     const installMesh = (mesh: { positions: Float32Array; indices: Uint32Array }, index?: number) => {
       const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3)); geometry.setIndex(new THREE.BufferAttribute(mesh.indices, 1)); geometry.computeVertexNormals()
+      // Smooth across the facets of a curved face, sharp along a real edge (crease angle 30 degrees).
+      const shaded = creasedNormals(mesh)
+      geometry.setAttribute("position", new THREE.BufferAttribute(shaded.positions, 3)); geometry.setIndex(new THREE.BufferAttribute(shaded.indices, 1)); geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3))
       const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: .2, roughness: .65, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }))
       object.userData.solidIndex = index
       object.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 25), new THREE.LineBasicMaterial({ color: 0x202830 })))

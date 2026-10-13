@@ -25,12 +25,23 @@ import type { Vec2 } from "./vec.ts"
 import { meshBounds, meshOf, meshVolume, type Mesh } from "./solid.ts"
 import { edgedHoleTool, edgedPrism, moveRing, taperedHoleTool, taperedPrism, treatCorners, type EdgeShape, type TreatmentStyle } from "./profile-shape.ts"
 import { loftSolid, roundPath, sweepSolid, type P3 } from "./sweep-loft.ts"
+import { COIL_MAX_TURNS, coilGeometry } from "./helix.ts"
+import { developedLength, sheetOutline, thickenPath, withHems, type Developed } from "./sheet-metal.ts"
+import { threadProblem, threadTool } from "./thread.ts"
+import { textSolid } from "./text-solid.ts"
+import { findPlanarFace, type PlanarFace } from "./face-edit.ts"
+import { metricThread } from "./fasteners.ts"
+export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
 import { blendEdges, findEdges, selectEdges } from "./edge-blend.ts"
 import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
 import { elementMesh } from "../cam/model/element-mesh.ts"
 
 export type PlaneName = "XY" | "YZ" | "ZX"
+/** A plane a sketch, hole or text lies on: one of the three base planes, or the id of an earlier `plane` feature. */
+export type PlaneRef = PlaneName | (string & {})
 type V3 = { readonly x: number; readonly y: number; readonly z: number }
+/** An orthonormal right-handed frame (u x v = n) at `origin`. */
+export interface PlaneFrame { readonly u: V3; readonly v: V3; readonly n: V3; readonly origin: V3 }
 
 const FRAMES: Readonly<Record<PlaneName, { readonly u: V3; readonly v: V3; readonly n: V3 }>> = {
   XY: { u: { x: 1, y: 0, z: 0 }, v: { x: 0, y: 1, z: 0 }, n: { x: 0, y: 0, z: 1 } },
@@ -63,7 +74,7 @@ export interface EdgeTreatment {
 /** The sharp vertical corners of the profile, rounded (`fillet`) or bevelled (`chamfer`) before the extrusion. */
 export interface CornerTreatment { readonly style: "chamfer" | "fillet"; readonly size: Dimension }
 
-export interface SketchFeature { readonly id: string; readonly type: "sketch"; readonly plane: PlaneName; readonly offset?: Dimension; readonly sketch: HistorySketch }
+export interface SketchFeature { readonly id: string; readonly type: "sketch"; readonly plane: PlaneRef; readonly offset?: Dimension; readonly sketch: HistorySketch }
 export interface ExtrudeFeature {
   readonly id: string
   readonly type: "extrude"
@@ -94,7 +105,7 @@ export interface RevolveFeature {
 export interface HoleFeature {
   readonly id: string
   readonly type: "hole"
-  readonly plane: PlaneName
+  readonly plane: PlaneRef
   readonly offset?: Dimension
   readonly at: readonly [Dimension, Dimension]
   readonly diameter: Dimension
@@ -108,6 +119,15 @@ export interface HoleFeature {
   readonly headDepth?: Dimension
   /** Included angle of the countersink cone, degrees (default 90). */
   readonly angle?: Dimension
+  /**
+   * A cosmetic thread note (Fusion's cosmetic thread): the hole is the tap drill and the drawing says `M4 - 6H depth 8`. `designation` is
+   * `M4`, `M8x1` or a pipe thread such as `G1/2"`; the geometry is not changed.
+   */
+  readonly thread?: { readonly designation: string; readonly depth: Dimension; readonly fit?: string }
+  /** Tolerance of the diameter in mm, written on the drawing (`+upper / -lower`; equal values print as +-). */
+  readonly tolerance?: { readonly upper: Dimension; readonly lower: Dimension }
+  /** ISO 286 hole fit for the drawing, such as `H7`: the deviation is derived from the IT grade (H holes only). */
+  readonly fit?: string
 }
 export interface PatternFeature {
   readonly id: string
@@ -241,6 +261,137 @@ export interface CombineFeature {
   readonly operation: "join" | "cut" | "intersect"
   readonly keepTools?: boolean
 }
+/** A web standing on the bodies (Fusion's Rib): the open lines of a sketch, thickened and extruded, united with what they touch. */
+export interface RibFeature {
+  readonly id: string
+  readonly type: "rib"
+  /** A sketch with open chains of lines and arcs (the centre lines of the ribs). */
+  readonly sketch: string
+  readonly thickness: Dimension
+  /** How far the rib stands from the sketch plane. */
+  readonly depth: Dimension
+  readonly direction?: "up" | "down" | "symmetric"
+  /** Default `union`. */
+  readonly operation?: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+/**
+ * A bent strip of constant thickness (sheet metal): one open chain of the sketch is the profile line, thickened to `thickness` on
+ * `side`, its corners bent with the INSIDE radius `bendRadius`, and extruded `width` along the sketch normal (a base flange).
+ */
+export interface SheetFeature {
+  readonly id: string
+  readonly type: "sheet"
+  readonly sketch: string
+  readonly thickness: Dimension
+  readonly width: Dimension
+  readonly bendRadius?: Dimension
+  /** Which side of the drawn line the material lies on, looking along it (default `centre`). */
+  readonly side?: "centre" | "left" | "right"
+  /** Hems folded back at the ends of the line: a hem is two 90 degree bends, so with a bend radius `gap` must be at least twice the inside radius. */
+  readonly hems?: ReadonlyArray<{ readonly end: "start" | "end"; readonly length: Dimension; readonly gap?: Dimension; readonly fold?: "left" | "right" }>
+  readonly direction?: "up" | "down" | "symmetric"
+  readonly operation: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+/**
+ * A modelled ISO metric thread along Z (Fusion's Thread with Modeled on): `external` is a threaded rod, `internal` the tool that
+ * cuts a tapped hole. The default operation is `new` for an external thread and `subtract` for an internal one.
+ */
+export interface ThreadFeature {
+  readonly id: string
+  readonly type: "thread"
+  readonly kind: "external" | "internal"
+  readonly diameter: Dimension
+  readonly pitch: Dimension
+  readonly length: Dimension
+  /** Where the axis stands on the XY plane and the Z where the thread starts. */
+  readonly at?: readonly [Dimension, Dimension]
+  readonly offset?: Dimension
+  /** How the thread is named on a drawing (`M8`, `G1/2"`); the default is `M` + diameter. */
+  readonly designation?: string
+  readonly handedness?: "right" | "left"
+  readonly operation?: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+/** Text raised from, or cut into, a plane (Fusion's Text): a single-stroke font given a stroke width and a depth. */
+export interface TextFeature {
+  readonly id: string
+  readonly type: "text"
+  readonly text: string
+  readonly height: Dimension
+  readonly depth: Dimension
+  /** Stroke width; the default is a ninth of the height. */
+  readonly strokeWidth?: Dimension
+  readonly plane: PlaneRef
+  readonly offset?: Dimension
+  /** Where the text sits on the plane: its lower-left corner, or its centre with `align: "centre"`. */
+  readonly at?: readonly [Dimension, Dimension]
+  readonly align?: "left" | "centre"
+  readonly spacing?: Dimension
+  readonly direction?: "up" | "down" | "symmetric"
+  readonly operation: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+/** Moves a planar face of a body along its normal (Fusion's Press Pull): positive grows the body, negative cuts into it. */
+export interface PushPullFeature {
+  readonly id: string
+  readonly type: "pushpull"
+  /** A point on, or near, the face: the face nearest it is taken. */
+  readonly near: readonly [Dimension, Dimension, Dimension]
+  /** Only faces whose outward normal points this way (within 60 degrees) are considered. */
+  readonly normal?: readonly [Dimension, Dimension, Dimension]
+  readonly distance: Dimension
+  /** The body to search; by default the one with the face nearest `near`. */
+  readonly body?: string
+}
+/**
+ * Draft on one planar face of a body (Fusion's Draft): the face is tilted by `angle` degrees about its hinge, the line where it meets
+ * the neutral plane (`pull` · p = `neutral`). Above the neutral plane (along `pull`) a positive angle takes material away, below it adds,
+ * so the walls of a body lean towards the pull direction. Works on any body, not only on an extrusion.
+ */
+export interface DraftFeature {
+  readonly id: string
+  readonly type: "draft"
+  readonly near: readonly [Dimension, Dimension, Dimension]
+  readonly normal?: readonly [Dimension, Dimension, Dimension]
+  readonly angle: Dimension
+  /** Pull direction (default +Z). */
+  readonly pull?: readonly [Dimension, Dimension, Dimension]
+  /** Position of the neutral plane along the pull direction, mm from the origin (default 0). */
+  readonly neutral?: Dimension
+  readonly body?: string
+}
+/**
+ * A rigid joint between two bodies (Fusion's Joint, rigid): a face of `body` is brought flush against a face of `to.body`, the two face
+ * centres on top of each other, `offset` mm apart along the target face's normal, then turned `spin` degrees about that normal.
+ * `body` moves; `to.body` stays.
+ */
+export interface MateFeature {
+  readonly id: string
+  readonly type: "mate"
+  readonly body: string
+  readonly face: { readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension] }
+  readonly to: { readonly body: string; readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension] }
+  readonly offset?: Dimension
+  readonly spin?: Dimension
+}
+/**
+ * A work plane (Fusion's Construct): a plane other than XY, YZ and ZX for a sketch, a hole or a text to lie on. Name it by this
+ * feature's id in the `plane` field of the feature that uses it.
+ *
+ *   offset   `base` moved `distance` along its normal
+ *   angle    `base` turned `angle` degrees about a line of it: the u axis (`about: "u"`) or the v axis, through the point `at` along the other axis
+ *   points   through three points: u runs from the first to the second, the normal is u x (third - first)
+ *   face     on the planar face of a body nearest `near` (`normal` picks between faces, `body` limits the search), at the face's centre
+ *            and square to it; `offset` lifts it off the face. The plane follows the face when the history is rebuilt.
+ */
+export type PlaneDefinition =
+  | { readonly kind: "offset"; readonly base: PlaneRef; readonly distance: Dimension }
+  | { readonly kind: "angle"; readonly base: PlaneRef; readonly angle: Dimension; readonly about: "u" | "v"; readonly at?: Dimension }
+  | { readonly kind: "points"; readonly points: readonly [readonly [Dimension, Dimension, Dimension], readonly [Dimension, Dimension, Dimension], readonly [Dimension, Dimension, Dimension]] }
+  | { readonly kind: "face"; readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension]; readonly body?: string; readonly offset?: Dimension }
+export interface PlaneFeature { readonly id: string; readonly type: "plane"; readonly from: PlaneDefinition }
 /** The solid elements of the 3D catalogue a history can place, built by the same code that draws them in the editor. */
 export const PRIMITIVE_ELEMENTS = [
   "cube", "sphere", "ellipsoid", "cylinder", "cone", "prism", "pyramid", "hemisphere", "capsule", "torus", "gear", "extrusion", "revolution", "sweep", "loft",
@@ -272,7 +423,7 @@ export interface PrimitiveFeature {
   readonly targets?: ReadonlyArray<string>
 }
 
-export type Feature = SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature
+export type Feature = SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature | RibFeature | SheetFeature | ThreadFeature | TextFeature | PushPullFeature | DraftFeature | MateFeature | PlaneFeature
 
 export interface History {
   readonly parameters: ParameterTable
@@ -286,7 +437,9 @@ export interface Body { readonly id: string; readonly mesh: Mesh; readonly featu
 export interface RebuildResult {
   readonly bodies: ReadonlyArray<Body>
   readonly parameters: Readonly<Record<string, number>>
-  readonly sketches: Readonly<Record<string, { readonly plane: PlaneName; readonly offset: number; readonly solve: SolveResult }>>
+  readonly sketches: Readonly<Record<string, { readonly plane: PlaneRef; readonly offset: number; readonly frame: PlaneFrame; readonly solve: SolveResult }>>
+  /** The flat pattern of each sheet-metal feature: straight length, bends and the strip's length before bending. */
+  readonly flatPatterns: Readonly<Record<string, Developed>>
   readonly issues: ReadonlyArray<Issue>
 }
 
@@ -315,6 +468,28 @@ const insideRing = (p: Vec2, ring: ReadonlyArray<Vec2>): boolean => {
   return c
 }
 
+/**
+ * Whether a loop lies inside another: every one of its vertices does (up to a point on the border). Testing one point is not enough:
+ * two circles that overlap, the figure-eight of a boss, each have a point inside the other and neither contains the other.
+ */
+const ringInside = (inner: ReadonlyArray<Vec2>, outer: ReadonlyArray<Vec2>): boolean => {
+  let on = 0
+  for (const p of inner) {
+    if (insideRing(p, outer)) continue
+    // A vertex on the outer border counts as inside; one clearly outside decides.
+    let near = Infinity
+    for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+      const a = outer[j]!, b = outer[i]!
+      const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy
+      const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2))
+      near = Math.min(near, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)))
+    }
+    if (near > 1e-6) return false
+    on++
+  }
+  return on < inner.length
+}
+
 const prism = (ring: ReadonlyArray<Vec2>, from: number, to: number): Mesh =>
   meshOf({ _tag: "Extrude", profile: ring.map((p) => ({ x: p.x, y: p.y })), height: to - from, origin: { x: 0, y: 0, z: from } }, 0.01)
 
@@ -331,11 +506,11 @@ interface ProfileShape {
 const profileSolid = (loops: ReadonlyArray<Vec2[]>, from: number, to: number, shape: ProfileShape = {}): Mesh | undefined => {
   if (loops.length === 0) return undefined
   const rounded = shape.corner === undefined ? loops : loops.map((l) => treatCorners(l, shape.corner!.style, shape.corner!.size))
-  const depth = rounded.map((l, i) => rounded.filter((o, j) => j !== i && insideRing(l[0]!, o)).length)
+  const depth = rounded.map((l, i) => rounded.filter((o, j) => j !== i && ringInside(l, o)).length)
   const parent = (i: number): number | undefined => {
     let best: number | undefined
     rounded.forEach((o, j) => {
-      if (j === i || depth[j] !== depth[i]! - 1 || !insideRing(rounded[i]![0]!, o)) return
+      if (j === i || depth[j] !== depth[i]! - 1 || !ringInside(rounded[i]!, o)) return
       if (best === undefined || Math.abs(polygonArea(o)) < Math.abs(polygonArea(rounded[best]!))) best = j
     })
     return best
@@ -378,36 +553,6 @@ const scaleMesh = (mesh: Mesh, factor: V3, about: V3): Mesh => {
 /** Which world axis (0 = x, 1 = y, 2 = z) each local axis of a sketch plane lies along. */
 const PLANE_AXES: Readonly<Record<PlaneName, { readonly u: number; readonly v: number; readonly n: number }>> = {
   XY: { u: 0, v: 1, n: 2 }, YZ: { u: 1, v: 2, n: 0 }, ZX: { u: 2, v: 0, n: 1 }
-}
-
-/** Points per turn of a coil: a chord of 11 degrees keeps the wire's centre line within 0.5% of the true helix. */
-export const COIL_STEPS_PER_TURN = 32
-const COIL_MAX_TURNS = 60
-
-/**
- * The path and the first ring of a coiled wire. The ring lies in the plane square to the helix at its start (spanned by the radial
- * direction and the binormal), which is what the sweep expects: its normal is the start tangent.
- */
-export const coilGeometry = (c: { cx: number; cy: number; z0: number; radius: number; pitch: number; turns: number; wire: number; square: boolean; left: boolean }): { path: P3[]; ring: P3[]; ring2d: Vec2[]; normal: P3; centre: P3 } => {
-  const steps = Math.ceil(c.turns * COIL_STEPS_PER_TURN)
-  const sign = c.left ? -1 : 1
-  const path: P3[] = Array.from({ length: steps + 1 }, (_, k) => {
-    const turn = (c.turns * k) / steps
-    const angle = sign * 2 * Math.PI * turn
-    return { x: c.cx + c.radius * Math.cos(angle), y: c.cy + c.radius * Math.sin(angle), z: c.z0 + c.pitch * turn }
-  })
-  const a = path[0]!, b = path[1]!
-  const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
-  const tangent: P3 = { x: (b.x - a.x) / length, y: (b.y - a.y) / length, z: (b.z - a.z) / length }
-  const radial: P3 = { x: 1, y: 0, z: 0 }
-  // The tangent has no radial part at the start of the helix, so radial and tangent are square; the third axis completes the frame.
-  const binormal: P3 = { x: tangent.y * radial.z - tangent.z * radial.y, y: tangent.z * radial.x - tangent.x * radial.z, z: tangent.x * radial.y - tangent.y * radial.x }
-  const half = c.wire / 2
-  const corners: Vec2[] = c.square
-    ? [{ x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }, { x: -half, y: -half }]
-    : Array.from({ length: Math.max(16, Math.ceil(Math.PI / Math.acos(Math.max(0, 1 - 0.01 / half)))) }, (_, k) => k).map((k, _i, all) => ({ x: half * Math.cos((2 * Math.PI * k) / all.length), y: half * Math.sin((2 * Math.PI * k) / all.length) }))
-  const ring = corners.map((p) => ({ x: a.x + radial.x * p.x + binormal.x * p.y, y: a.y + radial.y * p.x + binormal.y * p.y, z: a.z + radial.z * p.x + binormal.z * p.y }))
-  return { path, ring, ring2d: corners, normal: tangent, centre: a }
 }
 
 /**
@@ -479,6 +624,107 @@ const shellRevolveProfile = (ring: ReadonlyArray<{ readonly a: number; readonly 
   return unique.map((p) => ({ x: p.x, y: open !== "none" && (open === "top" || open === "both") && Math.abs(p.y - top) < 1e-6 ? p.y + t + 1 : open !== "none" && (open === "bottom" || open === "both") && Math.abs(p.y - bottom) < 1e-6 ? p.y - t - 1 : p.y }))
 }
 
+const vsub = (a: V3, b: V3): V3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z })
+const vdot = (a: V3, b: V3): number => a.x * b.x + a.y * b.y + a.z * b.z
+const vcross = (a: V3, b: V3): V3 => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x })
+const vadd = (a: V3, b: V3): V3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z })
+const vmul = (a: V3, s: number): V3 => ({ x: a.x * s, y: a.y * s, z: a.z * s })
+const vunit = (a: V3): V3 => vmul(a, 1 / Math.hypot(a.x, a.y, a.z))
+const meshExtent = (mesh: Mesh): number => { const b = meshBounds(mesh); return Math.max(b.maxX - b.minX, b.maxY - b.minY, b.maxZ - b.minZ, 1e-6) }
+
+/** The planar face nearest `near` over several bodies (each searched; the face with the nearest triangle wins). */
+const pickFace = (candidates: ReadonlyArray<Body>, near: V3, normal: V3 | undefined): { readonly body: Body; readonly face: PlanarFace } | { readonly error: string } => {
+  let chosen: { body: Body; face: PlanarFace } | undefined
+  let reason = "No face found"
+  for (const body of candidates) {
+    const found = findPlanarFace(body.mesh, { near, ...(normal !== undefined ? { normal } : {}) })
+    if ("error" in found) { reason = found.error; continue }
+    if (chosen === undefined || found.face.distance < chosen.face.distance) chosen = { body, face: found.face }
+  }
+  return chosen ?? { error: reason }
+}
+
+/** A box of side `2 half` with the frame (u, v, n) at `origin`, between `lo` and `hi` along n: the half-space tool of a draft. */
+const slabTool = (u: V3, v: V3, n: V3, origin: V3, half: number, lo: number, hi: number): Mesh =>
+  place(prism([{ x: -half, y: -half }, { x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }], lo, hi), u, v, n, origin)
+
+/**
+ * The material a draft adds and removes. The drafted plane is the face's plane turned by `angle` about the hinge (face plane meeting
+ * the neutral plane `w . p = neutral`). Adds: the face outline pushed out, kept inside the new plane. Removes: pushed in, kept outside it.
+ * Returns a reason when the draft cannot be made.
+ */
+const draftTools = (face: PlanarFace, w: V3, neutral: number, angle: number, extent: number): { readonly add?: Mesh; readonly remove?: Mesh } | string => {
+  const n = face.normal
+  const wn = vdot(w, n)
+  const q0 = vsub(w, vmul(n, wn))
+  const ql = Math.hypot(q0.x, q0.y, q0.z)
+  if (ql < 1e-6) return "A face square to the pull direction cannot be drafted"
+  if (Math.abs(angle) < 1e-12) return {}
+  const q = vmul(q0, 1 / ql)
+  // The hinge: the point of the face plane at the neutral height, on the line through the face origin along its steepest direction.
+  const t = (neutral - vdot(w, face.origin)) / vdot(w, q)
+  const hinge = vadd(face.origin, vmul(q, t))
+  const e = vunit(vcross(n, w))
+  const rotate = (v: V3, theta: number): V3 => vadd(vadd(vmul(v, Math.cos(theta)), vmul(vcross(e, v), Math.sin(theta))), vmul(e, vdot(e, v) * (1 - Math.cos(theta))))
+  // Positive angle: higher up the face (along the pull direction) the new plane lies inside the body.
+  const displacement = (nn: V3, p: V3): number => -vdot(nn, vsub(p, hinge)) / vdot(nn, n)
+  const lean = displacement(rotate(n, Math.abs(angle)), vadd(hinge, q)) < 0 ? 1 : -1
+  const tilted = rotate(n, lean * angle)
+  const tv = vunit(vcross(tilted, Math.abs(tilted.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }))
+  const tu = vcross(tv, tilted)
+  const at = (p: Vec2): V3 => vadd(face.origin, vadd(vmul(face.u, p.x), vmul(face.v, p.y)))
+  let sMax = 0, sMin = 0
+  for (const loop of face.loops) for (const p of loop) { const s = displacement(tilted, at(p)); sMax = Math.max(sMax, s); sMin = Math.min(sMin, s) }
+  if (Math.max(sMax, -sMin) > 2 * extent) return "The draft is too large for this body (the face tilts away by more than twice the body's size)"
+  const half = 4 * extent + 4 * Math.max(sMax, -sMin)
+  const margin = 0.01
+  const out: { add?: Mesh; remove?: Mesh } = {}
+  if (sMax > 1e-9) {
+    const pushed = profileSolid(face.loops, -margin, sMax + margin)
+    if (pushed !== undefined) {
+      const inside = slabTool(tu, tv, tilted, hinge, half, -half, 0)
+      const part = booleanMesh(place(pushed, face.u, face.v, n, face.origin), inside, "intersect")
+      if (part.indices.length > 0) out.add = part
+    }
+  }
+  if (sMin < -1e-9) {
+    const pushed = profileSolid(face.loops, sMin - margin, margin)
+    if (pushed !== undefined) {
+      const outside = slabTool(tu, tv, tilted, hinge, half, 0, half)
+      const part = booleanMesh(place(pushed, face.u, face.v, n, face.origin), outside, "intersect")
+      if (part.indices.length > 0) out.remove = part
+    }
+  }
+  return out
+}
+
+/** The mesh moved so that `mine` lies flush against `theirs` (normals opposed, centres together, `offset` apart), then spun about their normal. */
+const mateMesh = (mesh: Mesh, mine: PlanarFace, theirs: PlanarFace, offset: number, spin: number): Mesh => {
+  const target = vmul(theirs.normal, -1)
+  const d = Math.max(-1, Math.min(1, vdot(mine.normal, target)))
+  let turned = mesh
+  if (d < 1 - 1e-12) {
+    let axis = vcross(mine.normal, target)
+    if (Math.hypot(axis.x, axis.y, axis.z) < 1e-9) axis = vcross(mine.normal, Math.abs(mine.normal.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 })
+    turned = rotateMesh(mesh, vunit(axis), Math.acos(d), mine.centroid)
+  }
+  const goal = vadd(theirs.centroid, vmul(theirs.normal, offset))
+  const moved = translateMesh(turned, goal.x - mine.centroid.x, goal.y - mine.centroid.y, goal.z - mine.centroid.z)
+  return Math.abs(spin) < 1e-12 ? moved : rotateMesh(moved, theirs.normal, spin, goal)
+}
+
+/** The corners of a sketched chain: its points where the direction turns by more than a degree (the points of an arc's chords drop out only when straight). */
+const cornersOf = (line: ReadonlyArray<Vec2>): Vec2[] => {
+  const pts = line.filter((p, i) => i === 0 || Math.hypot(p.x - line[i - 1]!.x, p.y - line[i - 1]!.y) > 1e-9)
+  return pts.filter((p, i) => {
+    if (i === 0 || i === pts.length - 1) return true
+    const a = pts[i - 1]!, b = pts[i + 1]!
+    const cross = (p.x - a.x) * (b.y - p.y) - (p.y - a.y) * (b.x - p.x)
+    const dot = (p.x - a.x) * (b.x - p.x) + (p.y - a.y) * (b.y - p.y)
+    return Math.abs(Math.atan2(cross, dot)) > (Math.PI / 180)
+  })
+}
+
 /** Replays the history from the top. Never throws: what cannot be built is in `issues`. */
 export const rebuild = (history: History): RebuildResult => {
   const issues: Issue[] = []
@@ -490,24 +736,29 @@ export const rebuild = (history: History): RebuildResult => {
       return undefined
     }
   }
-  const sketches: Record<string, { plane: PlaneName; offset: number; solve: SolveResult }> = {}
+  const sketches: Record<string, { plane: PlaneRef; offset: number; frame: PlaneFrame; solve: SolveResult }> = {}
+  /** Work planes made by `plane` features, with their offset already applied. */
+  const planes = new Map<string, PlaneFrame>()
+  const frameFor = (ref: string, offset: number): PlaneFrame | undefined => {
+    const base: PlaneFrame | undefined = Object.hasOwn(FRAMES, ref) ? { ...FRAMES[ref as PlaneName], origin: { x: 0, y: 0, z: 0 } } : planes.get(ref)
+    if (base === undefined) return undefined
+    return offset === 0 ? base : { ...base, origin: { x: base.origin.x + base.n.x * offset, y: base.origin.y + base.n.y * offset, z: base.origin.z + base.n.z * offset } }
+  }
   const bodies: Body[] = []
+  const flatPatterns: Record<string, Developed> = {}
   const tools = new Map<string, { readonly meshes: ReadonlyArray<Mesh>; readonly operation: Operation; readonly targets?: ReadonlyArray<string> }>()
   /** What a shell needs from an extrusion: its profile after the corner treatment, its depths and its plane. */
-  const extrusions = new Map<string, { readonly loops: ReadonlyArray<Vec2[]>; readonly from: number; readonly to: number; readonly plane: PlaneName; readonly offset: number; readonly tapered: boolean }>()
+  const extrusions = new Map<string, { readonly loops: ReadonlyArray<Vec2[]>; readonly from: number; readonly to: number; readonly frame: PlaneFrame; readonly tapered: boolean }>()
   /** Full revolutions, for a shell: the profile as (axial, radial) points and how to put a mesh built in the revolve's local frame in the world. */
   const revolutions = new Map<string, { readonly ring: ReadonlyArray<{ readonly a: number; readonly r: number }>; readonly full: boolean; readonly put: (mesh: Mesh) => Mesh }>()
   /** Sweeps, for a shell: the profile loops in their plane, the path in the world and the plane's data. */
-  const sweeps = new Map<string, { readonly sketch: { plane: PlaneName; offset: number }; readonly loops: ReadonlyArray<Vec2[]>; readonly path: ReadonlyArray<V3>; readonly closed: boolean }>()
-  const usable = (id: string): { plane: PlaneName; offset: number; solve: SolveResult } | undefined => {
+  const sweeps = new Map<string, { readonly sketch: { frame: PlaneFrame }; readonly loops: ReadonlyArray<Vec2[]>; readonly path: ReadonlyArray<V3>; readonly closed: boolean }>()
+  const usable = (id: string): { plane: PlaneRef; offset: number; frame: PlaneFrame; solve: SolveResult } | undefined => {
     const sk = sketches[id]
     return sk === undefined || sk.solve.status === "conflicting" || sk.solve.status === "failed" ? undefined : sk
   }
   /** A point of a sketch's plane in the world. */
-  const worldOf = (sk: { plane: PlaneName; offset: number }, p: Vec2): V3 => {
-    const fr = FRAMES[sk.plane]
-    return ptOf(fr, { x: fr.n.x * sk.offset, y: fr.n.y * sk.offset, z: fr.n.z * sk.offset }, { x: p.x, y: p.y, z: 0 })
-  }
+  const worldOf = (sk: { frame: PlaneFrame }, p: Vec2): V3 => ptOf(sk.frame, sk.frame.origin, { x: p.x, y: p.y, z: 0 })
 
   const apply = (feature: string, tool: Mesh, operation: Operation, targets: ReadonlyArray<string> | undefined, label: string): void => {
     if (operation === "new") { bodies.push({ id: label, mesh: tool, feature }); return }
@@ -524,9 +775,9 @@ export const rebuild = (history: History): RebuildResult => {
   }
 
   /** The solid swept from the loops of a profile sketch along a world path: loops inside loops are holes. */
-  const sweepLoops = (sk: { plane: PlaneName; offset: number }, loops: ReadonlyArray<Vec2[]>, path: ReadonlyArray<V3>, closed: boolean): Mesh | undefined => {
-    const fr = FRAMES[sk.plane]
-    const nesting = loops.map((l, i) => loops.filter((o, j) => j !== i && insideRing(l[0]!, o)).length)
+  const sweepLoops = (sk: { frame: PlaneFrame }, loops: ReadonlyArray<Vec2[]>, path: ReadonlyArray<V3>, closed: boolean): Mesh | undefined => {
+    const fr = sk.frame
+    const nesting = loops.map((l, i) => loops.filter((o, j) => j !== i && ringInside(l, o)).length)
     const solids: Mesh[] = []
     loops.forEach((loop, i) => {
       if (nesting[i]! % 2 !== 0) return
@@ -535,7 +786,7 @@ export const rebuild = (history: History): RebuildResult => {
       const centre = { x: ring.reduce((a, p) => a + p.x, 0) / ring.length, y: ring.reduce((a, p) => a + p.y, 0) / ring.length, z: ring.reduce((a, p) => a + p.z, 0) / ring.length }
       let solid = sweepSolid({ ring, ring2d: loop, normal: fr.n, centre, path, closed })
       loops.forEach((hole, j) => {
-        if (nesting[j] !== nesting[i]! + 1 || !insideRing(hole[0]!, loop)) return
+        if (nesting[j] !== nesting[i]! + 1 || !ringInside(hole, loop)) return
         solid = booleanMesh(solid, sweepSolid({ ring: world(hole), ring2d: hole, normal: fr.n, centre, path, closed, extend: true }), "subtract")
       })
       solids.push(solid)
@@ -584,7 +835,9 @@ export const rebuild = (history: History): RebuildResult => {
           }
           if (!ok) break
           const solve = solveSketch({ entities: expanded.entities, constraints })
-          sketches[f.id] = { plane: f.plane, offset, solve }
+          const planeFrame = frameFor(f.plane, offset)
+          if (planeFrame === undefined) { issues.push({ feature: f.id, severity: "error", message: `Plane '${f.plane}' is not XY, YZ, ZX or an earlier plane feature` }); break }
+          sketches[f.id] = { plane: f.plane, offset, frame: planeFrame, solve }
           if (solve.status === "conflicting" || solve.status === "failed") {
             issues.push({ feature: f.id, severity: "error", message: solve.message ?? `The sketch could not be solved (${solve.status})` })
           } else if (solve.status === "over-constrained") issues.push({ feature: f.id, severity: "warning", message: `The sketch has ${solve.redundant} redundant constraint(s)` })
@@ -622,10 +875,10 @@ export const rebuild = (history: History): RebuildResult => {
           const rounded = shape.corner === undefined ? loops : loops.map((l) => treatCorners(l, shape.corner!.style, shape.corner!.size))
           const { corner: _corner, ...rest } = shape
           const local = profileSolid(rounded, from, from + depth, rest)
-          if (local !== undefined) extrusions.set(f.id, { loops: rounded, from, to: from + depth, plane: sk.plane, offset: sk.offset, tapered: shape.taper !== undefined })
+          if (local !== undefined) extrusions.set(f.id, { loops: rounded, from, to: from + depth, frame: sk.frame, tapered: shape.taper !== undefined })
           if (local === undefined) { issues.push({ feature: f.id, severity: "error", message: "The sketch has no closed profile to extrude" }); break }
-          const frame = FRAMES[sk.plane]
-          const tool = place(local, frame.u, frame.v, frame.n, { x: frame.n.x * sk.offset, y: frame.n.y * sk.offset, z: frame.n.z * sk.offset })
+          const frame = sk.frame
+          const tool = place(local, frame.u, frame.v, frame.n, frame.origin)
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break
@@ -660,11 +913,11 @@ export const rebuild = (history: History): RebuildResult => {
           const ring = loops[0]!.map((p, i) => ({ a: (p.x - a0.x) * dirA.x + (p.y - a0.y) * dirA.y, r: Math.max(0, radial[i]!) }))
           const local = meshOf({ _tag: "Revolve", profile: ring.map((p) => ({ x: p.r, y: p.a })), angle: (degrees * Math.PI) / 180 }, 0.01)
           // Local x is the radial direction (N x axis), y the plane normal, z the axis: x cross y = z.
-          const frame = FRAMES[sk.plane]
+          const frame = sk.frame
           const ax = ptOf(frame, { x: 0, y: 0, z: 0 }, { x: dirA.x, y: dirA.y, z: 0 })
           const nrm = frame.n
           const ex = { x: nrm.y * ax.z - nrm.z * ax.y, y: nrm.z * ax.x - nrm.x * ax.z, z: nrm.x * ax.y - nrm.y * ax.x }
-          const origin = ptOf(frame, { x: nrm.x * sk.offset, y: nrm.y * sk.offset, z: nrm.z * sk.offset }, { x: a0.x, y: a0.y, z: 0 })
+          const origin = ptOf(frame, frame.origin, { x: a0.x, y: a0.y, z: 0 })
           const fixed = place(local, ex, nrm, ax, origin)
           revolutions.set(f.id, { ring, full: degrees >= 360 - 1e-9, put: (mesh) => place(mesh, ex, nrm, ax, origin) })
           tools.set(f.id, { meshes: [fixed], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
@@ -676,8 +929,14 @@ export const rebuild = (history: History): RebuildResult => {
           const x = dim(f.at[0], f.id), y = dim(f.at[1], f.id), d = dim(f.diameter, f.id), depth = dim(f.depth, f.id)
           if (offset === undefined || x === undefined || y === undefined || d === undefined || depth === undefined) break
           if (!(d > 0 && depth > 0)) { issues.push({ feature: f.id, severity: "error", message: "A hole needs a positive diameter and depth" }); break }
-          const frame = FRAMES[f.plane]
-          const offsetVec = { x: frame.n.x * offset, y: frame.n.y * offset, z: frame.n.z * offset }
+          if (f.thread !== undefined) {
+            const metric = /^M(\d+(?:\.\d+)?)(?:x[\d.]+)?$/.exec(f.thread.designation)
+            const known = metric === null ? undefined : metricThread(`M${metric[1]}`)
+            if (known !== undefined && Math.abs(known.tapDrill - d) > 0.15) issues.push({ feature: f.id, severity: "warning", message: `The tap drill of ${known.name} is ${known.tapDrill} mm, this hole is ${d} mm` })
+          }
+          const frame = frameFor(f.plane, offset)
+          if (frame === undefined) { issues.push({ feature: f.id, severity: "error", message: `Plane '${f.plane}' is not XY, YZ, ZX or an earlier plane feature` }); break }
+          const offsetVec = frame.origin
           let tool: Mesh
           if (f.kind === undefined || f.kind === "simple") {
             const n = Math.max(16, Math.ceil(Math.PI / Math.acos(Math.max(0, 1 - 0.01 / (d / 2)))))
@@ -762,21 +1021,21 @@ export const rebuild = (history: History): RebuildResult => {
             const z0 = extrusion.from + (open === "bottom" || open === "both" ? -1 : t)
             const z1 = extrusion.to + (open === "top" || open === "both" ? 1 : -t)
             if (!(z1 - z0 > 1e-6)) { issues.push({ feature: f.id, severity: "error", message: `A ${t} mm shell leaves no cavity in a ${(extrusion.to - extrusion.from).toFixed(3)} mm deep part` }); break }
-            const depthOf = extrusion.loops.map((l, i) => extrusion.loops.filter((o, j) => j !== i && insideRing(l[0]!, o)).length)
+            const depthOf = extrusion.loops.map((l, i) => extrusion.loops.filter((o, j) => j !== i && ringInside(l, o)).length)
             const cavities: Mesh[] = []
             extrusion.loops.forEach((loop, i) => {
               if (depthOf[i]! % 2 !== 0) return
               let cavity = prism(moveRing(loop, t), z0, z1)
               extrusion.loops.forEach((hole, j) => {
-                if (depthOf[j] !== depthOf[i]! + 1 || !insideRing(hole[0]!, loop)) return
+                if (depthOf[j] !== depthOf[i]! + 1 || !ringInside(hole, loop)) return
                 cavity = booleanMesh(cavity, prism(moveRing(hole, -t), z0 - 1, z1 + 1), "subtract")
               })
               cavities.push(cavity)
             })
             if (cavities.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is nothing to hollow out" }); break }
-            const fr = FRAMES[extrusion.plane]
+            const fr = extrusion.frame
             const local = cavities.slice(1).reduce((acc, m) => booleanMesh(acc, m, "union"), cavities[0]!)
-            tool = place(local, fr.u, fr.v, fr.n, { x: fr.n.x * extrusion.offset, y: fr.n.y * extrusion.offset, z: fr.n.z * extrusion.offset })
+            tool = place(local, fr.u, fr.v, fr.n, fr.origin)
           } else if (revolution !== undefined) {
             if (!revolution.full) { issues.push({ feature: f.id, severity: "error", message: "Only a full revolution (360 degrees) can be shelled" }); break }
             const profile = shellRevolveProfile(revolution.ring, t, open)
@@ -784,7 +1043,7 @@ export const rebuild = (history: History): RebuildResult => {
           } else if (swept !== undefined) {
             // The cavity is the same sweep of the profile moved inwards by the wall; a closed hollow stops a wall short of each end.
             const inner = swept.loops.map((l, i) => {
-              const nesting = swept.loops.filter((o, j) => j !== i && insideRing(l[0]!, o)).length
+              const nesting = swept.loops.filter((o, j) => j !== i && ringInside(l, o)).length
               return moveRing(l, nesting % 2 === 0 ? t : -t)
             })
             const startShift = open === "bottom" || open === "both" ? -1 : t, endShift = open === "top" || open === "both" ? -1 : t
@@ -814,7 +1073,7 @@ export const rebuild = (history: History): RebuildResult => {
           }
           const tool = sweepLoops(profileSketch, profile.loops, path, closedPath)
           if (tool === undefined) { issues.push({ feature: f.id, severity: "error", message: "The profile has no solid loop to sweep" }); break }
-          sweeps.set(f.id, { sketch: { plane: profileSketch.plane, offset: profileSketch.offset }, loops: profile.loops, path, closed: closedPath })
+          sweeps.set(f.id, { sketch: { frame: profileSketch.frame }, loops: profile.loops, path, closed: closedPath })
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break
@@ -882,7 +1141,7 @@ export const rebuild = (history: History): RebuildResult => {
           if (!(radius! > wire! / 2 + 1e-9)) { issues.push({ feature: f.id, severity: "error", message: `The coil radius (${radius}) must exceed the wire radius (${wire! / 2}) or the wire crosses the axis` }); break }
           if (!(pitch! > wire! + 1e-9)) { issues.push({ feature: f.id, severity: "error", message: `The pitch (${pitch} mm) must exceed the wire diameter (${wire} mm): neighbouring turns would overlap` }); break }
           const g = coilGeometry({ cx: cx!, cy: cy!, z0: z0!, radius: radius!, pitch: pitch!, turns: turns!, wire: wire!, square: f.section === "square", left: f.handedness === "left" })
-          const tool = sweepSolid({ ring: g.ring, ring2d: g.ring2d, normal: g.normal, centre: g.centre, path: g.path, closed: false })
+          const tool = sweepSolid({ ring: g.ring, ring2d: g.ring2d, normal: g.normal, centre: g.centre, path: g.path, closed: false, axis: { point: { x: cx!, y: cy!, z: z0! }, direction: { x: 0, y: 0, z: 1 } } })
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break
@@ -956,6 +1215,190 @@ export const rebuild = (history: History): RebuildResult => {
           if (f.keepTools !== true) for (const tool of toolBodies) bodies.splice(bodies.indexOf(tool!), 1)
           break
         }
+        case "rib": {
+          const sk = usable(f.sketch)
+          if (sk === undefined) { issues.push({ feature: f.id, severity: "error", message: `Sketch '${f.sketch}' is not available` }); break }
+          const thickness = dim(f.thickness, f.id), depth = dim(f.depth, f.id)
+          if (thickness === undefined || depth === undefined) break
+          if (!(thickness > 0 && depth > 0)) { issues.push({ feature: f.id, severity: "error", message: `A rib needs a positive thickness and depth (they are ${thickness} and ${depth})` }); break }
+          const { loops, open } = sketchProfiles(sk.solve.sketch)
+          if (open.length === 0) { issues.push({ feature: f.id, severity: "error", message: "A rib needs an open line in the sketch (its centre line); the sketch has none" }); break }
+          if (loops.length > 0) issues.push({ feature: f.id, severity: "warning", message: `${loops.length} closed loop(s) in the sketch are ignored (a rib is drawn with open lines)` })
+          const dir = f.direction ?? "up"
+          const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
+          const frame = sk.frame
+          const origin = frame.origin
+          const webs = open.map((line) => place(prism(thickenPath(line, -thickness / 2, thickness / 2), from, from + depth), frame.u, frame.v, frame.n, origin))
+          const tool = webs.slice(1).reduce((acc, m) => booleanMesh(acc, m, "union"), webs[0]!)
+          const operation = f.operation ?? "union"
+          tools.set(f.id, { meshes: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, operation, f.targets, f.id)
+          break
+        }
+        case "sheet": {
+          const sk = usable(f.sketch)
+          if (sk === undefined) { issues.push({ feature: f.id, severity: "error", message: `Sketch '${f.sketch}' is not available` }); break }
+          const thickness = dim(f.thickness, f.id), width = dim(f.width, f.id)
+          const radius = f.bendRadius === undefined ? 0 : dim(f.bendRadius, f.id)
+          if (thickness === undefined || width === undefined || radius === undefined) break
+          if (!(thickness > 0 && width > 0)) { issues.push({ feature: f.id, severity: "error", message: `A sheet needs a positive thickness and width (they are ${thickness} and ${width})` }); break }
+          const { open } = sketchProfiles(sk.solve.sketch)
+          if (open.length !== 1) { issues.push({ feature: f.id, severity: "error", message: `A sheet profile is one open line (lines and arcs end to end); the sketch has ${open.length}` }); break }
+          const side = f.side ?? "centre"
+          let line: Vec2[] = open[0]!
+          if (f.hems !== undefined && f.hems.length > 0) {
+            const specs = f.hems.map((h) => ({ end: h.end, length: dim(h.length, f.id), gap: h.gap === undefined ? 0 : dim(h.gap, f.id), fold: h.fold ?? "left" }))
+            if (specs.some((h) => h.length === undefined || h.gap === undefined)) break
+            if (new Set(specs.map((h) => h.end)).size !== specs.length) { issues.push({ feature: f.id, severity: "error", message: "A sheet has at most one hem at each end" }); break }
+            line = withHems(cornersOf(line), thickness, specs as never)
+          }
+          const outline = sheetOutline(line, thickness, side, radius)
+          const dir = f.direction ?? "up"
+          const from = dir === "up" ? 0 : dir === "down" ? -width : -width / 2
+          const frame = sk.frame
+          const tool = place(prism(outline, from, from + width), frame.u, frame.v, frame.n, frame.origin)
+          // The flat pattern is read off the drawn line with its arcs replaced by their corners: only the corners count.
+          flatPatterns[f.id] = developedLength(cornersOf(line), thickness, radius, side)
+          tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "thread": {
+          const diameter = dim(f.diameter, f.id), pitch = dim(f.pitch, f.id), length = dim(f.length, f.id)
+          const cx = f.at === undefined ? 0 : dim(f.at[0], f.id), cy = f.at === undefined ? 0 : dim(f.at[1], f.id)
+          const z0 = f.offset === undefined ? 0 : dim(f.offset, f.id)
+          if ([diameter, pitch, length, cx, cy, z0].some((v) => v === undefined)) break
+          const spec = { diameter: diameter!, pitch: pitch!, length: length!, internal: f.kind === "internal", left: f.handedness === "left", cx: cx!, cy: cy!, z0: z0! }
+          const problem = threadProblem(spec)
+          if (problem !== undefined) { issues.push({ feature: f.id, severity: "error", message: problem }); break }
+          const tool = threadTool(spec)
+          const operation = f.operation ?? (f.kind === "internal" ? "subtract" : "new")
+          tools.set(f.id, { meshes: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, operation, f.targets, f.id)
+          break
+        }
+        case "text": {
+          const height = dim(f.height, f.id), depth = dim(f.depth, f.id)
+          const stroke = f.strokeWidth === undefined ? undefined : dim(f.strokeWidth, f.id)
+          const offset = f.offset === undefined ? 0 : dim(f.offset, f.id)
+          const at = f.at === undefined ? [0, 0] : [dim(f.at[0], f.id), dim(f.at[1], f.id)]
+          const spacing = f.spacing === undefined ? 1 : dim(f.spacing, f.id)
+          if ([height, depth, offset, spacing, ...at].some((v) => v === undefined) || (f.strokeWidth !== undefined && stroke === undefined)) break
+          if (!(height! > 0 && depth! > 0)) { issues.push({ feature: f.id, severity: "error", message: `Text needs a positive height and depth (they are ${height} and ${depth})` }); break }
+          if (f.text.trim().length === 0) { issues.push({ feature: f.id, severity: "error", message: "The text is empty" }); break }
+          if (f.text.length > 200) { issues.push({ feature: f.id, severity: "error", message: "A text feature takes at most 200 characters" }); break }
+          const built = textSolid({ text: f.text, height: height!, strokeWidth: stroke ?? height! / 9, depth: depth!, spacing: spacing!, align: f.align ?? "left" })
+          if (built.unsupported.length > 0) issues.push({ feature: f.id, severity: "warning", message: `No glyph for ${built.unsupported.map((c) => `'${c}'`).join(", ")}: not drawn` })
+          if (built.mesh === undefined) { issues.push({ feature: f.id, severity: "error", message: "Nothing of the text could be drawn" }); break }
+          const dir = f.direction ?? "up"
+          const local = translateMesh(built.mesh, at[0]!, at[1]!, dir === "up" ? 0 : dir === "down" ? -depth! : -depth! / 2)
+          const frame = frameFor(f.plane, offset!)
+          if (frame === undefined) { issues.push({ feature: f.id, severity: "error", message: `Plane '${f.plane}' is not XY, YZ, ZX or an earlier plane feature` }); break }
+          const tool = place(local, frame.u, frame.v, frame.n, frame.origin)
+          tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "plane": {
+          const d = f.from
+          let frame: PlaneFrame | undefined
+          if (d.kind === "offset") {
+            const distance = dim(d.distance, f.id)
+            if (distance === undefined) break
+            frame = frameFor(d.base, distance)
+            if (frame === undefined) { issues.push({ feature: f.id, severity: "error", message: `Base plane '${d.base}' is not XY, YZ, ZX or an earlier plane feature` }); break }
+          } else if (d.kind === "angle") {
+            const angle = dim(d.angle, f.id), at = d.at === undefined ? 0 : dim(d.at, f.id)
+            const base = frameFor(d.base, 0)
+            if (angle === undefined || at === undefined) break
+            if (base === undefined) { issues.push({ feature: f.id, severity: "error", message: `Base plane '${d.base}' is not XY, YZ, ZX or an earlier plane feature` }); break }
+            const axis = d.about === "u" ? base.u : base.v
+            const across = d.about === "u" ? base.v : base.u
+            const turn = (vec: V3): V3 => {
+              const c = Math.cos((angle * Math.PI) / 180), sn = Math.sin((angle * Math.PI) / 180)
+              return vadd(vadd(vmul(vec, c), vmul(vcross(axis, vec), sn)), vmul(axis, vdot(axis, vec) * (1 - c)))
+            }
+            const origin = vadd(base.origin, vmul(across, at))
+            frame = d.about === "u" ? { u: base.u, v: turn(base.v), n: turn(base.n), origin } : { u: turn(base.u), v: base.v, n: turn(base.n), origin }
+          } else if (d.kind === "points") {
+            const c = d.points.map((p) => p.map((x) => dim(x, f.id)))
+            if (c.some((p) => p.some((x) => x === undefined))) break
+            const [p1, p2, p3] = c.map((p) => ({ x: p[0]!, y: p[1]!, z: p[2]! })) as [V3, V3, V3]
+            const e1 = vsub(p2, p1), nn = vcross(e1, vsub(p3, p1))
+            if (Math.hypot(e1.x, e1.y, e1.z) < 1e-9 || Math.hypot(nn.x, nn.y, nn.z) < 1e-9) { issues.push({ feature: f.id, severity: "error", message: "The three points of a plane must not be on one line" }); break }
+            const u = vunit(e1), n = vunit(nn)
+            frame = { u, v: vcross(n, u), n, origin: p1 }
+          } else {
+            const near = d.near.map((x) => dim(x, f.id)), wanted = d.normal?.map((x) => dim(x, f.id))
+            const lift = d.offset === undefined ? 0 : dim(d.offset, f.id)
+            if (near.some((x) => x === undefined) || wanted?.some((x) => x === undefined) || lift === undefined) break
+            const candidates = bodies.filter((b) => d.body === undefined || b.id === d.body)
+            if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: d.body === undefined ? "There is no body to take a face from" : `Body '${d.body}' does not exist at this point of the history` }); break }
+            const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! })
+            if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
+            const n = pick.face.normal
+            // u is the world X (or Y when the face is square to X) projected on the face, so a top face is read like XY.
+            const hint = Math.abs(n.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+            const u = vunit(vsub(hint, vmul(n, vdot(hint, n))))
+            frame = { u, v: vcross(n, u), n, origin: vadd(pick.face.centroid, vmul(n, lift)) }
+          }
+          if (frame !== undefined) planes.set(f.id, frame)
+          break
+        }
+        case "draft": {
+          const near = f.near.map((d) => dim(d, f.id)), wanted = f.normal?.map((d) => dim(d, f.id))
+          const pullRaw = (f.pull ?? [0, 0, 1]).map((d) => dim(d, f.id))
+          const angle = dim(f.angle, f.id), neutral = f.neutral === undefined ? 0 : dim(f.neutral, f.id)
+          if (near.some((v) => v === undefined) || wanted?.some((v) => v === undefined) || pullRaw.some((v) => v === undefined) || angle === undefined || neutral === undefined) break
+          if (!(Math.abs(angle) < 45)) { issues.push({ feature: f.id, severity: "error", message: `The draft angle must be between -45 and 45 degrees (it is ${angle})` }); break }
+          const pl = Math.hypot(pullRaw[0]!, pullRaw[1]!, pullRaw[2]!)
+          if (!(pl > 0)) { issues.push({ feature: f.id, severity: "error", message: "The pull direction is a zero vector" }); break }
+          const w: V3 = { x: pullRaw[0]! / pl, y: pullRaw[1]! / pl, z: pullRaw[2]! / pl }
+          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to draft" : `Body '${f.body}' does not exist at this point of the history` }); break }
+          const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! })
+          if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
+          const { face, body } = pick
+          const parts = draftTools(face, w, neutral, (angle * Math.PI) / 180, meshExtent(body.mesh))
+          if (typeof parts === "string") { issues.push({ feature: f.id, severity: "error", message: parts }); break }
+          if (parts.add !== undefined) apply(f.id, parts.add, "union", [body.id], f.id)
+          if (parts.remove !== undefined) apply(f.id, parts.remove, "subtract", [body.id], f.id)
+          if (parts.add === undefined && parts.remove === undefined) issues.push({ feature: f.id, severity: "warning", message: "The draft changes nothing (the neutral plane lies beyond the face, or the angle is 0)" })
+          break
+        }
+        case "mate": {
+          const a = f.face.near.map((d) => dim(d, f.id)), an = f.face.normal?.map((d) => dim(d, f.id))
+          const b = f.to.near.map((d) => dim(d, f.id)), bn = f.to.normal?.map((d) => dim(d, f.id))
+          const offset = f.offset === undefined ? 0 : dim(f.offset, f.id), spin = f.spin === undefined ? 0 : dim(f.spin, f.id)
+          if ([...a, ...b, ...(an ?? []), ...(bn ?? [])].some((v) => v === undefined) || offset === undefined || spin === undefined) break
+          const moving = bodies.find((x) => x.id === f.body), fixed = bodies.find((x) => x.id === f.to.body)
+          if (moving === undefined || fixed === undefined) { issues.push({ feature: f.id, severity: "error", message: `Body '${moving === undefined ? f.body : f.to.body}' does not exist at this point of the history` }); break }
+          if (moving === fixed) { issues.push({ feature: f.id, severity: "error", message: "A body cannot be mated to itself" }); break }
+          const v3 = (c: ReadonlyArray<number | undefined>): V3 => ({ x: c[0]!, y: c[1]!, z: c[2]! })
+          const first = pickFace([moving], v3(a), an === undefined ? undefined : v3(an)), second = pickFace([fixed], v3(b), bn === undefined ? undefined : v3(bn))
+          if ("error" in first) { issues.push({ feature: f.id, severity: "error", message: `Face of '${f.body}': ${first.error}` }); break }
+          if ("error" in second) { issues.push({ feature: f.id, severity: "error", message: `Face of '${f.to.body}': ${second.error}` }); break }
+          const mesh = mateMesh(moving.mesh, first.face, second.face, offset, (spin * Math.PI) / 180)
+          bodies[bodies.indexOf(moving)] = { ...moving, mesh }
+          break
+        }
+        case "pushpull": {
+          const near = f.near.map((d) => dim(d, f.id)), wantedNormal = f.normal?.map((d) => dim(d, f.id))
+          const distance = dim(f.distance, f.id)
+          if (near.some((v) => v === undefined) || wantedNormal?.some((v) => v === undefined) || distance === undefined) break
+          if (distance === 0) { issues.push({ feature: f.id, severity: "warning", message: "A push/pull of 0 changes nothing" }); break }
+          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to push or pull" : `Body '${f.body}' does not exist at this point of the history` }); break }
+          const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wantedNormal === undefined ? undefined : { x: wantedNormal[0]!, y: wantedNormal[1]!, z: wantedNormal[2]! })
+          if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
+          const { face, body } = pick
+          const margin = 0.01
+          const local = distance > 0 ? profileSolid(face.loops, -margin, distance) : profileSolid(face.loops, distance, margin)
+          if (local === undefined) { issues.push({ feature: f.id, severity: "error", message: "The face has no closed outline to push" }); break }
+          const tool = place(local, face.u, face.v, face.normal, face.origin)
+          apply(f.id, tool, distance > 0 ? "union" : "subtract", [body.id], f.id)
+          break
+        }
         case "pattern": {
           const source = tools.get(f.feature)
           if (source === undefined) { issues.push({ feature: f.id, severity: "error", message: `Feature '${f.feature}' has no tool to copy` }); break }
@@ -995,7 +1438,7 @@ export const rebuild = (history: History): RebuildResult => {
       issues.push({ feature: f.id, severity: "error", message: error instanceof SketchError || error instanceof Error ? error.message : String(error) })
     }
   }
-  return { bodies, parameters: values, sketches, issues }
+  return { bodies, parameters: values, sketches, flatPatterns, issues }
 }
 
 /** Volume of the bodies together, mm^3 (they may touch but are assumed not to overlap). */

@@ -54,6 +54,8 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
       add("headDiameter", f.kind === "countersink" ? "countersink diameter" : "counterbore diameter", f.headDiameter)
       add("headDepth", "counterbore depth", f.headDepth)
       add("angle", "countersink angle (deg)", f.angle)
+      add("thread.depth", "thread depth", f.thread?.depth)
+      add("tolerance.upper", "tolerance, upper", f.tolerance?.upper); add("tolerance.lower", "tolerance, lower", f.tolerance?.lower)
       break
     case "mirror": add("offset", "mirror plane offset", f.offset); break
     case "shell": add("thickness", "shell thickness", f.thickness); break
@@ -83,6 +85,35 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
       f.about?.forEach((c, i) => add(`about.${i}`, `scale about ${"xyz"[i]}`, c))
       break
     case "split": add("offset", "split plane offset", f.offset); break
+    case "rib": add("thickness", "rib thickness", f.thickness); add("depth", "rib height", f.depth); break
+    case "sheet": add("thickness", "sheet thickness", f.thickness); add("width", "flange width", f.width); add("bendRadius", "inside bend radius", f.bendRadius)
+      f.hems?.forEach((h, i) => { add(`hems.${i}.length`, `hem ${i + 1} length`, h.length); add(`hems.${i}.gap`, `hem ${i + 1} gap`, h.gap) })
+      break
+    case "thread":
+      add("diameter", "thread diameter", f.diameter); add("pitch", "pitch", f.pitch); add("length", "thread length", f.length); add("offset", "start height", f.offset)
+      f.at?.forEach((c, i) => add(`at.${i}`, `axis ${"xy"[i]}`, c))
+      break
+    case "text":
+      add("height", "text height", f.height); add("depth", "text depth", f.depth); add("strokeWidth", "stroke width", f.strokeWidth); add("offset", "offset along the normal", f.offset); add("spacing", "letter spacing", f.spacing)
+      f.at?.forEach((c, i) => add(`at.${i}`, `position ${"uv"[i]}`, c))
+      break
+    case "plane":
+      if (f.from.kind === "offset") add("from.distance", "plane offset", f.from.distance)
+      else if (f.from.kind === "angle") { add("from.angle", "plane angle (deg)", f.from.angle); add("from.at", "hinge position", f.from.at) }
+      else if (f.from.kind === "points") f.from.points.forEach((p, k) => p.forEach((c, i) => add(`from.points.${k}.${i}`, `point ${k + 1} ${"xyz"[i]}`, c)))
+      else { f.from.near.forEach((c, i) => add(`from.near.${i}`, `face point ${"xyz"[i]}`, c)); add("from.offset", "lift off the face", f.from.offset) }
+      break
+    case "draft":
+      add("angle", "draft angle (deg)", f.angle); add("neutral", "neutral plane", f.neutral)
+      f.near.forEach((c, i) => add(`near.${i}`, `face point ${"xyz"[i]}`, c))
+      break
+    case "mate":
+      add("offset", "gap", f.offset); add("spin", "spin (deg)", f.spin)
+      break
+    case "pushpull":
+      add("distance", "push/pull distance", f.distance)
+      f.near.forEach((c, i) => add(`near.${i}`, `face point ${"xyz"[i]}`, c))
+      break
     case "combine": break
     case "pattern":
       add("count", "count", f.count)
@@ -173,9 +204,9 @@ export const removeParameter = (history: History, name: string): History => {
   return { ...history, parameters }
 }
 
-/** Ids of the features that need `id` to exist: a sketch used by an extrude or revolve, an extrude / revolve / hole copied by a pattern or a mirror, a sketch used by a sweep or loft, an extrusion hollowed by a shell. */
+/** Ids of the features that need `id` to exist: a sketch used by an extrude, revolve, rib or sheet, an extrude / revolve / hole copied by a pattern or a mirror, a sketch used by a sweep or loft, an extrusion hollowed by a shell. */
 export const dependentsOf = (history: History, id: string): ReadonlyArray<string> =>
-  history.features.filter((f) => ((f.type === "extrude" || f.type === "revolve") && f.sketch === id) || ((f.type === "pattern" || f.type === "mirror" || f.type === "shell") && f.feature === id) || (f.type === "sweep" && (f.profile === id || f.path === id)) || (f.type === "loft" && f.sections.includes(id))).map((f) => f.id)
+  history.features.filter((f) => ((f.type === "extrude" || f.type === "revolve" || f.type === "rib" || f.type === "sheet") && f.sketch === id) || (f.type === "plane" && f.from.kind !== "points" && f.from.kind !== "face" && f.from.base === id) || (f.type === "sketch" && f.plane === id) || ((f.type === "hole" || f.type === "text") && f.plane === id) || ((f.type === "pattern" || f.type === "mirror" || f.type === "shell") && f.feature === id) || (f.type === "sweep" && (f.profile === id || f.path === id)) || (f.type === "loft" && f.sections.includes(id))).map((f) => f.id)
 
 /** A feature removed together with everything that cannot exist without it (the extrusions of a sketch, the patterns of those, ...). */
 export const removeFeature = (history: History, id: string): History => {

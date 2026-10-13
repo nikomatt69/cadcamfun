@@ -189,7 +189,17 @@ export const expandShape = (shape: SketchShape, evaluate: Evaluate, lenient = fa
         // Right end: from the low side round the far tip to the high side; left end: from the high side round the near tip to the low side.
         ["a2s", at(1, -1)], ["a2e", at(1, 1)], ["a1s", at(-1, 1)], ["a1e", at(-1, -1)]
       ]
-      for (const [name, [x, y]] of names) placed(acc, name, x, y)
+      for (const [name, [x, y]] of names) {
+        // The end of an arc is already tied to the circle through its start (the arc's own equation), so one coordinate pins it:
+        // two would make that equation redundant. The coordinate with the SMALLER offset from the centre is pinned: the one left free
+        // is then the one with the larger offset, where the circle's equation has a slope (at the extreme of the circle it has none).
+        const endOf = name === "a2e" ? "c2" : name === "a1e" ? "c1" : undefined
+        if (endOf === undefined) { placed(acc, name, x, y); continue }
+        const c = names.find((n) => n[0] === endOf)![1]
+        const dx = Math.abs(evaluate(x) - evaluate(c[0])), dy = Math.abs(evaluate(y) - evaluate(c[1]))
+        acc.entities.push({ id: `${id}.${name}`, kind: "point", x: evaluate(x), y: evaluate(y) })
+        acc.constraints.push(dx < dy ? { type: "distanceX", a: `${id}.o`, b: `${id}.${name}`, value: x } : { type: "distanceY", a: `${id}.o`, b: `${id}.${name}`, value: y })
+      }
       acc.entities.push(
         { id: `${id}.r2`, kind: "arc", center: `${id}.c2`, start: `${id}.a2s`, end: `${id}.a2e` },
         { id: `${id}.r1`, kind: "arc", center: `${id}.c1`, start: `${id}.a1s`, end: `${id}.a1e` },

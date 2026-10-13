@@ -7,3 +7,4 @@
 export * from "./cad/index.ts"
 export * as cad from "./cad/index.ts"
 export * as cam from "./cam/index.ts"
+export * as drawing from "./drawing/index.ts"

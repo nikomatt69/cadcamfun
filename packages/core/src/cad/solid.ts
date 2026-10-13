@@ -364,27 +364,28 @@ const sphereMesh = (solid: SphereSolid): Mesh => {
   const segments = Math.max(3, rings * 2)
   const c = solid.center
   const r = solid.radius
-  for (let i = 0; i <= rings; i++) {
+  // One vertex at each pole and fans around it: a ring of copies of the pole would leave triangles with no area and a seam.
+  const north = b.vertex(c.x, c.y, c.z + r)
+  const ring: number[][] = []
+  for (let i = 1; i < rings; i++) {
     const phi = (i * Math.PI) / rings
+    const row: number[] = []
     for (let j = 0; j < segments; j++) {
       const theta = (j * TAU) / segments
-      b.vertex(
-        c.x + r * Math.sin(phi) * Math.cos(theta),
-        c.y + r * Math.sin(phi) * Math.sin(theta),
-        c.z + r * Math.cos(phi)
-      )
+      row.push(b.vertex(c.x + r * Math.sin(phi) * Math.cos(theta), c.y + r * Math.sin(phi) * Math.sin(theta), c.z + r * Math.cos(phi)))
     }
+    ring.push(row)
   }
-  for (let i = 0; i < rings; i++) {
-    for (let j = 0; j < segments; j++) {
-      const j1 = (j + 1) % segments
-      const a = i * segments + j
-      const bIdx = i * segments + j1
-      const cIdx = (i + 1) * segments + j
-      const d = (i + 1) * segments + j1
+  const south = b.vertex(c.x, c.y, c.z - r)
+  for (let j = 0; j < segments; j++) {
+    const j1 = (j + 1) % segments
+    b.triangle(north, ring[0]![j]!, ring[0]![j1]!)
+    for (let i = 0; i + 1 < ring.length; i++) {
+      const a = ring[i]![j]!, bIdx = ring[i]![j1]!, cIdx = ring[i + 1]![j]!, d = ring[i + 1]![j1]!
       b.triangle(a, d, bIdx)
       b.triangle(a, cIdx, d)
     }
+    b.triangle(ring[ring.length - 1]![j]!, south, ring[ring.length - 1]![j1]!)
   }
   return b.build()
 }
@@ -430,7 +431,10 @@ const extrudeMesh = (solid: ExtrudeSolid): Mesh => {
  */
 const revolveMesh = (solid: RevolveSolid): Mesh => {
   const b = new MeshBuilder()
-  const ring = dropClosingDuplicate(solid.profile)
+  // A point within a billionth of the profile's size of the axis is on it (a sketch solver leaves 1e-12 where 0 was meant): left
+  // off it, its ring collapses into slivers whose planes point anywhere.
+  const reach = Math.max(...solid.profile.map((p) => Math.abs(p.x)), ...solid.profile.map((p) => Math.abs(p.y)), 1e-300)
+  const ring = dropClosingDuplicate(solid.profile).map((p) => (Math.abs(p.x) <= 1e-9 * reach ? { x: 0, y: p.y } : p))
   const m = ring.length
   const sweep = solid.angle
   const fullCircle = Math.abs(sweep) >= TAU - 1e-9
@@ -458,9 +462,10 @@ const revolveMesh = (solid: RevolveSolid): Mesh => {
       const b1 = at(row, col1)
       const c = at(row1, col)
       const d = at(row1, col1)
-      // A→B→D→C walks the quad in order, so both triangles share one winding.
-      b.emitWound(a, b1, d, flip)
-      b.emitWound(a, d, c, flip)
+      // A→B→D→C walks the quad in order, so both triangles share one winding. A row on the axis turns the quad into one
+      // triangle: the half with two corners on the axis has no area and is left out.
+      if (ring[row]!.x !== 0) b.emitWound(a, b1, d, flip)
+      if (ring[row1]!.x !== 0) b.emitWound(a, d, c, flip)
     }
   }
   // Sweep-end caps: triangulate the profile ring in the end plane. The cap at
@@ -469,7 +474,9 @@ const revolveMesh = (solid: RevolveSolid): Mesh => {
   if (!fullCircle) {
     const triangles = triangulateRing(ring)
     for (const col of [0, steps]) {
-      const reverse = (signedArea(ring) < 0) !== ((col === 0 ? -1 : 1) * sweep < 0)
+      // A counter-clockwise profile laid in the half-plane at angle a faces -tangent(a): outward at the start of a positive sweep,
+      // inward at its end. (Both caps contain the axis, so the volume cannot tell a turned cap; the edge orientation can.)
+      const reverse = (signedArea(ring) < 0) === ((col === 0 ? -1 : 1) * sweep < 0)
       for (const [a, c, d] of triangles) b.emitWound(at(a, col), at(c, col), at(d, col), reverse)
     }
   }

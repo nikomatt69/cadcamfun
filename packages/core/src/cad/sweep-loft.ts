@@ -91,6 +91,12 @@ export interface SweepInput {
   readonly closed: boolean
   /** Carry the path a millimetre past each end (for a tool that is subtracted, so its caps do not touch the faces it cuts). */
   readonly extend?: boolean
+  /**
+   * The axis a helical path winds about. The profile then keeps its side towards the axis (its radial direction stays radial, like the
+   * Frenet frame of a helix) instead of being parallel-transported, which turns a non-round profile by 2 pi sin(helix angle) per turn:
+   * a thread profile would end up lying on its side after a few turns.
+   */
+  readonly axis?: { readonly point: P3; readonly direction: P3 }
 }
 
 /** Sweeps a profile along a path. Throws a `RangeError` for a degenerate path or profile. */
@@ -118,8 +124,30 @@ export const sweepSolid = (input: SweepInput): Mesh => {
   const offsets = input.ring.map((q) => sub(q, input.centre))
   const rings: P3[][] = []
   let frame = alignment(unit(input.normal), tangents[0]!)
+  /** The orthonormal frame (tangent, radial, third) at path point `k` for a helix about `input.axis`. */
+  const helixFrame = (k: number): readonly [P3, P3, P3] => {
+    const a = unit(input.axis!.direction)
+    const q = sub(path[k]!, input.axis!.point)
+    const t = tangents[k]!
+    const radial = sub(q, mul(a, dot(q, a)))
+    // Remove the part along the tangent (the helix's tangent has a radial part only where it is not a true helix, e.g. at its ends).
+    const r = unit(sub(radial, mul(t, dot(radial, t))))
+    return [t, r, cross(t, r)]
+  }
+  const helixStart = input.axis === undefined ? undefined : helixFrame(0)
+  /** A frame carrying the start frame's basis (tangent, radial, third) to the one at `k`. */
+  const toHelixFrame = (k: number): ((v: P3) => P3) => {
+    const [t0, r0, b0] = helixStart!
+    const [t1, r1, b1] = helixFrame(k)
+    return (v) => add(add(mul(t1, dot(v, t0)), mul(r1, dot(v, r0))), mul(b1, dot(v, b0)))
+  }
+  // The profile's own frame at the start: first aligned to the tangent as for any sweep; the helix frame then keeps it radial.
+  const startAligned = frame
   for (let k = 0; k < m; k++) {
-    if (k > 0) {
+    if (input.axis !== undefined) {
+      const carry = toHelixFrame(k)
+      frame = (v) => carry(startAligned(v))
+    } else if (k > 0) {
       const previous = frame
       const step = alignment(tangents[k - 1]!, tangents[k]!)
       frame = (v) => step(previous(v))

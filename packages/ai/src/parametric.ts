@@ -1,6 +1,6 @@
 /** Validated boundary for the existing feature-history engine; no second modeller. */
 import { z } from "zod"
-import { PRIMITIVE_ELEMENTS, expandShape, rebuild, meshVolume, type History } from "@cadcamfun/core"
+import { PRIMITIVE_ELEMENTS, cleanMesh, describeTopology, expandShape, meshTopology, rebuild, meshVolume, type History } from "@cadcamfun/core"
 
 const id = z.string().trim().min(1).max(100)
 const n = z.number().finite()
@@ -46,21 +46,23 @@ const shape = z.discriminatedUnion("kind", [
   z.object({ id, kind: z.literal("curve"), curve: z.enum(["spline", "bezier", "nurbs"]), points: z.array(pair).min(2).max(100), closed: z.boolean().optional(), chord: z.boolean().optional(), degree: z.number().int().min(1).max(8).optional(), divisions: z.number().int().min(4).max(400).optional() })
     .describe("spline passes through the points; bezier and nurbs use control points. Open = sweep path; chord:true closes it with a straight line (extrude/revolve profile); closed:true closes smoothly.")
 ])
+/** The plane of a sketch, hole or text: XY, YZ, ZX, or the id of an earlier `plane` feature. */
+const planeRef = z.union([plane, id]).describe("XY, YZ, ZX, or the id of an earlier plane feature (a work plane: offset, angle, three points, or on a face)")
 const targets = z.array(id).min(1).max(40).optional()
 /** Features whose tool a pattern or a mirror may copy. */
-const TOOL_SOURCES: ReadonlyArray<string> = ["extrude", "revolve", "hole", "sweep", "loft", "mirror", "primitive", "coil"]
-const BODY_FEATURES: ReadonlyArray<string> = ["extrude", "revolve", "sweep", "loft", "primitive", "coil"]
+const TOOL_SOURCES: ReadonlyArray<string> = ["extrude", "revolve", "hole", "sweep", "loft", "mirror", "primitive", "coil", "rib", "sheet", "thread", "text"]
+const BODY_FEATURES: ReadonlyArray<string> = ["extrude", "revolve", "sweep", "loft", "primitive", "coil", "rib", "sheet", "thread", "text"]
 const treatmentStyle = z.enum(["chamfer", "fillet"])
 const edgeTreatment = z.object({ style: treatmentStyle, size: dimensionSchema, ends: z.enum(["top", "bottom", "both"]).optional(), holes: z.boolean().optional() })
   .describe("Break the edges round the end faces of the extrusion: chamfer (straight bevel) or fillet (quarter-round of radius size). ends defaults to both; holes also breaks the rim of the holes.")
 const cornerTreatment = z.object({ style: treatmentStyle, size: dimensionSchema })
   .describe("Round (fillet) or bevel (chamfer) the sharp vertical corners of the sketch profile before extruding. Size is the radius or the setback in mm.")
 const feature = z.discriminatedUnion("type", [
-  z.object({ id, type: z.literal("sketch"), plane, offset: dimensionSchema.optional(), sketch: z.object({ entities: z.array(entity).max(200).default([]), constraints: z.array(constraint).max(200).default([]), shapes: z.array(shape).max(40).optional().describe("Parametric profiles, fully constrained, measures take parameters. Prefer them to hand-built points and lines.") }) }),
+  z.object({ id, type: z.literal("sketch"), plane: planeRef, offset: dimensionSchema.optional(), sketch: z.object({ entities: z.array(entity).max(200).default([]), constraints: z.array(constraint).max(200).default([]), shapes: z.array(shape).max(40).optional().describe("Parametric profiles, fully constrained, measures take parameters. Prefer them to hand-built points and lines.") }) }),
   z.object({ id, type: z.literal("extrude"), sketch: id, depth: dimensionSchema, direction: z.enum(["up", "down", "symmetric"]).optional(), operation, targets, edge: edgeTreatment.optional(), corner: cornerTreatment.optional(), taper: dimensionSchema.optional() }),
   z.object({ id, type: z.literal("revolve"), sketch: id, axis: z.union([z.enum(["x", "y"]), z.object({ line: id })]), angle: dimensionSchema.optional(), operation, targets }),
   z.object({
-    id, type: z.literal("hole"), plane, offset: dimensionSchema.optional(), at: pair, diameter: dimensionSchema, depth: dimensionSchema, targets,
+    id, type: z.literal("hole"), plane: planeRef, offset: dimensionSchema.optional(), at: pair, diameter: dimensionSchema, depth: dimensionSchema, targets,
     kind: z.enum(["simple", "counterbore", "countersink"]).optional().describe("simple (default), counterbore (flat recess for a screw head: needs headDiameter and headDepth) or countersink (cone for a flat head: needs headDiameter; angle is the included cone angle, default 90)."),
     headDiameter: dimensionSchema.optional(), headDepth: dimensionSchema.optional(), angle: dimensionSchema.optional()
   }),
@@ -97,6 +99,29 @@ const feature = z.discriminatedUnion("type", [
       within: z.object({ min: triple, max: triple }).optional()
     }).optional().describe("Which edges: parallel to an axis, convex/concave (default convex), longer than minLength, wholly inside the box within {min,max}; curved:true also takes rims of curved surfaces (slow, off by default). No selection = every convex edge.")
   }).describe("Round (fillet radius) or bevel (chamfer setback) the edges between planar faces that meet at 25 degrees or more, on the bodies built so far. Read the issues: a size wider than the faces is refused."),
+  z.object({ id, type: z.literal("rib"), sketch: id, thickness: dimensionSchema, depth: dimensionSchema, direction: z.enum(["up", "down", "symmetric"]).optional(), operation: operation.optional(), targets })
+    .describe("Rib / web (Fusion Rib): every OPEN line chain of an earlier sketch (the centre line, lines and arcs) is thickened to thickness and stands depth mm from the sketch plane along its normal, united (default union) with the bodies. Draw the sketch on the face the rib stands on (offset = that face)."),
+  z.object({ id, type: z.literal("sheet"), sketch: id, thickness: dimensionSchema, width: dimensionSchema, bendRadius: dimensionSchema.optional(), side: z.enum(["centre", "left", "right"]).optional(), hems: z.array(z.object({ end: z.enum(["start", "end"]), length: dimensionSchema, gap: dimensionSchema.optional(), fold: z.enum(["left", "right"]).optional() })).max(2).optional(), direction: z.enum(["up", "down", "symmetric"]).optional(), operation, targets })
+    .describe("Sheet-metal base flange: ONE open line chain of an earlier sketch is the profile, given thickness on side (the material side looking along the line, default centre), its corners bent with the INSIDE radius bendRadius (omit for sharp), extruded width along the sketch normal. hems folds a flange back at an end (two 90 degree bends; with a bend radius gap must be at least twice the inside radius). The flat pattern length and bend count (K-factor 0.44) are reported as flatPatterns."),
+  z.object({ id, type: z.literal("thread"), kind: z.enum(["external", "internal"]), diameter: dimensionSchema, pitch: dimensionSchema, length: dimensionSchema, at: pair.optional(), offset: dimensionSchema.optional(), handedness: z.enum(["right", "left"]).optional(), operation: operation.optional(), targets })
+    .describe("Modelled ISO metric thread along Z at [x,y], starting at height offset. external = a threaded rod of the major diameter (default operation new; union it onto a stud); internal = the tool for a tapped hole (default operation subtract: the cavity is the tap drill plus the groove). Pitch from the ISO table (M8 1.25, M10 1.5)."),
+  z.object({ id, type: z.literal("text"), text: z.string().min(1).max(200), height: dimensionSchema, depth: dimensionSchema, strokeWidth: dimensionSchema.optional(), plane: planeRef, offset: dimensionSchema.optional(), at: pair.optional(), align: z.enum(["left", "centre"]).optional(), spacing: dimensionSchema.optional(), direction: z.enum(["up", "down", "symmetric"]).optional(), operation, targets })
+    .describe("Solid text (capitals, digits, punctuation of a single-stroke font). Emboss: operation union, plane at the face (offset), direction up. Engrave: operation subtract, direction down. at = lower-left corner, or the centre with align centre. height = cap height."),
+  z.object({ id, type: z.literal("pushpull"), near: triple, normal: triple.optional(), distance: dimensionSchema, body: id.optional() })
+    .describe("Press Pull: move the planar face of a body nearest the point near along its outward normal by distance (positive grows the body, negative cuts into it). normal restricts to faces facing that way (use it to choose between the top and bottom face at the same point). A face with holes keeps them."),
+  z.object({ id, type: z.literal("draft"), near: triple, normal: triple.optional(), angle: dimensionSchema, pull: triple.optional(), neutral: dimensionSchema.optional(), body: id.optional() })
+    .describe("Draft of ONE planar face of any body (Fusion Draft): the face nearest the point near is tilted by angle degrees (-45..45) about its hinge, where it meets the neutral plane (pull . p = neutral; pull defaults to [0,0,1], neutral to 0). Positive angle: above the neutral plane the wall leans inward (material removed), below it outward (added). One feature per face; faces square to the pull direction are refused. Use extrude.taper when the whole extrusion is drafted."),
+  z.object({ id, type: z.literal("mate"), body: id, face: z.object({ near: triple, normal: triple.optional() }), to: z.object({ body: id, near: triple, normal: triple.optional() }), offset: dimensionSchema.optional(), spin: dimensionSchema.optional() })
+    .describe("Rigid joint (Fusion Joint): body (the id of the feature that made it) moves so that its face nearest face.near lies flush against the face nearest to.near of the other body (normals opposed, face centres together), offset mm apart, then spins degrees about the common normal. Needs two bodies (an extrude etc. with operation new)."),
+  z.object({
+    id, type: z.literal("plane"),
+    from: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("offset"), base: planeRef, distance: dimensionSchema }),
+      z.object({ kind: z.literal("angle"), base: planeRef, angle: dimensionSchema, about: z.enum(["u", "v"]), at: dimensionSchema.optional() }),
+      z.object({ kind: z.literal("points"), points: z.tuple([triple, triple, triple]) }),
+      z.object({ kind: z.literal("face"), near: triple, normal: triple.optional(), body: id.optional(), offset: dimensionSchema.optional() })
+    ])
+  }).describe("Work plane (Fusion Construct), named by this feature's id in the plane field of a sketch, hole or text. offset: base moved distance along its normal. angle: base turned angle degrees about its u or v axis (hinge at position `at` along the other axis). points: through three points (u from the first to the second). face: ON the planar face of a body nearest near, at the face centre (u = world X projected on the face, v = normal x u: a top face reads like XY), lifted by offset; follows the face on every rebuild. Sketch on a face = a face plane + a sketch on it."),
   z.object({ id, type: z.literal("mirror"), feature: id, plane, offset: dimensionSchema.optional() }).describe("Mirror the tool of an earlier extrude, revolve, hole or mirror through a plane: XY reflects Z, YZ reflects X, ZX reflects Y, at offset along the plane normal.")
 ])
 
@@ -106,16 +131,25 @@ export const historySchema = z.object({ parameters: parameterSchema, features: z
   const issue = (index: number, message: string) => ctx.addIssue({ code: "custom", path: ["features", index], message })
   history.features.forEach((f, index) => {
     if (seen.has(f.id)) issue(index, `Duplicate feature id '${f.id}'`)
-    if ((f.type === "extrude" || f.type === "revolve") && seen.get(f.sketch)?.type !== "sketch") issue(index, `Sketch '${f.sketch}' must precede this feature`)
+    if ((f.type === "extrude" || f.type === "revolve" || f.type === "rib" || f.type === "sheet") && seen.get(f.sketch)?.type !== "sketch") issue(index, `Sketch '${f.sketch}' must precede this feature`)
     if (f.type === "pattern" && (f.kind === "linear" || f.kind === "grid") && f.step === undefined) issue(index, `${f.kind === "grid" ? "Grid" : "Linear"} patterns need step [dx,dy,dz]`)
     if (f.type === "pattern" && f.kind === "grid" && (f.countB === undefined || f.stepB === undefined)) issue(index, "Grid patterns need countB (rows) and stepB [dx,dy,dz]")
-    if (f.type === "pattern" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil or mirror`)
-    if (f.type === "mirror" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil or mirror`)
+    if (f.type === "pattern" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Pattern source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
+    if (f.type === "mirror" && !TOOL_SOURCES.includes(seen.get(f.feature)?.type ?? "")) issue(index, `Mirror source '${f.feature}' must be an earlier extrude, revolve, hole, sweep, loft, primitive, coil, rib, sheet, thread, text or mirror`)
     if (f.type === "sweep") for (const [role, ref] of [["profile", f.profile], ["path", f.path]] as const) if (seen.get(ref)?.type !== "sketch") issue(index, `Sweep ${role} '${ref}' must be an earlier sketch`)
     if (f.type === "sweep" && f.profile === f.path) issue(index, "A sweep needs two different sketches: the profile and the path")
     if (f.type === "loft") for (const ref of f.sections) if (seen.get(ref)?.type !== "sketch") issue(index, `Loft section '${ref}' must be an earlier sketch`)
     if (f.type === "shell" && !["extrude", "revolve", "sweep"].includes(seen.get(f.feature)?.type ?? "")) issue(index, `Shell source '${f.feature}' must be an earlier extrude, revolve or sweep`)
     if (f.type === "fillet" && !BODY_FEATURES.some((type) => [...seen.values()].some((e) => e.type === type))) issue(index, "A fillet needs a body built before it (extrude, revolve, sweep or loft)")
+    if ((f.type === "draft" || f.type === "mate") && !BODY_FEATURES.some((type) => [...seen.values()].some((e) => e.type === type))) issue(index, `A ${f.type} needs a body built before it`)
+    if (f.type === "mate" && f.body === f.to.body) issue(index, "A mate needs two different bodies")
+    if (f.type === "mate" && (!seen.has(f.body) || !seen.has(f.to.body))) issue(index, "Both bodies of a mate must be earlier features")
+    if (f.type === "draft" && f.body !== undefined && !seen.has(f.body)) issue(index, `Body '${f.body}' must be an earlier feature`)
+    if ((f.type === "sketch" || f.type === "hole" || f.type === "text") && !["XY", "YZ", "ZX"].includes(f.plane) && seen.get(f.plane)?.type !== "plane") issue(index, `Plane '${f.plane}' must be XY, YZ, ZX or an earlier plane feature`)
+    if (f.type === "plane" && (f.from.kind === "offset" || f.from.kind === "angle") && !["XY", "YZ", "ZX"].includes(f.from.base) && seen.get(f.from.base)?.type !== "plane") issue(index, `Base plane '${f.from.base}' must be XY, YZ, ZX or an earlier plane feature`)
+    if (f.type === "plane" && f.from.kind === "face" && !BODY_FEATURES.some((type) => [...seen.values()].some((e) => e.type === type))) issue(index, "A plane on a face needs a body built before it")
+    if (f.type === "pushpull" && !BODY_FEATURES.some((type) => [...seen.values()].some((e) => e.type === type))) issue(index, "A push/pull needs a body built before it")
+    if (f.type === "pushpull" && f.body !== undefined && !seen.has(f.body)) issue(index, `Body '${f.body}' must be an earlier feature`)
     if (f.type === "hole" && f.kind === "counterbore" && (f.headDiameter === undefined || f.headDepth === undefined)) issue(index, "A counterbore hole needs headDiameter and headDepth")
     if (f.type === "hole" && f.kind === "countersink" && f.headDiameter === undefined) issue(index, "A countersink hole needs headDiameter")
     if ("targets" in f && f.targets?.some((t) => !seen.has(t))) issue(index, "Targets must name earlier body features")
@@ -163,6 +197,13 @@ export const parametricReport = (history: History) => {
     parameters: result.parameters, bodyCount: result.bodies.length, volumeMm3: finite ? volume : null,
     bounds: result.bodies.length > 0 && finite ? { min, max } : null,
     issues: result.issues.slice(0, 40), omittedIssues: Math.max(0, result.issues.length - 40),
-    sketches: Object.entries(result.sketches).map(([id, s]) => ({ id, status: s.solve.status, degreesOfFreedom: s.solve.dof, residual: s.solve.residual }))
+    flatPatterns: Object.fromEntries(Object.entries(result.flatPatterns).map(([id, d]) => [id, { straightMm: d.straight, bends: d.bends.length, lengthMm: d.length }])),
+    sketches: Object.entries(result.sketches).map(([id, s]) => ({ id, status: s.solve.status, degreesOfFreedom: s.solve.dof, residual: s.solve.residual })),
+    // What each body is as a solid (welded first): closed or with open/non-manifold edges, its shells and through holes (genus), so a
+    // defect the CAM or an STL export would trip on is reported, and the hole count can be checked against what was asked.
+    solids: result.bodies.map((b) => {
+      const t = meshTopology(cleanMesh(b.mesh, { mergeCoplanar: false }))
+      return { id: b.id, closedSolid: t.solid, shells: t.shells, throughHoles: t.genus ?? null, triangles: t.triangles, summary: describeTopology(t) }
+    })
   }
 }
