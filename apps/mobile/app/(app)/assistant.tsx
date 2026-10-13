@@ -61,7 +61,7 @@ export default function AssistantScreen() {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [agentPickerOpen, setAgentPickerOpen] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState("cadcam")
+  const [selectedAgentId, setSelectedAgentId] = useState("general")
   const [log, setLog] = useState<readonly ChatRow[]>(emptyLog)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<AssistantMode>("general")
@@ -432,7 +432,7 @@ export default function AssistantScreen() {
                 style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, borderRadius: 14, borderCurve: "continuous", backgroundColor: selected ? `${palette.accent}14` : "transparent", paddingHorizontal: 12, paddingVertical: 12 }}
               >
                 <View style={{ width: 36, height: 36, borderRadius: 12, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: selected ? `${palette.accent}1F` : palette.panel }}>
-                  {agent.id === "cadcam" ? <Sparkles size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
+                  {agent.id === "general" ? <Sparkles size={17} color={selected ? palette.accent : palette.soft} /> : <Bot size={17} color={selected ? palette.accent : palette.soft} />}
                 </View>
                 <View style={{ flex: 1, gap: 3 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>

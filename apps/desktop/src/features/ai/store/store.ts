@@ -155,7 +155,7 @@ export const createAiStore = (): AiStore => {
   const [contextTokens, setContextTokens] = createSignal(0)
   const [agents, setAgents] = createSignal<ReadonlyArray<AiAgent>>([])
   const [permissionMode, setPermissionMode] = createSignal<"auto" | "ask" | "approve">("ask")
-  const [agent, setAgent] = createSignal("cadcam")
+  const [agent, setAgent] = createSignal("general")
   const [mode, setMode] = createSignal<"general" | "cad" | "cam" | "gcode" | "toolpath">("general")
   const [questions, setQuestions] = createSignal<ReadonlyArray<AiPendingQuestion>>([])
   const [hostContext, setHostContext] = createSignal<AiContextState>()

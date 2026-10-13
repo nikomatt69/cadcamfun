@@ -26,11 +26,11 @@ import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/sy
 import { resolveLocale } from "./nikcli/locale.ts"
 import { providerAllowed } from "./nikcli/policy.ts"
 import { goalArgumentsOf, goalSummary } from "./nikcli/goal.ts"
-import { SUBAGENTS, isSubagentId, SUBAGENT_IDS, childAgent } from "./nikcli/agents.ts"
+import { SUBAGENTS, isSubagentId, childAgent } from "./nikcli/agents.ts"
 import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
 import type { HostTaskInfo } from "./nikcli/chat.ts"
-import { CADCAM_AGENT } from "./nikcli/config.ts"
+import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "./nikcli/primaries.ts"
 import { compactHostSession, readContextBreakdown, type ContextBreakdown, readHostContextPolicy } from "./nikcli/context.ts"
 import { contextBudget, questionsForSession, replySessionQuestion, type SessionControlInput } from "./nikcli/session-controls.ts"
 import {
@@ -338,7 +338,9 @@ export class AiService extends Context.Service<AiService, {
                }))) {
                 return yield* new AiConfigError({ message: "This conversation belongs to a different authenticated actor." })
               }
-              const agent = input.agent === undefined || input.agent === CADCAM_AGENT ? CADCAM_AGENT : isSubagentId(input.agent) ? SUBAGENTS[input.agent].host : undefined
+              const primary = resolvePrimary(input.agent)
+              // A subagent is still addressable by id (an older client may send one), but only the three primaries are offered.
+              const agent = primary !== undefined ? PRIMARIES[primary].host : isSubagentId(input.agent) ? SUBAGENTS[input.agent].host : undefined
               if (agent === undefined) return yield* new AiConfigError({ message: `Unknown assistant agent: ${input.agent}` })
               const variant = input.model?.variant
               if (variant) {
@@ -450,7 +452,7 @@ export class AiService extends Context.Service<AiService, {
         providers,
         invalidateCatalogue: invalidateCatalog,
         chat,
-        agents: [{ id: CADCAM_AGENT, title: "CAD/CAM assistant", description: "Coordinates drawing, 3D modelling and verified machining.", tools: [], edits: true }, ...SUBAGENT_IDS.map((id) => ({ id, title: SUBAGENTS[id].title, description: SUBAGENTS[id].description, tools: SUBAGENTS[id].tools, edits: SUBAGENTS[id].edits }))],
+        agents: PRIMARY_IDS.map((id) => ({ id, title: PRIMARIES[id].title, description: PRIMARIES[id].description, tools: [], edits: true })),
         controlSession,
         complete: (input) => direct.generateText(input).pipe(Effect.map((r) => ({ text: r.text, model: r.model }))),
         generate: (input) => direct.generateObject(input),

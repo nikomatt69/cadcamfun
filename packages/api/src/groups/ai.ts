@@ -167,7 +167,8 @@ export const SessionStateBody = Schema.Struct({ sessionId: Schema.String, projec
 export const SessionTask = Schema.Struct({
   id: Schema.String, agent: Schema.String, description: Schema.String,
   status: Schema.Literals(["queued", "running", "completed", "error", "cancelled"]),
-  background: Schema.Boolean, text: opt(Schema.String), error: opt(Schema.String)
+  background: Schema.Boolean, text: opt(Schema.String), error: opt(Schema.String),
+  createdAt: opt(Schema.Number), startedAt: opt(Schema.Number), finishedAt: opt(Schema.Number)
 })
 /** Stored tool evidence for reconnecting clients; replay never executes tools. */
 export const AiRecoveryEvent = Schema.Union([

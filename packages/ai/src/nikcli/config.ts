@@ -2,6 +2,7 @@ import { NATIVE_APPROVAL_TOOL_IDS, permissionAgents } from "./permission-modes.t
 import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
+import { PRIMARIES, PRIMARY_IDS } from "./primaries.ts"
 import { NATIVE_TOOLS } from "./tool-registry.ts"
 import { permittedTools, toolAllowed, type PolicyStatement } from "./policy.ts"
 import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
@@ -18,7 +19,7 @@ import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
  * provider and model the host knows (`provider.list()`), while the entries
  * below only override base URL / protocol for the ones we care about.
  */
-export const CADCAM_AGENT = "cadcam"
+export const CADCAM_AGENT = PRIMARIES.general.host
 export const CADCAM_WORKER = SUBAGENTS.researcher.host
 export const BACKGROUND_TOOL_IDS = ["agent"] as const
 
@@ -139,6 +140,22 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     })
   )
 
+  // The three agents a person talks to (`primaries.ts`). No step cap, as in nikcli (`agent.steps ?? Infinity`): one request runs
+  // from the model through the machining to the check for as long as it takes. What ends it is the host's doom-loop guard,
+  // the goal budget, or the user's abort.
+  const primaries = Object.fromEntries(
+    PRIMARY_IDS.map((id) => {
+      const spec = PRIMARIES[id]
+      const held = Object.fromEntries(Object.entries(permission).filter(([tool]) => !spec.without.includes(tool)))
+      return [spec.host, {
+        mode: "primary",
+        description: spec.description,
+        prompt: spec.focus === "" ? input.systemPrompt : `${input.systemPrompt}\n\n${spec.focus}`,
+        permission: held
+      }]
+    })
+  )
+
   const provider: Record<string, unknown> = {}
   for (const p of input.providers) {
     for (const model of p.models) for (const limit of [model.context, model.input, model.output]) {
@@ -175,15 +192,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     default_agent: "cadcam-memory",
     agent: {
       "cadcam-memory": { mode: "primary", description: "Internal project memory consolidator", prompt: memoryPrompt.trim(), permission: { "*": "deny", read: "allow", edit: "allow", glob: "allow", grep: "allow", list: "allow", tree: "allow" } },
-      ...permissionAgents({ [CADCAM_AGENT]: {
-        mode: "primary",
-        description: "CAD/CAM assistant",
-        // No step cap, as in nikcli (`agent.steps ?? Infinity`): one request runs from the model through the machining to the
-        // check for as long as it takes. What ends it is the host's doom-loop guard, the goal budget, or the user's abort.
-        prompt: input.systemPrompt,
-        permission
-      },
-      ...specialists }, toolIds),
+      ...permissionAgents({ ...primaries, ...specialists }, toolIds),
       compaction: { prompt: compactionPrompt.trim(), permission: { "*": "deny" } },
       // Background helpers would spend extra model calls on titles and summaries.
       title: { disable: true },

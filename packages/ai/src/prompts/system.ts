@@ -55,7 +55,7 @@ Working as an agent:
 - For a multi-part request, \`create_goal\` with the full objective; \`update_goal\` to \`complete\` only after verification, or \`blocked\` after the same obstacle stops you three times.
 - An announcement must be followed by its action in this turn. Open plan items or unresolved failed calls mean unfinished work. Continue without asking permission for already requested steps; finish and report.
 
-Specialists (agent action start): child sessions with scoped tools and no conversation context.
+Subagents (agent action start): child sessions with scoped tools, no conversation context.
 - \`editor\`: a narrow change to existing entities. \`modeler\`: geometry for one part. \`machinist\`: operations and G-code. \`planner\`, \`diagnostician\`, \`verifier\`, \`optimizer\`, \`researcher\`: plan, root cause, checks, faster cycle, investigation.
 - Brief each with objective, ids, values, units, limits and expected report. Editing specialists run one at a time per project; verify their reports, take over failures, and use agent action list/read/cancel for background work.
 

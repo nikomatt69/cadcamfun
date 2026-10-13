@@ -35,10 +35,11 @@ const stubAi = (overrides: Record<string, unknown> = {}): CommandHost["ai"] => {
   const accessors = {
     model: () => ({ provider: "anthropic", model: "claude-sonnet-4" }),
     agents: () => [
-      { id: "cadcam", title: "CAD/CAM coordinator", description: "", tools: [], edits: true },
-      { id: "modeler", title: "3D modeller", description: "", tools: [], edits: true }
+      { id: "general", title: "General", description: "", tools: [], edits: true },
+      { id: "cad", title: "CAD", description: "", tools: [], edits: true },
+      { id: "cam", title: "CAM", description: "", tools: [], edits: true }
     ],
-    agent: () => "cadcam",
+    agent: () => "general",
     mode: () => "general",
     providers: () => [
       {
@@ -211,8 +212,8 @@ describe("running commands", () => {
     const rec = recorder(stubAi({ setMode, setPermissionMode, setAgent }))
     expect(await run("/mode cad", rec)).toEqual({ kind: "done" })
     expect(await run("/permissions auto", rec)).toEqual({ kind: "done" })
-    expect(await run("/agent modeler", rec)).toEqual({ kind: "done" })
-    expect(calls).toEqual(["mode:cad", "perm:auto", "agent:modeler"])
+    expect(await run("/agent cad", rec)).toEqual({ kind: "done" })
+    expect(calls).toEqual(["mode:cad", "perm:auto", "agent:cad"])
     expect(await run("/mode sculpting", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.mode.unknown" })
     expect(await run("/permissions maybe", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.permissions.unknown" })
     expect(await run("/agent architect", rec)).toEqual({ kind: "rejected", reason: "ai.cmd.agent.unknown" })

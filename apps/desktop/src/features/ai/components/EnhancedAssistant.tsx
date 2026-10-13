@@ -53,6 +53,8 @@ import { SkillsSettings } from "./SkillsSettings.tsx"
 import "../styles/assistant.css"
 import { toolTitle } from "../lib/tools.ts"
 import { ToolRow } from "./ToolRow.tsx"
+import { TaskCard } from "./TaskCard.tsx"
+import { isTaskStart } from "../lib/task-card.ts"
 import { groupExploration, timelineOf } from "../lib/timeline.ts"
 import { renderAssistantMarkdown } from "../lib/markdown.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
@@ -1145,7 +1147,14 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
               )
             }
             const call = createMemo(() => ai.toolCalls()[segment.callId])
-            return <ul class="space-y-1 pl-2"><ToolRow tool={segment.tool} call={call()} projectId={ai.projectId()} /></ul>
+            // A delegated task is a card that follows the host's record of it, not a one-line tool row.
+            return (
+              <ul class="space-y-1 pl-2">
+                <Show when={isTaskStart(call())} fallback={<ToolRow tool={segment.tool} call={call()} projectId={ai.projectId()} />}>
+                  <TaskCard call={call()!} />
+                </Show>
+              </ul>
+            )
           }}
         </For>
         <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
