@@ -1,4 +1,4 @@
-import type { SetupCandidate, MachiningPlanInput } from "../actions/cam.ts"
+import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
 import type { CadGrepInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -29,6 +29,8 @@ export interface VerifyToolOptions {
  */
 export interface ToolHandlersShape {
   validateMachiningPlan?(projectId: string, input: MachiningPlanInput): Promise<unknown>
+  /** Runs the CAM kernel on the active drawing: plan from the CAD, cutting data per material, NC and its replay evidence. */
+  manufacture?(projectId: string, input: ManufactureInput): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
