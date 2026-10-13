@@ -3,10 +3,12 @@ import { z } from "zod"
 import { buildRecipe, type History } from "@cadcamfun/core"
 import { historySchema } from "../src/parametric.ts"
 import { toSpec } from "../src/tools/define.ts"
-import { cadParametric, parametricInputSchema } from "../src/tools/cad_parametric.ts"
+import { cadTool } from "../src/tools/cad.ts"
+import { parametricInputSchema, parametricHarness } from "./helpers/parametric.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
 import { lenient } from "../src/tools/lenient-arguments.ts"
 import { toolPrompt } from "../src/tools/prompts/index.ts"
+import { CADCAM_SKILLS } from "../src/skills/index.ts"
 
 /** Booleans on thousands of facets are slow on a loaded machine. */
 const SLOW = 120_000
@@ -48,11 +50,9 @@ const issuesOf = (value: unknown): string => {
 const accepted = (value: unknown): boolean => historySchema.safeParse(value).success
 
 interface Call { readonly projectId: string; readonly input: unknown }
-const harness = (reply: (input: any) => unknown = () => ({ ok: true })) => {
-  const calls: Call[] = []
-  const handlers = { parametric: async (projectId: string, input: unknown) => { calls.push({ projectId, input }); return reply(input) } } as unknown as ToolHandlersShape
-  const run = (input: unknown) => cadParametric.execute(cadParametric.parameters.parse(input), { handlers, projectId: "p1" }) as Promise<any>
-  return { calls, run }
+const harness = (reply: (input: never) => unknown = () => ({ ok: true })) => {
+  const built = parametricHarness(reply)
+  return { calls: built.calls as Call[], run: built.run as (input: unknown) => Promise<any> }
 }
 const rel = (got: number, want: number) => Math.abs(got - want) / Math.abs(want)
 
@@ -136,14 +136,14 @@ describe("the history schema takes sweep, loft, shell, fillet and grid patterns"
 describe("cad_parametric accepts the new histories and reports them", () => {
   test("the input schema converts to JSON Schema with the new features in it, and the lenient wrapper too", () => {
     expect(() => z.toJSONSchema(parametricInputSchema as never)).not.toThrow()
-    expect(() => z.toJSONSchema(lenient(cadParametric.parameters) as never)).not.toThrow()
-    const json = JSON.stringify(z.toJSONSchema(lenient(cadParametric.parameters) as never))
+    expect(() => z.toJSONSchema(lenient(cadTool.parameters) as never)).not.toThrow()
+    const json = JSON.stringify(z.toJSONSchema(lenient(cadTool.parameters) as never))
     for (const word of ["sweep", "loft", "shell", "fillet", "grid", "recipe", "dfm", "fastener"]) expect(json).toContain(word)
   })
 
   test("validate: a closed 2 mm shell reports the volume 24000 - 36 x 26 x 16 and one body", async () => {
     const { calls, run } = harness()
-    const out = await run({ action: "validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2 }]) })
+    const out = await run({ action: "parametric_validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2 }]) })
     expect(out).toMatchObject({ ok: true, bodyCount: 1 })
     expect(out.volumeMm3).toBeCloseTo(9024, 2)
     expect(out.issues).toEqual([])
@@ -151,34 +151,34 @@ describe("cad_parametric accepts the new histories and reports them", () => {
   }, SLOW)
 
   test("validate: an open-top shell is a cup, 7152 mm3", async () => {
-    const out = await harness().run({ action: "validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2, open: "top" }]) })
+    const out = await harness().run({ action: "parametric_validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2, open: "top" }]) })
     expect(out.ok).toBe(true)
     expect(out.volumeMm3).toBeCloseTo(7152, 2)
   }, SLOW)
 
   test("validate: a fillet of the vertical edges removes 4 (1 - pi/4) r^2 h; a chamfer exactly 4 x c^2/2 x h", async () => {
     const { run } = harness()
-    const fillet = await run({ action: "validate", history: box([{ id: "f", type: "fillet", radius: 4, edges: { parallel: "z" } }]) })
+    const fillet = await run({ action: "parametric_validate", history: box([{ id: "f", type: "fillet", radius: 4, edges: { parallel: "z" } }]) })
     expect(fillet.ok).toBe(true)
     expect(rel(fillet.volumeMm3, 24000 - 4 * (1 - Math.PI / 4) * 16 * 20)).toBeLessThan(0.0005)
-    const chamfer = await run({ action: "validate", history: box([{ id: "f", type: "fillet", style: "chamfer", radius: 3, edges: { parallel: "z" } }]) })
+    const chamfer = await run({ action: "parametric_validate", history: box([{ id: "f", type: "fillet", style: "chamfer", radius: 3, edges: { parallel: "z" } }]) })
     expect(chamfer.volumeMm3).toBeCloseTo(24000 - 360, 2)
   }, SLOW)
 
   test("validate: a fillet wider than the faces is reported in the issues, not hidden", async () => {
-    const out = await harness().run({ action: "validate", history: box([{ id: "f", type: "fillet", radius: 50, edges: { parallel: "z" } }]) })
+    const out = await harness().run({ action: "parametric_validate", history: box([{ id: "f", type: "fillet", radius: 50, edges: { parallel: "z" } }]) })
     expect(out.ok).toBe(false)
     expect(JSON.stringify(out.issues)).toMatch(/needs 50\.00 mm of face/)
   }, SLOW)
 
   test("validate: a pipe along an L route is ok, one body, and about area x length", async () => {
-    const out = await harness().run({ action: "validate", history: { parameters: {}, features: [rings("section", "YZ", 0, 0, [3]), route("path", [[0, 0], [50, 0], [50, 50]]), { id: "pipe", type: "sweep", profile: "section", path: "path", operation: "new" }] } })
+    const out = await harness().run({ action: "parametric_validate", history: { parameters: {}, features: [rings("section", "YZ", 0, 0, [3]), route("path", [[0, 0], [50, 0], [50, 50]]), { id: "pipe", type: "sweep", profile: "section", path: "path", operation: "new" }] } })
     expect(out).toMatchObject({ ok: true, bodyCount: 1 })
     expect(rel(out.volumeMm3, Math.PI * 9 * 100)).toBeLessThan(0.01)
   }, SLOW)
 
   test("validate: a loft of two squares is the frustum, 7000 mm3", async () => {
-    const out = await harness().run({ action: "validate", history: { parameters: {}, features: [rectangle("a", "XY", -10, -10, 20, 20), rectangle("b", "XY", -5, -5, 10, 10, 30), { id: "lf", type: "loft", sections: ["a", "b"], operation: "new" }] } })
+    const out = await harness().run({ action: "parametric_validate", history: { parameters: {}, features: [rectangle("a", "XY", -10, -10, 20, 20), rectangle("b", "XY", -5, -5, 10, 10, 30), { id: "lf", type: "loft", sections: ["a", "b"], operation: "new" }] } })
     expect(out.ok).toBe(true)
     expect(out.volumeMm3).toBeCloseTo(7000, 1)
     expect(out.bounds.max.z).toBeCloseTo(30, 4)
@@ -186,13 +186,13 @@ describe("cad_parametric accepts the new histories and reports them", () => {
 
   test("validate: a 3 x 2 grid of holes removes six holes' worth", async () => {
     const hole = { id: "h", type: "hole", plane: "XY", offset: "h", at: [6, 6], diameter: 3, depth: "h" }
-    const out = await harness().run({ action: "validate", history: box([hole, { id: "g", type: "pattern", feature: "h", kind: "grid", count: 3, countB: 2, step: [10, 0, 0], stepB: [0, 15, 0] }]) })
+    const out = await harness().run({ action: "parametric_validate", history: box([hole, { id: "g", type: "pattern", feature: "h", kind: "grid", count: 3, countB: 2, step: [10, 0, 0], stepB: [0, 15, 0] }]) })
     expect(out.ok).toBe(true)
     expect(rel(out.volumeMm3, 24000 - 6 * Math.PI * 2.25 * 20)).toBeLessThan(0.0005)
   }, SLOW)
 
   test("a schema refusal reaches the model as readable paths: a loft with one section", () => {
-    const parsed = parametricInputSchema.safeParse({ action: "validate", history: { parameters: {}, features: [rectangle("a", "XY", 0, 0, 10, 10), { id: "lf", type: "loft", sections: ["a"], operation: "new" }] } })
+    const parsed = parametricInputSchema.safeParse({ action: "parametric_validate", history: { parameters: {}, features: [rectangle("a", "XY", 0, 0, 10, 10), { id: "lf", type: "loft", sections: ["a"], operation: "new" }] } })
     expect(parsed.success).toBe(false)
     expect(parsed.success ? "" : JSON.stringify(parsed.error.issues)).toContain("sections")
   })
@@ -255,19 +255,22 @@ describe("cad_parametric: dfm sees grid patterns", () => {
 
 describe("the tool prompt and the host adapter know the new features", () => {
   test("the prompt names every new feature and recipe", () => {
-    const prompt = toolPrompt("cad_parametric")
-    for (const word of ["sweep", "loft", "shell", "fillet", "grid", "pipe_bend", "duct_transition"]) expect(prompt).toContain(word)
+    const prompt = toolPrompt("cad")
+    for (const word of ["parametric_validate", "parametric_recipe", "parametric_dfm", "parametric_fastener"]) expect(prompt).toContain(word)
+    // The engineering reference itself moved to the skills, where the model loads it on demand.
+    const skills = CADCAM_SKILLS.map((skill) => skill.body).join("\n")
+    for (const word of ["sweep", "loft", "shell", "fillet", "grid", "pipe_bend", "duct_transition"]) expect(skills, word).toContain(word)
   })
 
   test("through the host adapter a shell history validates and comes back as JSON", async () => {
-    const spec = toSpec(cadParametric, { handlers: {} as ToolHandlersShape, projectId: "p1" })
-    const out = JSON.parse(await spec.execute({ action: "validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2, open: "top" }]) }, { signal: new AbortController().signal, sessionId: "s", projectId: "p1" }))
+    const spec = toSpec(cadTool, { handlers: {} as ToolHandlersShape, projectId: "p1" })
+    const out = JSON.parse(await spec.execute({ action: "parametric_validate", history: box([{ id: "sh", type: "shell", feature: "box", thickness: 2, open: "top" }]) }, { signal: new AbortController().signal, sessionId: "s", projectId: "p1" }))
     expect(out).toMatchObject({ ok: true, bodyCount: 1 })
   }, SLOW)
 
   test("a malformed sweep through the adapter is refused with the recovery text, not a crash", async () => {
-    const spec = toSpec(cadParametric, { handlers: {} as ToolHandlersShape, projectId: "p1" })
-    const out = JSON.parse(await spec.execute({ action: "validate", history: { parameters: {}, features: [rings("section", "YZ", 0, 0, [3]), { id: "pipe", type: "sweep", profile: "section", path: "ghost", operation: "new" }] } }, { signal: new AbortController().signal, sessionId: "s", projectId: "p1" }))
+    const spec = toSpec(cadTool, { handlers: {} as ToolHandlersShape, projectId: "p1" })
+    const out = JSON.parse(await spec.execute({ action: "parametric_validate", history: { parameters: {}, features: [rings("section", "YZ", 0, 0, [3]), { id: "pipe", type: "sweep", profile: "section", path: "ghost", operation: "new" }] } }, { signal: new AbortController().signal, sessionId: "s", projectId: "p1" }))
     expect(out.ok).toBe(false)
     expect(JSON.stringify(out)).toContain("ghost")
   })

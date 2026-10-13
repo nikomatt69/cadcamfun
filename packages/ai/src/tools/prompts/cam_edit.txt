@@ -1,0 +1,26 @@
+Program and store the machining. Every action here writes: an operation, a program, a report or the stock.
+
+Actions
+- create: add an operation to the active drawing from a type and its parameters.
+- update: change the parameters of an existing operation. Its stored G-code is dropped so nothing exports a stale program.
+- generate: run the pipeline for an operation and store the G-code; returns the statistics and the first lines.
+- verify: replay the operation's program against its stock (removal, rapids in material, shank/holder/fixture collisions, gouges) and store the report with the regenerated program on the operation.
+- stock_set: define the real stock; the drawing's raw piece is updated and every affected program must be generated again.
+
+Parameters (mm, mm/min, rpm, angles in degrees)
+- create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning_od, parting_od, ...), params - the generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum, steel, wood, plastic, brass, titanium, composite, other), offset (inside|outside|center), workOffset (G54..G59), originType, machineType, and printer extras (infillDensity, supportType, shellCount).
+- update: operationId, params - only the fields that change; the rest of the stored settings are kept.
+- generate: operationId (the newest operation when omitted), maxLines (1-200, default 40).
+- verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds shape), resolution, tolerance. Give what you know: a field you leave out was not modelled.
+- stock_set: stock {width, height, depth, radius, x, y, topZ, allowance, material?, elementId?}.
+
+Result (JSON)
+- ok; create the operationId and the geometry it will use; generate stats and preview; verify ok, the issues with their codes, the stats and what was modelled; stock_set the stored stock, the workpiece and the operations it invalidated.
+- ok:false is a result: an empty drawing, a missing operation or a refused regeneration says so.
+
+Do not use it
+- To read the machine, the operations or a static analysis: cam does that without writing.
+- To claim a program is safe: verify reports only what it modelled.
+
+After it
+- Generate, analyse, verify, fix by cause, regenerate and verify again. After three rounds on the same finding, report the blocker.

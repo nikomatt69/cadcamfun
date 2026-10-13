@@ -4,7 +4,7 @@
  *   image (png, jpeg, webp, gif)  -> a file part the model looks at (a drawing, a photo, a sketch)
  *   pdf                           -> a file part too (a dimensioned drawing as a document); a model that cannot read PDFs gets
  *                                    the transform's explicit "cannot read" notice instead of a failed request
- *   text (dxf, svg, csv, gcode, ...) -> kept by name for the tools (`cad_import_drawing` reads a DXF/SVG attachment) and, when
+ *   text (dxf, svg, csv, gcode, ...) -> kept by name for the tools (cad_edit action import reads a DXF/SVG attachment) and, when
  *                                       short, shown to the model in the message itself
  *   anything else                    -> refused with a reason (never silently dropped)
  *
@@ -118,14 +118,14 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
       }
       const mime = mimeOfImage(attachment)
       parts.push({ type: "file", mime, filename: name, url: `data:${mime};base64,${attachment.data}` })
-      lines.push(`- ${name}: image (attached below). Read the dimensions, shapes and notes in it; for a dimensioned drawing build the part with cad_add_elements from the numbers you read.`)
+      lines.push(`- ${name}: image (attached below). Read the dimensions, shapes and notes in it; for a dimensioned drawing build the part with cad_edit action add from the numbers you read.`)
     } else if (kind === "pdf") {
       if (bytesOf(attachment.data) > MAX_PDF_BYTES) {
         rejected.push({ name, reason: `PDF larger than ${MAX_PDF_BYTES / 1024 / 1024} MB` })
         continue
       }
       parts.push({ type: "file", mime: "application/pdf", filename: name, url: `data:application/pdf;base64,${attachment.data}` })
-      lines.push(`- ${name}: PDF document (attached below). Read the dimensions, views and notes in it; for a dimensioned drawing build the part with cad_add_elements from the numbers you read.`)
+      lines.push(`- ${name}: PDF document (attached below). Read the dimensions, views and notes in it; for a dimensioned drawing build the part with cad_edit action add from the numbers you read.`)
     } else if (kind === "text") {
       if (attachment.data.length > MAX_TEXT_CHARS) {
         rejected.push({ name, reason: `text longer than ${MAX_TEXT_CHARS} characters` })
@@ -138,9 +138,9 @@ export const prepareAttachments = (projectId: string, attachments: ReadonlyArray
       stored.push(name)
       const ext = extensionOf(name)
       const hint = name.endsWith(".mesh.json")
-        ? `parsed mesh; use cad_import_drawing with format mesh and attachment "${name}"; specify source-unit scale to mm`
+        ? `parsed mesh; use cad_edit action import with format mesh and attachment "${name}"; specify source-unit scale to mm`
         : ext === "dxf" || ext === "svg" || ext === "step" || ext === "stp"
-        ? `use cad_import_drawing with attachment "${name}" (and a depth for DXF/SVG) to build it in 3D`
+        ? `use cad_edit action import with attachment "${name}" (and a depth for DXF/SVG) to build it in 3D`
         : "kept for the tools"
       if (attachment.data.length <= INLINE_TEXT_CHARS && ext !== "dxf" && ext !== "svg" && ext !== "step" && ext !== "stp") {
         lines.push(`- ${name}: text, ${attachment.data.length} characters (${hint}). Content:\n\`\`\`\n${attachment.data}\n\`\`\``)

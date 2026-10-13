@@ -1,6 +1,6 @@
 /**
  * Every element type the CAD editor renders, with the fields the assistant may set and their defaults
- * (the same values as the editor's own tool panel). `cad_add_elements` accepts these in the editor's own
+ * (the same values as the editor's own tool panel). cad_edit action add accepts these in the editor's own
  * shape, so the assistant can build what the editor can show: solids, revolved and extruded profiles,
  * lofts, sweeps, booleans, curves, mechanical parts and architecture, not only 2D sketches.
  *
@@ -65,7 +65,7 @@ export const ELEMENT_SPECS = {
   parametric: {
     defaults: { ...at, history: { parameters: {}, features: [] } },
     required: ["history"],
-    doc: "dimension-driven part: history OBJECT {parameters:{name:number|\"expr\"},features:[...]}. Validate with cad_parametric first. Features have id/type: sketch {plane:XY|YZ|ZX,offset?,sketch:{entities:[...],constraints:[]}}, extrude {sketch:earlierId,depth,operation:new|union|subtract|intersect,direction?:up|down|symmetric}, revolve {sketch,axis:x|y|{line},operation,angle? (deg)}, hole {plane,at:[u,v],diameter,depth}, pattern {feature,kind:linear|circular|grid,count,step|centre,span?,countB?,stepB?}, mirror {feature,plane,offset?}, sweep/loft/shell/fillet (see cad_parametric). Entities use kind, not type: point {id,kind:point,x,y}; line {id,kind:line,p1,p2}; circle {id,kind:circle,center,radius}; arc {id,kind:arc,center,start,end}. References are point IDs. Constraints use type."
+    doc: "dimension-driven part: history OBJECT {parameters:{name:number|\"expr\"},features:[...]}. Validate with cad action parametric_validate first. Features have id/type: sketch {plane:XY|YZ|ZX,offset?,sketch:{entities:[...],constraints:[]}}, extrude {sketch:earlierId,depth,operation:new|union|subtract|intersect,direction?:up|down|symmetric}, revolve {sketch,axis:x|y|{line},operation,angle? (deg)}, hole {plane,at:[u,v],diameter,depth}, pattern {feature,kind:linear|circular|grid,count,step|centre,span?,countB?,stepB?}, mirror {feature,plane,offset?}, sweep/loft/shell/fillet (see cad action parametric_validate). Entities use kind, not type: point {id,kind:point,x,y}; line {id,kind:line,p1,p2}; circle {id,kind:circle,center,radius}; arc {id,kind:arc,center,start,end}. References are point IDs. Constraints use type."
   },
   // ---- containers
   component: {
@@ -216,7 +216,7 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
   }
   if (type === "parametric") {
     const decoded = historySchema.safeParse(element["history"])
-    if (!decoded.success) return { ok: false, error: `parametric.history: ${formatToolValidationError("cad_add_elements", decoded.error)}` }
+    if (!decoded.success) return { ok: false, error: `parametric.history: ${formatToolValidationError("cad_edit action add", decoded.error)}` }
     const history: History = decoded.data
     element["history"] = history
     // Build it now: a history that makes nothing is the model's mistake to hear about, not the user's to find on screen.
@@ -291,5 +291,5 @@ export const withDefaultTolerance = (element: Record<string, unknown>, tolerance
   return warning === undefined ? { element: next } : { element: next, warning }
 }
 
-/** Most elements one `cad_add_elements` call may carry: a call is written by the model token by token, and a huge one is cut off by its output limit. */
+/** Most elements one cad_edit action add call may carry: a call is written by the model token by token, and a huge one is cut off by its output limit. */
 export const MAX_ELEMENTS_PER_CALL = 40

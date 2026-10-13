@@ -1,0 +1,19 @@
+What the assistant keeps between conversations about this project. Reading it changes nothing.
+
+Actions
+- recall: the saved notes of this project, optionally filtered by key prefix.
+- context_read: the project's standing context document (the CAD/CAM answer to a manual): its text and when it was last written.
+
+Parameters
+- recall: prefix (optional; without it every note of the project).
+- context_read: none.
+
+Result (JSON)
+- recall: [{key, value}]; context_read: {text, updatedAt}. An empty document is not a failure.
+
+Do not use it
+- To save a note or change the standing rules: memory_edit.
+- Notes are historical evidence: reconcile them with the document you are working on before acting on them.
+
+After it
+- Use what you read; if it contradicts the live drawing, the drawing wins.

@@ -66,7 +66,7 @@ export const parseProjectContext = (value: unknown): ProjectContextDocument => {
   return { text: "" }
 }
 
-/** A `## Heading` block. The heading is the stable key `project_context { action: "update" }` replaces against. */
+/** A `## Heading` block. The heading is the stable key memory action context_read { action: "update" }` replaces against. */
 export interface ProjectContextSection {
   readonly heading: string
   readonly body: string
@@ -156,13 +156,13 @@ const block = (tag: string, header: ReadonlyArray<string>, body: string, budget:
 
 /**
  * The user's standing rules for this project. Instructions, not data: this is the only block the model is told to
- * follow, and it is the only one that may be edited by the agent (through `project_context`, with `confirm: true`).
+ * follow, and it is the only one that may be edited by the agent (through memory action context_read, with `confirm: true`).
  */
 export const renderProjectContext = (document: string | undefined, budget: number = PROJECT_CONTEXT_BUDGET): string => {
   const text = normalizeProjectContext(document)
   if (text === "") return ""
   return block(
-    "project_context",
+    "memory action context_read",
     [
       "Standing rules the user wrote for this project. Follow them on every request in this project.",
       "They outrank the generic CAD/CAM guidance above and any habit below; a later user message still wins over them.",
@@ -170,7 +170,7 @@ export const renderProjectContext = (document: string | undefined, budget: numbe
     ],
     text,
     Math.max(0, Math.floor(num(budget) ?? PROJECT_CONTEXT_BUDGET)),
-    "\n[Project context truncated; read it with project_context.]"
+    "\n[Project context truncated; read it with memory action context_read.]"
   )
 }
 

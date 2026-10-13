@@ -1,0 +1,32 @@
+Read the machining side of the project. Nothing here changes an operation or a program.
+
+Actions
+- machine: the axes, rotation, zeros and accepted operations of a mill, a lathe or a 3D printer. Call it before programming.
+- operations: the operations of the active drawing with their tool, depth, stepdown, feedrate and whether G-code exists.
+- suggest: depth, stepdown, cutting speed, chip load and warnings for the drawing, from the parameters you give.
+- compare_setups: generate and verify up to four candidate setups against the configured stock and compare them.
+- analyze: static checks of a G-code program (travel limits, rapids below Z0, missing spindle or feed) plus the axis checks of the machine type.
+- stock: the configured stock, its volume and whether the workpiece element matches it.
+- vision: the real CAM preview with its operation and verification context.
+- chain_suggest: the next operation recommended from the current chain.
+- chain_status: one operation's previous operation, rest-tool reference and warnings.
+
+Parameters (mm, mm/min, rpm)
+- machine: machineType (mill|lathe|3dprinter).
+- operations, stock: none.
+- suggest: params - the generator settings you already know (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material, offset, workOffset, ...).
+- compare_setups: candidates - 1 to 4 of {name, params, toolId?, materialId?} from the libraries.
+- analyze: gcode - the program text; machineType to add the axis checks.
+- vision: focus - what to look at, in one line.
+- chain_suggest: fromOperationId, materialHint, toolHint.
+- chain_status: operationId.
+
+Result (JSON)
+- ok; machine gives the limits table; operations the list; suggest the numbers and warnings; analyze the issues (an empty list means "no static findings", never "safe"); chain_status the warnings.
+
+Do not use it
+- To program or verify: cam_edit (create, update, generate, verify, stock_set) writes.
+- To read geometry: cad describes what is being machined.
+
+After it
+- Take the numbers to cam_edit, then analyse and verify the program you generated.

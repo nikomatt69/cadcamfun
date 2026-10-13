@@ -19,7 +19,7 @@ import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
  */
 export const CADCAM_AGENT = "cadcam"
 export const CADCAM_WORKER = SUBAGENTS.researcher.host
-export const BACKGROUND_TOOL_IDS = ["agent_task", "agent_tasks", "agent_task_read", "agent_task_cancel"] as const
+export const BACKGROUND_TOOL_IDS = ["agent"] as const
 
 /** What the read-only researcher may call (verification persists operation metadata, so it is not a worker tool). */
 export const WORKER_TOOL_IDS = SUBAGENTS.researcher.tools

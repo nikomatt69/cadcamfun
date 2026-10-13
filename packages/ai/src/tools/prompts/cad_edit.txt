@@ -1,0 +1,38 @@
+Change the open drawing. This tool is never given to a read-only role: it may add, move, replace and remove geometry.
+
+Actions
+- add: build 3D geometry in the editor's element format (solids, revolutions, extrusions, booleans, lofts, sweeps, curves, standard parts). This is THE way to create objects.
+- add_entities: flat 2D sketch entities, only for a sketch the user explicitly asks for.
+- modify: change fields of existing elements by id.
+- transform: move, turn, scale, or lay out copies of existing elements by id.
+- group: gather elements into one component, or open a component into its parts.
+- delete: remove elements by id. Destructive: the host asks before the tool runs.
+- editor: layers, the view, the section, the selection, show/hide, isolate, undo and redo in the open editor.
+- import: a DXF, SVG, STEP or mesh attachment (or its text) into solids.
+- parametric_create: store a parametric history as an element.
+- parametric_update: change the parameters of a parametric part, keeping its features.
+- parametric_recipe_create: build a standard part and store it in one call.
+
+Parameters (mm, radians; ids are read from cad, never invented)
+- add: elements - 1 to 40 flat objects, each {"type": <element type>, ...fields}; components and layers name parts instead of nesting. Valid elements are added, invalid ones come back under skipped.
+- add_entities: entities - 1 to 500 of line, circle, arc, polyline, rectangle; each with layer, name, color.
+- modify: changes - [{id, changes}] with the fields to set.
+- transform: ids (1-100), dx, dy, dz, rotateAxis (x|y|z), rotateDegrees, scale, about {x,y,z}, copies (0-100, 0 = move only).
+- group: ids (1-200), name, ungroup, layer.
+- delete: ids - the elements to remove.
+- editor: actions - 1 to 40 of layer_create, layer_rename, layer_color, layer_show, layer_hide, layer_lock, layer_unlock, layer_delete, layer_activate, view_3d, view_2d, view_fit, section_on, section_off, select, select_none, show, hide, isolate, undo, redo; with layer, newName, color, moveTo, ids, axis, position (mm), inverted.
+- import: attachment (preferred) or content, format (dxf|svg|step|mesh), depth (mm, required for dxf and svg), up (x|y|z, STEP), scale, gap, tolerance, name, color, layer.
+- parametric_create: history, name, x, y, z, layer.
+- parametric_update: elementId, parameters, expectedRevision (the revision the last inspect returned).
+- parametric_recipe_create: recipe, params, name, x, y, z, layer.
+
+Result (JSON)
+- ok, ids, elements (what was stored, defaults filled), projectId, drawingId; import adds stats and warnings, parametric writes add revision and report.
+- ok:false is a result, not a crash: the reason and, for add, the skipped elements with their errors.
+
+Do not use it
+- To look at the model first: cad (describe, inspect, check) changes nothing and is cheaper than a wrong edit.
+- To move or turn something, use transform; to change one property, use modify. Do not delete and rebuild.
+
+After it
+- cad.check the result, or cad.describe it, before telling the user it is done.

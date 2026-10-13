@@ -44,6 +44,7 @@ interface ElementsState {
   setMousePosition: (position: Point) => void;
   duplicateElement: (id: string) => string | undefined;
   clearSelection: () => void;
+  clearElements: () => void;
   getElementsByLayerId: (layerId: string) => Element[];
   // Multiple selection for CAM operations
   toggleElementSelection: (id: string) => void;
@@ -299,6 +300,15 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
 
   clearSelection: () => {
     set({ selectedElement: null });
+  },
+
+  /**
+   * Drops every element from the editor (used by the project-scoped assistant to swap the live
+   * drawing before it captures a snapshot of the current one). Recorded in history so the
+   * caller can undo the swap.
+   */
+  clearElements: () => {
+    set(state => ({ selectedElement: null, selectedElements: [], ...withHistory(state, []) }));
   },
 
   getElementsByLayerId: layerId => {

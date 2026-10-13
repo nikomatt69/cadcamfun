@@ -1,0 +1,23 @@
+Hand a job to a specialist agent that has only the tools that job needs. The specialist does not see this conversation.
+
+Actions
+- start: give one bounded job to a specialist (researcher, editor, modeler, machinist or reviewer).
+- list: the tasks started from this conversation, with their status.
+- read: the full findings of one task.
+- cancel: stop a task that is no longer needed.
+
+Parameters
+- start: description (one line), prompt (the whole job: the entity ids, values, constraints and what to report), agent (or subagent_type), background (true or false; the default follows the specialist).
+- list: none.
+- read, cancel: taskId (the id the call returned).
+
+Result (JSON)
+- start: the task; with background the call returns at once and the findings arrive later, otherwise it waits and returns the report. read: the task with its status and findings. cancel: the cancelled task.
+
+Do not use it
+- To do the job yourself: delegate only when the work is separable and the specialist has the right tools.
+- Verify what an editing specialist reports (cad.describe, cad.check) before telling the user it is done.
+
+Rules
+- Give real ids, units, constraints, setup and the report you expect; a specialist that has to guess wastes the turn.
+- Editing specialists run one at a time per project; a read-only one runs in the background.

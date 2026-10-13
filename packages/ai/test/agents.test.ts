@@ -1,31 +1,33 @@
 import { describe, expect, test } from "bun:test"
 import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS } from "../src/nikcli/agents.ts"
 import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/nikcli/background-tasks.ts"
-import { backgroundTools } from "../src/nikcli/background-tools.ts"
+import { backgroundToolContributions } from "../src/nikcli/background-tools.ts"
 import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
 import { mapHostEvent, newMapperState } from "../src/nikcli/event-mapper.ts"
-import { LIBRARY_READ_ALL, LIBRARY_WRITE_TOOL_IDS, CHAIN_TOOL_IDS, SIDECAR_TOOL_IDS } from "../src/tools/project-tools.ts"
+import { ACTION_CATALOGUE, ACTION_TOOL_IDS, toolKind } from "../src/actions/catalogue.ts"
+import { DESTRUCTIVE_TOOL_IDS, READ_TOOL_IDS, WRITE_TOOL_IDS } from "../src/tools/project-tools.ts"
 import { TOOL_IDS } from "../src/tools/registry.ts"
 
-const REGISTERED = [...TOOL_IDS, ...SIDECAR_TOOL_IDS]
+const REGISTERED = [...TOOL_IDS]
 
 describe("specialist roster", () => {
-  test("destructive and replacement tools require native approval in default and ask roles", () => {
+  test("a tool that contains a destructive action requires native approval, in every role", () => {
+    expect(DESTRUCTIVE_TOOL_IDS.length).toBeGreaterThan(0)
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
-    for (const name of ["cadcam", "cadcam-ask", "cadcam-editor", "cadcam-editor-ask"]) {
-      expect(config.agent[name]!.permission["cad_delete_entities"]).toBe("ask")
+    for (const id of DESTRUCTIVE_TOOL_IDS) {
+      for (const name of ["cadcam", "cadcam-ask"]) expect(config.agent[name]!.permission[id], name).toBe("ask")
     }
-    for (const name of ["cadcam", "cadcam-ask", "cadcam-machinist", "cadcam-machinist-ask"]) {
-      expect(config.agent[name]!.permission["lib_delete"]).toBe("ask")
-      expect(config.agent[name]!.permission["lib_upsert_tool"]).toBe("ask")
-    }
-    expect(config.agent["cadcam-reviewer"]!.permission["lib_delete"]).toBeUndefined()
+    // The editor deletes elements and the machinist removes library rows: both ask, and the researcher has neither tool.
+    expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toBe("ask")
+    expect(config.agent["cadcam-machinist"]!.permission["library_edit"]).toBe("ask")
+    expect(config.agent["cadcam-researcher"]!.permission["cad_edit"]).toBeUndefined()
   })
-  test("read-only specialists cannot persist verification or launch write-capable workflows", () => {
+
+  test("read-only specialists cannot persist verification, write memory, the libraries or dispatch workflows", () => {
     for (const id of ["researcher", "reviewer"] as const) {
       expect(SUBAGENTS[id].edits).toBe(false)
-      for (const tool of ["cam_verify_toolpath", "actions_run", "memory_remember"]) {
-        expect(SUBAGENTS[id].tools).not.toContain(tool)
+      for (const tool of ["cam_edit", "vcs_edit", "memory_edit", "library_edit", "cad_edit", "parts", "agent"]) {
+        expect(SUBAGENTS[id].tools, `${id} must not have ${tool}`).not.toContain(tool)
       }
     }
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
@@ -33,40 +35,42 @@ describe("specialist roster", () => {
       for (const suffix of ["", "-auto", "-ask"]) {
         const permission = config.agent[`${SUBAGENTS[id].host}${suffix}`]!.permission
         expect(permission["**"]).toBe("deny")
-        expect(permission["cam_verify_toolpath"]).toBeUndefined()
-        expect(permission["actions_run"]).toBeUndefined()
+        for (const tool of WRITE_TOOL_IDS) expect(permission[tool], `${tool} must stay denied`).toBeUndefined()
       }
     }
   })
 
   test("every tool a specialist names exists, and only the editors can change the document", () => {
+    for (const id of SUBAGENT_IDS) for (const tool of SUBAGENTS[id].tools) expect(ACTION_TOOL_IDS).toContain(tool)
+    // Derived from the catalogue's effects, not from a hand-written list of ids.
     for (const id of SUBAGENT_IDS) {
-      for (const tool of SUBAGENTS[id].tools) expect(REGISTERED).toContain(tool)
+      const writes = SUBAGENTS[id].tools.filter((tool) => toolKind(tool) !== "read")
+      expect(writes.length === 0, `${id} writes: ${writes.join(", ")}`).toBe(SUBAGENTS[id].edits)
     }
-    const MUTATING = /^(cad_(add|modify|transform|group|delete|import|editor)|cam_(create|update|generate|verify))/
-    expect(SUBAGENTS.researcher.tools.filter((t) => MUTATING.test(t))).toEqual([])
-    expect(SUBAGENTS.editor.tools.filter((t) => t.startsWith("cam_"))).toEqual([])
-    expect(SUBAGENTS.editor.tools).toContain("cad_modify_entities")
-    expect(SUBAGENTS.machinist.tools.filter((t) => t.startsWith("cad_") && MUTATING.test(t))).toEqual([])
+    for (const id of ["researcher", "reviewer"] as const) for (const tool of READ_TOOL_IDS) expect(SUBAGENTS[id].tools).toContain(tool)
+    expect(SUBAGENTS.editor.tools).toContain("cad_edit")
+    expect(SUBAGENTS.editor.tools).not.toContain("cam_edit")
+    expect(SUBAGENTS.machinist.tools).toContain("cam_edit")
+    expect(SUBAGENTS.machinist.tools).not.toContain("cad_edit")
+    expect(SUBAGENTS.modeler.tools).toContain("cad_edit")
+    expect(SUBAGENTS.modeler.tools).not.toContain("cam_edit")
     // Committing and opening the pull request stay with the main agent.
-    for (const id of SUBAGENT_IDS) for (const t of SUBAGENTS[id].tools) expect(["vcs_start_change", "vcs_commit", "vcs_open_pull_request"]).not.toContain(t)
+    for (const id of SUBAGENT_IDS) expect(SUBAGENTS[id].tools).not.toContain("vcs_edit")
+    for (const id of SUBAGENT_IDS) expect(SUBAGENTS[id].tools).not.toContain("agent")
     // A repeated id would silently widen (or narrow) a permission map, and the host config reflects the set it builds.
     for (const id of SUBAGENT_IDS) expect(new Set(SUBAGENTS[id].tools).size).toBe(SUBAGENTS[id].tools.length)
-    // The user's libraries: every role that reasons about machining or parts reads them (the editor only touches
-    // geometry, so it keeps the material and cutter lookups and no machine configuration).
-    for (const id of ["researcher", "modeler", "machinist", "reviewer"] as const) {
-      for (const t of LIBRARY_READ_ALL) expect(SUBAGENTS[id].tools, `${id} must read ${t}`).toContain(t)
-    }
-    for (const t of ["lib_lookup_component", "lib_lookup_material", "lib_lookup_tool"] as const) expect(SUBAGENTS.editor.tools).toContain(t)
-    // The operation chain is CAM knowledge; the modeller is handed parts, not sequences.
-    for (const id of ["researcher", "machinist", "reviewer"] as const) {
-      for (const t of CHAIN_TOOL_IDS) expect(SUBAGENTS[id].tools, `${id} must read ${t}`).toContain(t)
-    }
-    expect(SUBAGENTS.modeler.tools.filter((t) => CHAIN_TOOL_IDS.includes(t as typeof CHAIN_TOOL_IDS[number]))).toEqual([])
-    // Only the machinist writes the libraries, and the read-only roles never do.
-    for (const id of SUBAGENT_IDS) {
-      const writes = SUBAGENTS[id].tools.filter((t) => LIBRARY_WRITE_TOOL_IDS.includes(t as typeof LIBRARY_WRITE_TOOL_IDS[number]))
-      expect(writes, `${id} must not write the libraries`).toEqual(id === "machinist" ? [...LIBRARY_WRITE_TOOL_IDS] : [])
+    // Every role that reasons about machining or parts reads the user's libraries.
+    for (const id of SUBAGENT_IDS) expect(SUBAGENTS[id].tools, `${id} must read the libraries`).toContain("library")
+    // Only the machinist writes them.
+    expect(SUBAGENTS.machinist.tools).toContain("library_edit")
+    for (const id of SUBAGENT_IDS.filter((other) => other !== "machinist")) expect(SUBAGENTS[id].tools).not.toContain("library_edit")
+  })
+
+  test("no tool mixes read and write effects, which is what makes the allow-lists safe", () => {
+    for (const tool of ACTION_TOOL_IDS) {
+      const kinds = new Set(ACTION_CATALOGUE.filter((action) => action.id.startsWith(`${tool}.`)).map((action) => action.kind))
+      expect(kinds.size === 1 && !(kinds.has("read") && kinds.size > 1), `${tool} mixes ${[...kinds].join(", ")}`).toBe(true)
+      expect(toolKind(tool) === (kinds.has("destructive") ? "destructive" : kinds.has("write") ? "write" : "read")).toBe(true)
     }
   })
 
@@ -80,7 +84,7 @@ describe("specialist roster", () => {
       expect(allowed).toEqual([...SUBAGENTS[id].tools, "invalid", "search_tools", "question"].sort())
       expect(agent.permission["task"]).toBeUndefined()
     }
-    expect(config.agent["cadcam-editor"]!.permission["cam_generate_gcode"]).toBeUndefined()
+    expect(config.agent["cadcam-editor"]!.permission["cam_edit"]).toBeUndefined()
     expect(config.agent["cadcam"]!.permission["task"]).toBe("deny")
   })
 
@@ -88,16 +92,17 @@ describe("specialist roster", () => {
     const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission_mode?: string; permission: Record<string, string> }> }
     expect(config.agent["cadcam-auto"]?.permission_mode).toBe("auto")
     expect(config.agent["cadcam-ask"]?.permission_mode).toBe("default")
-    expect(config.agent["cadcam-ask"]?.permission["cad_parametric"]).toBe("ask")
-    expect(config.agent["cadcam"]?.permission["cad_parametric"]).toBe("allow")
-    expect(config.agent["cadcam-modeler-auto"]?.permission["cam_create_operation"]).toBeUndefined()
+    expect(config.agent["cadcam-ask"]?.permission["cad_edit"]).toBe("ask")
+    expect(config.agent["cadcam"]?.permission["cad_edit"]).toBe("ask")
+    expect(config.agent["cadcam"]?.permission["cam"]).toBe("allow")
+    expect(config.agent["cadcam-modeler-auto"]?.permission["cam_edit"]).toBeUndefined()
     expect(config.agent["cadcam-modeler-auto"]?.permission["**"]).toBe("deny")
   })
 
   test("a tool the project did not register is left out of the specialist's permissions", () => {
-    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: ["cad_describe_drawing"], systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
-    expect(config.agent["cadcam-editor"]!.permission["cad_modify_entities"]).toBeUndefined()
-    expect(config.agent["cadcam-editor"]!.permission["cad_describe_drawing"]).toBe("allow")
+    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: ["cad"], systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toBeUndefined()
+    expect(config.agent["cadcam-editor"]!.permission["cad"]).toBe("allow")
   })
 })
 
@@ -156,14 +161,14 @@ describe("task manager with specialists", () => {
   })
 })
 
-const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
-const agentTask = (manager: BackgroundTaskManager) => backgroundTools(manager).find((t) => t.id === "agent_task")!
+const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal, handlers: {} as never }
+const start = (manager: BackgroundTaskManager) => backgroundToolContributions(manager)["agent.start"]!
 
-describe("agent_task", () => {
+describe("agent.start", () => {
   test("an editing specialist is waited for and its report is the call's result", async () => {
     const seen: BackgroundTaskRunnerInput[] = []
     const manager = new BackgroundTaskManager({ runner: async (input) => (seen.push(input), "moved the bracket") })
-    const result = JSON.parse(await agentTask(manager).execute({ description: "move", prompt: "move box-1 up 20", agent: "editor" }, ctx))
+    const result = await start(manager)({ description: "move", prompt: "move box-1 up 20", agent: "editor" } as never, ctx)
     expect(result).toMatchObject({ status: "completed", text: "moved the bracket", agent: "editor" })
     expect(seen[0]).toMatchObject({ agent: "editor", edits: true, background: false })
     await manager.dispose()
@@ -172,18 +177,18 @@ describe("agent_task", () => {
   test("a researcher returns at once; the nikcli spelling and the host name both resolve", async () => {
     const hold = gate()
     const manager = new BackgroundTaskManager({ runner: async () => (await hold.promise, "found") })
-    const queued = JSON.parse(await agentTask(manager).execute({ description: "d", prompt: "p" }, ctx))
+    const queued = await start(manager)({ description: "d", prompt: "p" } as never, ctx)
     expect(queued).toMatchObject({ background: true, agent: "researcher" })
-    expect(["queued", "running"]).toContain(queued.status)
-    const alias = JSON.parse(await agentTask(manager).execute({ description: "d", prompt: "p", subagent_type: "cadcam-machinist", background: "true", extra: 1 }, ctx))
+    expect(["queued", "running"]).toContain((queued as { status: string }).status)
+    const alias = await start(manager)({ description: "d", prompt: "p", subagent_type: "cadcam-machinist", background: "true" } as never, ctx)
     expect(alias).toMatchObject({ agent: "machinist", edits: true, background: true })
     hold.open()
     await manager.dispose()
   })
 
-  test("an unknown agent is refused with the names to use", async () => {
+  test("an unknown agent is refused with the names to use, not thrown", async () => {
     const manager = new BackgroundTaskManager({ runner: async () => "x" })
-    await expect(agentTask(manager).execute({ description: "d", prompt: "p", agent: "welder" }, ctx)).rejects.toThrow(/editor, modeler, machinist|researcher, editor/)
+    expect(await start(manager)({ description: "d", prompt: "p", agent: "welder" } as never, ctx)).toMatchObject({ ok: false, error: /editor, modeler, machinist/ })
     await manager.dispose()
   })
 })
@@ -194,17 +199,17 @@ describe("specialist events reach the parent's stream", () => {
   test("a child's tool calls are forwarded with the agent; its text is not", () => {
     const release = adoptChildSession("parent", "child", "editor")
     const state = newMapperState()
-    const call = part("child", "tool", { callID: "c1", tool: "cad_modify_entities", state: { status: "running", input: { id: "a" } } })
-    const done = part("child", "tool", { callID: "c1", tool: "cad_modify_entities", state: { status: "completed", output: "{\"ok\":true}" } })
-    expect(mapHostEvent("parent", call, state)).toEqual([{ type: "tool_call", sessionId: "parent", agent: "editor", callId: "child:c1", tool: "cad_modify_entities", input: { id: "a" } }])
-    expect(mapHostEvent("parent", done, state)).toEqual([{ type: "tool_result", sessionId: "parent", agent: "editor", callId: "child:c1", tool: "cad_modify_entities", ok: true, output: "{\"ok\":true}" }])
+    const call = part("child", "tool", { callID: "c1", tool: "cad_edit", state: { status: "running", input: { action: "modify" } } })
+    const done = part("child", "tool", { callID: "c1", tool: "cad_edit", state: { status: "completed", output: "{\"ok\":true}" } })
+    expect(mapHostEvent("parent", call, state)).toEqual([{ type: "tool_call", sessionId: "parent", agent: "editor", callId: "child:c1", tool: "cad_edit", input: { action: "modify" } }])
+    expect(mapHostEvent("parent", done, state)).toEqual([{ type: "tool_result", sessionId: "parent", agent: "editor", callId: "child:c1", tool: "cad_edit", ok: true, output: "{\"ok\":true}" }])
     expect(mapHostEvent("parent", part("child", "text", { text: "hello" }), state)).toEqual([])
     expect(mapHostEvent("parent", part("child", "tool", { callID: "t", tool: "todowrite", state: { status: "running", input: {} } }), state)).toEqual([])
     release()
-    expect(mapHostEvent("parent", part("child", "tool", { callID: "c2", tool: "cad_describe_drawing", state: { status: "running", input: {} } }), state)).toEqual([])
+    expect(mapHostEvent("parent", part("child", "tool", { callID: "c2", tool: "cad", state: { status: "running", input: { action: "describe" } } }), state)).toEqual([])
   })
 
   test("a session that is nobody's child stays out", () => {
-    expect(mapHostEvent("parent", part("stranger", "tool", { callID: "c", tool: "cad_describe_drawing", state: { status: "running", input: {} } }), newMapperState())).toEqual([])
+    expect(mapHostEvent("parent", part("stranger", "tool", { callID: "c", tool: "cad", state: { status: "running", input: { action: "describe" } } }), newMapperState())).toEqual([])
   })
 })

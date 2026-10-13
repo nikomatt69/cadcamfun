@@ -1,17 +1,20 @@
 /**
  * The specialist agents the `cadcam` agent delegates to (nikcli's `Agent` roster and `SUBAGENT_TOOLSETS`): each has a
  * name, a prompt that says how it works, and a curated tool set, so a job runs with exactly the tools it needs and
- * nothing else. The host config (`config.ts`), the `agent_task` tool and the runner all read this one list.
+ * nothing else. The host config (`config.ts`), the `agent` tool and the runner all read this one list.
  *
- * An agent that edits the document (`edits`) runs in the parent's turn by default, one at a time per project, and its tool
- * results reach the editor live through the parent's stream (`adoptChildSession`). A read-only agent runs in the
+ * The lists name **tool ids**, and a tool may not mix effects, so the cut between reading and changing is enforced by
+ * the catalogue: `cad`, `cam`, `library`, `vcs` and `memory` cannot change anything, while `cad_edit`, `cam_edit`,
+ * `parts`, `library_edit`, `memory_edit`, `vcs_edit` and `agent` always do (`agents.test.ts` derives both halves).
+ *
+ * An agent that edits the document (`edits`) runs in the parent's turn by default, one at a time per project, and its
+ * tool results reach the editor live through the parent's stream (`adoptChildSession`). A read-only agent runs in the
  * background and wakes the parent with its findings.
  */
 
 import { specialistPrompt } from "./prompts/index.ts"
 import { SPECIALIST_NATIVE_TOOLS } from "./tool-registry.ts"
-import { NATIVE_APPROVAL_TOOL_IDS } from "./permission-modes.ts"
-import { LIBRARY_READ_ALL, LIBRARY_READ_TOOL_IDS, CHAIN_TOOL_IDS, COMPONENT_TOOL_IDS, LIBRARY_WRITE_TOOL_IDS } from "../tools/project-tools.ts"
+import { DESTRUCTIVE_TOOL_IDS } from "../tools/project-tools.ts"
 
 export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer"] as const
 export type SubagentId = (typeof SUBAGENT_IDS)[number]
@@ -32,21 +35,10 @@ export interface SubagentSpec {
   readonly timeoutMs: number
 }
 
-
 const MINUTE = 60_000
 
-/** Read-only view of the user's libraries: materials, cutters, saved machines, components and the operation chain. */
-const LIBRARY_READ = LIBRARY_READ_ALL
-
-/** Operation chain: what the next operation should be, and the state of one operation in the chain. */
-const CHAIN_READ = CHAIN_TOOL_IDS
-
-/**
- * Version control, read-only: where the project stands (branch, uncommitted files, open pull requests) and what changed.
- * Starting a change, committing and opening the pull request stay with the main agent, which owns the change as a whole;
- * a specialist's edits land on the branch it was started on. Write-capable workflows belong to the CAM specialist.
- */
-const VCS_READ = ["vcs_status", "vcs_diff", "vcs_list_pull_requests"] as const
+/** Read-only view of the drawing, the machine, the libraries, the project history and the outside world. */
+const READS = ["cad", "cam", "library", "vcs", "memory", "research"] as const
 
 export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   researcher: {
@@ -54,12 +46,8 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-worker",
     description: "Read-only investigator: inspects the drawing, operations, machine, materials, tools and G-code and returns findings. Cannot change anything.",
     prompt: specialistPrompt("researcher"),
-    // Verification persists operation metadata, so it is not here.
-    tools: [
-      "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cad_vision", "cam_vision", "cad_describe_drawing", "cad_check_design", "cam_list_operations", "cam_suggest_parameters",
-      "cam_describe_machine", "cam_analyze_gcode", "memory_recall",
-      ...LIBRARY_READ, ...CHAIN_READ, ...VCS_READ
-    ],
+    // Verification stores a program and a report (`cam_edit`), so it is not here: this role reads reports, it does not make them.
+    tools: [...READS],
     edits: false,
     background: true,
     steps: 40,
@@ -70,13 +58,8 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-editor",
     description: "Minimal-change editor: changes, moves, scales, regroups or removes specific existing entities and touches nothing else. Use for \"make this hole 8 mm\", \"move the bracket 20 mm up\", \"rename the layer\".",
     prompt: specialistPrompt("editor"),
-    // Reusing a stored part is an edit like any other; the libraries stay read-only for this role.
-    tools: [
-      "cad_inspect", "cad_component_relations", "attachment_read", "cad_vision", "cad_parametric", "cad_describe_drawing", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor",
-      "cad_delete_entities", "cad_check_design", "memory_recall",
-      "cad_component_list", "cad_component_insert",
-      "lib_lookup_component", "lib_lookup_material", "lib_lookup_tool", ...VCS_READ
-    ],
+    // It edits and places saved parts; the libraries stay read-only for this role.
+    tools: ["cad", "cad_edit", "library", "parts", "memory", "research", "vcs"],
     edits: true,
     background: false,
     steps: 40,
@@ -87,14 +70,8 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-modeler",
     description: "3D modeller: builds new geometry (solids, booleans, revolutions, imported drawings) for one well-described part or group.",
     prompt: specialistPrompt("modeler"),
-    // A reusable part comes from the project's components; libraries stay read-only here (a new cutter or machine is
-    // a decision for the machinist or the user).
-    tools: [
-      "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cad_vision", "cad_parametric", "cad_describe_drawing", "cad_add_elements", "cad_add_entities", "cad_import_drawing", "cad_group_entities",
-      "cad_transform_entities", "cad_check_design", "memory_recall",
-      ...COMPONENT_TOOL_IDS,
-      ...LIBRARY_READ_TOOL_IDS, ...VCS_READ
-    ],
+    // A reusable part comes from the project's components; a new cutter or machine is a decision for the machinist or the user.
+    tools: ["cad", "cad_edit", "library", "parts", "memory", "research", "vcs"],
     edits: true,
     background: false,
     steps: 60,
@@ -107,12 +84,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     prompt: specialistPrompt("machinist"),
     // The CAM specialist owns the libraries: it reads them, and may add a cutter, a material or a machine the shop
     // actually has, or remove one that is gone. Model confirmation is not native human approval.
-    tools: [
-      "cam_stock", "cad_inspect", "cad_component_relations", "web_search", "attachment_read", "cam_vision", "cad_describe_drawing", "cad_check_design", "cam_describe_machine", "cam_create_operation", "cam_list_operations",
-      "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
-      ...LIBRARY_READ, ...LIBRARY_WRITE_TOOL_IDS, ...CHAIN_READ,
-      "memory_recall", ...VCS_READ, "actions_run"
-    ],
+    tools: ["cad", "cam", "cam_edit", "library", "library_edit", "memory", "research", "vcs", "vcs_edit"],
     edits: true,
     background: false,
     steps: 60,
@@ -123,11 +95,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-reviewer",
     description: "Reviews a pull request: reads the diff, the workflow runs and the verification reports, then writes a verdict. Read-only.",
     prompt: specialistPrompt("reviewer"),
-    tools: [
-      "vcs_status", "vcs_diff", "vcs_list_pull_requests", "cam_list_operations",
-      "cam_analyze_gcode", "cad_describe_drawing", "cad_check_design", "cam_describe_machine",
-      ...LIBRARY_READ, ...CHAIN_READ, "memory_recall"
-    ],
+    tools: ["cad", "cam", "library", "vcs", "memory"],
     edits: false,
     background: true,
     steps: 40,
@@ -144,16 +112,15 @@ export const subagentById = (id: string | undefined): SubagentSpec => SUBAGENTS[
 export const subagentPermission = (spec: SubagentSpec, registeredToolIds: ReadonlyArray<string>): Record<string, "allow" | "deny" | "ask"> => {
   const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
   for (const id of spec.tools) if (registeredToolIds.includes(id)) permission[id] = "allow"
-  for (const id of NATIVE_APPROVAL_TOOL_IDS) {
-    if (permission[id] === "allow") permission[id] = "ask"
-  }
+  // A tool that contains a destructive action asks natively; the catalogue is where that is decided.
+  for (const id of DESTRUCTIVE_TOOL_IDS) if (permission[id] === "allow") permission[id] = "ask"
   for (const id of SPECIALIST_NATIVE_TOOLS) permission[id] = "allow"
   // The confined program runner sees only the tools allowed above.
   permission["code_mode"] = "allow"
   return permission
 }
 
-/** What the model reads in the `agent_task` description: who it can delegate to. */
+/** What the model reads in the `agent.start` description: who it can delegate to. */
 export const subagentCatalogue = (): string =>
   SUBAGENT_IDS.map((id) => {
     const spec = SUBAGENTS[id]

@@ -12,7 +12,7 @@ export const toolValidationFailure = (tool: string, error: z.ZodError) => {
       hints.add('Send history as a JSON object {"parameters":{},"features":[...]}, never as a string containing JSON.')
     }
     if (issue.path.includes("entities") && issue.path.at(-1) === "kind") {
-      hints.add('Sketch entities use kind: "point", "line", "circle" or "arc"; features and constraints use type. Lines reference point IDs through p1/p2; circles reference a point ID through center. See cad_parametric for a complete validate example.')
+      hints.add('Sketch entities use kind: "point", "line", "circle" or "arc"; features and constraints use type. Lines reference point IDs through p1/p2; circles reference a point ID through center. See cad action parametric_validate for a complete validate example.')
     }
   }
   hints.add(`Correct the named fields and retry ${tool}; do not repeat unchanged arguments or switch tools to bypass validation.`)

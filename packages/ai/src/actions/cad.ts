@@ -1,0 +1,143 @@
+/**
+ * `cad` — everything that reads the open drawing. No action here changes the document, the operations or the
+ * libraries: inspection never provisions a project, a drawing or a default (the sidecar's handlers enforce that too),
+ * which is what lets the read-only specialists have the whole tool.
+ */
+import { z } from "zod"
+import { CadInspectionElements, CadInspectionLayers, CadInspectionProperty, CadInspectionSearch } from "@cadcamfun/api"
+import { visionInputSchema } from "../vision.ts"
+import { nikcliWireSchema } from "../tools/wire-schema.ts"
+import { ToolMediaResult } from "../tools/define.ts"
+import { defineAction, type ActionContext, type ActionParameters, type ActionSpec } from "./action.ts"
+import type { CadInspectionInput as CadInspectionInputWire } from "@cadcamfun/api"
+import {
+  parametricDfmSchema, parametricFastenerSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
+  runParametricDfm, runParametricFastener, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
+} from "./parametric.ts"
+
+/** A leaf's own parameters: the wire schema without its `action` literal, which the tool adds as the discriminator. */
+const leaf = (schema: { omit: (mask: Record<string, true>) => unknown }) => schema.omit({ action: true }) as ActionParameters
+
+/** What `cadInspect` receives: the shared contract with the host's own defaults filled in. */
+export type CadInspectionInput =
+  | (Extract<CadInspectionInputWire, { action: "elements" }> & { offset: number; limit: number })
+  | Extract<CadInspectionInputWire, { action: "layers" }>
+  | (Extract<CadInspectionInputWire, { action: "search" }> & { limit: number })
+  | (Extract<CadInspectionInputWire, { action: "property" }> & { offset: number; maxChars: number })
+export type CadComponentRelationsInput = { firstId: string; secondId: string }
+
+/** The host's defaults (`offset` 0, `limit` 10/20, `maxChars` 10000) the handler reads; the wire schema stays free of transforms. */
+const withDefaults = (value: Record<string, unknown>): Record<string, unknown> => {
+  switch (value["action"]) {
+    case "elements": return { offset: 0, limit: 10, ...value }
+    case "search": return { limit: 20, ...value }
+    case "property": return { offset: 0, maxChars: 10_000, ...value }
+    default: return value
+  }
+}
+
+export const cadGrepParameters = z.object({
+  query: z.string().min(1).max(200),
+  layerId: z.string().min(1).max(100).optional(),
+  /** Restrict to parametric parts. Off by default so one search also finds the plain geometry of a big project. */
+  parametricOnly: z.boolean().default(false),
+  /** Inline each parametric hit's full parameter set, so finding a part and reading its parameters is one call. */
+  includeParameters: z.boolean().default(true),
+  offset: z.number().int().nonnegative().default(0),
+  limit: z.number().int().min(1).max(50).default(20)
+})
+export type CadGrepInput = z.infer<typeof cadGrepParameters>
+
+const inspect = (action: string) => (input: unknown, context: ActionContext) =>
+  context.handlers.cadInspect === undefined
+    ? { ok: false, error: "Inspection is unavailable in this host." }
+    : context.handlers.cadInspect(context.projectId, withDefaults({ ...(input as Record<string, unknown>), action }) as never)
+
+const vision = (mode: "cad" | "cam", filename: string) => async (input: z.infer<typeof visionInputSchema>, context: ActionContext) => {
+  if (context.handlers.vision === undefined) return { ok: false, error: "Viewport capture is unavailable in this host." }
+  const result = await context.handlers.vision(context.projectId, mode, input.focus, context.signal)
+  if (!result.ok) return result
+  return new ToolMediaResult(result.evidence, [{ type: "file", mime: result.capture.mime, filename, url: `data:${result.capture.mime};base64,${result.capture.data}` }])
+}
+
+export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
+  defineAction({
+    id: "cad.describe", kind: "read", replaces: "cad_describe_drawing",
+    parameters: z.object({}),
+    run: (_input, { handlers, projectId }) => handlers.describeDrawing(projectId)
+  }),
+  defineAction({
+    id: "cad.check", kind: "read", replaces: "cad_check_design",
+    parameters: z.object({}),
+    run: (_input, { handlers, projectId }) => handlers.checkDesign(projectId)
+  }),
+  defineAction({
+    id: "cad.relations", kind: "read", replaces: "cad_component_relations",
+    parameters: z.object({ firstId: z.string().min(1), secondId: z.string().min(1) }),
+    run: (input, { handlers, projectId }) =>
+      handlers.cadComponentRelations === undefined
+        ? { ok: false, error: "Inspection is unavailable in this host." }
+        : handlers.cadComponentRelations(projectId, input)
+  }),
+  defineAction({
+    id: "cad.grep", kind: "read", replaces: "cad_grep",
+    parameters: cadGrepParameters,
+    run: (input, { handlers, projectId }) =>
+      handlers.grep === undefined ? { ok: false, error: "Drawing search is unavailable in this host." } : handlers.grep(projectId, input)
+  }),
+  defineAction({
+    id: "cad.vision", kind: "read", replaces: "cad_vision",
+    parameters: visionInputSchema,
+    run: vision("cad", "cad-viewport.png")
+  }),
+  defineAction({
+    id: "cad.inspect_elements", kind: "read", replaces: "cad_inspect",
+    parameters: leaf(nikcliWireSchema(CadInspectionElements)),
+    run: inspect("elements")
+  }),
+  defineAction({
+    id: "cad.inspect_layers", kind: "read", replaces: "cad_inspect",
+    parameters: leaf(nikcliWireSchema(CadInspectionLayers)),
+    run: inspect("layers")
+  }),
+  defineAction({
+    id: "cad.inspect_search", kind: "read", replaces: "cad_inspect",
+    parameters: leaf(nikcliWireSchema(CadInspectionSearch)),
+    run: inspect("search")
+  }),
+  defineAction({
+    id: "cad.inspect_property", kind: "read", replaces: "cad_inspect",
+    parameters: leaf(nikcliWireSchema(CadInspectionProperty)),
+    run: inspect("property")
+  }),
+  defineAction({
+    id: "cad.parametric_validate", kind: "read", replaces: "cad_parametric",
+    parameters: parametricValidateSchema,
+    run: (input) => runParametricValidate(input)
+  }),
+  defineAction({
+    id: "cad.parametric_inspect", kind: "read", replaces: "cad_parametric",
+    parameters: parametricInspectSchema,
+    run: (input, context) => runParametricInspect(input, context)
+  }),
+  defineAction({
+    id: "cad.parametric_test", kind: "read", replaces: "cad_parametric",
+    parameters: parametricTestSchema,
+    run: (input, context) => runParametricTest(input, context)
+  }),
+  defineAction({
+    id: "cad.parametric_dfm", kind: "read", replaces: "cad_parametric",
+    parameters: parametricDfmSchema,
+    run: (input, context) => runParametricDfm(input, context)
+  }),
+  defineAction({
+    id: "cad.parametric_fastener", kind: "read", replaces: "cad_parametric",
+    parameters: parametricFastenerSchema,
+    run: (input) => runParametricFastener(input)
+  }),
+  defineAction({
+    id: "cad.parametric_recipe", kind: "read", replaces: "cad_parametric",
+    parameters: parametricRecipeSchema,
+    run: (input, context) => runParametricRecipe(input, context)
+  })
+]

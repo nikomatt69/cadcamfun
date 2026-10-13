@@ -1,0 +1,21 @@
+Read-only version control: where the project stands and what a person is being asked to review.
+
+Actions
+- status: the checked-out branch, uncommitted files, branches and open pull requests. Call it before changing anything.
+- diff: entity-level changes between two revisions (property path, before, after); `from` defaults to main.
+- list_pull_requests: the project's pull requests with their review verdicts.
+
+Parameters
+- status: none.
+- diff: from (branch, tag or commit id; defaults to main), to (defaults to HEAD).
+- list_pull_requests: state (open|merged|closed, default open).
+
+Result (JSON)
+- ok; status the branch, dirty paths and open pull requests; diff one entry per changed entity; list_pull_requests the verdicts.
+
+Do not use it
+- To record work: vcs_edit starts a change, commits, restores, opens the pull request and runs the workflows.
+- A specialist never commits: the agent that owns the change does, on an ai/* branch, and a person merges.
+
+After it
+- Read the diff before writing a pull-request body; cite what changed by name.

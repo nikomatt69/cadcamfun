@@ -6,7 +6,7 @@ import { ProjectVcsRepo } from "../src/repos/project-vcs-repo.ts"
 import { GitHubTransports, ProjectVcs, type Actor } from "../src/services/project-vcs.ts"
 import { Repository, memoryBackend, repositoryTransport } from "@cadcamfun/vcs"
 import { WorkflowRunner } from "../src/services/workflow-runner.ts"
-import { vcsToolSpecs } from "../src/services/ai-vcs-tools.ts"
+import { vcsContributions } from "../src/services/ai-vcs-tools.ts"
 
 const migrationsFolder = new URL("../../../packages/db/drizzle", import.meta.url).pathname
 const transport = Layer.succeed(GitHubTransports, GitHubTransports.of({ make: () => repositoryTransport(new Repository(memoryBackend())) }))
@@ -27,16 +27,16 @@ test("AI VCS tools deny visible read-only members before workflow or branch muta
     const actor: Actor = { userId: member.id, name: "Member", email: "member@test.local" }
     let triggers = 0
     const runner = { trigger: () => Effect.sync(() => { triggers++; return [] }) } as unknown as WorkflowRunner["Service"]
-    const tools = vcsToolSpecs({ vcs, projects, runner, actor })
-    const ctx = { projectId: project.id, sessionId: "s", signal: new AbortController().signal }
+    const contributions = vcsContributions({ vcs, projects, runner, actor })
+    const ctx = { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }
     expect(yield* projects.find(member.id, project.id)).toBeDefined()
     for (const [id, input] of [
-      ["vcs_start_change", { topic: "plate" }], ["vcs_commit", { message: "Save" }],
-      ["vcs_restore_paths", { paths: ["drawings/d.json"], from: "main" }],
-      ["vcs_open_pull_request", { title: "Plate" }], ["actions_run", { trigger: "manual" }]
+      ["vcs_edit.start_change", { topic: "plate" }], ["vcs_edit.commit", { message: "Save" }],
+      ["vcs_edit.restore", { paths: ["drawings/d.json"], from: "main" }],
+      ["vcs_edit.open_pull_request", { title: "Plate", body: "" }], ["vcs_edit.run_workflows", { trigger: "manual" }]
     ] as const) {
-      const result = yield* Effect.promise(() => tools.find((tool) => tool.id === id)!.execute(input, ctx))
-      expect(JSON.parse(result)).toEqual({ ok: false, error: "You do not have permission to write this project" })
+      const refused = yield* Effect.promise(() => contributions[id]!(input as never, ctx).then(() => "ran", (error: Error) => error.message))
+      expect(refused, id).toBe("You do not have permission to write this project")
     }
     expect(triggers).toBe(0)
     expect(db.select().from(schema.gitRefTable).all()).toEqual([])
@@ -54,12 +54,12 @@ test("VCS tool actor is captured at invocation, not at cached tool registration"
     let current = first.id
     const actor: Actor = { get userId() { return current }, name: "User", email: "user@test.local" }
     const runner = {} as WorkflowRunner["Service"]
-    const status = vcsToolSpecs({ vcs, projects, runner, actor }).find((tool) => tool.id === "vcs_status")!
+    const status = vcsContributions({ vcs, projects, runner, actor })["vcs.status"]!
+    const ctx = { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }
     current = second.id
-    const result = yield* Effect.promise(() => status.execute({}, { projectId: project.id, sessionId: "s", signal: new AbortController().signal }))
-    expect(JSON.parse(result).ok).toBe(true)
+    expect(yield* Effect.promise(() => status({} as never, ctx))).toMatchObject({ dirty: expect.anything() })
     current = first.id
-    const denied = yield* Effect.promise(() => status.execute({}, { projectId: project.id, sessionId: "s", signal: new AbortController().signal }))
-    expect(JSON.parse(denied).ok).toBe(false)
+    const denied = yield* Effect.promise(() => status({} as never, ctx).then(() => "ran", (error: Error) => error.message))
+    expect(denied).toMatch(/No such project|permission/)
   }).pipe(Effect.provide(Live), Effect.scoped))
 })

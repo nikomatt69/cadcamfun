@@ -1,0 +1,17 @@
+Save what was learned, so the next conversation starts where this one stopped.
+
+Actions
+- remember: store one note under a stable key; writing the key again replaces it.
+- context_update: replace or add one section (by its heading) of the project's standing context document.
+
+Parameters
+- remember: key (letters, digits, dot, dash, underscore; up to 80 characters), value (up to 2000).
+- context_update: heading (the section's name), content (the section's body).
+
+Result (JSON)
+- ok, key; context_update returns the document the store actually kept, plus changed: true. If it did not keep it, ok:false says so.
+
+Do not use it
+- To read them first: memory.
+- Keep notes to confirmed, reusable facts: setup, machine and work offset, material, workholding, named design constraints, user corrections. Never store secrets, speculative geometry, failed operations or conversation transcripts.
+- The standing context changes every later conversation in this project: write only what the user confirmed.

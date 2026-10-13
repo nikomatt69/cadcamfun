@@ -35,8 +35,8 @@ export * from "./heartbeat.ts"
 export { readHostSessionState, type HostSessionState } from "./nikcli/chat.ts"
 export {
   BACKGROUND_TOOL_IDS,
-  backgroundToolIds,
-  backgroundTools
+  backgroundToolContributions,
+  backgroundToolIds
 } from "./nikcli/background-tools.ts"
 export { BackgroundToolsRunner } from "./nikcli/background-tools-runner.ts"
 export {
@@ -51,14 +51,15 @@ export {
   type BackgroundTaskRunnerInput,
   type BackgroundTaskStatus
 } from "./nikcli/background-tasks.ts"
-export { backgroundToolSpecs, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
+export { backgroundToolContributionsFor, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
 
 export * from "./parametric.ts"
-export type { ParametricInput, ParametricHandlerInput } from "./tools/cad_parametric.ts"
+export type { ParametricInput } from "./actions/parametric.ts"
 export * from "./vision.ts"
 export * from "./web-search.ts"
-export type { cadInspectInput } from "./tools/cad_inspect.ts"
-export type { cadComponentRelationsInput } from "./tools/cad_component_relations.ts"
+export type { CadInspectionInput, CadComponentRelationsInput, CadGrepInput } from "./actions/cad.ts"
+export type { SetupCandidate } from "./actions/cam.ts"
+export { EDITOR_ACTIONS, entityZod } from "./actions/cad-edit.ts"
 
 export * from "./project-memory.ts"
 export * from "./project-context.ts"

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 import { z } from "zod"
 import { BUILT_IN_TOOLS, TOOL_IDS, buildTools, defineTool } from "../src/tools/catalogue.ts"
+import { ACTION_CATALOGUE, REPLACED_TOOL_IDS, actionsOf, toolOf } from "../src/actions/catalogue.ts"
 
 const dir = new URL("../src/tools/", import.meta.url).pathname
 const calls: Array<{ method: string; args: unknown[] }> = []
@@ -9,13 +10,15 @@ const handlers = new Proxy({} as never, {
   get: (_t, method: string) => async (...args: unknown[]) => { calls.push({ method, args }); return { ok: true, method } }
 })
 
-describe("one definition per tool (nikcli style)", () => {
+describe("one action tool per capability boundary (nikcli style)", () => {
   test("every tool id has a tools/<id>.ts that defines it, next to prompts/<id>.txt", () => {
     for (const id of TOOL_IDS) {
       expect(existsSync(`${dir}${id}.ts`), `${id}.ts`).toBe(true)
       expect(existsSync(`${dir}prompts/${id}.txt`), `${id}.txt`).toBe(true)
     }
-    const files = readdirSync(dir).filter((f) => /^(cad|cam|lib|memory|attachment|web|project)_.*\.ts$/.test(f)).map((f) => f.slice(0, -3)).sort()
+    const files = readdirSync(dir)
+      .filter((f) => /^(cad|cam|lib|memory|vcs|research|agent|parts)_?[a-z_]*\.ts$/.test(f) && f !== "catalogue.ts" && f !== "action.ts" && f !== "define.ts" && f !== "handlers.ts" && f !== "lenient-arguments.ts" && f !== "project-tools.ts" && f !== "registry.ts" && f !== "wire-schema.ts" && f !== "web_search.ts")
+      .map((f) => f.slice(0, -3)).sort()
     expect(files).toEqual([...TOOL_IDS].sort())
   })
 
@@ -24,10 +27,19 @@ describe("one definition per tool (nikcli style)", () => {
     for (const tool of BUILT_IN_TOOLS) expect(tool.description.length).toBeGreaterThan(200)
   })
 
+  test("every capability is declared once: the catalogue is the only source of tool ids", () => {
+    const ids = new Set(ACTION_CATALOGUE.map((action) => action.id))
+    expect(ids.size).toBe(ACTION_CATALOGUE.length)
+    expect(TOOL_IDS.every((tool) => ACTION_CATALOGUE.some((action) => toolOf(action) === tool))).toBe(true)
+    expect(BUILT_IN_TOOLS.every((tool) => Object.keys(actionsOf(tool.id)).length > 0)).toBe(true)
+    // Every retired per-verb id is mapped to the action that replaced it (spec 26 §6.2).
+    for (const replaced of REPLACED_TOOL_IDS) expect(ACTION_CATALOGUE.some((action) => action.replaces === replaced), replaced).toBe(true)
+  })
+
   test("a tool runs its action on the handlers of the active project and answers JSON text", async () => {
     calls.length = 0
-    const tool = buildTools(handlers, "project-1").find((t) => t.id === "cam_list_operations")!
-    const out = await tool.execute({}, { sessionId: "s", projectId: "project-1", signal: new AbortController().signal })
+    const tool = buildTools(handlers, "project-1").find((t) => t.id === "cam")!
+    const out = await tool.execute({ action: "operations" }, { sessionId: "s", projectId: "project-1", signal: new AbortController().signal })
     expect(JSON.parse(out)).toEqual({ ok: true, method: "listOperations" })
     expect(calls).toEqual([{ method: "listOperations", args: ["project-1"] }])
   })
@@ -42,7 +54,8 @@ describe("one definition per tool (nikcli style)", () => {
     expect(specs).toHaveLength(TOOL_IDS.length + 1)
     const spec = specs.find((s) => s.id === "ext_ping")!
     expect(JSON.parse(await spec.execute({ n: 2 }, { sessionId: "s", projectId: "p", signal: new AbortController().signal }))).toEqual({ pong: 2, projectId: "p" })
-    expect(() => buildTools(handlers, "p", [defineTool("cam_list_operations", { parameters: z.object({}), execute: async () => ({}) })])).toThrow("Duplicate tool id")
+    const clash = defineTool("cam", { description: "Clash.", parameters: z.object({}), execute: async () => ({}) })
+    expect(() => buildTools(handlers, "p", [clash])).toThrow("Duplicate tool id")
   })
 
   test("a tool without a prompt file and without a description cannot be defined", () => {
@@ -82,7 +95,6 @@ describe("arguments written the XML way", () => {
     // Already well-formed arguments are untouched.
     const good = { elements: [{ type: "cube", width: 5, operands: [0, 1], name: "a" }] }
     expect(sanitizeArguments(good)).toEqual(good)
-    const { z } = await import("zod")
     const schema = lenient(z.object({ elements: z.array(z.looseObject({ type: z.string() })).min(1) }))
     expect(schema.safeParse({ elements: { item: { type: "cube", width: "5" } } }).success).toBe(true)
     expect(z.toJSONSchema(schema, { io: "input" })).toBeDefined()
@@ -91,7 +103,7 @@ describe("arguments written the XML way", () => {
 
 describe("assemblies without nesting", () => {
   test("elements that name the same component become one component, booleans and their operands stay out", async () => {
-    const { groupIntoComponents } = await import("../src/tools/cad_add_elements.ts")
+    const { groupIntoComponents } = await import("../src/actions/cad-edit.ts")
     const { normalizeElement } = await import("../src/element-catalog.ts")
     const entry = (index: number, input: Record<string, unknown>) => { const r = normalizeElement(input); if (!r.ok) throw new Error(r.error); return { index, element: r.element } }
     const kept = [
@@ -111,15 +123,15 @@ describe("assemblies without nesting", () => {
   })
 })
 
-describe("cad_editor section actions", () => {
+describe("cad_edit editor actions", () => {
   test("section_on needs a position; section_off needs nothing", async () => {
-    const { cadEditor } = await import("../src/tools/cad_editor.ts")
+    const { cadEditTool } = await import("../src/tools/cad_edit.ts")
     const ctx = { handlers: {} as never, projectId: "p" }
-    const run = (actions: unknown) => cadEditor.execute(cadEditor.parameters.parse({ actions }), ctx) as Promise<{ ok: boolean; problems?: string[] }>
+    const run = (actions: unknown) => cadEditTool.execute(cadEditTool.parameters.parse({ action: "editor", actions }), ctx) as Promise<{ ok: boolean; problems?: string[] }>
     expect((await run([{ action: "section_on", axis: "z" }])).ok).toBe(false)
     expect((await run([{ action: "section_on", axis: "z" }])).problems?.[0]).toContain("position")
     expect((await run([{ action: "section_on", axis: "x", position: 40, inverted: true }])).ok).toBe(true)
     expect((await run([{ action: "section_off" }])).ok).toBe(true)
-    expect(() => cadEditor.parameters.parse({ actions: [{ action: "section_on", axis: "w", position: 1 }] })).toThrow()
+    expect(() => cadEditTool.parameters.parse({ action: "editor", actions: [{ action: "section_on", axis: "w", position: 1 }] })).toThrow()
   })
 })

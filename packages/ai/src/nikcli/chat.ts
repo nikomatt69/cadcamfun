@@ -58,7 +58,7 @@ export const continuationFor = (state: Pick<EventMapperState, "todos" | "lastToo
   if (state.lastToolError && /permission (?:denied|rejected)|user (?:denied|rejected)|execution cancel(?:led|ed)/i.test(state.lastToolError)) return undefined
   // The host counts `length` as a finished turn: a long tool call cut by the output limit ends the work right there.
   if (finish === "length") {
-    return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_add_elements call, one operation at a time, and keep going until the request is complete and checked."
+    return "Your last message was cut off by the output limit, so the tool call you were writing did not run. Continue from where you stopped in smaller steps: at most 10 elements per cad_edit action add call, one operation at a time, and keep going until the request is complete and checked."
   }
   const open = state.todos.filter((t) => t.status === "pending" || t.status === "in_progress")
   if (open.length > 0) {

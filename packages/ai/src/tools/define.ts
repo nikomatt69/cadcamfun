@@ -13,11 +13,16 @@ import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
 import { formatToolValidationError, toolValidationFailure } from "../tool-validation.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
 
+/** An implementation the application contributes for a catalogue action it owns (libraries, version control, delegation). */
+export type ActionContribution = (input: never, context: ToolContext) => Promise<unknown>
+
 export interface ToolContext {
   readonly handlers: ToolHandlersShape
   readonly projectId: string
   readonly signal?: AbortSignal
   readonly sessionId?: string
+  /** Present only where the host contributes implementations (the sidecar); a missing one answers "not available". */
+  readonly contributions?: Readonly<Record<string, ActionContribution>>
 }
 
 export interface ToolDefinition<S extends z.ZodType = z.ZodType> {

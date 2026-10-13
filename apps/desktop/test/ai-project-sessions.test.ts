@@ -151,11 +151,11 @@ describe("project-scoped assistant workspace", () => {
       expect(requests).toEqual([{ sessionId: "ses_native_recovered", projectId: doc.projectId }])
       expect(mounted.store.messages().at(-1)?.text).toBe("Partial answer")
       recovered.resolve({ busy: false, text: "Recovered answer", events: [
-        { type: "tool_call", sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", input: {} },
-        { type: "tool_result", sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", ok: true, output: '{"ok":true,"issues":[]}' },
-        { type: "tool_call", sessionId: "ses_unrelated_recovery", callId: "unrelated-check", tool: "cad_check_design", input: {} },
-        { type: "delta", sessionId: "ses_unrelated_recovery", text: "Unrelated answer" },
-        { type: "done", sessionId: "ses_native_recovered", text: "Recovered answer" }
+        { type: "tool_call" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", input: {} },
+        { type: "tool_result" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", ok: true, output: '{"ok":true,"issues":[]}' },
+        { type: "tool_call" as const, sessionId: "ses_unrelated_recovery", callId: "unrelated-check", tool: "cad_check_design", input: {} },
+        { type: "delta" as never, sessionId: "ses_unrelated_recovery", text: "Unrelated answer" },
+        { type: "done" as never, sessionId: "ses_native_recovered", text: "Recovered answer" }
       ] })
       await app.wait(() => mounted.store.status() === "idle")
       expect(mounted.store.error()).toBeUndefined()

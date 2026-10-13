@@ -208,7 +208,7 @@ describe("WorkflowRunner", () => {
 })
 
 import { ProjectRepo } from "../src/repos/project-repo.ts"
-import { vcsToolSpecs } from "../src/services/ai-vcs-tools.ts"
+import { vcsContributions } from "../src/services/ai-vcs-tools.ts"
 
 describe("assistant VCS tools", () => {
   test("start_change -> edit -> commit -> open PR; main stays untouched and cannot be merged by the AI", () =>
@@ -223,8 +223,16 @@ describe("assistant VCS tools", () => {
         db.insert(schema.drawingTable).values({ id: "d1", name: "Plate", data: { w: 1 }, projectId: project.id }).run()
         const actor: Actor = { userId: u!.id, name: "Ada", email: "a@x.io" }
         yield* vcs.commit(project.id, { message: "init" }, actor)
-        const tools = Object.fromEntries(vcsToolSpecs({ vcs, runner, projects, actor }).map((t) => [t.id, t]))
-        const call = (id: string, input: unknown) => Effect.promise(async () => JSON.parse(await tools[id]!.execute(input, { sessionId: "s", projectId: project.id, signal: new AbortController().signal })))
+        const contributions = vcsContributions({ vcs, runner, projects, actor })
+        const keys: Record<string, string> = {
+          vcs_status: "vcs.status", vcs_diff: "vcs.diff", vcs_list_pull_requests: "vcs.list_pull_requests",
+          vcs_start_change: "vcs_edit.start_change", vcs_commit: "vcs_edit.commit", vcs_open_pull_request: "vcs_edit.open_pull_request"
+        }
+        // The reply in the shape the assistant reads: `{ ok, value }` or `{ ok: false, error }`.
+        const call = (id: string, input: unknown) => Effect.promise(() => contributions[keys[id]!]!(input as never, { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }).then(
+          (value) => ({ ok: true, value }),
+          (error: Error) => ({ ok: false, error: error.message })
+        ))
 
         expect((yield* call("vcs_commit", { message: "on main" })).ok).toBe(false) // nothing changed yet; and main is protected
         expect(yield* call("vcs_start_change", { topic: "Widen the plate!" })).toEqual({ ok: true, value: { branch: "ai/widen-the-plate" } })

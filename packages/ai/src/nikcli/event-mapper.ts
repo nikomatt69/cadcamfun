@@ -5,7 +5,8 @@ import { childAgent } from "./agents.ts"
 
 /** Only bounded inline PNG evidence from the application's own viewport tools reaches the UI. */
 const toolImages = (tool: string, state: Record<string, unknown> | undefined) => {
-  if (tool !== "cad_vision" && tool !== "cam_vision") return {}
+  // Only the viewport reads of `cad` and `cam` carry images; every image is still checked as a bounded PNG data URL.
+  if (tool !== "cad" && tool !== "cam") return {}
   const attachments = state?.["attachments"]
   const images = (Array.isArray(attachments) ? attachments : []).map((file) => file?.url).filter((url): url is string => typeof url === "string" && url.length <= 4_000_100 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(url)).slice(0, 2)
   return images.length ? { images } : {}
@@ -110,8 +111,8 @@ const toolDiagnostics = (sessionId: string, callId: string, tool: string, output
   const partial = partialProblem(value)
   if (partial) return [{ type: "tool_diagnostic", ...shared, kind: "partial", severity: "warning", message: partial,
     recovery: str(value?.["recovery"]) ?? "Inspect confirmed changes; correct and retry only skipped items.",
-    ...(typeof value?.["mutationApplied"] === "boolean" ? { mutationApplied: value["mutationApplied"] } : tool === "cad_add_elements" && Array.isArray(value?.["elements"]) && value["elements"].length > 0 ? { mutationApplied: true } : {}) }]
-  if (!["cad_check_design", "cam_analyze_gcode", "cam_verify_toolpath"].includes(tool) || !Array.isArray(value?.["issues"])) return []
+    ...(typeof value?.["mutationApplied"] === "boolean" ? { mutationApplied: value["mutationApplied"] } : tool === "cad_edit" && Array.isArray(value?.["elements"]) && value["elements"].length > 0 ? { mutationApplied: true } : {}) }]
+  if (!["cad", "cam", "cam_edit"].includes(tool) || !Array.isArray(value?.["issues"])) return []
   return value["issues"].slice(0, 8).flatMap((item): AiEvent[] => {
     const issue = rec(item)
     const message = str(issue?.["message"])

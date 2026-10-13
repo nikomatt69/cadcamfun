@@ -1,0 +1,22 @@
+Reusable parts: gather what is in the drawing into a saved component, place one, or remove it.
+
+Actions
+- save: gather existing elements by id into a named component of this project; children are stored relative to the group's origin.
+- insert: place a stored component in the active drawing, optionally moved, turned or scaled; returns the new element ids.
+- delete: remove a saved component by id. Destructive: the host asks before the tool runs.
+
+Parameters (mm, degrees)
+- save: ids (the elements to gather), name.
+- insert: componentId, transform {move {x,y,z}, rotate {axis, degrees, about}, scale {factor, about}} - all parts optional.
+- delete: componentId.
+
+Result (JSON)
+- ok; save the componentId and the number of children; insert the new ids and the elements; delete the removed id.
+- ok:false names what is wrong (unknown id, nothing selected, a component with no elements, or a write you may not do).
+
+Do not use it
+- To look up a component: library.lookup_component.
+- To move a part already in the drawing: cad_edit.transform, which is cheaper than saving and re-inserting.
+
+After it
+- cad.check, and describe the drawing again if the count matters.

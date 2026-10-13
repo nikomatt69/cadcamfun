@@ -5,7 +5,7 @@
  * Sections come in order of how much they matter (document and units, what is selected, the model, the machining, the
  * last verification, attached files, notes); when the budget runs out the long, low-value parts shrink first (the element
  * list, then the G-code preview) and the text says how much was left out, so the model knows to call
- * `cad_describe_drawing` rather than guess. Unknown or missing fields are skipped, never invented.
+ * cad action describe rather than guess. Unknown or missing fields are skipped, never invented.
  */
 import { attachmentNames } from "./attachments.ts"
 
@@ -72,7 +72,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   const coordinates = rec(s["coordinateSystem"])
   if (Object.keys(coordinates).length > 0) {
     const origin = rec(coordinates["originOffset"])
-    lines.push(`Coordinates: ${str(coordinates["axes"]) ?? "right-handed XYZ; Z up"}; CAD origin offset (${n(origin["x"])}, ${n(origin["y"])}, ${n(origin["z"])}) mm. Element positions are drawing coordinates; inspect full transforms with cad_inspect. Rotation properties use ${str(coordinates["elementRotationUnit"]) ?? "degrees"}.`)
+    lines.push(`Coordinates: ${str(coordinates["axes"]) ?? "right-handed XYZ; Z up"}; CAD origin offset (${n(origin["x"])}, ${n(origin["y"])}, ${n(origin["z"])}) mm. Element positions are drawing coordinates; inspect full transforms with cad action inspect_elements. Rotation properties use ${str(coordinates["elementRotationUnit"]) ?? "degrees"}.`)
   }
 
   // 2. Selection.
@@ -84,7 +84,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   if (layers.length > 0) lines.push(`Layers: ${layers.slice(0, 12).map((l) => `${label(l["name"])}${l["visible"] === false ? " (hidden)" : ""}${l["locked"] === true ? " (locked)" : ""}`).join(", ")}${layers.length > 12 ? `, +${layers.length - 12} more` : ""}; active ${str(s["activeLayer"]) ?? "?"}.`)
   const stock = rec(s["workpiece"])
   if (Object.keys(stock).length > 0 && num(stock["width"]) !== undefined) {
-    lines.push(`Stock: ${n(stock["width"])}×${n(stock["height"])}×${n(stock["depth"] ?? stock["thickness"])} mm; XY centre (${n(stock["x"])}, ${n(stock["y"])}), top Z ${n(stock["topZ"])} mm${str(stock["material"]) ? `; material ${str(stock["material"])}` : ""}. Missing coordinates require cam_stock inspection.`)
+    lines.push(`Stock: ${n(stock["width"])}×${n(stock["height"])}×${n(stock["depth"] ?? stock["thickness"])} mm; XY centre (${n(stock["x"])}, ${n(stock["y"])}), top Z ${n(stock["topZ"])} mm${str(stock["material"]) ? `; material ${str(stock["material"])}` : ""}. Missing coordinates require cam action stock inspection.`)
   }
 
   // 3. Machining.
@@ -142,7 +142,7 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
       used += line.length + 1
     }
     const hidden = Math.max(0, (total ?? listed.length) - rows.length)
-    out.push(`Elements (* = selected${hidden > 0 ? `; ${hidden} not shown - call cad_describe_drawing` : ""}):\n${rows.join("\n")}`)
+    out.push(`Elements (* = selected${hidden > 0 ? `; ${hidden} not shown - call cad (action describe)` : ""}):\n${rows.join("\n")}`)
     left -= used
   }
   const preview = typeof cam["gcodePreview"] === "string" ? cam["gcodePreview"] : undefined
@@ -177,7 +177,7 @@ export const renderNotes = (notes: ReadonlyArray<{ readonly key: string; readonl
   const budget = Math.max(0, Math.floor(num(maxChars) ?? 1_500))
   if (notes.length === 0 || budget === 0) return ""
   const rows: string[] = []
-  const header = (omitted: number) => `Saved notes${omitted > 0 ? ` (${omitted} older not shown; memory_recall lists all)` : ""}:\n`
+  const header = (omitted: number) => `Saved notes${omitted > 0 ? ` (${omitted} older not shown; memory action recall lists all)` : ""}:\n`
   for (const note of notes) {
     let value: string
     try { value = typeof note.value === "string" ? note.value : JSON.stringify(note.value) ?? "unknown" }

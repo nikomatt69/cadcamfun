@@ -21,7 +21,7 @@ export interface CadCamSkill {
 
 const MODELING = `# Modelling in 3D
 
-Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or assembly. \`cad_add_entities\` is only for a flat sketch the user explicitly asks for. A "car", "bottle" or "bracket" is never a set of rectangles and circles: it is solids, and it should look like the thing. Read the drawing first with \`cad_describe_drawing\`; the tools create the project and the drawing when there are none, so never ask the user to.
+Objects are built in 3D, always: cad_edit action add for every part, shape or assembly. cad_edit action add_entities is only for a flat sketch the user explicitly asks for. A "car", "bottle" or "bracket" is never a set of rectangles and circles: it is solids, and it should look like the thing. Read the drawing first with cad action describe; the tools create the project and the drawing when there are none, so never ask the user to.
 
 ## Conventions
 - Millimetres and radians. \`x,y,z\` is the centre of a solid and the origin of a profile.
@@ -30,19 +30,19 @@ Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or a
 - \`rectangle\`, \`circle\`, \`polygon\` are flat on the XY plane at height \`z\`.
 - Put related parts on one layer (\`layer: "car"\`); the layer is created if needed.
 - **Layers and components**: one layer per system (\`layer: "body"\`, \`"wheels"\`, \`"fixtures"\`; created if needed, each with its own colour). A part made of several solids is a \`component\` (\`name\`, \`x,y,z\`, \`elements\` = its children placed relative to the component), so it can be selected, moved and machined as one thing; a Boolean stays its own element.
-- **Change what exists**: \`cad_transform_entities\` moves, turns and scales by id, and makes copies (a row: \`dx\` with \`copies\`; a ring: \`rotateDegrees\` + \`about\` + \`copies\`), so never rebuild a part to move it. \`cad_group_entities\` gathers parts into a component or opens one. \`cad_editor\` creates, renames, colours, hides and locks layers, switches 3D/2D, fits the view, selects, isolates and undoes.
-- **Work like a coding agent**: for anything bigger than one shape, say the plan in a line, build it in steps (a few calls, one subsystem each, on its own layer), call \`cad_check_design\` after the model is complete and fix what it reports, then go on to CAM (\`cam_create_operation\`, \`cam_generate_gcode\`, \`cam_verify_toolpath\`) when the user wants it machined.
+- **Change what exists**: cad_edit action transform moves, turns and scales by id, and makes copies (a row: \`dx\` with \`copies\`; a ring: \`rotateDegrees\` + \`about\` + \`copies\`), so never rebuild a part to move it. cad_edit action group gathers parts into a component or opens one. cad_edit action editor creates, renames, colours, hides and locks layers, switches 3D/2D, fits the view, selects, isolates and undoes.
+- **Work like a coding agent**: for anything bigger than one shape, say the plan in a line, build it in steps (a few calls, one subsystem each, on its own layer), call cad action check after the model is complete and fix what it reports, then go on to CAM (cam_edit action create, cam_edit action generate, cam_edit action verify) when the user wants it machined.
 - One call holds at most 40 elements (a long call is cut off by the model's output limit): build big things in steps, each a few calls, in the order a person would build it. Each element in a call is judged on its own: the valid ones are added, the invalid ones are listed under \`skipped\` with their index; resend only those, corrected.
 
 ## Recipes
 - **Block with a hole**: \`cube\` + \`cylinder\` (taller than the block), then \`boolean-subtract\` with \`operands: [0, 1]\` (indexes of the two elements in the same call).
 - **Bottle, vase, shaft, pulley**: ONE \`revolution\`. Give the half section as profile points from the axis outwards, bottom to top, e.g. \`[{x:0,y:0},{x:30,y:0},{x:30,y:150},{x:10,y:200},{x:10,y:260}]\`; use 32+ segments (default).
-- **Part the user will change the dimensions of** ("make it 10 mm wider", "I need it in three sizes"): ONE \`parametric\` element instead of loose solids. \`history.parameters\` holds the named dimensions (numbers or expressions of each other: \`"half": "width / 2"\`), \`history.features\` builds the part in order. A plate with a hole: \`parameters: {width: 60, depth: 40, thick: 8, hole: 10}\`, a \`sketch\` on plane \`XY\` with a rectangle (points p1..p4, lines l1..l4, \`fixed\` p1, \`horizontal\`/\`vertical\` on the sides, \`length\` l1 = \`"width"\`, l2 = \`"depth"\`), an \`extrude\` of it by \`"thick"\` (\`operation: "new"\`), then a \`hole\` on plane \`XY\` at \`offset: "thick"\`, \`at: ["width / 2", "depth / 2"]\`, \`diameter: "hole"\`, \`depth: "thick"\`. Validate a new history with \`cad_parametric\` before creating it; its prompt contains an exact JSON example. To change a parameter later, inspect the part and update it with \`expectedRevision\` (the features stay); send a whole \`history\` only to change the features themselves. The tool tells you at once what the history cannot build.
+- **Part the user will change the dimensions of** ("make it 10 mm wider", "I need it in three sizes"): ONE \`parametric\` element instead of loose solids. \`history.parameters\` holds the named dimensions (numbers or expressions of each other: \`"half": "width / 2"\`), \`history.features\` builds the part in order. A plate with a hole: \`parameters: {width: 60, depth: 40, thick: 8, hole: 10}\`, a \`sketch\` on plane \`XY\` with a rectangle (points p1..p4, lines l1..l4, \`fixed\` p1, \`horizontal\`/\`vertical\` on the sides, \`length\` l1 = \`"width"\`, l2 = \`"depth"\`), an \`extrude\` of it by \`"thick"\` (\`operation: "new"\`), then a \`hole\` on plane \`XY\` at \`offset: "thick"\`, \`at: ["width / 2", "depth / 2"]\`, \`diameter: "hole"\`, \`depth: "thick"\`. Validate a new history with cad action parametric_validate before creating it; its prompt contains an exact JSON example. To change a parameter later, inspect the part and update it with \`expectedRevision\` (the features stay); send a whole \`history\` only to change the features themselves. The tool tells you at once what the history cannot build.
 - **Plate with a pattern of holes**: one \`cube\` plate, the holes as \`cylinder\`s, one \`boolean-subtract\` with the plate first.
 - **Bracket / L profile**: \`extrusion\` with \`profile\` points (>= 3, closed automatically) and \`depth\`.
 - **Pipe along a path**: \`sweep\` with \`path\` points and a round \`radius\`.
 - **Vehicle**: body as a \`cube\` or an \`extrusion\` of the side profile, cabin as a smaller \`cube\`, wheels as four \`cylinder\`s turned to the axle (\`rotation\` in DEGREES: a cylinder stands along Z, so a wheel on a Y axle needs rotation {x: 90}), lights and details as small solids. Say what is simplified.
-- **From a DXF or SVG drawing**: \`cad_import_drawing\` with the file text and a \`depth\` (a drawing has no height - ask). Closed outlines become solids standing on Z0, circles and inner loops become holes. If it reports open outlines, say so and offer a larger \`gap\`; never close them by guessing. To work from an image or a dimensioned drawing you can only look at, read the numbers yourself and build with \`cad_add_elements\`.
+- **From a DXF or SVG drawing**: cad_edit action import with the file text and a \`depth\` (a drawing has no height - ask). Closed outlines become solids standing on Z0, circles and inner loops become holes. If it reports open outlines, say so and offer a larger \`gap\`; never close them by guessing. To work from an image or a dimensioned drawing you can only look at, read the numbers yourself and build with cad_edit action add.
 - **Standard parts**: \`gear\`, \`spring\`, \`bolt\`, \`screw\`, \`nut\`, \`washer\` take their size and defaults from the catalogue.
 
 ## Design space
@@ -50,26 +50,26 @@ Objects are built in 3D, always: \`cad_add_elements\` for every part, shape or a
 - \`rotation\` is in DEGREES, arc and revolution angles in RADIANS.
 
 ## After modelling
-Run \`cad_check_design\`: it finds sizes that are not positive, rotation typed in radians, booleans with missing operands, duplicates, parts that float, and parts outside the stock. Fix what it reports, then describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use \`cad_modify_entities\` with the ids you were given; to remove, \`cad_delete_entities\` with \`confirm: true\` only when the user asked.`
+Run cad action check: it finds sizes that are not positive, rotation typed in radians, booleans with missing operands, duplicates, parts that float, and parts outside the stock. Fix what it reports, then describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use cad_edit action modify with the ids you were given; to remove, cad_edit action delete with \`confirm: true\` only when the user asked.`
 
 const WORKFLOW = `# From model to verified G-code
 
 Follow the loop; do not skip a step and do not call a program safe before the last one.
 
-1. \`cad_describe_drawing\`: what is there, its bounds and ids. Nothing to machine means stop and say so.
-2. \`lib_lookup_material\` and \`lib_lookup_tool\`: use the user's tool and material; if there is none, say which assumption you made.
-3. \`cam_suggest_parameters\`: depth, stepdown, cutting speed, chip load and warnings for this drawing.
-4. \`cam_create_operation\` with a type (contour, pocket, drill, engrave, profile, threading, 3d_surface) and parameters: \`toolDiameter\`, \`depth\` (positive, below the stock top), \`stepdown\`, \`feedrate\`, \`rpm\`, \`material\`, \`offset\` (outside for a part contour, inside for a pocket wall).
-5. \`cam_generate_gcode\` for the operation id.
-6. \`cam_analyze_gcode\`: static checks (travel limits, missing spindle or feed).
-7. \`cam_verify_toolpath\`: simulate it on the stock. Pass what you know: \`tool.cuttingLength\`, \`tool.stickout\`, \`tool.holderDiameter\`, \`fixtures\`, \`targetSolids\` for the finished part.
-8. Errors? \`cam_update_operation\`, then generate and verify again. Repeat until the report has no errors or you can state what blocks it.
+1. cad action describe: what is there, its bounds and ids. Nothing to machine means stop and say so.
+2. library action lookup_material and library action lookup_tool: use the user's tool and material; if there is none, say which assumption you made.
+3. cam action suggest: depth, stepdown, cutting speed, chip load and warnings for this drawing.
+4. cam_edit action create with a type (contour, pocket, drill, engrave, profile, threading, 3d_surface) and parameters: \`toolDiameter\`, \`depth\` (positive, below the stock top), \`stepdown\`, \`feedrate\`, \`rpm\`, \`material\`, \`offset\` (outside for a part contour, inside for a pocket wall).
+5. cam_edit action generate for the operation id.
+6. cam action analyze: static checks (travel limits, missing spindle or feed).
+7. cam_edit action verify: simulate it on the stock. Pass what you know: \`tool.cuttingLength\`, \`tool.stickout\`, \`tool.holderDiameter\`, \`fixtures\`, \`targetSolids\` for the finished part.
+8. Errors? cam_edit action update, then generate and verify again. Repeat until the report has no errors or you can state what blocks it.
 
 Report: the operation, the parameters you chose and why, the verification result with what it did NOT model, and the next decision for the user.`
 
 const VERIFICATION = `# Reading a verification report
 
-\`cam_verify_toolpath\` replays the G-code on a height-field model of the stock. It answers "does this program damage anything it knows about", never "is this safe on the machine".
+cam_edit action verify replays the G-code on a height-field model of the stock. It answers "does this program damage anything it knows about", never "is this safe on the machine".
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
@@ -86,7 +86,7 @@ Always state what was modelled (\`modelled\` in the result): without a holder, f
 
 const PARAMETERS = `# Cutting parameters, as a starting point
 
-Use the tool and material library values first, then \`cam_suggest_parameters\`. Without them, start here and say they are starting values.
+Use the tool and material library values first, then cam action suggest. Without them, start here and say they are starting values.
 
 - Spindle speed: \`rpm = Vc * 1000 / (pi * D)\`; feed: \`F = rpm * flutes * fz\`.
 - Surface speed Vc (m/min, carbide): aluminium 200-400, brass 150-300, plastics 150-300, mild steel 80-150, stainless 50-100, titanium 30-60, hardwood 300-600.
@@ -140,12 +140,12 @@ An H hole starts at its nominal size and goes up by the grade; a shaft size has 
 - Tool wear, tool deflection, thermal growth and the machine's own accuracy are not modelled. Say so; propose a first-off measurement and an offset correction.
 
 ## Checking it
-- \`cam_verify_toolpath\` is exact in height and one cell wide sideways. For micron checks narrow \`stock\` to the feature (a few mm), \`resolution\` 0.002-0.005, \`tolerance\` 0.001, and give the finished part in \`targetSolids\`.
+- cam_edit action verify is exact in height and one cell wide sideways. For micron checks narrow \`stock\` to the feature (a few mm), \`resolution\` 0.002-0.005, \`tolerance\` 0.001, and give the finished part in \`targetSolids\`.
 - A pass means "no gouge beyond the tolerance at that resolution", never "in tolerance on the machine".`
 
 const MACHINES = `# Machines, axes and zeros
 
-The same drawing becomes a different program on each machine. Program as if the TOOL moves round a fixed workpiece (ISO 841); what differs is what turns and what is made. Call \`cam_describe_machine\` for the exact table.
+The same drawing becomes a different program on each machine. Program as if the TOOL moves round a fixed workpiece (ISO 841); what differs is what turns and what is made. Call cam action machine for the exact table.
 
 | | Mill | Lathe | 3D printer |
 | --- | --- | --- | --- |
@@ -168,26 +168,26 @@ The same drawing becomes a different program on each machine. Program as if the 
 - Probe first, machine after: a program that measures its own zero removes setup error. Say which offset it wrote.
 
 ## Checking
-- \`cam_analyze_gcode\` with \`machineType\` catches what is illogical for the axes: Y on a lathe, X through the axis, a cut away from the chuck, a spindle that never started, cold extrusion, a build that goes down.
-- \`cam_verify_toolpath\` simulates mills only.`
+- cam action analyze with \`machineType\` catches what is illogical for the axes: Y on a lathe, X through the axis, a cut away from the chuck, a spindle that never started, cold extrusion, a build that goes down.
+- cam_edit action verify simulates mills only.`
 
 const DRAWINGS = `# From drawings and images to 3D
 
 Three kinds of input, three routes. Pick by what the user attached (the message lists "Attached files").
 
 ## DXF, SVG or STEP file
-- \`cad_import_drawing\` with \`attachment\` (the file name) and \`depth\` (mm). It chains lines and arcs into closed profiles, extrudes each outer profile from Z0 along +Z, makes circles and inner loops holes, and reports outlines it could not close. Ask for the thickness if the user gave none; it is the only thing a flat drawing cannot say.
+- cad_edit action import with \`attachment\` (the file name) and \`depth\` (mm). It chains lines and arcs into closed profiles, extrudes each outer profile from Z0 along +Z, makes circles and inner loops holes, and reports outlines it could not close. Ask for the thickness if the user gave none; it is the only thing a flat drawing cannot say.
 - STEP (\`attachment\` is enough, the part brings its height): reads prismatic parts from the flat face looking down; its warnings say what it did not read (steps, pockets with a floor, slopes, curved faces). Report them, and if the part was modelled lying on another plane retry with \`up: "y"\` or \`"x"\`. It is not a full STEP kernel: do not promise free-form surfaces.\n- DXF is read in its own units (\`$INSUNITS\`) and lands in mm; SVG needs \`scale\` (mm per SVG unit) when it is not 1: a 96 dpi export in px is 0.2646.
 - Open outlines: report how many, offer a larger \`gap\` (mm) and say where the break probably is. Never close a profile by guessing.
-- Several parts in one file become several solids; give each a clear \`name\` and, if the user wants them stacked or moved, use \`cad_modify_entities\`.
-- Afterwards run \`cad_check_design\`, then continue to CAM.
+- Several parts in one file become several solids; give each a clear \`name\` and, if the user wants them stacked or moved, use cad_edit action modify.
+- Afterwards run cad action check, then continue to CAM.
 
 ## Image of a drawing or a photo
 - Look first, then list what you read: every dimension with its unit, the view it belongs to, tolerances and notes. Say what is unreadable or missing instead of filling it in.
-- Build from the numbers with \`cad_add_elements\`: the base solid from the overall size, features one by one (holes as cylinders and one boolean-subtract, pockets, fillets as spheres/tori or a revolution profile, chamfers as extrusion profiles). A hole with a tolerance gets the middle of the limits.
+- Build from the numbers with cad_edit action add: the base solid from the overall size, features one by one (holes as cylinders and one boolean-subtract, pockets, fillets as spheres/tori or a revolution profile, chamfers as extrusion profiles). A hole with a tolerance gets the middle of the limits.
 - Three-view drawings: front gives X and Z, top gives X and Y, side gives Y and Z. Check that the same size read from two views agrees; if not, ask which is right.
 - A photo has no scale: ask for one known dimension, then derive the rest and label them as estimates.
-- After building, compare against the numbers you read: \`cad_describe_drawing\` gives the bounds; report any difference.
+- After building, compare against the numbers you read: cad action describe gives the bounds; report any difference.
 
 ## Sketch by hand
 Treat it like a photo: ask for the scale, build the outline as an \`extrusion\` profile, then add features.`
@@ -220,25 +220,31 @@ A parametric element holds \`history: { parameters, features }\`.
 
 - \`parameters\`: named dimensions, numbers or expressions of each other (\`"half": "width / 2"\`). Cycles are rejected.
 - \`features\` run in order: \`sketch\`, \`extrude\` (optional \`edge\` chamfer/fillet round the end faces, \`corner\` rounding of the profile and \`taper\` draft angle), \`revolve\`, \`hole\` (\`kind\`: simple, counterbore, countersink), \`pattern\` (linear, circular or grid), \`mirror\`, \`sweep\` (profile along a path sketch, optional \`bendRadius\` for pipe bends), \`loft\` (through sketch sections), \`shell\` (hollow an extrude, full revolve or sweep, optionally open) and \`fillet\` (round or chamfer edges between planar faces). A dimension is a parameter name or an expression.
-- History is a JSON object, never a string. Features and constraints use \`type\`; sketch entities use \`kind: point|line|circle|arc\`. Lines use point IDs in \`p1/p2\`; circles use a point ID in \`center\`. Read the complete \`cad_parametric\` validate example instead of inventing a rectangle entity.
+- History is a JSON object, never a string. Features and constraints use \`type\`; sketch entities use \`kind: point|line|circle|arc\`. Lines use point IDs in \`p1/p2\`; circles use a point ID in \`center\`. Validate with \`cad\` action \`parametric_validate\` before \`cad_edit\` action \`parametric_create\`, and send this exact example (a Ø20 cylinder) rather than inventing a rectangle entity:
+
+\`\`\`json
+{"history":{"parameters":{"radius":10,"height":20},"features":[{"id":"profile","type":"sketch","plane":"XY","sketch":{"entities":[{"id":"origin","kind":"point","x":0,"y":0},{"id":"outline","kind":"circle","center":"origin","radius":10}],"constraints":[{"type":"fixed","point":"origin","x":0,"y":0},{"type":"radius","circle":"outline","value":"radius"}]}},{"id":"body","type":"extrude","sketch":"profile","depth":"height","operation":"new"}]}}
+\`\`\`
+
+Send it to \`cad\` with \`{"action":"parametric_validate","history":{...}}\`. Change \`parameters.height\` to resize it; \`cad_edit\` \`parametric_update\` does that on an existing part with its revision.
 
 ## Workflow
 
 1. If the user names a quantity that will change (count, diameter, thickness, hole spacing), make it a parameter.
 2. Sketch on plane \`XY\` by default, with named lengths tied to parameters.
 3. Extrude with \`operation: "new"\`, \`direction: "up"\`, \`depth\` set to a parameter name.
-4. Add features that reference parameter names, then call \`cad_parametric\` validate. Repair the reported paths and rebuild errors before create; switching to \`cad_add_elements\` cannot bypass the same history schema.
-5. End with \`cad_check_design\`. On \`RebuildFailed\`, read the cause, fix it, repeat.
-6. Save on an \`ai/<topic>\` branch with \`vcs_commit\` (see the version-control-cadcam skill).
+4. Add features that reference parameter names, then call cad action parametric_validate validate. Repair the reported paths and rebuild errors before create; switching to cad_edit action add cannot bypass the same history schema.
+5. End with cad action check. On \`RebuildFailed\`, read the cause, fix it, repeat.
+6. Save on an \`ai/<topic>\` branch with vcs_edit action commit (see the version-control-cadcam skill).
 
 ## Standard parts and design rules
 
-- \`cad_parametric\` \`action: "recipe"\` generates mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend (long-radius bend by default, \`bendRadius\` 0 = mitred) or duct_transition from design inputs (fastener size, diameters, bolt count); holes follow ISO 273, counterbores ISO 4762 / DIN 974, keyways DIN 6885, and edge distance and spacing rules are enforced. Edit its parameters afterwards.
+- cad action parametric_validate \`action: "recipe"\` generates mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend (long-radius bend by default, \`bendRadius\` 0 = mitred) or duct_transition from design inputs (fastener size, diameters, bolt count); holes follow ISO 273, counterbores ISO 4762 / DIN 974, keyways DIN 6885, and edge distance and spacing rules are enforced. Edit its parameters afterwards.
 - \`action: "fastener"\` returns thread, tap drill, clearance and counterbore sizes. \`action: "dfm"\` returns the manufacturability findings for a process, cutter and material; fix errors before CAM.
 
 ## Editing later
 
-- Resize: \`cad_parametric\` inspect, then update with the real elementId, returned expectedRevision and \`parameters: {width:70}\`. Features and element ID stay. Inspect again if the revision is stale.
+- Resize: cad action parametric_validate inspect, then update with the real elementId, returned expectedRevision and \`parameters: {width:70}\`. Features and element ID stay. Inspect again if the revision is stale.
 - Add a feature: append it to the same parametric's history.
 - Rewrite the whole history only when the user asks. It is destructive.
 
@@ -255,7 +261,7 @@ const COMPOSED_CAM = `# Composing CAM programs
 
 A real part has many operations. Plan them in this order and do not skip ahead.
 
-1. Probe the work offset (\`cam_create_operation\` with \`type: "probing"\`). Use the result as the zero.
+1. Probe the work offset (cam_edit action create with \`type: "probing"\`). Use the result as the zero.
 2. Face the top (\`face\`) to establish a reference plane.
 3. Rough (\`roughing\` or \`adaptive\`), leaving a small allowance (0.1 to 0.3 mm).
 4. Rest-machine what the big tool could not reach (\`rest\`) with a smaller tool.
@@ -275,7 +281,7 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 
 ## Picking a tool
 
-Use \`lib_lookup_tool\`. Confirm the cutter radius fits the smallest inside radius, the cutting length covers the depth, and RPM stays under both the tool and machine maximum.
+Use library action lookup_tool. Confirm the cutter radius fits the smallest inside radius, the cutting length covers the depth, and RPM stays under both the tool and machine maximum.
 
 ## Setups
 
@@ -283,7 +289,7 @@ A flip is a new setup with its own stock, origin, work offset, fixtures and tool
 
 ## Verifying each operation
 
-For every operation: \`cam_generate_gcode\`, then \`cam_analyze_gcode\`, then \`cam_verify_toolpath\`. Fix by cause, regenerate, verify again. After three rounds on the same finding, report the blocker. Report what was modelled; never write "safe".`
+For every operation: cam_edit action generate, then cam action analyze, then cam_edit action verify. Fix by cause, regenerate, verify again. After three rounds on the same finding, report the blocker. Report what was modelled; never write "safe".`
 
 const VERSION_CONTROL = `# Version control for the agent
 
@@ -291,7 +297,7 @@ The cadcam agent edits on an \`ai/<topic>\` branch and opens a pull request. A p
 
 ## Order of operations
 
-1. \`vcs_status\`: branch, dirty files, open pull requests.
+1. vcs action status: branch, dirty files, open pull requests.
 2. Start a change on an \`ai/<topic>\` branch. Do not edit on a dirty working copy.
 3. Make the CAD and CAM edits.
 4. Commit with a short imperative message saying what and why.
@@ -305,11 +311,11 @@ The cadcam agent edits on an \`ai/<topic>\` branch and opens a pull request. A p
 
 ## Diff
 
-\`vcs_diff\` returns entity-level changes (property path, before, after). Read it before writing the pull request body.
+vcs action diff returns entity-level changes (property path, before, after). Read it before writing the pull request body.
 
 ## Restore
 
-\`vcs_restore_paths\` rolls named ids back to an earlier commit on the current \`ai/*\` branch. Use it when a \`RebuildFailed\` is faster to revert than to repair. Not available on \`main\`.`
+vcs_edit action restore rolls named ids back to an earlier commit on the current \`ai/*\` branch. Use it when a \`RebuildFailed\` is faster to revert than to repair. Not available on \`main\`.`
 
 const WORKFLOWS_CAM = `# Workflows in cadcamfun
 
@@ -326,7 +332,7 @@ An unknown \`uses:\` fails the workflow before any step runs.
 
 ## Dispatching
 
-- \`actions_run\` runs the manual workflows on the checked-out branch and returns their run ids.
+- vcs_edit action run_workflows runs the manual workflows on the checked-out branch and returns their run ids.
 - \`pullRequest\` workflows fire when a pull request is opened.
 - \`push\` workflows fire on commit.
 
@@ -360,18 +366,18 @@ Load the operation schema before applying a preset. Read the actual machine, mat
 - Hole series: drill, with the supported peck cycle for depth; tapping or thread milling only with confirmed pitch and controller support.
 - Rotational part: facing, turning_od, then parting; threading_od only after confirming pitch, tool and machine.
 
-Use lib_lookup_tool and cam_suggest_parameters for starting values. Create operations through cam_create_operation, generate through cam_generate_gcode, analyse through cam_analyze_gcode, and verify through cam_verify_toolpath. Preserve real operation ids, predecessor links and remaining stock. Each flipped setup needs its own coordinate origin and fixtures. Report unsupported cycle/controller combinations instead of substituting an unrelated cycle.`
+Use library action lookup_tool and cam action suggest for starting values. Create operations through cam_edit action create, generate through cam_edit action generate, analyse through cam action analyze, and verify through cam_edit action verify. Preserve real operation ids, predecessor links and remaining stock. Each flipped setup needs its own coordinate origin and fixtures. Report unsupported cycle/controller combinations instead of substituting an unrelated cycle.`
 
 const AUTO_MEMORY = `# Project memory and continuation
 
-Before work, read memory_recall and inspect the live document. Automatically save confirmed reusable units, machine/work offset, material, workholding choices, named design constraints and user corrections through memory_remember after successful work. Use stable keys to replace obsolete facts. Never save secrets, speculative geometry, failed operations or raw conversation logs.
+Before work, read memory action recall and inspect the live document. Automatically save confirmed reusable units, machine/work offset, material, workholding choices, named design constraints and user corrections through memory_edit action remember after successful work. Use stable keys to replace obsolete facts. Never save secrets, speculative geometry, failed operations or raw conversation logs.
 
 Project notes are loaded into fresh turns. Treat them as historical evidence and reconcile them with the current setup and revisions. Delegate a bounded job with real drawing/operation ids, units, constraints, setup and expected report. Specialists inherit the parent model and context, but their permissions still govern their work. After compaction, inspect the recorded ids and revisions before resuming mutations; preserve completed work and unresolved questions.`
 
 export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "cad-3d-modeling", description: `Model 3D and 2D geometry in the open editor (${Object.keys(ELEMENT_SPECS).length} element types): conventions, recipes for common parts, how to build complex objects.`, category: "cad", tags: ["cad", "3d", "modeling"], body: MODELING },
   { name: "cam-operation-workflow", description: "The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.", category: "cam", tags: ["cam", "workflow", "gcode"], body: WORKFLOW },
-  { name: "toolpath-verification", description: "How to read and report a cam_verify_toolpath result: every finding code, its cause and its fix, and what was not modelled.", category: "cam", tags: ["cam", "verification", "safety"], body: VERIFICATION },
+  { name: "toolpath-verification", description: "How to read and report a cam_edit action verify result: every finding code, its cause and its fix, and what was not modelled.", category: "cam", tags: ["cam", "verification", "safety"], body: VERIFICATION },
   { name: "cutting-parameters", description: "Speeds, feeds, stepdown and stepover starting points by material, and the formulas behind them.", category: "cam", tags: ["cam", "feeds", "speeds"], body: PARAMETERS },
   { name: "drilling-and-holes", description: "Drilling operations: cycles, peck rules, through-hole depth, large holes.", category: "cam", tags: ["cam", "drilling"], body: DRILLING },
   { name: "precision-and-tolerances", description: "Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.", category: "cam", tags: ["precision", "tolerance", "iso286"], body: PRECISION },

@@ -1,14 +1,16 @@
-import type { CamStockInput } from "./cam_stock.ts"
-import type { SetupCandidate } from "./cam_suggest_parameters.ts"
-import type { cadInspectInput } from "./cad_inspect.ts"
-import type { cadComponentRelationsInput } from "./cad_component_relations.ts"
+import type { SetupCandidate } from "../actions/cam.ts"
+import type { CadGrepInput } from "../actions/cad.ts"
+import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
+import type { ParametricHandlerInput } from "../actions/parametric.ts"
+export type { ParametricHandlerInput } from "../actions/parametric.ts"
 import type { WebSearchInput } from "../web-search.ts"
 import type { VisionCapture } from "../vision.ts"
-import type { ParametricHandlerInput } from "./cad_parametric.ts"
-import type { CadGrepInput } from "./cad_grep.ts"
 import { Context } from "effect"
 import type { cad, cam } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
+
+/** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
+export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
 
 /** What `cam_verify_toolpath` adds to the operation's own settings and stock; validated before the handler runs. */
 export interface VerifyToolOptions {
@@ -27,8 +29,8 @@ export interface VerifyToolOptions {
 export interface ToolHandlersShape {
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
-  cadInspect?(projectId: string, input: cadInspectInput): Promise<unknown>
-  cadComponentRelations?(projectId: string, input: cadComponentRelationsInput): Promise<unknown>
+  cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>
+  cadComponentRelations?(projectId: string, input: CadComponentRelationsInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
   parametric?(projectId: string, input: ParametricHandlerInput): Promise<unknown>

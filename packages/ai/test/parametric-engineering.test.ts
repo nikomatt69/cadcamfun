@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { buildRecipe, plateTemplate, recipeNames, RECIPES, type History } from "@cadcamfun/core"
 import { historySchema, parametricReport } from "../src/parametric.ts"
 import { toSpec } from "../src/tools/define.ts"
-import { cadParametric, parametricInputSchema } from "../src/tools/cad_parametric.ts"
+import { BUILT_IN_TOOLS } from "../src/tools/registry.ts"
+import { parametricInputSchema, parametricHarness } from "./helpers/parametric.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
 import { toolPrompt } from "../src/tools/prompts/index.ts"
 
@@ -13,14 +14,12 @@ const base = plateTemplate()
 const plateWith = (...extra: unknown[]): unknown => ({ ...base, features: [...base.features, ...extra] })
 const plateEdited = (plate: Record<string, unknown>): unknown => ({ ...base, features: base.features.map((f) => (f.id === "plate" ? { ...f, ...plate } : f)) })
 
-interface Call { readonly projectId: string; readonly input: unknown }
-const harness = (reply: (input: any) => unknown = () => ({ ok: true })) => {
-  const calls: Call[] = []
-  const handlers = { parametric: async (projectId: string, input: unknown) => { calls.push({ projectId, input }); return reply(input) } } as unknown as ToolHandlersShape
-  const run = (input: unknown) => cadParametric.execute(cadParametric.parameters.parse(input), { handlers, projectId: "p1" }) as Promise<any>
-  return { calls, run, handlers }
+type Call = { readonly projectId: string; readonly input: unknown }
+const harness = (reply: (input: never) => unknown = () => ({ ok: true })) => {
+  const built = parametricHarness(reply)
+  return { calls: built.calls as Call[], run: built.run as (input: unknown) => Promise<any>, handlers: built.handlers }
 }
-const withoutHandler = (input: unknown) => cadParametric.execute(cadParametric.parameters.parse(input), { handlers: {} as ToolHandlersShape, projectId: "p1" }) as Promise<any>
+const withoutHandler = (input: unknown) => parametricHarness().withoutHandler(input)
 
 describe("the history schema takes the engineering features", () => {
   test("the existing minimal cylinder history and the starting plate are still accepted", () => {
@@ -121,8 +120,8 @@ describe("cad_parametric input schema", () => {
   })
 
   test("the tool prompt documents the new actions and features", () => {
-    const prompt = toolPrompt("cad_parametric")
-    for (const word of ["recipe", "dfm", "fastener", "mirror", "counterbore", "countersink", "edge", "corner"]) expect(prompt).toContain(word)
+    const prompt = toolPrompt("cad")
+    for (const word of ["parametric_recipe", "parametric_dfm", "parametric_fastener"]) expect(prompt).toContain(word)
     for (const name of recipeNames()) expect(prompt).toContain(name)
   })
 })
@@ -224,7 +223,7 @@ describe("cad_parametric: dfm", () => {
   }, SLOW)
 
   test("with an elementId the part is read through the project handler (inspect) and then checked", async () => {
-    const { calls, run } = harness((input) => (input.action === "inspect" ? { ok: true, history: bracket, revision: "r7" } : { ok: false }))
+    const { calls, run } = harness((input) => ((input as { action?: string }).action === "inspect" ? { ok: true, history: bracket, revision: "r7" } : { ok: false }))
     const result = await run({ action: "dfm", elementId: "el-3" })
     expect(calls).toHaveLength(1)
     expect(calls[0]!.input).toEqual({ action: "inspect", elementId: "el-3" })
@@ -318,25 +317,26 @@ describe("cad_parametric: the existing actions are untouched", () => {
 })
 
 describe("through the host tool adapter", () => {
-  const spec = (handlers: ToolHandlersShape = {} as ToolHandlersShape) => toSpec(cadParametric, { handlers, projectId: "p1" })
+  const spec = (tool: string, handlers: ToolHandlersShape = {} as ToolHandlersShape) =>
+    toSpec(BUILT_IN_TOOLS.find((entry) => entry.id === tool)!, { handlers, projectId: "p1" })
   const call = () => ({ signal: new AbortController().signal, sessionId: "s", projectId: "p1" })
 
   test("a recipe call arrives as JSON the model can read", async () => {
-    const out = JSON.parse(await spec().execute({ action: "recipe", recipe: "mounting_plate" }, call()))
+    const out = JSON.parse(await spec("cad").execute({ action: "parametric_recipe", recipe: "mounting_plate" }, call()))
     expect(out).toMatchObject({ ok: true, recipe: "mounting_plate" })
     expect(out.history.features.length).toBeGreaterThan(4)
   }, SLOW)
 
   test("a recipe name the model made up is refused before anything runs, with the recovery text", async () => {
-    const out = JSON.parse(await spec().execute({ action: "recipe", recipe: "rocket" }, call()))
+    const out = JSON.parse(await spec("cad").execute({ action: "parametric_recipe", recipe: "rocket" }, call()))
     expect(out.ok).toBe(false)
-    expect(JSON.stringify(out)).toContain("cad_parametric")
+    expect(JSON.stringify(out)).toContain("cad")
   })
 
   test("dfm and fastener through the adapter", async () => {
-    const dfm = JSON.parse(await spec().execute({ action: "dfm", history: buildRecipe("mounting_plate").history }, call()))
+    const dfm = JSON.parse(await spec("cad").execute({ action: "parametric_dfm", history: buildRecipe("mounting_plate").history }, call()))
     expect(dfm).toMatchObject({ ok: true, process: "mill" })
-    const fastener = JSON.parse(await spec().execute({ action: "fastener", size: "M6" }, call()))
+    const fastener = JSON.parse(await spec("cad").execute({ action: "parametric_fastener", size: "M6" }, call()))
     expect(fastener.thread.tapDrill).toBe(5)
   }, SLOW)
 })

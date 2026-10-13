@@ -1,0 +1,43 @@
+Read the open drawing. Nothing here changes it, so every read-only specialist may have this whole tool.
+
+Actions
+- describe: the whole drawing, its counts, bounds and layers. Start here.
+- check: design-space and model checks (sizes, rotation typed in radians, booleans without operands, duplicates, parts that float). Run it after modelling and fix what it reports.
+- relations: nominal bounds, placement, distance and parameter dependencies between two existing ids. Equal parameter names are not shared bindings.
+- grep: substring search over the drawing (ids, names, layers, property values) that returns each parametric hit's revision. Use it when you have no ids.
+- vision: the real CAD viewport plus scene evidence as an image.
+- inspect_elements: full properties and bounds of elements, in pages.
+- inspect_layers: the layers of the workspace snapshot, and which one is active.
+- inspect_search: elements whose text matches a query, in pages.
+- inspect_property: one property of one element by path, in pages of characters.
+- parametric_validate: rebuild a parametric history and report what it cannot build. Read only.
+- parametric_inspect: the history, parameters and report of one parametric part.
+- parametric_test: run a list of parameter variants and report bodies and volumes; nothing is written.
+- parametric_dfm: manufacturability findings for a history or an existing part.
+- parametric_fastener: thread, tap drill, clearance and counterbore sizes for a metric size.
+- parametric_recipe: build a standard part (mounting plate, flange, L bracket, stepped shaft, enclosure, pipe bend, duct transition) and return its history. Use cad_edit.parametric_recipe_create to put it in the drawing.
+
+Parameters (mm, radians; ids are read, never invented)
+- describe, check, inspect_layers: none.
+- relations: firstId, secondId - two different existing ids.
+- grep: query (1-200 chars), layerId, parametricOnly (default false), includeParameters (default true), offset (default 0), limit (1-50, default 20).
+- vision: focus - what to look at, in one line.
+- inspect_elements: ids (max 20), layerId, offset (default 0), limit (max 20, default 10).
+- inspect_search: query, layerId, limit (max 50, default 20).
+- inspect_property: elementId, path (1-12 property names), offset (default 0), maxChars (default 10000).
+- parametric_validate: history - the part's own history object.
+- parametric_inspect, parametric_test: elementId; test also takes cases: [{name, parameters, expectedBodies?, minVolumeMm3?, maxVolumeMm3?}] (1-12).
+- parametric_dfm: exactly one of elementId or history; process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
+- parametric_fastener: size (M3 ...), fit (fine|medium|coarse), shaftDiameter.
+- parametric_recipe: recipe (one of the names above), params (the design inputs the recipe asks for).
+
+Result (JSON)
+- ok; for describe the elements, counts and bounds; for inspect the page plus total and nextOffset; for parametric the report with bodyCount, volumeMm3 and any problems.
+- Every element carries its id: those are the ids the edit actions take.
+
+Do not use it
+- To change something: cad_edit has add, modify, transform, group, delete, import and the parametric writes.
+- To machine: cam and cam_edit, not this tool.
+
+After it
+- Report ids, positions and bounds rather than prose, then check or verify what you claim is done.

@@ -2,9 +2,9 @@ import { inspectProperties, readProperty, componentParameters } from "./ai-inspe
 import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
-  ToolHandlers, backgroundToolSpecs, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type HostToolSpec, type ProviderId, type ToolHandlersShape,
-  LIBRARY_TOOL_IDS
+  ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
+  searchWeb, makeNikCliRuntime, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  CONTRIBUTION_KEYS
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Effect, Layer, Redacted, Schema } from "effect"
@@ -27,7 +27,7 @@ import { applyChanges, describeElements, elementsOf, newElements, type Element }
 import { LocalProfile } from "./local-profile.ts"
 import { ProjectVcs } from "./project-vcs.ts"
 import { WorkflowRunner } from "./workflow-runner.ts"
-import { vcsToolSpecs } from "./ai-vcs-tools.ts"
+import { vcsContributions } from "./ai-vcs-tools.ts"
 import { aiPromptStep } from "./workflow-service-steps.ts"
 import { ProjectRepo as ProjectsForVcs } from "../repos/project-repo.ts"
 
@@ -734,30 +734,40 @@ const toolHandlers = Effect.gen(function*() {
 export const ToolHandlersLive = Layer.effect(ToolHandlers, toolHandlers.pipe(Effect.map((h) => ToolHandlers.of(h))))
 
 /**
- * The library and CAM-chain tools that are not in the `packages/ai` registry (spec 22 §3). They are host specs, not
- * package tools, so they carry their description here and need no `tools/<id>.txt`; the host derives the permitted ids
- * from `toolsFor`, so the `cadcam` agent and the specialists that name them get them without any config edit.
+ * The implementations of the library actions (`library.*`, `parts.*`, `library_edit.*`): the catalogue declares them, this
+ * supplies what the repositories do with them. Keys are catalogue action ids; `contributionGuard` checks they match.
  */
-const libraryToolSpecs = (handlers: ToolHandlersShape): ReadonlyArray<HostToolSpec> => {
-  const run = <A>(self: Promise<A>): Promise<string> => self.then((value) => JSON.stringify(value)).catch((e) => JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }))
-  const point3 = z.object({ x: z.number(), y: z.number(), z: z.number() })
-  const transform = z.object({ move: point3.optional(), rotate: z.object({ axis: z.enum(["x", "y", "z"]), degrees: z.number(), about: point3.optional() }).optional(), scale: z.object({ factor: z.number(), about: point3.optional() }).optional() }).optional()
-  const specs: ReadonlyArray<HostToolSpec> = [
-    { id: "cad_component_list", description: "List component instances currently present in the active CAD canvas, including their element ids, layer, child count and bounds. Read-only; these are canvas element ids, not saved-library ids.", parameters: z.object({}), execute: async (_input, ctx) => run(handlers.listComponents(ctx.projectId)) },
-    { id: "cad_component_save", description: "Gather elements by id into a named, reusable component of this project. Children are stored relative to the group's origin.", parameters: z.object({ ids: z.array(z.string()).min(1), name: z.string().min(1) }), execute: async (input, ctx) => { const i = input as { ids: string[]; name: string }; return run(handlers.saveComponent(ctx.projectId, i.ids, i.name)) } },
-    { id: "cad_component_insert", description: "Insert a stored component into the active drawing by id, with an optional transform (move/rotate/scale). Returns the new element ids.", parameters: z.object({ componentId: z.string().min(1), transform }), execute: async (input, ctx) => { const i = input as { componentId: string; transform?: cad.ElementTransform }; return run(handlers.insertComponent(ctx.projectId, i.componentId, i.transform)) } },
-    { id: "cad_component_delete", description: "Delete a reusable component by id. Destructive; require confirm: true.", parameters: z.object({ componentId: z.string().min(1), confirm: z.literal(true) }), execute: async (input) => run(handlers.deleteComponent((input as { componentId: string }).componentId)) },
-    { id: "lib_lookup_component", description: "Search saved reusable components across every accessible user/organisation project plus public components. Returns saved component ids for cad_component_insert; an empty query lists the newest visible entries.", parameters: z.object({ query: z.string().default("") }), execute: async (input) => run(handlers.lookupComponent((input as { query: string }).query)) },
-    { id: "lib_upsert_material", description: "Create or replace a Material row (properties: name, numbers, strings). Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), description: z.string().optional(), properties: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMaterial(input as Record<string, unknown>)) },
-    { id: "lib_upsert_tool", description: "Create or replace a Tool row: name, type, diameter (mm), material. Destructive replace when id names an existing row; create-only when id is omitted.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), type: z.string(), diameter: z.number().positive(), material: z.string(), numberOfFlutes: z.number().int().positive().optional(), maxRPM: z.number().int().positive().optional(), coolantType: z.string().optional(), cuttingLength: z.number().positive().optional(), totalLength: z.number().positive().optional(), shankDiameter: z.number().positive().optional(), notes: z.string().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertTool(input as Record<string, unknown>)) },
-    { id: "lib_upsert_machine_config", description: "Create or replace a MachineConfig row: name, kind (mill/lathe/3Dprinter), kinematics, postProcessor, workOffsets. Destructive replace when id names an existing row.", parameters: z.object({ id: z.string().optional(), name: z.string().min(1), kind: z.enum(["mill", "lathe", "3Dprinter"]), kinematics: z.record(z.string(), z.object({ min: z.number(), max: z.number() })).default({}), postProcessor: z.string(), workOffsets: z.array(z.string()).default(["G54", "G55", "G56", "G57", "G58", "G59"]), probing: z.record(z.string(), z.unknown()).optional(), maxRPM: z.number().int().positive().optional(), maxFeed: z.number().positive().optional(), isPublic: z.boolean().default(false) }), execute: async (input) => run(handlers.upsertMachineConfig(input as Record<string, unknown>)) },
-    { id: "lib_set_default", description: "Set the project's default material, tool and/or machine config, used to seed new operations.", parameters: z.object({ materialId: z.string().optional(), toolId: z.string().optional(), machineConfigId: z.string().optional() }), execute: async (input, ctx) => run(handlers.setProjectDefault({ ...(input as { materialId?: string; toolId?: string; machineConfigId?: string }), projectId: ctx.projectId })) },
-    { id: "cam_operations_suggest_chain", description: "Given the current operations and the chosen one, recommend the next operation as JSON suitable for cam_create_operation. Read-only.", parameters: z.object({ fromOperationId: z.string().optional(), materialHint: z.string().optional(), toolHint: z.string().optional() }), execute: async (input, ctx) => { const i = input as { fromOperationId?: string; materialHint?: string; toolHint?: string }; return run(handlers.suggestChain({ ...i, projectId: ctx.projectId })) } },
-    { id: "cam_chain_status", description: "Read one operation's chain state: previous operation, rest-tool reference, whether G-code is generated, and warnings (OrphanRef). Read-only.", parameters: z.object({ operationId: z.string().min(1) }), execute: async (input, ctx) => run(handlers.chainStatus({ projectId: ctx.projectId, operationId: (input as { operationId: string }).operationId })) }
-  ]
-  // One drift guard: an id a specialist (or a prompt) names must be one the host actually registers.
-  for (const spec of specs) if (!LIBRARY_TOOL_IDS.includes(spec.id as (typeof LIBRARY_TOOL_IDS)[number])) throw new Error(`Unregistered library tool id: ${spec.id}`)
-  return specs
+const libraryContributions = (handlers: ToolHandlersShape): Readonly<Record<string, ActionContribution>> => ({
+  "library.component_list": (_input, context) => handlers.listComponents(context.projectId),
+  "library.lookup_component": (input) => handlers.lookupComponent((input as { query: string }).query),
+  "library.lookup_machine_config": (input) => handlers.lookupMachineConfig((input as { query: string }).query),
+  "parts.save": (input, context) => {
+    const value = input as { ids: string[]; name: string }
+    return handlers.saveComponent(context.projectId, value.ids, value.name)
+  },
+  "parts.insert": (input, context) => {
+    const value = input as { componentId: string; transform?: cad.ElementTransform }
+    return handlers.insertComponent(context.projectId, value.componentId, value.transform)
+  },
+  "parts.delete": (input) => handlers.deleteComponent((input as { componentId: string }).componentId),
+  "library_edit.upsert_material": (input) => handlers.upsertMaterial(input as Record<string, unknown>),
+  "library_edit.upsert_tool": (input) => handlers.upsertTool(input as Record<string, unknown>),
+  "library_edit.upsert_machine_config": (input) => handlers.upsertMachineConfig(input as Record<string, unknown>),
+  "library_edit.set_default": (input, context) => handlers.setProjectDefault({ ...(input as { materialId?: string; toolId?: string; machineConfigId?: string }), projectId: context.projectId }),
+  "library_edit.delete": (input) => handlers.deleteLibrary(input as { kind: "material" | "tool" | "machine_config"; id: string })
+})
+
+/**
+ * Every contributed action must have exactly one implementation, and every implementation must name a contributed action:
+ * a model-visible capability with nothing behind it, or a dead implementation, fails at startup rather than at a call.
+ */
+const contributionGuard = (contributions: Readonly<Record<string, ActionContribution>>): void => {
+  const provided = Object.keys(contributions)
+  const missing = CONTRIBUTION_KEYS.filter((key) => !provided.includes(key))
+  const unknown = provided.filter((key) => !CONTRIBUTION_KEYS.includes(key))
+  if (missing.length > 0 || unknown.length > 0) {
+    throw new Error(`Action contributions do not match the catalogue. Missing: ${missing.join(", ") || "none"}. Unknown: ${unknown.join(", ") || "none"}.`)
+  }
 }
 
 /** The embedded nikcli host (the primary path); skipped with `CADCAMFUN_AI_HOST=direct`. */
@@ -783,6 +793,13 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
   // it (no second scheduler, no second scheduler across projects).
   const scheduler = new BackgroundTaskManager({})
+  // Every implementation the application owns, keyed by catalogue action id; the guard keeps the two sides in step.
+  const contributions: Readonly<Record<string, ActionContribution>> = {
+    ...libraryContributions(handlers),
+    ...vcsContributions({ vcs, runner, projects: projectsRepo, actor }),
+    ...backgroundToolContributionsFor(scheduler)
+  }
+  contributionGuard(contributions)
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
     providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
@@ -792,12 +809,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     // what turns "the four providers we declare" into the whole catalogue. Offline tests
     // set the flag and the seed answers "skipped" without touching the network.
     catalogue: { network: !config.aiOffline },
-    toolsFor: (projectId) => [
-      ...buildTools(handlers, projectId),
-      ...libraryToolSpecs(handlers),
-      ...vcsToolSpecs({ vcs, runner, projects: projectsRepo, actor }),
-      ...backgroundToolSpecs(scheduler)
-    ].map((spec): HostToolSpec => ({
+    toolsFor: (projectId) => buildTools(handlers, projectId, [], contributions).map((spec): HostToolSpec => ({
       ...spec,
       execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal).catch(() => JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." })),
       ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})

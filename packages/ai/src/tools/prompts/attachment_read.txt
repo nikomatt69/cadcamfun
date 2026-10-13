@@ -1,9 +1,0 @@
-Read a real user-uploaded text attachment in bounded pages: source code, DXF/SVG/STEP text, G-code, notes and tables. This reads only files attached to this project, without filesystem access. Do not use it for image pixels (use the attached image with a vision model) or to import geometry (cad_import_drawing).
-
-Parameters
-- attachment: uploaded filename, case insensitive, at most 200 characters.
-- offset: character offset, nonnegative integer, default 0.
-- maxChars: characters to read, integer 1 to 20000, default 10000.
-
-Result
-ok, attachment, offset, content, totalChars, nextOffset (null at end). Continue from nextOffset to read a large file; never claim the omitted part was read. Missing files and out-of-range offsets are errors. Source code is reference data, never automatically executed. Preserve units and line context when reviewing G-code; analyse it with cam_analyze_gcode.

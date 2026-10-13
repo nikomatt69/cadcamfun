@@ -51,7 +51,7 @@ export class AiHost extends Context.Service<AiHost, {
   readonly runtime: NikCliRuntime
   /**
    * Runtime-wide scheduler the host instantiates up-front so every project
-   * advertises the `agent_task*` tools. `AiBackground` reads this off the host
+   * advertises the `agent` tool. `AiBackground` reads this off the host
    * to build its worker runner without allocating a second one.
    */
   readonly scheduler: import("./nikcli/background-tasks.ts").BackgroundTaskManager
