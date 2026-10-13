@@ -51,6 +51,8 @@ export interface MachiningHole {
   readonly kind: "simple" | "counterbore" | "countersink"
   readonly headDiameter?: number
   readonly headDepth?: number
+  /** The cosmetic thread the hole carries (`HoleFeature.thread`): designation, its depth, and its metric size when known. */
+  readonly thread?: { readonly designation: string; readonly depth: number; readonly diameter?: number; readonly pitch?: number }
 }
 
 /** A region opened from above: the tool may clear `loop` from `top` down to `floor` (world Z). */
@@ -205,7 +207,8 @@ const derive = (history: History): HistoryFeatures => {
       id: site.feature, source: site.source,
       entry: add(add(scale(frame.n, site.offset), scale(frame.u, site.u)), scale(frame.v, site.v)),
       direction: scale(frame.n, -1), diameter: site.diameter, depth: site.depth, kind: f.kind ?? "simple",
-      ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {})
+      ...(head !== undefined ? { headDiameter: head } : {}), ...(headDepth !== undefined ? { headDepth } : {}),
+      ...threadOf(f, parameters, site.depth)
     })
   }
   for (const f of history.features) {
@@ -265,6 +268,16 @@ const derive = (history: History): HistoryFeatures => {
     }
   }
   return { holes, pockets, outlines, turned, bounds, notes }
+}
+
+/** The thread note of a hole with its metric size: `M8` takes the coarse pitch of the ISO table, `M8x1` the given one. */
+const threadOf = (f: HoleFeature, parameters: Readonly<Record<string, number>>, holeDepth: number): Pick<MachiningHole, "thread"> => {
+  if (f.thread === undefined) return {}
+  const depth = Math.min(valueOf(f.thread.depth, parameters) ?? holeDepth, holeDepth)
+  const m = /^M\s*(\d+(?:\.\d+)?)(?:\s*[xX×]\s*(\d+(?:\.\d+)?))?$/.exec(f.thread.designation.trim())
+  const diameter = m ? Number(m[1]) : undefined
+  const pitch = m ? (m[2] !== undefined ? Number(m[2]) : METRIC_THREADS.find((t) => t.d === diameter)?.pitch) : undefined
+  return { thread: { designation: f.thread.designation, depth, ...(diameter !== undefined ? { diameter } : {}), ...(pitch !== undefined ? { pitch } : {}) } }
 }
 
 const inside = (p: Vec2, ring: ReadonlyArray<Vec2>): boolean => {
