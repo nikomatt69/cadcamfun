@@ -27,9 +27,10 @@ import { edgedHoleTool, edgedPrism, moveRing, taperedHoleTool, taperedPrism, tre
 import { loftSolid, roundPath, sweepSolid, type P3 } from "./sweep-loft.ts"
 import { COIL_MAX_TURNS, coilGeometry } from "./helix.ts"
 import { developedLength, sheetOutline, thickenPath, withHems, type Developed } from "./sheet-metal.ts"
-import { threadProblem, threadTool } from "./thread.ts"
+import { threadGroove, threadProblem, threadTool } from "./thread.ts"
 import { textSolid } from "./text-solid.ts"
 import { findPlanarFace, type PlanarFace } from "./face-edit.ts"
+import { findSmoothFace, type SmoothFace } from "./smooth-face.ts"
 import { metricThread } from "./fasteners.ts"
 export { COIL_STEPS_PER_TURN, coilGeometry } from "./helix.ts"
 import { blendEdges, findEdges, selectEdges } from "./edge-blend.ts"
@@ -305,12 +306,21 @@ export interface ThreadFeature {
   readonly diameter: Dimension
   readonly pitch: Dimension
   readonly length: Dimension
-  /** Where the axis stands on the XY plane and the Z where the thread starts. */
+  /**
+   * Where the axis stands and where the thread starts. Along Z (the default): `at` = [x, y], `offset` = z. Along X: `at` = [y, z],
+   * `offset` = x. Along Y: `at` = [z, x], `offset` = y (the u, v and normal of the YZ and ZX planes). The thread runs towards +axis.
+   */
   readonly at?: readonly [Dimension, Dimension]
   readonly offset?: Dimension
+  readonly axis?: "x" | "y" | "z"
   /** How the thread is named on a drawing (`M8`, `G1/2"`); the default is `M` + diameter. */
   readonly designation?: string
   readonly handedness?: "right" | "left"
+  /**
+   * External threads only: cut the thread into the shaft that is already there (the bodies the thread overlaps, or `targets`) instead of
+   * making a threaded rod. The shaft should be the major diameter; a wider one is turned down to it over the thread length.
+   */
+  readonly cut?: boolean
   readonly operation?: Operation
   readonly targets?: ReadonlyArray<string>
 }
@@ -333,7 +343,11 @@ export interface TextFeature {
   readonly operation: Operation
   readonly targets?: ReadonlyArray<string>
 }
-/** Moves a planar face of a body along its normal (Fusion's Press Pull): positive grows the body, negative cuts into it. */
+/**
+ * Moves a face of a body along its normal (Fusion's Press Pull): positive grows the body, negative cuts into it. A flat face moves with
+ * its outline (holes kept); a curved one (a boss side, a hole wall, a fillet and the faces tangent to it) is offset along its normals, so
+ * a cylinder changes radius by `distance`.
+ */
 export interface PushPullFeature {
   readonly id: string
   readonly type: "pushpull"
@@ -375,6 +389,16 @@ export interface MateFeature {
   readonly to: { readonly body: string; readonly near: readonly [Dimension, Dimension, Dimension]; readonly normal?: readonly [Dimension, Dimension, Dimension] }
   readonly offset?: Dimension
   readonly spin?: Dimension
+  /** Slider / planar joint: how far the moving face is shifted along the target face's own u and v axes from the face centre. */
+  readonly slide?: readonly [Dimension, Dimension]
+  /** Motion limits of the joint (Fusion's joint limits): a spin, offset or slide outside them is an error, not a silent pose. */
+  readonly limits?: {
+    readonly spin?: readonly [Dimension, Dimension]
+    readonly offset?: readonly [Dimension, Dimension]
+    readonly slide?: readonly [readonly [Dimension, Dimension], readonly [Dimension, Dimension]]
+  }
+  /** Report when the two bodies overlap in this pose (default true; one Boolean per mate). */
+  readonly interference?: boolean
 }
 /**
  * A work plane (Fusion's Construct): a plane other than XY, YZ and ZX for a sketch, a hole or a text to lie on. Name it by this
@@ -699,7 +723,7 @@ const draftTools = (face: PlanarFace, w: V3, neutral: number, angle: number, ext
 }
 
 /** The mesh moved so that `mine` lies flush against `theirs` (normals opposed, centres together, `offset` apart), then spun about their normal. */
-const mateMesh = (mesh: Mesh, mine: PlanarFace, theirs: PlanarFace, offset: number, spin: number): Mesh => {
+const mateMesh = (mesh: Mesh, mine: PlanarFace, theirs: PlanarFace, offset: number, spin: number, slideU = 0, slideV = 0): Mesh => {
   const target = vmul(theirs.normal, -1)
   const d = Math.max(-1, Math.min(1, vdot(mine.normal, target)))
   let turned = mesh
@@ -708,7 +732,7 @@ const mateMesh = (mesh: Mesh, mine: PlanarFace, theirs: PlanarFace, offset: numb
     if (Math.hypot(axis.x, axis.y, axis.z) < 1e-9) axis = vcross(mine.normal, Math.abs(mine.normal.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 })
     turned = rotateMesh(mesh, vunit(axis), Math.acos(d), mine.centroid)
   }
-  const goal = vadd(theirs.centroid, vmul(theirs.normal, offset))
+  const goal = vadd(vadd(vadd(theirs.centroid, vmul(theirs.normal, offset)), vmul(theirs.u, slideU)), vmul(theirs.v, slideV))
   const moved = translateMesh(turned, goal.x - mine.centroid.x, goal.y - mine.centroid.y, goal.z - mine.centroid.z)
   return Math.abs(spin) < 1e-12 ? moved : rotateMesh(moved, theirs.normal, spin, goal)
 }
@@ -1271,8 +1295,19 @@ export const rebuild = (history: History): RebuildResult => {
           const spec = { diameter: diameter!, pitch: pitch!, length: length!, internal: f.kind === "internal", left: f.handedness === "left", cx: cx!, cy: cy!, z0: z0! }
           const problem = threadProblem(spec)
           if (problem !== undefined) { issues.push({ feature: f.id, severity: "error", message: problem }); break }
-          const tool = threadTool(spec)
-          const operation = f.operation ?? (f.kind === "internal" ? "subtract" : "new")
+          if (f.cut === true && f.kind === "internal") { issues.push({ feature: f.id, severity: "error", message: "cut is for an external thread on a shaft; an internal thread already cuts into the body" }); break }
+          if (f.cut === true && f.operation !== undefined && f.operation !== "subtract") { issues.push({ feature: f.id, severity: "error", message: "A thread cut into a shaft is a subtraction; leave operation out" }); break }
+          // Built along Z in the frame of the plane square to the axis, then carried to the world (XY for z, YZ for x, ZX for y).
+          const axisFrame = FRAMES[f.axis === "x" ? "YZ" : f.axis === "y" ? "ZX" : "XY"]
+          const local = f.cut === true ? threadGroove(spec) : threadTool(spec)
+          const tool = f.axis === undefined || f.axis === "z" ? local : place(local, axisFrame.u, axisFrame.v, axisFrame.n, { x: 0, y: 0, z: 0 })
+          const operation = f.cut === true ? "subtract" : f.operation ?? (f.kind === "internal" ? "subtract" : "new")
+          if (f.cut === true) {
+            // The shaft must be there: something of a body inside the major diameter over the thread length.
+            const sleeve = meshBounds(tool)
+            const touched = bodies.filter((b) => (f.targets === undefined || f.targets.includes(b.id)) && (() => { const m = meshBounds(b.mesh); return m.maxX > sleeve.minX && m.minX < sleeve.maxX && m.maxY > sleeve.minY && m.minY < sleeve.maxY && m.maxZ > sleeve.minZ && m.minZ < sleeve.maxZ })())
+            if (touched.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no shaft where the thread is to be cut" }); break }
+          }
           tools.set(f.id, { meshes: [tool], operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, operation, f.targets, f.id)
           break
@@ -1356,7 +1391,31 @@ export const rebuild = (history: History): RebuildResult => {
           const w: V3 = { x: pullRaw[0]! / pl, y: pullRaw[1]! / pl, z: pullRaw[2]! / pl }
           const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
           if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to draft" : `Body '${f.body}' does not exist at this point of the history` }); break }
-          const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! })
+          const draftNear = { x: near[0]!, y: near[1]!, z: near[2]! }
+          const draftHint = wanted === undefined ? undefined : { x: wanted[0]!, y: wanted[1]!, z: wanted[2]! }
+          // A curved face (the side of a boss, a hole wall) leans by moving each vertex square to the pull, by its height above the
+          // neutral plane times tan(angle): a cylinder becomes a cone. One-sided only: the neutral plane must not cross the face.
+          let curvedDraft: { readonly body: Body; readonly face: SmoothFace } | undefined
+          for (const b of candidates) {
+            const found = findSmoothFace(b.mesh, { near: draftNear, ...(draftHint !== undefined ? { normal: draftHint } : {}) })
+            if ("error" in found) continue
+            if (curvedDraft === undefined || found.face.distance < curvedDraft.face.distance) curvedDraft = { body: b, face: found.face }
+          }
+          if (curvedDraft !== undefined && !curvedDraft.face.planar) {
+            const tan = Math.tan((angle * Math.PI) / 180)
+            const across = (_p: V3, n: V3): V3 => { const h = vsub(n, vmul(w, vdot(w, n))); const l = Math.hypot(h.x, h.y, h.z); return l < 1e-9 ? { x: 0, y: 0, z: 0 } : vmul(h, 1 / l) }
+            const shift = (p: V3): number => -(vdot(w, p) - neutral) * tan
+            const shifts = curvedDraft.face.vertices.map((v) => shift(v.p))
+            const lo = Math.min(...shifts), hi = Math.max(...shifts)
+            if (curvedDraft.face.vertices.some((v) => { const a = across(v.p, v.n); return a.x === 0 && a.y === 0 && a.z === 0 })) { issues.push({ feature: f.id, severity: "error", message: "Part of the curved face is square to the pull direction and cannot be drafted" }); break }
+            if (lo < -1e-9 && hi > 1e-9) { issues.push({ feature: f.id, severity: "error", message: "The neutral plane crosses this curved face: put it at the face's base or top (a curved face is drafted one way only)" }); break }
+            const margin = 0.01
+            if (hi <= 1e-9 && lo < -1e-9) apply(f.id, curvedDraft.face.slab((p) => shift(p), margin, across), "subtract", [curvedDraft.body.id], f.id)
+            else if (hi > 1e-9) apply(f.id, curvedDraft.face.slab(-margin, (p) => Math.max(shift(p), 0) + 1e-9, across), "union", [curvedDraft.body.id], f.id)
+            else issues.push({ feature: f.id, severity: "warning", message: "The draft changes nothing (the face lies on the neutral plane, or the angle is 0)" })
+            break
+          }
+          const pick = pickFace(candidates, draftNear, draftHint)
           if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
           const { face, body } = pick
           const parts = draftTools(face, w, neutral, (angle * Math.PI) / 180, meshExtent(body.mesh))
@@ -1370,7 +1429,23 @@ export const rebuild = (history: History): RebuildResult => {
           const a = f.face.near.map((d) => dim(d, f.id)), an = f.face.normal?.map((d) => dim(d, f.id))
           const b = f.to.near.map((d) => dim(d, f.id)), bn = f.to.normal?.map((d) => dim(d, f.id))
           const offset = f.offset === undefined ? 0 : dim(f.offset, f.id), spin = f.spin === undefined ? 0 : dim(f.spin, f.id)
-          if ([...a, ...b, ...(an ?? []), ...(bn ?? [])].some((v) => v === undefined) || offset === undefined || spin === undefined) break
+          const slide = (f.slide ?? [0, 0]).map((d) => dim(d, f.id))
+          if ([...a, ...b, ...(an ?? []), ...(bn ?? []), ...slide].some((v) => v === undefined) || offset === undefined || spin === undefined) break
+          // Joint limits.
+          const range = (pair: readonly [Dimension, Dimension] | undefined): [number, number] | undefined | null => {
+            if (pair === undefined) return undefined
+            const lo = dim(pair[0], f.id), hi = dim(pair[1], f.id)
+            return lo === undefined || hi === undefined ? null : [Math.min(lo, hi), Math.max(lo, hi)]
+          }
+          const outside: string[] = []
+          const check = (name: string, value: number, pair: readonly [Dimension, Dimension] | undefined): boolean => {
+            const r = range(pair)
+            if (r === null) return false
+            if (r !== undefined && (value < r[0] - 1e-9 || value > r[1] + 1e-9)) outside.push(`${name} ${value} is outside its limits ${r[0]} to ${r[1]}`)
+            return true
+          }
+          if (!check("spin", spin, f.limits?.spin) || !check("offset", offset, f.limits?.offset) || !check("slide u", slide[0]!, f.limits?.slide?.[0]) || !check("slide v", slide[1]!, f.limits?.slide?.[1])) break
+          if (outside.length > 0) { issues.push({ feature: f.id, severity: "error", message: `The joint is posed beyond its limits: ${outside.join("; ")}` }); break }
           const moving = bodies.find((x) => x.id === f.body), fixed = bodies.find((x) => x.id === f.to.body)
           if (moving === undefined || fixed === undefined) { issues.push({ feature: f.id, severity: "error", message: `Body '${moving === undefined ? f.body : f.to.body}' does not exist at this point of the history` }); break }
           if (moving === fixed) { issues.push({ feature: f.id, severity: "error", message: "A body cannot be mated to itself" }); break }
@@ -1378,8 +1453,13 @@ export const rebuild = (history: History): RebuildResult => {
           const first = pickFace([moving], v3(a), an === undefined ? undefined : v3(an)), second = pickFace([fixed], v3(b), bn === undefined ? undefined : v3(bn))
           if ("error" in first) { issues.push({ feature: f.id, severity: "error", message: `Face of '${f.body}': ${first.error}` }); break }
           if ("error" in second) { issues.push({ feature: f.id, severity: "error", message: `Face of '${f.to.body}': ${second.error}` }); break }
-          const mesh = mateMesh(moving.mesh, first.face, second.face, offset, (spin * Math.PI) / 180)
+          const mesh = mateMesh(moving.mesh, first.face, second.face, offset, (spin * Math.PI) / 180, slide[0]!, slide[1]!)
           bodies[bodies.indexOf(moving)] = { ...moving, mesh }
+          if (f.interference !== false) {
+            const overlap = meshVolume(booleanMesh(mesh, fixed.mesh, "intersect"))
+            const tolerance = 1e-6 * Math.min(Math.abs(meshVolume(mesh)), Math.abs(meshVolume(fixed.mesh)))
+            if (overlap > tolerance + 1e-9) issues.push({ feature: f.id, severity: "warning", message: `'${f.body}' and '${f.to.body}' interfere in this pose: ${overlap.toFixed(3)} mm3 overlap` })
+          }
           break
         }
         case "pushpull": {
@@ -1389,10 +1469,24 @@ export const rebuild = (history: History): RebuildResult => {
           if (distance === 0) { issues.push({ feature: f.id, severity: "warning", message: "A push/pull of 0 changes nothing" }); break }
           const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
           if (candidates.length === 0) { issues.push({ feature: f.id, severity: "error", message: f.body === undefined ? "There is no body to push or pull" : `Body '${f.body}' does not exist at this point of the history` }); break }
-          const pick = pickFace(candidates, { x: near[0]!, y: near[1]!, z: near[2]! }, wantedNormal === undefined ? undefined : { x: wantedNormal[0]!, y: wantedNormal[1]!, z: wantedNormal[2]! })
+          const nearPoint = { x: near[0]!, y: near[1]!, z: near[2]! }
+          const normalHint = wantedNormal === undefined ? undefined : { x: wantedNormal[0]!, y: wantedNormal[1]!, z: wantedNormal[2]! }
+          const margin = 0.01
+          // A curved face (the side of a boss, the wall of a hole, a fillet) is offset along its vertex normals; a flat one by its outline.
+          let curved: { readonly body: Body; readonly face: SmoothFace } | undefined
+          for (const b of candidates) {
+            const found = findSmoothFace(b.mesh, { near: nearPoint, ...(normalHint !== undefined ? { normal: normalHint } : {}) })
+            if ("error" in found) continue
+            if (curved === undefined || found.face.distance < curved.face.distance) curved = { body: b, face: found.face }
+          }
+          if (curved !== undefined && !curved.face.planar) {
+            const tool = distance > 0 ? curved.face.slab(-margin, distance) : curved.face.slab(distance, margin)
+            apply(f.id, tool, distance > 0 ? "union" : "subtract", [curved.body.id], f.id)
+            break
+          }
+          const pick = pickFace(candidates, nearPoint, normalHint)
           if ("error" in pick) { issues.push({ feature: f.id, severity: "error", message: pick.error }); break }
           const { face, body } = pick
-          const margin = 0.01
           const local = distance > 0 ? profileSolid(face.loops, -margin, distance) : profileSolid(face.loops, distance, margin)
           if (local === undefined) { issues.push({ feature: f.id, severity: "error", message: "The face has no closed outline to push" }); break }
           const tool = place(local, face.u, face.v, face.normal, face.origin)

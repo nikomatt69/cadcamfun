@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
 import { AlertCircle, Check, Save } from "lucide-solid"
-import { useElementsStore } from "../store/elementsStore.ts"
+import { componentLibraryDocument } from "../lib/component-assembly.ts"
+import { useElementsStore, type Element } from "../store/elementsStore.ts"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 import { elementMetadataExtractors, generateSuggestedTags } from "../lib/elementMetadata.ts"
 import { Modal } from "../../../shared/ui/modal.tsx"
@@ -117,14 +118,15 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
 
   const saveLocal = (element: Record<string, unknown>): void => {
     const { specifications } = extractor(element.type as string)(element)
-    library.addComponent({
+    const saved = library.addComponent({
       name: name(),
       description: form().description,
       type: form().type,
       tags: form().tags.split(",").map((tag) => tag.trim()).filter(Boolean),
-      data: { ...element, id: undefined, selected: undefined },
+      data: componentLibraryDocument(element as Element),
       meta: { specifications, elementType: element.type }
     })
+    if (!saved) throw new Error(t("cad.saveElement.failedLocal"))
     setStatus({ kind: "ok", text: t("cad.saveElement.saveLocal") })
     setOpen(false)
     props.onSaveComplete?.("local")
@@ -140,14 +142,7 @@ export default function SaveElementToLibrary(props: Props): JSX.Element {
           type: form().type,
           isPublic: isPublic(),
           thumbnail: null,
-          // The API normalises a component document; the element travels as the first entry of
-          // `elements`, which is what the legacy components page and `normalizeComponentData` expect.
-          data: {
-            version: "1.0",
-            type: form().type,
-            elements: [element],
-            metadata: { elementType: element.type, savedFrom: "cad-editor", tags: form().tags.split(",").map((tag) => tag.trim()).filter(Boolean) }
-          }
+          data: componentLibraryDocument(element as Element)
         }
       })
     )

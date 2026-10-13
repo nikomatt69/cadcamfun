@@ -447,5 +447,15 @@
   "cad.drawing.close": "Close",
   "cad.drawing.x": "X (mm)",
   "cad.drawing.y": "Y (mm)",
-  "cad.drawing.z": "Z (mm)"
+  "cad.drawing.z": "Z (mm)",
+  "cad.createComponent.workflowHint": "Create an assembly from your selection and save it for reuse, all from the CAD editor.",
+  "cad.createComponent.contents": "Included geometry",
+  "cad.createComponent.summary": "{roots} selected · {total} elements in total · {nested} nested components / groups",
+  "cad.createComponent.hierarchyHint": "All descendants, geometry and local transforms are included. The hierarchy stays editable.",
+  "cad.createComponent.createSave": "Create & Save to Library",
+  "cad.createComponent.createdSaved": "Component created and saved to the library",
+  "cad.createComponent.created": "Component created",
+  "cad.createComponent.retryProjects": "Could not load projects. Retry",
+  "cad.createComponent.selectionChanged": "The selected geometry changed. Close and reopen this dialog to use the current selection.",
+  "cad.createComponent.duplicateHint": "This name is already used. Saving will create a separate library entry."
 }

@@ -43,7 +43,7 @@ const cross = (a: V3, b: V3): V3 => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - 
 const norm = (a: V3): number => Math.hypot(a.x, a.y, a.z)
 
 /** Distance from `p` to the triangle abc. */
-const distanceToTriangle = (p: V3, a: V3, b: V3, c: V3): number => {
+export const distanceToTriangle = (p: V3, a: V3, b: V3, c: V3): number => {
   // Ericson, Real-Time Collision Detection: closest point on a triangle.
   const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a)
   const d1 = dot(ab, ap), d2 = dot(ac, ap)

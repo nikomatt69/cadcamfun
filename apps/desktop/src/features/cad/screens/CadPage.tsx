@@ -1,3 +1,4 @@
+import { transformLibraryItemToCADElement } from "../lib/libraryTransform.ts"
 import { Effect } from "effect"
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
@@ -63,6 +64,7 @@ export default function CadPage(): JSX.Element {
   const [showImportExport, setShowImportExport] = createSignal(false)
   const [dialogMode, setDialogMode] = createSignal<"import" | "export">("export")
   const [showFloating, setShowFloating] = createSignal(true)
+  const [libraryItem, setLibraryItem] = createSignal<LibraryComponent | null>(null)
   const [libraryComponent, setLibraryComponent] = createSignal<string | null>(null)
   const [showLibrary, setShowLibrary] = createSignal(false)
   const [showCustomElements, setShowCustomElements] = createSignal(false)
@@ -159,7 +161,7 @@ export default function CadPage(): JSX.Element {
       if (!stored) { toast.error("Component data not found"); return }
       const data = JSON.parse(stored)
       if (!data || !data.id || data.id !== componentId) { toast.error("Invalid component data"); return }
-      elements.addElement({ id: `component-${Date.now()}`, type: "component", x: 0, y: 0, z: 0, name: data.name || "Unnamed Component", componentId: data.id, data: data.data, layerId: layers.layers[0]?.id ?? "default" })
+      elements.addElement(transformLibraryItemToCADElement(data, { x: 0, y: 0, z: 0 }))
       toast.success(`Component '${data.name}' loaded successfully`)
       localStorage.removeItem("componentToLoadInCAD")
       localStorage.removeItem("componentToLoadInCAD_timestamp")
@@ -186,11 +188,12 @@ export default function CadPage(): JSX.Element {
     }, () => { if (!controller.signal.aborted) setSidebarPlugins([]) })
   })
 
-  createEffect(() => { if (!showLibrary() && !sidebarOpen()) setLibraryComponent(null) })
+  createEffect(() => { if (libraryComponent() === null) setLibraryItem(null) })
 
   const openExport = () => { setDialogMode("export"); setShowImportExport(true) }
 
   const pickComponent = (component: LibraryComponent) => {
+    setLibraryItem(component)
     setLibraryComponent(component.id)
     toast.success(`Component '${component.name}' selected. Place it on the canvas.`)
     setShowLibrary(false)
@@ -233,7 +236,7 @@ export default function CadPage(): JSX.Element {
 
           <Motion.div class="cad-workspace__stage flex-1 min-w-0 flex relative overflow-hidden rounded-2xl mr-2" {...rise} transition={{ duration: 0.8, delay: 0.6 }}>
             <CADCanvas
-              width="100%" height="100%" previewComponent={libraryComponent()}
+              width="100%" height="100%" previewComponent={libraryComponent()} previewLibraryItem={libraryItem()}
               onComponentPlaced={() => { toast.success("Component placed successfully!"); setLibraryComponent(null) }}
               onReady={setCanvas} onSave={openExport}
             />

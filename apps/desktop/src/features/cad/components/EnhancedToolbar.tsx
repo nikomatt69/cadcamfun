@@ -1,6 +1,6 @@
 import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import { Portal } from "solid-js/web"
-import { A, useNavigate } from "@solidjs/router"
+import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { Activity, Blocks, BookOpen, ChevronDown, Copy, Maximize, Menu, MousePointer, Moon, RotateCcw, RotateCw, Save, SquarePlus, Sun, Upload, Wrench, X } from "lucide-solid"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -11,6 +11,7 @@ import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { prefersDark } from "../../../shared/state/settings.ts"
 import CADCanvas from "./CADCanvas.tsx"
+import ComponentCreationModal from "./ComponentCreationModal.tsx"
 
 export interface EnhancedToolbarProps {
   readonly sidebarOpen: boolean
@@ -40,7 +41,7 @@ const press = { scale: 0.95 }
 
 /** The editor's top bar: menu, save/import/library, undo/redo, view toggles, CAM link, selection summary, FEA dialog. */
 export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Element {
-  const navigate = useNavigate()
+  const [showComponentModal, setShowComponentModal] = createSignal(false)
   const elements = useElementsStore()
   const cad = useCADStore()
   const selection = useSelectionStore()
@@ -68,23 +69,17 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
     onCleanup(() => { document.removeEventListener("mousedown", outside); document.removeEventListener("keydown", key) })
   })
 
-  const remember = (key: string, value: unknown) => { try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* storage unavailable */ } }
-
   const createComponentFromSelected = () => {
     const selected = elements.selectedElement
-    if (!selected) return
-    remember("cadSelectedElementForComponent", selected)
-    navigate("/components?createFromCad=true")
-    toast.success("Element prepared for component creation")
+    if (!selected && !selectedCount()) return
+    if (!selection.selectedElementIds.length && selected) selection.selectElement(selected.id)
+    setShowComponentModal(true)
   }
 
   const createComponentFromSelection = () => {
-    const chosen = selectedElements()
-    if (chosen.length === 0) { toast.error("No elements selected"); return }
-    remember("cadSelectionForComponent", { elements: chosen })
-    navigate("/components?createFromSelection=true")
-    toast.success("Selection prepared for component creation")
+    if (!selectedCount()) return
     setShowElementsPopup(false)
+    setShowComponentModal(true)
   }
 
   /** Positions the FEA dialog next to the cursor, keeping it inside the window (like the tool forms). */
@@ -133,15 +128,15 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
             <Blocks size={16} class="text-gray-600 dark:text-gray-400" />
           </Motion.button>
 
-          <Show when={elements.selectedElement}>
+          <Show when={selectedCount() > 0 || elements.selectedElement}>
             <Motion.button
               onClick={createComponentFromSelected}
               class="px-4 py-2 backdrop-blur-sm bg-green-50/90 dark:bg-green-900/90 border border-green-300/60 dark:border-green-700/60 hover:bg-green-100/90 dark:hover:bg-green-800/90 text-green-700 dark:text-green-300 rounded-xl shadow-md flex items-center transition-all duration-200"
-              title="Create Component from Selected Element" hover={hover} press={press}
+              title={t("cad.createComponent.title")} hover={hover} press={press}
               initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
             >
               <SquarePlus size={16} class="mr-1.5" />
-              <span class="text-sm font-medium">Create Component</span>
+              <span class="text-sm font-medium">{t("cad.createComponent.title")}</span>
             </Motion.button>
           </Show>
 
@@ -308,6 +303,7 @@ export default function EnhancedToolbar(props: EnhancedToolbarProps): JSX.Elemen
           </div>
         </Portal>}
       </Show>
+      <ComponentCreationModal isOpen={showComponentModal()} onClose={() => setShowComponentModal(false)} />
     </Motion.div>
   )
 }

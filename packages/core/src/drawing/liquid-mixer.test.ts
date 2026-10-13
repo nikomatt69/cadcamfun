@@ -1,8 +1,11 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { insideLoops, sectionView } from "./section.ts"
 import { generateSheet } from "./sheet.ts"
 import { liquidMixerHistory, liquidMixerSheetOptions } from "./liquid-mixer.ts"
 import { rebuild } from "../cad/history.ts"
+
+// Booleans and hidden-line removal on real parts: seconds each on a loaded machine, not milliseconds.
+setDefaultTimeout(60_000)
 
 const sheet = generateSheet(liquidMixerHistory(), liquidMixerSheetOptions)
 

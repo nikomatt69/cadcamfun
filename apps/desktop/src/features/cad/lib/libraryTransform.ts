@@ -1,10 +1,21 @@
 // src/lib/libraryTransform.ts
 import * as THREE from "three";
+import { libraryComponentElement, translateComponentElement, componentBounds } from "./component-assembly.ts";
+import { createThreeObject } from "./createThreeObject.ts";
+import { initializeElementTransform, type ElementTransformFields } from "./element-transform.ts";
 
 /**
  * Transform a library item to a CAD element format suitable for the elements store
  */
 export function transformLibraryItemToCADElement(item: any, position?: { x: number; y: number; z: number }): any {
+  const stored = libraryComponentElement(item);
+  if (stored) {
+    const bounds = componentBounds([stored]);
+    const placed = position && bounds ? translateComponentElement(stored,
+      position.x - bounds.centerX, position.y - bounds.centerY, position.z - bounds.centerZ) : stored;
+    return { ...placed, name: item.name || placed.name, description: item.description || placed.description,
+      componentId: item.id, layerId: undefined };
+  }
   // Handle different possible inputs (direct LibraryItem or predefined component)
   const componentItem =
     item.category === "component"
@@ -172,6 +183,17 @@ export function transformLibraryItemToCADElement(item: any, position?: { x: numb
  * Create a ThreeJS preview object from a component
  */
 export function createComponentPreview(component: any): THREE.Object3D | null {
+  const stored = typeof component === "object" && component ? libraryComponentElement(component) : null;
+  if (stored) {
+    const bounds = componentBounds([stored]);
+    const centered = bounds ? translateComponentElement(stored, -bounds.centerX, -bounds.centerY, -bounds.centerZ) : stored;
+    const object = createThreeObject(centered, { x: 0, y: 0, z: 0 });
+    if (!object) return null;
+    initializeElementTransform(object, centered as ElementTransformFields);
+    const preview = new THREE.Group();
+    preview.add(object);
+    return preview;
+  }
   // Handle string ID case
   if (typeof component === "string") {
     // Create a simple placeholder

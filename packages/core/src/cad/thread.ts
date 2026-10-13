@@ -109,3 +109,16 @@ export const ridgeVolumePerTurn = (diameter: number, pitch: number, internal: bo
   const centroid = (s.height * (s.rootWidth + 2 * s.crestWidth)) / (3 * (s.rootWidth + s.crestWidth))
   return area * 2 * Math.PI * (s.minor / 2 + centroid)
 }
+
+/**
+ * The material a modelled EXTERNAL thread takes off an existing shaft (Fusion's Thread on a cylindrical face, Modeled): a cylinder a
+ * little wider than the major diameter over the thread length, minus the threaded rod. Subtracted from a shaft of the major diameter it
+ * leaves exactly the rod; a wider shaft is turned down to the major diameter over the thread length, as a lathe would before threading.
+ */
+export const threadGroove = (t: ThreadSpec): Mesh => {
+  if (t.internal) throw new RangeError("A groove is cut for an external thread; an internal thread's tool already cuts")
+  const rod = threadTool(t)
+  const cx = t.cx ?? 0, cy = t.cy ?? 0, z0 = t.z0 ?? 0
+  const sleeve = roundBar(cx, cy, t.diameter / 2 + 2 * t.pitch, z0, z0 + t.length)
+  return booleanMesh(sleeve, rod, "subtract")
+}

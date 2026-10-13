@@ -98,7 +98,7 @@ async function writeComponents(app: Pick<AppState, "client" | "runtime">, projec
           data: {
             version: "1.0",
             type: component.type,
-            elements: toJsonSafe(Array.isArray(component.data?.elements) ? component.data.elements : [component.data]),
+            elements: toJsonSafe(typeof component.data === "object" && component.data !== null && "elements" in component.data && Array.isArray(component.data.elements) ? component.data.elements : [component.data]),
             metadata: { elementType: component.meta?.elementType ?? component.type, savedFrom: "cad-editor", tags: component.tags ?? [] }
           }
         }

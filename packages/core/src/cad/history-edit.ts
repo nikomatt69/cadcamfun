@@ -109,6 +109,7 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
       break
     case "mate":
       add("offset", "gap", f.offset); add("spin", "spin (deg)", f.spin)
+      f.slide?.forEach((c, i) => add(`slide.${i}`, `slide ${"uv"[i]}`, c))
       break
     case "pushpull":
       add("distance", "push/pull distance", f.distance)

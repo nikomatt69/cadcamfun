@@ -5,6 +5,7 @@
  * Everything is returned as accessors, so call them inside JSX / effects.
  */
 import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-js"
+import { loadComponentCatalogue } from "../../cad/lib/component-catalogue.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { predefinedComponents, predefinedMaterials, predefinedTools } from "../../cad/lib/predefinedLibraries.ts"
 import { useLocalComponentsLibraryStore } from "../../cad/store/localComponentsLibraryStore.ts"
@@ -102,6 +103,7 @@ const normalizeApiItems = <T extends LibraryItem>(entityType: LibraryEntityType,
       normalized["type"] = item.type || ""
       normalized["data"] = item.data || {}
       normalized["thumbnail"] = item.thumbnail
+      normalized["tags"] = item.data?.metadata?.tags ?? []
     } else if (entityType === "materials") {
       normalized["properties"] = item.properties || {}
       if (item.properties) {
@@ -127,13 +129,14 @@ export function useUnifiedLibrary<T extends LibraryItem>(entityType: LibraryEnti
   const localItems = (): T[] => {
     const state = localStore().getState() as any
     state.loadLibrary()
-    return (entityType === "components" ? state.components : entityType === "materials" ? state.materials : state.tools) as T[]
+    const loaded = localStore().getState() as typeof state
+    return (entityType === "components" ? loaded.components : entityType === "materials" ? loaded.materials : loaded.tools) as T[]
   }
 
   const fetchApiItems = async (): Promise<T[]> => {
     try {
       if (entityType === "components") {
-        const rows = await app.runtime.run(app.client.library.list({ query: { category: "components" } }))
+        const rows = await loadComponentCatalogue(app)
         return normalizeApiItems<T>(entityType, rows as ReadonlyArray<any>)
       }
       if (entityType === "materials") {
@@ -257,7 +260,7 @@ export function useUnifiedLibrary<T extends LibraryItem>(entityType: LibraryEnti
     void fetchSourceStats()
     // The legacy listeners watched `<entity>-library-updated`, while its stores announced the singular form: listen to both.
     const names = [`${entityType}-library-updated`, `${entityType.slice(0, -1)}-library-updated`]
-    const onUpdated = (): void => { if (activeSource() === "local") void refreshLibrary(); else void fetchSourceStats() }
+    const onUpdated = (): void => { if (activeSource() !== "predefined") void refreshLibrary(); void fetchSourceStats() }
     for (const name of names) window.addEventListener(name, onUpdated)
     onCleanup(() => { for (const name of names) window.removeEventListener(name, onUpdated) })
   }))

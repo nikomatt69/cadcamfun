@@ -1,11 +1,12 @@
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { Box, Cpu, Layers, Package, Search, Wrench } from "lucide-solid"
 import { useApp } from "../../../shared/state/context.ts"
 import { useLocalComponentsLibraryStore } from "../store/localComponentsLibraryStore.ts"
 import { predefinedComponents } from "../lib/predefinedLibraries.ts"
+import { loadComponentCatalogue } from "../lib/component-catalogue.ts"
 import { t } from "../../../i18n/index.ts"
 
-export interface LibraryComponent { readonly id: string; readonly name: string; readonly description?: string | undefined; readonly origin: "built-in" | "local" }
+export interface LibraryComponent extends Record<string, unknown> { readonly data?: unknown; readonly id: string; readonly name: string; readonly description?: string | undefined; readonly origin: "built-in" | "local" | "project" }
 
 interface Props { onSelectComponent?: (component: LibraryComponent) => void }
 
@@ -45,6 +46,7 @@ export default function LibraryBrowser(props: Props): JSX.Element {
   const local = useLocalComponentsLibraryStore()
   const [kind, setKind] = createSignal<Kind>("components")
   const [query, setQuery] = createSignal("")
+  const [projectComponents, setProjectComponents] = createSignal<LibraryComponent[]>([])
   const [materials, setMaterials] = createSignal<ReadonlyArray<Row>>([])
   const [tools, setTools] = createSignal<ReadonlyArray<Row>>([])
   const [machines, setMachines] = createSignal<ReadonlyArray<Row>>([])
@@ -69,9 +71,23 @@ export default function LibraryBrowser(props: Props): JSX.Element {
     })()
   })
 
+  createEffect(() => {
+    let disposed = false
+    const refresh = async (): Promise<void> => {
+      try {
+        const rows = await loadComponentCatalogue(app)
+        if (!disposed) setProjectComponents(rows.map((row) => ({ ...row, description: row.description ?? undefined, origin: "project" as const })))
+      } catch (cause) { if (!disposed) setError(cause instanceof Error ? cause.message : String(cause)) }
+    }
+    void refresh()
+    window.addEventListener("component-library-updated", refresh)
+    onCleanup(() => { disposed = true; window.removeEventListener("component-library-updated", refresh) })
+  })
+
   const components = createMemo<LibraryComponent[]>(() => [
-    ...predefinedComponents.map((component: Row) => ({ id: str(component["name"]), name: str(component["name"]), description: str(component["description"]) || undefined, origin: "built-in" as const })),
-    ...local.components.map((component) => ({ id: component.id, name: component.name, description: component.description ?? undefined, origin: "local" as const }))
+    ...predefinedComponents.map((component: Row) => ({ ...component, id: str(component["name"]), name: str(component["name"]), description: str(component["description"]) || undefined, origin: "built-in" as const })),
+    ...local.components.map((component) => ({ ...component, description: component.description ?? undefined, origin: "local" as const })),
+    ...projectComponents()
   ])
 
   /** Every row of the open kind, as the assistant's lookups return it. */
@@ -79,7 +95,7 @@ export default function LibraryBrowser(props: Props): JSX.Element {
     if (kind() === "materials") return materials()
     if (kind() === "tools") return tools()
     if (kind() === "machines") return machines()
-    return components().map((component) => ({ id: component.id, name: component.name, description: component.description ?? "", origin: component.origin }))
+    return components()
   })
 
   const filtered = createMemo<ReadonlyArray<Row>>(() => {
@@ -129,7 +145,8 @@ export default function LibraryBrowser(props: Props): JSX.Element {
 
   const selectComponent = (row: Row) => {
     if (kind() !== "components") return
-    props.onSelectComponent?.({ id: rowId(row), name: str(row["name"]), description: str(row["description"]) || undefined, origin: str(row["origin"]) === "local" ? "local" : "built-in" })
+    const component = components().find((candidate) => candidate.id === rowId(row) && candidate.origin === row["origin"])
+    if (component) props.onSelectComponent?.(component)
   }
 
   return (

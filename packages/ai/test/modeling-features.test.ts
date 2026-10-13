@@ -107,4 +107,15 @@ describe("rib, sheet metal, thread, text and press/pull reach the assistant", ()
     expect(parse([plate, { id: "p", type: "plane", from: { kind: "face", near: [0, 0, 0] } }]).success).toBe(false)
     expect(parse([...base, { id: "p", type: "plane", from: { kind: "offset", base: "ghost", distance: 1 } }]).success).toBe(false)
   })
+
+  test("a thread cut into a shaft and a slider joint with limits pass the schema and build", () => {
+    const shaft = [{ id: "c", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "o", kind: "circle", at: [0, 0], diameter: 10 }] } }, { id: "rod", type: "extrude", sketch: "c", depth: 20, operation: "new" }]
+    const cut = parse([...shaft, { id: "t", type: "thread", kind: "external", diameter: 10, pitch: 1.5, length: 12, offset: 8, cut: true }])
+    expect(cut.success).toBe(true)
+    if (cut.success) expect(rebuild(cut.data as History).issues).toEqual([])
+    const second = [{ id: "s2", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "r2", kind: "rectangle", at: [100, 100], width: 20, height: 20 }] } }, { id: "e2", type: "extrude", sketch: "s2", depth: 10, operation: "new" }]
+    const joint = parse([...base, ...second, { id: "j", type: "mate", body: "e2", face: { near: [110, 110, 0], normal: [0, 0, -1] }, to: { body: "e", near: [20, 15, 10], normal: [0, 0, 1] }, slide: [5, 0], limits: { slide: [[0, 10], [-5, 5]] } }])
+    expect(joint.success).toBe(true)
+    if (joint.success) expect(rebuild(joint.data as History).issues).toEqual([])
+  })
 })

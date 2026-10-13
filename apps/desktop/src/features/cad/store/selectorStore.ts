@@ -2,6 +2,7 @@
 import { create } from "../../../shared/state/zustand.ts";
 const uuidv4 = (): string => crypto.randomUUID();
 import { useElementsStore } from "./elementsStore.ts";
+import { componentBounds, createComponentAssembly, translateComponentElement, cloneComponentElement } from "../lib/component-assembly.ts";
 import { useLayerStore } from "./layerStore.ts";
 
 export interface SelectionBounds {
@@ -197,192 +198,16 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     }
   },
 
-  getSelectionBounds: () => {
-    const { selectedElementIds } = get();
-    if (selectedElementIds.length === 0) return null;
-
-    const elements = useElementsStore.getState().elements;
-    const selectedElements = elements.filter(element => selectedElementIds.includes(element.id));
-
-    if (selectedElements.length === 0) return null;
-
-    // Initialize with extreme values
-    let bounds = {
-      minX: Infinity,
-      maxX: -Infinity,
-      minY: Infinity,
-      maxY: -Infinity,
-      minZ: Infinity,
-      maxZ: -Infinity
-    };
-
-    // Calculate bounds based on element type
-    selectedElements.forEach(element => {
-      const x = element.x || 0;
-      const y = element.y || 0;
-      const z = element.z || 0;
-
-      let halfWidth = 0;
-      let halfHeight = 0;
-      let halfDepth = 0;
-
-      switch (element.type) {
-        case "rectangle":
-          halfWidth = (element.width || 0) / 2;
-          halfHeight = (element.height || 0) / 2;
-          halfDepth = 0;
-          break;
-        case "circle":
-          halfWidth = element.radius || 0;
-          halfHeight = element.radius || 0;
-          halfDepth = 0;
-          break;
-        case "cube":
-          halfWidth = (element.width || 0) / 2;
-          halfHeight = (element.height || 0) / 2;
-          halfDepth = (element.depth || 0) / 2;
-          break;
-        case "sphere":
-          halfWidth = element.radius || 0;
-          halfHeight = element.radius || 0;
-          halfDepth = element.radius || 0;
-          break;
-        case "line":
-          // For lines, use the actual endpoints
-          const x1 = element.x1 || 0;
-          const y1 = element.y1 || 0;
-          const z1 = element.z1 || 0;
-          const x2 = element.x2 || 0;
-          const y2 = element.y2 || 0;
-          const z2 = element.z2 || 0;
-
-          bounds.minX = Math.min(bounds.minX, x1, x2);
-          bounds.maxX = Math.max(bounds.maxX, x1, x2);
-          bounds.minY = Math.min(bounds.minY, y1, y2);
-          bounds.maxY = Math.max(bounds.maxY, y1, y2);
-          bounds.minZ = Math.min(bounds.minZ, z1, z2);
-          bounds.maxZ = Math.max(bounds.maxZ, z1, z2);
-          return;
-        case "component":
-          // For components, include all child elements
-          if (element.elements) {
-            element.elements.forEach((childElement: any) => {
-              const childX = x + (childElement.x || 0);
-              const childY = y + (childElement.y || 0);
-              const childZ = z + (childElement.z || 0);
-
-              let childHalfWidth = 0;
-              let childHalfHeight = 0;
-              let childHalfDepth = 0;
-
-              // Determine dimensions based on child type
-              if (childElement.type === "rectangle" || childElement.type === "cube") {
-                childHalfWidth = (childElement.width || 0) / 2;
-                childHalfHeight = (childElement.height || 0) / 2;
-                childHalfDepth = childElement.type === "cube" ? (childElement.depth || 0) / 2 : 0;
-              } else if (childElement.type === "circle" || childElement.type === "sphere") {
-                childHalfWidth = childElement.radius || 0;
-                childHalfHeight = childElement.radius || 0;
-                childHalfDepth = childElement.type === "sphere" ? childElement.radius || 0 : 0;
-              }
-
-              bounds.minX = Math.min(bounds.minX, childX - childHalfWidth);
-              bounds.maxX = Math.max(bounds.maxX, childX + childHalfWidth);
-              bounds.minY = Math.min(bounds.minY, childY - childHalfHeight);
-              bounds.maxY = Math.max(bounds.maxY, childY + childHalfHeight);
-              bounds.minZ = Math.min(bounds.minZ, childZ - childHalfDepth);
-              bounds.maxZ = Math.max(bounds.maxZ, childZ + childHalfDepth);
-            });
-          }
-          return;
-        default:
-          // Default small size for other elements
-          halfWidth = 5;
-          halfHeight = 5;
-          halfDepth = 0;
-      }
-
-      // Update bounds
-      bounds.minX = Math.min(bounds.minX, x - halfWidth);
-      bounds.maxX = Math.max(bounds.maxX, x + halfWidth);
-      bounds.minY = Math.min(bounds.minY, y - halfHeight);
-      bounds.maxY = Math.max(bounds.maxY, y + halfHeight);
-      bounds.minZ = Math.min(bounds.minZ, z - halfDepth);
-      bounds.maxZ = Math.max(bounds.maxZ, z + halfDepth);
-    });
-
-    // Calculate width, height, depth and center
-    const width = bounds.maxX - bounds.minX;
-    const height = bounds.maxY - bounds.minY;
-    const depth = bounds.maxZ - bounds.minZ;
-    const centerX = (bounds.minX + bounds.maxX) / 2;
-    const centerY = (bounds.minY + bounds.maxY) / 2;
-    const centerZ = (bounds.minZ + bounds.maxZ) / 2;
-
-    return {
-      ...bounds,
-      width,
-      height,
-      depth,
-      centerX,
-      centerY,
-      centerZ
-    };
-  },
+  getSelectionBounds: () => componentBounds(useElementsStore.getState().elements.filter(element => get().selectedElementIds.includes(element.id))),
 
   saveAsComponent: () => {
-    const { selectedElementIds } = get();
-    if (selectedElementIds.length === 0) return "";
-
-    const elements = useElementsStore.getState().elements;
-    const selectedElements = elements.filter(element => selectedElementIds.includes(element.id));
-
-    // Create a new component
-    const componentId = uuidv4();
-
-    // Get selection bounds
-    const bounds = get().getSelectionBounds();
-    if (!bounds) return "";
-
-    // Create component with elements positioned relative to component center
-    const component = {
-      id: componentId,
-      type: "component",
-      name: `Component-${componentId.slice(0, 6)}`,
-      x: bounds.centerX,
-      y: bounds.centerY,
-      z: bounds.centerZ,
-      width: bounds.width,
-      height: bounds.height,
-      depth: bounds.depth,
-      elements: selectedElements.map(element => ({
-        ...element,
-        x: element.x - bounds.centerX,
-        y: element.y - bounds.centerY,
-        z: (element.z || 0) - bounds.centerZ
-      })),
-      layerId: useLayerStore.getState().activeLayer,
-      // Add metadata for CAM processing
-      metadata: {
-        createdAt: new Date().toISOString(),
-        isComposite: true,
-        elementCount: selectedElements.length,
-        elementTypes: Array.from(new Set(selectedElements.map(el => el.type)))
-      }
-    };
-
-    // Add component to elements store
-    useElementsStore.getState().addElement(component);
-
-    // Remove original elements
-    selectedElements.forEach(element => {
-      useElementsStore.getState().deleteElement(element.id);
-    });
-
-    // Select the new component
-    set({ selectedElementIds: [componentId] });
-
-    return componentId;
+    const selected = useElementsStore.getState().elements.filter(element => get().selectedElementIds.includes(element.id));
+    const layerId = useLayerStore.getState().activeLayer;
+    if (!selected.length || !layerId) return "";
+    const component = createComponentAssembly(selected, { name: "Component", layerId });
+    useElementsStore.getState().insertComponent(component, selected.map(element => element.id), false);
+    set({ selectedElementIds: [component.id] });
+    return component.id;
   },
 
   moveSelectionToLayer: (layerId: string) => {
@@ -451,19 +276,8 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     const componentZ = element.z || 0;
 
     // Create copies of all child elements with absolute positions
-    const childElements = element.elements.map((childElement: any) => {
-      // Generate a new ID for the child
-      const newId = uuidv4();
-
-      return {
-        ...childElement,
-        id: newId,
-        // Calculate absolute position
-        x: componentX + (childElement.x || 0),
-        y: componentY + (childElement.y || 0),
-        z: componentZ + (childElement.z || 0)
-      };
-    });
+    const childElements = element.elements.map((childElement: import("./elementsStore.ts").Element) =>
+      cloneComponentElement(translateComponentElement(childElement, componentX, componentY, componentZ), true));
 
     // Add all child elements
     const newIds = useElementsStore.getState().addElements(childElements);

@@ -58,6 +58,7 @@ export interface CADCanvasApi {
 export interface CADCanvasProps {
   readonly width?: string | number
   readonly height?: string | number
+  readonly previewLibraryItem?: Record<string, unknown> | null
   readonly previewComponent?: string | null
   readonly onComponentPlaced?: (component: string, position: Point3) => void
   readonly allowDragDrop?: boolean
@@ -619,7 +620,7 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     if (preview) { disposeObject(preview); preview = undefined }
     setPlacing(false)
     if (!name) { if (orbit) orbit.enabled = true; invalidate(); return }
-    const component = predefinedComponents.find((candidate: any) => candidate.data === name || candidate.name === name)
+    const component = props.previewLibraryItem ?? predefinedComponents.find((candidate: any) => candidate.data === name || candidate.name === name)
     const object = component ? createComponentPreview(component) : null
     if (!object) return
     if (object instanceof THREE.Mesh) {
@@ -830,7 +831,12 @@ export default function CADCanvas(props: CADCanvasProps): JSX.Element {
     const name = props.previewComponent
     if (!name || !preview) return
     const position = previewPosition()
-    elements.addElement({ id: `component-${Date.now()}`, type: "component", x: position.x, y: position.y, z: position.z, componentId: name, layerId: layers.layers[0]?.id || "default" })
+    const component = props.previewLibraryItem ?? predefinedComponents.find((candidate: any) => candidate.data === name || candidate.name === name)
+    if (!component) return
+    const offset = originOffset()
+    const id = elements.addElement(transformLibraryItemToCADElement(component, { x: position.x - offset.x, y: position.y - offset.y, z: position.z - offset.z }))
+    if (!id) return
+    selection.selectElement(id)
     props.onComponentPlaced?.(name, position)
     cancelPlacementKeepPreview()
   }

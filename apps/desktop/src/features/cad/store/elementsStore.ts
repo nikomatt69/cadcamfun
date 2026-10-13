@@ -65,6 +65,7 @@ interface ElementsState {
   redo: () => void;
   // Group operations
   groupElements: (ids: string[]) => string;
+  insertComponent: (component: Element, sourceIds: string[], keepOriginals: boolean) => string;
   ungroupElement: (groupId: string) => void;
   // AI suggestions
   addAISuggestion: (elementId: string, suggestion: AIDesignSuggestion) => void;
@@ -524,6 +525,14 @@ export const useElementsStore = create<ElementsState>((set, get) => ({
         selectedElement: null // Clear selection when redoing
       };
     });
+  },
+
+  insertComponent: (component, sourceIds, keepOriginals) => {
+    set(state => {
+      const elements = [...state.elements.filter(element => keepOriginals || !sourceIds.includes(element.id)), component];
+      return { elements, selectedElement: component, selectedElements: [component.id], ...withHistory(state, elements) };
+    });
+    return component.id;
   },
 
   // Group multiple elements into a group element

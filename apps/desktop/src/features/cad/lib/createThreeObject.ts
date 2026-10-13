@@ -5,6 +5,7 @@ import { useCustomElementsStore } from "../store/customElementsStore.ts";
 import { evaluateCustomElement } from "./customElements/evaluate.ts";
 import { customElementOf } from "../types/customElements.ts";
 import * as THREE from "three";
+import { initializeElementTransform } from "./element-transform.ts";
 
 interface SolidMesh { readonly positions: ArrayLike<number>; readonly indices: ArrayLike<number> }
 
@@ -138,10 +139,9 @@ const metricDiameter = (size: unknown, fallback: number): number => {
  */
 const Y_UP_BUILT = new Set(["wall", "floor", "roof", "window", "door", "stair", "column", "spring", "screw", "bolt", "rivet"]);
 
-export const createThreeObject = (element: any): THREE.Object3D | null => {
-  const object = buildObject(element);
+export const createThreeObject = (element: any, originOffset = useCADStore.getState().originOffset): THREE.Object3D | null => {
+  const object = buildObject(element, originOffset);
   if (object === null || !Y_UP_BUILT.has(element.type)) return object;
-  const { originOffset } = useCADStore.getState();
   object.rotation.set(Math.PI / 2, 0, 0);
   // A wall's z is its base (0 = standing on the ground), so moving it by d moves it by d; everything else is placed by x, y, z.
   const z = element.type === "wall" ? (element.z || 0) + (element.height || 30) / 2 : element.z || 0;
@@ -149,8 +149,8 @@ export const createThreeObject = (element: any): THREE.Object3D | null => {
   return object;
 };
 
-const buildObject = (element: any): THREE.Object3D | null => {
-    const { originOffset, tolerance: documentTolerance } = useCADStore.getState();
+const buildObject = (element: any, originOffset: { x: number; y: number; z: number }): THREE.Object3D | null => {
+    const { tolerance: documentTolerance } = useCADStore.getState();
     // Round shapes: the element's own `segments`, else enough for its tolerance (its own, else the drawing's), never coarser than 32.
     const seg = (radius: number): number =>
       typeof element.segments === "number" ? element.segments
@@ -2252,9 +2252,10 @@ const buildObject = (element: any): THREE.Object3D | null => {
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            });
+            }, { x: 0, y: 0, z: 0 });
 
             if (childThreeObject) {
+              initializeElementTransform(childThreeObject, childElement);
               childThreeObject.userData.isCADElement = true;
               childThreeObject.userData.elementId = childElement.id;
               group.add(childThreeObject);
@@ -2314,9 +2315,10 @@ const buildObject = (element: any): THREE.Object3D | null => {
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            });
+            }, { x: 0, y: 0, z: 0 });
 
             if (childThreeObject) {
+              initializeElementTransform(childThreeObject, childElement);
               // Ensure children have the component's ID for selection
               childThreeObject.userData.isCADElement = true;
               childThreeObject.userData.elementId = element.id;
@@ -2333,9 +2335,10 @@ const buildObject = (element: any): THREE.Object3D | null => {
               x: childElement.x || 0,
               y: childElement.y || 0,
               z: childElement.z || 0
-            });
+            }, { x: 0, y: 0, z: 0 });
 
             if (childThreeObject) {
+              initializeElementTransform(childThreeObject, childElement);
               childThreeObject.userData.isCADElement = true;
               childThreeObject.userData.elementId = element.id;
               childThreeObject.userData.isComponentChild = true;

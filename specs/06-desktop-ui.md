@@ -1,5 +1,10 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Component creation and library round-trip (2026-10-13)
+
+Status: in progress. WP6 owns this editor increment in `features/cad/{components,lib,store,screens}`, `features/library/hooks`, locale entries and desktop tests. Create Component from the toolbar or canvas opens one in-editor dialog for the complete selection: name, description, tags, target layer, original retention and optional library saving (enabled by default), with local or project destination and project visibility. All descendant components and groups remain nested, with geometry, poses and metadata preserved. Preview the included hierarchy and counts. Persistence failures keep the dialog and original scene intact; creation is one undo step. Library placement and preview must use the complete stored geometry with fresh instance IDs, including legacy single-element records and project documents. Existing typed API contracts are reused.
+
+
 ## Assistant controls (2026-10-10)
 
 See `24-assistant-control-flow.md`: WP6 adds role/domain/thinking selectors, manual context compaction, interactive native question replies and background task cancellation in the existing assistant. Controls remain bound to the active session/project and generated API; context follows host limits, with unknown values explicit. Status: in progress. Change log: 2026-10-10 — registered assistant control UI ownership before implementation.

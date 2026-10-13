@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { dimensionsOf, removeFeature, setDimension } from "./history-edit.ts"
 import { historyVolume, rebuild, type History } from "./history.ts"
 import { findPlanarFace } from "./face-edit.ts"
@@ -9,6 +9,9 @@ import { meshBounds, meshVolume } from "./solid.ts"
 import { ridgeVolumePerTurn, threadProblem, threadSizes, threadTool } from "./thread.ts"
 import { textSolid } from "./text-solid.ts"
 import { signedArea } from "./shapes.ts"
+
+// Booleans on real parts take seconds each on a loaded machine, not milliseconds.
+setDefaultTimeout(60_000)
 
 const rel = (got: number, want: number): number => Math.abs(got - want) / Math.abs(want)
 const L = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 20 }]
@@ -418,6 +421,7 @@ describe("scripting API", () => {
 /** The volume of the part of a mesh between two heights (the mesh intersected with a slab). */
 import { booleanMesh } from "./csg.ts"
 import { meshOf, type Mesh } from "./solid.ts"
+
 function cutZ(mesh: Mesh, z0: number, z1: number): Mesh {
   const slab = meshOf({ _tag: "Extrude", profile: [{ x: -50, y: -50 }, { x: 50, y: -50 }, { x: 50, y: 50 }, { x: -50, y: 50 }], height: z1 - z0, origin: { x: 0, y: 0, z: z0 } } as never, 0.01)
   return booleanMesh(mesh, slab, "intersect")
@@ -794,5 +798,213 @@ describe("loops of one sketch: overlapping, nested", () => {
   test("two separate circles stay two solids in one body", () => {
     const r = extrudeCircles([[0, 0, 10], [30, 0, 10]])
     expect(rel(historyVolume(r), 2 * Math.PI * 25 * 10)).toBeLessThan(0.01)
+  })
+})
+
+describe("a thread cut into an existing shaft", () => {
+  const shaft = () => {
+    const m = model()
+    m.extrude(m.sketch("XY").circle([0, 0], 10), { depth: 20, id: "shaft" })
+    return m
+  }
+  test("cutting M10 x 1.5 over 15 mm of a Ø10 x 20 shaft leaves the threaded rod plus the plain 5 mm", () => {
+    const m = shaft()
+    m.thread({ kind: "external", diameter: 10, pitch: 1.5, length: 15, offset: 5, cut: true })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    expect(r.bodies).toHaveLength(1)
+    const rod = meshVolume(threadTool({ diameter: 10, pitch: 1.5, length: 15, internal: false, z0: 5 }))
+    const plain = Math.PI * 25 * 5
+    expect(rel(historyVolume(r), plain + rod)).toBeLessThan(0.01)
+    // Less material than the plain shaft, more than the core of the thread.
+    expect(historyVolume(r)).toBeLessThan(Math.PI * 25 * 20)
+    expect(historyVolume(r)).toBeGreaterThan(plain + Math.PI * (threadSizes(10, 1.5, false).minor / 2) ** 2 * 15)
+  })
+
+  test("a wider shaft is turned down to the major diameter over the thread length", () => {
+    const m = model()
+    m.extrude(m.sketch("XY").circle([0, 0], 14), { depth: 20 })
+    m.thread({ kind: "external", diameter: 10, pitch: 1.5, length: 10, offset: 10, cut: true })
+    const b = meshBounds(cutZ(m.rebuild().bodies[0]!.mesh, 12, 18))
+    expect(b.maxX).toBeLessThan(5.01)
+  })
+
+  test("cut needs a shaft, an external thread and no other operation", () => {
+    const empty = model()
+    empty.extrude(empty.sketch("XY").rectangle([50, 50], 5, 5), { depth: 5 })
+    empty.thread({ kind: "external", diameter: 10, pitch: 1.5, length: 10, cut: true, id: "nowhere" })
+    expect(empty.rebuild().issues.map((i) => i.message).join(" ")).toMatch(/no shaft/)
+    const m = shaft()
+    m.thread({ kind: "internal", diameter: 10, pitch: 1.5, length: 10, cut: true, id: "inner" })
+    m.thread({ kind: "external", diameter: 10, pitch: 1.5, length: 10, cut: true, operation: "union", id: "union" })
+    const msgs = m.rebuild().issues.map((i) => `${i.feature}: ${i.message}`)
+    expect(msgs.some((x) => x.startsWith("inner:") && /external thread on a shaft/.test(x))).toBe(true)
+    expect(msgs.some((x) => x.startsWith("union:") && /subtraction/.test(x))).toBe(true)
+  })
+})
+
+describe("joints: slider, limits, interference", () => {
+  const two = () => {
+    const m = model()
+    const a = m.extrude(m.sketch("XY").rectangle([0, 0], 40, 30), { depth: 10 })
+    const b = m.extrude(m.sketch("XY").rectangle([100, 100], 20, 20), { depth: 10, operation: "new" })
+    return { m, a, b }
+  }
+  const mate = { face: { near: [110, 110, 0] as const, normal: [0, 0, -1] as const }, to: { near: [20, 15, 10] as const, normal: [0, 0, 1] as const } }
+
+  test("a slider joint moves the body along the target face: slide [8, -3] shifts it by 8 in x and -3 in y on a top face", () => {
+    const { m, a, b } = two()
+    m.mate({ body: b, face: mate.face, to: { body: a, ...mate.to }, slide: [8, -3] })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    const box = meshBounds(r.bodies.find((x) => x.id === b)!.mesh)
+    expect((box.minX + box.maxX) / 2).toBeCloseTo(28, 5)
+    expect((box.minY + box.maxY) / 2).toBeCloseTo(12, 5)
+    expect(box.minZ).toBeCloseTo(10, 6)
+  })
+
+  test("limits: a pose inside them builds, one outside is an error naming the value and the range", () => {
+    const inside = two()
+    inside.m.mate({ body: inside.b, face: mate.face, to: { body: inside.a, ...mate.to }, spin: 30, limits: { spin: [0, 45] } })
+    expect(inside.m.rebuild().issues).toEqual([])
+    const out = two()
+    out.m.mate({ body: out.b, face: mate.face, to: { body: out.a, ...mate.to }, spin: 60, slide: [25, 0], limits: { spin: [0, 45], slide: [[-10, 10], [-5, 5]] } })
+    const msg = out.m.rebuild().issues.map((i) => i.message).join(" ")
+    expect(msg).toMatch(/spin 60 is outside its limits 0 to 45/)
+    expect(msg).toMatch(/slide u 25 is outside its limits -10 to 10/)
+  })
+
+  test("a negative gap pushes one body into the other: the overlap is reported with its volume", () => {
+    const { m, a, b } = two()
+    m.mate({ body: b, face: mate.face, to: { body: a, ...mate.to }, offset: -2 })
+    const warning = m.rebuild().issues.find((i) => i.severity === "warning")
+    expect(warning?.message).toMatch(/interfere/)
+    expect(Number(/([\d.]+) mm3/.exec(warning!.message)![1])).toBeCloseTo(20 * 20 * 2, 0)
+  })
+
+  test("flush faces touch but do not interfere; the check can be switched off", () => {
+    const { m, a, b } = two()
+    m.mate({ body: b, face: mate.face, to: { body: a, ...mate.to } })
+    expect(m.rebuild().issues).toEqual([])
+    const off = two()
+    off.m.mate({ body: off.b, face: mate.face, to: { body: off.a, ...mate.to }, offset: -2, interference: false })
+    expect(off.m.rebuild().issues).toEqual([])
+  })
+})
+
+describe("threads along X and Y", () => {
+  test("an external thread along X cut into a horizontal shaft has the volume of the Z one, and lies along X", () => {
+    const along = (axis: "x" | "z") => {
+      const m = model()
+      if (axis === "z") m.extrude(m.sketch("XY").circle([0, 0], 10), { depth: 20 })
+      else m.extrude(m.sketch("YZ").circle([0, 0], 10), { depth: 20 })
+      m.thread({ kind: "external", diameter: 10, pitch: 1.5, length: 12, offset: 4, cut: true, axis })
+      return m.rebuild()
+    }
+    const x = along("x"), z = along("z")
+    expect(x.issues).toEqual([])
+    expect(rel(historyVolume(x), historyVolume(z))).toBeLessThan(1e-3)
+    const b = meshBounds(x.bodies[0]!.mesh)
+    expect(b.maxX - b.minX).toBeCloseTo(20, 5)
+    expect(b.maxY - b.minY).toBeLessThan(10.05)
+  })
+
+  test("an internal thread along Y taps a hole into the +y side of a block at [z, x]", () => {
+    const m = model()
+    m.extrude(m.sketch("XY").rectangle([0, 0], 40, 30), { depth: 20 })
+    m.thread({ kind: "internal", diameter: 8, pitch: 1.25, length: 10, axis: "y", at: [10, 20], offset: 20 })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    const tool = threadTool({ diameter: 8, pitch: 1.25, length: 10, internal: true })
+    expect(rel(historyVolume(r), 40 * 30 * 20 - meshVolume(tool))).toBeLessThan(1e-3)
+  })
+})
+
+describe("press/pull on curved faces", () => {
+  const bossOnPlate = () => {
+    const m = model()
+    m.extrude(m.sketch("XY").rectangle([0, 0], 60, 60), { depth: 10 })
+    m.extrude(m.sketch("XY", 10).circle([30, 30], 20), { depth: 10 })
+    return m
+  }
+  const plateWithHole = () => {
+    const m = model()
+    m.extrude(m.sketch("XY").rectangle([0, 0], 40, 40).circle([20, 20], 10), { depth: 10 })
+    return m
+  }
+
+  test("pulling the side of a Ø20 boss by 2 makes it Ø24: the volume grows by pi (12^2 - 10^2) x 10", () => {
+    const m = bossOnPlate()
+    const before = historyVolume(m.rebuild())
+    m.pushPull({ near: [40, 30, 15], normal: [1, 0, 0], distance: 2 })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    expect(rel(historyVolume(r) - before, Math.PI * (144 - 100) * 10)).toBeLessThan(0.02)
+    const b = meshBounds(cutZ(r.bodies[0]!.mesh, 12, 18))
+    expect(b.maxX).toBeCloseTo(42, 1)
+    expect(b.minX).toBeCloseTo(18, 1)
+  })
+
+  test("pushing the wall of a Ø10 hole into the material by 1 makes it Ø12", () => {
+    const m = plateWithHole()
+    const before = historyVolume(m.rebuild())
+    // The wall's outward normal points into the hole: at (25, 20) it is -x.
+    m.pushPull({ near: [25, 20, 5], normal: [-1, 0, 0], distance: -1 })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    expect(rel(before - historyVolume(r), Math.PI * (36 - 25) * 10)).toBeLessThan(0.02)
+  })
+
+  test("pulling the wall of a hole further than its radius would fold it shut: an error, the part unchanged", () => {
+    const m = plateWithHole()
+    const before = historyVolume(m.rebuild())
+    m.pushPull({ near: [25, 20, 5], normal: [-1, 0, 0], distance: 6 })
+    const r = m.rebuild()
+    expect(r.issues[0]!.message).toMatch(/folds onto itself/)
+    expect(historyVolume(r)).toBeCloseTo(before, 6)
+  })
+
+  test("a flat face still moves with its outline", () => {
+    const m = bossOnPlate()
+    const before = historyVolume(m.rebuild())
+    m.pushPull({ near: [30, 30, 20], normal: [0, 0, 1], distance: 3 })
+    expect(rel(historyVolume(m.rebuild()) - before, Math.PI * 100 * 3)).toBeLessThan(0.01)
+  })
+})
+
+describe("draft on curved faces", () => {
+  const bossOnPlate = () => {
+    const m = model()
+    m.extrude(m.sketch("XY").rectangle([0, 0], 60, 60), { depth: 10 })
+    m.extrude(m.sketch("XY", 10).circle([30, 30], 20), { depth: 10 })
+    return m
+  }
+  const frustum = (R: number, r: number, h: number) => (Math.PI * h * (R * R + R * r + r * r)) / 3
+  const t5 = Math.tan((5 * Math.PI) / 180)
+
+  test("a 5 degree draft from the base turns a Ø20 x 10 boss into a cone: top radius 10 - 10 tan 5", () => {
+    const m = bossOnPlate()
+    const before = historyVolume(m.rebuild())
+    m.draft({ near: [40, 30, 15], normal: [1, 0, 0], angle: 5, neutral: 10 })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    expect(rel(before - historyVolume(r), Math.PI * 100 * 10 - frustum(10, 10 - 10 * t5, 10))).toBeLessThan(0.03)
+    const top = meshBounds(cutZ(r.bodies[0]!.mesh, 19.5, 20))
+    expect(top.maxX - 30).toBeCloseTo(10 - 10 * t5, 1)
+  })
+
+  test("a negative angle widens it towards the top", () => {
+    const m = bossOnPlate()
+    const before = historyVolume(m.rebuild())
+    m.draft({ near: [40, 30, 15], normal: [1, 0, 0], angle: -5, neutral: 10 })
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    expect(rel(historyVolume(r) - before, frustum(10, 10 + 10 * t5, 10) - Math.PI * 100 * 10)).toBeLessThan(0.03)
+  })
+
+  test("a neutral plane across the curved face is refused with the reason", () => {
+    const m = bossOnPlate()
+    m.draft({ near: [40, 30, 15], normal: [1, 0, 0], angle: 5, neutral: 15 })
+    expect(m.rebuild().issues[0]!.message).toMatch(/neutral plane crosses this curved face/)
   })
 })
