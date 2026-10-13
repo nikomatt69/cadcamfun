@@ -1,32 +1,34 @@
 Read machining data. All actions are read-only.
 
 Actions
-- plan_check: validate proposed operations against drawing, stock, schemas, DFM, machine limits and generation. Pass validates a plan, not a machined part.
-- review: saved pass/failed/stale/unverified evidence and remaining refinements, tied to drawing/program revisions. Stale or unverified evidence cannot accept a program.
-- machine: axes, zeros, limits and accepted operations; read before programming.
-- operations: active drawing operations, settings and program availability.
+- plan_check: validate proposed operations (drawing, stock, schemas, DFM, machine limits, generation); a pass validates a plan, not a part.
+- review: saved pass/failed/stale/unverified evidence and refinements per drawing/program revision; stale or unverified cannot accept a program.
+- machine: axes, zeros, limits, accepted operations; read first.
+- operations: drawing operations, settings, program availability.
 - suggest: depths, speeds, chip load and warnings from supplied settings.
-- compare_setups: generate and verify candidates against configured stock.
+- compare_setups: generate and verify candidates on the stock.
 - analyze: static G-code and machine-axis findings, not a safety verdict.
 - stock: configured stock, volume and workpieceMatchesStock.
-- vision: displayed CAM preview with operation and verification evidence.
+- vision: the displayed CAM preview and its evidence.
 - chain_suggest: recommend the next operation.
-- chain_status: preceding operation, rest-tool reference and warnings.
+- chain_status: previous operation, rest tool, warnings.
+- materials, cutting_data, manufacture: CAM kernel grades; feeds/speeds of a cutter in a material; plan, NC and replay claims.
 
 Parameters (mm, mm/min, rpm)
 - machine: machineType (mill|lathe|3dprinter).
 - operations, stock: none.
 - plan_check: operations (1-8 of {type, params}), expectedRevision (optional drawing revision). Use the returned revision on create/update.
 - review: operationId.
-- suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material, offset, workOffset, ...).
+- suggest: params (operationType, toolDiameter, depth, stepdown, feedrate, rpm, material, ...).
 - compare_setups: candidates (1-4 of {name, params, toolId?, materialId?}) from libraries.
-- analyze: operationId (checks the full stored program) or gcode; machineType adds axis checks. Generated previews are truncated.
+- analyze: operationId (full stored program; previews are truncated) or gcode; machineType adds axis checks.
 - vision: focus.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
+- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, planOnly.
 
 Result (JSON)
-- ok and action data/findings. Empty analyze issues means "no static findings", never "safe". Review reports modelling limits and revision validity.
+- ok and data/findings. Empty analyze issues means "no static findings", never "safe".
 
 Do not use it
 - For writes or stored verification: use cam_edit.
