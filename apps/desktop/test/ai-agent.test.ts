@@ -126,3 +126,57 @@ test("assistant controls select roles and modes, answer questions and compact th
     release(); dispose(); client.ai.chatStream = originalStream; client.ai.sessionControl = originalControl
   }
 }, 60000)
+
+describe("the goal can be set and controlled like nikcli's /goal", () => {
+  test("typing /goal sends the line as it is, and the goal panel pauses, resumes and clears it with the same line", async () => {
+    const client = app.state.client as unknown as { ai: { chatStream: unknown } }
+    const original = client.ai.chatStream
+    const sent: string[] = []
+    let status = "active"
+    client.ai.chatStream = (input: { payload: { message: string } }) => {
+      sent.push(input.payload.message)
+      const line = input.payload.message
+      if (line === "/goal pause") status = "paused"
+      if (line === "/goal resume") status = "active"
+      const goal = line === "/goal clear" ? null : { objective: "Machine the bracket", status, iteration: 0, tokensUsed: 0 }
+      return Effect.succeed(Stream.fromIterable([
+        { type: "goal", sessionId: "sg", goal },
+        { type: "delta", sessionId: "sg", text: "ok" },
+        { type: "done", sessionId: "sg", text: "ok" }
+      ].map((e) => JSON.stringify(e))))
+    }
+    const { dispose } = app.visit("/cad")
+    try {
+      ;(await w("open-button", () => q<HTMLButtonElement>('button[title="Show CAD Assistant"]') ?? q("textarea.assistant-prompt"))) instanceof window.HTMLButtonElement && (q<HTMLButtonElement>('button[title="Show CAD Assistant"]')!.click())
+      const type = async (text: string) => {
+        const input = await w("prompt", () => q<HTMLTextAreaElement>("textarea.assistant-prompt"))
+        input.value = text
+        input.dispatchEvent(new window.Event("input", { bubbles: true }))
+        await flush()
+        q<HTMLElement>("button.assistant-send")!.click()
+      }
+      await type("/goal Machine the bracket --token-budget 50000")
+      await w("goal panel", () => q('[data-testid="ai-goal"]'))
+      expect(sent).toEqual(["/goal Machine the bracket --token-budget 50000"])
+      expect(q('[data-testid="ai-goal"]')!.textContent).toContain("Machine the bracket")
+      // The controls appear when the turn is over: while the agent works a message would join its turn.
+      await w("controls once idle", () => q('[data-testid="ai-goal-pause"]'))
+      expect(q('[data-testid="ai-goal-resume"]')).toBeNull()
+
+      q<HTMLButtonElement>('[data-testid="ai-goal-pause"]')!.click()
+      await w("paused", () => q('[data-testid="ai-goal-resume"]'))
+      expect(sent.at(-1)).toBe("/goal pause")
+      expect(q('[data-testid="ai-goal"]')!.textContent).toContain("paused")
+
+      q<HTMLButtonElement>('[data-testid="ai-goal-resume"]')!.click()
+      await w("resumed", () => q('[data-testid="ai-goal-pause"]'))
+      expect(sent.at(-1)).toBe("/goal resume")
+
+      q<HTMLButtonElement>('[data-testid="ai-goal-clear"]')!.click()
+      await w("cleared", () => q('[data-testid="ai-goal"]') === null)
+      expect(sent.at(-1)).toBe("/goal clear")
+    } finally {
+      dispose(); client.ai.chatStream = original
+    }
+  }, 60000)
+})

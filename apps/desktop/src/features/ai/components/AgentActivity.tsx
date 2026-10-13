@@ -40,6 +40,18 @@ export function AgentActivity(): JSX.Element {
               <span class="min-w-0 flex-1 truncate" title={goal().objective}>{goal().objective}</span>
               <span class="rounded bg-gray-200 px-1.5 text-[10px] dark:bg-gray-700">{t(`ai.agent.goal.${goal().status}` as never)}</span>
               <span class="text-[10px] text-gray-500">{t("ai.agent.iteration", { n: goal().iteration })}</span>
+              {/* A goal is read and changed with the same line `/goal` takes; while the agent works a message would join its turn, so the buttons wait. */}
+              <Show when={!running()}>
+                <span class="flex gap-1" data-testid="ai-goal-controls">
+                  <Show when={goal().status === "active" || goal().status === "budget_limited"}>
+                    <button type="button" class="rounded border px-1.5 text-[10px]" data-testid="ai-goal-pause" onClick={() => void ai.send("/goal pause")}>{t("ai.agent.goal.pause")}</button>
+                  </Show>
+                  <Show when={goal().status === "paused" || goal().status === "blocked" || goal().status === "usage_limited"}>
+                    <button type="button" class="rounded border px-1.5 text-[10px]" data-testid="ai-goal-resume" onClick={() => void ai.send("/goal resume")}>{t("ai.agent.goal.resume")}</button>
+                  </Show>
+                  <button type="button" class="rounded border px-1.5 text-[10px]" data-testid="ai-goal-clear" onClick={() => void ai.send("/goal clear")}>{t("ai.agent.goal.clear")}</button>
+                </span>
+              </Show>
             </p>
           )}
         </Show>

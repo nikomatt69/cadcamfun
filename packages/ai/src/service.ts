@@ -25,6 +25,7 @@ import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompt
 import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/system.ts"
 import { resolveLocale } from "./nikcli/locale.ts"
 import { providerAllowed } from "./nikcli/policy.ts"
+import { goalArgumentsOf, goalSummary } from "./nikcli/goal.ts"
 import { SUBAGENTS, isSubagentId, SUBAGENT_IDS, childAgent } from "./nikcli/agents.ts"
 import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
@@ -105,6 +106,8 @@ export interface SessionControlState {
   readonly tasks: ReadonlyArray<HostTaskInfo>
   readonly permissions: ReadonlyArray<{ readonly requestId: string; readonly sessionId: string; readonly permission: string; readonly patterns: ReadonlyArray<string> }>
   readonly questions: ReadonlyArray<{ readonly requestId: string; readonly questions: HostQuestionRequest["questions"] }>
+  /** The session's goal (nikcli `SessionGoal`), or null when it has none. */
+  readonly goal: ReturnType<typeof goalSummary> | null
   readonly context: { readonly memory?: import("@nikcli-ai/sdk-next").HostBrainStatus } & HostContextPolicy & ReturnType<typeof contextBudget> & { readonly provider?: string; readonly model?: string; readonly tokens?: number; readonly compacted: boolean; readonly breakdown?: ContextBreakdown }
 }
 
@@ -343,8 +346,11 @@ export class AiService extends Context.Service<AiService, {
                 const selected = flattenCatalog(catalog).find((m) => m.provider === resolved.provider && m.id === resolved.modelId)
                 if (!selected?.variants.includes(variant)) return yield* new AiConfigError({ message: `Thinking variant ${variant} is unavailable for ${resolved.provider}/${resolved.modelId}.` })
               }
+              // `/goal ...` is the host's own command (nikcli's goal loop), not a prompt: see `nikcli/goal.ts`.
+              const goalArguments = goalArgumentsOf(input.message)
               return hostChatStream({
                 host: target.host, sessionId: target.sessionId, message, files: attached.parts, system,
+                ...(goalArguments !== undefined ? { goalArguments } : {}),
                 agent: hostAgentWithPermissions(agent, input.permissionMode), ...(variant ? { variant } : {}),
                 model: { providerID: resolved.provider, modelID: resolved.modelId }
               }).pipe(
@@ -429,7 +435,9 @@ export class AiService extends Context.Service<AiService, {
         const breakdown = input.action === "context" ? yield* readContextBreakdown(projectHost, sessionId) : undefined
         const memory = yield* Effect.tryPromise({ try: () => projectHost.client.brain.status(), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
         const tokens = latest?.info.tokens
-        return { busy: state.busy, text: state.text, permissions, tasks: taskInfos(host.value.scheduler, owner), questions: questions.map((question) => ({ requestId: question.id, questions: question.questions })),
+        // The goal lives in the host's session: a reloaded window reads it back instead of showing none.
+        const goal = yield* Effect.tryPromise({ try: () => projectHost.client.session.goal({ sessionID: sessionId }), catch: (cause) => cause }).pipe(Effect.orElseSucceed(() => null))
+        return { goal: goal ? goalSummary(goal) : null, busy: state.busy, text: state.text, permissions, tasks: taskInfos(host.value.scheduler, owner), questions: questions.map((question) => ({ requestId: question.id, questions: question.questions })),
           context: { ...policy, memory, ...(breakdown ? { breakdown } : {}), ...(providerID && modelID ? { provider: providerID, model: modelID } : {}), ...(selected ? contextBudget(selected, policy) : {}),
             ...(input.action !== "compact" && tokens ? { tokens: tokens.total || tokens.input + tokens.output + (tokens.cache?.read ?? 0) + (tokens.cache?.write ?? 0) } : summaryIndex >= 0 ? { tokens: 0 } : {}), compacted: input.action === "compact" } }
       })

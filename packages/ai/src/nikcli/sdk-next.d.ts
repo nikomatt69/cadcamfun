@@ -52,6 +52,16 @@ declare module "@nikcli-ai/sdk-next" {
     readonly properties: Record<string, unknown>
   }
 
+  export interface HostGoalState {
+    readonly sessionID: string
+    readonly objective: string
+    readonly status: "active" | "paused" | "blocked" | "usage_limited" | "budget_limited" | "complete"
+    readonly tokenBudget?: number
+    readonly tokensUsed: number
+    readonly timeUsedSeconds: number
+    readonly iterationCount: number
+  }
+
   export interface HostContextBreakdown {
     readonly estimatedTotal: number
     readonly reported?: { readonly total: number }
@@ -144,6 +154,13 @@ declare module "@nikcli-ai/sdk-next" {
         input: { sessionID: string; limit?: number },
         options?: RequestOptions
       ): Promise<ReadonlyArray<{ info: HostMessageInfo; parts: ReadonlyArray<HostPart> }>>
+      /** nikcli's `SessionGoal` state of the session, or null when it has none. */
+      goal(input: { sessionID: string }, options?: RequestOptions): Promise<HostGoalState | null>
+      /** Runs one of the host's commands (`goal`, `init`, ...) in the session; the result is the message it wrote or the turn it started. */
+      command(
+        input: { sessionID: string; command: string; arguments: string; agent?: string; model?: string; variant?: string; delivery?: "steer" | "queue" },
+        options?: RequestOptions
+      ): Promise<HostPromptResult>
       /** nikcli's `SessionContext.breakdown`: where the tokens of the next request come from (estimated, per source). */
       contextBreakdown(input: { sessionID: string }, options?: RequestOptions): Promise<HostContextBreakdown>
     }

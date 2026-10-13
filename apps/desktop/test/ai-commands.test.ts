@@ -316,3 +316,25 @@ describe("transcript markdown", () => {
     expect(markdown).toContain("Attachments: bracket.dxf")
   })
 })
+
+describe("/goal (nikcli's goal command)", () => {
+  test("is a session command in the palette, found by name, alias and what it does", () => {
+    expect(findCommand("goal")?.group).toBe("session")
+    expect(findCommand("/Objective")?.name).toBe("goal")
+    expect(searchCommands("goal")[0]?.name).toBe("goal")
+    expect(searchCommands("autonomous").map((command) => command.name)).toContain("goal")
+  })
+
+  test("turns the line into the prompt the host's goal command takes, unchanged", async () => {
+    expect(await run("/goal")).toEqual({ kind: "prompt", prompt: "/goal" })
+    expect(await run("/goal   Machine the bracket and verify it ")).toEqual({ kind: "prompt", prompt: "/goal Machine the bracket and verify it" })
+    expect(await run("/goal Rough the pocket --token-budget 80000")).toEqual({ kind: "prompt", prompt: "/goal Rough the pocket --token-budget 80000" })
+    for (const sub of ["pause", "resume", "clear", "status"]) expect(await run(`/goal ${sub}`)).toEqual({ kind: "prompt", prompt: `/goal ${sub}` })
+  })
+
+  test("a malformed token budget is refused before anything is sent", async () => {
+    for (const bad of ["/goal x --token-budget", "/goal x --token-budget abc", "/goal x --token-budget -1", "/goal x --token-budget 2.5"]) {
+      expect(await run(bad), bad).toEqual({ kind: "rejected", reason: "ai.cmd.goal.budget" })
+    }
+  })
+})

@@ -182,7 +182,13 @@ export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questio
 export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),
   action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory", "context"]),
   taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
-export const SessionControlReply = Schema.Struct({ permissions: opt(Schema.Array(Schema.Struct({ requestId: Schema.String, sessionId: Schema.String, permission: Schema.String, patterns: Schema.Array(Schema.String) }))), busy: Schema.Boolean, text: Schema.String, tasks: Schema.Array(SessionTask), questions: Schema.Array(PendingQuestion),
+/** nikcli's session goal (`/goal`): what the agent works toward on its own, and how far it is. */
+export const SessionGoal = Schema.Struct({
+  objective: Schema.String,
+  status: Schema.Literals(["active", "paused", "blocked", "usage_limited", "budget_limited", "complete"]),
+  iteration: Schema.Number, tokensUsed: Schema.Number, tokenBudget: opt(Schema.Number)
+})
+export const SessionControlReply = Schema.Struct({ goal: opt(Schema.NullOr(SessionGoal)), permissions: opt(Schema.Array(Schema.Struct({ requestId: Schema.String, sessionId: Schema.String, permission: Schema.String, patterns: Schema.Array(Schema.String) }))), busy: Schema.Boolean, text: Schema.String, tasks: Schema.Array(SessionTask), questions: Schema.Array(PendingQuestion),
   context: Schema.Struct({ memory: Schema.optional(Schema.Struct({ enabled: Schema.Boolean, memoryEnabled: Schema.Boolean, minHours: Schema.Number, minSessions: Schema.Number, lastBrainAt: Schema.Number, hoursSinceLastBrain: Schema.Number, sessionsSinceLastBrain: Schema.Number, shouldTrigger: Schema.Boolean })), source: Schema.Literal("host-config"), auto: Schema.Boolean, prune: Schema.Boolean, reserved: opt(Schema.Number),
     provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean,
     /** nikcli `SessionContext.breakdown` summed per category; only on the `context` action. */

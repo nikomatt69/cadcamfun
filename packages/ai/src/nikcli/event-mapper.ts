@@ -52,6 +52,8 @@ export interface EventMapperState {
   readonly reportedUser: Set<string>
   /** Inner calls of `code_mode` programs reported so far (their call ids are numbered). */
   programCalls: number
+  /** User messages the host writes for a command this stream ran (`/goal`): its own wording, not something the user said meanwhile. */
+  skipUserMessages: number
 }
 
 export const newMapperState = (): EventMapperState => ({
@@ -74,7 +76,8 @@ export const newMapperState = (): EventMapperState => ({
   toolErrors: new Map(),
   ownTexts: new Set(),
   reportedUser: new Set(),
-  programCalls: 0
+  programCalls: 0,
+  skipUserMessages: 0
 })
 
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
@@ -279,6 +282,7 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
         const partId = str(part["id"]) ?? messageId
         if (text && part["synthetic"] !== true && !state.ownTexts.has(text) && !state.reportedUser.has(partId)) {
           state.reportedUser.add(partId)
+          if (state.skipUserMessages > 0) { state.skipUserMessages -= 1; return [] }
           return [{ type: "user_message", sessionId, text }]
         }
         return []

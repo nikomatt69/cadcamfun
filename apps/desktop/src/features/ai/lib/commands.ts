@@ -106,6 +106,23 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     run: ({ host }) => { host.togglePanel("help"); return done }
   },
   {
+    // nikcli's `/goal`: the agent works toward a condition on its own until it is met, blocked or out of budget. The line goes to the
+    // host's own command (`packages/ai/src/nikcli/goal.ts`), so `status`, `pause`, `resume` and `clear` act on the session's goal.
+    name: "goal",
+    aliases: ["objective"],
+    group: "session",
+    title: "ai.cmd.goal",
+    description: "ai.cmd.goal.desc",
+    args: "[objective [--token-budget N] | pause | resume | clear | status]",
+    keywords: ["autonomous", "objective", "until", "continue", "budget", "pause", "resume"],
+    run: ({ args }) => {
+      const text = args.trim()
+      const budget = /(?:^|\s)--token-budget(?:\s+(\S+))?(?=\s|$)/.exec(text)
+      if (budget !== null && !/^\d+$/.test(budget[1] ?? "")) return reject("ai.cmd.goal.budget")
+      return { kind: "prompt", prompt: text === "" ? "/goal" : `/goal ${text}` }
+    }
+  },
+  {
     name: "new",
     aliases: ["fresh"],
     group: "session",

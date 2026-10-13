@@ -5456,6 +5456,98 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       ],
                       "type": "object",
                     },
+                    "goal": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "iteration": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                                "objective": {
+                                  "type": "string",
+                                },
+                                "status": {
+                                  "enum": [
+                                    "active",
+                                    "paused",
+                                    "blocked",
+                                    "usage_limited",
+                                    "budget_limited",
+                                    "complete",
+                                  ],
+                                  "type": "string",
+                                },
+                                "tokenBudget": {
+                                  "anyOf": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "type": "number",
+                                        },
+                                        {
+                                          "enum": [
+                                            "Infinity",
+                                            "-Infinity",
+                                            "NaN",
+                                          ],
+                                          "type": "string",
+                                        },
+                                      ],
+                                    },
+                                    {
+                                      "type": "null",
+                                    },
+                                  ],
+                                },
+                                "tokensUsed": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "objective",
+                                "status",
+                                "iteration",
+                                "tokensUsed",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                     "permissions": {
                       "anyOf": [
                         {

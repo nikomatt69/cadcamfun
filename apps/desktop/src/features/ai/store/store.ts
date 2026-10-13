@@ -756,6 +756,8 @@ export const createAiStore = (): AiStore => {
       batch(() => {
         if (state.permissions) setPermissions(state.permissions)
         setQuestions(state.questions); setTasks(state.tasks)
+        // The goal lives in the host session (nikcli `/goal`): a reloaded window reads it back instead of showing none.
+        if (state.goal !== undefined) setGoal(state.goal ?? undefined)
         // The breakdown is only sent on request: a later status poll keeps the last one rather than blanking the gauge.
         setHostContext((previous) => ({ ...state.context, ...(state.context.breakdown === undefined && previous?.breakdown !== undefined ? { breakdown: previous.breakdown } : {}) }))
         if (state.context.tokens !== undefined) setContextTokens(state.context.tokens)

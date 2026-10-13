@@ -7,6 +7,7 @@ import { isContextOverflowError } from "../provider-error.ts"
 import { CADCAM_AGENT } from "./config.ts"
 import { mapHostEvent, newMapperState, type EventMapperState } from "./event-mapper.ts"
 import type { ProjectHost } from "./runtime.ts"
+import { formatGoalStatus, goalSubcommandTexts, parseGoalArguments, type GoalCommand, type GoalSubcommand } from "./goal.ts"
 
 export interface HostChatInput {
   readonly host: ProjectHost
@@ -19,6 +20,8 @@ export interface HostChatInput {
   readonly model: { readonly providerID: string; readonly modelID: string }
   readonly agent?: string
   readonly variant?: string
+  /** The arguments of a `/goal` line (`status`, `pause`, an objective, ...): the turn runs the host's own `goal` command instead of a prompt. */
+  readonly goalArguments?: string
   /**
    * How many times the turn is resumed on its own after the provider failed for a reason that passes (overload, rate limit,
    * outage, a dropped provider connection). Each resume waits longer (nikcli's retry curve, capped); the count restarts whenever
@@ -365,6 +368,28 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
         return false
       }
 
+      /**
+       * The pinned host applies a `/goal` change and then fails to encode its reply (`UnexpectedStatus`, the reply of a command that
+       * writes no answer). So the reply proves nothing either way: the effect is read back from the goal itself, and only a goal
+       * that did not change is an error.
+       */
+      const runGoalSubcommand = async (command: GoalSubcommand): Promise<string> => {
+        const readGoal = () => host.client.session.goal({ sessionID: sessionId }, { signal: controller.signal })
+        const before = await readGoal().catch(() => null)
+        if (command === "status") return formatGoalStatus(before)
+        const texts = goalSubcommandTexts(command, before)
+        for (const text of texts) state.ownTexts.add(text)
+        let failure: unknown
+        await host.client.session.command(
+          { sessionID: sessionId, command: "goal", arguments: command, agent: input.agent ?? CADCAM_AGENT, model: `${input.model.providerID}/${input.model.modelID}` },
+          { signal: controller.signal }
+        ).catch((cause: unknown) => { failure = cause })
+        const after = await readGoal().catch(() => undefined)
+        const applied = before === null || before === undefined || (after !== undefined && (command === "clear" ? after === null : after !== null && after.status === (command === "pause" ? "paused" : "active")))
+        if (!applied) throw failure ?? new Error(`The host did not ${command} the goal.`)
+        return texts[0]!
+      }
+
       const run = (async () => {
         await Promise.race([connectedPromise, new Promise((r) => setTimeout(r, CONNECT_TIMEOUT_MS))])
         offer({ type: "turn", sessionId, phase: "start" })
@@ -379,15 +404,58 @@ export const hostChatStream = (input: HostChatInput): Stream.Stream<AiEvent, AiP
           { type: "text", text: input.message },
           ...(input.files ?? []).map((f) => ({ type: "file" as const, mime: f.mime, filename: f.filename, url: f.url }))
         ]
+        // `/goal`: the host's own command sets, pauses, resumes, clears or reads the goal; the application only parses the line
+        // and carries the answer. An objective then runs as the turn: the command writes its brief and starts the agent.
+        const hostModel = `${input.model.providerID}/${input.model.modelID}`
+        let goalPending: GoalCommand | undefined
+        let usedGoalCommand = false
+        if (input.goalArguments !== undefined) {
+          let command: GoalCommand
+          try { command = parseGoalArguments(input.goalArguments) } catch (cause) {
+            controller.abort()
+            offer({ type: "error", sessionId, code: "config", message: cause instanceof Error ? cause.message : String(cause) })
+            return
+          }
+          if (command.type === "subcommand") {
+            try {
+              const text = await runGoalSubcommand(command.command)
+              offer({ type: "delta", sessionId, text })
+              offer({ type: "done", sessionId, text })
+            } catch (cause) {
+              offer({ type: "error", sessionId, code: "provider", message: describeHostFailure(cause) })
+            }
+            controller.abort()
+            return
+          }
+          if (command.objective === "") {
+            controller.abort()
+            offer({ type: "error", sessionId, code: "config", message: "You must provide a goal condition." })
+            return
+          }
+          goalPending = command
+          // The host records its own brief as a user message of the session: the stream's, not something the user wrote meanwhile.
+          state.skipUserMessages += 1
+        }
         for (;;) {
           let result: HostPromptResult
           try {
+            usedGoalCommand = false
+            if (goalPending !== undefined) {
+              goalPending = undefined
+              usedGoalCommand = true
+              result = await host.client.session.command(
+                { sessionID: sessionId, command: "goal", arguments: input.goalArguments!, agent: input.agent ?? CADCAM_AGENT, model: hostModel, ...(input.variant ? { variant: input.variant } : {}) },
+                { signal: controller.signal }
+              )
+            } else
             result = await host.client["session-prompt"].prompt(
               { sessionID: sessionId, agent: input.agent ?? CADCAM_AGENT, model: input.model, ...(input.variant ? { variant: input.variant } : {}), ...(input.system ? { system: input.system } : {}), parts },
               { signal: controller.signal }
             )
           } catch (cause) {
             const message = describeHostFailure(cause)
+            // The host started the goal and ran its loop, then failed to encode the command's reply: the work is in the session.
+            if (usedGoalCommand && !isInterruption(message) && !controller.signal.aborted && (await host.client.session.goal({ sessionID: sessionId }).catch(() => null)) !== null && (await finishFromSession(answers))) return
             if (isInterruption(message) && state.reportedUser.size > 0 && (await finishFromSession(answers))) return
             if (isInterruption(message)) {
               if (attempt < resumes && !controller.signal.aborted) {

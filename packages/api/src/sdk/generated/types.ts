@@ -1813,6 +1813,16 @@ export type AiSessionControlInput = {
 }
 
 export type AiSessionControlOutput = {
+  goal?:
+    | {
+        objective: string
+        status: "active" | "paused" | "blocked" | "usage_limited" | "budget_limited" | "complete"
+        iteration: number
+        tokensUsed: number
+        tokenBudget?: number | undefined
+      }
+    | null
+    | undefined
   permissions?: Array<{ requestId: string; sessionId: string; permission: string; patterns: Array<string> }> | undefined
   busy: boolean
   text: string
