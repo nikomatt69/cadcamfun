@@ -1,5 +1,6 @@
 /** Toolpaths for selected CAD elements (legacy `generateFromSelectedElements` and the primitive generators). */
 import { above, circleSlice, cornerMoves, cutLevels, f3, fullCircleFrom, offsetDistance, offsetRadius, plunge, pointMoves, polygonPoints, ellipsePoints, rectangleCorners, retractRapid, type Pt } from "./common.ts"
+import { elementOutline } from "./elements.ts"
 import type { CadElement, GeometryInput, ToolpathSettings } from "./schema.ts"
 
 // -- selected-element toolpaths ------------------------------------------------------------------
@@ -520,6 +521,33 @@ export const genericToolpath = (e: CadElement, s: ToolpathSettings): string => {
   return gcode
 }
 
+/**
+ * A path that follows the element's own outline instead of its bounding rectangle: a spline, a Bezier or a NURBS is followed along
+ * the curve at each depth (an open curve is cut on its centre line; the tool offset has no side to take there), an extrusion round
+ * its profile or circle with the tool offset applied. The curve is followed in plan; its heights are not (2.5D).
+ */
+export const outlineToolpath = (e: CadElement, s: ToolpathSettings): string => {
+  const type = String(e.type)
+  const outline = elementOutline(e)
+  if (outline.length < 2) return `; ${type} has no outline to follow\n`
+  const closed = type === "extrusion"
+  const top = closed ? (e.z || 0) + (e.depth > 0 ? e.depth : 0) : Math.max(...outline.map((p) => p.z))
+  const reach = closed && e.depth > 0 ? Math.min(s.depth, e.depth) : s.depth
+  let gcode = `; ${type}: ${outline.length} outline points${closed ? "" : ", followed along the curve"}\n`
+  let path: Pt[] = outline.map((p) => [p.x, p.y] as Pt)
+  if (closed && s.offset !== "center") {
+    const shifted = offsetPolygon(path, s.offset === "outside" ? s.toolDiameter / 2 : -s.toolDiameter / 2)
+    if (shifted !== null && shifted.length >= 3) path = shifted
+    else gcode += `; Could not apply the tool offset to the ${type} outline, using the outline itself\n`
+  } else if (!closed && s.offset !== "center") gcode += "; An open curve is cut on its centre line: the tool offset does not apply\n"
+  for (const level of cutLevels(reach, s.stepdown)) {
+    const z = top + level
+    const ring = s.direction === "conventional" ? [...path].reverse() : path
+    gcode += `\n; Z Level: ${z.toFixed(3)}\n` + above(ring[0]![0], ring[0]![1], z) + plunge(z, s) + pointMoves(ring, s.feedrate, "Point")
+  }
+  return gcode
+}
+
 /** Dispatch on the CAD element type (legacy `generateFromSelectedElements` switch). */
 export const elementToolpath = (e: CadElement, s: ToolpathSettings, g: GeometryInput): string => {
   switch (e.type) {
@@ -544,6 +572,9 @@ export const elementToolpath = (e: CadElement, s: ToolpathSettings, g: GeometryI
     case "arc": return arcToolpath(e, s)
     case "ellipse": return ellipseToolpath(e, s)
     case "text3d": return text3dToolpath(e, s)
+    // A curve with its points is followed along the curve; one with only a size keeps the generic contour.
+    case "spline": case "bezier": case "nurbs": case "path3d": return Array.isArray(e["points"]) && e["points"].length >= 2 ? outlineToolpath(e, s) : genericToolpath(e, s)
+    case "extrusion": return outlineToolpath(e, s)
     default:
       // Members of a container keep the legacy "not yet implemented" note; anything else gets the generic contour.
       if (e["inContainer"] === true && (e.type === "tube" || e.type === "lathe" || e.type === "grid")) return notImplementedMember(e)

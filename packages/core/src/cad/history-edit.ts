@@ -29,6 +29,16 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
     case "sketch":
       add("offset", "offset along the normal", f.offset)
       f.sketch.constraints.forEach((c, i) => { if ("value" in c) add(`sketch.constraints.${i}.value`, constraintLabel(c), c.value as Dimension) })
+      f.sketch.shapes?.forEach((shape, i) => {
+        const base = `sketch.shapes.${i}`, name = `${shape.kind} ${shape.id}`
+        if (shape.kind === "polyline" || shape.kind === "curve") { shape.points.forEach((p, k) => { add(`${base}.points.${k}.0`, `${name} point ${k + 1} x`, p[0]); add(`${base}.points.${k}.1`, `${name} point ${k + 1} y`, p[1]) }); return }
+        add(`${base}.at.0`, `${name} x`, shape.at[0]); add(`${base}.at.1`, `${name} y`, shape.at[1])
+        if (shape.kind === "rectangle") { add(`${base}.width`, `${name} width`, shape.width); add(`${base}.height`, `${name} height`, shape.height) }
+        else if (shape.kind === "circle") add(`${base}.diameter`, `${name} diameter`, shape.diameter)
+        else if (shape.kind === "polygon") { add(`${base}.radius`, shape.flats === true ? `${name} radius to the sides` : `${name} radius to the corners`, shape.radius); add(`${base}.rotation`, `${name} rotation (deg)`, shape.rotation) }
+        else if (shape.kind === "ellipse") { add(`${base}.radiusX`, `${name} radius X`, shape.radiusX); add(`${base}.radiusY`, `${name} radius Y`, shape.radiusY) }
+        else { add(`${base}.length`, `${name} overall length`, shape.length); add(`${base}.width`, `${name} width`, shape.width); add(`${base}.angle`, `${name} angle (deg)`, shape.angle) }
+      })
       break
     case "extrude":
       add("depth", "depth", f.depth)
@@ -50,6 +60,30 @@ export const dimensionsOf = (f: Feature): ReadonlyArray<DimensionRef> => {
     case "fillet": add("radius", f.style === "chamfer" ? "chamfer size" : "fillet radius", f.radius); add("edges.minLength", "shortest edge", f.edges?.minLength); break
     case "sweep": add("bendRadius", "bend radius", f.bendRadius); break
     case "loft": break
+    case "primitive":
+      for (const [key, value] of Object.entries(f.params ?? {})) add(`params.${key}`, `${f.element} ${key}`, value)
+      f.at?.forEach((c, i) => add(`at.${i}`, `position ${"xyz"[i]}`, c))
+      f.rotation?.forEach((c, i) => add(`rotation.${i}`, `rotation ${"xyz"[i]} (deg)`, c))
+      f.profile?.forEach((p, k) => { add(`profile.${k}.0`, `profile point ${k + 1} x`, p[0]); add(`profile.${k}.1`, `profile point ${k + 1} y`, p[1]) })
+      for (const [name, list] of [["path", f.path], ["positions", f.positions]] as const) list?.forEach((p, k) => p.forEach((c, axis) => add(`${name}.${k}.${axis}`, `${name} point ${k + 1} ${"xyz"[axis]}`, c)))
+      f.radii?.forEach((r, k) => add(`radii.${k}`, `section ${k + 1} radius`, r))
+      break
+    case "coil":
+      add("radius", "coil radius", f.radius); add("pitch", "pitch", f.pitch); add("turns", "turns", f.turns); add("wireDiameter", "wire diameter", f.wireDiameter); add("offset", "start height", f.offset)
+      f.centre?.forEach((c, i) => add(`centre.${i}`, `axis ${"xy"[i]}`, c))
+      break
+    case "move":
+      f.translate?.forEach((t, i) => add(`translate.${i}`, `move ${"xyz"[i]}`, t))
+      add("rotate.angle", "rotation (deg)", f.rotate?.angle)
+      f.rotate?.about?.forEach((c, i) => add(`rotate.about.${i}`, `turn about ${"xyz"[i]}`, c))
+      break
+    case "scale":
+      if (Array.isArray(f.factor)) f.factor.forEach((t, i) => add(`factor.${i}`, `scale ${"xyz"[i]}`, t as Dimension))
+      else add("factor", "scale factor", f.factor as Dimension)
+      f.about?.forEach((c, i) => add(`about.${i}`, `scale about ${"xyz"[i]}`, c))
+      break
+    case "split": add("offset", "split plane offset", f.offset); break
+    case "combine": break
     case "pattern":
       add("count", "count", f.count)
       if (f.kind === "grid") {

@@ -4,6 +4,7 @@
  * strategy needs: the height of the finished surface in every column, undercuts and holes included.
  */
 import { Dexels, gridFor, type Grid } from "./dexel.ts"
+import { flattenElements } from "../generator/elements.ts"
 import { elementMesh, meshBounds, type Element, type Mesh64 } from "./element-mesh.ts"
 
 export interface PartModel {
@@ -32,7 +33,9 @@ const idOf = (e: Element): string | undefined => (typeof e["id"] === "string" ? 
 const label = (e: Element): string => `${String(e["type"])}${typeof e["name"] === "string" ? ` "${e["name"]}"` : ""}`
 
 /** Meshes of the elements in play: the operands a boolean consumes are not machined on their own. */
-const resolve = (elements: ReadonlyArray<Element>, tolerance: number) => {
+const resolve = (selected: ReadonlyArray<Element>, tolerance: number) => {
+  // A component or a group is its parts, placed relative to it: machine what is inside.
+  const elements = flattenElements(selected as never) as ReadonlyArray<Element>
   const byId = new Map<string, Element>()
   for (const e of elements) { const id = idOf(e); if (id !== undefined) byId.set(id, e) }
   const consumed = new Set<string>()

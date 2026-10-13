@@ -66,6 +66,12 @@ export default function ParametricPanel(props: { readonly element: Element; read
       case "sweep": return `sweep ${feature.operation} of ${feature.profile} along ${feature.path}${feature.bendRadius !== undefined ? `, bends R${String(feature.bendRadius)}` : ""}`
       case "loft": return `loft ${feature.operation} through ${feature.sections.join(", ")}${feature.smooth ? " (smooth)" : ""}`
       case "shell": return `shell of ${feature.feature}, open ${feature.open ?? "none"}`
+      case "primitive": return `${feature.element} ${feature.operation}`
+      case "coil": return `${feature.section ?? "round"} coil ${feature.operation}, ${feature.handedness ?? "right"} hand`
+      case "move": return `${feature.copy === true ? "copy" : "move"}${feature.rotate !== undefined ? ` turned about ${feature.rotate.axis}` : ""}${feature.translate !== undefined ? " and shifted" : ""}`
+      case "scale": return Array.isArray(feature.factor) ? "scale along x, y, z" : "scale"
+      case "split": return `split by ${feature.plane}, keep ${feature.keep}`
+      case "combine": return `${feature.operation} ${feature.tools.join(", ")} ${feature.operation === "join" ? "into" : feature.operation === "cut" ? "from" : "with"} ${feature.target}`
       case "fillet": return `${feature.style ?? "fillet"} of ${feature.edges?.parallel ? `${feature.edges.parallel}-parallel` : feature.edges?.within ? "boxed" : "all"} ${feature.edges?.kind ?? "convex"} edges`
     }
   }

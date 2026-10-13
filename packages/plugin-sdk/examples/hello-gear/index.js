@@ -6078,6 +6078,46 @@ var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
 // packages/core/src/cad/profile-shape.ts
 var CORNER_TURN = 10 * Math.PI / 180;
+
+// packages/core/src/cam/model/element-mesh.ts
+var TAU2 = 2 * Math.PI;
+var parametricCache = new Map;
+
+// packages/core/src/cad/history.ts
+var PRIMITIVE_MAY_BE_ZERO = new Set(["holeDiameter", "phiStart"]);
+// packages/core/src/cad/parametric-from-element.ts
+var SOLIDS2 = {
+  cube: { numbers: ["width", "height", "depth"] },
+  sphere: { numbers: ["radius", "segments"] },
+  ellipsoid: { numbers: ["radiusX", "radiusY", "radiusZ", "segments"] },
+  cylinder: { numbers: ["radius", "height", "segments"] },
+  cone: { numbers: ["radius", "height", "segments"] },
+  prism: { numbers: ["radius", "height", "sides"] },
+  pyramid: { numbers: ["baseWidth", "baseDepth", "height"] },
+  hemisphere: { numbers: ["radius", "segments"], options: ["direction"] },
+  capsule: { numbers: ["radius", "height", "segments"], options: ["direction"] },
+  torus: { numbers: ["radius", "tubeRadius"] },
+  gear: { numbers: ["moduleValue", "teeth", "thickness", "pressureAngle", "holeDiameter"] },
+  extrusion: { numbers: ["depth", "width", "height", "radius"], options: ["shape"], arrays: ["profile"] },
+  revolution: { numbers: ["angle", "segments"], options: ["axis"], arrays: ["profile"] },
+  sweep: { numbers: ["radius", "segments"], arrays: ["profile", "path"] },
+  loft: { numbers: [], arrays: ["profiles", "positions"] },
+  spring: { numbers: ["radius", "wireRadius", "turns", "height"] },
+  bolt: { numbers: ["length"], options: ["size"] },
+  screw: { numbers: ["length"], options: ["size"] },
+  nut: { numbers: [], options: ["size"] },
+  washer: { numbers: ["outerDiameter", "thickness"], options: ["size"] },
+  wall: { numbers: ["length", "thickness", "height"] },
+  floor: { numbers: ["width", "depth", "thickness"] },
+  window: { numbers: ["width", "height", "thickness"] },
+  door: { numbers: ["width", "height", "thickness"], options: ["style"] },
+  column: { numbers: ["radius", "height"], options: ["style"] },
+  roof: { numbers: ["width", "depth", "height"], options: ["style"] },
+  stair: { numbers: ["width", "height", "depth", "steps"] }
+};
+var FLAT = ["rectangle", "circle", "polygon", "ellipse", "triangle"];
+var CONTAINERS = new Set(["component", "group"]);
+var CONVERTIBLE_TYPES = [...Object.keys(SOLIDS2), ...FLAT, ...CONTAINERS];
 // packages/core/src/cad/element-transform.ts
 var DEG = Math.PI / 180;
 // packages/core/src/cad/scene-evidence.ts
@@ -6437,10 +6477,6 @@ var CODE_OF = {
   [FixedCycleType.BORING_WITH_RETRACT]: "G89",
   [FixedCycleType.CUSTOM]: "G81"
 };
-
-// packages/core/src/cam/model/element-mesh.ts
-var TAU2 = 2 * Math.PI;
-var parametricCache = new Map;
 
 // packages/core/src/cam/model/dexel.ts
 var EMPTY = new Float64Array(0);

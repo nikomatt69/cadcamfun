@@ -67,7 +67,10 @@ describe("element meshes are closed, outward and the right size", () => {
     const coarse = vol({ type: "cylinder", radius: 50, height: 1 }, 0.5)
     const fine = vol({ type: "cylinder", radius: 50, height: 1 }, 0.001)
     expect(Math.abs(fine - Math.PI * 2500)).toBeLessThan(Math.abs(coarse - Math.PI * 2500))
-    for (const type of ["spring", "bolt", "text3d", "sweep", "loft", "wall"]) expect(elementMesh({ type })).toBeUndefined()
+    // Text is drawn as a placeholder by the editor: there is no font outline to cut, so it is not faked. A spring, a bolt, a sweep,
+    // a loft and a wall have real geometry (see `element-cam.test.ts`); a sweep and a loft need their path and sections first.
+    for (const type of ["text3d", "sweep", "loft"]) expect(elementMesh({ type })).toBeUndefined()
+    for (const type of ["spring", "bolt", "wall"]) expect(elementMesh({ type })).toBeDefined()
     expect(elementMesh({ type: "revolution", profile: [{ x: -3, y: 0 }, { x: 3, y: 4 }] })).toBeUndefined()
   })
 })

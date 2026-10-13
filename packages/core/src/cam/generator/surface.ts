@@ -7,6 +7,7 @@
 import { Schema } from "effect"
 import type { Move } from "../ir.ts"
 import { elementMesh } from "../model/element-mesh.ts"
+import { flattenElements } from "./elements.ts"
 import { buildPartModel } from "../model/model.ts"
 import { SurfaceParams, generateSurface, type SurfaceStrategy } from "../operations/surface.ts"
 import type { Stock as MachineStock, Tool, ToolKind } from "../tool.ts"
@@ -16,6 +17,8 @@ import type { CadElement, Stock, ToolpathSettings } from "./schema.ts"
 /** True when the element is a solid the surface engine can machine (a mesh, or a boolean of solids). */
 export const isSolidElement = (e: CadElement): boolean =>
   String(e["type"]).startsWith("boolean-") || elementMesh(e as never, 0.05) !== undefined
+  // A component or a group counts when something inside it is a solid.
+  || flattenElements([e]).some((child) => child !== e && isSolidElement(child))
 
 const TOOL_KINDS: Partial<Record<string, ToolKind>> = { endmill: "endmill", ballnose: "ballnose" }
 

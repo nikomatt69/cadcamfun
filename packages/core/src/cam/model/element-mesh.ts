@@ -11,8 +11,13 @@
  *
  * Meshes are closed (a hemisphere gets its flat disc, an open lathe profile is closed against its axis) so a ray through
  * them enters and leaves in pairs, which is what the dexel model needs. Doubles throughout: float32 positions would lose
- * microns on a large part. Shapes that are not a plain solid (spring, thread, text, sweep, loft, architecture) return
- * `undefined` and the caller reports them: a block of the bounding box would be a lie.
+ * microns on a large part. Standard parts and architecture have their real geometry too, standing on Z as the catalogue says:
+ * a bolt or screw is its head (1.8 d across, 0.8 d high) on a shank, centred on its length, without the cosmetic thread; a nut is a
+ * hexagon (1.8 d across corners, 0.8 d thick) with its bore; a washer a ring; a spring a helix of wire about Z; a wall, floor, window
+ * and door slabs; a column its shaft with the base and capital of its style; a roof a gable or a flat slab; a stair a solid flight
+ * (each step filled down to the base, running toward -Y). A wall's openings are drawn as markers in the editor and are not cut, here
+ * either. What has no solid, 2D shapes and curves (machined as contours, `generator/elements.ts`) and `text3d` (the editor draws a
+ * placeholder, there is no font outline to cut), returns `undefined` and the caller reports it: a block of the bounding box would be a lie.
  *
  * Two kinds of element carry their own geometry instead of parameters: `mesh` (vertices and faces, what the editor's Boolean command
  * leaves behind) and `parametric` (a feature history, `cad/history.ts`, rebuilt and united into one solid). Both are in the same
@@ -20,7 +25,8 @@
  */
 import { booleanAll } from "../../cad/csg.ts"
 import { gearOutline } from "../../cad/gear.ts"
-import { rebuild, type History } from "../../cad/history.ts"
+import { COIL_STEPS_PER_TURN, coilGeometry, rebuild, type History } from "../../cad/history.ts"
+import { loftSolid, sweepSolid, type P3 } from "../../cad/sweep-loft.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { segmentsFor } from "../../cad/tolerance.ts"
 import { triangulateRing } from "../../cad/triangulate.ts"
@@ -257,6 +263,42 @@ const parametricMesh = (history: unknown): Mesh64 | undefined => {
   return result
 }
 
+const hexRing = (acrossCorners: number): Vec2[] => Array.from({ length: 6 }, (_, k) => ({ x: (acrossCorners / 2) * Math.cos((TAU * k) / 6), y: (acrossCorners / 2) * Math.sin((TAU * k) / 6) }))
+/** The diameter of a metric size such as "M8", as the editor reads it. */
+const metricDiameter = (size: unknown, fallback: number): number => {
+  const match = typeof size === "string" ? size.match(/M(\d+(?:\.\d+)?)/i) : null
+  return match ? Number(match[1]) : fallback
+}
+/** Boolean on single-precision meshes (the CSG works in float32, about 1e-5 mm on a part this size), widened again. */
+const subtractMeshes = (a: Mesh64, b: Mesh64): Mesh64 => {
+  const single = (m: Mesh64) => ({ positions: Float32Array.from(m.positions), indices: m.indices })
+  const cut = booleanAll([single(a), single(b)], "subtract")
+  return { positions: Float64Array.from(cut.positions), indices: Uint32Array.from(cut.indices) }
+}
+const unionMeshes = (parts: ReadonlyArray<Mesh64>): Mesh64 => {
+  const single = (m: Mesh64) => ({ positions: Float32Array.from(m.positions), indices: m.indices })
+  const united = booleanAll(parts.map(single), "union")
+  return { positions: Float64Array.from(united.positions), indices: Uint32Array.from(united.indices) }
+}
+const widen = (m: { readonly positions: ArrayLike<number>; readonly indices: Uint32Array }): Mesh64 => ({ positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices) })
+const shifted = (m: Mesh64, dx: number, dy: number, dz: number): Mesh64 => {
+  const out = Float64Array.from(m.positions)
+  for (let k = 0; k < out.length; k += 3) { out[k] = out[k]! + dx; out[k + 1] = out[k + 1]! + dy; out[k + 2] = out[k + 2]! + dz }
+  return { positions: out, indices: m.indices }
+}
+const points3Of = (list: unknown): P3[] => Array.isArray(list) ? list.filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null).map((p) => ({ x: num(p["x"]), y: num(p["y"]), z: num(p["z"]) })) : []
+
+/** A frame square to `tangent`: two unit vectors spanning the plane a swept profile lies in. */
+const planeFrame = (tangent: P3): { readonly u: P3; readonly v: P3 } => {
+  const length = Math.hypot(tangent.x, tangent.y, tangent.z) || 1
+  const t = { x: tangent.x / length, y: tangent.y / length, z: tangent.z / length }
+  const helper = Math.abs(t.z) < 0.9 ? { x: 0, y: 0, z: 1 } : { x: 1, y: 0, z: 0 }
+  const cross = (a: P3, b: P3): P3 => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x })
+  const norm = (a: P3): P3 => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l } }
+  const u = norm(cross(helper, t))
+  return { u, v: cross(t, u) }
+}
+
 /** Local mesh around the origin, or `undefined` when the element is not a plain solid. */
 const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: readonly [number, number, number] } | undefined => {
   const seg = (radius: number, minimum = 16, cap = 256): number => typeof e["segments"] === "number" && e["segments"] >= 3 ? Math.min(2048, Math.floor(e["segments"] as number)) : Math.max(minimum, segmentsFor(radius, typeof e["tolerance"] === "number" ? e["tolerance"] : tolerance, cap))
@@ -326,6 +368,99 @@ const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: read
         if (e["axis"] === "x") { out[k] = sy; out[k + 1] = -sx; out[k + 2] = sz } else { out[k] = sx; out[k + 1] = sy; out[k + 2] = sz }
       }
       return { mesh: { positions: out, indices: m.indices } }
+    }
+    // ---- sweeps and lofts given by points, relative to the element's x, y, z.
+    case "sweep": {
+      const path = points3Of(e["path"])
+      if (path.length < 2) return undefined
+      const frame = planeFrame({ x: path[1]!.x - path[0]!.x, y: path[1]!.y - path[0]!.y, z: path[1]!.z - path[0]!.z })
+      const given = profileOf(e["profile"])
+      const radius = positive(e["radius"], 10)
+      const around = seg(radius)
+      const section: Vec2[] = given.length >= 3 ? given : Array.from({ length: around }, (_, k) => ({ x: radius * Math.cos((TAU * k) / around), y: radius * Math.sin((TAU * k) / around) }))
+      const ring = section.map((q) => ({ x: path[0]!.x + frame.u.x * q.x + frame.v.x * q.y, y: path[0]!.y + frame.u.y * q.x + frame.v.y * q.y, z: path[0]!.z + frame.u.z * q.x + frame.v.z * q.y }))
+      const tangent = { x: path[1]!.x - path[0]!.x, y: path[1]!.y - path[0]!.y, z: path[1]!.z - path[0]!.z }
+      try { return { mesh: widen(sweepSolid({ ring, ring2d: section, normal: tangent, centre: path[0]!, path, closed: false })) } } catch { return undefined }
+    }
+    case "loft": {
+      const profiles = Array.isArray(e["profiles"]) ? (e["profiles"] as Array<Record<string, unknown>>) : []
+      const positions = points3Of(e["positions"])
+      if (profiles.length < 2 || profiles.length !== positions.length) return undefined
+      const sections = profiles.map((profile, k) => {
+        const r = positive(profile?.["radius"], 1), n = Math.max(24, seg(r))
+        return { ring: Array.from({ length: n }, (_, i) => ({ x: positions[k]!.x + r * Math.cos((TAU * i) / n), y: positions[k]!.y + r * Math.sin((TAU * i) / n), z: positions[k]!.z })) }
+      })
+      try { return { mesh: widen(loftSolid(sections)) } } catch { return undefined }
+    }
+    // ---- standard parts, standing on Z.
+    case "spring": {
+      const radius = positive(e["radius"], 1), wire = positive(e["wireRadius"], 0.1), turns = positive(e["turns"], 5), height = positive(e["height"], 5)
+      const pitch = height / turns
+      // Turns that touch or overlap make a surface that crosses itself: that is not a solid a tool can be asked to clear.
+      if (!(radius > wire) || !(pitch > 2 * wire + 1e-9) || turns > 60) return undefined
+      const g = coilGeometry({ cx: 0, cy: 0, z0: -height / 2, radius, pitch, turns, wire: 2 * wire, square: false, left: false })
+      try { return { mesh: widen(sweepSolid({ ring: g.ring, ring2d: g.ring2d, normal: g.normal, centre: g.centre, path: g.path, closed: false })) } } catch { return undefined }
+    }
+    case "bolt": case "screw": {
+      const d = metricDiameter(e["size"], 5), length = positive(e["length"], 20)
+      const head = Math.min(0.8 * d, length / 2)
+      return { mesh: turned([{ r: d / 2, z: -length / 2 }, { r: d / 2, z: length / 2 - head }, { r: 0.9 * d, z: length / 2 - head }, { r: 0.9 * d, z: length / 2 }], seg(0.9 * d, 32)) }
+    }
+    case "nut": {
+      const d = metricDiameter(e["size"], 5), thickness = 0.8 * d
+      return { mesh: subtractMeshes(prism(hexRing(1.8 * d), -thickness / 2, thickness / 2), cone(d / 2, d / 2, thickness + 2, seg(d / 2, 32))) }
+    }
+    case "washer": {
+      const d = metricDiameter(e["size"], 5)
+      const outer = positive(e["outerDiameter"], 0) > d ? (e["outerDiameter"] as number) : d * 2.2
+      const t = positive(e["thickness"], d * 0.2)
+      return { mesh: subtractMeshes(cone(outer / 2, outer / 2, t, seg(outer / 2, 48)), cone(d / 2, d / 2, t + 2, seg(d / 2, 32))) }
+    }
+    // ---- architecture. Wall, window and door stand on their length (X) and thickness (Y); the wall stands on its base at z.
+    case "wall": return { mesh: shifted(box(positive(e["length"], 100), positive(e["thickness"], 5), positive(e["height"], 30)), 0, 0, positive(e["height"], 30) / 2) }
+    case "floor": return { mesh: box(positive(e["width"], 100), positive(e["depth"] ?? e["length"], 100), positive(e["thickness"], 2)) }
+    case "window": return { mesh: box(positive(e["width"], 10), positive(e["thickness"], 0.5), positive(e["height"], 15)) }
+    case "door": {
+      const w = positive(e["width"], 10), h = positive(e["height"], 20), t = positive(e["thickness"], 1)
+      const knob = sphere(w * 0.08, w * 0.08, w * 0.08, 16)
+      return { mesh: unionMeshes([box(w, t, h), shifted(knob, w * 0.4, -t * 0.6, 0)]) }
+    }
+    case "column": {
+      const r = positive(e["radius"], 5), h = positive(e["height"], 30), style = e["style"]
+      const n = seg(r, 20)
+      if (style !== "doric" && style !== "ionic" && style !== "corinthian") return { mesh: cone(r, r, h, n) }
+      const trim = 0.05 * h, flare = 1.2 * r
+      const profile = [{ r: flare, z: -h / 2 }, { r: flare, z: -h / 2 + trim }, { r, z: -h / 2 + trim }, { r, z: h / 2 - trim }, { r: flare, z: h / 2 - trim }, { r: flare, z: h / 2 }]
+      if (style !== "doric") profile.push({ r: 1.32 * r, z: h / 2 + 0.025 * h })
+      else profile.push({ r: flare, z: h / 2 })
+      return { mesh: turned(profile, n) }
+    }
+    case "roof": {
+      const w = positive(e["width"], 100), d = positive(e["depth"] ?? e["length"], 100), h = positive(e["height"], 20)
+      if (e["style"] === "flat") return { mesh: box(w, d, h / 4) }
+      // A gable: the triangle (-w/2, 0) (w/2, 0) (0, h) in X and Z, running the length d along Y.
+      const b = new Builder()
+      const a0 = [b.v(-w / 2, -d / 2, 0), b.v(w / 2, -d / 2, 0), b.v(0, -d / 2, h)], a1 = [b.v(-w / 2, d / 2, 0), b.v(w / 2, d / 2, 0), b.v(0, d / 2, h)]
+      b.tri(a0[0]!, a0[1]!, a0[2]!)
+      b.tri(a1[0]!, a1[2]!, a1[1]!)
+      b.quad(a0[0]!, a1[0]!, a1[1]!, a0[1]!)
+      b.quad(a0[1]!, a1[1]!, a1[2]!, a0[2]!)
+      b.quad(a0[2]!, a1[2]!, a1[0]!, a0[0]!)
+      return { mesh: b.build() }
+    }
+    case "stair": {
+      const width = positive(e["width"], 10), height = positive(e["height"], 20), depth = positive(e["depth"], 30), steps = Math.max(1, Math.floor(positive(e["steps"], 10)))
+      // One staircase outline in Y and Z, extruded across the width: the flight is solid down to the base and runs toward -Y.
+      const outline: Vec2[] = [{ x: 0, y: 0 }]
+      for (let i = 0; i < steps; i++) outline.push({ x: -(i * depth) / steps, y: ((i + 1) * height) / steps }, { x: -((i + 1) * depth) / steps, y: ((i + 1) * height) / steps })
+      outline.push({ x: -depth, y: 0 })
+      // `prism` puts the outline in XY and extrudes along Z; turn it so world Y = outline x, world Z = outline y, world X = the width.
+      const flat = prism(outline, -width / 2, width / 2)
+      const out = new Float64Array(flat.positions.length)
+      for (let k = 0; k < out.length; k += 3) { out[k] = flat.positions[k + 2]!; out[k + 1] = flat.positions[k]!; out[k + 2] = flat.positions[k + 1]! }
+      // (x, y, z) -> (z, x, y) is a cyclic turn, not a mirror: the winding is kept.
+      const idx = Uint32Array.from(flat.indices)
+      return { mesh: { positions: out, indices: idx } }
     }
     default: return undefined
   }

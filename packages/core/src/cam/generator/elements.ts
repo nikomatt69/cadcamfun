@@ -12,6 +12,7 @@
  * a cube; cylinders, cones, prisms and capsules extend along Z by `height`; a pyramid is
  * `width` x `depth` in XY and `height` in Z.
  */
+import { sampleSpline } from "../../cad/spline.ts"
 import { elementMesh } from "../model/element-mesh.ts"
 import type { CadElement, OperationType, Stock, ToolpathSettings } from "./schema.ts"
 
@@ -167,7 +168,8 @@ export const elementBounds = (e: CadElement): Bounds => {
       // The knob stands out of the face that looks toward -Y by 0.6 thickness + its radius (0.08 width).
       const t = num(e["thickness"]), w = num(e["width"]), h = num(e["height"])
       const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
-      return boundsOf({ x: x - w / 2, y: y - Math.max(t / 2, t * 0.6 + w * 0.08), z: z - h / 2 }, { x: x + w / 2, y: y + t / 2, z: z + h / 2 })
+      // The knob (radius 0.08 w) is centred 0.6 t out of the face and is wider than most doors are thick, so it shows on the back too.
+      return boundsOf({ x: x - w / 2, y: y - Math.max(t / 2, t * 0.6 + w * 0.08), z: z - h / 2 }, { x: x + w / 2, y: y + Math.max(t / 2, w * 0.08 - t * 0.6), z: z + h / 2 })
     }
     // ---- standard parts
     case "spring": {
@@ -329,6 +331,44 @@ const ring = (cx: number, cy: number, rx: number, ry: number, count: number, z: 
     return { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), z }
   })
 
+/** Points of a spline, Bezier or NURBS element as the machine follows them: sampled, relative to the element's x, y, z. */
+const curvePoints = (e: CadElement): V3[] => {
+  const control = points3(e["points"])
+  const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
+  if (control.length < 2) return control.map((p) => ({ x: x + p.x, y: y + p.y, z: z + p.z }))
+  const divisions = Math.max(8, Math.min(400, Math.floor(n(e["divisions"], 50))))
+  const type = e["type"]
+  let sampled: V3[]
+  if (type === "nurbs" || type === "path3d") {
+    const degree = Math.max(1, Math.min(Math.floor(n(e["degree"], 3)), control.length - 1))
+    // A B-spline is linear in its control points, so x and y can be sampled together and z on its own with the same parameters.
+    const xy = sampleSpline(control.map((p) => ({ x: p.x, y: p.y })), degree, false, divisions)
+    const zz = sampleSpline(control.map((p) => ({ x: p.z, y: 0 })), degree, false, divisions)
+    const last = control[control.length - 1]!
+    sampled = [...xy.map((p, k) => ({ x: p.x, y: p.y, z: zz[k]!.x })), { ...last }]
+  } else if (type === "bezier") {
+    sampled = Array.from({ length: divisions + 1 }, (_, k) => {
+      const t = k / divisions
+      let level = control.map((p) => ({ ...p }))
+      while (level.length > 1) level = level.slice(1).map((q, i) => ({ x: level[i]!.x + (q.x - level[i]!.x) * t, y: level[i]!.y + (q.y - level[i]!.y) * t, z: level[i]!.z + (q.z - level[i]!.z) * t }))
+      return level[0]!
+    })
+  } else {
+    // A spline passes through its points: Catmull-Rom.
+    const per = Math.max(2, Math.ceil(divisions / (control.length - 1)))
+    const at = (i: number): V3 => control[Math.min(control.length - 1, Math.max(0, i))]!
+    sampled = []
+    for (let i = 0; i < control.length - 1; i++) for (let k = 0; k < per; k++) {
+      const t = k / per, t2 = t * t, t3 = t2 * t
+      const c = (a: number, b: number, d: number, f: number): number => 0.5 * (2 * b + (-a + d) * t + (2 * a - 5 * b + 4 * d - f) * t2 + (-a + 3 * b - 3 * d + f) * t3)
+      const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+      sampled.push({ x: c(p0.x, p1.x, p2.x, p3.x), y: c(p0.y, p1.y, p2.y, p3.y), z: c(p0.z, p1.z, p2.z, p3.z) })
+    }
+    sampled.push({ ...control[control.length - 1]! })
+  }
+  return sampled.map((p) => ({ x: x + p.x, y: y + p.y, z: z + p.z }))
+}
+
 /** Closed or open outline of the element in XY at its own Z; `offset` > 0 grows it (legacy `getElementContourPath`). */
 export const elementOutline = (e: CadElement, offset = 0): V3[] => {
   const x = num(e["x"]), y = num(e["y"]), z = num(e["z"])
@@ -373,6 +413,31 @@ export const elementOutline = (e: CadElement, offset = 0): V3[] => {
         { x: n(e["x1"], x), y: n(e["y1"], y), z: b.min.z },
         { x: n(e["x2"], x), y: n(e["y2"], y), z: b.min.z }
       ]
+    }
+    case "spline": case "bezier": case "nurbs": case "path3d": return curvePoints(e)
+    case "extrusion": {
+      const shape = e["shape"]
+      if (shape === "circle") return ring(x, y, n(e["radius"], 25) + offset, n(e["radius"], 25) + offset, 48, z)
+      if (shape === "rect" || shape === undefined) return box(n(e["width"], 50) / 2 + offset, n(e["height"], 30) / 2 + offset)
+      const outline = points2(e["profile"]).map((p) => ({ x: x + p.x, y: y + p.y, z }))
+      return outline.length >= 3 ? [...outline, outline[0]!] : box(num(e["width"]) / 2 + offset, num(e["height"]) / 2 + offset)
+    }
+    case "bolt": case "screw": return ring(x, y, metricDiameter(e["size"], 5) * 0.9 + offset, metricDiameter(e["size"], 5) * 0.9 + offset, 36, z)
+    case "washer": {
+      const d = metricDiameter(e["size"], 5)
+      const outer = (num(e["outerDiameter"]) > d ? num(e["outerDiameter"]) : d * 2.2) / 2 + offset
+      return ring(x, y, outer, outer, 48, z)
+    }
+    case "nut": {
+      const r = metricDiameter(e["size"], 5) * 0.9 + offset
+      const pts = Array.from({ length: 6 }, (_, i) => ({ x: x + r * Math.cos((i * Math.PI) / 3), y: y + r * Math.sin((i * Math.PI) / 3), z }))
+      return [...pts, pts[0]!]
+    }
+    case "spring": { const r = num(e["radius"]) + num(e["wireRadius"]) + offset; return ring(x, y, r, r, 48, z) }
+    case "column": {
+      const plain = e["style"] === undefined || e["style"] === "simple"
+      const r = num(e["radius"]) * (plain ? 1 : 1.2) + offset
+      return ring(x, y, r, r, 36, z)
     }
     case "triangle": {
       const b = elementBounds(e)

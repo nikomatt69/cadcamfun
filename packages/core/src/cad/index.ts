@@ -61,6 +61,8 @@ export * from "./expr.ts"
 export * from "./sketch.ts"
 export * from "./csg.ts"
 export * from "./history.ts"
+export * from "./sketch-shapes.ts"
+export * from "./parametric-from-element.ts"
 export * from "./history-edit.ts"
 export * from "./element-transform.ts"
 // Surface helpers add their own `Mesh` interface (already exported through

@@ -26,6 +26,8 @@ import { meshBounds, meshOf, meshVolume, type Mesh } from "./solid.ts"
 import { edgedHoleTool, edgedPrism, moveRing, taperedHoleTool, taperedPrism, treatCorners, type EdgeShape, type TreatmentStyle } from "./profile-shape.ts"
 import { loftSolid, roundPath, sweepSolid, type P3 } from "./sweep-loft.ts"
 import { blendEdges, findEdges, selectEdges } from "./edge-blend.ts"
+import { expandSketch, type SketchShape } from "./sketch-shapes.ts"
+import { elementMesh } from "../cam/model/element-mesh.ts"
 
 export type PlaneName = "XY" | "YZ" | "ZX"
 type V3 = { readonly x: number; readonly y: number; readonly z: number }
@@ -43,6 +45,8 @@ export type DimConstraint = Dimensioned<Constraint>
 export interface HistorySketch {
   readonly entities: ReadonlyArray<SketchEntity>
   readonly constraints: ReadonlyArray<DimConstraint>
+  /** Parametric profiles (rectangle, circle, polygon, ellipse, slot, polyline) expanded into the sketch before it is solved. */
+  readonly shapes?: ReadonlyArray<SketchShape>
 }
 
 export type Operation = "new" | "union" | "subtract" | "intersect"
@@ -182,7 +186,93 @@ export interface FilletFeature {
   readonly edges?: EdgeSelection
   readonly targets?: ReadonlyArray<string>
 }
-export type Feature = SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature
+/** A helical sweep of a round or square wire about the Z axis: a spring, a thread form, a coiled pipe (Fusion's Coil). */
+export interface CoilFeature {
+  readonly id: string
+  readonly type: "coil"
+  /** Radius of the helix, to the centre of the wire. */
+  readonly radius: Dimension
+  /** Axial advance per turn. */
+  readonly pitch: Dimension
+  readonly turns: Dimension
+  /** Wire diameter (the side of a square wire). */
+  readonly wireDiameter: Dimension
+  readonly section?: "round" | "square"
+  readonly handedness?: "right" | "left"
+  /** Where the axis stands on the XY plane and the height of the start of the helix. */
+  readonly centre?: readonly [Dimension, Dimension]
+  readonly offset?: Dimension
+  readonly operation: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+/** Moves, turns or copies bodies (Fusion's Move/Copy): the turn is applied first, about a point, then the translation. */
+export interface MoveFeature {
+  readonly id: string
+  readonly type: "move"
+  readonly targets?: ReadonlyArray<string>
+  readonly translate?: readonly [Dimension, Dimension, Dimension]
+  readonly rotate?: { readonly axis: "x" | "y" | "z"; readonly angle: Dimension; readonly about?: readonly [Dimension, Dimension, Dimension] }
+  /** Leave the bodies where they are and make moved copies instead. */
+  readonly copy?: boolean
+}
+/** Scales bodies about a point (Fusion's Scale): one factor for a uniform scale, three for a stretch along x, y and z. */
+export interface ScaleFeature {
+  readonly id: string
+  readonly type: "scale"
+  readonly factor: Dimension | readonly [Dimension, Dimension, Dimension]
+  readonly about?: readonly [Dimension, Dimension, Dimension]
+  readonly targets?: ReadonlyArray<string>
+}
+/** Cuts bodies with a plane (Fusion's Split Body): keep the side the normal points to, the other side, or both as two bodies. */
+export interface SplitFeature {
+  readonly id: string
+  readonly type: "split"
+  readonly plane: PlaneName
+  readonly offset?: Dimension
+  readonly keep: "above" | "below" | "both"
+  readonly targets?: ReadonlyArray<string>
+}
+/** Joins, cuts or intersects whole bodies by their ids (Fusion's Combine). Tool bodies are consumed unless `keepTools`. */
+export interface CombineFeature {
+  readonly id: string
+  readonly type: "combine"
+  readonly target: string
+  readonly tools: ReadonlyArray<string>
+  readonly operation: "join" | "cut" | "intersect"
+  readonly keepTools?: boolean
+}
+/** The solid elements of the 3D catalogue a history can place, built by the same code that draws them in the editor. */
+export const PRIMITIVE_ELEMENTS = [
+  "cube", "sphere", "ellipsoid", "cylinder", "cone", "prism", "pyramid", "hemisphere", "capsule", "torus", "gear", "extrusion", "revolution", "sweep", "loft",
+  "spring", "bolt", "screw", "nut", "washer", "wall", "floor", "window", "door", "column", "roof", "stair"
+] as const
+/** Primitive fields that may be zero or negative: a gear without a bore, a start angle. */
+const PRIMITIVE_MAY_BE_ZERO: ReadonlySet<string> = new Set(["holeDiameter", "phiStart"])
+export type PrimitiveElement = (typeof PRIMITIVE_ELEMENTS)[number]
+/**
+ * A catalogue solid with parametric measures: `params` are its numeric fields (width, radius, teeth, moduleValue, ...), each a number or
+ * an expression of the history's parameters; `options` its choices (direction, shape, axis, style, a metric `size` such as "M8");
+ * `profile` the outline of an extrusion, a revolution or a sweep; `path` the points of a sweep and `positions` those of a loft (relative
+ * to `at`), `radii` the radius of each loft section. It is placed at `at` and turned by `rotation` (degrees, about its centre), then
+ * combined like any other tool.
+ */
+export interface PrimitiveFeature {
+  readonly id: string
+  readonly type: "primitive"
+  readonly element: PrimitiveElement
+  readonly params?: Readonly<Record<string, Dimension>>
+  readonly options?: Readonly<Record<string, string>>
+  readonly profile?: ReadonlyArray<readonly [Dimension, Dimension]>
+  readonly path?: ReadonlyArray<readonly [Dimension, Dimension, Dimension]>
+  readonly positions?: ReadonlyArray<readonly [Dimension, Dimension, Dimension]>
+  readonly radii?: ReadonlyArray<Dimension>
+  readonly at?: readonly [Dimension, Dimension, Dimension]
+  readonly rotation?: readonly [Dimension, Dimension, Dimension]
+  readonly operation: Operation
+  readonly targets?: ReadonlyArray<string>
+}
+
+export type Feature = SketchFeature | ExtrudeFeature | RevolveFeature | HoleFeature | PatternFeature | MirrorFeature | SweepFeature | LoftFeature | ShellFeature | FilletFeature | PrimitiveFeature | CoilFeature | MoveFeature | ScaleFeature | SplitFeature | CombineFeature
 
 export interface History {
   readonly parameters: ParameterTable
@@ -272,6 +362,52 @@ const mirrorMesh = (mesh: Mesh, axis: "x" | "y" | "z", value: number): Mesh => {
   const indices = Uint32Array.from(mesh.indices)
   for (let i = 0; i + 2 < indices.length; i += 3) { const b = indices[i + 1]!; indices[i + 1] = indices[i + 2]!; indices[i + 2] = b }
   return { positions, indices }
+}
+
+/** A mesh scaled about a point; the factors are positive, so the winding is kept. */
+const scaleMesh = (mesh: Mesh, factor: V3, about: V3): Mesh => {
+  const positions = Float32Array.from(mesh.positions)
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] = about.x + (positions[i]! - about.x) * factor.x
+    positions[i + 1] = about.y + (positions[i + 1]! - about.y) * factor.y
+    positions[i + 2] = about.z + (positions[i + 2]! - about.z) * factor.z
+  }
+  return { positions, indices: mesh.indices }
+}
+
+/** Which world axis (0 = x, 1 = y, 2 = z) each local axis of a sketch plane lies along. */
+const PLANE_AXES: Readonly<Record<PlaneName, { readonly u: number; readonly v: number; readonly n: number }>> = {
+  XY: { u: 0, v: 1, n: 2 }, YZ: { u: 1, v: 2, n: 0 }, ZX: { u: 2, v: 0, n: 1 }
+}
+
+/** Points per turn of a coil: a chord of 11 degrees keeps the wire's centre line within 0.5% of the true helix. */
+export const COIL_STEPS_PER_TURN = 32
+const COIL_MAX_TURNS = 60
+
+/**
+ * The path and the first ring of a coiled wire. The ring lies in the plane square to the helix at its start (spanned by the radial
+ * direction and the binormal), which is what the sweep expects: its normal is the start tangent.
+ */
+export const coilGeometry = (c: { cx: number; cy: number; z0: number; radius: number; pitch: number; turns: number; wire: number; square: boolean; left: boolean }): { path: P3[]; ring: P3[]; ring2d: Vec2[]; normal: P3; centre: P3 } => {
+  const steps = Math.ceil(c.turns * COIL_STEPS_PER_TURN)
+  const sign = c.left ? -1 : 1
+  const path: P3[] = Array.from({ length: steps + 1 }, (_, k) => {
+    const turn = (c.turns * k) / steps
+    const angle = sign * 2 * Math.PI * turn
+    return { x: c.cx + c.radius * Math.cos(angle), y: c.cy + c.radius * Math.sin(angle), z: c.z0 + c.pitch * turn }
+  })
+  const a = path[0]!, b = path[1]!
+  const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+  const tangent: P3 = { x: (b.x - a.x) / length, y: (b.y - a.y) / length, z: (b.z - a.z) / length }
+  const radial: P3 = { x: 1, y: 0, z: 0 }
+  // The tangent has no radial part at the start of the helix, so radial and tangent are square; the third axis completes the frame.
+  const binormal: P3 = { x: tangent.y * radial.z - tangent.z * radial.y, y: tangent.z * radial.x - tangent.x * radial.z, z: tangent.x * radial.y - tangent.y * radial.x }
+  const half = c.wire / 2
+  const corners: Vec2[] = c.square
+    ? [{ x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }, { x: -half, y: -half }]
+    : Array.from({ length: Math.max(16, Math.ceil(Math.PI / Math.acos(Math.max(0, 1 - 0.01 / half)))) }, (_, k) => k).map((k, _i, all) => ({ x: half * Math.cos((2 * Math.PI * k) / all.length), y: half * Math.sin((2 * Math.PI * k) / all.length) }))
+  const ring = corners.map((p) => ({ x: a.x + radial.x * p.x + binormal.x * p.y, y: a.y + radial.y * p.x + binormal.y * p.y, z: a.z + radial.z * p.x + binormal.z * p.y }))
+  return { path, ring, ring2d: corners, normal: tangent, centre: a }
 }
 
 /**
@@ -428,7 +564,13 @@ export const rebuild = (history: History): RebuildResult => {
           if (offset === undefined) break
           const constraints: Constraint[] = []
           let ok = true
-          for (const c of f.sketch.constraints) {
+          const expanded = expandSketch(f.sketch, (d) => {
+            const v = dim(d, f.id)
+            if (v === undefined) { ok = false; return 0 }
+            return v
+          })
+          if (!ok) break
+          for (const c of expanded.constraints) {
             if ("value" in c) {
               const v = dim(c.value as Dimension, f.id)
               if (v === undefined) { ok = false; continue }
@@ -441,7 +583,7 @@ export const rebuild = (history: History): RebuildResult => {
             } else constraints.push(c as Constraint)
           }
           if (!ok) break
-          const solve = solveSketch({ entities: f.sketch.entities, constraints })
+          const solve = solveSketch({ entities: expanded.entities, constraints })
           sketches[f.id] = { plane: f.plane, offset, solve }
           if (solve.status === "conflicting" || solve.status === "failed") {
             issues.push({ feature: f.id, severity: "error", message: solve.message ?? `The sketch could not be solved (${solve.status})` })
@@ -694,6 +836,124 @@ export const rebuild = (history: History): RebuildResult => {
           const tool = loftSolid(rings, { smooth: f.smooth === true })
           tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "primitive": {
+          const fields: Record<string, unknown> = { type: f.element, ...(f.options ?? {}) }
+          let failed = false
+          for (const [key, value] of Object.entries(f.params ?? {})) {
+            const v = dim(value, f.id)
+            if (v === undefined) failed = true
+            else fields[key] = v
+          }
+          const at = (f.at ?? [0, 0, 0]).map((d) => dim(d, f.id)), turn = f.rotation?.map((d) => dim(d, f.id))
+          const outline = f.profile?.map(([x, y]) => ({ x: dim(x, f.id), y: dim(y, f.id) }))
+          const triples = (list: ReadonlyArray<readonly [Dimension, Dimension, Dimension]> | undefined) => list?.map(([x, y, z]) => ({ x: dim(x, f.id), y: dim(y, f.id), z: dim(z, f.id) }))
+          const route = triples(f.path), stations = triples(f.positions)
+          const sections = f.radii?.map((r) => dim(r, f.id))
+          const incomplete = [...(route ?? []), ...(stations ?? [])].some((p) => p.x === undefined || p.y === undefined || p.z === undefined) || sections?.some((r) => r === undefined)
+          if (failed || incomplete || at.some((v) => v === undefined) || turn?.some((v) => v === undefined) || outline?.some((p) => p.x === undefined || p.y === undefined)) break
+          fields["x"] = at[0]; fields["y"] = at[1]; fields["z"] = at[2]
+          if (turn !== undefined) fields["rotation"] = { x: turn[0], y: turn[1], z: turn[2] }
+          if (outline !== undefined) fields["profile"] = outline
+          if (route !== undefined) fields["path"] = route
+          if (stations !== undefined) fields["positions"] = stations
+          if (sections !== undefined) fields["profiles"] = sections.map((radius) => ({ radius }))
+          // The element builder would quietly use its default for a size that is not positive: say so instead.
+          for (const key of Object.keys(f.params ?? {})) {
+            const v = fields[key] as number
+            if (!(v > 0) && !PRIMITIVE_MAY_BE_ZERO.has(key)) { issues.push({ feature: f.id, severity: "error", message: `${f.element}.${key} must be positive (it is ${v})` }); failed = true }
+          }
+          if (failed) break
+          const built = elementMesh(fields)
+          if (built === undefined) { issues.push({ feature: f.id, severity: "error", message: `The ${f.element} cannot be built from these measures${f.element === "extrusion" || f.element === "revolution" ? " (it needs a profile of points; a revolution needs them on one side of the axis)" : ""}` }); break }
+          const tool: Mesh = { positions: Float32Array.from(built.positions), indices: built.indices }
+          tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "coil": {
+          const radius = dim(f.radius, f.id), pitch = dim(f.pitch, f.id), turns = dim(f.turns, f.id), wire = dim(f.wireDiameter, f.id)
+          const cx = f.centre === undefined ? 0 : dim(f.centre[0], f.id), cy = f.centre === undefined ? 0 : dim(f.centre[1], f.id)
+          const z0 = f.offset === undefined ? 0 : dim(f.offset, f.id)
+          if ([radius, pitch, turns, wire, cx, cy, z0].some((v) => v === undefined)) break
+          if (!(wire! > 0 && radius! > 0 && pitch! > 0 && turns! > 0)) { issues.push({ feature: f.id, severity: "error", message: "A coil needs a positive radius, pitch, number of turns and wire diameter" }); break }
+          if (turns! > COIL_MAX_TURNS) { issues.push({ feature: f.id, severity: "error", message: `A coil has at most ${COIL_MAX_TURNS} turns (it has ${turns})` }); break }
+          if (!(radius! > wire! / 2 + 1e-9)) { issues.push({ feature: f.id, severity: "error", message: `The coil radius (${radius}) must exceed the wire radius (${wire! / 2}) or the wire crosses the axis` }); break }
+          if (!(pitch! > wire! + 1e-9)) { issues.push({ feature: f.id, severity: "error", message: `The pitch (${pitch} mm) must exceed the wire diameter (${wire} mm): neighbouring turns would overlap` }); break }
+          const g = coilGeometry({ cx: cx!, cy: cy!, z0: z0!, radius: radius!, pitch: pitch!, turns: turns!, wire: wire!, square: f.section === "square", left: f.handedness === "left" })
+          const tool = sweepSolid({ ring: g.ring, ring2d: g.ring2d, normal: g.normal, centre: g.centre, path: g.path, closed: false })
+          tools.set(f.id, { meshes: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, tool, f.operation, f.targets, f.id)
+          break
+        }
+        case "move": {
+          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+          if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body to move" }); break }
+          if (f.translate === undefined && f.rotate === undefined) { issues.push({ feature: f.id, severity: "error", message: "A move needs a translation, a rotation or both" }); break }
+          const shift = f.translate?.map((d) => dim(d, f.id))
+          const angle = f.rotate === undefined ? undefined : dim(f.rotate.angle, f.id)
+          const about = f.rotate?.about?.map((d) => dim(d, f.id))
+          if (shift?.some((v) => v === undefined) || (f.rotate !== undefined && angle === undefined) || about?.some((v) => v === undefined)) break
+          const axis = f.rotate === undefined ? undefined : f.rotate.axis === "x" ? { x: 1, y: 0, z: 0 } : f.rotate.axis === "y" ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 }
+          for (const b of chosen) {
+            let mesh = b.mesh
+            if (axis !== undefined) mesh = rotateMesh(mesh, axis, (angle! * Math.PI) / 180, about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! })
+            if (shift !== undefined) mesh = translateMesh(mesh, shift[0]!, shift[1]!, shift[2]!)
+            if (f.copy === true) bodies.push({ id: chosen.length === 1 ? f.id : `${f.id}#${b.id}`, mesh, feature: f.id })
+            else bodies[bodies.indexOf(b)] = { ...b, mesh }
+          }
+          break
+        }
+        case "scale": {
+          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+          if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body to scale" }); break }
+          const factors = (Array.isArray(f.factor) ? f.factor : [f.factor, f.factor, f.factor]).map((d) => dim(d as Dimension, f.id))
+          const about = f.about?.map((d) => dim(d, f.id))
+          if (factors.some((v) => v === undefined) || about?.some((v) => v === undefined)) break
+          if (factors.some((v) => !(v! > 0))) { issues.push({ feature: f.id, severity: "error", message: `A scale factor must be positive (they are ${factors.join(", ")})` }); break }
+          const centre = about === undefined ? { x: 0, y: 0, z: 0 } : { x: about[0]!, y: about[1]!, z: about[2]! }
+          for (const b of chosen) bodies[bodies.indexOf(b)] = { ...b, mesh: scaleMesh(b.mesh, { x: factors[0]!, y: factors[1]!, z: factors[2]! }, centre) }
+          break
+        }
+        case "split": {
+          const value = f.offset === undefined ? 0 : dim(f.offset, f.id)
+          if (value === undefined) break
+          const chosen = bodies.filter((b) => f.targets === undefined || f.targets.includes(b.id))
+          if (chosen.length === 0) { issues.push({ feature: f.id, severity: "error", message: "There is no body to split" }); break }
+          const frame = FRAMES[f.plane], axes = PLANE_AXES[f.plane]
+          /** The part of a body on one side of the plane: the body cut with a box that fills that half-space. */
+          const side = (mesh: Mesh, above: boolean): Mesh | undefined => {
+            const bb = meshBounds(mesh)
+            const lo = [bb.minX, bb.minY, bb.minZ], hi = [bb.maxX, bb.maxY, bb.maxZ]
+            const ring = [{ x: lo[axes.u]! - 1, y: lo[axes.v]! - 1 }, { x: hi[axes.u]! + 1, y: lo[axes.v]! - 1 }, { x: hi[axes.u]! + 1, y: hi[axes.v]! + 1 }, { x: lo[axes.u]! - 1, y: hi[axes.v]! + 1 }]
+            const box = above ? prism(ring, value, Math.max(hi[axes.n]!, value) + 1) : prism(ring, Math.min(lo[axes.n]!, value) - 1, value)
+            const part = booleanMesh(mesh, place(box, frame.u, frame.v, frame.n, { x: 0, y: 0, z: 0 }), "intersect")
+            return part.indices.length === 0 ? undefined : part
+          }
+          for (const b of chosen) {
+            const kept = f.keep === "below" ? [false] : f.keep === "above" ? [true] : [true, false]
+            const parts = kept.map((above) => ({ above, mesh: side(b.mesh, above) }))
+            const present = parts.filter((p) => p.mesh !== undefined)
+            if (present.length === 0) { issues.push({ feature: f.id, severity: "error", message: `The plane leaves nothing of '${b.id}' on the side asked for` }); continue }
+            if (f.keep === "both" && present.length < 2) issues.push({ feature: f.id, severity: "warning", message: `The plane does not cut through '${b.id}': it stays whole` })
+            bodies[bodies.indexOf(b)] = { ...b, mesh: present[0]!.mesh! }
+            if (present.length > 1) bodies.push({ id: `${f.id}:${b.id}:below`, mesh: present[1]!.mesh!, feature: f.id })
+          }
+          break
+        }
+        case "combine": {
+          const target = bodies.find((b) => b.id === f.target)
+          if (target === undefined) { issues.push({ feature: f.id, severity: "error", message: `Body '${f.target}' does not exist at this point of the history` }); break }
+          const toolBodies = f.tools.map((id) => bodies.find((b) => b.id === id))
+          const missing = f.tools.filter((_, i) => toolBodies[i] === undefined)
+          if (missing.length > 0) { issues.push({ feature: f.id, severity: "error", message: `Tool bod${missing.length === 1 ? "y" : "ies"} ${missing.map((m) => `'${m}'`).join(", ")} do${missing.length === 1 ? "es" : ""} not exist at this point of the history` }); break }
+          if (f.tools.includes(f.target)) { issues.push({ feature: f.id, severity: "error", message: "A body cannot be combined with itself" }); break }
+          const op = f.operation === "join" ? "union" : f.operation === "cut" ? "subtract" : "intersect"
+          let mesh = target.mesh
+          for (const tool of toolBodies) mesh = booleanMesh(mesh, tool!.mesh, op)
+          bodies[bodies.indexOf(target)] = { ...target, mesh }
+          if (f.keepTools !== true) for (const tool of toolBodies) bodies.splice(bodies.indexOf(tool!), 1)
           break
         }
         case "pattern": {
