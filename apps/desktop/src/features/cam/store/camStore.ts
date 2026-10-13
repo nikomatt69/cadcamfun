@@ -65,6 +65,9 @@ interface CAMState {
   // Last generated program (camera simulation)
   program: cam.Program
 
+  /** The generated program of each stored operation, in the order they were first generated. */
+  operationResults: ReadonlyArray<OperationResult>
+
   // Legacy CAM store (src/store/camStore.ts): the generated text, the selection and the raw piece
   gcode: string
   selectedEntities: string[]
@@ -93,6 +96,14 @@ interface CAMState {
   setPlaybackTime(seconds: number): void
   setProgram(program: cam.Program): void
   setGcode(gcode: string): void
+  /**
+   * Keeps the program of one stored operation next to the others: generating five operations shows all five (the preview
+   * draws every toolpath, the editor lists every program in order). Re-generating an operation replaces only its own entry.
+   */
+  upsertOperationResult(result: OperationResult): void
+  /** Drops one operation's program (its settings changed, so its G-code is stale); the others stay. */
+  removeOperationResult(id: string): void
+  clearOperationResults(): void
   toggleEntitySelection(id: string): void
   clearSelectedEntities(): void
   setSelectedWorkpieceElementId(id: string | null): void
@@ -109,7 +120,31 @@ interface CAMState {
   reset(): void
 }
 
+/** One stored operation's generated program, as the page shows it. */
+export interface OperationResult {
+  readonly id: string
+  readonly name: string
+  readonly gcode: string
+  readonly program: cam.Program
+  /** The cutter, as the preview names and colours it (`endmill Ø6`): one colour per tool across operations. */
+  readonly tool?: string
+}
+
+/**
+ * The page's program and editor text for a set of operation results: every toolpath of every operation (ids prefixed with the
+ * operation, so two operations' `tp-1` never collide) and every program text, each under a comment naming its operation.
+ */
+export const combineOperationResults = (results: ReadonlyArray<OperationResult>): { readonly program: cam.Program; readonly gcode: string } => {
+  if (results.length === 0) return { program: cam.makeProgram("untitled", [], {}), gcode: "" }
+  const first = results[0]!.program
+  const toolpaths = results.flatMap((r) => r.program.toolpaths.map((tp) => ({ ...tp, id: `${r.id}:${tp.id}`, toolId: r.tool ?? `${r.id}:${tp.toolId}`, name: results.length > 1 ? `${r.name} · ${tp.name}` : tp.name })))
+  const program = cam.makeProgram(results.length > 1 ? `${results.length} operations` : first.name, toolpaths, { units: first.units, workOffset: first.workOffset })
+  const gcode = results.length === 1 ? results[0]!.gcode : results.map((r, i) => `; ===== Operation ${i + 1}/${results.length}: ${r.name} =====\n${r.gcode.trimEnd()}`).join("\n\n")
+  return { program, gcode }
+}
+
 const legacyInitial = {
+  operationResults: [] as ReadonlyArray<OperationResult>,
   gcode: "",
   selectedEntities: [] as string[],
   selectedWorkpieceElementId: null as string | null,
@@ -159,6 +194,17 @@ export const useCamStore = create<CAMState>((set, get) => ({
   setPlaybackTime: (seconds) => set({ playbackTime: seconds }),
   setProgram: (program) => set({ program }),
   setGcode: (gcode) => set({ gcode }),
+  upsertOperationResult: (result) => set((state) => {
+    const at = state.operationResults.findIndex((r) => r.id === result.id)
+    const operationResults = at < 0 ? [...state.operationResults, result] : state.operationResults.map((r, i) => (i === at ? result : r))
+    return { operationResults, ...combineOperationResults(operationResults) }
+  }),
+  removeOperationResult: (id) => set((state) => {
+    if (!state.operationResults.some((r) => r.id === id)) return {}
+    const operationResults = state.operationResults.filter((r) => r.id !== id)
+    return { operationResults, ...combineOperationResults(operationResults) }
+  }),
+  clearOperationResults: () => set({ operationResults: [], ...combineOperationResults([]) }),
   toggleEntitySelection: (id) => set((state) => ({
     selectedEntities: state.selectedEntities.includes(id) ? state.selectedEntities.filter((entity) => entity !== id) : [...state.selectedEntities, id]
   })),

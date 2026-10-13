@@ -45,6 +45,7 @@ export const operationIdOf = (key: string, input: unknown, output: string): stri
 }
 
 interface OperationRow {
+  readonly name?: string | null
   readonly gcode: string | null
   readonly data: { readonly request?: { readonly settings?: ToolpathSettings }; readonly verification?: { readonly report?: VerifyResponse } } | null
 }
@@ -61,9 +62,9 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
     useCamStore.getState().setWorkpiece({ x: stock.width, y: stock.height, z: stock.depth })
     useCamStore.getState().setStockAllowance(stock.allowance)
     useCamStore.getState().setSelectedWorkpieceElementId(stock.elementId ?? null)
-    useCamStore.getState().setGcode("")
+    // A new stock invalidates every program generated on the old one.
+    useCamStore.getState().clearOperationResults()
     useGeneratorStore.getState().setResult("", [])
-    useCamStore.getState().setProgram(coreCam.makeProgram("untitled", [], {}))
     useVerifyStore.getState().reset()
     return true
   }
@@ -85,16 +86,17 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
     const cam = useCamStore.getState()
     cam.setSelectedOperationId(id)
     if (kind === "create" || kind === "update") {
-      cam.setGcode("")
-      cam.setProgram(coreCam.makeProgram("untitled", [], {}))
+      // Only this operation's program is stale; the programs of the other operations stay on the page.
+      cam.removeOperationResult(id)
       useGeneratorStore.getState().setResult("", [])
       useVerifyStore.getState().reset()
       return settings !== undefined
     }
     if (gcode.trim() === "") return settings !== undefined
-    cam.setGcode(gcode)
+    const name = typeof row.name === "string" && row.name !== "" ? row.name : settings?.operationType ?? id
+    const tool = settings !== undefined ? `${settings.toolType} Ø${settings.toolDiameter}` : undefined
+    cam.upsertOperationResult({ id, name, gcode, program: (parsed?.program as never) ?? coreCam.makeProgram(name, [], {}), ...(tool !== undefined ? { tool } : {}) })
     useGeneratorStore.getState().setResult(gcode, [])
-    if (parsed !== undefined) cam.setProgram(parsed.program as never)
     if (kind === "verify" && report !== undefined) {
       useVerifyStore.getState().finish(report, gcode)
       cam.setRightTab("verify")

@@ -21,6 +21,8 @@ export interface OperationRow {
   readonly name: string
   readonly toolId: string
   readonly moves: number
+  /** The tool's colour in the preview (`#rrggbb`). */
+  readonly color?: string
 }
 
 export interface OperationsListProps {
@@ -64,7 +66,10 @@ export default function OperationsList(props: OperationsListProps): JSX.Element 
                 >
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{row.name}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{row.toolId} · {t("cam.downloads", { count: row.moves })}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
+                      <Show when={row.color}>{(color) => <span class="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ "background-color": color() }} aria-hidden="true" />}</Show>
+                      <span class="truncate">{row.toolId} · {t("cam.downloads", { count: row.moves })}</span>
+                    </div>
                   </div>
                   <Motion.button
                     class="ml-2 p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
