@@ -203,7 +203,7 @@ export const COMMANDS: ReadonlyArray<SlashCommand> = [
     title: "ai.cmd.agent",
     description: "ai.cmd.agent.desc",
     args: "[id]",
-    keywords: ["role", "coordinator", "modeler", "machinist", "researcher", "planner", "diagnostician", "verifier", "optimizer"],
+    keywords: ["role", "general", "cad", "cam", "coordinator"],
     run: ({ args, host }) => {
       const wanted = normalise(args)
       if (wanted === "") { host.notify(host.ai.agents().find((agent) => agent.id === host.ai.agent())?.title ?? host.ai.agent()); return done }

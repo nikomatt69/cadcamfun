@@ -16,7 +16,6 @@ import Brain from "lucide-solid/icons/brain"
 import Check from "lucide-solid/icons/check"
 import { t } from "../../../i18n/index.ts"
 import { useAiStore } from "../store/context.tsx"
-import { agentLabel } from "./ToolRow.tsx"
 import type { AiPendingQuestion } from "../lib/types.ts"
 
 interface ControlOption {
@@ -124,8 +123,8 @@ export function AssistantControls(): JSX.Element {
         onClose={() => setOpen(undefined)}
         onChange={(value) => ai.setAgent(value)}
         options={[
-          { value: "cadcam", label: t("ai.controls.coordinator") },
-          ...ai.agents().filter((candidate) => candidate.id !== "cadcam").map((candidate) => ({ value: candidate.id, label: agentLabel(candidate.id), description: candidate.description }))
+          { value: "general", label: t("ai.controls.coordinator") },
+          ...ai.agents().filter((candidate) => candidate.id !== "general").map((candidate) => ({ value: candidate.id, label: candidate.title, description: candidate.description }))
         ]}
       />
 

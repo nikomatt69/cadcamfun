@@ -1899,6 +1899,9 @@ export type AiSessionControlOutput = {
     background: boolean
     text?: string | undefined
     error?: string | undefined
+    createdAt?: number | undefined
+    startedAt?: number | undefined
+    finishedAt?: number | undefined
   }>
   questions: Array<{
     requestId: string
@@ -1958,6 +1961,9 @@ export type AiSessionStateOutput = {
         background: boolean
         text?: string | undefined
         error?: string | undefined
+        createdAt?: number | undefined
+        startedAt?: number | undefined
+        finishedAt?: number | undefined
       }>
     | undefined
   events?:

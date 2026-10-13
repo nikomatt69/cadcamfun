@@ -136,6 +136,10 @@ export interface AiTask {
   readonly background: boolean
   readonly text?: string
   readonly error?: string
+  /** Epoch milliseconds, from the host: queued, started, stopped. */
+  readonly createdAt?: number
+  readonly startedAt?: number
+  readonly finishedAt?: number
 }
 
 export interface AiToolCall {
