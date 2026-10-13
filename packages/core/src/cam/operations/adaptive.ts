@@ -272,22 +272,26 @@ const plan = (rings: ReadonlyArray<ReadonlyArray<Vec2>>, R: number, engagementPc
     let sx = 0, sy = 0, sn = 0
     for (let k = 0; k < field.phi.length; k++) if (uncut[k] === 1 && field.phi[k]! >= top - 1e-9) { sx += x0 + (k % w) * h; sy += y0 + Math.floor(k / w) * h; sn++ }
     if (sn === 0) return { runs, warnings, stats: { ...stats, left: 0, uncutInitial: initial } }
-    let best = -1, bd = Infinity
-    for (let k = 0; k < field.phi.length; k++) {
-      if (uncut[k] !== 1 || field.phi[k]! < top - 1e-9) continue
-      const d = (x0 + (k % w) * h - sx / sn) ** 2 + (y0 + Math.floor(k / w) * h - sy / sn) ** 2
-      if (d < bd) { bd = d; best = k }
+    // The deepest uncut node must be a place the centre may stand: when all the stock lies outside the region (a band narrower
+    // than the tool round a part), a helix or plunge there would put the cutter into the part; the runs then enter from the side.
+    if (top >= 0) {
+      let best = -1, bd = Infinity
+      for (let k = 0; k < field.phi.length; k++) {
+        if (uncut[k] !== 1 || field.phi[k]! < top - 1e-9) continue
+        const d = (x0 + (k % w) * h - sx / sn) ** 2 + (y0 + Math.floor(k / w) * h - sy / sn) ** 2
+        if (d < bd) { bd = d; best = k }
+      }
+      const c: Vec2 = { x: x0 + (best % w) * h, y: y0 + Math.floor(best / w) * h }
+      let rh = Math.min(0.6 * R, 0.9 * Math.max(0, field.at(c.x, c.y)))
+      let entry: Entry
+      if (rh >= 0.25 * R) entry = { at: { x: c.x + rh, y: c.y }, helix: { centre: c, clockwise: climb } }
+      else { rh = 0; stats.plunges++; entry = { at: c } }
+      for (let k = 0; rh > 0 && k < 24; k++) clear(c.x + rh * Math.cos((2 * Math.PI * k) / 24), c.y + rh * Math.sin((2 * Math.PI * k) / 24))
+      clear(c.x, c.y)
+      runs.push({ entry, points: [c], stayDown: false })
+      stats.runs++
+      end = c
     }
-    const c: Vec2 = { x: x0 + (best % w) * h, y: y0 + Math.floor(best / w) * h }
-    let rh = Math.min(0.6 * R, 0.9 * Math.max(0, field.at(c.x, c.y)))
-    let entry: Entry
-    if (rh >= 0.25 * R) entry = { at: { x: c.x + rh, y: c.y }, helix: { centre: c, clockwise: climb } }
-    else { rh = 0; stats.plunges++; entry = { at: c } }
-    for (let k = 0; rh > 0 && k < 24; k++) clear(c.x + rh * Math.cos((2 * Math.PI * k) / 24), c.y + rh * Math.sin((2 * Math.PI * k) / 24))
-    clear(c.x, c.y)
-    runs.push({ entry, points: [c], stayDown: false })
-    stats.runs++
-    end = c
   }
 
   /** Splits a closed loop into the pieces where the centre may stand; a loop wholly feasible stays closed (first point repeated). */
