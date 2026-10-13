@@ -2,6 +2,8 @@
 
 Status: foundation hardening and a first verification module implemented; commercial parity not established.
 
+The owner-requested [native CAM kernel architecture](29-native-cam-kernel.md) expands the manufacturing design with stock-aware generation, machine kinematics, continuous assembly checking and independent final-NC verification. It is a design contract, not an implementation or qualification claim; existing acceptance gates and implementation sequence still apply. Its current-source inventory supersedes historical CAM limitation summaries below where subsequent code has already landed.
+
 ## Evidence and scope
 
 Official sources inspected on 2026-10-07:
@@ -106,3 +108,7 @@ git diff --check -- packages/core specs/03-core-cad.md specs/04-core-cam.md spec
 ```
 
 New regression tests are beside the WP-owned CAD/CAM source. Existing golden NC files and existing assertions remain unchanged.
+
+## Change log
+
+- 2026-10-13: linked the owner-requested [native CAM kernel contract](29-native-cam-kernel.md), distinguishing its current-source inventory and target architecture from historical implementation summaries. Design only; no acceptance gate or commercial parity claimed.

@@ -8,6 +8,10 @@ WP2 derives drilling, contour, pocket, thread and external turning paths from WP
 
 Pure and I/O-free, same rules as WP1.
 
+## Native CAM kernel architecture contract (2026-10-13)
+
+[Spec 29](29-native-cam-kernel.md) defines the owner-requested deep CAM kernel: immutable manufacturing snapshots, authoritative CAD geometry through native B-rep/mesh Adapters, stock lineage shared across operations, separate cutter-location/machine/controller motion, continuous assembly collision checks, independent replay of final NC bytes and capability-specific release evidence. It records the current Implementation's limits and the degree-to-radian compatibility Seam. Status: design only; the existing exports, generation behavior and acceptance results remain as recorded below. Implementation follows the existing owner scopes and ordered-step prerequisites; this contract does not mark a professional kernel as built.
+
 Legacy reference (domain knowledge only; **do not port verbatim**): `.reference/src/lib/gcodeGenerator.ts`, `.reference/src/lib/cam/{unifiedGcodeGenerator,geometryProcessor,geometryToolpathIntegrator}.ts`, `.reference/src/lib/{fanucGcodeGenerator,fanucOptimizer,advanced-post-processor,gCodeGenerationUtils,cncControllers}.ts`.
 
 ## 1. Pipeline
@@ -183,6 +187,8 @@ The `3d_surface` operation no longer follows each element's outline: the selecte
 - **Indexed (3+2)** (`indexing.ts`, `Orient` move in the IR, emitted as a rotary `G0 A.. B.. C..`): an operation is made on a tilted `WorkFrame`; `indexToolpath` turns the frame's z axis into trunnion-table angles (`table-AC`: C about Z then A tilt about X; `table-BC`: C then B about Y; each normal has two solutions, the smaller tilt inside the limits is taken) and carries every point from the work frame through the part to machine coordinates (`R (part - pivot) + pivot`). Because R lays the work plane horizontal, arcs stay arcs in G17, helices stay helices and a drilling cycle still runs down machine Z. Not covered: a head that tilts (the pivot then moves with the tool length), tilted-plane controller cycles (G68.2, CYCLE800), RTCP, and simultaneous 5-axis; `cam.verify` skips `Orient`, so a verification must be given the stock in machine coordinates.
 
 ## 9. Change log
+
+- 2026-10-13: added the native CAM kernel contract in [spec 29](29-native-cam-kernel.md): geometry/stock/motion/controller Seams, capability-specific quality and final-NC evidence, legacy conversion Adapters, migration gates and independent acceptance fixtures. Design only; existing runtime behavior and implementation statuses are unchanged.
 
 - 2026-10-13: integrated the parametric-machining worktree with the current named work-plane history contract.
   Turning feature extraction explicitly reports unsupported custom work planes instead of indexing the three
