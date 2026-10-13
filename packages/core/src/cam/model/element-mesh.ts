@@ -29,6 +29,8 @@ import { COIL_STEPS_PER_TURN, coilGeometry, rebuild, type History } from "../../
 import { loftSolid, sweepSolid, type P3 } from "../../cad/sweep-loft.ts"
 import { signedArea } from "../../cad/shapes.ts"
 import { segmentsFor } from "../../cad/tolerance.ts"
+import { tessellateBrep } from "../../cad/brep/tessellate.ts"
+import type { Brep } from "../../cad/brep/topology.ts"
 import { triangulateRing } from "../../cad/triangulate.ts"
 import type { Vec2 } from "../../cad/vec.ts"
 
@@ -218,6 +220,28 @@ export interface MeshResult {
 const profileOf = (value: unknown): Vec2[] =>
   Array.isArray(value) ? value.filter((p): p is { x: number; y: number } => typeof p === "object" && p !== null && Number.isFinite((p as Vec2).x) && Number.isFinite((p as Vec2).y)).map((p) => ({ x: p.x, y: p.y })) : []
 
+/**
+ * An exact solid (`brep` element: a STEP import or a converted part) as its watertight tessellation within `tolerance`,
+ * cached per B-rep object.
+ */
+const brepMeshCache = new WeakMap<object, Map<number, Mesh64 | null>>()
+const brepElementMesh = (value: unknown, tolerance: number): Mesh64 | undefined => {
+  if (typeof value !== "object" || value === null || !Array.isArray((value as Brep).faces)) return undefined
+  let byTol = brepMeshCache.get(value)
+  if (byTol === undefined) { byTol = new Map(); brepMeshCache.set(value, byTol) }
+  const hit = byTol.get(tolerance)
+  if (hit !== undefined) return hit ?? undefined
+  let mesh: Mesh64 | undefined
+  try {
+    const t = tessellateBrep(value as Brep, { chordTol: tolerance })
+    mesh = t.indices.length >= 12 ? { positions: t.positions, indices: t.indices } : undefined
+  } catch {
+    mesh = undefined
+  }
+  byTol.set(tolerance, mesh ?? null)
+  return mesh
+}
+
 const meshOfElement = (e: Element): Mesh64 | undefined => {
   const verts = Array.isArray(e["vertices"]) ? (e["vertices"] as unknown[]) : []
   const faces = Array.isArray(e["faces"]) ? (e["faces"] as unknown[]) : []
@@ -305,6 +329,7 @@ const localMesh = (e: Element, tolerance: number): { mesh: Mesh64; offset?: read
   switch (e["type"]) {
     case "mesh": { const m = meshOfElement(e); return m === undefined ? undefined : { mesh: m } }
     case "parametric": { const m = parametricMesh(e["history"]); return m === undefined ? undefined : { mesh: m } }
+    case "brep": { const m = brepElementMesh(e["brep"], typeof e["tolerance"] === "number" ? e["tolerance"] : tolerance); return m === undefined ? undefined : { mesh: m } }
     case "cube": return { mesh: box(positive(e["width"], 1), positive(e["height"], 1), positive(e["depth"], 1)) }
     case "sphere": { const r = positive(e["radius"], 1); return { mesh: sphere(r, r, r, seg(r)) } }
     case "ellipsoid": {

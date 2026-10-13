@@ -1,4 +1,4 @@
-import { cam, creasedNormals, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
+import { brep, cam, creasedNormals, elementBrep as cadElementBrep, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
 import { useCustomElementsStore } from "../store/customElementsStore.ts";
@@ -24,6 +24,57 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
   geometry.setAttribute("normal", new THREE.BufferAttribute(shaded.normals, 3));
   const material = new THREE.MeshStandardMaterial({ color: element.color || 0x4285f4, wireframe: element.wireframe || false });
   return new THREE.Mesh(geometry, material);
+};
+
+/**
+ * An exact solid (`brep` element) as the CAD shows it: one mesh per face with the surface's exact normals (sharp edges stay
+ * sharp), the B-rep edges as lines, and `userData.brepFace` / `brepEdge` on each piece for face and edge picking. Placed by
+ * the same `elementBrep` the STEP export and the CAM use. Cached per element object.
+ */
+const brepObjectCache = new WeakMap<object, THREE.Group>();
+const brepObject = (element: any, offset: { x: number; y: number; z: number }): THREE.Group | null => {
+  const cached = brepObjectCache.get(element);
+  if (cached) return cached.clone();
+  const placed = cadElementBrep(element);
+  if (!placed.brep) return null;
+  const t = brep.tessellateBrep(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 });
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ color: element.color || 0x8fa3b8, wireframe: element.wireframe || false, metalness: 0.25, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  for (const face of t.faces) {
+    const positions = new Float32Array(face.positions.length);
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i] = face.positions[i]! + offset.x;
+      positions[i + 1] = face.positions[i + 1]! + offset.y;
+      positions[i + 2] = face.positions[i + 2]! + offset.z;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(face.normals, 3));
+    geometry.setIndex(Array.from(face.indices));
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.brepFace = face.face;
+    mesh.userData.surface = placed.brep.faces[face.face]?.surface.kind;
+    if (placed.brep.faces[face.face]?.name) mesh.userData.faceName = placed.brep.faces[face.face]!.name;
+    group.add(mesh);
+  }
+  const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1b1f24 });
+  for (const edge of t.edges) {
+    const pts = new Float32Array(edge.points.length * 3);
+    edge.points.forEach((g, k) => {
+      pts[k * 3] = t.positions[g * 3]! + offset.x;
+      pts[k * 3 + 1] = t.positions[g * 3 + 1]! + offset.y;
+      pts[k * 3 + 2] = t.positions[g * 3 + 2]! + offset.z;
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(pts, 3));
+    const line = new THREE.Line(geometry, edgeMaterial);
+    line.userData.brepEdge = edge.edge;
+    group.add(line);
+  }
+  group.userData.isBrep = true;
+  group.userData.brepFaces = placed.brep.faces.length;
+  brepObjectCache.set(element, group);
+  return group;
 };
 
 /** The elements a Boolean depends on, itself included. */
@@ -1341,6 +1392,10 @@ const buildObject = (element: any): THREE.Object3D | null => {
         const solid = cam.model.elementMesh(element);
         return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset) : null;
       }
+
+      // An exact solid (a STEP import): faces with their exact normals and the B-rep edges.
+      case "brep":
+        return brepObject(element, originOffset);
 
       // ======= INDUSTRIAL ELEMENTS =======
       case "thread":

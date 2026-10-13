@@ -5,6 +5,7 @@ import { useElementsStore } from "../store/elementsStore.ts"
 import type { CADCanvasApi } from "./CADCanvas.tsx"
 import SaveCADAsProjectModal from "./SaveCADAsProjectModal.tsx"
 import { t } from "../../../i18n/index.ts"
+import { sceneToStep, stepToElements } from "@cadcamfun/core"
 
 interface Props {
   readonly isOpen: boolean
@@ -49,7 +50,23 @@ export default function ImportExportDialog(props: Props): JSX.Element {
     const format = fileFormat()
     if (format === "stl" && props.canvas) props.canvas.exportSTL()
     else if (format === "obj" && props.canvas) props.canvas.exportOBJ()
-    else {
+    else if (format === "step") {
+      // A real ISO 10303-21 (AP214) file: exact solids from the kernel, faceted ones only where an element has no exact model.
+      const result = sceneToStep(elements.elements as ReadonlyArray<Record<string, unknown>>, { author: "CAD/CAM FUN" })
+      if (result.step === undefined) {
+        alert(`Nothing to write as STEP: no solid in the drawing.${result.skipped.length > 0 ? `\n\n${result.skipped.map((s) => `${s.name}: ${s.reason}`).join("\n")}` : ""}`)
+        return
+      }
+      download(result.step, "application/step", `${fileName()}.step`)
+      const faceted = result.parts.filter((p) => !p.exact)
+      if (faceted.length > 0 || result.skipped.length > 0) {
+        alert([
+          `STEP written: ${result.parts.length - faceted.length} exact solid(s), ${faceted.length} faceted.`,
+          ...faceted.map((p) => `${p.name}: ${p.note ?? "faceted"}`),
+          ...result.skipped.map((s) => `${s.name}: skipped, ${s.reason}`)
+        ].join("\n"))
+      }
+    } else {
       const data = { elements: elements.elements, selectedElementId: elements.selectedElement?.id, metadata: { created: new Date().toISOString(), version: "1.0", application: "CAD/CAM FUN" } }
       download(JSON.stringify(data, null, 2), "application/json", `${fileName()}.${format}`)
     }
@@ -60,7 +77,32 @@ export default function ImportExportDialog(props: Props): JSX.Element {
     const file = (event.currentTarget as HTMLInputElement).files?.[0]
     if (!file) return
     const reader = new FileReader()
+    const isStep = /\.(step|stp)$/i.test(file.name)
     reader.onload = (loaded) => {
+      if (isStep) {
+        // Exact import: every solid of the file (assembly placements and units included) as a `brep` element.
+        try {
+          const imported = stepToElements(String(loaded.target?.result))
+          if (imported.elements.length === 0) {
+            alert(`No solid found in ${file.name}.${imported.warnings.length > 0 ? `\n\n${imported.warnings.slice(0, 8).join("\n")}` : ""}`)
+            return
+          }
+          useElementsStore.getState().addElements(imported.elements.map((e) => ({ ...e })))
+          const invalid = imported.report.filter((r) => !r.valid)
+          if (imported.warnings.length > 0 || invalid.length > 0) {
+            alert([
+              `Imported ${imported.elements.length} solid(s) from ${file.name}.`,
+              ...invalid.map((r) => `${r.name}: ${r.issues.join("; ")}`),
+              ...imported.warnings.slice(0, 8)
+            ].join("\n"))
+          }
+          props.onClose()
+        } catch (cause) {
+          console.error("Error reading STEP file:", cause)
+          alert(`Failed to read ${file.name} as STEP: ${cause instanceof Error ? cause.message : String(cause)}`)
+        }
+        return
+      }
       try {
         const json = JSON.parse(String(loaded.target?.result))
         if (json.elements && Array.isArray(json.elements)) {
@@ -96,7 +138,7 @@ export default function ImportExportDialog(props: Props): JSX.Element {
                       <div class="flex text-sm text-gray-600 dark:text-gray-400">
                         <label for="file-upload" class="relative cursor-pointer bg-white dark:bg-gray-700 rounded-md font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400 dark:ring-offset-gray-800 transition-colors">
                           <span>{t("cad.importExport.upload")}</span>
-                          <input id="file-upload" name="file-upload" type="file" accept=".json,.cad,.stl,.obj,.step" class="sr-only" onChange={importFile} />
+                          <input id="file-upload" name="file-upload" type="file" accept=".json,.cad,.stl,.obj,.step,.stp" class="sr-only" onChange={importFile} />
                         </label>
                         <p class="pl-1">{t("cad.importExport.orDrag")}</p>
                       </div>

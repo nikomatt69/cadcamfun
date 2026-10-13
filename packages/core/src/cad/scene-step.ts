@@ -11,6 +11,7 @@ import type { History } from "./history.ts"
 import {
   booleanBrep,
   polyhedron,
+  readStepBreps,
   transformBrep,
   translation,
   validateBrep,
@@ -65,6 +66,11 @@ export const elementBrep = (e: Element, byId: ReadonlyMap<string, Element> = new
     for (const b of ex.bodies.slice(1)) united = booleanBrep(united, b.brep!, "union").brep
     return gizmo(e, transformBrep(united, translation(at)))
   }
+  if (type === "brep") {
+    const stored = e["brep"] as Brep | undefined
+    if (stored === undefined || typeof stored !== "object" || !Array.isArray(stored.faces)) return { reason: "the element carries no B-rep" }
+    return gizmo(e, at.x === 0 && at.y === 0 && at.z === 0 ? stored : transformBrep(stored, translation(at)))
+  }
   if (type === "boolean-union" || type === "boolean-subtract" || type === "boolean-intersect") {
     const ids = Array.isArray(e["operands"]) ? (e["operands"] as unknown[]).map(String) : []
     if (ids.length < 2) return { reason: "a Boolean element needs two operands" }
@@ -101,6 +107,32 @@ export const elementBrep = (e: Element, byId: ReadonlyMap<string, Element> = new
   const built = catalogueBrep(type, params, options, at, profile)
   if (typeof built === "string") return { reason: built }
   return gizmo(e, built.brep)
+}
+
+export interface StepImport {
+  /** One `brep` element per solid (assembly instances included), in millimetres, at the origin of the file. */
+  readonly elements: ReadonlyArray<{ readonly type: "brep"; readonly name: string; readonly brep: Brep; readonly x: 0; readonly y: 0; readonly z: 0 }>
+  readonly report: ReadonlyArray<{ readonly name: string; readonly faces: number; readonly valid: boolean; readonly volume: number; readonly issues: ReadonlyArray<string> }>
+  readonly warnings: ReadonlyArray<string>
+  readonly lengthScale: number
+}
+
+/**
+ * A STEP file as drawing elements: each solid read exactly (faces, edges, surfaces, assembly placement, units) and
+ * checked, so what is imported can be measured, machined and written back without loss.
+ */
+export const stepToElements = (text: string): StepImport => {
+  const read = readStepBreps(text)
+  const report = read.parts.map((p) => {
+    const rep = validateBrep(p.brep)
+    return { name: p.name, faces: p.brep.faces.length, valid: rep.valid, volume: rep.volume ?? 0, issues: rep.issues.slice(0, 5).map((i) => i.message) }
+  })
+  return {
+    elements: read.parts.map((p) => ({ type: "brep" as const, name: p.name, brep: p.brep, x: 0 as const, y: 0 as const, z: 0 as const })),
+    report,
+    warnings: read.warnings,
+    lengthScale: read.lengthScale
+  }
 }
 
 /** A closed triangle mesh as a faceted solid (one planar face per triangle), with coincident vertices welded. */

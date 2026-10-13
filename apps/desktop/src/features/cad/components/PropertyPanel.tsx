@@ -5,6 +5,10 @@ import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { getFieldsForElementType, type PropertyField } from "../lib/propertyFields.ts"
 import ParametricPanel from "./ParametricPanel.tsx"
+import ExactModelPanel from "./ExactModelPanel.tsx"
+
+/** Elements that can have an exact (B-rep) model: STEP imports, analytic catalogue solids, parametric parts, Booleans. */
+const EXACT_TYPES: ReadonlySet<string> = new Set(["brep", "parametric", "cube", "cylinder", "cone", "sphere", "torus", "hemisphere", "prism", "pyramid", "extrusion", "revolution", "boolean-union", "boolean-subtract", "boolean-intersect"])
 import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
 import SurfacingPanel from "./SurfacingPanel.tsx"
 import { canMakeParametric, makeParametric } from "../lib/makeParametric.ts"
@@ -162,6 +166,10 @@ export default function PropertyPanel(): JSX.Element {
 
         <Show when={selected().type === "parametric" && selected().history}>
           <ParametricPanel element={selected()} locked={locked()} />
+        </Show>
+
+        <Show when={EXACT_TYPES.has(String(selected().type))}>
+          <ExactModelPanel element={selected()} all={elements.elements as ReadonlyArray<Record<string, unknown>>} />
         </Show>
 
         <Show when={canMakeParametric(selected())}>

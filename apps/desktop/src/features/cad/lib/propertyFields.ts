@@ -471,6 +471,7 @@ export const getFieldsForElementType = (type: string): PropertyField[] => {
 
     // A parametric part: its geometry comes from its history, edited in the parametric panel below the form.
     case "parametric":
+    case "brep":
       return [
         { name: "x", label: "X", type: "number", step: 0.1 },
         { name: "y", label: "Y", type: "number", step: 0.1 },

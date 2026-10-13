@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { elementBrep, sceneToStep } from "./scene-step.ts"
+import { elementBrep, sceneToStep, stepToElements } from "./scene-step.ts"
 import { brepBox } from "./history-brep.ts"
 import { massProperties, readStepBreps, validateBrep } from "./brep/index.ts"
 import { elementMesh, volumeOf } from "../cam/model/element-mesh.ts"
@@ -90,5 +90,28 @@ describe("the drawing as a STEP file", () => {
     expect(r.parts[0]!.exact).toBe(false)
     expect(r.parts[0]!.note).toContain("faceted")
     expect(readStepBreps(r.step!).parts.length).toBe(1)
+  })
+
+  test("STEP in, drawing, CAM mesh and STEP out keep the exact solid", () => {
+    const drilled = sceneToStep([
+      { id: "a", type: "cube", width: 40, height: 30, depth: 10, x: 0, y: 0, z: 0 },
+      { id: "b", type: "cylinder", radius: 5, height: 20, x: 0, y: 0, z: 0 },
+      { id: "c", type: "boolean-subtract", operands: ["a", "b"], name: "plate" }
+    ]).step!
+    const imported = stepToElements(drilled)
+    expect(imported.warnings).toEqual([])
+    expect(imported.report.map((r) => [r.name, r.valid])).toEqual([["plate", true]])
+    // The CAM and the viewport see it through its tessellation.
+    const element = { ...imported.elements[0]!, id: "imported", x: 100 }
+    const mesh = elementMesh(element)!
+    expect(rel(volumeOf(mesh), 12000 - PI * 250)).toBeLessThan(1e-2)
+    let minX = Infinity
+    for (let i = 0; i < mesh.positions.length; i += 3) minX = Math.min(minX, mesh.positions[i]!)
+    expect(minX).toBeCloseTo(80, 6)
+    // Written back exactly, moved where the element is.
+    const again = readStepBreps(sceneToStep([element]).step!)
+    const mp = massProperties(again.parts[0]!.brep)
+    expect(rel(mp.volume, 12000 - PI * 250)).toBeLessThan(1e-9)
+    expect(mp.centroid.x).toBeCloseTo(100, 9)
   })
 })
