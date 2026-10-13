@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { buildHostConfig } from "../src/nikcli/config.ts"
+import { PRIMARIES, PRIMARY_IDS } from "../src/nikcli/primaries.ts"
 import { HostToolRegistry } from "../src/nikcli/tool-registry.ts"
 import { definePluginTool, MAX_PLUGIN_SCHEMA_CHARS, pluginParameters, pluginToolId, type PluginToolListing } from "../src/tools/plugin-tool.ts"
 import { buildTools, TOOL_IDS } from "../src/tools/registry.ts"
@@ -76,13 +77,14 @@ describe("who asks before a plugin tool runs", () => {
   test("the host config asks for the write tool in every permission mode and allows the read tool", () => {
     const registry = new HostToolRegistry(() => buildTools(stub, "p", [read, write]))
     const config = buildHostConfig({ providers: [], toolIds: registry.ids("p"), askToolIds: registry.approvalIds("p"), systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
-    for (const name of ["cadcam", "cadcam-ask", "cadcam-auto"]) {
+    for (const name of ["cadcam", "cadcam-ask", "cadcam-auto", "cadcam-cad", "cadcam-cam", "cadcam-cad-auto", "cadcam-cam-ask"]) {
       expect(config.agent[name]!.permission[write.id], name).toBe("ask")
       expect(config.agent[name]!.permission[read.id], name).toMatch(/^(allow|ask)$/)
     }
     expect(config.agent["cadcam"]!.permission[read.id]).toBe("allow")
-    // A specialist's allow-list names catalogue tools only: a plugin's tool never reaches one.
-    for (const name of Object.keys(config.agent)) if (name.startsWith("cadcam-") && !name.endsWith("-ask") && !name.endsWith("-auto") && name !== "cadcam-memory") {
+    // A subagent's allow-list names catalogue tools only: a plugin's tool never reaches one. The primaries (general, cad, cam) hold it.
+    const primaries: ReadonlyArray<string> = PRIMARY_IDS.map((id) => PRIMARIES[id].host)
+    for (const name of Object.keys(config.agent)) if (name.startsWith("cadcam-") && !name.endsWith("-ask") && !name.endsWith("-auto") && name !== "cadcam-memory" && !primaries.includes(name)) {
       expect(config.agent[name]!.permission?.[write.id], name).toBeUndefined()
       expect(config.agent[name]!.permission?.[read.id], name).toBeUndefined()
     }

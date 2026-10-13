@@ -28,6 +28,10 @@ export interface BackgroundTask extends BackgroundTaskInput {
   readonly status: BackgroundTaskStatus;
   readonly text?: string;
   readonly error?: string;
+  /** Epoch milliseconds: when the task was queued, when its runner started, and when it stopped. */
+  readonly createdAt?: number;
+  readonly startedAt?: number;
+  readonly finishedAt?: number;
 }
 
 export interface BackgroundTaskManagerOptions {
@@ -111,6 +115,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         ...(input.edits === true ? { edits: true } : {}),
         background: input.background !== false,
         status: "queued",
+        createdAt: Date.now(),
       },
       controller: new AbortController(),
     };
@@ -200,7 +205,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   private cancelEntry(entry: Entry): boolean {
     const status = entry.task.status;
     if (status !== "queued" && status !== "running") return false;
-    entry.task = { ...entry.task, status: "cancelled" };
+    entry.task = { ...entry.task, status: "cancelled", finishedAt: Date.now() };
     if (status === "queued") {
       const index = this.queue.indexOf(entry);
       if (index >= 0) this.queue.splice(index, 1);
@@ -221,7 +226,7 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         this.queue.unshift(entry);
         break;
       }
-      entry.task = { ...entry.task, status: "running" };
+      entry.task = { ...entry.task, status: "running", startedAt: Date.now() };
       this.occupied.add(entry);
       // Cancelled before the runner got to start: there is nothing to run, and the abort event has already fired.
       const work = Promise.resolve().then(() => entry.controller.signal.aborted ? "" : runner({
@@ -236,12 +241,12 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
       })).then(
         (text) => {
           if (entry.task.status !== "cancelled") {
-            entry.task = { ...entry.task, status: "completed", text };
+            entry.task = { ...entry.task, status: "completed", text, finishedAt: Date.now() };
           }
         },
         (error: unknown) => {
           if (entry.task.status !== "cancelled") {
-            entry.task = { ...entry.task, status: "error", error: error instanceof Error ? error.message : String(error) };
+            entry.task = { ...entry.task, status: "error", error: error instanceof Error ? error.message : String(error), finishedAt: Date.now() };
           }
         },
       ).finally(() => {

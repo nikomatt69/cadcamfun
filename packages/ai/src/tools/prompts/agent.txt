@@ -1,4 +1,4 @@
-Hand a job to a specialist agent that has only the tools that job needs. The specialist does not see this conversation.
+Hand a job to a subagent that has only the tools that job needs. The subagent does not see this conversation. The person talks to one of three primary agents (general, cad, cam); everything this tool starts is a subagent of that agent, and a background job shows in the chat as a task card.
 
 Actions
 - start: give one bounded job to a specialist (researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer).
@@ -20,4 +20,4 @@ Do not use it
 
 Rules
 - Give real ids, units, constraints, setup and the report you expect; a specialist that has to guess wastes the turn.
-- Editing specialists run one at a time per project; a read-only one runs in the background.
+- Editing subagents run one at a time per project; a read-only one runs in the background. Start independent jobs with background true and carry on: each report comes back on its own.

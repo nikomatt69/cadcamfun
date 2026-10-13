@@ -59,7 +59,21 @@ describe("the chat shows tasks, tools, version control and workflows together", 
       expect(tasks[1]!.getAttribute("data-status")).toBe("running")
       expect(tasks[1]!.textContent).toContain("background")
 
-      await app.wait(() => (qa('[data-testid="tool-call"]').length >= 6 ? true : undefined), 10000)
+      // Each delegation is a card inside the message that started it, driven by the host's record of the task.
+      await app.wait(() => (qa('[data-testid="ai-task-card"]').length === 2 ? true : undefined), 10000)
+      const cards = qa('[data-testid="ai-task-card"]')
+      expect(cards[0]!.getAttribute("data-status")).toBe("completed")
+      expect(cards[0]!.getAttribute("data-background")).toBe("false")
+      expect(cards[0]!.querySelector('[data-testid="ai-task-agent"]')?.textContent).toBe("Editor")
+      expect(cards[0]!.querySelector('[data-testid="ai-task-report"]')?.textContent).toContain("hole-1 radius 3 -> 4.")
+      expect(cards[0]!.querySelector('[data-testid="ai-task-cancel"]')).toBeNull()
+      expect(cards[1]!.getAttribute("data-status")).toBe("running")
+      expect(cards[1]!.getAttribute("data-background")).toBe("true")
+      expect(cards[1]!.querySelector('[data-testid="ai-task-status"]')?.textContent).toBe("working")
+      expect(cards[1]!.querySelector('[data-testid="ai-task-cancel"]')).not.toBeNull()
+      expect(cards[1]!.querySelector('[data-testid="ai-task-report"]')).toBeNull()
+
+      await app.wait(() => (qa('[data-testid="tool-call"]').length >= 4 ? true : undefined), 10000)
       const rows = qa('[data-testid="tool-call"]')
       const child = rows.find((r) => r.getAttribute("data-tool") === "cad")!
       expect(child.getAttribute("data-agent")).toBe("editor")

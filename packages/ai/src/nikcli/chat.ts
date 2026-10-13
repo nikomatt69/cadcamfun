@@ -192,13 +192,17 @@ export interface HostTaskInfo {
   /** The specialist's report, cut to a size a status poll can carry. */
   readonly text?: string
   readonly error?: string
+  /** Epoch milliseconds: queued, started, stopped. */
+  readonly createdAt?: number
+  readonly startedAt?: number
+  readonly finishedAt?: number
 }
 
 const TASK_TEXT_LIMIT = 4_000
 
 /** The tasks of one conversation as plain data. */
 export const taskInfos = (
-  manager: { list(owner: { projectId: string; parentSessionId: string }): ReadonlyArray<{ id: string; agent?: string; description: string; status: HostTaskInfo["status"]; background?: boolean; text?: string; error?: string }> },
+  manager: { list(owner: { projectId: string; parentSessionId: string }): ReadonlyArray<{ id: string; agent?: string; description: string; status: HostTaskInfo["status"]; background?: boolean; text?: string; error?: string; createdAt?: number; startedAt?: number; finishedAt?: number }> },
   owner: { projectId: string; parentSessionId: string }
 ): ReadonlyArray<HostTaskInfo> =>
   manager.list(owner).map((task) => ({
@@ -207,6 +211,9 @@ export const taskInfos = (
     description: task.description,
     status: task.status,
     background: task.background !== false,
+    ...(task.createdAt !== undefined ? { createdAt: task.createdAt } : {}),
+    ...(task.startedAt !== undefined ? { startedAt: task.startedAt } : {}),
+    ...(task.finishedAt !== undefined ? { finishedAt: task.finishedAt } : {}),
     ...(task.text !== undefined ? { text: task.text.length > TASK_TEXT_LIMIT ? `${task.text.slice(0, TASK_TEXT_LIMIT)}…` : task.text } : {}),
     ...(task.error !== undefined ? { error: task.error } : {})
   }))

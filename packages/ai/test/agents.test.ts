@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "../src/nikcli/primaries.ts"
 import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS, subagentCatalogue } from "../src/nikcli/agents.ts"
 import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/nikcli/background-tasks.ts"
 import { backgroundToolContributions } from "../src/nikcli/background-tools.ts"
@@ -97,6 +98,38 @@ describe("specialist roster", () => {
     }
     expect(config.agent["cadcam-editor"]!.permission["cam_edit"]).toBeUndefined()
     expect(config.agent["cadcam"]!.permission["task"]).toBe("deny")
+  })
+
+  test("three primary agents (plus the internal memory consolidator), every other agent a subagent", () => {
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { mode: string; prompt?: string; permission: Record<string, string> }> }
+    expect(PRIMARY_IDS).toEqual(["general", "cad", "cam"])
+    expect(Object.entries(config.agent).filter(([name, spec]) => spec.mode === "primary" && name !== "cadcam-memory" && !/-(ask|auto)$/.test(name)).map(([name]) => name).sort())
+      .toEqual(PRIMARY_IDS.map((id) => PRIMARIES[id].host).sort())
+    for (const id of SUBAGENT_IDS) expect(config.agent[SUBAGENTS[id].host]!.mode).toBe("subagent")
+    // The legacy host name is the general agent, and a subagent id is not a primary.
+    expect(resolvePrimary(undefined)).toBe("general")
+    expect(resolvePrimary("cadcam")).toBe("general")
+    expect(resolvePrimary("modeler")).toBeUndefined()
+  })
+
+  test("the CAD primary changes the drawing and the CAM primary the machining; both read both and delegate", () => {
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { prompt?: string; permission: Record<string, string> }> }
+    const general = config.agent[PRIMARIES.general.host]!
+    const cad = config.agent[PRIMARIES.cad.host]!
+    const cam = config.agent[PRIMARIES.cam.host]!
+    for (const tool of ["cad_edit", "parts", "cam_edit", "library_edit"]) expect(general.permission[tool], `general ${tool}`).toBeDefined()
+    expect(cad.permission["cad_edit"]).toBeDefined()
+    expect(cad.permission["parts"]).toBeDefined()
+    for (const tool of ["cam_edit", "library_edit"]) expect(cad.permission[tool], `cad ${tool}`).toBeUndefined()
+    expect(cam.permission["cam_edit"]).toBeDefined()
+    expect(cam.permission["library_edit"]).toBeDefined()
+    for (const tool of ["cad_edit", "parts"]) expect(cam.permission[tool], `cam ${tool}`).toBeUndefined()
+    for (const agent of [general, cad, cam]) for (const tool of ["cad", "cam", "library", "vcs", "memory", "agent"]) expect(agent.permission[tool]).toBeDefined()
+    // Variants keep the narrowing, and the focus reaches the prompt.
+    expect(config.agent["cadcam-cam-auto"]!.permission["cad_edit"]).toBeUndefined()
+    expect(general.prompt).toBe("base")
+    expect(cad.prompt).toContain("CAD agent")
+    expect(cam.prompt).toContain("CAM agent")
   })
 
   test("permission modes use native evaluation and preserve role denials", () => {
