@@ -16,8 +16,8 @@
  * hexagon (1.8 d across corners, 0.8 d thick) with its bore; a washer a ring; a spring a helix of wire about Z; a wall, floor, window
  * and door slabs; a column its shaft with the base and capital of its style; a roof a gable or a flat slab; a stair a solid flight
  * (each step filled down to the base, running toward -Y). A wall's openings are drawn as markers in the editor and are not cut, here
- * either. What has no solid, 2D shapes and curves (machined as contours, `generator/elements.ts`) and `text3d` (the editor draws a
- * placeholder, there is no font outline to cut), returns `undefined` and the caller reports it: a block of the bounding box would be a lie.
+ * either. What has no solid, 2D shapes and curves (machined as contours, `generator/elements.ts`) and `text3d` (engraved along the strokes of
+ * `cad/stroke-font.ts`, not cut as a solid), returns `undefined` and the caller reports it: a block of the bounding box would be a lie.
  *
  * Two kinds of element carry their own geometry instead of parameters: `mesh` (vertices and faces, what the editor's Boolean command
  * leaves behind) and `parametric` (a feature history, `cad/history.ts`, rebuilt and united into one solid). Both are in the same

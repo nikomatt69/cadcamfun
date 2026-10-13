@@ -13,6 +13,7 @@
  * `width` x `depth` in XY and `height` in Z.
  */
 import { sampleSpline } from "../../cad/spline.ts"
+import { textStrokes } from "../../cad/stroke-font.ts"
 import { elementMesh } from "../model/element-mesh.ts"
 import type { CadElement, OperationType, Stock, ToolpathSettings } from "./schema.ts"
 
@@ -195,7 +196,8 @@ export const elementBounds = (e: CadElement): Bounds => {
     case "text3d": {
       const text = typeof e["text"] === "string" ? e["text"] : ""
       const h = num(e["height"]) || 5
-      return centered(e, (text.length > 0 ? text.length * h * 0.6 : 10) / 2, h / 2, -(num(e["depth"]) || 2) / 2, (num(e["depth"]) || 2) / 2)
+      const laid = textStrokes(text, h)
+      return centered(e, (laid.strokes.length > 0 ? laid.width : 10) / 2, (laid.strokes.length > 0 ? laid.height : h) / 2, -(num(e["depth"]) || 2) / 2, (num(e["depth"]) || 2) / 2)
     }
     // ---- curves and sweeps are given by points; the curve stays inside the hull of its points.
     case "spline": case "bezier": case "nurbs": case "path3d": return aroundPoints(points3(e["points"]), 0, zero)

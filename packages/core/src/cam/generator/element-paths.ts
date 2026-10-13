@@ -1,5 +1,6 @@
 /** Toolpaths for selected CAD elements (legacy `generateFromSelectedElements` and the primitive generators). */
 import { above, circleSlice, cornerMoves, cutLevels, f3, fullCircleFrom, offsetDistance, offsetRadius, plunge, pointMoves, polygonPoints, ellipsePoints, rectangleCorners, retractRapid, type Pt } from "./common.ts"
+import { textStrokes } from "../../cad/stroke-font.ts"
 import { elementOutline } from "./elements.ts"
 import type { CadElement, GeometryInput, ToolpathSettings } from "./schema.ts"
 
@@ -411,28 +412,35 @@ export const ellipseToolpath = (e: CadElement, s: ToolpathSettings): string => {
   return gcode
 }
 
+/**
+ * `text3d` is engraved: one pass along the centre line of every stroke of the single-stroke font (`cad/stroke-font.ts`), at each
+ * stepdown level down to the engraving depth (the operation's, never more than the text's own). The text is centred on the
+ * element, as the editor draws it, and its top face is the surface the tool starts from. A character the font has no glyph for is
+ * left out and said so.
+ */
 export const text3dToolpath = (e: CadElement, s: ToolpathSettings): string => {
-  let gcode = `; 3D Text: position (${e.x}, ${e.y}, ${e.z}), text "${e.text || ""}", height ${e.height || 10}mm, depth ${e.depth || 5}mm\n`
-  const text: string = e.text || ""
-  const textHeight = e.height || 10
-  const textDepth = e.depth || 5
-  if (!text) return "; No text content provided\n"
-  gcode += "; Note: Text toolpath is approximated - for production use, convert text to paths first\n"
+  const text: string = typeof e.text === "string" ? e.text : ""
+  const textHeight = e.height > 0 ? e.height : 10
+  const textDepth = e.depth > 0 ? e.depth : 2
+  let gcode = `; 3D Text: position (${e.x}, ${e.y}, ${e.z}), text "${text}", height ${textHeight}mm, depth ${textDepth}mm\n`
+  if (text.trim() === "") return gcode + "; No text content provided\n"
+  const laid = textStrokes(text, textHeight)
+  if (laid.strokes.length === 0) return gcode + "; The text has no character the engraving font can draw\n"
+  if (laid.unsupported.length > 0) gcode += `; Not engraved, no glyph in the engraving font: ${laid.unsupported.join(" ")}\n`
+  gcode += `; Engraved along the centre line of ${laid.strokes.length} strokes (single-stroke font), tool offset does not apply\n`
+  const left = (e.x || 0) - laid.width / 2
+  const bottom = (e.y || 0) + laid.height / 2 - textHeight
+  const top = (e.z || 0) + textDepth / 2
+  const safe = top + 5
   for (const level of cutLevels(Math.min(s.depth, textDepth), s.stepdown)) {
-    const z = e.z + level
-    const right = e.x + text.length * textHeight * 0.6
-    const top = e.y + textHeight
+    const z = top + level
     gcode += `\n; Z Level: ${z.toFixed(3)}\n`
-    gcode += above(e.x, e.y, e.z) + plunge(z, s)
-    gcode += `G1 X${f3(right)} Y${f3(e.y)} F${s.feedrate} ; Bottom edge\n`
-    gcode += `G1 X${f3(right)} Y${f3(top)} F${s.feedrate} ; Right edge\n`
-    gcode += `G1 X${f3(e.x)} Y${f3(top)} F${s.feedrate} ; Top edge\n`
-    gcode += `G1 X${f3(e.x)} Y${f3(e.y)} F${s.feedrate} ; Left edge\n`
-    gcode += "; Note: For actual text engraving, each character would need to be converted to paths\n"
-    gcode += "; Characters would be machined individually with appropriate tool movement\n"
+    for (const stroke of laid.strokes) {
+      const path: Pt[] = stroke.map((p) => [left + p.x, bottom + p.y] as Pt)
+      gcode += retractRapid(safe) + `G0 X${f3(path[0]![0])} Y${f3(path[0]![1])} ; Move to the start of a stroke\n` + plunge(z, s) + pointMoves(path, s.feedrate, "Stroke point")
+    }
   }
-  gcode += "; For production text machining, please export text as SVG or DXF and import as paths\n"
-  return gcode
+  return gcode + retractRapid(safe)
 }
 
 /** Legacy notes for the sweep-like members a composite cannot machine yet. */

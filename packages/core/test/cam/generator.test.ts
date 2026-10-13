@@ -641,3 +641,37 @@ describe("rest finishing from the generator", () => {
     expect(pts(pencil.gcode)).toBeLessThan(pts(all.gcode))
   })
 })
+
+describe("3D text is engraved", () => {
+  const run = (element: Record<string, unknown>, patch: Partial<ToolpathSettings> = {}) =>
+    gen(settings({ depth: 1, stepdown: 0.5, ...patch }), geometry({ geometryType: "selected", selectedElements: [element] })).gcode
+  const moves = (gcode: string) => [...gcode.matchAll(/^G1 X(-?\d+\.\d+) Y(-?\d+\.\d+)/gm)].map((m) => [Number(m[1]), Number(m[2])] as const)
+
+  test("each letter is cut along its strokes at every stepdown level, not as a bounding box", () => {
+    const gcode = run({ type: "text3d", x: 0, y: 0, z: 0, text: "AB", height: 12, depth: 2 })
+    expect(gcode).toContain("single-stroke font")
+    expect(gcode.match(/; Z Level:/g)?.length).toBe(2)
+    expect(gcode).not.toContain("approximated")
+    const points = moves(gcode)
+    expect(points.length).toBeGreaterThan(20)
+    // Centred on the element, capitals 12 tall.
+    expect(Math.min(...points.map((p) => p[1]))).toBeCloseTo(-6, 3)
+    expect(Math.max(...points.map((p) => p[1]))).toBeCloseTo(6, 3)
+    expect(Math.min(...points.map((p) => p[0]))).toBeCloseTo(-Math.max(...points.map((p) => p[0])), 3)
+    // The tool starts at the top face (z + depth / 2) and never goes deeper than the text.
+    expect(gcode).toMatch(/G1 Z0\.500 F/)
+    expect(gcode).toMatch(/G1 Z0\.000 F/)
+  })
+
+  test("the engraving is as deep as the operation, never deeper than the text", () => {
+    const gcode = run({ type: "text3d", x: 0, y: 0, z: 0, text: "I", height: 10, depth: 1 }, { depth: 5 })
+    const depths = [...gcode.matchAll(/^G1 Z(-?\d+\.\d+) F/gm)].map((m) => Number(m[1]))
+    expect(Math.min(...depths)).toBeCloseTo(-0.5, 6)
+  })
+
+  test("a character the font cannot draw is left out and named; empty text says so", () => {
+    expect(run({ type: "text3d", x: 0, y: 0, z: 0, text: "A§", height: 10, depth: 2 })).toContain("no glyph in the engraving font: §")
+    expect(run({ type: "text3d", x: 0, y: 0, z: 0, text: "", height: 10, depth: 2 })).toContain("No text content")
+    expect(run({ type: "text3d", x: 0, y: 0, z: 0, text: "§", height: 10, depth: 2 })).toContain("no character the engraving font can draw")
+  })
+})

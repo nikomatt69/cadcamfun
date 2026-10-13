@@ -1,4 +1,4 @@
-import { cam, gearOutline, segmentsFor } from "@cadcamfun/core";
+import { cam, gearOutline, segmentsFor, textStrokes } from "@cadcamfun/core";
 import { useCADStore } from "../store/cadStore.ts";
 import { useElementsStore } from "../store/elementsStore.ts";
 import { useCustomElementsStore } from "../store/customElementsStore.ts";
@@ -2023,20 +2023,39 @@ const buildObject = (element: any): THREE.Object3D | null => {
         return columnGroup;
 
       // ======= SPECIAL ELEMENTS =======
-      case "text3d":
-        // Three.js requires loading fonts for proper TextGeometry
-        // For a placeholder, we'll create a plane with the text content
-        const textWidth = element.text ? element.text.length * element.height * 0.6 : 10;
+      case "text3d": {
+        // The block the text occupies, and on its top face the strokes the CAM engraves: what is drawn is what is machined.
         const textHeight = element.height || 5;
         const textDepth = element.depth || 2;
+        const laid = textStrokes(String(element.text ?? ""), textHeight);
+        const drawn = laid.strokes.length > 0;
+        const textWidth = drawn ? laid.width : 10;
+        const blockHeight = drawn ? laid.height : textHeight;
 
-        const textPlaceholder = new THREE.Mesh(
-          new THREE.BoxGeometry(textWidth, textHeight, textDepth),
+        const textPlaceholder = new THREE.Group();
+        textPlaceholder.add(new THREE.Mesh(
+          new THREE.BoxGeometry(textWidth, blockHeight, textDepth),
           new THREE.MeshStandardMaterial({
             color: element.color || 0x4285f4,
-            wireframe: element.wireframe || false
+            wireframe: element.wireframe || false,
+            transparent: drawn,
+            opacity: drawn ? 0.35 : 1
           })
-        );
+        ));
+        if (drawn) {
+          const points: number[] = [];
+          for (const stroke of laid.strokes) {
+            for (let i = 1; i < stroke.length; i++) {
+              points.push(
+                stroke[i - 1]!.x - textWidth / 2, stroke[i - 1]!.y + blockHeight / 2 - textHeight, textDepth / 2 + 0.01,
+                stroke[i]!.x - textWidth / 2, stroke[i]!.y + blockHeight / 2 - textHeight, textDepth / 2 + 0.01
+              );
+            }
+          }
+          const lines = new THREE.BufferGeometry();
+          lines.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+          textPlaceholder.add(new THREE.LineSegments(lines, new THREE.LineBasicMaterial({ color: 0xffffff })));
+        }
 
         textPlaceholder.position.set(
           element.x + originOffset.x,
@@ -2048,6 +2067,7 @@ const buildObject = (element: any): THREE.Object3D | null => {
         textPlaceholder.userData.isTextPlaceholder = true;
 
         return textPlaceholder;
+      }
 
       case "path3d":
         if (!element.points || element.points.length < 2) return null;

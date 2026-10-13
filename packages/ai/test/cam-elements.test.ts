@@ -6,7 +6,7 @@ setDefaultTimeout(60_000)
 
 /** The shapes that are machined by following their outline (a contour, a pocket, an engraving), not by cutting a solid. */
 const CONTOURS = new Set(["circle", "rectangle", "triangle", "polygon", "ellipse", "arc", "line", "spline", "bezier", "nurbs"])
-/** What the editor draws as a placeholder: there is no font outline to cut, and the CAM says so. */
+/** No solid to cut: the part model reports it, and the toolpath engraves it along the strokes of the engraving font. */
 const REPORTED = new Set(["text3d"])
 
 const build = (type: string): Record<string, unknown> => {
@@ -38,6 +38,8 @@ describe("the CAM can process every element the assistant can create", () => {
         expect(mesh).toBeUndefined()
         const model = cam.model.buildPartModel([{ type: "cube" }, element], { cell: 1 })
         expect(model!.skipped.some((s) => s.startsWith(type))).toBe(true)
+        const gcode = cam.generator.elementToolpath(element as never, { depth: 1, stepdown: 1, feedrate: 500, plungerate: 200, offset: "center" } as never, {} as never)
+        expect(gcode, `${type} is engraved`).toContain("Stroke point")
         return
       }
       if (type === "component" || type === "group") {
