@@ -28,6 +28,7 @@ import {
   revolveProfile,
   rotation,
   segmentPoint,
+  treatLoopCorners,
   tessellateBrep,
   massProperties,
   validateBrep,
@@ -342,14 +343,24 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         case "extrude": {
           const sk = sketchOf(f.sketch)
           if (sk === undefined) break
-          if (f.edge !== undefined || f.corner !== undefined || (f.taper !== undefined && dim(f.taper) !== 0)) {
-            unsupported(f, "edge treatments, rounded corners and drafts of an extrusion have no exact model yet")
+          if (f.edge !== undefined || (f.taper !== undefined && dim(f.taper) !== 0)) {
+            unsupported(f, "edge treatments and drafts of an extrusion have no exact model yet")
             break
           }
           const depth = dim(f.depth)
           const dir = f.direction ?? "up"
           const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
-          const { loops } = exactSketchLoops(sk.solve.sketch)
+          let { loops } = exactSketchLoops(sk.solve.sketch)
+          // Rounded or bevelled profile corners: exact tangent arcs or lines between the sketch's lines.
+          if (f.corner !== undefined) {
+            const size = dim(f.corner.size)
+            try {
+              loops = loops.map((l) => treatLoopCorners(l, f.corner!.style, size))
+            } catch (e) {
+              unsupported(f, e instanceof Error ? e.message : String(e))
+              break
+            }
+          }
           // The rebuild already resolved the sketch's plane (base or work plane, offset applied).
           const F = sk.frame
           const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)

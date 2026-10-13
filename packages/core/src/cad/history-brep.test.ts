@@ -94,6 +94,25 @@ describe("exact replay of a parametric history", () => {
     expect(rel(Math.min(...vols), 15 * 25 * 6)).toBeLessThan(1e-9)
   })
 
+  test("rounded and bevelled profile corners are exact arcs and lines", () => {
+    const filleted = plate([], {}).features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 } } : f))
+    const vf = exactVolume({ parameters: { width: 40, height: 25, thick: 6 }, features: filleted })
+    expect(rel(vf, (1000 - (4 - PI) * 25) * 6)).toBeLessThan(1e-9)
+    const r = rebuildExact({ parameters: { width: 40, height: 25, thick: 6 }, features: filleted })
+    // Four quarter-round walls, exact cylinders of radius 5.
+    const cylinders = r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "cylinder")
+    expect(cylinders.length).toBe(4)
+    expect(cylinders.every((f) => f.surface.kind === "cylinder" && Math.abs(f.surface.radius - 5) < 1e-12)).toBe(true)
+    const chamfered = plate([], {}).features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "chamfer" as const, size: 3 } } : f))
+    expect(rel(exactVolume({ parameters: { width: 40, height: 25, thick: 6 }, features: chamfered }), (1000 - 2 * 9) * 6)).toBeLessThan(1e-9)
+  })
+
+  test("a corner treatment that does not fit is reported, not approximated", () => {
+    const tooBig = plate([], {}).features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 30 } } : f))
+    const r = rebuildExact({ parameters: { width: 40, height: 25, thick: 6 }, features: tooBig })
+    expect(r.bodies.every((b) => b.brep === undefined)).toBe(true)
+  })
+
   test("a feature without an exact counterpart is reported per body, the mesh stays", () => {
     const r = rebuildExact(plate([{ id: "round", type: "fillet", radius: 1 }]))
     expect(r.bodies[0]!.brep).toBeUndefined()
