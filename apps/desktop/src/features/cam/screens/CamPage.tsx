@@ -19,9 +19,9 @@ import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { stockOf } from "../lib/job.ts"
 import CamStatusBar from "../components/CamStatusBar.tsx"
-import { buildPlayback } from "../../../viewport/view3d/playback.ts"
+import { buildPlayback, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
-import { useCamStore } from "../store/camStore.ts"
+import { combineOperationResults, useCamStore } from "../store/camStore.ts"
 import { useGeneratorStore, type LibraryTool } from "../store/generatorStore.ts"
 import CamToolbar from "../components/CamToolbar.tsx"
 import CamSidebar, { type SidebarTab } from "../components/CamSidebar.tsx"
@@ -77,6 +77,9 @@ export default function CamPage(): JSX.Element {
   // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.
   createEffect(on(gcode, (text) => {
     if (text.trim().length === 0) return
+    // The text the store composed from the assistant's operations already has its program (every operation's toolpaths,
+    // one colour per tool): parsing the concatenated programs back would collapse them into one.
+    if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
     const timer = setTimeout(() => {
       void app.runtime.run(generator.parse(text)).then(
         (parsed) => camStore.setProgram(parsed.program as never),
@@ -95,7 +98,13 @@ export default function CamPage(): JSX.Element {
     if (camStore.playing && duration() > 0 && camStore.playbackTime >= duration()) camStore.setPlaying(false)
   })
 
-  const rows = createMemo(() => camStore.program.toolpaths.map((tp) => ({ id: tp.id, name: tp.name, toolId: tp.toolId, moves: tp.moves.length })))
+  const rows = createMemo(() => {
+    const colors = toolColors(camStore.program)
+    return camStore.program.toolpaths.map((tp) => {
+      const color = colors.get(tp.toolId)
+      return { id: tp.id, name: tp.name, toolId: tp.toolId, moves: tp.moves.length, ...(color !== undefined ? { color: colorHex(color) } : {}) }
+    })
+  })
 
   const loadFromStorage = (key: string): { readonly id?: string; readonly name?: string; readonly gcode?: string } | undefined => {
     try {

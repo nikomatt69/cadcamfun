@@ -9,7 +9,7 @@ import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
 import { creasedNormals, isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
-import { buildPlayback, positionAt, type Playback } from "./playback.ts"
+import { buildPlayback, positionAt, toolColors, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
@@ -329,9 +329,15 @@ export function View3D(props: View3DProps) {
         }
       }
       playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
-      const rapid: number[] = [], cuts: number[] = []
-      for (const s of playback.segments) (s.rapid ? rapid : cuts).push(s.from.x, s.from.y, s.from.z, s.to.x, s.to.y, s.to.z)
-      addLines(rapid, true); addLines(cuts, false)
+      // Rapids dashed; cuts one colour per tool, so the operations of a multi-tool program read apart.
+      const colors = props.program ? toolColors(props.program) : new Map<string, number>()
+      const rapid: number[] = [], cuts = new Map<string, number[]>()
+      for (const s of playback.segments) {
+        const into = s.rapid ? rapid : cuts.get(s.toolId) ?? (cuts.set(s.toolId, []), cuts.get(s.toolId)!)
+        into.push(s.from.x, s.from.y, s.from.z, s.to.x, s.to.y, s.to.z)
+      }
+      addLines(rapid, true)
+      for (const [toolId, positions] of cuts) addLines(positions, false, colors.get(toolId))
       if (props.program && props.toolpathDisplay) {
         const overlay = toolpathOverlayModel(props.program)
         if (props.toolpathDisplay.showPoints) {
