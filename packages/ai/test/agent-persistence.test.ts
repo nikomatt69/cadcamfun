@@ -118,10 +118,10 @@ describe("the turn does not end on words", () => {
   test("a call that failed is retried after the agent gave up on it", async () => {
     let asked = 0
     script = (request) => {
-      if (textOf(request).includes("Your last tool call failed")) { failing = false; asked += 1; return { toolCalls: [{ name: "cad_describe_drawing", args: {} }] } }
+      if (textOf(request).includes("Your last tool call failed")) { failing = false; asked += 1; return { toolCalls: [{ name: "cad", args: { action: "describe" } }] } }
       if (lastIsTool(request)) return failing ? { text: "I could not read the drawing." } : { text: "The drawing has one element." }
       failing = true
-      return { toolCalls: [{ name: "cad_describe_drawing", args: {} }] }
+      return { toolCalls: [{ name: "cad", args: { action: "describe" } }] }
     }
     const events = await run("describe it", "persist-4")
     failing = false
@@ -184,7 +184,7 @@ describe("code_mode, the confined program runner", () => {
   test("a program loops over the agent's tools and returns one value; the host's other tools are refused", async () => {
     handlerCalls = []
     const program = `const results = []
-for (let i = 0; i < 3; i++) { results.push(await tools.cad_describe_drawing({})) }
+for (let i = 0; i < 3; i++) { results.push(await tools.cad({ action: "describe" })) }
 const refused = {}
 for (const name of ["bash", "write", "task"]) {
   try { await tools[name]({ command: "echo hi", description: "x", filePath: "/tmp/cadcam-refused.txt", content: "x", prompt: "x", subagent_type: "general" }); refused[name] = "ran" } catch (e) { refused[name] = "refused" }

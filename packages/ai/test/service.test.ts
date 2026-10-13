@@ -160,14 +160,14 @@ describe("prompts and tools", () => {
     })
     const tools = buildTools(handlers, "p1")
     expect(tools.map((t) => t.id).sort()).toEqual([...TOOL_IDS].sort())
-    const del = tools.find((t) => t.id === "cad_delete_entities")!
+    const del = tools.find((t) => t.id === "cad_edit")!
     const ctx = { sessionId: "s", projectId: "p1", signal: new AbortController().signal }
-    expect(JSON.parse(await del.execute({ ids: ["a"], confirm: false }, ctx))).toMatchObject({ ok: false })
+    expect(JSON.parse(await del.execute({ action: "delete", ids: ["a"], confirm: false }, ctx))).toMatchObject({ ok: false })
     expect(calls).toEqual([])
-    await del.execute({ ids: ["a"], confirm: true }, ctx)
+    await del.execute({ action: "delete", ids: ["a"], confirm: true }, ctx)
     expect(calls).toEqual(["deleteEntities"])
-    const add = tools.find((t) => t.id === "cad_add_entities")!
-    const rejected = JSON.parse(await add.execute({ entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: -1 }] }, ctx)) as { ok: boolean }
+    // One tool, two capabilities: the action says which, and a refused delete never reaches a handler.
+    const rejected = JSON.parse(await del.execute({ action: "add_entities", entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: -1 }] }, ctx)) as { ok: boolean }
     expect(rejected.ok).toBe(false)
   })
 })

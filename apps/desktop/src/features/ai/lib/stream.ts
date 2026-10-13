@@ -14,7 +14,7 @@ import { AiStreamEventSchema } from "@cadcamfun/api"
 import type { Client, AppRuntime } from "../../../shared/state/client.ts"
 import type { AiEvent, ProviderId, Tier } from "./types.ts"
 import type { ChatAttachment } from "./attachments.ts"
-import { AGENT_TOOL_IDS, TOOL_IDS, VCS_TOOL_IDS, type ToolId } from "./tools.ts"
+import { TOOL_IDS, type ToolId } from "./tools.ts"
 import { ToolInputSchemas } from "./tool-schemas.ts"
 import { sanitizeError } from "./errors.ts"
 
@@ -241,7 +241,8 @@ interface CallState {
   readonly finished: Set<string>
 }
 
-const isToolId = (tool: string): tool is ToolId =>
+/** Is this one of the catalogue tools this build validates the input of? */
+export const isToolId = (tool: string): tool is ToolId =>
   (TOOL_IDS as ReadonlyArray<string>).includes(tool)
 
 const inputSize = (input: unknown): number => {
@@ -282,11 +283,13 @@ const rejectToolCall = (
  * model after `parameters.parse(args)` rejects, so the transcript reads the
  * same on both sides.
  */
-/** Tools the host itself offers the agent (its skill loader, plan and goal): no schema of ours, never rejected. */
+/**
+ * Tools the host itself offers the agent: no schema of ours, never rejected. Delegation, version control and workflows are
+ * NOT here — `agent`, `vcs` and `vcs_edit` are catalogue tools like `cad`, so they carry the same input contract and are
+ * validated the same way. Listing them twice is how a tool id drifts into being exempt from the checks it must pass.
+ */
 export const HOST_TOOLS: ReadonlyArray<string> = [
-  "question", "search_tools", "invalid", "skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal", "code_mode",
-  // Added by the sidecar beside the CAD/CAM tools: delegation, version control, workflows. The host validated their arguments.
-  ...AGENT_TOOL_IDS, ...VCS_TOOL_IDS
+  "question", "search_tools", "invalid", "skill", "todowrite", "todoread", "get_goal", "create_goal", "update_goal", "code_mode"
 ]
 
 export const validateToolCall = (

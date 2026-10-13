@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
+import { makeParametricRunner } from "./helpers/parametric.ts"
 
 /** Shell, fillet, sweep, loft (through a recipe) and grid patterns through the real project handlers: create, inspect, update, test. */
 let app: Awaited<ReturnType<typeof makeApp>>
 let handlers: ToolHandlersShape
 let projectId: string
 const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
-const run = async (input: unknown) => JSON.parse(await buildTools(handlers, projectId).find((t) => t.id === "cad_parametric")!.execute(input, ctx))
+const run = makeParametricRunner(() => handlers, () => projectId)
 const SLOW = 120_000
 const rel = (got: number, want: number) => Math.abs(got - want) / Math.abs(want)
 

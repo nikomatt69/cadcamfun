@@ -43,7 +43,7 @@ describe("workspace context", () => {
   test("a big model fits the budget and says what was left out", () => {
     const text = renderWorkspaceContext(snapshot(400), { budget: 2_500 })
     expect(text.length).toBeLessThanOrEqual(2_700)
-    expect(text).toMatch(/\d+ not shown - call cad_describe_drawing/)
+    expect(text).toMatch(/\d+ not shown - call cad \(action describe\)/)
     expect(text).toContain("* id-000002-xxxxxxxx cube")
   })
 
@@ -62,7 +62,7 @@ describe("workspace context", () => {
 
   test("the system prompt carries the workflow, attachments and when to ask", () => {
     const prompt = systemPrompt("ctx")
-    for (const phrase of ["Workflow:", "cad_check_design", "cad_import_drawing", "Asking:", "a mill turns the tool"]) expect(prompt).toContain(phrase)
+    for (const phrase of ["Workflow:", "cad action check", "cad_edit action import", "Asking:", "a mill turns the tool"]) expect(prompt).toContain(phrase)
     expect(prompt).not.toContain("{{")
   })
 })

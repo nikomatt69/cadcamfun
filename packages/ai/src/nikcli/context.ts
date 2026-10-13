@@ -49,3 +49,35 @@ export const compactHostSession = (
     },
     catch: (cause) => new AiProviderError({ message: `Failed to compact the session: ${describeHostFailure(cause)}` })
   })
+
+/** Where the tokens of the next request go, by category, in the order nikcli's `SessionContext` lists the sources. */
+export interface ContextBreakdown {
+  readonly estimatedTotal: number
+  readonly categories: ReadonlyArray<{ readonly category: string; readonly tokens: number }>
+}
+
+/** Sums the enabled sources of the host's breakdown per category, largest first; a source that is off costs nothing. */
+export const summariseBreakdown = (raw: {
+  readonly estimatedTotal: number
+  readonly sources: ReadonlyArray<{ readonly category: string; readonly tokens: number; readonly enabled: boolean }>
+}): ContextBreakdown => {
+  const totals = new Map<string, number>()
+  for (const source of raw.sources) {
+    if (!source.enabled || !(source.tokens > 0)) continue
+    totals.set(source.category, (totals.get(source.category) ?? 0) + Math.round(source.tokens))
+  }
+  return {
+    estimatedTotal: Number.isFinite(raw.estimatedTotal) ? Math.max(0, Math.round(raw.estimatedTotal)) : [...totals.values()].reduce((a, b) => a + b, 0),
+    categories: [...totals.entries()].map(([category, tokens]) => ({ category, tokens })).sort((a, b) => b.tokens - a.tokens || a.category.localeCompare(b.category))
+  }
+}
+
+/**
+ * The host's own estimate of the context (system prompt, instructions, skills, tools, agents, messages). Decoration for the
+ * gauge: a host that is busy or cannot answer yields undefined instead of failing the control call.
+ */
+export const readContextBreakdown = (host: ProjectHost, sessionId: string): Effect.Effect<ContextBreakdown | undefined> =>
+  Effect.tryPromise({
+    try: async (signal) => summariseBreakdown(await host.client.session.contextBreakdown({ sessionID: sessionId }, { signal })),
+    catch: (cause) => cause
+  }).pipe(Effect.orElseSucceed(() => undefined))

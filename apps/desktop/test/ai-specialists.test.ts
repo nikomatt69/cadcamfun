@@ -19,18 +19,18 @@ const task = { id: "11111111-1111-4111-8111-111111111111", agent: "editor", desc
 const research = { id: "22222222-2222-4222-8222-222222222222", agent: "researcher", description: "Find the right feed", status: "running", background: true }
 
 const script = [
-  { type: "tool_call", sessionId: "s", callId: "t1", tool: "vcs_start_change", input: { topic: "bigger hole" } },
-  { type: "tool_result", sessionId: "s", callId: "t1", tool: "vcs_start_change", ok: true, output: JSON.stringify({ ok: true, value: { branch: "ai/bigger-hole" } }) },
-  { type: "tool_call", sessionId: "s", callId: "t2", tool: "agent_task", input: { description: task.description, prompt: "x", agent: "editor" } },
-  { type: "tool_call", sessionId: "s", agent: "editor", callId: "child:c1", tool: "cad_describe_drawing", input: {} },
-  { type: "tool_result", sessionId: "s", agent: "editor", callId: "child:c1", tool: "cad_describe_drawing", ok: true, output: JSON.stringify({ ok: true, count: 1 }) },
-  { type: "tool_result", sessionId: "s", callId: "t2", tool: "agent_task", ok: true, output: JSON.stringify(task) },
-  { type: "tool_call", sessionId: "s", callId: "t3", tool: "agent_task", input: { description: research.description, prompt: "y", agent: "researcher" } },
-  { type: "tool_result", sessionId: "s", callId: "t3", tool: "agent_task", ok: true, output: JSON.stringify(research) },
-  { type: "tool_call", sessionId: "s", callId: "t4", tool: "vcs_open_pull_request", input: { title: "Bigger hole", body: "" } },
-  { type: "tool_result", sessionId: "s", callId: "t4", tool: "vcs_open_pull_request", ok: true, output: JSON.stringify({ ok: true, value: { number: 3, head: "ai/bigger-hole", base: "main" } }) },
-  { type: "tool_call", sessionId: "s", callId: "t5", tool: "actions_run", input: {} },
-  { type: "tool_result", sessionId: "s", callId: "t5", tool: "actions_run", ok: true, output: JSON.stringify({ ok: true, value: [{ workflow: "verify", status: "success" }] }) },
+  { type: "tool_call", sessionId: "s", callId: "t1", tool: "vcs_edit", input: { action: "start_change", topic: "bigger hole" } },
+  { type: "tool_result", sessionId: "s", callId: "t1", tool: "vcs_edit", ok: true, output: JSON.stringify({ ok: true, value: { branch: "ai/bigger-hole" } }) },
+  { type: "tool_call", sessionId: "s", callId: "t2", tool: "agent", input: { action: "start", description: task.description, prompt: "x", agent: "editor" } },
+  { type: "tool_call", sessionId: "s", agent: "editor", callId: "child:c1", tool: "cad", input: { action: "describe",} },
+  { type: "tool_result", sessionId: "s", agent: "editor", callId: "child:c1", tool: "cad", ok: true, output: JSON.stringify({ ok: true, count: 1 }) },
+  { type: "tool_result", sessionId: "s", callId: "t2", tool: "agent", ok: true, output: JSON.stringify(task) },
+  { type: "tool_call", sessionId: "s", callId: "t3", tool: "agent", input: { action: "start", description: research.description, prompt: "y", agent: "researcher" } },
+  { type: "tool_result", sessionId: "s", callId: "t3", tool: "agent", ok: true, output: JSON.stringify(research) },
+  { type: "tool_call", sessionId: "s", callId: "t4", tool: "vcs_edit", input: { action: "open_pull_request", title: "Bigger hole", body: "" } },
+  { type: "tool_result", sessionId: "s", callId: "t4", tool: "vcs_edit", ok: true, output: JSON.stringify({ ok: true, value: { number: 3, head: "ai/bigger-hole", base: "main" } }) },
+  { type: "tool_call", sessionId: "s", callId: "t5", tool: "vcs_edit", input: { action: "run_workflows",} },
+  { type: "tool_result", sessionId: "s", callId: "t5", tool: "vcs_edit", ok: true, output: JSON.stringify({ ok: true, value: [{ workflow: "verify", status: "success" }] }) },
   { type: "done", sessionId: "s", text: "Hole is 8 mm; PR #3 is open." }
 ]
 
@@ -61,12 +61,12 @@ describe("the chat shows tasks, tools, version control and workflows together", 
 
       await app.wait(() => (qa('[data-testid="tool-call"]').length >= 6 ? true : undefined), 10000)
       const rows = qa('[data-testid="tool-call"]')
-      const child = rows.find((r) => r.getAttribute("data-tool") === "cad_describe_drawing")!
+      const child = rows.find((r) => r.getAttribute("data-tool") === "cad")!
       expect(child.getAttribute("data-agent")).toBe("editor")
       expect(child.querySelector('[data-testid="tool-agent"]')?.textContent).toBe("Editor")
-      const pr = rows.find((r) => r.getAttribute("data-tool") === "vcs_open_pull_request")!
+      const pr = rows.find((r) => r.querySelector('[data-testid="tool-facts"]')?.textContent?.includes("pull request #3"))!
       expect(pr.querySelector('[data-testid="tool-facts"]')?.textContent).toContain("pull request #3 ai/bigger-hole → main")
-      const workflow = rows.find((r) => r.getAttribute("data-tool") === "actions_run")!
+      const workflow = rows.find((r) => r.querySelector('[data-testid="tool-facts"]')?.textContent?.includes("verify: success"))!
       expect(workflow.querySelector('[data-testid="tool-facts"]')?.textContent).toContain("verify: success")
       // Nothing the sidecar added is reported as refused.
       expect(document.body.textContent).not.toContain("is not allowed")

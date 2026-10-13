@@ -3,6 +3,7 @@ import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
 import { NATIVE_TOOLS } from "./tool-registry.ts"
+import { permittedTools, toolAllowed, type PolicyStatement } from "./policy.ts"
 import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
 
 /**
@@ -63,6 +64,18 @@ export interface HostConfigInput {
   readonly toolIds: ReadonlyArray<string>
   readonly systemPrompt: string
   readonly compaction?: HostCompactionSettings
+  /**
+   * Deadlines for one tool call and for one delegated task, in milliseconds. The pinned host's defaults
+   * (600_000 / 1_800_000) are sized for editing text files: a pocket, a roughing pass or a full machine
+   * verification can outlast them, and the host would abort work that is still making progress. Declared here
+   * rather than inherited, so the budget is a reviewed decision and `false` keeps the host default.
+   */
+  readonly timeouts?: HostTimeoutSettings
+  /**
+   * nikcli resource policy (`experimental.policies`). The host enforces `provider.use` itself; `tool.use` is resolved
+   * here into the deny-by-default permission map, so a forbidden tool is denied for the agent and every specialist.
+   */
+  readonly policies?: ReadonlyArray<PolicyStatement>
 }
 
 /** Settings supported by the pinned host, not a client-side token budget. */
@@ -70,6 +83,22 @@ export interface HostCompactionSettings {
   readonly auto?: boolean
   readonly prune?: boolean
   readonly reserved?: number
+}
+
+/** `experimental.tool_timeout` / `experimental.task_timeout` of the pinned host: milliseconds, or `false` for the host default. */
+export interface HostTimeoutSettings {
+  readonly tool?: number | false
+  readonly task?: number | false
+}
+
+/** What a CAD/CAM turn needs: a long generate or verification is normal work here, not a hung tool. */
+export const CAM_TOOL_TIMEOUTS: HostTimeoutSettings = { tool: 1_800_000, task: 3_600_000 }
+
+export const validateTimeoutSettings = (settings: HostTimeoutSettings): void => {
+  for (const [name, value] of [["tool_timeout", settings.tool], ["task_timeout", settings.task]] as const) {
+    if (value === undefined || value === false) continue
+    if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive safe integer or false`)
+  }
 }
 
 export const validateCompactionSettings = (settings: HostCompactionSettings): void => {
@@ -80,22 +109,30 @@ export const validateCompactionSettings = (settings: HostCompactionSettings): vo
   }
 }
 
+/** Natives such as `code_mode` are granted by the role itself; a `tool.use` deny must still take them away. */
+const withoutDeniedTools = (permission: Record<string, "allow" | "deny" | "ask">, policies: ReadonlyArray<PolicyStatement>): Record<string, "allow" | "deny" | "ask"> =>
+  policies.length === 0 ? permission : Object.fromEntries(Object.entries(permission).filter(([id]) => id === "**" || toolAllowed(policies, id)))
+
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {
   validateCompactionSettings(input.compaction ?? {})
+  const timeouts = input.timeouts ?? CAM_TOOL_TIMEOUTS
+  validateTimeoutSettings(timeouts)
   // Native wildcard matching makes `**` deny every unregistered capability. Unlike
   // the special curated `*` fallback, it preserves nikcli's deferred schema loading.
+  const policies = input.policies ?? []
+  const toolIds = permittedTools(policies, input.toolIds)
   const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
-  for (const id of input.toolIds) permission[id] = "allow"
+  for (const id of toolIds) permission[id] = "allow"
   for (const id of NATIVE_APPROVAL_TOOL_IDS) {
-    if (input.toolIds.includes(id)) permission[id] = "ask"
+    if (toolIds.includes(id)) permission[id] = "ask"
   }
-  for (const tool of NATIVE_TOOLS) permission[tool.id] = "allow"
+  for (const tool of NATIVE_TOOLS) if (toolAllowed(policies, tool.id)) permission[tool.id] = "allow"
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.
   const specialists = Object.fromEntries(
     SUBAGENT_IDS.map((id) => {
       const spec = SUBAGENTS[id]
-      return [spec.host, { mode: "subagent", description: spec.description, steps: spec.steps, prompt: spec.prompt, permission: subagentPermission(spec, input.toolIds) }]
+      return [spec.host, { mode: "subagent", description: spec.description, steps: spec.steps, prompt: spec.prompt, permission: withoutDeniedTools(subagentPermission(spec, toolIds), policies) }]
     })
   )
 
@@ -121,7 +158,13 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     share: "disabled",
     autoupdate: false,
     snapshot: false,
-    experimental: { brain: true, memory: true },
+    experimental: {
+      brain: true,
+      memory: true,
+      ...(policies.length > 0 ? { policies: policies.map((p) => ({ effect: p.effect, action: p.action, resource: p.resource })) } : {}),
+      ...(timeouts.tool !== undefined ? { tool_timeout: timeouts.tool } : {}),
+      ...(timeouts.task !== undefined ? { task_timeout: timeouts.task } : {})
+    },
     compaction: { auto: true, prune: true, ...input.compaction },
     username: "cadcam",
     provider,
@@ -137,7 +180,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
         prompt: input.systemPrompt,
         permission
       },
-      ...specialists }, input.toolIds),
+      ...specialists }, toolIds),
       compaction: { prompt: compactionPrompt.trim(), permission: { "*": "deny" } },
       // Background helpers would spend extra model calls on titles and summaries.
       title: { disable: true },

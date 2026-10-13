@@ -13,8 +13,8 @@ beforeAll(async () => {
 
 test("read-only inspection does not create a missing drawing", async () => {
   const empty = (await app.call("/api/projects", { method: "POST", json: { name: "Empty" } })).body.id
-  const spec = buildTools(handlers, empty).find((tool) => tool.id === "cad_describe_drawing")!
-  const result = JSON.parse(await spec.execute({}, { sessionId: "s", projectId: empty, signal: new AbortController().signal }))
+  const spec = buildTools(handlers, empty).find((tool) => tool.id === "cad")!
+  const result = JSON.parse(await spec.execute({ action: "describe" }, { sessionId: "s", projectId: empty, signal: new AbortController().signal }))
   expect(result.ok).toBe(false)
   expect(result.error).toContain("no drawing")
   const drawings = await app.call(`/api/projects/${empty}/drawings`)
@@ -23,63 +23,63 @@ test("read-only inspection does not create a missing drawing", async () => {
 afterAll(async () => { await app.dispose() })
 test("an explicit inaccessible project never redirects a mutation to the active project", async () => {
   const before = await handlers.describeDrawing(project)
-  const denied = JSON.parse(await buildTools(handlers, "inaccessible-project").find((tool) => tool.id === "cad_add_elements")!.execute({ elements: [{ type: "cube", width: 2, height: 2, depth: 2 }] }, { sessionId: "s", projectId: project, signal: new AbortController().signal }))
+  const denied = JSON.parse(await buildTools(handlers, "inaccessible-project").find((tool) => tool.id === "cad_edit")!.execute({ action: "add", elements: [{ type: "cube", width: 2, height: 2, depth: 2 }] }, { sessionId: "s", projectId: project, signal: new AbortController().signal }))
   expect(denied.ok).toBe(false)
   const after = await handlers.describeDrawing(project)
   expect((after as { elements: unknown }).elements).toEqual((before as { elements: unknown }).elements)
 })
 test("mesh import persists explicit scale and original source evidence", async () => {
-  const imported = await run("cad_import_drawing", { format: "mesh", scale: 1000, content: JSON.stringify({ format: "cadcamfun-mesh", elements: [{ type: "mesh", vertices: [{ x: 0, y: 0, z: 0 }, { x: 0.01, y: 0, z: 0 }, { x: 0, y: 0.02, z: 0 }], faces: [[0, 1, 2]], sourceMetadata: { format: "brep", units: "source units" } }] }) })
+  const imported = await run("cad_edit", { action: "import", format: "mesh", scale: 1000, content: JSON.stringify({ format: "cadcamfun-mesh", elements: [{ type: "mesh", vertices: [{ x: 0, y: 0, z: 0 }, { x: 0.01, y: 0, z: 0 }, { x: 0, y: 0.02, z: 0 }], faces: [[0, 1, 2]], sourceMetadata: { format: "brep", units: "source units" } }] }) })
   expect(imported.ok).toBe(true)
-  const detail = await run("cad_inspect", { action: "elements", ids: imported.ids })
+  const detail = await run("cad", { action: "inspect_elements", ids: imported.ids })
   expect(detail.elements[0].bounds.max).toEqual({ x: 10, y: 20, z: 0 })
-  const metadata = await run("cad_inspect", { action: "property", elementId: imported.ids[0], path: ["sourceMetadata"] })
+  const metadata = await run("cad", { action: "inspect_property", elementId: imported.ids[0], path: ["sourceMetadata"] })
   expect(metadata).toMatchObject({ ok: true })
   expect(JSON.stringify(metadata)).toContain("sourceToMmScale")
-  await run("cad_delete_entities", { ids: imported.ids, confirm: true })
+  await run("cad_edit", { action: "delete", ids: imported.ids, confirm: true })
 })
 test("explicit stock drives real removal simulation and invalidates generated programs on change", async () => {
-  await run("cad_add_elements", { elements: [{ type: "cube", width: 30, height: 20, depth: 3, z: -1.5 }] })
+  await run("cad_edit", { action: "add", elements: [{ type: "cube", width: 30, height: 20, depth: 3, z: -1.5 }] })
   const stock = { width: 50, height: 40, depth: 10, x: 2, y: 3, topZ: 0, allowance: 1, radius: 0, material: "Aluminium" }
-  expect((await run("cam_stock", { action: "set", stock })).volumeMm3).toBe(20_000)
-  const operation = await run("cam_create_operation", { type: "contour", params: { toolDiameter: 6, depth: 3, stepdown: 1 } })
-  const report = await run("cam_verify_toolpath", { operationId: operation.operationId, resolution: 1 })
+  expect((await run("cam_edit", { action: "stock_set", stock })).volumeMm3).toBe(20_000)
+  const operation = await run("cam_edit", { action: "create", type: "contour", params: { toolDiameter: 6, depth: 3, stepdown: 1 } })
+  const report = await run("cam_edit", { action: "verify", operationId: operation.operationId, resolution: 1 })
   expect(report.stockSource).toBe("configured drawing stock")
   expect(report.stats.stockVolume).toBeCloseTo(20_000, 4)
   expect(report.stats.removedVolume).toBeGreaterThan(0)
   expect(report.stats.removedVolume + report.stats.remainingVolume).toBeCloseTo(report.stats.stockVolume, 4)
-  const changed = await run("cam_stock", { action: "set", stock: { ...stock, width: 60 } })
+  const changed = await run("cam_edit", { action: "stock_set", stock: { ...stock, width: 60 } })
   expect(changed.invalidatedOperations).toContain(operation.operationId)
-  expect((await run("cam_list_operations", {}))[0].generated).toBe(false)
+  expect((await run("cam", { action: "operations", }))[0].generated).toBe(false)
   // The stock has two faces: the CAM one (drawing stock) and the CAD one (the `workpiece` element in the scene).
-  const elements = (await run("cad_inspect", { action: "elements" })).elements as Array<{ properties: Record<string, unknown> }>
+  const elements = (await run("cad", { action: "inspect_elements" })).elements as Array<{ properties: Record<string, unknown> }>
   expect(elements).toHaveLength(2)
   const workpiece = elements.map((e) => e.properties).find((p) => p["type"] === "workpiece")
   expect(workpiece).toMatchObject({ type: "workpiece", width: 60, height: 40, depth: 10, x: 2, y: 3, z: -5 })
-  const inspected = await run("cam_stock", { action: "inspect" })
+  const inspected = await run("cam", { action: "stock" })
   expect(inspected.stock).toMatchObject({ width: 60, height: 40, depth: 10 })
   expect(inspected.workpiece).toMatchObject({ width: 60, height: 40, depth: 10, x: 2, y: 3, z: -5 })
   expect(inspected.workpieceMatchesStock).toBe(true)
 })
 test("component inspection exposes actual parameter dependencies and exact property pages", async () => {
-  const created = await run("cad_add_elements", { elements: [
+  const created = await run("cad_edit", { action: "add", elements: [
     { type: "parametric", history: plateTemplate(), x: 10 },
     { type: "parametric", history: plateTemplate(), x: 100 }
   ] })
-  const result = await run("cad_component_relations", { firstId: created.ids[0], secondId: created.ids[1] })
+  const result = await run("cad", { action: "relations", firstId: created.ids[0], secondId: created.ids[1] })
   expect(result.ok).toBe(true)
   expect(result.originDistanceMm).toBe(90)
   expect(result.first.parametric[0].resolved.width).toBe(60)
   expect(result.explicitReferences).toEqual([])
-  const property = await run("cad_inspect", { action: "property", elementId: created.ids[0], path: ["history"], maxChars: 50 })
+  const property = await run("cad", { action: "inspect_property", elementId: created.ids[0], path: ["history"], maxChars: 50 })
   expect(property.content).toHaveLength(50)
   expect(property.nextOffset).toBe(50)
-  expect((await run("cad_inspect", { action: "property", elementId: created.ids[0], path: ["__proto__"] })).ok).toBe(false)
+  expect((await run("cad", { action: "inspect_property", elementId: created.ids[0], path: ["__proto__"] })).ok).toBe(false)
 })
 
  test("candidate comparisons calculate real variants without writing operations or geometry", async () => {
-  const before = await run("cam_list_operations", {})
-  const result = await run("cam_suggest_parameters", { candidates: [
+  const before = await run("cam", { action: "operations", })
+  const result = await run("cam", { action: "compare_setups", candidates: [
     { name: "contour 4mm", params: { toolDiameter: 4, depth: 2, stepdown: 1 } },
     { name: "invalid", params: { depth: -1 } }
   ] })
@@ -87,12 +87,12 @@ test("component inspection exposes actual parameter dependencies and exact prope
   expect(result.mutated).toBe(false)
   expect(result.candidates[0].verification.stats.removedVolume).toBeGreaterThan(0)
   expect(result.candidates[1].ok).toBe(false)
-  expect(await run("cam_list_operations", {})).toEqual(before)
+  expect(await run("cam", { action: "operations", })).toEqual(before)
 })
 
 test("inspection uses actual rotated and scaled mesh bounds", async () => {
-  const created = await run("cad_add_elements", { elements: [{ type: "cube", width: 10, height: 20, depth: 30, x: 50, rotation: { x: 0, y: 0, z: 90 }, scale: { x: 2, y: 1, z: 1 } }] })
-  const inspected = await run("cad_inspect", { action: "elements", ids: created.ids })
+  const created = await run("cad_edit", { action: "add", elements: [{ type: "cube", width: 10, height: 20, depth: 30, x: 50, rotation: { x: 0, y: 0, z: 90 }, scale: { x: 2, y: 1, z: 1 } }] })
+  const inspected = await run("cad", { action: "inspect_elements", ids: created.ids })
   const bounds = inspected.elements[0].bounds
   expect(bounds.max.x - bounds.min.x).toBeCloseTo(20, 5)
   expect(bounds.max.y - bounds.min.y).toBeCloseTo(20, 5)

@@ -81,6 +81,8 @@ export interface AiContextState {
   readonly auto: boolean; readonly prune: boolean; readonly reserved?: number
   readonly provider?: string; readonly model?: string; readonly contextWindow?: number; readonly inputWindow?: number
   readonly maxOutput?: number; readonly requestOutput?: number; readonly compactAt?: number; readonly tokens?: number; readonly compacted: boolean
+  /** Where the tokens of the next request go, summed per category (system, instructions, skills, mcp, tools, agents, messages). */
+  readonly breakdown?: { readonly estimatedTotal: number; readonly categories: ReadonlyArray<{ readonly category: string; readonly tokens: number }> }
 }
 
 export type AiMessageStatus = "streaming" | "done" | "error"

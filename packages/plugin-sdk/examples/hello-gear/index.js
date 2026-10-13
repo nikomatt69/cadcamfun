@@ -6067,10 +6067,43 @@ var RADIAN_LOOKALIKES = [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 3 *
 // packages/core/src/cad/expr.ts
 var UNITS = { mm: 1, cm: 10, m: 1000, in: 25.4, deg: Math.PI / 180, rad: 1 };
 var CONSTANTS = { pi: Math.PI, e: Math.E, tau: 2 * Math.PI };
+// packages/core/src/cad/profile-shape.ts
+var CORNER_TURN = 10 * Math.PI / 180;
 // packages/core/src/cad/element-transform.ts
 var DEG = Math.PI / 180;
 // packages/core/src/cad/scene-evidence.ts
 var PRESENTATION = new Set(["layer", "layerId", "name", "description", "visible", "locked", "selected", "color", "opacity", "wireframe", "linewidth", "originalData"]);
+// packages/core/src/cad/fasteners.ts
+var t = (d, pitch, tapDrill, fine, medium, coarse, headDiameter, headHeight, counterboreDiameter, counterboreDepth, countersinkDiameter) => ({
+  name: `M${d}`,
+  d,
+  pitch,
+  tapDrill,
+  clearance: { fine, medium, coarse },
+  headDiameter,
+  headHeight,
+  counterboreDiameter,
+  counterboreDepth,
+  countersinkDiameter
+});
+var METRIC_THREADS = [
+  t(2, 0.4, 1.6, 2.2, 2.4, 2.6, 3.8, 2, 4.5, 2.4, 4),
+  t(2.5, 0.45, 2.05, 2.7, 2.9, 3.1, 4.5, 2.5, 5.5, 3, 5),
+  t(3, 0.5, 2.5, 3.2, 3.4, 3.6, 5.5, 3, 6.5, 3.4, 6),
+  t(4, 0.7, 3.3, 4.3, 4.5, 4.8, 7, 4, 8, 4.6, 8),
+  t(5, 0.8, 4.2, 5.3, 5.5, 5.8, 8.5, 5, 10, 5.7, 10),
+  t(6, 1, 5, 6.4, 6.6, 7, 10, 6, 11, 6.8, 12),
+  t(8, 1.25, 6.8, 8.4, 9, 10, 13, 8, 15, 9, 16),
+  t(10, 1.5, 8.5, 10.5, 11, 12, 16, 10, 18, 11, 20),
+  t(12, 1.75, 10.2, 13, 13.5, 14.5, 18, 12, 20, 13, 24),
+  t(14, 2, 12, 15, 15.5, 16.5, 21, 14, 24, 15, 27),
+  t(16, 2, 14, 17, 17.5, 18.5, 24, 16, 26, 17.5, 30),
+  t(20, 2.5, 17.5, 21, 22, 24, 30, 20, 33, 21.5, 36),
+  t(24, 3, 21, 25, 26, 28, 36, 24, 40, 25.5, 43),
+  t(30, 3.5, 26.5, 31, 33, 35, 45, 30, 50, 32, 54)
+];
+// packages/core/src/cad/dfm.ts
+var GRAZING = Math.cos(65 * Math.PI / 180);
 // packages/core/src/cam/ir.ts
 var Positive = Finite.check(isGreaterThan2(0));
 var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));

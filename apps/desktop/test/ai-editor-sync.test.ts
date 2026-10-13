@@ -17,16 +17,16 @@ afterEach(() => resetStores())
 
 describe("assistant results -> editor", () => {
   test("only successful CAD tool results produce changes", () => {
-    expect(opsFor("cad_add_elements", json({ ok: true, elements: [cube] }))).toEqual([{ kind: "add", elements: [cube] }])
-    expect(opsFor("cad_add_entities", json({ ok: false, elements: [cube] }))).toEqual([])
-    expect(opsFor("cam_generate_gcode", json({ ok: true, elements: [cube] }))).toEqual([])
-    expect(opsFor("cad_add_elements", "not json")).toEqual([])
-    expect(opsFor("cad_delete_entities", json({ ok: true, ids: ["a", 3, "b"] }))).toEqual([{ kind: "delete", ids: ["a", "b"] }])
-    expect(opsFor("cad_modify_entities", json({ ok: true, elements: [cube, { nope: 1 }] }))).toEqual([{ kind: "update", elements: [cube] }])
+    expect(opsFor("cad_edit.add", json({ ok: true, elements: [cube] }))).toEqual([{ kind: "add", elements: [cube] }])
+    expect(opsFor("cad_edit.add_entities", json({ ok: false, elements: [cube] }))).toEqual([])
+    expect(opsFor("cam_edit.generate", json({ ok: true, elements: [cube] }))).toEqual([])
+    expect(opsFor("cad_edit.add", "not json")).toEqual([])
+    expect(opsFor("cad_edit.delete", json({ ok: true, ids: ["a", 3, "b"] }))).toEqual([{ kind: "delete", ids: ["a", "b"] }])
+    expect(opsFor("cad_edit.modify", json({ ok: true, elements: [cube, { nope: 1 }] }))).toEqual([{ kind: "update", elements: [cube] }])
   })
 
   test("added elements appear in the store with the tool's ids, on the active layer", () => {
-    const result = mirrorToolResult("cad_add_elements", true, json({ ok: true, elements: [cube] }))
+    const result = mirrorToolResult("cad_edit.add", true, json({ ok: true, elements: [cube] }))
     expect(result).toEqual({ added: 1, updated: 0, removed: 0 })
     const stored = useElementsStore.getState().elements.find((e) => e.id === "e1")!
     expect(stored).toMatchObject({ type: "cube", x: 1, z: 3 })

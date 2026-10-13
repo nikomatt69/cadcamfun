@@ -7,6 +7,10 @@ import { t } from "../../../i18n/index.ts"
 import { useAiStore } from "../store/context.tsx"
 import { contextWindowFor, contextMetrics, formatTokenCount } from "../lib/context-metrics.ts"
 
+const CATEGORIES = ["system", "instructions", "skills", "mcp", "tools", "agents", "messages"] as const
+/** A category this version has no word for keeps the host's own name. */
+const categoryLabel = (category: string): string => ((CATEGORIES as ReadonlyArray<string>).includes(category) ? t(`ai.context.category.${category}` as never) : category)
+
 const RADIUS = 7
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
@@ -28,6 +32,11 @@ export function ContextGauge(): JSX.Element {
     )
     if (m.level === "warn") parts.push(t("ai.context.gauge.warn"))
     if (m.level === "full") parts.push(t("ai.context.gauge.full"))
+    const breakdown = ai.hostContext()?.breakdown
+    if (breakdown !== undefined && breakdown.categories.length > 0) {
+      const shown = breakdown.categories.map((c) => `${categoryLabel(c.category)} ${formatTokenCount(c.tokens)}`).join(", ")
+      parts.push(t("ai.context.gauge.breakdown", { parts: shown }))
+    }
     return parts.join(" · ")
   }
   return (
@@ -39,6 +48,10 @@ export function ContextGauge(): JSX.Element {
         role="img"
         aria-label={`${t("ai.context.gauge.label")}: ${title()}`}
         title={title()}
+        // The breakdown costs a tokenizer pass in the host, so it is asked for when someone looks, not on every poll.
+        onMouseEnter={() => void ai.loadContextBreakdown()}
+        onFocus={() => void ai.loadContextBreakdown()}
+        tabindex="0"
       >
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
           <circle cx="9" cy="9" r={RADIUS} fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="2" />

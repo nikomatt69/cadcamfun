@@ -26,7 +26,7 @@ import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "
 import type { ChatAttachment } from "../lib/attachments.ts"
 import { contextTokensOf } from "../lib/context-metrics.ts"
 import { mirrorCamResult } from "../lib/cam-sync.ts"
-import { captureEditorOwner, mirrorToolResult, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
+import { actionKey, captureEditorOwner, mirrorToolResult, reconcileCoalesced, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
 import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "../lib/types.ts"
 
 export type PendingDelivery = "queue" | "steer"
@@ -94,6 +94,8 @@ export interface AiStore {
   readonly controlBusy: Accessor<boolean>
   readonly controlError: Accessor<string | undefined>
   readonly refreshControls: () => Promise<void>
+  /** Asks the host where the context tokens go (nikcli `SessionContext.breakdown`); the answer lands in `hostContext().breakdown`. */
+  readonly loadContextBreakdown: () => Promise<void>
   readonly consolidateMemory: () => Promise<void>
   readonly compact: () => Promise<void>
   readonly cancelTask: (id: string) => Promise<void>
@@ -386,12 +388,15 @@ export const createAiStore = (): AiStore => {
       return
     }
     if (event.type === "tool_result") {
-      // The CAD tools ran in the sidecar: show their result in the editor the user has open.
-      try { mirrorToolResult(event.tool, event.ok, event.output, editorOwner) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
+      // The CAD tools ran in the sidecar: show their result in the editor the user has open. A call made inside a `code_mode`
+      // program arrives the same way, as its own event with its own input.
+      const input = toolCalls()[event.callId]?.input
+      const key = actionKey(event.tool, input)
+      try { mirrorToolResult(key, event.ok, event.output, editorOwner) } catch (cause) { console.error("Could not mirror the tool result into the editor", cause) }
       // Whatever the tool answered, the stored drawing is the truth: bring the editor in line with it.
-      if (event.ok && (event.tool.includes("cad_") || event.tool.endsWith("cam_stock"))) void reconcileFromStored(app, editorOwner).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
-      if (event.ok) void mirrorCamResult(app, event.tool, toolCalls()[event.callId]?.input, event.output, editorOwner)
-      if (event.tool === "agent_task" || event.tool === "agent_tasks" || event.tool === "agent_task_read" || event.tool === "agent_task_cancel") noteTasks(event.output)
+      if (event.ok && (event.tool.includes("cad_") || key === "cam_edit.stock_set" || event.tool.endsWith("cam_stock") || event.tool === "code_mode")) void reconcileCoalesced(app, editorOwner).catch((cause) => console.error("Could not reconcile the editor with the stored drawing", cause))
+      if (event.ok) void mirrorCamResult(app, key, input, event.output, editorOwner)
+      if (event.tool === "agent") noteTasks(event.output)
       const id = idForEvent
       setToolCalls((current) => {
         const existing = current[event.callId]
@@ -737,27 +742,32 @@ export const createAiStore = (): AiStore => {
     if (!disposed && generation === conversationGeneration) setPermissions((current) => current.filter((item) => item.requestId !== requestId))
   }
 
-  type ControlAction = "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "consolidate_memory"
+  type ControlAction = "status" | "context" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "consolidate_memory"
   const control = async (action: ControlAction, fields: { taskId?: string; requestId?: string; answers?: ReadonlyArray<ReadonlyArray<string>> } = {}): Promise<void> => {
     const sid = sessionId(), project = projectId(), generation = conversationGeneration
     const current = () => !disposed && generation === conversationGeneration && sessionId() === sid && projectId() === project
-    if (!sid || action !== "status" && controlBusy()) return
-    if (action !== "status") { setControlBusy(true); setControlError(undefined) }
+    // Reads (`status`, `context`) are silent: they never block a command and never raise the error banner.
+    const read = action === "status" || action === "context"
+    if (!sid || !read && controlBusy()) return
+    if (!read) { setControlBusy(true); setControlError(undefined) }
     try {
       const state = await app.runtime.run(app.client.ai.sessionControl({ payload: { sessionId: sid, ...(project ? { projectId: project } : {}), action, ...fields, ...(model() ? { model: model()! } : {}) } }))
       if (!current()) return
       batch(() => {
         if (state.permissions) setPermissions(state.permissions)
-        setQuestions(state.questions); setTasks(state.tasks); setHostContext(state.context)
+        setQuestions(state.questions); setTasks(state.tasks)
+        // The breakdown is only sent on request: a later status poll keeps the last one rather than blanking the gauge.
+        setHostContext((previous) => ({ ...state.context, ...(state.context.breakdown === undefined && previous?.breakdown !== undefined ? { breakdown: previous.breakdown } : {}) }))
         if (state.context.tokens !== undefined) setContextTokens(state.context.tokens)
         if (state.context.compacted) { setContextTokens(0); setActivity((current) => ({ ...current, compacted: true })) }
       })
       if (state.busy && status() !== "streaming" && status() !== "connecting" || activeTask(state.tasks)) void watchTasks(state.busy)
     } catch (cause) {
-      if (action !== "status" && current()) setControlError(cause instanceof Error ? cause.message : String(cause))
-    } finally { if (action !== "status" && current()) setControlBusy(false) }
+      if (!read && current()) setControlError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (!read && current()) setControlBusy(false) }
   }
   const refreshControls = () => control("status")
+  const loadContextBreakdown = () => control("context")
   const consolidateMemory = () => control("consolidate_memory")
   const compact = () => control("compact")
   const cancelTask = (taskId: string) => control("cancel_task", { taskId })
@@ -831,7 +841,7 @@ export const createAiStore = (): AiStore => {
     status, error, sessionId, sessions, messages, toolCalls, permissions, plan, goal, activity, tasks,
     model, setModel, includeContext, setIncludeContext, stats, contextTokens, suggestions, dismissSuggestion,
     projectId, send, pending, abort, clear, newSession, openSession, renameSession, deleteSession, replyPermission,
-    permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, questions, hostContext, controlBusy, controlError, refreshControls, compact, consolidateMemory, cancelTask, replyQuestion
+    permissionMode, setPermissionMode, agents, agent, setAgent, mode, setMode, questions, hostContext, controlBusy, controlError, refreshControls, loadContextBreakdown, compact, consolidateMemory, cancelTask, replyQuestion
   }
   })
   onCleanup(() => disposeStore?.())

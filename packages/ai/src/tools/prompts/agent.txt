@@ -1,7 +1,7 @@
 Hand a job to a specialist agent that has only the tools that job needs. The specialist does not see this conversation.
 
 Actions
-- start: give one bounded job to a specialist (researcher, editor, modeler, machinist or reviewer).
+- start: give one bounded job to a specialist (researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier or optimizer).
 - list: the tasks started from this conversation, with their status.
 - read: the full findings of one task.
 - cancel: stop a task that is no longer needed.

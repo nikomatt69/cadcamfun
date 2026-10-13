@@ -56,6 +56,9 @@ export const timelineOf = (message: Pick<AiMessage, "events" | "text" | "thinkin
 
 /** Tools that only look: a run of them, once it is over, is folded into one row (nikcli's exploration summary). */
 export const READ_ONLY_TOOLS: ReadonlyArray<string> = [
+  // The consolidated tools that cannot change anything (the catalogue's `read` kind); their write twins (`cad_edit`, `cam_edit`, ...) never fold.
+  "cad", "cam", "library", "memory", "vcs", "research",
+  // The per-verb ids they replaced, for conversations saved before the consolidation.
   "cad_describe_drawing", "cad_check_design", "cam_describe_machine", "cam_list_operations", "cam_suggest_parameters", "cam_analyze_gcode",
   "lib_lookup_tool", "lib_lookup_material", "memory_recall", "vcs_status", "vcs_diff", "vcs_list_pull_requests", "agent_tasks", "agent_task_read", "get_goal", "skill"
 ]

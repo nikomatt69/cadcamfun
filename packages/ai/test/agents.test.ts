@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS } from "../src/nikcli/agents.ts"
+import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS, subagentCatalogue } from "../src/nikcli/agents.ts"
 import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/nikcli/background-tasks.ts"
 import { backgroundToolContributions } from "../src/nikcli/background-tools.ts"
 import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
@@ -18,9 +18,11 @@ describe("specialist roster", () => {
       for (const name of ["cadcam", "cadcam-ask"]) expect(config.agent[name]!.permission[id], name).toBe("ask")
     }
     // The editor deletes elements and the machinist removes library rows: both ask, and the researcher has neither tool.
+    // The researcher's host name is the worker's (`cadcam-worker`), not a name spelled after the specialist.
     expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toBe("ask")
     expect(config.agent["cadcam-machinist"]!.permission["library_edit"]).toBe("ask")
-    expect(config.agent["cadcam-researcher"]!.permission["cad_edit"]).toBeUndefined()
+    expect(config.agent[SUBAGENTS.researcher.host]!.permission["cad_edit"]).toBeUndefined()
+    expect(config.agent[SUBAGENTS.researcher.host]!.permission["cad"]).toBe("allow")
   })
 
   test("read-only specialists cannot persist verification, write memory, the libraries or dispatch workflows", () => {
@@ -45,9 +47,16 @@ describe("specialist roster", () => {
     // Derived from the catalogue's effects, not from a hand-written list of ids.
     for (const id of SUBAGENT_IDS) {
       const writes = SUBAGENTS[id].tools.filter((tool) => toolKind(tool) !== "read")
-      expect(writes.length === 0, `${id} writes: ${writes.join(", ")}`).toBe(SUBAGENTS[id].edits)
+      // A specialist holds a write tool exactly when it edits the document: a role that edits without a write tool
+      // cannot do its job, and one that holds a write tool without `edits` would mutate behind the parent's back.
+      expect(writes.length > 0, `${id} writes: ${writes.join(", ")}`).toBe(SUBAGENTS[id].edits)
     }
-    for (const id of ["researcher", "reviewer"] as const) for (const tool of READ_TOOL_IDS) expect(SUBAGENTS[id].tools).toContain(tool)
+    // Both read-only specialists see the CAD, CAM, library and version-control reads. `research` is the researcher's
+    // own instrument (web search, attachments); the reviewer reasons from the project and does not search.
+    for (const id of ["researcher", "reviewer"] as const) for (const tool of READ_TOOL_IDS.filter((t) => t !== "research")) {
+      expect(SUBAGENTS[id].tools, `${id} must read ${tool}`).toContain(tool)
+    }
+    expect(SUBAGENTS.reviewer.tools).not.toContain("research")
     expect(SUBAGENTS.editor.tools).toContain("cad_edit")
     expect(SUBAGENTS.editor.tools).not.toContain("cam_edit")
     expect(SUBAGENTS.machinist.tools).toContain("cam_edit")
@@ -69,7 +78,9 @@ describe("specialist roster", () => {
   test("no tool mixes read and write effects, which is what makes the allow-lists safe", () => {
     for (const tool of ACTION_TOOL_IDS) {
       const kinds = new Set(ACTION_CATALOGUE.filter((action) => action.id.startsWith(`${tool}.`)).map((action) => action.kind))
-      expect(kinds.size === 1 && !(kinds.has("read") && kinds.size > 1), `${tool} mixes ${[...kinds].join(", ")}`).toBe(true)
+      // A tool may hold several actions, but they must share one effect: `write` beside `destructive` is fine
+      // (the whole tool asks), while any `read` would hand a read-only specialist a write.
+      expect(kinds.has("read") && kinds.size > 1, `${tool} mixes ${[...kinds].join(", ")}`).toBe(false)
       expect(toolKind(tool) === (kinds.has("destructive") ? "destructive" : kinds.has("write") ? "write" : "read")).toBe(true)
     }
   })
@@ -188,7 +199,9 @@ describe("agent.start", () => {
 
   test("an unknown agent is refused with the names to use, not thrown", async () => {
     const manager = new BackgroundTaskManager({ runner: async () => "x" })
-    expect(await start(manager)({ description: "d", prompt: "p", agent: "welder" } as never, ctx)).toMatchObject({ ok: false, error: /editor, modeler, machinist/ })
+    const refused = await start(manager)({ description: "d", prompt: "p", agent: "welder" } as never, ctx) as { ok: boolean; error: string }
+    expect(refused.ok).toBe(false)
+    expect(refused.error).toMatch(/researcher, editor, modeler, machinist, reviewer/)
     await manager.dispose()
   })
 })
@@ -211,5 +224,54 @@ describe("specialist events reach the parent's stream", () => {
 
   test("a session that is nobody's child stays out", () => {
     expect(mapHostEvent("parent", part("stranger", "tool", { callID: "c", tool: "cad", state: { status: "running", input: { action: "describe" } } }), newMapperState())).toEqual([])
+  })
+})
+describe("the nikcli-style roster for CAD/CAM", () => {
+  const NIKCLI_STYLE = ["planner", "diagnostician", "verifier", "optimizer"] as const
+  const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string>; prompt: string; mode: string }> }
+
+  test("each has its own title, host agent and role prompt on top of the shared contract", () => {
+    const prompts = new Set<string>()
+    for (const id of NIKCLI_STYLE) {
+      const spec = SUBAGENTS[id]
+      expect(spec.title.length, id).toBeGreaterThan(3)
+      expect(spec.host, id).toBe(`cadcam-${id}`)
+      expect(spec.prompt, id).toContain("You are a specialist agent of the CAD/CAM assistant")
+      expect(spec.prompt, id).toContain("Final message")
+      prompts.add(spec.prompt)
+      expect(config.agent[spec.host]!.mode, id).toBe("subagent")
+      expect(config.agent[spec.host]!.prompt, id).toBe(spec.prompt)
+    }
+    expect(prompts.size).toBe(NIKCLI_STYLE.length)
+  })
+
+  test("the planner and the diagnostician read and never write, in every permission mode", () => {
+    for (const id of ["planner", "diagnostician"] as const) {
+      expect(SUBAGENTS[id].edits, id).toBe(false)
+      for (const tool of WRITE_TOOL_IDS) expect(SUBAGENTS[id].tools, `${id} must not have ${tool}`).not.toContain(tool)
+      for (const suffix of ["", "-auto", "-ask"]) {
+        const permission = config.agent[`${SUBAGENTS[id].host}${suffix}`]!.permission
+        expect(permission["**"]).toBe("deny")
+        for (const tool of WRITE_TOOL_IDS) expect(permission[tool], `${id}${suffix} must keep ${tool} denied`).toBeUndefined()
+      }
+    }
+  })
+
+  test("the verifier and the optimizer change operations only: no drawing edits, no library rows, no commits", () => {
+    for (const id of ["verifier", "optimizer"] as const) {
+      expect(SUBAGENTS[id].edits, id).toBe(true)
+      expect(SUBAGENTS[id].tools, id).toContain("cam_edit")
+      for (const tool of ["cad_edit", "library_edit", "parts", "vcs_edit", "memory_edit", "agent"]) expect(SUBAGENTS[id].tools, `${id} must not have ${tool}`).not.toContain(tool)
+    }
+  })
+
+  test("the roles that gate the next step are waited for; the rest of the read-only roster runs in the background", () => {
+    expect(SUBAGENTS.planner.background).toBe(false)
+    expect(SUBAGENTS.diagnostician.background).toBe(false)
+    expect(SUBAGENTS.researcher.background).toBe(true)
+  })
+
+  test("the agent tool names every role it can start", () => {
+    for (const id of SUBAGENT_IDS) expect(subagentCatalogue(), id).toContain(id)
   })
 })

@@ -1,6 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { dependentsOf, dimensionsOf, moveFeature, plateTemplate, removeFeature, removeParameter, renameParameter, setDimension, setParameter, usesOf } from "./history-edit.ts"
 import { historyVolume, rebuild, type History } from "./history.ts"
+
+// These rebuild whole parametric models (grid patterns, mirrored features) and take seconds each; the default 5 s
+// timeout turns them into failures under the load of a full-suite run, as in `csg.test.ts`.
+setDefaultTimeout(60_000)
 
 describe("the starting plate", () => {
   test("builds a plate with a hole: width x depth x thick minus the cylinder", () => {

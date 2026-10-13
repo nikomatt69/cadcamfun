@@ -28,9 +28,9 @@ const events = (values: object[]) => Stream.fromIterable(values.map((event) => J
 describe("assistant lifecycle ownership", () => {
   test("partial tool diagnostics preserve confirmed success and committed mutation evidence", async () => {
     client().chatStream = () => Effect.succeed(events([
-      { type: "tool_call", sessionId: "s", callId: "partial", tool: "cad_check_design", input: {} },
-      { type: "tool_result", sessionId: "s", callId: "partial", tool: "cad_check_design", ok: true, output: "Checked the existing plate; one unsupported item was skipped." },
-      { type: "tool_diagnostic", sessionId: "s", callId: "partial", tool: "cad_check_design", kind: "partial", severity: "warning", mutationApplied: true, message: "One item was skipped", recovery: "Repair the remaining item" },
+      { type: "tool_call", sessionId: "s", callId: "partial", tool: "cad", input: { action: "check",} },
+      { type: "tool_result", sessionId: "s", callId: "partial", tool: "cad", ok: true, output: "Checked the existing plate; one unsupported item was skipped." },
+      { type: "tool_diagnostic", sessionId: "s", callId: "partial", tool: "cad", kind: "partial", severity: "warning", mutationApplied: true, message: "One item was skipped", recovery: "Repair the remaining item" },
       { type: "done", sessionId: "s", text: "The confirmed result remains valid." }
     ]))
     const { store, dispose } = await mount()
@@ -65,7 +65,7 @@ describe("assistant lifecycle ownership", () => {
       { type: "permission_blocked", sessionId: "s", permission: "shell", patterns: [], reason: "Unavailable in this workspace" },
       { type: "session_status", sessionId: "s", status: "idle" },
       { type: "turn", sessionId: "s", phase: "continuing", reason: "Repair the tool arguments" },
-      { type: "tool_diagnostic", sessionId: "s", callId: "c1", tool: "cad_add_elements", kind: "argument", severity: "error", message: "Missing dimensions", recovery: "Specify dimensions in millimetres" }
+      { type: "tool_diagnostic", sessionId: "s", callId: "c1", tool: "cad_edit", kind: "argument", severity: "error", message: "Missing dimensions", recovery: "Specify dimensions in millimetres" }
     ]), Stream.fromEffect(Effect.promise(() => finish.promise))))
     const { store, dispose } = await mount()
     try {

@@ -36,8 +36,8 @@ describe("stream recovery", () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(lookup).toMatchObject({ payload: { sessionId: "native-1", projectId: "p1" } })
     release({ busy: false, text: "Recovered", events: [
-      { type: "tool_result", sessionId: "other-session", callId: "wrong", tool: "cad_describe_drawing", ok: true, output: "{}" },
-      { type: "tool_result", sessionId: "native-1", callId: "right", tool: "cad_describe_drawing", ok: true, output: "{}" }
+      { type: "tool_result", sessionId: "other-session", callId: "wrong", tool: "cad", ok: true, output: "{}" },
+      { type: "tool_result", sessionId: "native-1", callId: "right", tool: "cad", ok: true, output: "{}" }
     ] })
     const events = await pending
     expect(events.some((event) => "callId" in event && event.callId === "wrong")).toBe(false)
@@ -65,9 +65,9 @@ describe("stream recovery", () => {
   })
 
   test("recovery restores tool-only answers once and retains diagnostics and usage", async () => {
-    const call = { type: "tool_call", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", input: {} }
-    const result = { type: "tool_result", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", ok: false, output: "Drawing not found" }
-    const diagnostic = { type: "tool_diagnostic", sessionId: "s1", callId: "c1", tool: "cad_describe_drawing", kind: "execution", severity: "error", message: "Drawing not found" }
+    const call = { type: "tool_call", sessionId: "s1", callId: "c1", tool: "cad", input: { action: "describe",} }
+    const result = { type: "tool_result", sessionId: "s1", callId: "c1", tool: "cad", ok: false, output: "Drawing not found" }
+    const diagnostic = { type: "tool_diagnostic", sessionId: "s1", callId: "c1", tool: "cad", kind: "execution", severity: "error", message: "Drawing not found" }
     let reads = 0
     const events = await run({ ai: {
       chatStream: () => Effect.succeed(sse(call, result)),

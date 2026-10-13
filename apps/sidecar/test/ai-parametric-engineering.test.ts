@@ -2,13 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { buildRecipe, plateTemplate } from "@cadcamfun/core"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
+import { makeParametricRunner } from "./helpers/parametric.ts"
 
 /** The engineering features (edge / corner treatments, counterbored holes, mirror) and the recipe / dfm / fastener actions through the real project handlers. */
 let app: Awaited<ReturnType<typeof makeApp>>
 let handlers: ToolHandlersShape
 let projectId: string
 const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
-const run = async (input: unknown) => JSON.parse(await buildTools(handlers, projectId).find((t) => t.id === "cad_parametric")!.execute(input, ctx))
+const run = makeParametricRunner(() => handlers, () => projectId)
 const SLOW = 120_000
 
 const base = plateTemplate()

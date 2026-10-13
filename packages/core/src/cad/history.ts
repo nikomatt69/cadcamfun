@@ -325,7 +325,10 @@ const shellRevolveProfile = (ring: ReadonlyArray<{ readonly a: number; readonly 
     const mirrored = [...chain].reverse().map((p) => ({ x: -p.x, y: p.y }))
     full = [...chain, { x: 0, y: run[0]!.y }, ...mirrored, { x: 0, y: run[run.length - 1]!.y }]
   }
-  const inner = moveRing(full, t)
+  // A wall as thick as the smallest radius of the profile moves the boundary past the axis, where it collapses or crosses itself:
+  // that is the same "no cavity" case the check below reports, told in the language of this feature.
+  let inner: Vec2[]
+  try { inner = moveRing(full, t) } catch { throw new RangeError(`A ${t} mm wall leaves no cavity in this revolution`) }
   // Cut back to the half-plane x >= 0 (Sutherland-Hodgman).
   const clipped: Vec2[] = []
   for (let i = 0; i < inner.length; i++) {
@@ -662,6 +665,9 @@ export const rebuild = (history: History): RebuildResult => {
           if (f.bendRadius !== undefined) {
             const bend = dim(f.bendRadius, f.id)
             if (bend === undefined) break
+            // Zero is the mitred elbow and a closed route has no bend at all; a negative radius is not a shape, so it is refused
+            // instead of being read as "no bend" and silently producing a mitred elbow nobody asked for.
+            if (bend < 0) { issues.push({ feature: f.id, severity: "error", message: `The bend radius cannot be negative (it is ${bend} mm); zero is the mitred elbow` }); break }
             if (!closedPath && bend > 0) path = roundPath(path, bend)
           }
           const tool = sweepLoops(profileSketch, profile.loops, path, closedPath)

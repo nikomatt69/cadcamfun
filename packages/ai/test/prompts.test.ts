@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, systemPrompt } from "../src/prompts/system.ts"
+import { CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
 
 const literals = (schema: unknown): ReadonlyArray<string> =>
   ((schema as { members?: ReadonlyArray<{ literal: unknown }> }).members ?? []).map((m) => String(m.literal))
@@ -77,7 +77,8 @@ describe("manufacturing judgement in the system prompt", () => {
   test("design checking has concrete causes to fix, not just a command name", () => {
     const prompt = CADCAM_SYSTEM_PROMPT
     for (const phrase of ["rotation left in radians", "floating", "too coarse"]) expect(prompt).toContain(phrase)
-    expect(prompt).toContain("cad_check_design")
+    // The catalogue names the check as an action of the `cad` tool, not the per-verb id it replaced.
+    expect(prompt).toContain("cad action check")
   })
 
   test("the parametric element is offered when a part is dimension-driven", () => {
@@ -120,8 +121,8 @@ describe("mode prompts", () => {
 
   test("the cam mode ends on the loop it must follow", () => {
     const prompt = MODE_PROMPTS.cam
-    // Read the machine, get the numbers, create, generate, analyse, verify, fix.
-    for (const step of ["cam_describe_machine", "cam_suggest_parameters", "cam_create_operation", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath", "cam_update_operation"]) {
+    // Read the machine, get the numbers, create, generate, analyse, verify, fix: the consolidated action ids.
+    for (const step of ["cam` action `machine", "cam` action `suggest", "cam_edit` action `create", "cam_edit` action `generate", "cam` action `analyze", "cam_edit` action `verify", "cam_edit` action `update"]) {
       expect(prompt).toContain(step)
     }
   })
@@ -129,5 +130,39 @@ describe("mode prompts", () => {
   test("unknown modes still fall back to general", () => {
     expect(systemPrompt(undefined, "nope")).toContain("general CAD/CAM")
     expect(systemPrompt()).not.toContain("{{")
+  })
+})
+
+describe("reply language wiring (nikcli locale resolver)", () => {
+  test("the default English fallback does not add a language line", () => {
+    // No `reply` arg → no language line. English users get no extra prompt.
+    const prompt = systemPrompt(undefined, "general")
+    expect(prompt.toLowerCase()).not.toContain("reply in ")
+  })
+
+  test("a non-English replyLanguage appends a deterministic instruction", () => {
+    const prompt = systemPrompt(undefined, "general", undefined, { tag: "it", name: "Italian" })
+    expect(prompt).toContain("Reply in Italian (it).")
+  })
+
+  test("a replyLanguage without an English name still works (raw tag)", () => {
+    const prompt = systemPrompt(undefined, "general", undefined, { tag: "it", name: "" })
+    expect(prompt).toContain("Reply in it.")
+  })
+
+  test("turnSystemPrompt honours the same language line", () => {
+    const prompt = turnSystemPrompt(undefined, "general", undefined, { tag: "fr", name: "French" })
+    expect(prompt).toContain("Reply in French (fr).")
+  })
+
+  test("null tag means silent: no language line is added", () => {
+    const prompt = systemPrompt(undefined, "general", undefined, { tag: null, name: "" })
+    expect(prompt.toLowerCase()).not.toContain("reply in ")
+  })
+
+  test("the language line does not bloat the prompt beyond the per-turn budget", () => {
+    // Even the longest plausible name must leave the prompt well under 11k characters.
+    const prompt = systemPrompt(undefined, "general", undefined, { tag: "zh", name: "Chinese" })
+    expect(prompt.length).toBeLessThan(11_000)
   })
 })

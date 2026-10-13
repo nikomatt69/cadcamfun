@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test"
 import { decodeEvent, dispatch } from "../src/features/ai/lib/stream.ts"
 import { buildSuggestions } from "../src/features/ai/lib/suggestions.ts"
 import { loadPersisted, savePersisted } from "../src/features/ai/store/persisted.ts"
-import { TOOL_IDS, TOOL_SUMMARIES } from "../src/features/ai/lib/tools.ts"
+import { EXTRA_TOOL_SUMMARIES, TOOL_IDS, TOOL_SUMMARIES, VCS_TOOL_IDS } from "../src/features/ai/lib/tools.ts"
 
 describe("AI SSE event decoder", () => {
   test("decodes a delta event", () => {
@@ -15,9 +15,9 @@ describe("AI SSE event decoder", () => {
     expect(event).toEqual({ type: "delta", sessionId: "s1", text: "hello" })
   })
   test("decodes a tool_call with input", () => {
-    const event = decodeEvent(JSON.stringify({ type: "tool_call", sessionId: "s1", callId: "c1", tool: "cad_add_entities", input: { entities: [] } }))
+    const event = decodeEvent(JSON.stringify({ type: "tool_call", sessionId: "s1", callId: "c1", tool: "cad_edit", input: { action: "add_entities", entities: [] } }))
     expect(event.type).toBe("tool_call")
-    if (event.type === "tool_call") expect(event.tool).toBe("cad_add_entities")
+    if (event.type === "tool_call") expect(event.tool).toBe("cad_edit")
   })
   test("decodes a tool_result with ok=false", () => {
     const event = decodeEvent(JSON.stringify({ type: "tool_result", sessionId: "s1", callId: "c1", tool: "cam_create_operation", ok: false, output: "error" }))
@@ -48,13 +48,13 @@ describe("AI SSE event decoder", () => {
 
 describe("AI tool catalogue (spec 08-ai.md §3)", () => {
   test("contains every locked-down tool id", () => {
-    // The list below is the source of truth for duplicates: a tool that is added without being
-    // listed here fails, which is the point — the catalogue is a contract, not a growing pile.
+    // The host registers one tool per capability group (`packages/ai/src/actions/catalogue.ts`), each carrying its
+    // actions behind an `action` discriminator. The list below is the desktop's half of that contract: a catalogue
+    // tool this list does not name would be rejected by `validateToolCall` as "not allowed", so a tool added
+    // without being listed here fails — which is the point.
     expect(new Set(TOOL_IDS)).toEqual(new Set([
-      "cad_parametric", "cad_vision", "cam_vision", "web_search", "attachment_read", "cad_inspect", "cad_component_relations", "cam_stock",
-      "cad_add_entities", "cad_add_elements", "cad_modify_entities", "cad_transform_entities", "cad_group_entities", "cad_editor", "cad_delete_entities", "cad_describe_drawing", "cad_check_design", "cad_import_drawing",
-      "cam_describe_machine", "cam_create_operation", "cam_list_operations", "cam_update_operation", "cam_suggest_parameters", "cam_generate_gcode", "cam_analyze_gcode", "cam_verify_toolpath",
-      "lib_lookup_material", "lib_lookup_tool", "memory_remember", "memory_recall"
+      "cad", "cad_edit", "cam", "cam_edit", "library", "parts", "library_edit",
+      "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent"
     ]))
     // No tool is registered twice under the same id. (Spread first: the source list is a literal
     // tuple, and comparing its literal length against `Set.size` would only restate the type.)
@@ -69,12 +69,16 @@ describe("AI tool catalogue (spec 08-ai.md §3)", () => {
     expect(TOOL_IDS).not.toContain("apply_patch")
   })
   test("every tool has a human-readable summary", () => {
-    expect(TOOL_SUMMARIES.length).toBe(TOOL_IDS.length)
-    expect(TOOL_SUMMARIES.map((summary) => summary.id).sort()).toEqual([...TOOL_IDS].sort())
+    // Version control is described apart (`EXTRA_TOOL_SUMMARIES`), with the host's program runner; the rest is here.
+    const vcs: ReadonlyArray<string> = VCS_TOOL_IDS
+    const described = TOOL_IDS.filter((id) => !vcs.includes(id))
+    expect(TOOL_SUMMARIES.map((summary) => summary.id).sort()).toEqual([...described].sort())
+    expect(TOOL_SUMMARIES).toHaveLength(described.length)
+    expect(EXTRA_TOOL_SUMMARIES.map((summary) => summary.id).sort()).toEqual(["code_mode", "vcs", "vcs_edit"])
     for (const summary of TOOL_SUMMARIES) {
       expect(summary.title.length).toBeGreaterThan(0)
       expect(summary.description.length).toBeGreaterThan(0)
-      expect(["cad", "cam", "library", "memory", "research"]).toContain(summary.category)
+      expect(["cad", "cam", "library", "memory", "research", "agents"]).toContain(summary.category)
     }
   })
 })
@@ -149,35 +153,20 @@ describe("AI tool-call validation (nikcli parity, spec 08-ai.md §3)", () => {
   test("rejects non-object inputs with nikcli's wording", () => {
     const out = dispatch({
       type: "tool_call", sessionId: "s1", callId: "c2",
-      tool: "cad_add_entities", input: "not-an-object" as unknown
+      tool: "cad_edit", input: "not-an-object" as unknown
     }, freshState())
     const rejection = expectResultOf(out)
     expect(rejection.ok).toBe(false)
     expect(rejection.output).toMatch(/called with invalid arguments: input must be a JSON object/)
   })
 
-  test("rejects inputs that violate the per-tool schema with nikcli's wording", () => {
-    // cad_add_entities requires entities: array(min 1, max 500). Empty array fails.
-    const out = dispatch({
-      type: "tool_call", sessionId: "s1", callId: "c3",
-      tool: "cad_add_entities", input: { entities: [] }
-    }, freshState())
-    const rejection = expectResultOf(out)
-    expect(rejection.ok).toBe(false)
-    expect(rejection.callId).toBe("c3")
-    expect(rejection.output).toMatch(/called with invalid arguments/)
-    expect(rejection.output).toMatch(/Please rewrite the input so it satisfies the expected schema/)
-  })
-
-  test("rejects memory_remember with a bad key pattern", () => {
-    // The pattern is /^[A-Za-z0-9_.-]{1,80}$/ — a key with spaces violates it.
-    const out = dispatch({
-      type: "tool_call", sessionId: "s1", callId: "c4",
-      tool: "memory_remember", input: { key: "has spaces", value: "v" }
-    }, freshState())
-    const rejection = expectResultOf(out)
-    expect(rejection.ok).toBe(false)
-    expect(rejection.output).toMatch(/memory_remember/)
+  test("an object input is passed on: the host validates it against the action's own schema", () => {
+    // The consolidated tools carry their actions behind a discriminator; the host (nikcli) validates each call against the
+    // action's zod schema and reports a refusal as a tool result, so the UI does not keep a second copy of 100+ schemas.
+    for (const [tool, input] of [["cad_edit", { action: "add_entities", entities: [] }], ["memory_edit", { action: "remember", key: "has spaces", value: "v" }]] as const) {
+      const event = { type: "tool_call" as const, sessionId: "s1", callId: `c-${tool}`, tool, input }
+      expect(dispatch(event, freshState())).toEqual([event])
+    }
   })
 
   test("passes a well-formed tool_call through unchanged", () => {
@@ -185,8 +174,8 @@ describe("AI tool-call validation (nikcli parity, spec 08-ai.md §3)", () => {
       type: "tool_call" as const,
       sessionId: "s1",
       callId: "c5",
-      tool: "cad_add_entities",
-      input: { entities: [{ type: "line", start: { x: 0, y: 0 }, end: { x: 1, y: 1 } }] }
+      tool: "cad_edit",
+      input: { action: "add_entities", entities: [{ type: "line", start: { x: 0, y: 0 }, end: { x: 1, y: 1 } }] }
     }
     const out = dispatch(event, freshState())
     expect(out).toHaveLength(1)

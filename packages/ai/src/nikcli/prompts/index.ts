@@ -7,8 +7,12 @@ import editor from "./editor.txt" with { type: "text" }
 import modeler from "./modeler.txt" with { type: "text" }
 import machinist from "./machinist.txt" with { type: "text" }
 import reviewer from "./reviewer.txt" with { type: "text" }
+import planner from "./planner.txt" with { type: "text" }
+import diagnostician from "./diagnostician.txt" with { type: "text" }
+import verifier from "./verifier.txt" with { type: "text" }
+import optimizer from "./optimizer.txt" with { type: "text" }
 
-const roles = { researcher, editor, modeler, machinist, reviewer } satisfies Record<SubagentId, string>
+const roles = { researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer } satisfies Record<SubagentId, string>
 
 /** Like nikcli's agent/prompt files: common contract, role method, then its report. */
 export const specialistPrompt = (role: SubagentId): string =>

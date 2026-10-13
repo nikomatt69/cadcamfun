@@ -52,6 +52,12 @@ declare module "@nikcli-ai/sdk-next" {
     readonly properties: Record<string, unknown>
   }
 
+  export interface HostContextBreakdown {
+    readonly estimatedTotal: number
+    readonly reported?: { readonly total: number }
+    readonly sources: ReadonlyArray<{ readonly category: string; readonly label: string; readonly tokens: number; readonly enabled: boolean }>
+  }
+
   export interface HostSession {
     readonly id: string
     readonly parentID?: string
@@ -138,6 +144,8 @@ declare module "@nikcli-ai/sdk-next" {
         input: { sessionID: string; limit?: number },
         options?: RequestOptions
       ): Promise<ReadonlyArray<{ info: HostMessageInfo; parts: ReadonlyArray<HostPart> }>>
+      /** nikcli's `SessionContext.breakdown`: where the tokens of the next request come from (estimated, per source). */
+      contextBreakdown(input: { sessionID: string }, options?: RequestOptions): Promise<HostContextBreakdown>
     }
     readonly "session-prompt": {
       prompt(

@@ -52,7 +52,7 @@ describe("one document for the editor and the tools", () => {
     expect(described.counts).toEqual({ circle: 1, cube: 1 })
 
     const added = await handlers.addElements(doc.projectId, [{ type: "sphere", x: 0, y: 0, z: 0, radius: 4, name: "Ball", color: "#ff0000" }]) as { ids: string[] }
-    mirrorToolResult("cad_add_elements", true, json({ ...(added as object) }))
+    mirrorToolResult("cad_edit.add", true, json({ ...(added as object) }))
     const elements = useElementsStore.getState().elements
     expect(elements).toHaveLength(3)
     expect(elements.some((e) => e.id === added.ids[0] && e.name === "Ball")).toBe(true)
@@ -73,7 +73,7 @@ describe("one document for the editor and the tools", () => {
   })
 
   test("a tool result adopts its drawing when the editor had none", () => {
-    mirrorToolResult("cad_add_entities", true, json({ ok: true, projectId: "p-1", drawingId: "d-1", elements: [{ id: "x1", type: "circle", layerId: "default", x: 0, y: 0, radius: 2 }] }))
+    mirrorToolResult("cad_edit.add_entities", true, json({ ok: true, projectId: "p-1", drawingId: "d-1", elements: [{ id: "x1", type: "circle", layerId: "default", x: 0, y: 0, radius: 2 }] }))
     expect(useDocumentStore.getState()).toMatchObject({ projectId: "p-1", drawingId: "d-1" })
   })
 
@@ -107,25 +107,25 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
   }
 
   test("the operation id comes from the right place and failures are ignored", () => {
-    expect(operationIdOf("cam_create_operation", {}, json({ ok: true, operationId: "o1" }))).toBe("o1")
-    expect(operationIdOf("cam_generate_gcode", { operationId: "o2" }, json({ stats: {} }))).toBe("o2")
-    expect(operationIdOf("cam_verify_toolpath", { operationId: "o3" }, json({ ok: false, error: "x" }))).toBeUndefined()
-    expect(operationIdOf("cam_generate_gcode", {}, "not json")).toBeUndefined()
+    expect(operationIdOf("cam_edit.create", {}, json({ ok: true, operationId: "o1" }))).toBe("o1")
+    expect(operationIdOf("cam_edit.generate", { operationId: "o2" }, json({ stats: {} }))).toBe("o2")
+    expect(operationIdOf("cam_edit.verify", { operationId: "o3" }, json({ ok: false, error: "x" }))).toBeUndefined()
+    expect(operationIdOf("cam_edit.generate", {}, "not json")).toBeUndefined()
   })
 
   test("create / generate / verify fill the settings, the editor, the preview and the Verify tab", async () => {
     const { doc, id, created } = await operation()
-    expect(await mirrorCamResult(app.state, "cam_create_operation", {}, json(created))).toBe(true)
+    expect(await mirrorCamResult(app.state, "cam_edit.create", {}, json(created))).toBe(true)
     expect(useGeneratorStore.getState().settings).toMatchObject({ toolDiameter: 6, depth: 3, stepdown: 1 })
 
     const generated = await handlers.generateGcode(doc.projectId, id)
-    expect(await mirrorCamResult(app.state, "cam_generate_gcode", { operationId: id }, json({ stats: generated.stats }))).toBe(true)
+    expect(await mirrorCamResult(app.state, "cam_edit.generate", { operationId: id }, json({ stats: generated.stats }))).toBe(true)
     expect(useCamStore.getState().gcode).toBe(generated.gcode)
     expect(useCamStore.getState().program.toolpaths.length).toBeGreaterThan(0)
     expect(verificationState().state).toBe("not-run")
 
     const verified = await handlers.verifyOperation(doc.projectId, id, {}) as { ok: boolean }
-    expect(await mirrorCamResult(app.state, "cam_verify_toolpath", { operationId: id }, json(verified))).toBe(true)
+    expect(await mirrorCamResult(app.state, "cam_edit.verify", { operationId: id }, json(verified))).toBe(true)
     expect(useVerifyStore.getState().report).not.toBeNull()
     expect(useVerifyStore.getState().report!.ok).toBe(verified.ok)
     expect(useVerifyStore.getState().report!.preview.heights.length).toBeGreaterThan(0)
@@ -138,16 +138,16 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
     const { doc, id } = await operation()
     await handlers.generateGcode(doc.projectId, id)
     await handlers.verifyOperation(doc.projectId, id, {})
-    await mirrorCamResult(app.state, "cam_verify_toolpath", { operationId: id }, json({ ok: true }))
+    await mirrorCamResult(app.state, "cam_edit.verify", { operationId: id }, json({ ok: true }))
     expect(verificationState().state).not.toBe("not-run")
     await handlers.updateOperation(doc.projectId, id, { depth: 5 })
-    await mirrorCamResult(app.state, "cam_update_operation", { operationId: id }, json({ ok: true, operationId: id }))
+    await mirrorCamResult(app.state, "cam_edit.update", { operationId: id }, json({ ok: true, operationId: id }))
     expect(useGeneratorStore.getState().settings.depth).toBe(5)
     expect(useCamStore.getState().gcode).toBe("")
     expect(verificationState().state).toBe("not-run")
     await handlers.generateGcode(doc.projectId, id)
     await handlers.verifyOperation(doc.projectId, id, {})
-    await mirrorCamResult(app.state, "cam_verify_toolpath", { operationId: id }, json({ ok: true }))
+    await mirrorCamResult(app.state, "cam_edit.verify", { operationId: id }, json({ ok: true }))
     expect(verificationState().state).not.toBe("not-run")
     expect(verificationState().state).not.toBe("stale")
     useCamStore.getState().setGcode(`${useCamStore.getState().gcode}\n; edited`)
@@ -156,8 +156,8 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
 
   test("other tools and unknown operations change nothing", async () => {
     const before = useCamStore.getState().gcode
-    expect(await mirrorCamResult(app.state, "cad_add_elements", {}, json({ ok: true }))).toBe(false)
-    expect(await mirrorCamResult(app.state, "cam_generate_gcode", { operationId: "ghost" }, json({}))).toBe(false)
+    expect(await mirrorCamResult(app.state, "cad_edit.add", {}, json({ ok: true }))).toBe(false)
+    expect(await mirrorCamResult(app.state, "cam_edit.generate", { operationId: "ghost" }, json({}))).toBe(false)
     expect(useCamStore.getState().gcode).toBe(before)
   })
 })
@@ -253,7 +253,7 @@ describe("the assistant lays out, groups and organises what it built", () => {
     const { doc, id } = await seed()
     const result = await handlers.transformEntities(doc.projectId, { ids: [id], transform: { move: { x: 30, y: 0, z: 0 } }, copies: 3 }) as { ok: boolean; copied: boolean; elements: Array<{ id: string; x: number }> }
     expect(result).toMatchObject({ ok: true, copied: true })
-    mirrorToolResult("cad_transform_entities", true, json(result))
+    mirrorToolResult("cad_edit.transform", true, json(result))
     const xs = useElementsStore.getState().elements.map((e) => e["x"]).sort((a, b) => Number(a) - Number(b))
     expect(xs).toEqual([0, 30, 60, 90])
     expect(new Set(useElementsStore.getState().elements.map((e) => e.id)).size).toBe(4)
@@ -262,7 +262,7 @@ describe("the assistant lays out, groups and organises what it built", () => {
   test("moving without copies updates the same element; an unknown id is told, not thrown", async () => {
     const { doc, id } = await seed()
     const moved = await handlers.transformEntities(doc.projectId, { ids: [id], transform: { move: { x: 5, y: 0, z: 0 }, rotate: { axis: "z", degrees: 90 } }, copies: 0 })
-    mirrorToolResult("cad_transform_entities", true, json(moved))
+    mirrorToolResult("cad_edit.transform", true, json(moved))
     expect(useElementsStore.getState().elements.find((e) => e.id === id)).toMatchObject({ x: 5, rotation: { z: expect.closeTo(90, 3) } })
     expect(await handlers.transformEntities(doc.projectId, { ids: ["ghost"], transform: { move: { x: 1, y: 0, z: 0 } }, copies: 0 })).toMatchObject({ ok: false })
   })
@@ -270,17 +270,17 @@ describe("the assistant lays out, groups and organises what it built", () => {
   test("grouping replaces the parts with one component, and ungrouping brings them back in place", async () => {
     const { doc, id } = await seed()
     const added = await handlers.addElements(doc.projectId, [{ type: "cylinder", x: 40, y: 0, z: 0, radius: 3, height: 20 }]) as { ids: string[]; elements: object[] }
-    mirrorToolResult("cad_add_elements", true, json(added))
+    mirrorToolResult("cad_edit.add", true, json(added))
     const grouped = await handlers.groupEntities(doc.projectId, { ids: [id, added.ids[0]!], ungroup: false, name: "Pair" }) as { ok: boolean; ids: string[]; removed: string[] }
     expect(grouped.ok).toBe(true)
-    mirrorToolResult("cad_group_entities", true, json(grouped))
+    mirrorToolResult("cad_edit.group", true, json(grouped))
     const after = useElementsStore.getState().elements
     expect(after.map((e) => e.type)).toEqual(["component"])
     expect(after[0]).toMatchObject({ name: "Pair", x: 0 })
     expect((after[0]!["elements"] as Array<{ x: number }>).map((c) => c.x)).toEqual([0, 40])
 
     const opened = await handlers.groupEntities(doc.projectId, { ids: grouped.ids, ungroup: true }) as object
-    mirrorToolResult("cad_group_entities", true, json(opened))
+    mirrorToolResult("cad_edit.group", true, json(opened))
     expect(useElementsStore.getState().elements.map((e) => [e.type, e["x"]]).sort()).toEqual([["cube", 0], ["cylinder", 40]])
   })
 
@@ -290,14 +290,14 @@ describe("the assistant lays out, groups and organises what it built", () => {
       { action: "layer_create", layer: "Housing", color: "#ff0000" }, { action: "layer_create", layer: "Spare" },
       { action: "layer_rename", layer: "spare", newName: "Fixtures" }, { action: "view_2d" }, { action: "hide", ids: [id] }
     ]
-    mirrorToolResult("cad_editor", true, json({ ok: true, actions }))
+    mirrorToolResult("cad_edit.editor", true, json({ ok: true, actions }))
     const layers = useLayerStore.getState().layers
     expect(layers.find((l) => l.name === "Housing")).toMatchObject({ color: "#ff0000", visible: true })
     expect(layers.some((l) => l.name === "Fixtures")).toBe(true)
     expect(useElementsStore.getState().elements.find((e) => e.id === id)!["visible"]).toBe(false)
 
     useElementsStore.getState().updateElement(id, { layerId: layers.find((l) => l.name === "Fixtures")!.id, visible: true })
-    mirrorToolResult("cad_editor", true, json({ ok: true, actions: [{ action: "layer_delete", layer: "Fixtures", moveTo: "Housing" }, { action: "layer_hide", layer: "nope" }] }))
+    mirrorToolResult("cad_edit.editor", true, json({ ok: true, actions: [{ action: "layer_delete", layer: "Fixtures", moveTo: "Housing" }, { action: "layer_hide", layer: "nope" }] }))
     const housing = useLayerStore.getState().layers.find((l) => l.name === "Housing")!
     expect(useLayerStore.getState().layers.some((l) => l.name === "Fixtures")).toBe(false)
     expect(useElementsStore.getState().elements.find((e) => e.id === id)!.layerId).toBe(housing.id)

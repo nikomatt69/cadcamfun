@@ -7,7 +7,7 @@ import { childAgent } from "./agents.ts"
 export interface SessionControlInput {
   readonly sessionId: string
   readonly projectId?: string
-  readonly action: "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "reply_permission" | "consolidate_memory"
+  readonly action: "status" | "compact" | "cancel_task" | "answer_question" | "reject_question" | "reply_permission" | "consolidate_memory" | "context"
   readonly taskId?: string
   readonly requestId?: string
   readonly answers?: ReadonlyArray<ReadonlyArray<string>>

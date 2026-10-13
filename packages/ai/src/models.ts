@@ -1,5 +1,6 @@
 import { Schema } from "effect"
 import { AiConfigError } from "./errors.ts"
+import { providerAllowed, type PolicyStatement } from "./nikcli/policy.ts"
 
 /**
  * Providers the app configures itself (base URL / protocol defaults). These
@@ -101,6 +102,8 @@ export interface ResolveOptions {
   /** Providers that currently hold a key. */
   readonly configured: ReadonlySet<ProviderId>
   readonly forceGateway?: boolean
+  /** nikcli resource policy: a provider denied for `provider.use` is never resolved, directly or through the gateway. */
+  readonly policies?: ReadonlyArray<PolicyStatement>
 }
 
 export interface ResolvedModel {
@@ -130,6 +133,25 @@ const gatewayModelId = (vendor: ProviderId | undefined, modelId: string): string
  * ordered list in `configured`).
  */
 export const resolveModel = (
+  selector: ModelSelector | undefined,
+  options: ResolveOptions
+): ResolvedModel | AiConfigError => {
+  const policies = options.policies ?? []
+  if (policies.length === 0) return resolveUnrestricted(selector, options)
+  const denied = (provider: ProviderId): AiConfigError =>
+    new AiConfigError({ message: `The AI policy does not allow using "${provider}".`, provider })
+  // The provider the caller asked for is what the policy is about, even when the gateway ends up serving it.
+  if (selector?.provider !== undefined && !providerAllowed(policies, selector.provider)) return denied(selector.provider)
+  // Without a preference, only providers the policy lets through can be picked.
+  const allowed = new Set([...options.configured].filter((provider) => providerAllowed(policies, provider)))
+  const resolved = resolveUnrestricted(selector, { ...options, configured: allowed })
+  if (resolved instanceof AiConfigError) return resolved
+  const vendor = resolved.viaGateway ? resolved.modelId.split("/")[0] : undefined
+  if (vendor !== undefined && resolved.modelId.includes("/") && !providerAllowed(policies, vendor)) return denied(vendor)
+  return providerAllowed(policies, resolved.provider) ? resolved : denied(resolved.provider)
+}
+
+const resolveUnrestricted = (
   selector: ModelSelector | undefined,
   options: ResolveOptions
 ): ResolvedModel | AiConfigError => {

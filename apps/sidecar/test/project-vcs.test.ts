@@ -224,29 +224,39 @@ describe("assistant VCS tools", () => {
         const actor: Actor = { userId: u!.id, name: "Ada", email: "a@x.io" }
         yield* vcs.commit(project.id, { message: "init" }, actor)
         const contributions = vcsContributions({ vcs, runner, projects, actor })
-        const keys: Record<string, string> = {
-          vcs_status: "vcs.status", vcs_diff: "vcs.diff", vcs_list_pull_requests: "vcs.list_pull_requests",
-          vcs_start_change: "vcs_edit.start_change", vcs_commit: "vcs_edit.commit", vcs_open_pull_request: "vcs_edit.open_pull_request"
-        }
-        // The reply in the shape the assistant reads: `{ ok, value }` or `{ ok: false, error }`.
-        const call = (id: string, input: unknown) => Effect.promise(() => contributions[keys[id]!]!(input as never, { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }).then(
-          (value) => ({ ok: true, value }),
-          (error: Error) => ({ ok: false, error: error.message })
+        type Reply = { ok: true; value: unknown } | { ok: false; error: string }
+        // The reply in the shape the assistant reads: `{ ok, value }` or `{ ok: false, error }`. The catalogue keys are
+        // `tool.action`, and the contributions are what the sidecar supplies for exactly those actions.
+        const call = (key: string, input: Record<string, unknown>) => Effect.promise(() => contributions[key]!((input as never), { projectId: project.id, sessionId: "s", signal: new AbortController().signal, handlers: {} as never }).then(
+          (value): Reply => ({ ok: true, value }),
+          (error: Error): Reply => ({ ok: false, error: error.message })
         ))
 
-        expect((yield* call("vcs_commit", { message: "on main" })).ok).toBe(false) // nothing changed yet; and main is protected
-        expect(yield* call("vcs_start_change", { topic: "Widen the plate!" })).toEqual({ ok: true, value: { branch: "ai/widen-the-plate" } })
-        db.update(schema.drawingTable).set({ data: { w: 2 } }).where(eq(schema.drawingTable.id, "d1")).run() // what cad_modify_entities would do
-        expect((yield* call("vcs_status", {})).value.dirty).toEqual(["drawings/d1.json"])
-        expect((yield* call("vcs_commit", { message: "Widen plate to 2" })).ok).toBe(true)
-        const diff = (yield* call("vcs_diff", {})).value
-        expect(diff[0].changes).toContainEqual({ pointer: "/data/w", before: 1, after: 2 })
-        expect((yield* call("vcs_open_pull_request", { title: "Widen plate", body: "w 1 -> 2" })).value).toEqual({ number: 1, head: "ai/widen-the-plate", base: "main" })
+        expect((yield* call("vcs_edit.commit", { message: "on main" })).ok).toBe(false) // nothing changed yet; and main is protected
+        expect(yield* call("vcs_edit.start_change", { topic: "Widen the plate!" })).toEqual({ ok: true, value: { branch: "ai/widen-the-plate" } })
+        db.update(schema.drawingTable).set({ data: { w: 2 } }).where(eq(schema.drawingTable.id, "d1")).run() // what cad_edit modify would do
+        // The value an action answered with; a refusal fails the test with its own message.
+        const answered = <V>(reply: Reply): V => {
+          if (!reply.ok) throw new Error(reply.error)
+          return reply.value as V
+        }
+        /** Why an action refused; answering instead of refusing fails the test. */
+        const refused = (reply: Reply): string => {
+          if (reply.ok) throw new Error("The action answered; it was expected to refuse.")
+          return reply.error
+        }
+
+        expect(answered<{ dirty: string[] }>(yield* call("vcs.status", {})).dirty).toEqual(["drawings/d1.json"])
+        expect((yield* call("vcs_edit.commit", { message: "Widen plate to 2" })).ok).toBe(true)
+        // The action's own schema fills `to` with "HEAD"; calling the contribution directly skips that, so the test says it.
+        const diff = answered<ReadonlyArray<{ changes: ReadonlyArray<unknown> }>>(yield* call("vcs.diff", { to: "HEAD" }))
+        expect(diff[0]?.changes).toContainEqual({ pointer: "/data/w", before: 1, after: 2 })
+        expect(answered<{ number: number; head: string; base: string }>(yield* call("vcs_edit.open_pull_request", { title: "Widen plate", body: "w 1 -> 2" }))).toEqual({ number: 1, head: "ai/widen-the-plate", base: "main" })
 
         // Working on a dirty tree is refused, and the AI cannot merge: that stays with a person.
         db.update(schema.drawingTable).set({ data: { w: 3 } }).where(eq(schema.drawingTable.id, "d1")).run()
-        expect((yield* call("vcs_start_change", { topic: "other" })).error).toContain("Uncommitted")
-        const list = (yield* call("vcs_list_pull_requests", {})).value
+        expect(refused(yield* call("vcs_edit.start_change", { topic: "other" }))).toContain("Uncommitted")
+        const list = answered<ReadonlyArray<{ number: number; title: string; head: string; authorKind: string; reviews: ReadonlyArray<unknown> }>>(yield* call("vcs.list_pull_requests", {}))
         expect(list).toEqual([{ number: 1, title: "Widen plate", head: "ai/widen-the-plate", authorKind: "ai", reviews: [] }])
         expect((yield* vcs.pullRequest(project.id, 1)).pullRequest.state).toBe("open")
       }).pipe(Effect.provide(WorkflowRunner.layer().pipe(Layer.provideMerge(ProjectRepo.layer), Layer.provideMerge(WithLocal))), Effect.scoped),

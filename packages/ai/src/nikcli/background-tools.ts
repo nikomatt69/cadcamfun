@@ -11,6 +11,14 @@ import type { ToolContext } from "../tools/define.ts"
 /** A readable refusal instead of a thrown error when the model names a specialist that does not exist. */
 const refuse = (message: string) => ({ ok: false, error: message })
 
+/**
+ * The `background` flag as a boolean. The action schema coerces `"true"` before an implementation sees it, but this
+ * contribution is also called directly, and a strict `=== true` there would read the string `"true"` as false and
+ * silently block the caller on a background job. A flag is never worth a wrong answer about whether to wait.
+ */
+const backgroundFlag = (value: unknown): boolean | undefined =>
+  value === undefined ? undefined : value === true || value === "true"
+
 /** The four contributions of the delegation tool, keyed by the catalogue's action id. */
 export const backgroundToolContributions = (manager: BackgroundTaskManagerInterface): Readonly<Record<string, ActionContribution>> => {
   const call = (action: string) => async (input: never, context: ToolContext): Promise<unknown> => {
@@ -24,7 +32,7 @@ export const backgroundToolContributions = (manager: BackgroundTaskManagerInterf
       const normalized = (name ?? "researcher").trim().toLowerCase().replace(/^cadcam-/, "").replace(/^worker$/, "researcher")
       if (!isSubagentId(normalized)) return { ok: false, error: `Unknown agent "${String(name)}". Use one of: ${SUBAGENT_IDS.join(", ")}.` }
       const spec = SUBAGENTS[normalized]
-      const background = value["background"] === undefined ? spec.background : value["background"] === true
+      const background = backgroundFlag(value["background"]) ?? spec.background
       const task = manager.enqueue({
         description: String(value["description"]), prompt: String(value["prompt"]),
         ...owner, agent: spec.id, edits: spec.edits, background

@@ -77,8 +77,8 @@ for (const scenario of ["completed", "unavailable", "pending", "late-disconnect"
         if (scenario === "unavailable") throw new Error("Host temporarily unavailable")
         return [{ info: { id: "user", role: "user" }, parts: [{ type: "text", text: "Build the part" }] },
           { info: { id: "answer", role: "assistant", finish: "stop" }, parts: [
-            tool("failed", "cad_add_elements", {}, { ok: false, error: "radius invalid" }),
-            tool("fixed", "cad_add_elements", {}, { elements: [{ id: "solid-kept" }] }),
+            tool("failed", "cad_edit", {}, { ok: false, error: "radius invalid" }),
+            tool("fixed", "cad_edit", {}, { elements: [{ id: "solid-kept" }] }),
             tool("plan-done", "todowrite", { todos: [{ content: "Build", status: scenario === "pending" && prompts === 1 ? "pending" : "completed" }] }, [])
           ] }]
       } },
@@ -86,7 +86,7 @@ for (const scenario of ["completed", "unavailable", "pending", "late-disconnect"
         yield { type: "server.connected", properties: {} }
         yield { type: "message.part.updated", properties: { part: { ...tool("plan", "todowrite", { todos: [{ content: "Build", status: "pending" }] }, []), sessionID: "s", messageID: "answer" } } }
         if (scenario === "late-disconnect") await new Promise((resolve) => setTimeout(resolve, 30))
-        yield { type: "message.part.updated", properties: { part: { ...tool("failed", "cad_add_elements", {}, { ok: false, error: "radius invalid" }), sessionID: "s", messageID: "answer" } } }
+        yield { type: "message.part.updated", properties: { part: { ...tool("failed", "cad_edit", {}, { ok: false, error: "radius invalid" }), sessionID: "s", messageID: "answer" } } }
         if (!signal.aborted) await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }))
       } },
       "session-prompt": { prompt: async () => {

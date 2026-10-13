@@ -9,7 +9,10 @@ import type { NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import { installSkills } from "../skills/index.ts"
 import { createUserSkillStore } from "../skills/user.ts"
-import { buildHostConfig, type HostProviderSpec, type HostCompactionSettings } from "./config.ts"
+import type { PolicyStatement } from "./policy.ts"
+import { recordProgramCall } from "./program-calls.ts"
+import { registerHostPatches } from "./host-patches.ts"
+import { buildHostConfig, type HostProviderSpec, type HostCompactionSettings, type HostTimeoutSettings } from "./config.ts"
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
 import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
@@ -46,6 +49,10 @@ export interface NikCliRuntimeOptions {
   readonly hostLogs?: HostLogSink
   /** Automatic compaction can spend model calls; omission preserves host defaults. */
   readonly compaction?: HostCompactionSettings
+  /** Deadlines for one tool call and one delegated task; omission uses the CAD/CAM budgets. */
+  readonly timeouts?: HostTimeoutSettings
+  /** nikcli resource policy: `provider.use` is enforced by the host, `tool.use` by the permission map built here. */
+  readonly policies?: ReadonlyArray<PolicyStatement>
   /** When this settles the host bundle is imported ahead of the first request. Omitted: it is imported on first use only. */
   readonly warmAfter?: Promise<unknown>
 }
@@ -109,6 +116,7 @@ let sdkPromise: Promise<Sdk> | undefined
  * and the whole host fails to load with `First argument must be an Error object`.
  */
 const importSdk = async (): Promise<Sdk> => {
+  registerHostPatches()
   const previous = Error.prepareStackTrace
   // lib.dom types the hook as non-optional; the runtime accepts `undefined` (its native default).
   Error.prepareStackTrace = undefined as unknown as typeof Error.prepareStackTrace
@@ -202,7 +210,9 @@ export const makeNikCliRuntime = (
               providers,
               toolIds: toolIdsOf(projectId),
               systemPrompt: options.systemPrompt,
-              ...(options.compaction ? { compaction: options.compaction } : {})
+              ...(options.compaction ? { compaction: options.compaction } : {}),
+              ...(options.timeouts ? { timeouts: options.timeouts } : {}),
+              ...(options.policies ? { policies: options.policies } : {})
             }), null, 2))
             await rename(temporary, file)
           } finally {
@@ -239,7 +249,15 @@ export const makeNikCliRuntime = (
             await ctx.ask({ permission: spec.id, patterns: [`project:${projectId}`], always: [`project:${projectId}`], metadata: { input: args } })
             assertOpen()
             const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
-            const result = spec.executeWithFiles ? await spec.executeWithFiles(args, call) : { output: await spec.execute(args, call) }
+            // Under `code_mode` the call id is the program's, not this tool's: record what happened so the program's inner calls
+            // reach the editor as they finish (see `program-calls.ts`).
+            const result: { readonly output: string; readonly files?: ReadonlyArray<FilePart> } = await (spec.executeWithFiles
+              ? spec.executeWithFiles(args, call)
+              : spec.execute(args, call).then((output) => ({ output }))).catch((cause: unknown) => {
+              recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: cause instanceof Error ? cause.message : String(cause), failed: true })
+              throw cause
+            })
+            recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: result.output, failed: false })
             return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
           }
         }))

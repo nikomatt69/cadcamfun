@@ -367,6 +367,7 @@ export type AiSessionControlPayload = {
     | "reject_question"
     | "reply_permission"
     | "consolidate_memory"
+    | "context"
   readonly taskId?: string | undefined
   readonly requestId?: string | undefined
   readonly answers?: ReadonlyArray<ReadonlyArray<string>> | undefined
@@ -1860,6 +1861,7 @@ export type AiSessionControlOutput = {
     compactAt?: number | undefined
     tokens?: number | undefined
     compacted: boolean
+    breakdown?: { estimatedTotal: number; categories: Array<{ category: string; tokens: number }> } | undefined
   }
 }
 

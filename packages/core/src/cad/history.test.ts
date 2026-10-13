@@ -1,8 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { buildPartModelFromMeshes } from "../cam/model/model.ts"
 import { historyVolume, rebuild, withParameter, type DimConstraint, type Feature, type History, type SketchFeature } from "./history.ts"
 import type { SketchEntity } from "./sketch.ts"
 import { meshBounds, meshVolume } from "./solid.ts"
+
+// A single history here can rebuild a filleted, countersunk, mirrored plate; the default 5 s timeout makes the heavy
+// ones fail under the load of a full-suite run (as in `csg.test.ts`).
+setDefaultTimeout(60_000)
 
 const pt = (id: string, x: number, y: number): SketchEntity => ({ id, kind: "point", x, y })
 const line = (id: string, p1: string, p2: string): SketchEntity => ({ id, kind: "line", p1, p2 })
@@ -941,7 +945,9 @@ describe("extrusion taper (draft)", () => {
     expect(r.issues).toEqual([])
     expect(r.bodies).toHaveLength(1)
     const side = 40 - 2 * 20 * t5
-    expect(vol(r)).toBeCloseTo(frustumSquare(40, side, 20), 6)
+    // A lofted frustum is compared in relative terms: the mesh keeps its vertices in float32, whose rounding of the
+    // leaning side costs about 4e-8 of the volume, far below anything a machinist would read off a solid.
+    expect(relErr(vol(r), frustumSquare(40, side, 20))).toBeLessThan(1e-6)
     const b = bounds(r)
     expect([b.minX, b.maxX, b.minZ, b.maxZ].map((v) => Math.round(v * 1e6) / 1e6 + 0)).toEqual([0, 40, 0, 20])
     // The top face is the smaller square, centred.
@@ -955,21 +961,21 @@ describe("extrusion taper (draft)", () => {
   test("a negative draft widens the solid towards the top: the same formula with the top (40 + 2 x 20 tan 5)^2", () => {
     const r = rebuild(taperedBox(-5))
     expect(r.issues).toEqual([])
-    expect(vol(r)).toBeCloseTo(frustumSquare(40, 40 + 2 * 20 * t5, 20), 6)
+    expect(relErr(vol(r), frustumSquare(40, 40 + 2 * 20 * t5, 20))).toBeLessThan(1e-6)
     expect(vol(r)).toBeGreaterThan(32000)
   })
 
   test("a draft of zero is the plain extrusion; the angle is a dimension", () => {
     expect(vol(rebuild(taperedBox(0)))).toBeCloseTo(32000, 6)
     const h = taperedBox("angle", {}, { angle: 3 })
-    expect(vol(rebuild(h))).toBeCloseTo(frustumSquare(40, 40 - 40 * Math.tan((3 * Math.PI) / 180), 20), 6)
+    expect(relErr(vol(rebuild(h)), frustumSquare(40, 40 - 40 * Math.tan((3 * Math.PI) / 180), 20))).toBeLessThan(1e-6)
     expect(vol(rebuild(withParameter(h, "angle", 8)))).toBeLessThan(vol(rebuild(h)))
   })
 
   test("it works from the other end: a downward extrusion leans the same way from its starting plane", () => {
     const r = rebuild(history([rectangle("s", "XY", 0, 0, 40, 40), { id: "x", type: "extrude", sketch: "s", depth: 20, direction: "down", operation: "new", taper: 5 }]))
     expect(r.issues).toEqual([])
-    expect(vol(r)).toBeCloseTo(frustumSquare(40, 40 - 40 * t5, 20), 6)
+    expect(relErr(vol(r), frustumSquare(40, 40 - 40 * t5, 20))).toBeLessThan(1e-6)
     expect(bounds(r).minZ).toBeCloseTo(-20, 5)
   })
 
@@ -1011,7 +1017,7 @@ describe("extrusion taper (draft)", () => {
     expect(errors(r)).toHaveLength(1)
     expect(errors(r)[0]).toMatchObject({ feature: "sh" })
     expect(errors(r)[0]!.message).toMatch(/drafted \(tapered\) extrusion cannot be shelled/)
-    expect(vol(r)).toBeCloseTo(frustumSquare(40, 40 - 40 * t5, 20), 6)
+    expect(relErr(vol(r), frustumSquare(40, 40 - 40 * t5, 20))).toBeLessThan(1e-6)
   })
 
   test("a fillet still works on the edges of a tapered body", () => {
@@ -1064,7 +1070,10 @@ describe("shell of a full revolution", () => {
     const r = rebuild(history([...cylinder(), { id: "sh", type: "shell", feature: "rev", thickness: 16 }]))
     expect(errors(r)).toHaveLength(1)
     expect(errors(r)[0]!.message).toMatch(/no cavity/)
-    expect(vol(r)).toBeCloseTo(solidCylinder, -1)
+    // The solid cylinder, meshed, is the reference: the failed shell must leave exactly what was there before.
+    const untouched = vol(rebuild(history(cylinder())))
+    expect(vol(r)).toBe(untouched)
+    expect(relErr(vol(r), solidCylinder)).toBeLessThan(0.003)
   })
 
   test("the thickness is a dimension: editing it rebuilds a thicker wall", () => {
@@ -1172,8 +1181,11 @@ describe("sweep with a bend radius", () => {
   })
 
   test("a negative radius is an error (zero is the mitre)", () => {
-    expect(errors(rebuild(pipe(-5))).length).toBeGreaterThanOrEqual(0)
-    expect(rebuild(pipe(-5)).bodies.length === 0 || errors(rebuild(pipe(-5))).length > 0).toBe(true)
+    const r = rebuild(pipe(-5))
+    expect(errors(r)).toHaveLength(1)
+    expect(errors(r)[0]).toMatchObject({ feature: "pipe" })
+    expect(errors(r)[0]!.message).toMatch(/bend radius cannot be negative/)
+    expect(r.bodies).toHaveLength(0)
   })
 
   test("a closed route ignores the bend radius: the same torus with or without it", () => {

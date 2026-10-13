@@ -30,10 +30,10 @@ beforeAll(async () => {
     if ((request.tools ?? []).length === 0) return { text: "Widen the plate" }
     const results = request.messages.filter((m) => m.role === "tool").length
     switch (results) {
-      case 0: return { toolCalls: [{ name: "vcs_start_change", args: { topic: "Widen the plate" } }] }
-      case 1: return { toolCalls: [{ name: "cad_add_entities", args: { entities: [{ type: "rectangle", origin: { x: 0, y: 0 }, width: 140, height: 50 }] } }] }
-      case 2: return { toolCalls: [{ name: "vcs_commit", args: { message: "Add the 140 x 50 plate outline" } }] }
-      case 3: return { toolCalls: [{ name: "vcs_open_pull_request", args: { title: "Widen the plate", body: "Adds a 140 x 50 mm outline. Please check the width." } }] }
+      case 0: return { toolCalls: [{ name: "vcs_edit", args: { action: "start_change", topic: "Widen the plate" } }] }
+      case 1: return { toolCalls: [{ name: "cad_edit", args: { action: "add_entities", entities: [{ type: "rectangle", origin: { x: 0, y: 0 }, width: 140, height: 50 }] } }] }
+      case 2: return { toolCalls: [{ name: "vcs_edit", args: { action: "commit", message: "Add the 140 x 50 plate outline" } }] }
+      case 3: return { toolCalls: [{ name: "vcs_edit", args: { action: "open_pull_request", title: "Widen the plate", body: "Adds a 140 x 50 mm outline. Please check the width." } }] }
       default: return { text: "I opened a pull request with the wider plate for you to review." }
     }
   })
@@ -84,7 +84,7 @@ describe("the assistant from the phone", () => {
     const events: ChatEvent[] = []
     for await (const event of phone.chat({ projectId: project.id, message: "Make the plate 140 mm wide and open a pull request for it" })) events.push(event)
     toolsCalled = events.flatMap((e) => (e.type === "tool_call" ? [String((e as { tool: string }).tool)] : []))
-    expect(toolsCalled).toEqual(["vcs_start_change", "cad_add_entities", "vcs_commit", "vcs_open_pull_request"])
+    expect(toolsCalled).toEqual(["vcs_edit", "cad_edit", "vcs_edit", "vcs_edit"])
     expect(events.at(-1)?.type).toBe("done")
     expect(events.some((e) => e.type === "error")).toBe(false)
 

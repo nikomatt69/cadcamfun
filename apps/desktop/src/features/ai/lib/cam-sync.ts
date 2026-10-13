@@ -16,10 +16,17 @@ import { useGeneratorStore, type ToolpathSettings } from "../../cam/store/genera
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { captureEditorOwner, type EditorOwner } from "./editor-sync.ts"
 
-const CAM_TOOLS = ["cam_create_operation", "cam_update_operation", "cam_generate_gcode", "cam_verify_toolpath"] as const
-type CamTool = (typeof CAM_TOOLS)[number]
+/** The four actions whose result changes what the CAM page shows; the key is `tool.action`. */
+const CAM_ACTIONS = ["create", "update", "generate", "verify"] as const
+type CamAction = (typeof CAM_ACTIONS)[number]
 
-const toolOf = (tool: string): CamTool | undefined => CAM_TOOLS.find((name) => tool.endsWith(name))
+/**
+ * Which CAM action a call is, from its `tool.action` key. `cam_edit.create` names the operation in its result (there was
+ * no id to ask for), the other three in their input or their result — so `create` and the rest are read differently below.
+ */
+const actionOfKey = (key: string): CamAction | undefined =>
+  CAM_ACTIONS.find((action) => key === `cam_edit.${action}` || key.endsWith(`.${action}`) || key.endsWith(action))
+const isStockSet = (key: string): boolean => key === "cam_edit.stock_set" || key === "cam.stock_set" || key.endsWith("cam_stock")
 
 const parse = (text: string): Record<string, unknown> => {
   try {
@@ -28,12 +35,12 @@ const parse = (text: string): Record<string, unknown> => {
   } catch { return {} }
 }
 
-/** The operation a CAM tool call was about: its result for `create`, its input for the others. */
-export const operationIdOf = (tool: string, input: unknown, output: string): string | undefined => {
+/** The operation a CAM call was about: `create` names it in its result, the other actions in the input they were given. */
+export const operationIdOf = (key: string, input: unknown, output: string): string | undefined => {
   const result = parse(output)
   if (result["ok"] === false || typeof result["error"] === "string") return undefined
   const fromInput = input !== null && typeof input === "object" ? (input as { operationId?: unknown }).operationId : undefined
-  const id = toolOf(tool) === "cam_create_operation" ? result["operationId"] : fromInput ?? result["operationId"]
+  const id = actionOfKey(key) === "create" ? result["operationId"] : fromInput ?? result["operationId"]
   return typeof id === "string" && id !== "" ? id : undefined
 }
 
@@ -42,10 +49,10 @@ interface OperationRow {
   readonly data: { readonly request?: { readonly settings?: ToolpathSettings }; readonly verification?: { readonly report?: VerifyResponse } } | null
 }
 
-/** Reads the operation back and mirrors it into the CAM stores. Best effort: a failure leaves the page as it was. */
-export async function mirrorCamResult(app: AppState, tool: string, input: unknown, output: string, owner: EditorOwner = captureEditorOwner()): Promise<boolean> {
+/** `key` is the call's action key (`cam_edit.generate`). Reads the operation back and mirrors it into the CAM stores. Best effort: a failure leaves the page as it was. */
+export async function mirrorCamResult(app: AppState, key: string, input: unknown, output: string, owner: EditorOwner = captureEditorOwner()): Promise<boolean> {
   if (!owner.current()) return false
-  if (tool.endsWith("cam_stock")) {
+  if (isStockSet(key)) {
     const result = parse(output)
     if (result["ok"] !== true || result["action"] !== "set") return false
     const stock = Schema.decodeUnknownSync(coreCam.generator.StockSchema)(result["stock"])
@@ -60,16 +67,16 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
     useVerifyStore.getState().reset()
     return true
   }
-  const kind = toolOf(tool)
+  const kind = actionOfKey(key)
   if (kind === undefined) return false
-  const id = operationIdOf(tool, input, output)
+  const id = operationIdOf(key, input, output)
   if (id === undefined || !owner.current()) return false
   try {
     const row = await app.runtime.run(app.client.toolpaths.get({ params: { id } })) as unknown as OperationRow
     if (!owner.current()) return false
     const settings = row.data?.request?.settings
     const gcode = row.gcode ?? ""
-    const parsesProgram = kind !== "cam_create_operation" && kind !== "cam_update_operation" && gcode.trim() !== ""
+    const parsesProgram = kind !== "create" && kind !== "update" && gcode.trim() !== ""
     const parsed = parsesProgram ? await app.runtime.run(makeToolpathGenerator(app.client).parse(gcode)) : undefined
     const report = row.data?.verification?.report
     if (!owner.current()) return false
@@ -77,7 +84,7 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
     if (settings !== undefined) useGeneratorStore.setState({ settings })
     const cam = useCamStore.getState()
     cam.setSelectedOperationId(id)
-    if (kind === "cam_create_operation" || kind === "cam_update_operation") {
+    if (kind === "create" || kind === "update") {
       cam.setGcode("")
       cam.setProgram(coreCam.makeProgram("untitled", [], {}))
       useGeneratorStore.getState().setResult("", [])
@@ -88,7 +95,7 @@ export async function mirrorCamResult(app: AppState, tool: string, input: unknow
     cam.setGcode(gcode)
     useGeneratorStore.getState().setResult(gcode, [])
     if (parsed !== undefined) cam.setProgram(parsed.program as never)
-    if (kind === "cam_verify_toolpath" && report !== undefined) {
+    if (kind === "verify" && report !== undefined) {
       useVerifyStore.getState().finish(report, gcode)
       cam.setRightTab("verify")
     }

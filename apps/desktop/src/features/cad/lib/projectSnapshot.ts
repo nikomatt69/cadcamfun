@@ -38,13 +38,15 @@ export interface ComponentClient {
 export const drawingPayload = (app: Pick<AppState, "settings">): Record<string, unknown> => {
   const { elements, selectedElement } = useElementsStore.getState()
   const { layers } = useLayerStore.getState()
-  return {
-    elements: toJsonSafe(elements),
-    layers: toJsonSafe(layers),
+  // The whole payload goes through the JSON filter, not just the geometry: a setting that holds `undefined` or a class instance
+  // is refused by the typed client ("Expected JSON value at ..."), and the assistant's turn would end before it started.
+  return toJsonSafe({
+    elements,
+    layers,
     selectedElement: selectedElement?.id ?? null,
     settings: documentSettings(app),
     version: "1.0"
-  }
+  }) as Record<string, unknown>
 }
 
 /** What a save actually put in the project, so the caller can report it instead of guessing. */

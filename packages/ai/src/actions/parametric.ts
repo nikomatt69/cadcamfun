@@ -41,11 +41,6 @@ export const parametricCreateSchema = z.object({ history: historySchema, ...name
 export const parametricUpdateSchema = z.object({ elementId, parameters: parameterSchema, expectedRevision: z.string().min(1).max(100) })
 export const parametricRecipeCreateSchema = z.object({ recipe: z.enum(recipes), params: z.record(z.string().min(1).max(80), z.unknown()).optional(), name: z.string().min(1).max(100).optional(), ...placement })
 
-export type ParametricInput =
-  | z.infer<typeof parametricValidateSchema> | z.infer<typeof parametricInspectSchema> | z.infer<typeof parametricTestSchema>
-  | z.infer<typeof parametricDfmSchema> | z.infer<typeof parametricFastenerSchema> | z.infer<typeof parametricRecipeSchema>
-  | z.infer<typeof parametricCreateSchema> | z.infer<typeof parametricUpdateSchema> | z.infer<typeof parametricRecipeCreateSchema>
-
 /** The parametric calls that read or write the drawing; the rest are answered by this package itself. */
 export type ParametricHandlerInput =
   | { action: "inspect"; elementId: string }

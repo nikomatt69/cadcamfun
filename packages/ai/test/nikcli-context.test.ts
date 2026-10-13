@@ -17,6 +17,19 @@ describe("host context management", () => {
     }
   })
 
+  test("a machining turn is not cut off by the host's editing-sized deadlines", () => {
+    // The pinned host defaults to 600_000 per tool and 1_800_000 per task, which aborts a long generate or
+    // verification mid-flight. The budgets are declared, validated, and overridable; `false` keeps the default.
+    expect(buildHostConfig({ providers: [], toolIds: [], systemPrompt: "CAD" })["experimental"]).toEqual({
+      brain: true, memory: true, tool_timeout: 1_800_000, task_timeout: 3_600_000
+    })
+    expect(buildHostConfig({ providers: [], toolIds: [], systemPrompt: "CAD", timeouts: { tool: false, task: 60_000 } })["experimental"])
+      .toMatchObject({ tool_timeout: false, task_timeout: 60_000 })
+    for (const timeouts of [{ tool: 0 }, { tool: -1 }, { tool: 1.5 }, { task: NaN }, { task: Infinity }]) {
+      expect(() => buildHostConfig({ providers: [], toolIds: [], systemPrompt: "CAD", timeouts })).toThrow()
+    }
+  })
+
   test("reads effective settings without usage estimates or model requests", async () => {
     const host = { client: { config: { get: async () => ({ compaction: { auto: false, reserved: 123 } }) } } } as unknown as ProjectHost
     expect(await Effect.runPromise(readHostContextPolicy(host))).toEqual({ source: "host-config", auto: false, prune: true, reserved: 123 })

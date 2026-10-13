@@ -46,7 +46,7 @@ export const PARTS_ACTIONS: ReadonlyArray<ActionSpec> = [
   contributedAction({
     // Removing a saved part is the destructive action of the group: the whole tool is registered as `ask`.
     id: "parts.delete", kind: "destructive", replaces: "cad_component_delete", contribution: "parts.delete",
-    parameters: z.object({ componentId: z.string().min(1) })
+    parameters: z.object({ componentId: z.string().min(1), confirm: z.literal(true) })
   })
 ]
 
@@ -84,7 +84,7 @@ export const LIBRARY_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   contributedAction({
     // Removing a library row cannot be undone from the assistant's side.
     id: "library_edit.delete", kind: "destructive", replaces: "lib_delete", contribution: "library_edit.delete",
-    parameters: z.object({ kind: z.enum(["material", "tool", "machine_config"]), id: z.string().min(1) })
+    parameters: z.object({ kind: z.enum(["material", "tool", "machine_config"]), id: z.string().min(1), confirm: z.literal(true) })
   })
 ]
 

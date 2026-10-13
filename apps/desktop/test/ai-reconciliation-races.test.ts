@@ -54,10 +54,10 @@ test("CAD results reject stale owners and explicit project or drawing mismatches
   const owner = captureEditorOwner()
   const layers = useLayerStore.getState().layers
   for (const identity of [{ projectId: "project-b" }, { drawingId: "drawing-b" }]) {
-    expect(mirrorToolResult("cad_add_elements", true, JSON.stringify({ ok: true, ...identity, elements: [{ ...element, layer: "Must not exist" }] }))).toBeUndefined()
+    expect(mirrorToolResult("cad_edit.add", true, JSON.stringify({ ok: true, ...identity, elements: [{ ...element, layer: "Must not exist" }] }))).toBeUndefined()
   }
   awayAndBack()
-  expect(mirrorToolResult("cad_add_elements", true, output, owner)).toBeUndefined()
+  expect(mirrorToolResult("cad_edit.add", true, output, owner)).toBeUndefined()
   expect(useElementsStore.getState().elements).toEqual([])
   expect(useLayerStore.getState().layers).toEqual(layers)
 })
@@ -70,14 +70,14 @@ test("CAD output parsing cannot mutate a document navigated away and back", () =
     return value
   })
   try {
-    expect(mirrorToolResult("cad_add_elements", true, output)).toBeUndefined()
+    expect(mirrorToolResult("cad_edit.add", true, output)).toBeUndefined()
     expect(useElementsStore.getState().elements).toEqual([])
   } finally { spy.mockRestore() }
 })
 
 test("a matching CAD result still adopts a drawing for a project with no drawing", () => {
   useDocumentStore.setState({ drawingId: null })
-  expect(mirrorToolResult("cad_add_elements", true, JSON.stringify({ ok: true, projectId: "project-a", drawingId: "created", elements: [element] }))).toEqual({ ...none, added: 1 })
+  expect(mirrorToolResult("cad_edit.add", true, JSON.stringify({ ok: true, projectId: "project-a", drawingId: "created", elements: [element] }))).toEqual({ ...none, added: 1 })
   expect(useDocumentStore.getState().drawingId).toBe("created")
 })
 
@@ -139,7 +139,7 @@ for (const navigate of [() => open("project-b", "drawing-b"), awayAndBack]) {
       return response.promise
     })
     const before = camState()
-    const pending = mirrorCamResult(app, "cam_verify_toolpath", { operationId: "operation-a" }, "{}")
+    const pending = mirrorCamResult(app, "cam_edit.verify", { operationId: "operation-a" }, "{}")
     await started.promise
     expect(camState()).toEqual(before)
     navigate()
@@ -151,7 +151,7 @@ for (const navigate of [() => open("project-b", "drawing-b"), awayAndBack]) {
 
 test("CAM generation applies parsed program and settings when the owner remains current", async () => {
   let calls = 0
-  expect(await mirrorCamResult(camApp(() => Promise.resolve(++calls === 1 ? operation : parsed)), "cam_generate_gcode", { operationId: "operation-a" }, "{}")).toBe(true)
+  expect(await mirrorCamResult(camApp(() => Promise.resolve(++calls === 1 ? operation : parsed)), "cam_edit.generate", { operationId: "operation-a" }, "{}")).toBe(true)
   expect(useCamStore.getState()).toMatchObject({ selectedOperationId: "operation-a", gcode: operation.gcode, program: parsed.program })
   expect(useGeneratorStore.getState().settings.toolDiameter).toBe(8)
 })

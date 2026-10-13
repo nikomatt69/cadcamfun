@@ -60,6 +60,9 @@ export interface StoredMessage {
   readonly error?: string
   readonly attachments?: ReadonlyArray<string>
   readonly events?: ReadonlyArray<AiEvent>
+  /** When the answer ended and what it cost: the turn footer reads both, so a restored conversation keeps them. */
+  readonly finishedAt?: string
+  readonly usage?: { readonly inputTokens: number; readonly outputTokens: number }
 }
 
 export const MAX_TRANSCRIPTS = 20
@@ -89,7 +92,7 @@ export const loadTranscripts = (): Readonly<Record<string, ReadonlyArray<StoredM
     if (!record(parsed)) return {}
     return Object.fromEntries(Object.entries(parsed).slice(0, MAX_TRANSCRIPTS).map(([id, values]) => [id, (Array.isArray(values) ? values : []).slice(-MAX_TRANSCRIPT_MESSAGES).flatMap((m) => {
       if (!record(m) || typeof m.id !== "string" || !["user", "assistant", "system"].includes(String(m.role)) || typeof m.text !== "string" || typeof m.createdAt !== "string" || (m.status !== "done" && m.status !== "error")) return []
-      const message: StoredMessage = { id: m.id, role: m.role as StoredMessage["role"], text: m.text.slice(0, MAX_STORED_TEXT), createdAt: m.createdAt, status: m.status, events: evidence(Array.isArray(m.events) ? m.events : []), ...(typeof m.error === "string" ? { error: m.error.slice(0, MAX_STORED_TEXT) } : {}), ...(Array.isArray(m.attachments) ? { attachments: m.attachments.filter((a): a is string => typeof a === "string").slice(0, 20) } : {}) }
+      const message: StoredMessage = { id: m.id, role: m.role as StoredMessage["role"], text: m.text.slice(0, MAX_STORED_TEXT), createdAt: m.createdAt, status: m.status, events: evidence(Array.isArray(m.events) ? m.events : []), ...(typeof m.error === "string" ? { error: m.error.slice(0, MAX_STORED_TEXT) } : {}), ...(Array.isArray(m.attachments) ? { attachments: m.attachments.filter((a): a is string => typeof a === "string").slice(0, 20) } : {}), ...(typeof m.finishedAt === "string" ? { finishedAt: m.finishedAt } : {}), ...(record(m.usage) && Number.isFinite(m.usage.inputTokens) && Number.isFinite(m.usage.outputTokens) ? { usage: { inputTokens: Number(m.usage.inputTokens), outputTokens: Number(m.usage.outputTokens) } } : {}) }
       return [message]
     })]))
   } catch {
@@ -113,11 +116,13 @@ export const saveTranscripts = (all: Readonly<Record<string, ReadonlyArray<Store
 }
 
 /** Only finished messages, text clipped. */
-export const toStored = (message: { readonly id: string; readonly role: "user" | "assistant" | "system"; readonly text: string; readonly createdAt: string; readonly status: string; readonly error?: string; readonly attachments?: ReadonlyArray<string>; readonly events?: ReadonlyArray<AiEvent> }): StoredMessage | undefined =>
+export const toStored = (message: { readonly id: string; readonly role: "user" | "assistant" | "system"; readonly text: string; readonly createdAt: string; readonly status: string; readonly error?: string; readonly attachments?: ReadonlyArray<string>; readonly events?: ReadonlyArray<AiEvent>; readonly finishedAt?: string; readonly usage?: { readonly inputTokens: number; readonly outputTokens: number } }): StoredMessage | undefined =>
   message.status === "done" || message.status === "error"
     ? {
         id: message.id, role: message.role, text: message.text.slice(0, MAX_STORED_TEXT), createdAt: message.createdAt,
         status: message.status, events: evidence(message.events ?? []), ...(message.error !== undefined ? { error: message.error.slice(0, MAX_STORED_TEXT) } : {}),
-        ...(message.attachments !== undefined ? { attachments: message.attachments } : {})
+        ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
+        ...(message.finishedAt !== undefined ? { finishedAt: message.finishedAt } : {}),
+        ...(message.usage !== undefined ? { usage: message.usage } : {})
       }
     : undefined

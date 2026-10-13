@@ -151,11 +151,11 @@ describe("project-scoped assistant workspace", () => {
       expect(requests).toEqual([{ sessionId: "ses_native_recovered", projectId: doc.projectId }])
       expect(mounted.store.messages().at(-1)?.text).toBe("Partial answer")
       recovered.resolve({ busy: false, text: "Recovered answer", events: [
-        { type: "tool_call" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", input: {} },
-        { type: "tool_result" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad_check_design", ok: true, output: '{"ok":true,"issues":[]}' },
-        { type: "tool_call" as const, sessionId: "ses_unrelated_recovery", callId: "unrelated-check", tool: "cad_check_design", input: {} },
-        { type: "delta" as never, sessionId: "ses_unrelated_recovery", text: "Unrelated answer" },
-        { type: "done" as never, sessionId: "ses_native_recovered", text: "Recovered answer" }
+        { type: "tool_call" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad", input: { action: "check" } },
+        { type: "tool_result" as const, sessionId: "ses_native_recovered", callId: "recovered-check", tool: "cad", ok: true, output: '{"ok":true,"issues":[]}' },
+        // Another conversation's evidence: recovery keeps this session's, never the neighbouring one's.
+        { type: "tool_call" as const, sessionId: "ses_unrelated_recovery", callId: "unrelated-check", tool: "cad", input: { action: "check" } },
+        { type: "todo" as const, sessionId: "ses_unrelated_recovery", todos: [{ content: "Unrelated plan", status: "pending", priority: "medium" }] }
       ] })
       await app.wait(() => mounted.store.status() === "idle")
       expect(mounted.store.error()).toBeUndefined()
@@ -261,7 +261,7 @@ describe("project-scoped assistant workspace", () => {
       expect(store.sessions()).toEqual([])
       store.openSession("ses_workspace_a")
       expect(store.sessionId()).toBeUndefined()
-      release(JSON.stringify({ type: "tool_result", sessionId: "ses_workspace_a", callId: "late", tool: "cad_add_elements", ok: true, output: JSON.stringify({ elements: [{ id: "wrong-part", type: "cube", width: 10, height: 10, depth: 10 }] }) }))
+      release(JSON.stringify({ type: "tool_result", sessionId: "ses_workspace_a", callId: "late", tool: "cad_edit", ok: true, output: JSON.stringify({ elements: [{ id: "wrong-part", type: "cube", width: 10, height: 10, depth: 10 }] }) }))
       await new Promise((resolve) => setTimeout(resolve, 40))
       expect(useElementsStore.getState().elements.some((element) => element.id === "wrong-part")).toBe(false)
       expect(aborted).toBe(0)
@@ -280,8 +280,8 @@ describe("project-scoped assistant workspace", () => {
     Object.assign(client, { chatStream: (input: Parameters<typeof original>[0]) => {
       payloads.push(input.payload)
       return Effect.succeed(eventStream([
-        { type: "tool_call", sessionId: "ses_workspace_persist", callId: "check", tool: "cad_check_design", input: {} },
-        { type: "tool_result", sessionId: "ses_workspace_persist", callId: "check", tool: "cad_check_design", ok: true, output: '{"ok":true,"issues":[]}' },
+        { type: "tool_call", sessionId: "ses_workspace_persist", callId: "check", tool: "cad", input: { action: "check",} },
+        { type: "tool_result", sessionId: "ses_workspace_persist", callId: "check", tool: "cad", ok: true, output: '{"ok":true,"issues":[]}' },
         { type: "done", sessionId: "ses_workspace_persist", text: "## Bracket\n\nChecked the saved part." }
       ]))
     } })
@@ -296,7 +296,7 @@ describe("project-scoped assistant workspace", () => {
       const before = useElementsStore.getState().elements
       mounted = await mount()
       expect(mounted.store.sessionId()).toBe("ses_workspace_persist")
-      expect(mounted.store.toolCalls().check).toMatchObject({ status: "ok", tool: "cad_check_design" })
+      expect(mounted.store.toolCalls().check).toMatchObject({ status: "ok", tool: "cad" })
       expect(mounted.store.messages().at(-1)?.events.map((event) => event.type)).toEqual(["tool_call", "tool_result"])
       expect(useElementsStore.getState().elements).toBe(before)
       await mounted.store.send("Continue checking")

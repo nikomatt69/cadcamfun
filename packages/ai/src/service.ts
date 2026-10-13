@@ -22,13 +22,15 @@ import { prepareAttachments, type Attachment } from "./attachments.ts"
 import { abortHostSession, createHostSession, hostChatStream, queueHostMessage, readHostSessionState, sessionExists, taskInfos, type HostSessionState, type PendingDelivery } from "./nikcli/chat.ts"
 import type { NikCliRuntime, ProjectHost } from "./nikcli/runtime.ts"
 import { isAssistantMode, SUGGESTED_PROMPTS, type AssistantMode } from "./prompts/modes.ts"
-import { systemPrompt, turnSystemPrompt } from "./prompts/system.ts"
+import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/system.ts"
+import { resolveLocale } from "./nikcli/locale.ts"
+import { providerAllowed } from "./nikcli/policy.ts"
 import { SUBAGENTS, isSubagentId, SUBAGENT_IDS, childAgent } from "./nikcli/agents.ts"
 import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
 import type { HostTaskInfo } from "./nikcli/chat.ts"
 import { CADCAM_AGENT } from "./nikcli/config.ts"
-import { compactHostSession, readHostContextPolicy } from "./nikcli/context.ts"
+import { compactHostSession, readContextBreakdown, type ContextBreakdown, readHostContextPolicy } from "./nikcli/context.ts"
 import { contextBudget, questionsForSession, replySessionQuestion, type SessionControlInput } from "./nikcli/session-controls.ts"
 import {
   ANALYZE_DESIGN,
@@ -103,7 +105,7 @@ export interface SessionControlState {
   readonly tasks: ReadonlyArray<HostTaskInfo>
   readonly permissions: ReadonlyArray<{ readonly requestId: string; readonly sessionId: string; readonly permission: string; readonly patterns: ReadonlyArray<string> }>
   readonly questions: ReadonlyArray<{ readonly requestId: string; readonly questions: HostQuestionRequest["questions"] }>
-  readonly context: { readonly memory?: import("@nikcli-ai/sdk-next").HostBrainStatus } & HostContextPolicy & ReturnType<typeof contextBudget> & { readonly provider?: string; readonly model?: string; readonly tokens?: number; readonly compacted: boolean }
+  readonly context: { readonly memory?: import("@nikcli-ai/sdk-next").HostBrainStatus } & HostContextPolicy & ReturnType<typeof contextBudget> & { readonly provider?: string; readonly model?: string; readonly tokens?: number; readonly compacted: boolean; readonly breakdown?: ContextBreakdown }
 }
 
 const describeControlError = (cause: unknown): string => cause instanceof Error ? cause.message : "Unable to control the conversation."
@@ -187,22 +189,28 @@ export class AiService extends Context.Service<AiService, {
           cost: { input: 0, output: 0 }
         }))
 
+      // nikcli lists only the providers its policy lets through (`Policy.filter`): the picker never offers what chat would refuse.
+      const policies = config.policies ?? []
+      const permitted = <T extends { readonly provider: string }>(entries: ReadonlyArray<T>): ReadonlyArray<T> =>
+        policies.length === 0 ? entries : entries.filter((entry) => providerAllowed(policies, entry.provider))
+
       const providers = Effect.gen(function* () {
         const ok = yield* configured
         const status = yield* credentials.status
+        const allowedProvider = (id: string): boolean => policies.length === 0 || providerAllowed(policies, id)
         if (Option.isNone(host)) {
-          return BUILTIN_PROVIDER_IDS.map((id): ProviderEntry => ({
+          return BUILTIN_PROVIDER_IDS.filter(allowedProvider).map((id): ProviderEntry => ({
             id, name: id, source: "config", auth: ["api"], models: builtinModels(id), configured: ok.has(id)
           }))
         }
-        const catalog = yield* catalogOf(host.value.runtime)
+        const catalog = (yield* catalogOf(host.value.runtime)).filter((provider) => allowedProvider(provider.id))
         return catalog.map((provider): ProviderEntry => ({
           ...provider,
           configured: ok.has(provider.id)
         })).concat(
           // Keys saved for a provider the host no longer advertises stay visible/editable.
           Object.keys(status)
-            .filter((id) => status[id] === "configured" && !catalog.some((p) => p.id === id))
+            .filter((id) => status[id] === "configured" && allowedProvider(id) && !catalog.some((p) => p.id === id))
             .map((id): ProviderEntry => ({
               id,
               name: id,
@@ -218,7 +226,7 @@ export class AiService extends Context.Service<AiService, {
         const ok = yield* configured
         if (Option.isSome(host)) {
           const catalog = yield* catalogOf(host.value.runtime)
-          return flattenCatalog(catalog).map((m): ModelEntry => ({
+          return permitted(flattenCatalog(catalog)).map((m): ModelEntry => ({
             id: m.id,
             provider: m.provider,
             contextWindow: m.contextWindow,
@@ -227,7 +235,7 @@ export class AiService extends Context.Service<AiService, {
             configured: ok.has(m.provider) || ok.has("gateway")
           }))
         }
-        return allModels().map((m): ModelEntry => ({ ...m, configured: ok.has(m.provider) || ok.has("gateway") }))
+        return permitted(allModels()).map((m): ModelEntry => ({ ...m, configured: ok.has(m.provider) || ok.has("gateway") }))
       })
 
       /**
@@ -300,9 +308,16 @@ export class AiService extends Context.Service<AiService, {
         Stream.unwrap(
           Effect.gen(function* () {
             const ok = yield* configured
-            const resolved = resolveModel(input.model, { configured: ok, forceGateway: config.forceGateway })
+            const resolved = resolveModel(input.model, { configured: ok, forceGateway: config.forceGateway, ...(config.policies ? { policies: config.policies } : {}) })
             if (resolved instanceof AiConfigError) return yield* resolved
-            const system = Option.isSome(host) ? turnSystemPrompt(input.context, input.mode, resolved.modelId) : systemPrompt(input.context, input.mode, resolved.modelId)
+            // Resolve the reply language once per chat (nikcli `locale/resolve.ts` shape, mirrored
+            // locally because the SDK does not expose it). English is the silent default; every
+            // other language becomes a deterministic instruction in the system prompt.
+            const reply: ReplyLanguage = (() => {
+              const locale = resolveLocale()
+              return { tag: locale.replyLanguage, name: locale.replyLanguage ? locale.languageName : "" }
+            })()
+            const system = Option.isSome(host) ? turnSystemPrompt(input.context, input.mode, resolved.modelId, reply) : systemPrompt(input.context, input.mode, resolved.modelId, reply)
             const attached = prepareAttachments(input.projectId ?? "default", input.attachments)
             const message = input.message + attached.note
 
@@ -410,10 +425,12 @@ export class AiService extends Context.Service<AiService, {
         const policy = yield* readHostContextPolicy(projectHost)
         const questions = yield* Effect.tryPromise({ try: () => questionsForSession(projectHost, sessionId), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
         const permissions = yield* Effect.tryPromise({ try: async () => (await projectHost.client.permission.list()).filter((request) => request["sessionID"] === sessionId || typeof request["sessionID"] === "string" && childAgent(sessionId, request["sessionID"]) !== undefined).map((request) => ({ requestId: String(request["id"]), sessionId: String(request["sessionID"]), permission: String(request["permission"]), patterns: Array.isArray(request["patterns"]) ? request["patterns"].filter((p): p is string => typeof p === "string") : [] })), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
+        // Counting the sources costs a tokenizer pass over everything the next request would carry: only on request, never on the poll.
+        const breakdown = input.action === "context" ? yield* readContextBreakdown(projectHost, sessionId) : undefined
         const memory = yield* Effect.tryPromise({ try: () => projectHost.client.brain.status(), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
         const tokens = latest?.info.tokens
         return { busy: state.busy, text: state.text, permissions, tasks: taskInfos(host.value.scheduler, owner), questions: questions.map((question) => ({ requestId: question.id, questions: question.questions })),
-          context: { ...policy, memory, ...(providerID && modelID ? { provider: providerID, model: modelID } : {}), ...(selected ? contextBudget(selected, policy) : {}),
+          context: { ...policy, memory, ...(breakdown ? { breakdown } : {}), ...(providerID && modelID ? { provider: providerID, model: modelID } : {}), ...(selected ? contextBudget(selected, policy) : {}),
             ...(input.action !== "compact" && tokens ? { tokens: tokens.total || tokens.input + tokens.output + (tokens.cache?.read ?? 0) + (tokens.cache?.write ?? 0) } : summaryIndex >= 0 ? { tokens: 0 } : {}), compacted: input.action === "compact" } }
       })
 
@@ -425,7 +442,7 @@ export class AiService extends Context.Service<AiService, {
         providers,
         invalidateCatalogue: invalidateCatalog,
         chat,
-        agents: [{ id: CADCAM_AGENT, title: "CAD/CAM assistant", description: "Coordinates drawing, 3D modelling and verified machining.", tools: [], edits: true }, ...SUBAGENT_IDS.map((id) => ({ id, title: ({ researcher: "CAD/CAM researcher", editor: "CAD editor", modeler: "3D modeller", machinist: "CAM programmer", reviewer: "Design and program reviewer" } as const)[id], description: SUBAGENTS[id].description, tools: SUBAGENTS[id].tools, edits: SUBAGENTS[id].edits }))],
+        agents: [{ id: CADCAM_AGENT, title: "CAD/CAM assistant", description: "Coordinates drawing, 3D modelling and verified machining.", tools: [], edits: true }, ...SUBAGENT_IDS.map((id) => ({ id, title: SUBAGENTS[id].title, description: SUBAGENTS[id].description, tools: SUBAGENTS[id].tools, edits: SUBAGENTS[id].edits }))],
         controlSession,
         complete: (input) => direct.generateText(input).pipe(Effect.map((r) => ({ text: r.text, model: r.model }))),
         generate: (input) => direct.generateObject(input),

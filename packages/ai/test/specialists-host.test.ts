@@ -151,7 +151,9 @@ describe("an editing specialist inside a real host turn", () => {
     const names = toolNames(editorRequests.find((request) => toolNames(request).includes("cad"))!)
     // Discovery may match one or both requested editor tools, within the permitted roster.
     expect(names).toContain("cad")
-    for (const forbidden of ["cam_edit", "cad_edit", "agent", "task", "bash"]) expect(names).not.toContain(forbidden)
+    // `cad_edit` is the editor's own tool (the model searched for it); what the editor must never see is CAM, delegation
+    // or any shell surface.
+    for (const forbidden of ["cam_edit", "cam", "agent", "task", "bash"]) expect(names).not.toContain(forbidden)
     expect(names.filter((n) => !SUBAGENTS.editor.tools.includes(n) && n !== "skill" && n !== "invalid" && n !== "code_mode" && n !== "search_tools" && n !== "question")).toEqual([])
     expect(editorRequests[0]!.model).toBe("fake-model")
     // Its instructions are the editor's, not the main agent's.

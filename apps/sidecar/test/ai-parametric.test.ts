@@ -2,12 +2,13 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { plateTemplate } from "@cadcamfun/core"
 import { buildTools, type ToolHandlersShape } from "@cadcamfun/ai"
 import { makeApp } from "./helpers.ts"
+import { makeParametricRunner } from "./helpers/parametric.ts"
 let app: Awaited<ReturnType<typeof makeApp>>
 let handlers: ToolHandlersShape
 let projectId: string
 let elementId: string
 const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
-const run = async (input: unknown) => JSON.parse(await buildTools(handlers, projectId).find((t) => t.id === "cad_parametric")!.execute(input, ctx))
+const run = makeParametricRunner(() => handlers, () => projectId)
 beforeAll(async () => {
   app = await makeApp(); handlers = await app.toolHandlers()
   projectId = (await app.call("/api/projects", { method: "POST", json: { name: "Parametric test" } })).body.id

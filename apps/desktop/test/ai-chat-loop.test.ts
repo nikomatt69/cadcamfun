@@ -35,8 +35,8 @@ describe("the transcript follows the order of the work", () => {
       { type: "reasoning", sessionId: "s", text: "The plate needs a hole." },
       { type: "delta", sessionId: "s", text: "Let me look at " },
       { type: "delta", sessionId: "s", text: "the drawing." },
-      { type: "tool_call", sessionId: "s", callId: "c1", tool: "cad_describe_drawing", input: {} },
-      { type: "tool_result", sessionId: "s", callId: "c1", tool: "cad_describe_drawing", ok: true, output: "{\"ok\":true}" },
+      { type: "tool_call", sessionId: "s", callId: "c1", tool: "cad", input: { action: "describe",} },
+      { type: "tool_result", sessionId: "s", callId: "c1", tool: "cad", ok: true, output: "{\"ok\":true}" },
       { type: "delta", sessionId: "s", text: "One plate, no hole yet." },
       { type: "done", sessionId: "s", text: "Let me look at the drawing.One plate, no hole yet." }
     ])))
@@ -50,8 +50,8 @@ describe("the transcript follows the order of the work", () => {
       const timeline = qa('[data-testid="ai-timeline"]').find((t) => t.textContent?.includes("One plate"))!
       const kinds = [...timeline.children].map((c) => c.getAttribute("data-testid") ?? (c.classList.contains("assistant-message-body") ? "text" : c.tagName.toLowerCase()))
       expect(kinds.slice(0, 4)).toEqual(["ai-thinking", "text", "ul", "text"])
-      expect(timeline.children[1]!.textContent).toBe("Let me look at the drawing.")
-      expect(timeline.children[2]!.getAttribute("data-testid") ?? timeline.children[2]!.querySelector("[data-testid='tool-call']")?.getAttribute("data-tool")).toBe("cad_describe_drawing")
+      expect(timeline.children[1]!.textContent?.trim()).toBe("Let me look at the drawing.")
+      expect(timeline.children[2]!.getAttribute("data-testid") ?? timeline.children[2]!.querySelector("[data-testid='tool-call']")?.getAttribute("data-tool")).toBe("cad")
     } finally { dispose() }
   }, 30000)
 })
@@ -65,9 +65,9 @@ describe("the turn reads like nikcli's session view", () => {
     ]
     client.ai.chatStream = () => Effect.succeed(Stream.fromIterable(sse([
       { type: "retry", sessionId: "s", attempt: 1, message: "Provider is overloaded" },
-      ...call("g1", "cad_describe_drawing", { total: 1 }), ...call("g2", "cad_check_design", { ok: true, issues: [] }), ...call("g3", "cad_describe_drawing", { total: 1 }),
-      ...call("g4", "cad_add_elements", { ok: true, ids: ["1"], elements: [{ id: "1", type: "cube" }] }, true, { elements: [{ type: "cube" }] }),
-      ...call("g5", "cad_describe_drawing", { total: 1 }, false),
+      ...call("g1", "cad", { total: 1 }, true, { action: "describe" }), ...call("g2", "cad", { ok: true, issues: [] }, true, { action: "check" }), ...call("g3", "cad", { total: 1 }, true, { action: "describe" }),
+      ...call("g4", "cad_edit", { ok: true, ids: ["1"], elements: [{ id: "1", type: "cube" }] }, true, { action: "add", elements: [{ type: "cube" }] }),
+      ...call("g5", "cad", { total: 1 }, false, { action: "describe" }),
       { type: "delta", sessionId: "s", text: "Built it." },
       { type: "done", sessionId: "s", text: "Built it.", usage: { inputTokens: 10, outputTokens: 42 } }
     ])))
@@ -87,7 +87,7 @@ describe("the turn reads like nikcli's session view", () => {
       expect(group.querySelectorAll('[data-testid="tool-call"]').length).toBe(3)
       // What changed the drawing and what failed are not folded away.
       const outside = [...answer.querySelectorAll('[data-testid="tool-call"]')].filter((r) => !group.contains(r)).map((r) => r.getAttribute("data-tool"))
-      expect(outside).toEqual(["cad_add_elements", "cad_describe_drawing"])
+      expect(outside).toEqual(["cad_edit", "cad"])
       expect(answer.querySelector('[data-testid="ai-turn-footer"]')!.textContent).toContain("42 tok")
     } finally { dispose() }
   }, 30000)
@@ -101,11 +101,11 @@ describe("a message written while the agent works", () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
     client.ai.chatStream = () => Effect.succeed(Stream.concat(
-      Stream.fromIterable(sse([{ type: "delta", sessionId: "s", text: "Building the plate." }, { type: "tool_call", sessionId: "s", callId: "w1", tool: "cad_describe_drawing", input: {} }])),
+      Stream.fromIterable(sse([{ type: "delta", sessionId: "s", text: "Building the plate." }, { type: "tool_call", sessionId: "s", callId: "w1", tool: "cad", input: { action: "describe",} }])),
       Stream.concat(
         Stream.fromEffect(Effect.promise(() => gate.then(() => JSON.stringify({ type: "heartbeat" })))),
         Stream.fromIterable(sse([
-          { type: "tool_result", sessionId: "s", callId: "w1", tool: "cad_describe_drawing", ok: true, output: "{\"ok\":true}" },
+          { type: "tool_result", sessionId: "s", callId: "w1", tool: "cad", ok: true, output: "{\"ok\":true}" },
           { type: "user_message", sessionId: "s", text: "also make it 5 mm thick" },
           { type: "delta", sessionId: "s", text: "Thickness set to 5 mm." },
           { type: "done", sessionId: "s", text: "Thickness set to 5 mm." }
@@ -115,6 +115,9 @@ describe("a message written while the agent works", () => {
     const { dispose } = app.visit("/cad")
     try {
       await open()
+      // Earlier tests of this file left their turns in the same conversation: let the last one finish before this one starts,
+      // or its stop button would be mistaken for this turn's.
+      await app.wait(() => (q('[data-testid="ai-stop"]') === null ? true : undefined), 10000)
       type("build a plate")
       await flush()
       q<HTMLElement>("button.assistant-send")!.click()

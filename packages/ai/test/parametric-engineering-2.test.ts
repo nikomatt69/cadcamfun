@@ -200,13 +200,18 @@ describe("cad_parametric accepts the new histories and reports them", () => {
 
 describe("cad_parametric: the new recipes", () => {
   test("pipe_bend: the history sweeps a hollow section along the route; ok, one body, derived numbers", async () => {
-    const out = await harness().run({ action: "recipe", recipe: "pipe_bend", params: { outerDiameter: 40, wall: 4, bendAngle: 120 } })
+    // A Ø10 pipe with the default long-radius elbow (R15) turning 120 degrees needs 25.98 mm of setback on each
+    // run, so the runs are 40 mm: the recipe refuses shorter ones rather than drawing a bend it cannot round.
+    const out = await harness().run({ action: "recipe", recipe: "pipe_bend", params: { outerDiameter: 10, wall: 1, bendAngle: 120, legA: 40, legB: 40 } })
     expect(out.ok).toBe(true)
-    expect(out.derived).toMatchObject({ innerDiameter: 32, centrelineLength: 200 })
+    expect(out.derived).toMatchObject({ innerDiameter: 8 })
     expect(out.history.features.map((f: { type: string }) => f.type)).toEqual(["sketch", "sketch", "sweep"])
     expect(historySchema.safeParse(out.history).success).toBe(true)
     expect(out.report).toMatchObject({ ok: true, bodyCount: 1 })
-    expect(rel(out.report.volumeMm3, Math.PI * (400 - 256) * 200)).toBeLessThan(0.005)
+    const turn = (120 * Math.PI) / 180, radius = 15
+    const centreline = 40 + 40 - 2 * radius * Math.tan(turn / 2) + radius * turn
+    expect(out.derived.centrelineLength).toBeCloseTo(centreline, 1)
+    expect(rel(out.report.volumeMm3, Math.PI * (25 - 16) * centreline)).toBeLessThan(0.005)
   }, SLOW)
 
   test("duct_transition: the history lofts the outside and the bore; ok, one body", async () => {
@@ -229,7 +234,9 @@ describe("cad_parametric: the new recipes", () => {
 
   test("create: true sends the generated sweep history to the project once", async () => {
     const { calls, run } = harness(() => ({ ok: true, elementId: "e-1" }))
-    const out = await run({ action: "recipe", recipe: "pipe_bend", create: true, name: "Elbow" })
+    // Creating only happens after the part rebuilds cleanly, so this test pays for a rebuild: the mitred Ø10 elbow
+    // keeps that check honest without the minutes the default Ø30 R45 bend costs.
+    const out = await run({ action: "recipe", recipe: "pipe_bend", params: { outerDiameter: 10, wall: 1, bendRadius: 0 }, create: true, name: "Elbow" })
     expect(calls).toHaveLength(1)
     expect(calls[0]!.input).toMatchObject({ action: "create", name: "Elbow" })
     expect(((calls[0]!.input as { history: History }).history.features.map((f) => f.type))).toContain("sweep")

@@ -270,7 +270,9 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   }),
   defineAction({
     id: "cad_edit.delete", kind: "destructive", replaces: "cad_delete_entities",
-    parameters: z.object({ ids: z.array(z.string().min(1)).min(1) }),
+    // `confirm: true` is the model's own acknowledgement that the user asked for this; the native `ask` permission the host
+    // registers for `cad_edit` is the human decision. Both are required, and neither one alone is enough.
+    parameters: z.object({ ids: z.array(z.string().min(1)).min(1), confirm: z.literal(true) }),
     run: ({ ids }, { handlers, projectId }) => handlers.deleteEntities(projectId, ids)
   }),
   defineAction({

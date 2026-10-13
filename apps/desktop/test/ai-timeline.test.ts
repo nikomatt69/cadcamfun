@@ -5,12 +5,12 @@ import type { AiEvent } from "../src/features/ai/lib/types.ts"
 test("recovered final text extends streamed text without losing tool order", () => {
   const events: AiEvent[] = [
     { type: "delta", sessionId: "s", text: "Checking. " },
-    { type: "tool_call", sessionId: "s", callId: "c", tool: "cad_check_design", input: {} },
+    { type: "tool_call", sessionId: "s", callId: "c", tool: "cad", input: { action: "check",} },
     { type: "delta", sessionId: "s", text: "The plate" },
   ]
   expect(timelineOf({ events, text: "Checking. The plate is valid." })).toEqual([
     { kind: "text", text: "Checking. " },
-    { kind: "tool", callId: "c", tool: "cad_check_design" },
+    { kind: "tool", callId: "c", tool: "cad" },
     { kind: "text", text: "The plate is valid." },
   ])
 })
@@ -18,9 +18,9 @@ test("recovered final text extends streamed text without losing tool order", () 
 test("a recovered replacement answer supersedes stale deltas", () => {
   expect(timelineOf({ text: "The corrected setup is safe.", events: [
     { type: "delta", sessionId: "s", text: "Incomplete analysis" },
-    { type: "tool_call", sessionId: "s", callId: "c", tool: "cam_analyze_gcode", input: {} },
+    { type: "tool_call", sessionId: "s", callId: "c", tool: "cam", input: { action: "analyze",} },
   ] })).toEqual([
-    { kind: "tool", callId: "c", tool: "cam_analyze_gcode" },
+    { kind: "tool", callId: "c", tool: "cam" },
     { kind: "text", text: "The corrected setup is safe." },
   ])
 })
@@ -43,13 +43,13 @@ test("host continuation and compaction explain work without rendering native idl
 
 test("partial committed mutations keep a visible warning and a successful tool result", () => {
   const events: AiEvent[] = [
-    { type: "tool_call", sessionId: "s", callId: "c", tool: "cad_add_elements", input: {} },
-    { type: "tool_result", sessionId: "s", callId: "c", tool: "cad_add_elements", ok: true, output: '{"elements":[{"id":"plate"}],"skipped":[{"reason":"Missing radius"}]}' },
-    { type: "tool_diagnostic", sessionId: "s", callId: "c", tool: "cad_add_elements", kind: "partial", severity: "warning", message: "One element was skipped", mutationApplied: true, recovery: "Repair the missing radius" },
+    { type: "tool_call", sessionId: "s", callId: "c", tool: "cad_edit", input: { action: "add",} },
+    { type: "tool_result", sessionId: "s", callId: "c", tool: "cad_edit", ok: true, output: '{"elements":[{"id":"plate"}],"skipped":[{"reason":"Missing radius"}]}' },
+    { type: "tool_diagnostic", sessionId: "s", callId: "c", tool: "cad_edit", kind: "partial", severity: "warning", message: "One element was skipped", mutationApplied: true, recovery: "Repair the missing radius" },
   ]
   expect(timelineOf({ text: "", events })).toEqual([
-    { kind: "tool", callId: "c", tool: "cad_add_elements" },
-    { kind: "diagnostic", severity: "warning", message: "One element was skipped", tool: "cad_add_elements", recovery: "Repair the missing radius" },
+    { kind: "tool", callId: "c", tool: "cad_edit" },
+    { kind: "diagnostic", severity: "warning", message: "One element was skipped", tool: "cad_edit", recovery: "Repair the missing radius" },
   ])
   expect(events[1]).toMatchObject({ type: "tool_result", ok: true })
 })

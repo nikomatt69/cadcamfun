@@ -149,7 +149,7 @@ export class DirectModel extends Context.Service<
           const status = yield* credentials.status
           // Only the providers `defaultModelFactory` can build a client for; the rest are host-only.
           const configured = new Set<ProviderId>(BUILTIN_PROVIDER_IDS.filter((id) => status[id] === "configured"))
-          const resolved = resolveModel(selector, { configured, forceGateway: config.forceGateway })
+          const resolved = resolveModel(selector, { configured, forceGateway: config.forceGateway, ...(config.policies ? { policies: config.policies } : {}) })
           if (resolved instanceof AiConfigError) return yield* resolved
           const credential = yield* credentials.get(resolved.provider)
           if (Option.isNone(credential)) {

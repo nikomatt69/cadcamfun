@@ -21,7 +21,7 @@ export const VCS_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   contributedAction({
     // Rolling named entities back to an earlier commit throws work away: destructive, so the tool is `ask`.
     id: "vcs_edit.restore", kind: "destructive", replaces: "vcs_restore_paths", contribution: "vcs_edit.restore",
-    parameters: z.object({ paths: z.array(z.string().min(1)).min(1).max(200), from: z.string().min(1) })
+    parameters: z.object({ paths: z.array(z.string().min(1)).min(1).max(200), from: z.string().min(1), confirm: z.literal(true) })
   }),
   contributedAction({
     id: "vcs_edit.open_pull_request", kind: "write", replaces: "vcs_open_pull_request", contribution: "vcs_edit.open_pull_request",

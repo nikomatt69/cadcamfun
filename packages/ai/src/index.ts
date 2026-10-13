@@ -27,6 +27,8 @@ export {
 export { flattenCatalog, hostCatalog, type HostModelInfo, type HostProviderInfo } from "./nikcli/catalog.ts"
 export { defaultProviderSpecs } from "./nikcli/config.ts"
 export { childAgent, adoptChildSession } from "./nikcli/agents.ts"
+export { policyAllows, providerAllowed, toolAllowed, filterProviders, permittedTools, readPolicyFile, type PolicyStatement, type PolicyInput } from "./nikcli/policy.ts"
+export { resolveLocale, type LocaleConfig, type ResolvedLocale } from "./nikcli/locale.ts"
 export * from "./attachments.ts"
 export * from "./skills/user.ts"
 export { CADCAM_SKILLS } from "./skills/index.ts"
@@ -54,7 +56,10 @@ export {
 export { backgroundToolContributionsFor, makeAiBackgroundLayer } from "./nikcli/background-layer.ts"
 
 export * from "./parametric.ts"
-export type { ParametricInput } from "./actions/parametric.ts"
+// The handler contract is the one callers narrow on (`Extract<..., { action: "test" }>`). The action-parameter
+// union carries no `action` discriminant — `defineActionTool` adds it as the tool discriminator — so exporting it
+// here would only invite callers to narrow a union on a key it does not have.
+export type { ParametricHandlerInput } from "./actions/parametric.ts"
 export * from "./vision.ts"
 export * from "./web-search.ts"
 export type { CadInspectionInput, CadComponentRelationsInput, CadGrepInput } from "./actions/cad.ts"

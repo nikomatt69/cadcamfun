@@ -5,14 +5,14 @@ Actions
 - upsert_tool: create a cutter row, or replace one.
 - upsert_machine_config: create a machine configuration, or replace one.
 - set_default: the project's default material, tool and machine, used to seed new operations.
-- delete: remove one row of the user's libraries. Destructive: the host asks before the tool runs.
+- delete: remove one row of the user's libraries. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
 
 Parameters
 - upsert_material: id (omit to create), name, description, properties ({name: number|string|boolean}), isPublic.
 - upsert_tool: id, name, type, diameter (mm), material, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic.
 - upsert_machine_config: id, name, kind (mill|lathe|3Dprinter), kinematics ({axis: {min, max}}), postProcessor, workOffsets, probing, maxRPM, maxFeed, isPublic.
 - set_default: materialId, toolId, machineConfigId (any subset; the open project is the one that changes).
-- delete: kind (material|tool|machine_config), id.
+- delete: kind (material|tool|machine_config), id, confirm (true, only when the user asked).
 
 Result (JSON)
 - ok, id, created (true when a row was created, false when an existing one was replaced); the store's answer, not the intention. delete also returns what still refers to the row.

@@ -3,12 +3,12 @@ Reusable parts: gather what is in the drawing into a saved component, place one,
 Actions
 - save: gather existing elements by id into a named component of this project; children are stored relative to the group's origin.
 - insert: place a stored component in the active drawing, optionally moved, turned or scaled; returns the new element ids.
-- delete: remove a saved component by id. Destructive: the host asks before the tool runs.
+- delete: remove a saved component by id. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
 
 Parameters (mm, degrees)
 - save: ids (the elements to gather), name.
 - insert: componentId, transform {move {x,y,z}, rotate {axis, degrees, about}, scale {factor, about}} - all parts optional.
-- delete: componentId.
+- delete: componentId, confirm (true, only when the user asked).
 
 Result (JSON)
 - ok; save the componentId and the number of children; insert the new ids and the elements; delete the removed id.

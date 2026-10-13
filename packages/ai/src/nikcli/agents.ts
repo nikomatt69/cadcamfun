@@ -16,13 +16,15 @@ import { specialistPrompt } from "./prompts/index.ts"
 import { SPECIALIST_NATIVE_TOOLS } from "./tool-registry.ts"
 import { DESTRUCTIVE_TOOL_IDS } from "../tools/project-tools.ts"
 
-export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer"] as const
+export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer", "planner", "diagnostician", "verifier", "optimizer"] as const
 export type SubagentId = (typeof SUBAGENT_IDS)[number]
 
 export interface SubagentSpec {
   readonly id: SubagentId
   /** The agent's name in the host config. */
   readonly host: string
+  /** What the UI calls it. */
+  readonly title: string
   readonly description: string
   readonly prompt: string
   /** Tool ids it may call; ids the project did not register are left out of its permissions. */
@@ -43,6 +45,7 @@ const READS = ["cad", "cam", "library", "vcs", "memory", "research"] as const
 export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   researcher: {
     id: "researcher",
+    title: "CAD/CAM researcher",
     host: "cadcam-worker",
     description: "Read-only investigator: inspects the drawing, operations, machine, materials, tools and G-code and returns findings. Cannot change anything.",
     prompt: specialistPrompt("researcher"),
@@ -55,6 +58,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   },
   editor: {
     id: "editor",
+    title: "CAD editor",
     host: "cadcam-editor",
     description: "Minimal-change editor: changes, moves, scales, regroups or removes specific existing entities and touches nothing else. Use for \"make this hole 8 mm\", \"move the bracket 20 mm up\", \"rename the layer\".",
     prompt: specialistPrompt("editor"),
@@ -67,6 +71,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   },
   modeler: {
     id: "modeler",
+    title: "3D modeller",
     host: "cadcam-modeler",
     description: "3D modeller: builds new geometry (solids, booleans, revolutions, imported drawings) for one well-described part or group.",
     prompt: specialistPrompt("modeler"),
@@ -79,12 +84,15 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   },
   machinist: {
     id: "machinist",
+    title: "CAM programmer",
     host: "cadcam-machinist",
     description: "CAM programmer: creates and updates machining operations for existing geometry, generates G-code, analyses it and simulates the toolpath.",
     prompt: specialistPrompt("machinist"),
     // The CAM specialist owns the libraries: it reads them, and may add a cutter, a material or a machine the shop
     // actually has, or remove one that is gone. Model confirmation is not native human approval.
-    tools: ["cad", "cam", "cam_edit", "library", "library_edit", "memory", "research", "vcs", "vcs_edit"],
+    // It holds no `vcs_edit`: workflow triggering shares that tool with commit, restore and the pull request, and no
+    // specialist may commit (spec 08 §specialists, spec 26 §6.5). The main agent runs the workflows.
+    tools: ["cad", "cam", "cam_edit", "library", "library_edit", "memory", "research", "vcs"],
     edits: true,
     background: false,
     steps: 60,
@@ -92,6 +100,7 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
   },
   reviewer: {
     id: "reviewer",
+    title: "Design and program reviewer",
     host: "cadcam-reviewer",
     description: "Reviews a pull request: reads the diff, the workflow runs and the verification reports, then writes a verdict. Read-only.",
     prompt: specialistPrompt("reviewer"),
@@ -100,6 +109,56 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     background: true,
     steps: 40,
     timeoutMs: 5 * MINUTE
+  },
+  planner: {
+    id: "planner",
+    title: "Build and machining planner",
+    host: "cadcam-planner",
+    description: "Read-only planner (nikcli's planning agent): turns a request into an ordered build and machining plan with layers, parts, values, tools and the risks it found. Use it before a large or ambiguous job.",
+    prompt: specialistPrompt("planner"),
+    tools: [...READS],
+    edits: false,
+    // The main agent needs the plan before it can act, so it is waited for unless the call says otherwise.
+    background: false,
+    steps: 40,
+    timeoutMs: 5 * MINUTE
+  },
+  diagnostician: {
+    id: "diagnostician",
+    title: "Failure diagnostician",
+    host: "cadcam-diagnostician",
+    description: "Read-only debugger (nikcli's debugging agent): finds the root cause of a failed check, a verification error, a gouge, a collision, a rapid in material or a refused call, and says exactly what to change. Does not repair.",
+    prompt: specialistPrompt("diagnostician"),
+    tools: [...READS],
+    edits: false,
+    background: false,
+    steps: 40,
+    timeoutMs: 5 * MINUTE
+  },
+  verifier: {
+    id: "verifier",
+    title: "Verification runner",
+    host: "cadcam-verifier",
+    description: "Test runner (nikcli's test-runner): generates a missing program, runs the model checks, the DFM rules, the static G-code analysis and the toolpath simulation, and reports what passed, what failed and what was not modelled. Does not fix.",
+    prompt: specialistPrompt("verifier"),
+    // Verification stores a program and a report, which is a write on the operation, so this role is an editor of operations only by prompt; it holds no `cad_edit`.
+    tools: ["cad", "cam", "cam_edit", "library", "vcs", "memory"],
+    edits: true,
+    background: false,
+    steps: 40,
+    timeoutMs: 10 * MINUTE
+  },
+  optimizer: {
+    id: "optimizer",
+    title: "Toolpath optimizer",
+    host: "cadcam-optimizer",
+    description: "Refactor agent (nikcli's refactor agent) for CAM: shortens cycle time and improves tool life of existing operations without changing the part, the stock or the finish; measures before and after.",
+    prompt: specialistPrompt("optimizer"),
+    tools: ["cad", "cam", "cam_edit", "library", "memory", "research", "vcs"],
+    edits: true,
+    background: false,
+    steps: 60,
+    timeoutMs: 10 * MINUTE
   }
 }
 

@@ -1,7 +1,7 @@
 /** Project adaptation of the existing parametric kernel. Tests never persist a variant. */
 import { createHash } from "node:crypto"
 import { usesOf } from "@cadcamfun/core"
-import { historySchema, parametricReport, type ParametricInput } from "@cadcamfun/ai"
+import { historySchema, parametricReport, type ParametricHandlerInput } from "@cadcamfun/ai"
 
 export const historyRevision = (history: unknown): string => createHash("sha256").update(JSON.stringify(history)).digest("hex")
 
@@ -20,7 +20,7 @@ export const changeParameters = (history: unknown, parameters: Readonly<Record<s
   return { ok: true as const, history: next, report: parametricReport(next) }
 }
 
-export const testParametric = (history: unknown, input: Extract<ParametricInput, { action: "test" }>) => {
+export const testParametric = (history: unknown, input: Extract<ParametricHandlerInput, { action: "test" }>) => {
   const cases = input.cases.map((c) => {
     const changed = changeParameters(history, c.parameters)
     if (!changed.ok) return { name: c.name, passed: false, error: changed.error }

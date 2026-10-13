@@ -4938,6 +4938,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "reject_question",
                       "reply_permission",
                       "consolidate_memory",
+                      "context",
                     ],
                     "type": "string",
                   },
@@ -5089,6 +5090,69 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                       "properties": {
                         "auto": {
                           "type": "boolean",
+                        },
+                        "breakdown": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "categories": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "category": {
+                                        "type": "string",
+                                      },
+                                      "tokens": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                          },
+                                          {
+                                            "enum": [
+                                              "Infinity",
+                                              "-Infinity",
+                                              "NaN",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "category",
+                                      "tokens",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "type": "array",
+                                },
+                                "estimatedTotal": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number",
+                                    },
+                                    {
+                                      "enum": [
+                                        "Infinity",
+                                        "-Infinity",
+                                        "NaN",
+                                      ],
+                                      "type": "string",
+                                    },
+                                  ],
+                                },
+                              },
+                              "required": [
+                                "estimatedTotal",
+                                "categories",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
                         },
                         "compactAt": {
                           "anyOf": [

@@ -17,7 +17,7 @@ describe("chat attachments", () => {
     expect(out.stored).toEqual(["plate.dxf", "notes.txt"])
     expect(getAttachment("p", "PLATE.DXF")).toBe("0\nSECTION\n")
     expect(getAttachment("other", "plate.dxf")).toBeUndefined()
-    expect(out.note).toContain('cad_import_drawing with attachment "plate.dxf"')
+    expect(out.note).toContain('cad_edit action import with attachment "plate.dxf"')
     expect(out.note).toContain("stock is 6061")
     expect(out.note).not.toContain("SECTION")
   })
@@ -37,27 +37,27 @@ describe("chat attachments", () => {
     expect(kindOf({ name: "x", mime: "application/pdf" })).toBe("pdf")
   })
 
-  test("cad_import_drawing reads an attached DXF by name and says what is attached when it is not found", async () => {
+  test("cad_edit import reads an attached DXF by name and says what is attached when it is not found", async () => {
     const added: unknown[] = []
     const handlers = new Proxy({} as never, { get: () => async (_p: string, e: unknown) => { added.push(e); return { ok: true, ids: [] } } })
-    const tool = buildTools(handlers, "p").find((t) => t.id === "cad_import_drawing")!
+    const tool = buildTools(handlers, "p").find((t) => t.id === "cad_edit")!
     const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
     const square = (s: number) => [[0, 0, s, 0], [s, 0, s, s], [s, s, 0, s], [0, s, 0, 0]].map(([a, b, c, d]) => `0\nLINE\n8\n0\n10\n${a}\n20\n${b}\n11\n${c}\n21\n${d}\n`).join("")
     prepareAttachments("p", [{ name: "sq.dxf", data: `0\nSECTION\n2\nENTITIES\n${square(20)}0\nENDSEC\n0\nEOF\n` }])
-    const ok = JSON.parse(await tool.execute({ attachment: "sq.dxf", depth: 5 }, ctx)) as { ok: boolean; stats: { solids: number } }
+    const ok = JSON.parse(await tool.execute({ action: "import", attachment: "sq.dxf", depth: 5 }, ctx)) as { ok: boolean; stats: { solids: number } }
     expect(ok.ok).toBe(true)
     expect(ok.stats.solids).toBe(1)
-    const missing = JSON.parse(await tool.execute({ attachment: "nope.dxf", depth: 5 }, ctx)) as { ok: boolean; error: string }
+    const missing = JSON.parse(await tool.execute({ action: "import", attachment: "nope.dxf", depth: 5 }, ctx)) as { ok: boolean; error: string }
     expect(missing.ok).toBe(false)
     expect(missing.error).toContain("Attached: sq.dxf")
-    const neither = JSON.parse(await tool.execute({ depth: 5 }, ctx)) as { ok: boolean }
+    const neither = JSON.parse(await tool.execute({ action: "import", depth: 5 }, ctx)) as { ok: boolean }
     expect(neither.ok).toBe(false)
   })
 
-  test("cad_import_drawing reads a STEP attachment with its own height and reports what a prism cannot say", async () => {
+  test("cad_edit import reads a STEP attachment with its own height and reports what a prism cannot say", async () => {
     const added: Array<Array<Record<string, unknown>>> = []
     const handlers = new Proxy({} as never, { get: () => async (_p: string, e: Array<Record<string, unknown>>) => { added.push(e); return { ok: true, ids: [] } } })
-    const tool = buildTools(handlers, "p").find((t) => t.id === "cad_import_drawing")!
+    const tool = buildTools(handlers, "p").find((t) => t.id === "cad_edit")!
     const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
     const pt = (id: number, x: number, y: number, z: number) => `#${id}=CARTESIAN_POINT('',(${x}.,${y}.,${z}.));\n`
     const step = `ISO-10303-21;\nDATA;\n#900=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));\n` +
@@ -68,11 +68,11 @@ describe("chat attachments", () => {
       "#50=ORIENTED_EDGE('',*,*,#33,.F.);\n#51=ORIENTED_EDGE('',*,*,#32,.F.);\n#52=ORIENTED_EDGE('',*,*,#31,.F.);\n#53=ORIENTED_EDGE('',*,*,#30,.F.);\n" +
       "#60=EDGE_LOOP('',(#50,#51,#52,#53));\n#62=FACE_OUTER_BOUND('',#60,.T.);\n#70=ADVANCED_FACE('',(#62),#71,.F.);\n#71=PLANE('',#72);\n#72=AXIS2_PLACEMENT_3D('',#1,#42,#43);\nENDSEC;\nEND-ISO-10303-21;\n"
     prepareAttachments("p", [{ name: "block.STEP", data: step }])
-    const out = JSON.parse(await tool.execute({ attachment: "block.STEP" }, ctx)) as { ok: boolean; stats: { solids: number } }
+    const out = JSON.parse(await tool.execute({ action: "import", attachment: "block.STEP" }, ctx)) as { ok: boolean; stats: { solids: number } }
     expect(out.ok).toBe(true)
     expect(out.stats.solids).toBe(1)
     expect(added[0]![0]).toMatchObject({ type: "extrusion", depth: 6 })
-    const noDepth = JSON.parse(await tool.execute({ content: "0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n", format: "dxf" }, ctx)) as { ok: boolean }
+    const noDepth = JSON.parse(await tool.execute({ action: "import", content: "0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n", format: "dxf" }, ctx)) as { ok: boolean }
     expect(noDepth.ok).toBe(false)
   })
 

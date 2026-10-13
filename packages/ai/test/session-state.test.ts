@@ -24,7 +24,7 @@ describe("recovered host session state", () => {
     const state = await read([
       message("user", "Model"),
       message("assistant", "Partial", { finish: "stop", tokens: { input: 12, output: 4 } }, [
-        { id: "tool", type: "tool", callID: "c", tool: "cad_add_elements", state: { status: "completed", input: { elements: [] }, output: JSON.stringify({ ok: false, error: "Rebuild failed", problems: ["features[1].depth: missing"] }) } }
+        { id: "tool", type: "tool", callID: "c", tool: "cad_edit", state: { status: "completed", input: { elements: [] }, output: JSON.stringify({ ok: false, error: "Rebuild failed", problems: ["features[1].depth: missing"] }) } }
       ])
     ])
     expect(state.events?.map((event) => event.type)).toEqual(["tool_call", "tool_result", "tool_diagnostic"])

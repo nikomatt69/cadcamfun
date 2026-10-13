@@ -48,7 +48,7 @@ describe("cadcam skills", () => {
     const { systemPrompt } = await import("../src/prompts/system.ts")
     const prompt = systemPrompt()
     expect(prompt).toContain("Build everything in 3D")
-    expect(prompt).toContain("cad_add_elements")
+    expect(prompt).toContain("cad_edit action add")
     expect(prompt).toContain("never use it to represent an object")
     expect(CADCAM_SKILLS.find((skill) => skill.name === "cad-3d-modeling")!.body).toContain("built in 3D, always")
   })

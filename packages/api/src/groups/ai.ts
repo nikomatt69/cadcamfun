@@ -180,11 +180,13 @@ export const AssistantAgent = Schema.Struct({ id: Schema.String, title: Schema.S
 export const QuestionInfo = Schema.Struct({ header: Schema.String, question: Schema.String, options: Schema.Array(Schema.Struct({ label: Schema.String, description: Schema.String })), multiple: opt(Schema.Boolean), custom: opt(Schema.Boolean) })
 export const PendingQuestion = Schema.Struct({ requestId: Schema.String, questions: Schema.Array(QuestionInfo) })
 export const SessionControlBody = Schema.Struct({ sessionId: Schema.String, projectId: opt(Schema.String),
-  action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory"]),
+  action: Schema.Literals(["status", "compact", "cancel_task", "answer_question", "reject_question", "reply_permission", "consolidate_memory", "context"]),
   taskId: opt(Schema.String), requestId: opt(Schema.String), answers: opt(Schema.Array(Schema.Array(Schema.String))), decision: opt(Schema.Literals(["once", "always", "reject"])), model: opt(AiModelSelector) })
 export const SessionControlReply = Schema.Struct({ permissions: opt(Schema.Array(Schema.Struct({ requestId: Schema.String, sessionId: Schema.String, permission: Schema.String, patterns: Schema.Array(Schema.String) }))), busy: Schema.Boolean, text: Schema.String, tasks: Schema.Array(SessionTask), questions: Schema.Array(PendingQuestion),
   context: Schema.Struct({ memory: Schema.optional(Schema.Struct({ enabled: Schema.Boolean, memoryEnabled: Schema.Boolean, minHours: Schema.Number, minSessions: Schema.Number, lastBrainAt: Schema.Number, hoursSinceLastBrain: Schema.Number, sessionsSinceLastBrain: Schema.Number, shouldTrigger: Schema.Boolean })), source: Schema.Literal("host-config"), auto: Schema.Boolean, prune: Schema.Boolean, reserved: opt(Schema.Number),
-    provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean }) })
+    provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean,
+    /** nikcli `SessionContext.breakdown` summed per category; only on the `context` action. */
+    breakdown: opt(Schema.Struct({ estimatedTotal: Schema.Number, categories: Schema.Array(Schema.Struct({ category: Schema.String, tokens: Schema.Number })) })) }) })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Union([AiStreamEventSchema, Schema.Struct({ type: Schema.Literal("heartbeat") })])

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
   CONTRIBUTION_KEYS
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
@@ -749,12 +749,16 @@ const libraryContributions = (handlers: ToolHandlersShape): Readonly<Record<stri
     const value = input as { componentId: string; transform?: cad.ElementTransform }
     return handlers.insertComponent(context.projectId, value.componentId, value.transform)
   },
+  // `confirm` is the catalogue's admission of intent, not a repository argument: it is required by the schema and proven to the user.
   "parts.delete": (input) => handlers.deleteComponent((input as { componentId: string }).componentId),
   "library_edit.upsert_material": (input) => handlers.upsertMaterial(input as Record<string, unknown>),
   "library_edit.upsert_tool": (input) => handlers.upsertTool(input as Record<string, unknown>),
   "library_edit.upsert_machine_config": (input) => handlers.upsertMachineConfig(input as Record<string, unknown>),
   "library_edit.set_default": (input, context) => handlers.setProjectDefault({ ...(input as { materialId?: string; toolId?: string; machineConfigId?: string }), projectId: context.projectId }),
-  "library_edit.delete": (input) => handlers.deleteLibrary(input as { kind: "material" | "tool" | "machine_config"; id: string })
+  "library_edit.delete": (input) => {
+    const { kind, id } = input as { kind: "material" | "tool" | "machine_config"; id: string }
+    return handlers.deleteLibrary({ kind, id })
+  }
 })
 
 /**
@@ -800,8 +804,10 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     ...backgroundToolContributionsFor(scheduler)
   }
   contributionGuard(contributions)
+  const policies = yield* readPolicyFile(policyFile(config.dataDir))
   const runtime = yield* makeNikCliRuntime({
     dataDir: config.dataDir,
+    ...(policies.length > 0 ? { policies } : {}),
     providers: defaultProviderSpecs(config.aiMinimaxBaseUrl ? { minimax: config.aiMinimaxBaseUrl } : {}),
     systemPrompt: agentSystemPrompt(),
     // Host imports and model metadata start on demand, after the editor is usable.
@@ -828,7 +834,12 @@ const AiBackgroundLive = Layer.unwrap(Effect.gen(function*() {
   return makeAiBackgroundLayer.pipe(Layer.provide(Layer.succeed(AiHost, host)))
 })).pipe(Layer.provide(AiHostLive), Layer.orDie)
 
-const AiConfigLive = Layer.unwrap(AppConfigService.useSync((c) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false })))
+/** nikcli resource policy (`provider.use`, `tool.use`) the operator keeps in `<data dir>/ai/policy.json`; absent means allow all. */
+const policyFile = (dataDir: string): string => `${dataDir}/ai/policy.json`
+
+const AiConfigLive = Layer.unwrap(AppConfigService.use((c) => readPolicyFile(policyFile(c.dataDir)).pipe(
+  Effect.map((policies) => AiConfig.layer({ dataDir: c.dataDir, forceGateway: false, ...(policies.length > 0 ? { policies } : {}) }))
+)))
 
 /** Publishes the assistant's one workflow step (`ai/prompt`) to the runner that is already in scope. */
 const AiPromptStepLive = Layer.effectDiscard(

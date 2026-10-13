@@ -38,6 +38,15 @@ export const captureEditorOwner = (): EditorOwner => {
   }
 }
 
+/**
+ * The key the sync tables are written against: `tool.action` for the consolidated tools (`cad_edit.add`), the bare id for a
+ * tool with no action. The same key serves a direct call and a call made inside a `code_mode` program.
+ */
+export const actionKey = (tool: string, input: unknown): string => {
+  const action = input !== null && typeof input === "object" ? (input as { action?: unknown }).action : undefined
+  return typeof action === "string" && action !== "" && !tool.includes(".") ? `${tool}.${action}` : tool
+}
+
 export type SyncOp =
   | { readonly kind: "add"; readonly elements: ReadonlyArray<Record<string, unknown>> }
   | { readonly kind: "update"; readonly elements: ReadonlyArray<Record<string, unknown>> }
@@ -60,8 +69,8 @@ export interface EditorAction {
 const isElement = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && typeof (value as { id?: unknown }).id === "string" && typeof (value as { type?: unknown }).type === "string"
 
-/** The changes a CAD tool result describes; `output` is the tool's JSON text. */
-export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
+/** The changes a CAD tool result describes. `key` is `tool.action`; `output` is the tool's JSON text. */
+export const opsFor = (key: string, output: string): ReadonlyArray<SyncOp> => {
   let result: { ok?: unknown; elements?: unknown; ids?: unknown }
   try { result = JSON.parse(output) } catch { return [] }
   if (result === null || typeof result !== "object" || result.ok !== true) return []
@@ -69,22 +78,22 @@ export const opsFor = (tool: string, output: string): ReadonlyArray<SyncOp> => {
   const created = (result as { created?: unknown }).created
   const source: { elements?: unknown; mutation?: unknown } = Array.isArray(result.elements) || typeof created !== "object" || created === null ? result : (created as { elements?: unknown; mutation?: unknown })
   const elements = Array.isArray(source.elements) ? source.elements.filter(isElement) : []
-  if (tool.endsWith("cad_add_entities") || tool.endsWith("cad_add_elements") || tool.endsWith("cad_import_drawing")) return elements.length > 0 ? [{ kind: "add", elements }] : []
-  if (tool.endsWith("cad_parametric")) return elements.length > 0 ? [{ kind: source.mutation === "add" ? "add" : "update", elements }] : []
-  if (tool.endsWith("cad_modify_entities")) return elements.length > 0 ? [{ kind: "update", elements }] : []
-  if (tool.endsWith("cad_transform_entities")) {
+  if (key === "cad_edit.add" || key === "cad_edit.add_entities" || key === "cad_edit.import") return elements.length > 0 ? [{ kind: "add", elements }] : []
+  if (key.startsWith("cad.parametric_validate") || key.startsWith("cad_edit.parametric_")) return elements.length > 0 ? [{ kind: source.mutation === "add" ? "add" : "update", elements }] : []
+  if (key === "cad_edit.modify") return elements.length > 0 ? [{ kind: "update", elements }] : []
+  if (key === "cad_edit.transform") {
     if (elements.length === 0) return []
     return [{ kind: (result as { copied?: unknown }).copied === true ? "add" : "update", elements }]
   }
-  if (tool.endsWith("cad_group_entities")) {
+  if (key === "cad_edit.group") {
     const removed = Array.isArray((result as { removed?: unknown }).removed) ? ((result as { removed: unknown[] }).removed).filter((id): id is string => typeof id === "string") : []
     return [...(removed.length > 0 ? [{ kind: "delete" as const, ids: removed }] : []), ...(elements.length > 0 ? [{ kind: "add" as const, elements }] : [])]
   }
-  if (tool.endsWith("cad_editor")) {
+  if (key === "cad_edit.editor") {
     const actions = Array.isArray((result as { actions?: unknown }).actions) ? ((result as { actions: unknown[] }).actions).filter((a): a is EditorAction => typeof a === "object" && a !== null && typeof (a as { action?: unknown }).action === "string") : []
     return actions.length > 0 ? [{ kind: "editor", actions }] : []
   }
-  if (tool.endsWith("cad_delete_entities")) {
+  if (key === "cad_edit.delete") {
     const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : []
     return ids.length > 0 ? [{ kind: "delete", ids }] : []
   }
@@ -332,4 +341,34 @@ export async function reconcileFromStored(app: { readonly client: unknown; reado
   for (const element of stored) pushed.set(String(element["id"]), JSON.stringify(useElementsStore.getState().elements.find((candidate) => candidate.id === element["id"]) ?? element))
   for (const op of ops) if (op.kind === "delete") for (const id of op.ids) pushed.delete(id)
   return result
+}
+
+type ReconcileApp = Parameters<typeof reconcileFromStored>[0]
+const inflight = new Map<string, { again: boolean; done: Promise<void> }>()
+
+/**
+ * `reconcileFromStored` for a stream of tool results: at most one read of the stored drawing is in flight per drawing, and
+ * results that arrive meanwhile ask for exactly one more read afterwards. A `code_mode` program that adds a hundred holes
+ * reports a hundred results in one burst; each of them needs the editor to catch up, not a hundred reads.
+ */
+export const reconcileCoalesced = (app: ReconcileApp, owner: EditorOwner = captureEditorOwner()): Promise<void> => {
+  const key = owner.drawingId ?? ""
+  const running = inflight.get(key)
+  if (running !== undefined) {
+    running.again = true
+    return running.done
+  }
+  const entry: { again: boolean; done: Promise<void> } = { again: false, done: Promise.resolve() }
+  entry.done = (async () => {
+    try {
+      do {
+        entry.again = false
+        await reconcileFromStored(app, owner)
+      } while (entry.again && owner.current())
+    } finally {
+      inflight.delete(key)
+    }
+  })()
+  inflight.set(key, entry)
+  return entry.done
 }

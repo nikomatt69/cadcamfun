@@ -19,6 +19,7 @@ import { captureEditorOwner, rememberPushed } from "./editor-sync.ts"
 import { useGeneratorStore } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { drawingPayload } from "../../cad/lib/projectSnapshot.ts"
+import { toJsonSafe } from "../../../shared/state/json-safe.ts"
 
 const { estimateTime } = cam
 
@@ -170,5 +171,5 @@ export function appProjectId(app: AppState): string | undefined {
 export async function persistDrawingContext(app: AppState, projectId?: string): Promise<void> {
   const target = projectId ?? appProjectId(app)
   if (!target) return
-  await run(app)(app.client.kv.set({ params: { key: `ai.context.${target}` }, payload: { value: currentDrawingContext(app) } }))
+  await run(app)(app.client.kv.set({ params: { key: `ai.context.${target}` }, payload: { value: toJsonSafe(currentDrawingContext(app)) } }))
 }

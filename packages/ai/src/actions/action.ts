@@ -100,7 +100,12 @@ export const contributedAction = <S extends ActionParameters>(config: Omit<Actio
       if (contribution === undefined) {
         return { ok: false, _tag: "ActionUnavailable", actionId: config.id, error: `${config.id} is not available in this host.` }
       }
-      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(input, context)
+      // The action's schema is the seam's decoder. The host already validates before it calls, but a contribution
+      // reached directly (a test, or the next adapter) must not get raw arguments: a flag sent as `"true"` would
+      // otherwise read as false and quietly change what the action does.
+      const parsed = (config.parameters as z.ZodType).safeParse(input)
+      if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: config.id, error: "The arguments do not match the action's schema." }
+      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(parsed.data, context)
     }
   }),
   contributed: config.contribution

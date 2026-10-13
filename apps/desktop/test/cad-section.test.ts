@@ -44,19 +44,19 @@ describe("section plane", () => {
 describe("the assistant cuts the model open (cad_editor)", () => {
   test("section_on sets the plane in the editor and shows the 3D view; section_off lifts it", () => {
     useCADStore.getState().setViewMode("2d")
-    mirrorToolResult("cad_editor", true, json({ ok: true, actions: [{ action: "section_on", axis: "x", position: 25, inverted: true }] }))
+    mirrorToolResult("cad_edit.editor", true, json({ ok: true, actions: [{ action: "section_on", axis: "x", position: 25, inverted: true }] }))
     expect(useCADStore.getState().section).toEqual({ enabled: true, axis: "x", position: 25, inverted: true })
     expect(useCADStore.getState().viewMode).toBe("3d")
     // Moving the cut keeps the other choices.
-    mirrorToolResult("cad_editor", true, json({ ok: true, actions: [{ action: "section_on", position: 60 }] }))
+    mirrorToolResult("cad_edit.editor", true, json({ ok: true, actions: [{ action: "section_on", position: 60 }] }))
     expect(useCADStore.getState().section).toEqual({ enabled: true, axis: "x", position: 60, inverted: true })
-    mirrorToolResult("cad_editor", true, json({ ok: true, actions: [{ action: "section_off" }] }))
+    mirrorToolResult("cad_edit.editor", true, json({ ok: true, actions: [{ action: "section_off" }] }))
     expect(useCADStore.getState().section.enabled).toBe(false)
     expect(useCADStore.getState().section.position).toBe(60)
   })
 
   test("the result of the tool carries the section fields through", () => {
-    expect(opsFor("cad_editor", json({ ok: true, actions: [{ action: "section_on", axis: "z", position: 5 }] }))).toEqual([
+    expect(opsFor("cad_edit.editor", json({ ok: true, actions: [{ action: "section_on", axis: "z", position: 5 }] }))).toEqual([
       { kind: "editor", actions: [{ action: "section_on", axis: "z", position: 5 }] }
     ])
   })

@@ -31,7 +31,7 @@ describe("cad tools provision what is missing", () => {
   })
 
   test("with no matching project the assistant draws in the user's newest project", async () => {
-    const out = await run("cad_add_entities", { entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: 15 }] }) as { ok: boolean; ids: string[]; elements: Array<{ type: string; radius: number }>; projectId: string }
+    const out = await run("cad_edit", { action: "add_entities", entities: [{ type: "circle", center: { x: 0, y: 0 }, radius: 15 }] }) as { ok: boolean; ids: string[]; elements: Array<{ type: string; radius: number }>; projectId: string }
     expect(out.ok).toBe(true)
     expect(out.elements[0]).toMatchObject({ type: "circle", radius: 15 })
     const orphan = await handlers.addEntities("default", [{ type: "sphere", center: { x: 0, y: 0 }, radius: 5 }]) as { ok: boolean; projectId: string; drawingId: string }
@@ -60,43 +60,43 @@ describe("cad tools provision what is missing", () => {
   })
 
   test("modify and delete work on the ids the add returned, and unknown ids are explained", async () => {
-    const added = await run("cad_add_elements", { elements: [{ type: "cylinder", x: 0, y: 0, radius: 4, height: 20 }] }) as { ids: string[] }
-    const changed = await run("cad_modify_entities", { changes: [{ id: added.ids[0], changes: { radius: 6, center: { x: 9, y: 9 } } }] }) as { ok: boolean; elements: Array<{ radius: number; x: number }> }
+    const added = await run("cad_edit", { action: "add", elements: [{ type: "cylinder", x: 0, y: 0, radius: 4, height: 20 }] }) as { ids: string[] }
+    const changed = await run("cad_edit", { action: "modify", changes: [{ id: added.ids[0], changes: { radius: 6, center: { x: 9, y: 9 } } }] }) as { ok: boolean; elements: Array<{ radius: number; x: number }> }
     expect(changed.elements[0]).toMatchObject({ radius: 6, x: 9 })
-    expect(await run("cad_modify_entities", { changes: [{ id: "nope", changes: { radius: 1 } }] })).toMatchObject({ ok: false })
-    const removed = await run("cad_delete_entities", { ids: added.ids, confirm: true }) as { deleted: number }
+    expect(await run("cad_edit", { action: "modify", changes: [{ id: "nope", changes: { radius: 1 } }] })).toMatchObject({ ok: false })
+    const removed = await run("cad_edit", { action: "delete", ids: added.ids, confirm: true }) as { deleted: number }
     expect(removed.deleted).toBe(1)
   })
 
   test("cad_modify_entities moves and turns a solid, changes a parametric dimension, and refuses a change that breaks the part", async () => {
     const template = plateTemplate()
     const plate = { type: "parametric", name: "Plate", history: template }
-    const added = await run("cad_add_elements", { elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, plate] }) as { ok: boolean; ids: string[]; problems?: string[]; skipped?: Array<{ error: string }> }
+    const added = await run("cad_edit", { action: "add", elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, plate] }) as { ok: boolean; ids: string[]; problems?: string[]; skipped?: Array<{ error: string }> }
     expect(added.ok).toBe(true)
     const [cubeId, plateId] = added.ids as [string, string]
     // Placement and rotation reach the stored element (they used to be dropped by the change schema).
-    const moved = await run("cad_modify_entities", { changes: [{ id: cubeId, changes: { x: 40, z: 5, rotation: { x: 90, y: 0, z: 0 } } }] }) as { ok: boolean; elements: Array<Record<string, unknown>> }
+    const moved = await run("cad_edit", { action: "modify", changes: [{ id: cubeId, changes: { x: 40, z: 5, rotation: { x: 90, y: 0, z: 0 } } }] }) as { ok: boolean; elements: Array<Record<string, unknown>> }
     expect(moved.elements[0]).toMatchObject({ x: 40, z: 5, rotation: { x: 90, y: 0, z: 0 } })
     // One named dimension changes, the features stay.
-    const wider = await run("cad_modify_entities", { changes: [{ id: plateId, changes: { parameters: { width: 90 } } }] }) as { ok: boolean; elements: Array<{ history: { parameters: Record<string, number>; features: unknown[] } }> }
+    const wider = await run("cad_edit", { action: "modify", changes: [{ id: plateId, changes: { parameters: { width: 90 } } }] }) as { ok: boolean; elements: Array<{ history: { parameters: Record<string, number>; features: unknown[] } }> }
     expect(wider).toMatchObject({ ok: true })
     expect(wider.elements[0]!.history.parameters).toEqual({ ...template.parameters, width: 90 })
     expect(wider.elements[0]!.history.features).toHaveLength(template.features.length)
     // A history that builds nothing, a rotation that is not {x,y,z} and a negative size change nothing at all.
     for (const bad of [{ history: { parameters: {}, features: [] } }, { rotation: "ninety" }]) {
-      const refused = await run("cad_modify_entities", { changes: [{ id: bad.history ? plateId : cubeId, changes: bad }] }) as { ok: boolean; error: string }
+      const refused = await run("cad_edit", { action: "modify", changes: [{ id: bad.history ? plateId : cubeId, changes: bad }] }) as { ok: boolean; error: string }
       expect(refused.ok).toBe(false)
       expect(refused.error).toContain("Nothing changed")
     }
   })
 
   test("cad_add_elements builds 3D: a revolved bottle, a car from solids, booleans by index", async () => {
-    const bottle = await run("cad_add_elements", { elements: [{ type: "revolution", name: "Bottle", profile: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 150 }, { x: 10, y: 200 }, { x: 10, y: 260 }], axis: "y" }] }) as { ok: boolean; elements: Array<{ type: string; profile: unknown[]; segments: number }> }
+    const bottle = await run("cad_edit", { action: "add", elements: [{ type: "revolution", name: "Bottle", profile: [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 150 }, { x: 10, y: 200 }, { x: 10, y: 260 }], axis: "y" }] }) as { ok: boolean; elements: Array<{ type: string; profile: unknown[]; segments: number }> }
     expect(bottle.ok).toBe(true)
     expect(bottle.elements[0]).toMatchObject({ type: "revolution", segments: 32 })
     expect(bottle.elements[0]!.profile).toHaveLength(5)
 
-    const car = await run("cad_add_elements", { elements: [
+    const car = await run("cad_edit", { action: "add", elements: [
       { type: "cube", name: "Body", width: 400, height: 120, depth: 100, z: 60, color: "#cc0000" },
       { type: "cylinder", name: "Wheel", radius: 30, height: 20, x: -130, y: 70, z: 30 },
       { type: "cube", name: "Slot", width: 50, height: 50, depth: 50 },
@@ -131,19 +131,19 @@ describe("cad tools provision what is missing", () => {
   test("cad_add_elements judges each element: the valid ones are added, the others are named, a boolean follows its operands", async () => {
     const count = async () => ((await app.call(`/api/projects/${projectId}/drawings`)).body[0].data.elements as unknown[]).length
     const before = await count()
-    const out = await run("cad_add_elements", { elements: [{ type: "sphere", radius: 5, name: "Ball" }, { type: "revolution" }, { type: "cube", width: -3 }, { type: "cube", width: 4, height: 4, depth: 4, name: "Block" }] }) as { ok: boolean; ids: string[]; skipped: Array<{ index: number; error: string }>; note: string }
+    const out = await run("cad_edit", { action: "add", elements: [{ type: "sphere", radius: 5, name: "Ball" }, { type: "revolution" }, { type: "cube", width: -3 }, { type: "cube", width: 4, height: 4, depth: 4, name: "Block" }] }) as { ok: boolean; ids: string[]; skipped: Array<{ index: number; error: string }>; note: string }
     expect(out.ok).toBe(true)
     expect(out.ids).toHaveLength(2)
     expect(out.skipped.map((s) => s.index)).toEqual([1, 2])
     expect(out.note).toContain("2 of 4")
     expect(await count()).toBe(before + 2)
     // A boolean over a skipped element is skipped too; operand indexes still point at the right elements after the gap.
-    const boolean = await run("cad_add_elements", { elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, { type: "cube", width: -1 }, { type: "cylinder", radius: 2, height: 30 }, { type: "boolean-subtract", operands: [0, 2] }, { type: "boolean-union", operands: [0, 1] }] }) as { ok: boolean; elements: Array<{ id: string; type: string; operands?: string[] }>; skipped: Array<{ index: number }> }
+    const boolean = await run("cad_edit", { action: "add", elements: [{ type: "cube", width: 10, height: 10, depth: 10 }, { type: "cube", width: -1 }, { type: "cylinder", radius: 2, height: 30 }, { type: "boolean-subtract", operands: [0, 2] }, { type: "boolean-union", operands: [0, 1] }] }) as { ok: boolean; elements: Array<{ id: string; type: string; operands?: string[] }>; skipped: Array<{ index: number }> }
     expect(boolean.skipped.map((s) => s.index).sort()).toEqual([1, 4])
     const sub = boolean.elements.find((e) => e.type === "boolean-subtract")!
     expect(sub.operands).toEqual([boolean.elements[0]!.id, boolean.elements[1]!.id])
     // Every element invalid: nothing added, every reason listed.
-    const none = await run("cad_add_elements", { elements: [{ type: "revolution" }, { type: "cube", width: -3 }] }) as { ok: boolean; problems: string[] }
+    const none = await run("cad_edit", { action: "add", elements: [{ type: "revolution" }, { type: "cube", width: -3 }] }) as { ok: boolean; problems: string[] }
     expect(none.ok).toBe(false)
     expect(none.problems).toHaveLength(2)
     const bad = await handlers.addElements(projectId, [{ type: "boolean-union", operands: [0, 7] }]) as { ok: boolean }
@@ -189,8 +189,8 @@ describe("cad tools provision what is missing", () => {
       const project = (await fresh.call("/api/projects", { method: "POST", json: { name: "Import" } })).body.id as string
       const line = (a: number, b: number, c: number, d: number) => `0\nLINE\n8\n0\n10\n${a}\n20\n${b}\n11\n${c}\n21\n${d}\n`
       const dxf = `0\nSECTION\n2\nENTITIES\n${line(0, 0, 80, 0)}${line(80, 0, 80, 40)}${line(80, 40, 0, 40)}${line(0, 40, 0, 0)}0\nCIRCLE\n8\n0\n10\n40\n20\n20\n40\n6\n0\nENDSEC\n0\nEOF\n`
-      const tool = buildTools(h, project).find((t) => t.id === "cad_import_drawing")!
-      const out = JSON.parse(String(await tool.execute({ format: "dxf", content: dxf, depth: 8, name: "Plate" }, ctx))) as { ok: boolean; stats: { solids: number; holes: number }; elements: Array<Record<string, unknown>> }
+      const tool = buildTools(h, project).find((t) => t.id === "cad_edit")!
+      const out = JSON.parse(String(await tool.execute({ action: "import", format: "dxf", content: dxf, depth: 8, name: "Plate" }, ctx))) as { ok: boolean; stats: { solids: number; holes: number }; elements: Array<Record<string, unknown>> }
       expect(out.ok).toBe(true)
       expect(out.stats).toMatchObject({ solids: 1, holes: 1 })
       const sub = out.elements.find((e) => e["type"] === "boolean-subtract")!
@@ -234,21 +234,21 @@ describe("cad tools provision what is missing", () => {
 
 describe("cam_list_operations / cam_update_operation / cam_suggest_parameters", () => {
   test("lists the operation with its tool and depth", async () => {
-    const list = await run("cam_list_operations", {})
+    const list = await run("cam", { action: "operations", })
     expect(list).toEqual([expect.objectContaining({ id: operationId, operationType: "contour", depth: 3, tool: expect.objectContaining({ diameter: 6 }) })])
   })
 
   test("updating settings clears the stale G-code and keeps the rest", async () => {
-    await run("cam_generate_gcode", { operationId })
-    expect((await run("cam_list_operations", {}))[0].generated).toBe(true)
-    const updated = await run("cam_update_operation", { operationId, params: { depth: 4 } })
+    await run("cam_edit", { action: "generate", operationId })
+    expect((await run("cam", { action: "operations", }))[0].generated).toBe(true)
+    const updated = await run("cam_edit", { action: "update", operationId, params: { depth: 4 } })
     expect(updated).toMatchObject({ ok: true, settings: { depth: 4, toolDiameter: 6 } })
-    expect((await run("cam_list_operations", {}))[0].generated).toBe(false)
-    expect(await run("cam_update_operation", { operationId: "nope", params: {} })).toMatchObject({ ok: false })
+    expect((await run("cam", { action: "operations", }))[0].generated).toBe(false)
+    expect(await run("cam_edit", { action: "update", operationId: "nope", params: {} })).toMatchObject({ ok: false })
   })
 
   test("suggestions come from the drawing", async () => {
-    const out = await run("cam_suggest_parameters", { params: { toolDiameter: 6 } })
+    const out = await run("cam", { action: "suggest", params: { toolDiameter: 6 } })
     expect(out.statistics).toBeDefined()
     expect(Array.isArray(out.warnings)).toBe(true)
   })
@@ -256,8 +256,8 @@ describe("cam_list_operations / cam_update_operation / cam_suggest_parameters", 
 
 describe("cam_verify_toolpath", () => {
   test("verifies the stored operation against its stock and reports what is modelled", async () => {
-    await run("cam_update_operation", { operationId, params: { depth: 3 } })
-    const out = await run("cam_verify_toolpath", { operationId })
+    await run("cam_edit", { action: "update", operationId, params: { depth: 3 } })
+    const out = await run("cam_edit", { action: "verify", operationId })
     expect(out.stats.removedVolume).toBeGreaterThan(0)
     expect(out.modelled).toEqual({ holder: false, shank: false, fixtures: 0, target: false })
     expect(out.note).toContain("not a machine certification")
@@ -265,8 +265,8 @@ describe("cam_verify_toolpath", () => {
   })
 
   test("a short cutter with a holder is checked against the depth", async () => {
-    await run("cam_update_operation", { operationId, params: { depth: 8 } })
-    const out = await run("cam_verify_toolpath", {
+    await run("cam_edit", { action: "update", operationId, params: { depth: 8 } })
+    const out = await run("cam_edit", { action: "verify", 
       operationId,
       tool: { cuttingLength: 3, stickout: 4, holderDiameter: 30, holderLength: 40 },
       stock: { minX: -30, maxX: 30, minY: -25, maxY: 25, minZ: -10, maxZ: 0 }
@@ -277,8 +277,8 @@ describe("cam_verify_toolpath", () => {
   })
 
   test("fixtures and a target part are validated and used", async () => {
-    await run("cam_update_operation", { operationId, params: { depth: 3 } })
-    const out = await run("cam_verify_toolpath", {
+    await run("cam_edit", { action: "update", operationId, params: { depth: 3 } })
+    const out = await run("cam_edit", { action: "verify", 
       operationId,
       stock: { minX: -30, maxX: 30, minY: -25, maxY: 25, minZ: -10, maxZ: 0 },
       fixtures: [{ id: "vise", bounds: { minX: -9, maxX: 9, minY: -9, maxY: 9, minZ: -10, maxZ: 5 } }],
@@ -287,11 +287,11 @@ describe("cam_verify_toolpath", () => {
     expect(out.modelled).toMatchObject({ fixtures: 1, target: true })
     expect(out.stats.gougeVolume).toBeDefined()
     // A malformed solid is rejected by the schema before the handler runs.
-    expect(await run("cam_verify_toolpath", { operationId, targetSolids: [{ _tag: "Nope" }] })).toMatchObject({ ok: false, error: expect.any(String) })
+    expect(await run("cam_edit", { action: "verify", operationId, targetSolids: [{ _tag: "Nope" }] })).toMatchObject({ ok: false, error: expect.any(String) })
   })
 
   test("unknown operations and non-mill operations are explained, not thrown", async () => {
-    expect(await run("cam_verify_toolpath", { operationId: "nope" })).toMatchObject({ ok: false, error: "Operation not found in the active drawing" })
+    expect(await run("cam_edit", { action: "verify", operationId: "nope" })).toMatchObject({ ok: false, error: "Operation not found in the active drawing" })
   })
 })
 
@@ -368,7 +368,7 @@ describe("library and chain tools (spec 22 §3)", () => {
   })
 
   test("cam_chain_status reports the previous operation and cam_operations_suggest_chain recommends the next", async () => {
-    await run("cam_update_operation", { operationId, params: { depth: 4, stepdown: 1 } })
+    await run("cam_edit", { action: "update", operationId, params: { depth: 4, stepdown: 1 } })
     const status = await handlers.chainStatus({ projectId, operationId }) as { ok: boolean; operationId: string; generated: boolean; warnings: string[] }
     expect(status.ok).toBe(true)
     expect(status.operationId).toBe(operationId)

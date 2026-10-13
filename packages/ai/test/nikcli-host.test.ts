@@ -146,14 +146,14 @@ describe("embedded nikcli host", () => {
     script = () => {
       if (requested) return { text: "Inspected." }
       requested = true
-      return { toolCalls: [{ name: "cad_vision", args: {} }] }
+      return { toolCalls: [{ name: "cad", args: { action: "vision" } }] }
     }
     const sessionId = await Effect.runPromise(createHostSession(host, "vision transport"))
     const events = await collect(hostChatStream({ host, sessionId, message: "Inspect the viewport", model }))
     const turns = chatTurns(fake.requests.slice(before))
     expect(turns.length).toBeGreaterThanOrEqual(2)
     expect(JSON.stringify(turns.slice(1))).toContain(`data:image/png;base64,${viewportPng}`)
-    const result = events.find((e) => e.type === "tool_result" && e.tool === "cad_vision")
+    const result = events.find((e) => e.type === "tool_result" && e.tool === "cad")
     expect(result?.type === "tool_result" && result.ok).toBe(true)
     expect(result?.type === "tool_result" && result.output).not.toContain(viewportPng)
   }, 180_000)
@@ -195,19 +195,26 @@ describe("embedded nikcli host", () => {
     expect(events.at(-1)?.type).toBe("done")
   })
 
-  test("the model builds in 3D: cad_add_elements goes through the real host with a revolved bottle and a cube", async () => {
+  test("the model builds in 3D: cad_edit.add goes through the real host with a revolved bottle and a cube", async () => {
     const host = await Effect.runPromise(runtime.host("project-3d"))
     added.length = 0
     const profile = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 150 }, { x: 10, y: 200 }, { x: 10, y: 260 }]
     let stage = 0
     script = () => ++stage === 1
-      ? { toolCalls: [{ name: "search_tools", args: { query: "cad_add_elements" } }] }
+      ? { toolCalls: [{ name: "search_tools", args: { query: "cad, cad_edit" } }] }
       : stage === 2
-        ? { toolCalls: [{ name: "cad_add_elements", args: { elements: [{ type: "revolution", name: "Bottle", profile }, { type: "cube", width: 40, height: 40, depth: 40, color: "#cc0000" }] } }] }
+        ? { toolCalls: [{ name: "cad_edit", args: { action: "add", elements: [{ type: "revolution", name: "Bottle", profile }, { type: "cube", width: 40, height: 40, depth: 40, color: "#cc0000" }] } }] }
         : { text: "Built." }
     const before = fake.requests.length
+    // `cad_edit` carries a destructive action, so the host asks before it runs. The ask role waits for a real
+    // answer; nothing executes until it arrives, which is what this test also proves by answering it.
     const sessionId = await Effect.runPromise(createHostSession(host, "3d"))
-    const events = await collect(hostChatStream({ host, sessionId, message: "make a bottle and a block", model }))
+    const events: AiEvent[] = []
+    await Effect.runPromise(Stream.runForEach(hostChatStream({ host, sessionId, agent: "cadcam-ask", message: "make a bottle and a block", model, autoContinues: 0 }), (event) => Effect.promise(async () => {
+      events.push(event)
+      if (event.type === "permission_request") await host.client.permission.reply({ requestID: event.requestId, reply: "once" })
+    })))
+    expect(events.some((event) => event.type === "permission_request")).toBe(true)
     expect(added).toHaveLength(1)
     expect(added[0]!.projectId).toBe("project-3d")
     expect(added[0]!.elements.map((e) => e["type"])).toEqual(["revolution", "cube"])
@@ -216,8 +223,8 @@ describe("embedded nikcli host", () => {
     expect(added[0]!.elements[1]).toMatchObject({ depth: 40, color: "#cc0000", x: 0 })
     expect(events.at(-1)?.type).toBe("done")
     const turns = chatTurns(fake.requests.slice(before))
-    expect(toolNames(turns[0]!)).not.toContain("cad_add_elements")
-    expect(toolNames(turns[1]!)).toContain("cad_add_elements")
+    expect(toolNames(turns[0]!)).not.toContain("cad_edit")
+    expect(toolNames(turns[1]!)).toContain("cad_edit")
   })
 
   test("tool call -> handler -> result -> final text", async () => {
@@ -241,10 +248,10 @@ describe("embedded nikcli host", () => {
 
   test("malformed history is rejected by the host with actionable recovery and no handler call", async () => {
     const host = await Effect.runPromise(runtime.host("project-invalid-history"))
-    script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Payload requires correction." } : { toolCalls: [{ name: "cad_parametric", args: { action: "validate", history: "{}" } }] }
+    script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Payload requires correction." } : { toolCalls: [{ name: "cad", args: { action: "parametric_validate", history: "{}" } }] }
     const sessionId = await Effect.runPromise(createHostSession(host, "invalid history"))
     const events = await collect(hostChatStream({ host, sessionId, message: "validate", model, autoContinues: 0 }))
-    const result = events.find((event) => event.type === "tool_result" && event.tool === "cad_parametric")
+    const result = events.find((event) => event.type === "tool_result" && event.tool === "cad")
     expect(result?.type === "tool_result" && result.ok).toBe(false)
     expect(result?.type === "tool_result" && result.output).toContain("history as a JSON object")
     expect(result?.type === "tool_result" && result.output).toContain("No mutation")

@@ -20,7 +20,7 @@ const events = (): object[] => [
   { type: "reasoning", sessionId: "s", text: "The plate needs two holes." },
   { type: "todo", sessionId: "s", todos: [{ content: "Model the plate", status: "in_progress" }, { content: "Drill the holes", status: "pending" }, { content: "Verify", status: "pending" }] },
   { type: "heartbeat" },
-  { type: "tool_progress", sessionId: "s", callId: "c1", tool: "cad_add_elements", chars: 1500 },
+  { type: "tool_progress", sessionId: "s", callId: "c1", tool: "cad_edit", chars: 1500 },
   { type: "retry", sessionId: "s", attempt: 1, message: "Provider is overloaded" },
   { type: "delta", sessionId: "s", text: "Building the plate." },
   { type: "skill-ish", sessionId: "s" },
@@ -60,7 +60,7 @@ describe("the agent's work is shown", () => {
         expect(q('[data-testid="ai-plan"]')?.textContent).toContain("Drill the holes")
         expect(q('[data-testid="ai-plan"] [data-status="in_progress"]')?.textContent).toContain("Model the plate")
         expect(q('[data-testid="ai-status-line"]')?.textContent).toContain("Step 1")
-        expect(q('[data-testid="ai-preparing"]')?.textContent).toContain("cad_add_elements")
+        expect(q('[data-testid="ai-preparing"]')?.textContent).toContain("cad_edit")
         expect(q('[data-testid="ai-preparing"]')?.textContent).toContain("1.5 KB")
         expect(q('[data-testid="ai-thinking"]')?.textContent).toContain("The plate needs two holes.")
 

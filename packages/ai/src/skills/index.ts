@@ -6,10 +6,30 @@
  */
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { ELEMENT_SPECS } from "../element-catalog.ts"
+import { cam } from "@cadcamfun/core"
+import { ELEMENT_SPECS, elementCatalogueLines } from "../element-catalog.ts"
 
 /** Written next to a skill that came from the user's store, so a deleted one can be cleaned from the host config. */
 export const USER_MARKER = ".user-skill"
+
+/**
+ * What each cutter type is for. The list of types is the generator's own schema, so a type the generator
+ * gains is documented here by name instead of becoming something the model must guess; the gloss is ours.
+ */
+const TOOL_TYPE_GLOSS: Readonly<Record<string, string>> = {
+  endmill: "flat end mill, the default for almost everything",
+  ballnose: "ball nose, for curved surfaces",
+  drill: "twist drill; the cycle comes from the operation",
+  vbit: "V-bit, for engraving and for a cut chamfer",
+  chamfer: "chamfer mill, for a real chamfer pass",
+  threadmill: "thread mill, for helical thread milling",
+  reamer: "reamer, for a bore that is finished, not cut",
+  probe: "touch probe, for a probing operation",
+  toolsetter: "tool setter, for measuring length and diameter"
+}
+const TOOL_TYPE_NOTES = cam.generator.ToolTypeSchema.literals
+  .map((type) => `\`${type}\` (${TOOL_TYPE_GLOSS[type] ?? "look it up before using"})`)
+  .join(", ")
 
 export interface CadCamSkill {
   readonly name: string
@@ -31,6 +51,7 @@ Objects are built in 3D, always: cad_edit action add for every part, shape or as
 - Put related parts on one layer (\`layer: "car"\`); the layer is created if needed.
 - **Layers and components**: one layer per system (\`layer: "body"\`, \`"wheels"\`, \`"fixtures"\`; created if needed, each with its own colour). A part made of several solids is a \`component\` (\`name\`, \`x,y,z\`, \`elements\` = its children placed relative to the component), so it can be selected, moved and machined as one thing; a Boolean stays its own element.
 - **Change what exists**: cad_edit action transform moves, turns and scales by id, and makes copies (a row: \`dx\` with \`copies\`; a ring: \`rotateDegrees\` + \`about\` + \`copies\`), so never rebuild a part to move it. cad_edit action group gathers parts into a component or opens one. cad_edit action editor creates, renames, colours, hides and locks layers, switches 3D/2D, fits the view, selects, isolates and undoes.
+- **Repeated geometry is a program**: a bolt circle, a grid of holes, a lattice, ribs or fifty similar operations are one \`code_mode\` program, not fifty calls in the conversation. Call the tools under \`tools\` with the arguments you would give them directly, \`await\` every call, and return one short summary: \`for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; await tools.cad_edit({ action: "add", elements: [{ type: "cylinder", layer: "holes", x: 40 * Math.cos(a), y: 40 * Math.sin(a), z: 0, radius: 3, height: 10 }] }) } return "8 holes"\`. Each call inside the program shows in the editor the moment it finishes, exactly like a direct call, so a long program is a build the user watches. Stop the program on the first \`ok: false\` (\`const r = JSON.parse(await tools.cad_edit(...)); if (!r.ok) return r\`) instead of looping on a failure.
 - **Work like a coding agent**: for anything bigger than one shape, say the plan in a line, build it in steps (a few calls, one subsystem each, on its own layer), call cad action check after the model is complete and fix what it reports, then go on to CAM (cam_edit action create, cam_edit action generate, cam_edit action verify) when the user wants it machined.
 - One call holds at most 40 elements (a long call is cut off by the model's output limit): build big things in steps, each a few calls, in the order a person would build it. Each element in a call is judged on its own: the valid ones are added, the invalid ones are listed under \`skipped\` with their index; resend only those, corrected.
 
@@ -50,7 +71,12 @@ Objects are built in 3D, always: cad_edit action add for every part, shape or as
 - \`rotation\` is in DEGREES, arc and revolution angles in RADIANS.
 
 ## After modelling
-Run cad action check: it finds sizes that are not positive, rotation typed in radians, booleans with missing operands, duplicates, parts that float, and parts outside the stock. Fix what it reports, then describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use cad_edit action modify with the ids you were given; to remove, cad_edit action delete with \`confirm: true\` only when the user asked.`
+Run cad action check: it finds sizes that are not positive, rotation typed in radians, booleans with missing operands, duplicates, parts that float, and parts outside the stock. Fix what it reports, then describe the drawing again and check the count and the bounds; report ids and positions, not prose. To change something use cad_edit action modify with the ids you were given; to remove, cad_edit action delete with \`confirm: true\` only when the user asked.
+
+## Element types
+Every type \`cad_edit\` action add accepts, with the fields it takes. Anything not listed here does not exist; a type the editor cannot show is a type you cannot create.
+
+${elementCatalogueLines()}`
 
 const WORKFLOW = `# From model to verified G-code
 
@@ -81,8 +107,9 @@ cam_edit action verify replays the G-code on a height-field model of the stock. 
 | Gouge | cut below the finished part by more than the tolerance | wrong offset (inside/outside), too much depth, or a wrong tool diameter |
 | UncutStock | stock left above the finished part (information) | normal after roughing; finishing passes are needed |
 | ResolutionCoarsened | the grid was coarsened to fit the budget | features under one cell are not resolved: say so |
+| InterpreterWarning | a line of the program could not be read and was skipped | that move was NOT verified; regenerate, or simplify the line the message names |
 
-Always state what was modelled (\`modelled\` in the result): without a holder, fixtures or a target part those checks did not run. Volume and air-cut numbers are planning figures. Never write "safe", "certified" or "collision-free": write "no errors found in what was modelled".`
+Always state what was modelled (\`modelled\` in the result): without a holder, fixtures or a target part those checks did not run. Volume and air-cut numbers are planning figures. An InterpreterWarning means part of the program was never replayed, so the rest of the report does not cover it. Never write "safe", "certified" or "collision-free": write "no errors found in what was modelled".`
 
 const PARAMETERS = `# Cutting parameters, as a starting point
 
@@ -282,6 +309,8 @@ A real part has many operations. Plan them in this order and do not skip ahead.
 ## Picking a tool
 
 Use library action lookup_tool. Confirm the cutter radius fits the smallest inside radius, the cutting length covers the depth, and RPM stays under both the tool and machine maximum.
+
+\`toolType\` is what an operation says the cutter IS, and the generator reads it: ${TOOL_TYPE_NOTES}. Everything else (diameter, flutes, reach, materials) comes from the library row.
 
 ## Setups
 

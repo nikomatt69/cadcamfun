@@ -21,7 +21,7 @@ describe("chat attachments (desktop)", () => {
   })
 
   test("an imported drawing shows in the editor like any other added element", () => {
-    const ops = opsFor("cad_import_drawing", JSON.stringify({ ok: true, ids: ["a"], elements: [{ id: "a", type: "extrusion", name: "Plate 1" }] }))
+    const ops = opsFor("cad_edit.import", JSON.stringify({ ok: true, ids: ["a"], elements: [{ id: "a", type: "extrusion", name: "Plate 1" }] }))
     expect(ops).toEqual([{ kind: "add", elements: [{ id: "a", type: "extrusion", name: "Plate 1" }] }])
   })
 })

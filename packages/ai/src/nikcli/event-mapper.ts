@@ -1,4 +1,5 @@
 /// <reference path="./sdk-next.d.ts" />
+import { drainProgramCalls, forgetProgramCalls } from "./program-calls.ts"
 import type { HostEvent } from "@nikcli-ai/sdk-next"
 import type { AiEvent } from "../events.ts"
 import { childAgent } from "./agents.ts"
@@ -49,6 +50,8 @@ export interface EventMapperState {
   readonly ownTexts: Set<string>
   /** User messages already reported as `user_message`. */
   readonly reportedUser: Set<string>
+  /** Inner calls of `code_mode` programs reported so far (their call ids are numbered). */
+  programCalls: number
 }
 
 export const newMapperState = (): EventMapperState => ({
@@ -70,7 +73,8 @@ export const newMapperState = (): EventMapperState => ({
   lastToolError: undefined,
   toolErrors: new Map(),
   ownTexts: new Set(),
-  reportedUser: new Set()
+  reportedUser: new Set(),
+  programCalls: 0
 })
 
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
@@ -162,6 +166,26 @@ export const toolFailure = (status: string | undefined, output: string): string 
   } catch { return undefined }
 }
 
+/**
+ * The inner calls of a `code_mode` program that finished since the last update of its part, as the same events a direct call
+ * produces. Their call ids hang off the program's, so a host that reuses ids across sessions cannot collide.
+ */
+const programCallEvents = (sessionId: string, programCallId: string, state: EventMapperState, agent?: string): ReadonlyArray<AiEvent> => {
+  const out: AiEvent[] = []
+  for (const call of drainProgramCalls(programCallId)) {
+    const callId = `${programCallId}#${state.programCalls++}`
+    state.startedCalls.add(callId)
+    state.finishedCalls.add(callId)
+    state.toolCalls += 1
+    const failure = call.failed ? call.output || "The tool call failed." : toolFailure(undefined, call.output)
+    const shared = { sessionId, callId, tool: call.tool, ...(agent ? { agent } : {}) }
+    out.push({ type: "tool_call", ...shared, input: call.input ?? {} })
+    out.push({ type: "tool_result", ...shared, ok: failure === undefined, output: call.output })
+    out.push(...toolDiagnostics(sessionId, callId, call.tool, call.output, failure, agent))
+  }
+  return out
+}
+
 /** The tool events of a specialist's session, as events of the parent's turn (call ids carry the child's session id: two sessions may reuse one). */
 const mapChildTool = (sessionId: string, childId: string, agent: string, part: Record<string, unknown>, state: EventMapperState): ReadonlyArray<AiEvent> => {
   if (str(part["type"]) !== "tool") return []
@@ -183,6 +207,10 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
     state.toolCalls += 1
     out.push({ type: "tool_call", sessionId, agent, callId, tool, input: toolState?.["input"] ?? {} })
   }
+  // A specialist's program: its inner calls are recorded under the host's own call id, not the prefixed one.
+  const hostCallId = str(part["callID"]) ?? str(part["id"]) ?? ""
+  if (tool === "code_mode" && (status === "running" || status === "completed" || status === "error")) out.push(...programCallEvents(sessionId, hostCallId, state, agent))
+  else if (status === "completed" || status === "error") forgetProgramCalls(hostCallId)
   if ((status === "completed" || status === "error") && !state.finishedCalls.has(callId)) {
     state.finishedCalls.add(callId)
     const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
@@ -193,7 +221,7 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
   return out
 }
 
-export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
+const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
   const props = event.properties
   switch (event.type) {
     case "question.asked": {
@@ -409,4 +437,27 @@ export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMa
     default:
       return []
   }
+}
+
+/**
+ * Maps one host event to the application's events. A `code_mode` program's inner calls are interleaved with its own part:
+ * after its start and before its result, so the transcript and the editor see them in the order they ran.
+ */
+export const mapHostEvent = (sessionId: string, event: HostEvent, state: EventMapperState): ReadonlyArray<AiEvent> => {
+  const events = mapHostEventParts(sessionId, event, state)
+  const part = event.type === "message.part.updated" ? rec(event.properties["part"]) : undefined
+  if (part === undefined || str(part["type"]) !== "tool") return events
+  const callId = str(part["callID"]) ?? str(part["id"]) ?? ""
+  const tool = str(part["tool"]) ?? ""
+  const status = str(rec(part["state"])?.["status"])
+  if (tool !== "code_mode") {
+    // A direct call recorded under its own id: nothing will drain it.
+    if (status === "completed" || status === "error") forgetProgramCalls(callId)
+    return events
+  }
+  if (callId === "" || (status !== "running" && status !== "completed" && status !== "error")) return events
+  const inner = programCallEvents(sessionId, callId, state)
+  if (inner.length === 0) return events
+  const result = events.findIndex((e) => e.type === "tool_result" && e.callId === callId)
+  return result === -1 ? [...events, ...inner] : [...events.slice(0, result), ...inner, ...events.slice(result)]
 }

@@ -15,7 +15,7 @@ Actions
 - parametric_test: run a list of parameter variants and report bodies and volumes; nothing is written.
 - parametric_dfm: manufacturability findings for a history or an existing part.
 - parametric_fastener: thread, tap drill, clearance and counterbore sizes for a metric size.
-- parametric_recipe: build a standard part (mounting plate, flange, L bracket, stepped shaft, enclosure, pipe bend, duct transition) and return its history. Use cad_edit.parametric_recipe_create to put it in the drawing.
+- parametric_recipe: build a standard part and return its history. `recipe` is one of mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend, duct_transition. Use cad_edit.parametric_recipe_create to put it in the drawing.
 
 Parameters (mm, radians; ids are read, never invented)
 - describe, check, inspect_layers: none.
