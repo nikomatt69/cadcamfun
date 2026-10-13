@@ -119,6 +119,7 @@ describe("what the assistant does on an operation shows in the CAM page", () => 
     expect(useGeneratorStore.getState().settings).toMatchObject({ toolDiameter: 6, depth: 3, stepdown: 1 })
 
     const generated = await handlers.generateGcode(doc.projectId, id)
+    if (!("gcode" in generated)) throw new Error("Expected a generated operation program")
     expect(await mirrorCamResult(app.state, "cam_edit.generate", { operationId: id }, json({ stats: generated.stats }))).toBe(true)
     expect(useCamStore.getState().gcode).toBe(generated.gcode)
     expect(useCamStore.getState().program.toolpaths.length).toBeGreaterThan(0)

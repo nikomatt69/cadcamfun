@@ -2427,15 +2427,50 @@ const adaptGroup26 = (raw: RawClient["toolpathExtras"]) => ({
   removeComment: Endpoint26_7(raw),
 })
 
-type Endpoint27_0Request = Parameters<RawClient["toolpathGenerator"]["generate"]>[0]
+type Endpoint27_0Request = Parameters<RawClient["toolpathGenerator"]["manufacture"]>[0]
 type Endpoint27_0Input = {
-  readonly settings: Endpoint27_0Request["payload"]["settings"]
-  readonly geometry: Endpoint27_0Request["payload"]["geometry"]
-  readonly printer: Endpoint27_0Request["payload"]["printer"]
+  readonly material: Endpoint27_0Request["payload"]["material"]
   readonly machine?: Endpoint27_0Request["payload"]["machine"]
-  readonly stamp?: Endpoint27_0Request["payload"]["stamp"]
+  readonly origin?: Endpoint27_0Request["payload"]["origin"]
+  readonly finishAllowance?: Endpoint27_0Request["payload"]["finishAllowance"]
+  readonly scallop?: Endpoint27_0Request["payload"]["scallop"]
+  readonly schemaVersion: Endpoint27_0Request["payload"]["schemaVersion"]
+  readonly id: Endpoint27_0Request["payload"]["id"]
+  readonly name: Endpoint27_0Request["payload"]["name"]
+  readonly elements: Endpoint27_0Request["payload"]["elements"]
+  readonly stock?: Endpoint27_0Request["payload"]["stock"]
+  readonly tolerance?: Endpoint27_0Request["payload"]["tolerance"]
+  readonly resolution?: Endpoint27_0Request["payload"]["resolution"]
+  readonly workOffset?: Endpoint27_0Request["payload"]["workOffset"]
 }
 const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_0Input) =>
+  raw["manufacture"]({
+    payload: {
+      material: input["material"],
+      machine: input["machine"],
+      origin: input["origin"],
+      finishAllowance: input["finishAllowance"],
+      scallop: input["scallop"],
+      schemaVersion: input["schemaVersion"],
+      id: input["id"],
+      name: input["name"],
+      elements: input["elements"],
+      stock: input["stock"],
+      tolerance: input["tolerance"],
+      resolution: input["resolution"],
+      workOffset: input["workOffset"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint27_1Request = Parameters<RawClient["toolpathGenerator"]["generate"]>[0]
+type Endpoint27_1Input = {
+  readonly settings: Endpoint27_1Request["payload"]["settings"]
+  readonly geometry: Endpoint27_1Request["payload"]["geometry"]
+  readonly printer: Endpoint27_1Request["payload"]["printer"]
+  readonly machine?: Endpoint27_1Request["payload"]["machine"]
+  readonly stamp?: Endpoint27_1Request["payload"]["stamp"]
+}
+const Endpoint27_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_1Input) =>
   raw["generate"]({
     payload: {
       settings: input["settings"],
@@ -2446,37 +2481,37 @@ const Endpoint27_0 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint27_1Request = Parameters<RawClient["toolpathGenerator"]["suggest"]>[0]
-type Endpoint27_1Input = {
-  readonly settings: Endpoint27_1Request["payload"]["settings"]
-  readonly geometry: Endpoint27_1Request["payload"]["geometry"]
+type Endpoint27_2Request = Parameters<RawClient["toolpathGenerator"]["suggest"]>[0]
+type Endpoint27_2Input = {
+  readonly settings: Endpoint27_2Request["payload"]["settings"]
+  readonly geometry: Endpoint27_2Request["payload"]["geometry"]
 }
-const Endpoint27_1 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_1Input) =>
+const Endpoint27_2 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_2Input) =>
   raw["suggest"]({ payload: { settings: input["settings"], geometry: input["geometry"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint27_2Request = Parameters<RawClient["toolpathGenerator"]["parse"]>[0]
-type Endpoint27_2Input = {
-  readonly gcode: Endpoint27_2Request["payload"]["gcode"]
-  readonly name: Endpoint27_2Request["payload"]["name"]
-}
-const Endpoint27_2 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_2Input) =>
-  raw["parse"]({ payload: { gcode: input["gcode"], name: input["name"] } }).pipe(Effect.mapError(mapClientError))
-
-type Endpoint27_3Request = Parameters<RawClient["toolpathGenerator"]["verify"]>[0]
+type Endpoint27_3Request = Parameters<RawClient["toolpathGenerator"]["parse"]>[0]
 type Endpoint27_3Input = {
-  readonly gcode?: Endpoint27_3Request["payload"]["gcode"]
-  readonly program?: Endpoint27_3Request["payload"]["program"]
-  readonly stock: Endpoint27_3Request["payload"]["stock"]
-  readonly tool: Endpoint27_3Request["payload"]["tool"]
-  readonly fixtures: Endpoint27_3Request["payload"]["fixtures"]
-  readonly target?: Endpoint27_3Request["payload"]["target"]
-  readonly resolution?: Endpoint27_3Request["payload"]["resolution"]
-  readonly tolerance: Endpoint27_3Request["payload"]["tolerance"]
-  readonly start?: Endpoint27_3Request["payload"]["start"]
+  readonly gcode: Endpoint27_3Request["payload"]["gcode"]
+  readonly name: Endpoint27_3Request["payload"]["name"]
 }
 const Endpoint27_3 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_3Input) =>
+  raw["parse"]({ payload: { gcode: input["gcode"], name: input["name"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint27_4Request = Parameters<RawClient["toolpathGenerator"]["verify"]>[0]
+type Endpoint27_4Input = {
+  readonly gcode?: Endpoint27_4Request["payload"]["gcode"]
+  readonly program?: Endpoint27_4Request["payload"]["program"]
+  readonly stock: Endpoint27_4Request["payload"]["stock"]
+  readonly tool: Endpoint27_4Request["payload"]["tool"]
+  readonly fixtures: Endpoint27_4Request["payload"]["fixtures"]
+  readonly target?: Endpoint27_4Request["payload"]["target"]
+  readonly resolution?: Endpoint27_4Request["payload"]["resolution"]
+  readonly tolerance: Endpoint27_4Request["payload"]["tolerance"]
+  readonly start?: Endpoint27_4Request["payload"]["start"]
+}
+const Endpoint27_4 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27_4Input) =>
   raw["verify"]({
     payload: {
       gcode: input["gcode"],
@@ -2492,10 +2527,11 @@ const Endpoint27_3 = (raw: RawClient["toolpathGenerator"]) => (input: Endpoint27
   }).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup27 = (raw: RawClient["toolpathGenerator"]) => ({
-  generate: Endpoint27_0(raw),
-  suggest: Endpoint27_1(raw),
-  parse: Endpoint27_2(raw),
-  verify: Endpoint27_3(raw),
+  manufacture: Endpoint27_0(raw),
+  generate: Endpoint27_1(raw),
+  suggest: Endpoint27_2(raw),
+  parse: Endpoint27_3(raw),
+  verify: Endpoint27_4(raw),
 })
 
 type Endpoint28_0Request = Parameters<RawClient["library"]["list"]>[0]

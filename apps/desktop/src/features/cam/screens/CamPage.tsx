@@ -17,7 +17,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { syncDocumentSettings } from "../../../shared/state/document-settings.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
-import { stockOf } from "../lib/job.ts"
+import { kernelStockOf, stockOf } from "../lib/job.ts"
 import CamStatusBar from "../components/CamStatusBar.tsx"
 import { buildPlayback, colorHex, toolColors } from "../../../viewport/view3d/playback.ts"
 import { makeToolpathGenerator } from "../api/generator.ts"
@@ -51,7 +51,9 @@ export default function CamPage(): JSX.Element {
   const gen = useGeneratorStore()
   const cadStore = useCADStore()
   const elementStore = useElementsStore()
-  const previewStock = createMemo(() => stockOf({ elements: elementStore.elements, selectedElement: null, selectedIds: [], workpiece: cadStore.workpiece, workpieceElementId: camStore.selectedWorkpieceElementId, stockAllowance: camStore.stockAllowance }))
+  const previewStock = createMemo(() => camStore.kernelArtifact?.nc === camStore.gcode
+    ? kernelStockOf(camStore.kernelArtifact)
+    : stockOf({ elements: elementStore.elements, selectedElement: null, selectedIds: [], workpiece: cadStore.workpiece, workpieceElementId: camStore.selectedWorkpieceElementId, stockAllowance: camStore.stockAllowance }))
   const generator = makeToolpathGenerator(app.client)
   const [search, setSearch] = useSearchParams()
 
@@ -80,6 +82,8 @@ export default function CamPage(): JSX.Element {
     // The text the store composed from the assistant's operations already has its program (every operation's toolpaths,
     // one colour per tool): parsing the concatenated programs back would collapse them into one.
     if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
+    // The kernel returned this exact program with named operations/tool changes; reparsing would discard that structure.
+    if (camStore.kernelArtifact?.nc === text) return
     const timer = setTimeout(() => {
       void app.runtime.run(generator.parse(text)).then(
         (parsed) => camStore.setProgram(parsed.program as never),

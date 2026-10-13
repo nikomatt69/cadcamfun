@@ -28,7 +28,7 @@ These are static observations, not reproduced exploits or claims that tests pass
 - Existing WP4 scope: `apps/sidecar/src/services/ai.ts` only, as RM-01's handler adapter.
 - Required WP4 amendment: `apps/sidecar/src/services/acting-user.ts`, `apps/sidecar/src/http/ai.ts`, `apps/sidecar/src/services/ai-vcs-tools.ts`, `apps/sidecar/test/` for immutable admission and adapter safety.
 - Required WP3 amendment: `packages/api/src/` and `packages/api/test/` for shared wire contracts; dependency wiring is separately explicit.
-- Required WP6 amendment: `apps/desktop/src/ai/` and `apps/desktop/test/` only for tool-ID decoding compatibility, not receipt UI implementation.
+- Required WP6 amendment: `apps/desktop/src/features/ai/lib/` and `apps/desktop/test/` only for tool-ID decoding and mutation-outcome compatibility, not receipt persistence or new UI implementation. This is the current source location of the consumers formerly listed as `src/ai/`.
 Before cross-WP implementation, amend RM-01 owner/deliverable lists and the affected WP contracts first.
 These proposed scopes are not permission to edit unlisted directories or manifests; publication owns only this file.
 
@@ -111,4 +111,6 @@ git diff --check
 
 ## Change log
 
+- 2026-10-14: owner-requested additive `cam_edit.manufacture` persists the native CAM result through the existing sidecar Toolpath repository and readback interface. The read-only `cam.manufacture` preview remains. Shared contracts, actual write classification, pre-commit actor/revision/cancellation checks and original-NC desktop reconciliation apply; no new DB migration or durable receipt implementation is included.
+- 2026-10-14: scoped the current CAM migration to shared Effect input contracts in `packages/api/src/ai-cam.ts`, derived nikcli validators and Effect decoding in the action module. Generation preserves typed refusals/conflicts/receipts rather than rebuilding them as previews; desktop consumers must not mirror a receipt as a fresh mutation. Action construction is lazy and cancellation is checked before entering foreign handlers. No RM-03 persistence or completion gate is included.
 - 2026-10-12: specified catalogue depth, immutable invocation authority and native permission safety; implementation pending.

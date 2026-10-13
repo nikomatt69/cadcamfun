@@ -1408,11 +1408,26 @@ export const rebuild = (history: History): RebuildResult => {
             const shifts = curvedDraft.face.vertices.map((v) => shift(v.p))
             const lo = Math.min(...shifts), hi = Math.max(...shifts)
             if (curvedDraft.face.vertices.some((v) => { const a = across(v.p, v.n); return a.x === 0 && a.y === 0 && a.z === 0 })) { issues.push({ feature: f.id, severity: "error", message: "Part of the curved face is square to the pull direction and cannot be drafted" }); break }
-            if (lo < -1e-9 && hi > 1e-9) { issues.push({ feature: f.id, severity: "error", message: "The neutral plane crosses this curved face: put it at the face's base or top (a curved face is drafted one way only)" }); break }
             const margin = 0.01
-            if (hi <= 1e-9 && lo < -1e-9) apply(f.id, curvedDraft.face.slab((p) => shift(p), margin, across), "subtract", [curvedDraft.body.id], f.id)
-            else if (hi > 1e-9) apply(f.id, curvedDraft.face.slab(-margin, (p) => Math.max(shift(p), 0) + 1e-9, across), "union", [curvedDraft.body.id], f.id)
-            else issues.push({ feature: f.id, severity: "warning", message: "The draft changes nothing (the face lies on the neutral plane, or the angle is 0)" })
+            if (lo >= -1e-9 && hi <= 1e-9) { issues.push({ feature: f.id, severity: "warning", message: "The draft changes nothing (the face lies on the neutral plane, or the angle is 0)" }); break }
+            // On one side of the neutral plane the face moves in (material removed), on the other out (material added). Each slab runs from the
+            // drafted surface to just past the original one and is clipped to its side of the neutral plane: the drafted surface is linear
+            // in the vertices, but the side a point is on is not, so the plane does the splitting, not the vertices.
+            const hint = Math.abs(w.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+            const hu = vunit(vcross(w, hint)), hv = vcross(w, hu)
+            const half = 4 * meshExtent(curvedDraft.body.mesh) + 10
+            const onPlane = vmul(w, neutral)
+            const above = slabTool(hu, hv, w, onPlane, half, 0, half), below = slabTool(hu, hv, w, onPlane, half, -half, 0)
+            // A positive angle moves the face in above the neutral plane; a negative one, below it.
+            const inward = tan > 0 ? above : below, outward = tan > 0 ? below : above
+            if (lo < -1e-9) {
+              const cut = booleanMesh(curvedDraft.face.slab((p) => shift(p), (p) => Math.max(shift(p), 0) + margin, across), inward, "intersect")
+              if (cut.indices.length > 0) apply(f.id, cut, "subtract", [curvedDraft.body.id], f.id)
+            }
+            if (hi > 1e-9) {
+              const grow = booleanMesh(curvedDraft.face.slab((p) => Math.min(shift(p), 0) - margin, (p) => shift(p), across), outward, "intersect")
+              if (grow.indices.length > 0) apply(f.id, grow, "union", [curvedDraft.body.id], f.id)
+            }
             break
           }
           const pick = pickFace(candidates, draftNear, draftHint)

@@ -32,13 +32,21 @@ const solidObject = (mesh: SolidMesh, element: any, offset: { x: number; y: numb
  * sharp), the B-rep edges as lines, and `userData.brepFace` / `brepEdge` on each piece for face and edge picking. Placed by
  * the same `elementBrep` the STEP export and the CAM use. Cached per element object.
  */
-const brepObjectCache = new WeakMap<object, THREE.Group>();
+/** The canvas owns editable transforms. Kernel geometry supplied to the factory includes placement only. */
+const withoutGizmo = (element: Record<string, unknown>): Record<string, unknown> => ({
+  ...element, rotation: undefined, scale: undefined, translateX: 0, translateY: 0, translateZ: 0
+});
+// Cache immutable geometry, never Three resources: two canvases must be able to highlight/dispose independently.
+const brepGeometryCache = new WeakMap<object, { readonly model: brep.Brep; readonly tessellation: ReturnType<typeof brep.tessellateBrep> }>();
 const brepObject = (element: any, offset: { x: number; y: number; z: number }): THREE.Group | null => {
-  const cached = brepObjectCache.get(element);
-  if (cached) return cached.clone();
-  const placed = cadElementBrep(element);
-  if (!placed.brep) return null;
-  const t = brep.tessellateBrep(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 });
+  let cached = brepGeometryCache.get(element);
+  if (!cached) {
+    const placed = cadElementBrep(withoutGizmo(element));
+    if (!placed.brep) return null;
+    cached = { model: placed.brep, tessellation: brep.tessellateBrep(placed.brep, { chordTol: typeof element.tolerance === "number" ? element.tolerance : 0.01 }) };
+    brepGeometryCache.set(element, cached);
+  }
+  const t = cached.tessellation;
   const group = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({ color: element.color || 0x8fa3b8, wireframe: element.wireframe || false, metalness: 0.25, roughness: 0.55, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   for (const face of t.faces) {
@@ -54,8 +62,8 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
     geometry.setIndex(Array.from(face.indices));
     const mesh = new THREE.Mesh(geometry, material);
     mesh.userData.brepFace = face.face;
-    mesh.userData.surface = placed.brep.faces[face.face]?.surface.kind;
-    if (placed.brep.faces[face.face]?.name) mesh.userData.faceName = placed.brep.faces[face.face]!.name;
+    mesh.userData.surface = cached.model.faces[face.face]?.surface.kind;
+    if (cached.model.faces[face.face]?.name) mesh.userData.faceName = cached.model.faces[face.face]!.name;
     group.add(mesh);
   }
   const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1b1f24 });
@@ -73,8 +81,7 @@ const brepObject = (element: any, offset: { x: number; y: number; z: number }): 
     group.add(line);
   }
   group.userData.isBrep = true;
-  group.userData.brepFaces = placed.brep.faces.length;
-  brepObjectCache.set(element, group);
+  group.userData.brepFaces = cached.model.faces.length;
   return group;
 };
 
@@ -1389,7 +1396,7 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
 
       // A parametric model: its feature history rebuilt into one solid (the same solid the CAM machines).
       case "parametric": {
-        const solid = cam.model.elementMesh(element);
+        const solid = cam.model.elementMesh(withoutGizmo(element));
         return solid ? solidObject(solid, { color: 0x26a69a, ...element }, originOffset) : null;
       }
 
@@ -2415,7 +2422,3 @@ const buildObject = (element: any, originOffset: { x: number; y: number; z: numb
       }
     });
   };
-
-
-
-  

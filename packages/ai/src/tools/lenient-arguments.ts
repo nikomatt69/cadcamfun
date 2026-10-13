@@ -11,7 +11,8 @@ import { z } from "zod"
 const TEXT_KEYS = new Set([
   "type", "name", "text", "layer", "layerId", "id", "color", "font", "plane", "operation", "sketch", "feature", "kind", "direction",
   "axis", "shape", "unit", "units", "description", "label", "message", "content", "query", "topic", "title", "body", "prompt", "path",
-  "file", "filename", "attachment", "focus", "expectedRevision", "mode", "format", "strategy", "component", "operationId", "sessionId", "projectId", "drawingId", "machine", "expression"
+  "file", "filename", "attachment", "focus", "expectedRevision", "mode", "format", "strategy", "component", "operationId", "sessionId", "projectId", "drawingId", "machine", "expression",
+  "material", "materialId", "toolId", "machineConfigId"
 ])
 
 const NUMBER = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i

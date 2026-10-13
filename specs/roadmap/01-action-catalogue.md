@@ -1,6 +1,6 @@
 # RM-01 — Action catalogue (deepen the tool seam)
 
-Status: **in progress**. Current step. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/ai` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
+Status: **in progress**. Current step. Design: `26-tool-consolidation.md`, `27-everything-via-nikcli.md` §3, [spec 28](../28-native-ai-architecture.md), [AI-01](../ai/01-actions-and-execution.md). Owners: WP8 `packages/ai`; WP4 `apps/sidecar/src/services/ai.ts`, `ai-vcs-tools.ts`, `acting-user.ts` and `apps/sidecar/src/http/ai.ts` for immutable invocation admission/handler authorization only; WP3 `packages/api/src` shared action schemas only; WP6 `apps/desktop/src/features/ai/lib` tool IDs/decoders/result consumers only. Matching tests in each workspace are included. No new routes, page redesign or task durability here.
 
 ## Why this is first
 

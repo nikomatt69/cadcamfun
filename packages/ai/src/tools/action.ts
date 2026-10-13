@@ -7,11 +7,10 @@
  * given `cad_edit` would gain every write in it. A group that contains a destructive action is registered as `ask`
  * (one native confirmation) rather than an invented action-level permission.
  */
-import { Effect } from "effect"
 import { z } from "zod"
 import { defineTool, ToolMediaResult, type ToolContext, type ToolDefinition } from "./define.ts"
-import type { ActionContext, ActionFailure, ActionKind, ActionSpec } from "../actions/action.ts"
-import { actionFailureResult } from "../actions/action.ts"
+import type { ActionContext, ActionKind, ActionSpec } from "../actions/action.ts"
+import { executeAction } from "../actions/action.ts"
 
 export interface ActionTool extends ToolDefinition {
   /** The actions this tool carries, keyed by action name. */
@@ -47,10 +46,7 @@ export const defineActionTool = (id: string, actions: Readonly<Record<string, Ac
       if (context.signal?.aborted) return { ok: false, _tag: "ActionInterrupted", actionId: `${id}.${name}`, error: "Tool execution cancelled." }
       const { action: _discriminator, ...payload } = input as Record<string, unknown>
       // One Promise crossing per call: the Effect is run here and nowhere else.
-      return Effect.runPromise(
-        action.run(payload as never, context).pipe(Effect.catch((error: ActionFailure) => Effect.succeed(actionFailureResult(error)))),
-        { signal: context.signal }
-      )
+      return executeAction(action, payload, context)
     }
   })
 

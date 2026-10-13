@@ -12,6 +12,7 @@ import { Effect, Schema } from "effect"
 import { z } from "zod"
 import { ActionDenied, ActionInvalidInput, ActionInterrupted } from "@cadcamfun/api"
 import type { ActionContribution, ToolContext } from "../tools/define.ts"
+import { nikcliWireSchema } from "../tools/wire-schema.ts"
 
 /** What an action does to domain data. Derived from the implementation, never from the tool's name. */
 export type ActionKind = "read" | "write" | "destructive"
@@ -68,21 +69,58 @@ export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>
   kind: config.kind,
   parameters: config.parameters,
   ...(config.replaces !== undefined ? { replaces: config.replaces } : {}),
-  run: (input, context) => {
-    // An action may answer with an Effect (a typed refusal or an interruptible write) or with a plain value/Promise.
-    let outcome: unknown
-    try {
-      outcome = config.run(input, context)
-    } catch (cause) {
-      return Effect.fail(new ActionFailed({ actionId: config.id, message: message(cause) }))
-    }
-    if (Effect.isEffect(outcome)) return outcome as Effect.Effect<unknown, ActionFailure>
-    return Effect.tryPromise({
+  run: Effect.fn(`actions.${config.id}`)(function*(input: z.infer<S>, context: ActionContext) {
+    // Constructing an Effect must not start a Promise handler: cancellation and admission happen before execution.
+    if (context.signal?.aborted) return yield* Effect.fail(new ActionInterrupted({ actionId: config.id, message: "Tool execution cancelled." }))
+    const outcome = yield* Effect.try({
+      try: () => config.run(input, context),
+      catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) })
+    })
+    if (Effect.isEffect(outcome)) return yield* outcome as Effect.Effect<unknown, ActionFailure>
+    return yield* Effect.tryPromise({
       try: () => Promise.resolve(outcome),
       catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) })
     })
-  }
+  })
 })
+
+/** Effect owns a wire action's input; nikcli only gets its derived, model-visible representation. */
+export const defineWireAction = <A>(config: {
+  readonly id: string
+  readonly kind: ActionKind
+  readonly parameters: Schema.Codec<A, unknown>
+  readonly replaces?: string
+  readonly run: (input: A, context: ActionContext) => Promise<unknown> | unknown
+}): ActionSpec => {
+  const decode = Schema.decodeUnknownEffect(config.parameters)
+  return defineAction({
+    ...config,
+    parameters: nikcliWireSchema(config.parameters),
+    run: (input, context) => decode(input).pipe(
+      Effect.mapError(() => new ActionInvalidInput({ actionId: config.id, message: "The arguments do not match the action's schema." })),
+      Effect.flatMap((decoded) => Effect.try({
+        try: () => config.run(decoded, context),
+        catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) })
+      })),
+      Effect.flatMap((outcome) => Effect.isEffect(outcome)
+        ? outcome as Effect.Effect<unknown, ActionFailure>
+        : Effect.tryPromise({ try: () => Promise.resolve(outcome), catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) }) }))
+    )
+  })
+}
+
+/** The shared Promise seam for the host and direct catalogue callers. Interruption has the same wire result on both. */
+export const executeAction = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<unknown> => {
+  try {
+    return await Effect.runPromise(
+      action.run(input as never, context).pipe(Effect.catch((error: ActionFailure) => Effect.succeed(actionFailureResult(error)))),
+      { signal: context.signal }
+    )
+  } catch (cause) {
+    if (context.signal?.aborted) return actionFailureResult(new ActionInterrupted({ actionId: action.id, message: "Tool execution cancelled." }))
+    throw cause
+  }
+}
 
 /**
  * An action whose implementation the application contributes (libraries, version control, delegation). The

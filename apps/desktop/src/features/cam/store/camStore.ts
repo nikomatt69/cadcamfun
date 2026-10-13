@@ -45,6 +45,8 @@ export interface DerivedWorkpieceDimensions {
 }
 
 interface CAMState {
+  kernelArtifact: cam.kernel.CamArtifact | undefined
+  setKernelArtifact(artifact: cam.kernel.CamArtifact | undefined): void
   // Persistent state
   workpiece: Workpiece
   material: string
@@ -193,6 +195,8 @@ export const useCamStore = create<CAMState>((set, get) => ({
   setPlaying: (playing) => set({ playing }),
   setPlaybackTime: (seconds) => set({ playbackTime: seconds }),
   setProgram: (program) => set({ program }),
+  kernelArtifact: undefined,
+  setKernelArtifact: (kernelArtifact) => set({ kernelArtifact }),
   setGcode: (gcode) => set({ gcode }),
   upsertOperationResult: (result) => set((state) => {
     const at = state.operationResults.findIndex((r) => r.id === result.id)
@@ -266,6 +270,7 @@ export const useCamStore = create<CAMState>((set, get) => ({
   },
 
   reset: () => set({
+    kernelArtifact: undefined,
     workpiece: initialWorkpiece,
     material: "",
     controller: "gcode",

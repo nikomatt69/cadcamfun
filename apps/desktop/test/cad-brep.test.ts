@@ -1,5 +1,6 @@
 import { expect, setDefaultTimeout, test } from "bun:test"
-import { brep, sceneToStep, stepToElements } from "@cadcamfun/core"
+import { brep, cad, cam, elementBrep, sceneToStep, stepToElements } from "@cadcamfun/core"
+import * as THREE from "three"
 
 setDefaultTimeout(60_000)
 
@@ -68,4 +69,46 @@ test("the exact solid of the imported element is what the CAM machines and what 
   const element = { ...imported.elements[0]!, id: "p" }
   const again = brep.readStepBreps(sceneToStep([element]).step!)
   expect(Math.abs(brep.massProperties(again.parts[0]!.brep).volume - (12000 - Math.PI * 250))).toBeLessThan(1e-6)
+})
+
+test("CADCanvas applies B-rep and parametric gizmo transforms once, matching the kernel's placed geometry", async () => {
+  const { buildElementObject, disposeObject } = await import("../src/features/cad/lib/sceneHelpers.ts")
+  const { useCADStore } = await import("../src/features/cad/store/cadStore.ts")
+  useCADStore.setState({ originOffset: { x: 0, y: 0, z: 0 } })
+  const part = { id: "plate", type: "brep", brep: brep.makeBox(10, 6, 4), x: 20, y: 5, z: 3, translateX: 7, translateY: -2, translateZ: 1, rotation: { x: 0, y: 0, z: 90 }, scale: { x: 2, y: 2, z: 2 } }
+  const exact = elementBrep(part)
+  if (!exact.brep) throw new Error(exact.reason)
+  const expected = cad.brepBox(exact.brep)
+  const object = buildElementObject({ ...part, layerId: "default" } as never)!
+  const box = new THREE.Box3().setFromObject(object)
+  expect(box.min.x).toBeCloseTo(expected.lo.x, 4)
+  expect(box.max.x).toBeCloseTo(expected.hi.x, 4)
+  expect(box.min.y).toBeCloseTo(expected.lo.y, 4)
+  expect(box.max.z).toBeCloseTo(expected.hi.z, 4)
+  disposeObject(object)
+
+  const parametric = { ...part, id: "history", type: "parametric", history: { parameters: {}, features: [{ id: "b", type: "primitive", element: "cube", params: { width: 10, height: 6, depth: 4 }, operation: "new" }] } }
+  const mesh = cam.model.elementMesh(parametric)!
+  const bounds = cam.model.meshBounds(mesh)
+  const drawn = buildElementObject({ ...parametric, layerId: "default" } as never)!
+  const actual = new THREE.Box3().setFromObject(drawn)
+  expect(actual.min.x).toBeCloseTo(bounds.min[0]!, 4)
+  expect(actual.max.y).toBeCloseTo(bounds.max[1]!, 4)
+  disposeObject(drawn)
+})
+
+test("two canvases own separate B-rep resources and origin offsets even when tessellation is cached", async () => {
+  const { createThreeObject } = await import("../src/features/cad/lib/createThreeObject.ts")
+  const { disposeObject } = await import("../src/features/cad/lib/sceneHelpers.ts")
+  const element = { id: "box", type: "brep", brep: brep.makeBox(10, 6, 4) }
+  const first = createThreeObject(element, { x: 0, y: 0, z: 0 })!
+  const second = createThreeObject(element, { x: 100, y: 20, z: 0 })!
+  const a = first.children[0] as THREE.Mesh
+  const b = second.children[0] as THREE.Mesh
+  expect(a.geometry).not.toBe(b.geometry)
+  expect(a.material).not.toBe(b.material)
+  expect(new THREE.Box3().setFromObject(second).min.x - new THREE.Box3().setFromObject(first).min.x).toBeCloseTo(100, 6)
+  disposeObject(first)
+  expect(b.geometry.getAttribute("position").count).toBeGreaterThan(0)
+  disposeObject(second)
 })

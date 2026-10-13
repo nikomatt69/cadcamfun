@@ -11,8 +11,7 @@
  * two tools, because notes and the project's standing context are writes and the host cannot ask per action.
  */
 import { z } from "zod"
-import { Effect } from "effect"
-import { actionFailureResult, type ActionContext, type ActionFailure, type ActionSpec } from "./action.ts"
+import { actionFailureResult, executeAction, type ActionContext, type ActionSpec } from "./action.ts"
 import { CAD_ACTIONS } from "./cad.ts"
 import { CAD_EDIT_ACTIONS } from "./cad-edit.ts"
 import { CAM_ACTIONS } from "./cam.ts"
@@ -69,10 +68,7 @@ export const runAction = async (id: string, input: unknown, context: ActionConte
   if (spec === undefined) return { ok: false, _tag: "ActionInvalidInput", actionId: id, error: `Unknown action: ${id}` }
   const parsed = (spec.parameters as z.ZodType).safeParse(input)
   if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: id, error: "The arguments do not match the action's schema." }
-  return Effect.runPromise(
-    spec.run(parsed.data as never, context).pipe(Effect.catch((error: ActionFailure) => Effect.succeed(actionFailureResult(error)))),
-    { signal: context.signal }
-  )
+  return executeAction(spec, parsed.data, context)
 }
 
 /** The JSON refusal for an admission failure, denial or interruption; shared with the host adapter. */

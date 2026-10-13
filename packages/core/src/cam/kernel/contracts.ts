@@ -183,6 +183,8 @@ export interface CamArtifact {
   readonly machine: { readonly id: string; readonly name: string; readonly post: PostId }
   /** Work zero in CAD world coordinates (toolpaths are relative to it). */
   readonly origin: Vec3
+  /** Resolved raw stock in CAD world coordinates; subtract `origin` to display it alongside the work-coordinate NC. */
+  readonly stockBounds: StockBox
   readonly operations: ReadonlyArray<OperationOutcome>
   readonly program: Program
   readonly tools: ReadonlyArray<Cutter & { readonly number: number }>
@@ -192,7 +194,7 @@ export interface CamArtifact {
   readonly release: ReleaseLevel
   readonly stock: StockSummary
   readonly cycleTimeSeconds: number
-  readonly identity: { readonly job: string; readonly nc: string; readonly algorithm: string }
+  readonly identity: { readonly job: string; readonly part: string; readonly nc: string; readonly algorithm: string }
   /** Notes of the planner (features it could not machine and why). */
   readonly notes: ReadonlyArray<string>
 }

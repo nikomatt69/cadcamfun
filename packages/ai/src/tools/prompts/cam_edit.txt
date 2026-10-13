@@ -1,29 +1,32 @@
 Write operations, programs, verification reports and stock.
 
 Actions
-- create: add an operation from type and params.
-- update: change params and invalidate stored G-code.
-- generate: store generated G-code; return stats and a line preview.
-- verify: simulate the operation's program against stock; store removal/collision/gouge findings and modelling limits.
-- stock_set: update raw stock/workpiece and invalidate affected programs.
+- create: add an operation.
+- update: change settings; invalidate NC.
+- generate: store NC; return stats and preview.
+- verify: store stock-removal, collision and gouge findings with modelling limits.
+- stock_set: change stock; invalidate programs.
+- manufacture: store the native kernel's whole-part, multi-tool NC and evidence.
 
 Parameters (mm, mm/min, rpm, angles in degrees)
 - create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning_od, parting_od, ...), params - the generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum, steel, wood, plastic, brass, titanium, composite, other), offset (inside|outside|center), workOffset (G54..G59), originType, machineType, and printer extras (infillDensity, supportType, shellCount).
-- update: operationId, params - only the fields that change; the rest of the stored settings are kept.
+- update: operationId, params (changed fields only).
 - generate: operationId (the newest operation when omitted), maxLines (1-200, default 40).
-- verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds shape), resolution, tolerance. Give what you know: a field you leave out was not modelled.
+- verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance. Omitted fields are not modelled.
 - stock_set: stock {width, height, depth, radius, x, y, topZ, allowance, material?, elementId?}.
+- manufacture: material grade (cam materials), machine preset, origin (stock-center|stock-corner), finishAllowance (0-5 mm), scallop (>0, <=1 mm), expectedRevision (optional). Blocked releases are not saved.
 
 Result (JSON)
-- ok; create returns operationId and geometry; generate stats and preview; verify issues/codes, stats and modelled fields; stock_set stock, workpiece and invalidated operations.
-- ok:false reports an empty drawing, missing operation or refused generation.
+- ok; create: operationId; generate: stats/preview; verify: issues, stats, modelling limits; stock_set: stock/workpiece, invalidated operations.
+- ok:false: empty drawing, missing operation or refusal.
+- manufacture: operationId, release, NC identity. Desktop loads the original; cam manufacture previews without writing.
 
 Do not use it
-- To read the machine, the operations or a static analysis: cam does that without writing.
+- For machine/operation reads or static analysis: use cam.
 - To claim a program is safe: verify reports only what it modelled.
 
 After it
-- For a checked plan, send expectedRevision on create/update. A stale refusal requires fresh plan_check.
-- verify accepts start {x,y,z} for the actual initial tool tip. Without it, replay assumes X0 Y0 at stock top + 10 mm and reports that assumption.
-- Read cam review after verification. Failed operations have at most three refinements at one drawing/stock revision; stop at refinement_limit and report the unresolved cause.
-- Generate, analyse, verify, fix by cause, regenerate and verify again. After three rounds on the same finding, report the blocker.
+- Send expectedRevision on create/update; stale plans require fresh plan_check.
+- verify: start {x,y,z} is the initial tip; otherwise X0 Y0 at stock top + 10 mm is assumed.
+- Read cam review after verification. At one drawing/stock revision, allow at most three refinements; stop at refinement_limit and report the cause.
+- Generate, analyze, verify and fix by cause; report the blocker after three rounds.

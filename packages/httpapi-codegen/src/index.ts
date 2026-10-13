@@ -989,7 +989,7 @@ function renderPromiseTypes(
   const resolvedErrors = errorTypes.map(resolve)
   const resolvedPayloads = payloadAliases.map(resolve)
   const resolvedOperations = resolve(operations)
-  const json = [...rendered.definitions, ...resolvedErrors, resolvedPayloads, resolvedOperations].some((type) =>
+  const json = [...rendered.definitions, ...resolvedErrors, ...resolvedPayloads, resolvedOperations].some((type) =>
     type.includes("JsonValue"),
   )
     ? `export type JsonValue = null | boolean | number | string | ${mutableOutputs ? "Array<JsonValue> | { [key: string]: JsonValue }" : "ReadonlyArray<JsonValue> | { readonly [key: string]: JsonValue }"}`

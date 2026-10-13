@@ -34,6 +34,7 @@ describe("calls made inside a code_mode program reach the editor like direct one
     expect(operationIdOf("cam_edit.generate", { operationId: "op-7" }, JSON.stringify({ ok: true }))).toBe("op-7")
     expect(operationIdOf("cam_edit.create", {}, JSON.stringify({ ok: true, operationId: "op-9" }))).toBe("op-9")
     expect(operationIdOf("cam_edit.verify", { operationId: "op-7" }, JSON.stringify({ ok: false, error: "x" }))).toBeUndefined()
+    expect(operationIdOf("cam_edit.generate", { operationId: "op-7" }, JSON.stringify({ ok: true, _tag: "ActionCommitted", receipt: { result: { operationId: "op-7" } } }))).toBeUndefined()
   })
 })
 

@@ -1,6 +1,7 @@
 import { cam } from "@cadcamfun/core"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
 import { BadRequest, InternalError } from "../errors.ts"
+import { CamKernelRequest, CamKernelResult } from "../cam-kernel.ts"
 
 const g = cam.generator
 const v = cam.verify
@@ -12,6 +13,9 @@ const v = cam.verify
  * `verify` replays G-code or IR against a stock model (removal, collisions, gouges) for the UI and the AI tools.
  */
 export class ToolpathGeneratorGroup extends HttpApiGroup.make("toolpathGenerator")
+  .add(HttpApiEndpoint.post("manufacture", "/api/toolpaths/manufacture", {
+    payload: CamKernelRequest, success: CamKernelResult, error: [BadRequest, InternalError]
+  }))
   .add(
     HttpApiEndpoint.post("generate", "/api/toolpaths/generate", {
       payload: g.GenerateRequestSchema, success: g.GenerateResponseSchema, error: [BadRequest, InternalError]

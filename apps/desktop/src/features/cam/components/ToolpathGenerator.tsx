@@ -30,6 +30,7 @@ import { OriginSection } from "./generator/OriginSection.tsx"
 import { PrinterParamsSection } from "./generator/PrinterParamsSection.tsx"
 import { ToolSection } from "./generator/ToolSection.tsx"
 import CapabilitiesOverview from "./CapabilitiesOverview.tsx"
+import KernelSection from "./generator/KernelSection.tsx"
 
 export interface ToolpathGeneratorProps {
   /** Receives the generated (or cycle-edited) program text. */
@@ -131,6 +132,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
 
       <OriginSection />
       <MachineSection />
+      <Show when={gen.settings.machineType === "mill"}><KernelSection onGCodeGenerated={props.onGCodeGenerated} /></Show>
       <OperationSection />
       <FixedCyclesSection onGCode={onCycleGCode} />
       <MaterialSection />

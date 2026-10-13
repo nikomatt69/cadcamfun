@@ -672,6 +672,19 @@ describe("HttpApiCodegen.generate", () => {
     expect(effectClient).toContain('payload: input["payload"]')
   })
 
+  test("emits JsonValue when only an aliased request payload contains JSON", () => {
+    const api = HttpApi.make("json-request").add(HttpApiGroup.make("jobs").add(
+      HttpApiEndpoint.post("generate", "/jobs", {
+        payload: Schema.Struct({ elements: Schema.Array(Schema.Record(Schema.String, Schema.Json)) }),
+        success: Schema.Struct({ ok: Schema.Boolean })
+      })
+    ))
+    const output = emitPromise(compileContract(api))
+    const types = output.files.find((file) => file.path === "types.ts")!.content
+    expect(types).toContain("export type JsonValue =")
+    expect(types).toContain("JsonValue }")
+  })
+
   test("supports an optional request body in Effect clients", () => {
     const contract = compileContract(
       api(

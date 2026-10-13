@@ -8,7 +8,7 @@ import {
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect"
-import type { SessionUser } from "@cadcamfun/api"
+import { CamKernelArtifact, type CamManufactureInput, type SessionUser } from "@cadcamfun/api"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
@@ -176,20 +176,18 @@ const toolHandlers = Effect.gen(function*() {
   }
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
-  const handlers: ToolHandlersShape = {
-    manufacture: async (projectId, input) => {
-      const loaded = await load(projectId)
+  const manufacturingJob = (loaded: Awaited<ReturnType<typeof load>>, input: typeof CamManufactureInput.Type):
+    { readonly ok: true; readonly job: cam.kernel.ManufacturingJob; readonly stockNote: string } | { readonly ok: false; readonly error: string } => {
       const elements = loaded.elements.filter((e) => e.type !== "workpiece")
-      if (elements.length === 0) return { ok: false, error: "There is no part to machine.", ...where(loaded) }
+      if (elements.length === 0) return { ok: false, error: "There is no part to machine." }
       // The stored stock is centred in CAD X/Y; its `topZ` is the machine reference, so it stands on the part's bottom here.
       const meshes = cam.model.partMeshes(elements as never, { tolerance: 0.01 })
-      if (meshes === undefined) return { ok: false, error: "No element of the drawing is a solid the kernel can machine.", ...where(loaded) }
+      if (meshes === undefined) return { ok: false, error: "No element of the drawing is a solid the kernel can machine." }
       const zMin = Math.min(...meshes.meshes.map((m) => cam.model.meshBounds(m).min[2]!))
-      const zMax = Math.max(...meshes.meshes.map((m) => cam.model.meshBounds(m).max[2]!))
       const stored = loaded.data["stock"] !== undefined ? Schema.decodeUnknownSync(cam.generator.StockSchema)(loaded.data["stock"]) : undefined
       const stock = stored === undefined ? undefined : {
         min: { x: stored.x - stored.width / 2, y: stored.y - stored.height / 2, z: zMin },
-        max: { x: stored.x + stored.width / 2, y: stored.y + stored.height / 2, z: zMin + Math.max(stored.depth, zMax - zMin) }
+        max: { x: stored.x + stored.width / 2, y: stored.y + stored.height / 2, z: zMin + stored.depth }
       }
       const machine = input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined
       if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINES.map((m) => m.id).join(", ")}` }
@@ -200,6 +198,15 @@ const toolHandlers = Effect.gen(function*() {
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}) }
       }
       const stockNote = stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
+      return { ok: true, job, stockNote }
+  }
+
+  const handlers: ToolHandlersShape = {
+    manufacture: async (projectId, input) => {
+      const loaded = await load(projectId)
+      const built = manufacturingJob(loaded, input)
+      if (!built.ok) return { ...built, ...where(loaded) }
+      const { job, stockNote } = built
       if (input.planOnly === true) {
         const plan = cam.kernel.planOnly(job)
         return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, issues: plan.issues, ...where(loaded) }
@@ -221,6 +228,28 @@ const toolHandlers = Effect.gen(function*() {
         note: "Read-only: nothing was stored. Release 'verified-program' means every replay claim passed for this NC; it is not a machine qualification.",
         ...where(loaded)
       }
+    },
+    manufactureOperation: async (projectId, input) => {
+      const loaded = await load(projectId, true)
+      const revision = drawingRevision(loaded)
+      if (input.expectedRevision !== undefined && input.expectedRevision !== revision) return { ok: false, status: "stale", error: "The drawing changed. Inspect the current part before manufacturing." }
+      const built = manufacturingJob(loaded, input)
+      if (!built.ok) return { ...built, ...where(loaded) }
+      const result = cam.kernel.runJob(built.job)
+      if (result.status === "failed") return { ok: false, issues: result.issues, ...where(loaded) }
+      if (result.value.release === "blocked") return { ok: false, release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
+      const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(result.value)
+      // Recheck the original drawing and authority after computation, immediately before the existing repository write.
+      const current = await Effect.runPromise(drawings.find(acting().id, loaded.id))
+      const data = record(current?.data)
+      if (!current || drawingRevision({ id: current.id, data, elements: elementsOf(data) }) !== revision) return { ok: false, status: "stale", error: "The drawing changed during manufacturing. Generate again." }
+      await assertWrite(loaded.projectId)
+      const row = await Effect.runPromise(toolpaths.create(acting().id, {
+        name: "Native CAM program", description: "Generated by the native CAM kernel",
+        projectId: loaded.projectId, drawingId: loaded.id, type: "mill", operationType: "kernel", gcode: artifact.nc,
+        data: { kernelArtifact: artifact, sourceRevision: revision }
+      }))
+      return { ok: true, operationId: row.id, release: artifact.release, identity: artifact.identity, ...where(loaded) }
     },
     validateMachiningPlan: async (projectId, input) => {
       const loaded = await load(projectId)
@@ -263,10 +292,19 @@ const toolHandlers = Effect.gen(function*() {
     },
     reviewOperation: async (projectId, operationId) => {
       const loaded = await load(projectId)
+      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
+      if (!stored || stored.row.drawingId !== loaded.id || stored.project.id !== loaded.projectId) return { ok: false, error: "Operation not found in the active drawing" }
+      const data = record(stored?.row.data)
+      if (data["kernelArtifact"] !== undefined) {
+        const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
+        const revision = drawingRevision(loaded)
+        const stale = data["sourceRevision"] !== revision || stored.row.gcode !== artifact.nc || cam.kernel.sha256(artifact.nc) !== artifact.identity.nc
+        const status = stale ? "stale" : artifact.release === "verified-program" ? "pass" : artifact.release
+        return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: data["sourceRevision"], release: artifact.release,
+          claims: artifact.claims, issues: artifact.issues, stock: artifact.stock, identity: artifact.identity, note: "Evidence covers the original native-kernel NC and its modelled capabilities; no program was regenerated." }
+      }
       const found = await operation(projectId, operationId)
       if ("error" in found) return { ok: false, error: found.error }
-      const stored = await Effect.runPromise(toolpaths.find(acting().id, operationId))
-      const data = record(stored?.row.data)
       const evidence = record(data["verification"])
       const revision = drawingRevision(loaded)
       const report = record(evidence["report"])
@@ -658,6 +696,13 @@ const toolHandlers = Effect.gen(function*() {
       const found = await Effect.runPromise(toolpaths.find(acting().id, operationId))
       if (!found || found.row.drawingId !== id || found.project.id !== projectId) return { ok: false, error: "Operation not found in the active drawing" }
       if (!found.row.gcode) return { ok: false, error: "The operation has no program yet (or its settings changed since): run cam_edit generate first." }
+      const data = record(found.row.data)
+      if (data["kernelArtifact"] !== undefined) {
+        const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data["kernelArtifact"])
+        const loaded = await load(drawingId)
+        if (data["sourceRevision"] !== drawingRevision(loaded) || found.row.gcode !== artifact.nc || cam.kernel.sha256(artifact.nc) !== artifact.identity.nc) return { ok: false, error: "The native program evidence is stale. Run cam_edit manufacture again." }
+        return { ok: true, operationId, gcode: found.row.gcode }
+      }
       const current = await operation(drawingId, operationId)
       if ("error" in current) return { ok: false, error: current.error }
       if (identity(record(found.row.data)["request"]) !== identity(current.request)) return { ok: false, error: "The drawing or stock changed since generation. Generate and verify the operation again." }

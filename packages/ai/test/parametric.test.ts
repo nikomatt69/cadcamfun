@@ -4,6 +4,19 @@ import { historySchema, parametricReport } from "../src/parametric.ts"
 import { normalizeElement } from "../src/element-catalog.ts"
 
 describe("parametric boundary and geometry", () => {
+  test("identical decoded histories get independent complete reports and changed parameters invalidate evidence", () => {
+    const history = plateTemplate()
+    const first = parametricReport(history)
+    const expected = structuredClone(first)
+    Object.assign(first.parameters, { width: 999 })
+    first.bounds!.max.x = 999
+    first.solids.length = 0
+    expect(parametricReport(structuredClone(history))).toEqual(expected)
+    const changed = parametricReport({ ...history, parameters: { ...history.parameters, width: 80 } })
+    expect(changed.parameters.width).toBe(80)
+    expect(changed.bounds!.max.x).toBeCloseTo(80, 2)
+    expect(changed.exact).not.toEqual(expected.exact)
+  })
   test("existing plate rebuilds and dependent dimensions follow variants", () => {
     const base = plateTemplate()
     expect(historySchema.safeParse(base).success).toBe(true)

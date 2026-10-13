@@ -7,9 +7,13 @@ test("the CAD canvas mounts without WebGL and keeps its overlays usable", async 
   const { default: CADCanvas } = await import("../src/features/cad/components/CADCanvas.tsx")
   const { useElementsStore } = await import("../src/features/cad/store/elementsStore.ts")
   const { useSelectionStore } = await import("../src/features/cad/store/selectorStore.ts")
+  const { AppProvider, createAppState } = await import("../src/shared/state/context.ts")
+  const { fakeRuntime } = await import("../src/shared/state/client.ts")
+  const connection = fakeRuntime()
+  const state = createAppState({ client: connection.client, runtime: connection.runtime })
   const root = document.createElement("div")
   document.body.append(root)
-  const dispose = render(() => CADCanvas({}), root)
+  const dispose = render(() => AppProvider({ state, get children() { return CADCanvas({}) } }), root)
   try {
     expect(root.textContent).toContain("needs WebGL")
     expect(root.querySelector("[title='Toggle Elements List']")).not.toBeNull()
@@ -27,5 +31,5 @@ test("the CAD canvas mounts without WebGL and keeps its overlays usable", async 
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(useElementsStore.getState().selectedElement).toBeNull()
     expect(root.textContent).not.toContain("Move (G)")
-  } finally { dispose() }
+  } finally { dispose(); state.dispose() }
 })

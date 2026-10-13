@@ -677,10 +677,10 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       schemaVersion: KERNEL_SCHEMA_VERSION, jobId: job.id,
       material: { id: material.id, name: material.name, iso: material.iso },
       machine: { id: machine.id, name: machine.name, post: post.id },
-      origin, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
+      origin, stockBounds: prepared.stock, operations: finalOutcomes, program, tools: usedTools, nc, claims, issues, release,
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000 },
       cycleTimeSeconds,
-      identity: { job: jobDigest, nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
+      identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
       notes: prepared.plan?.notes ?? []
     }
   }

@@ -211,11 +211,13 @@ describe("cad tools provision what is missing", () => {
       const lathe = await h.createOperation(project, { type: "turning", params: { machineType: "lathe", toolType: "turning", stockDiameter: 40, stockLength: 80, depth: 2, stepdown: 1 } }) as { ok: boolean; operationId: string }
       expect(lathe.ok).toBe(true)
       const gcode = await h.generateGcode(project, lathe.operationId)
+      if (!("gcode" in gcode)) throw new Error("Expected a generated lathe program")
       expect(gcode.gcode).toContain("G18")
       expect(gcode.gcode).toContain("G1 Z-80.000")
       const probing = await h.createOperation(project, { type: "probing", params: { toolType: "probe", probeCycle: "corner", workOffset: "G55" } }) as { ok: boolean; operationId: string }
       expect(probing.ok).toBe(true)
       const program = await h.generateGcode(project, probing.operationId)
+      if (!("gcode" in program)) throw new Error("Expected a generated probing program")
       expect(program.gcode).toContain("G10 L20 P2 X-2.000")
       expect(program.gcode).not.toMatch(/\bM3\b/)
       // A mill contour still needs something to cut.

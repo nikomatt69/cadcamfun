@@ -8,6 +8,8 @@ import type { VisionCapture } from "../vision.ts"
 import { Context } from "effect"
 import type { cad, cam } from "@cadcamfun/core"
 import type { MachineProfile } from "../gcode-analysis.ts"
+import type { ActionConflict, ActionCommitted, ActionDenied, ActionInvalidInput, ActionInterrupted } from "@cadcamfun/api"
+import type { CamManufactureOperationInput } from "@cadcamfun/api"
 
 /** What the stock handlers answer with: the raw piece as it is stored, or the one just configured. */
 export type CamStockInput = { action: "inspect" } | { action: "set"; stock: typeof cam.generator.StockSchema.Type }
@@ -31,6 +33,8 @@ export interface ToolHandlersShape {
   validateMachiningPlan?(projectId: string, input: MachiningPlanInput): Promise<unknown>
   /** Runs the CAM kernel on the active drawing: plan from the CAD, cutting data per material, NC and its replay evidence. */
   manufacture?(projectId: string, input: ManufactureInput): Promise<unknown>
+  /** Stores the native kernel's original multi-tool NC and artifact in the active drawing after write admission. */
+  manufactureOperation?(projectId: string, input: typeof CamManufactureOperationInput.Type): Promise<unknown>
   reviewOperation?(projectId: string, operationId: string): Promise<unknown>
   compareSetups?(projectId: string, candidates: ReadonlyArray<SetupCandidate>): Promise<unknown>
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
@@ -54,7 +58,9 @@ export interface ToolHandlersShape {
   /** Design-space and model checks (`cad.checkModel`) of the open drawing. */
   checkDesign(projectId: string): Promise<unknown>
   createOperation(projectId: string, operation: { type: string; params: unknown; expectedRevision?: string }): Promise<unknown>
-  generateGcode(projectId: string, operationId?: string): Promise<{ gcode: string; stats?: unknown }>
+  generateGcode(projectId: string, operationId?: string): Promise<
+    { gcode: string; stats?: unknown } | typeof ActionCommitted.Type | ActionConflict | ActionDenied | ActionInvalidInput | ActionInterrupted
+  >
   /** The program last generated for an operation, as it is stored (nothing is regenerated); an error when there is none yet. */
   operationProgram?(projectId: string, operationId: string): Promise<{ ok: true; operationId: string; gcode: string } | { ok: false; error: string }>
   listOperations(projectId: string): Promise<unknown>

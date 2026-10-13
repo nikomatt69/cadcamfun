@@ -6,6 +6,20 @@ This is a WP2 contract increment to [spec 04](04-core-cam.md) and [spec 12](12-p
 
 ## 1. Objective and engineering decisions
 
+### Owner-requested application integration (2026-10-14)
+
+The owner explicitly requests enriching the current CADCanvas, CAM components and sidecar API, preserving existing generators. This vertical owns `packages/api/src/cam-kernel.ts`, the existing `toolpathGenerator` group and generated clients; `apps/sidecar/src/http/toolpath-generator.ts`; the desktop CAM API, job builder, generator panel, i18n and matching tests; and the CAD renderer transform/cache fixes and matching tests. It adds authenticated, stateless `POST /api/toolpaths/manufacture` over an explicit CAD snapshot and the current kernel. The response carries the actual NC, IR, operations, tools, stock metrics, claims, release level and job/NC identity. No stored document is changed by generation. Existing toolpath storage remains the save interface; this integration adds no DB migration or new geometric algorithm. Generated results are published only while the source geometry, settings and editor owner remain current, and previous verification evidence is invalidated when a different program is loaded.
+
+The desktop adds a native-kernel section beside the existing operation generator. It uses selected CAD solids, material grades and machine presets; results populate the existing G-code editor and toolpath visualizer. Kernel claims remain attached to their original NC and become stale after edits. The exact CAD renderer must apply placement/gizmo transforms once, preserve face/edge picking and own disposable Three resources independently per canvas.
+
+The CAM store owns the displayed kernel artifact alongside its NC/program, so generic G-code parsing cannot erase the operation/tool structure of a matching kernel program. Its owner scope includes `apps/desktop/src/features/cam/store/camStore.ts` and `screens/CamPage.tsx` for that existing reconciliation path. Evidence remains stale after edits; loading unrelated code never certifies it.
+
+Additive core metadata scope includes `packages/core/src/cam/kernel/{contracts,execute}.ts` and matching kernel tests: artifacts expose the resolved stock bounds in CAD world coordinates, alongside their existing work origin. The viewport adapter converts that box into work coordinates; it must display the stock actually used by the kernel rather than the legacy fallback stock. The selected work offset crosses the existing job/post interface unchanged.
+
+Assistant integration adds `cam_edit.manufacture` beside the read-only `cam.manufacture`: shared input parameters plus optional expected drawing revision; write authority and cancellation checked before storing an eligible artifact. The existing Toolpath row stores the original NC and `data.kernelArtifact`, with drawing/project attribution; no DB migration. The action returns the stored operation ID and a bounded summary. Desktop CAM reconciliation fetches that row, validates artifact/NC identity, and publishes its original multi-tool program/evidence without regeneration. Owners additionally include the existing WP8 CAM action/handler/prompt definitions, WP4 AI handler, WP6 CAM result decoder and matching tests. Blocked/stale/denied runs create no program row.
+
+Artifact identity additionally carries the canonical part-source digest so the same evidence view can compare a saved assistant result with current CAD, without treating different caller job IDs as source changes. The existing job/NC/algorithm digests remain available.
+
 The CAM kernel is a deep **Module** that takes a revisioned manufacturing job and produces machine-specific NC plus evidence about that exact output. Its **Interface** owns units, frames, tolerances, material evolution, motion semantics, failures and release requirements. Its **Implementation** contains geometry queries, strategies, linking, kinematic planning, posts and verification. Callers do not assemble these algorithms themselves.
 
 Decisions:

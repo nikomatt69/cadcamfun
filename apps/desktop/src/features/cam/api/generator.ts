@@ -9,6 +9,7 @@
 import { Context, Effect, Layer, Schema } from "effect"
 import { cam } from "@cadcamfun/core"
 import type { Client } from "../../../shared/state/client.ts"
+import type { CamKernelRequest, CamKernelResult } from "@cadcamfun/api"
 
 export type GenerateRequest = Parameters<Client["toolpathGenerator"]["generate"]>[0]["payload"]
 export type SuggestRequest = Parameters<Client["toolpathGenerator"]["suggest"]>[0]["payload"]
@@ -30,6 +31,7 @@ const messageOf = (cause: unknown): string => {
 const failure = (cause: unknown): ToolpathGeneratorError => new ToolpathGeneratorError({ message: messageOf(cause) })
 
 export interface ToolpathGeneratorService {
+  readonly manufacture: (request: CamKernelRequest) => Effect.Effect<CamKernelResult, ToolpathGeneratorError>
   /** Runs the generator for a job. */
   readonly generate: (request: GenerateRequest) => Effect.Effect<GenerateResponse, ToolpathGeneratorError>
   /** Element-driven parameters, cutting feedback and stock warnings for the current job. */
@@ -41,6 +43,7 @@ export interface ToolpathGeneratorService {
 }
 
 export const makeToolpathGenerator = (client: Client): ToolpathGeneratorService => ({
+  manufacture: (payload) => client.toolpathGenerator.manufacture({ payload }).pipe(Effect.mapError(failure)),
   generate: (payload) => client.toolpathGenerator.generate({ payload }).pipe(Effect.mapError(failure)),
   suggest: (payload) => client.toolpathGenerator.suggest({ payload }).pipe(Effect.mapError(failure)),
   parse: (gcode, name) => client.toolpathGenerator.parse({ payload: { gcode, name: name ?? "Program" } }).pipe(Effect.mapError(failure)),

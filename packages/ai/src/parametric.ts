@@ -1,6 +1,6 @@
 /** Validated boundary for the existing feature-history engine; no second modeller. */
 import { z } from "zod"
-import { PRIMITIVE_ELEMENTS, cleanMesh, describeTopology, exactSummary, expandShape, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
+import { PRIMITIVE_ELEMENTS, cam, cleanMesh, describeTopology, exactSummary, expandShape, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
 
 const id = z.string().trim().min(1).max(100)
 const n = z.number().finite()
@@ -200,7 +200,7 @@ export const exactReport = (history: History, result: ReturnType<typeof rebuild>
   }
 }
 
-export const parametricReport = (history: History) => {
+const computeParametricReport = (history: History) => {
   const result = rebuild(history)
   let volume = 0
   const min = { x: Infinity, y: Infinity, z: Infinity }, max = { x: -Infinity, y: -Infinity, z: -Infinity }
@@ -227,4 +227,23 @@ export const parametricReport = (history: History) => {
       return { id: b.id, closedSolid: t.solid, shells: t.shells, throughHoles: t.genus ?? null, triangles: t.triangles, summary: describeTopology(t) }
     })
   }
+}
+
+const reports = new Map<string, ReturnType<typeof computeParametricReport>>()
+
+/** Validate/create/inspect cross the same geometry interface; unchanged histories reuse all checks, never partial evidence. */
+export const parametricReport = (history: History): ReturnType<typeof computeParametricReport> => {
+  let key: string
+  try { key = cam.kernel.canonicalJson(history) } catch { return computeParametricReport(history) }
+  let report = reports.get(key)
+  if (report === undefined) {
+    report = computeParametricReport(history)
+    if (reports.size >= 16) {
+      const oldest = reports.keys().next().value
+      if (oldest !== undefined) reports.delete(oldest)
+    }
+  } else reports.delete(key)
+  reports.set(key, report)
+  // Reports contain only summaries. No caller can alter another invocation's cached evidence.
+  return structuredClone(report)
 }

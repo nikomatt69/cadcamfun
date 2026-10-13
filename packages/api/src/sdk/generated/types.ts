@@ -1,3 +1,5 @@
+export type JsonValue = null | boolean | number | string | Array<JsonValue> | { [key: string]: JsonValue }
+
 export type Unauthorized = { readonly _tag: "Unauthorized"; readonly message: string }
 export const isUnauthorized = (value: unknown): value is Unauthorized =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Unauthorized"
@@ -1090,6 +1092,33 @@ export type ToolpathExtrasRestoreVersionPayload = { readonly versionId: string }
 export type ToolpathExtrasCreateCommentPayload = { readonly content: string }
 
 export type ToolpathExtrasUpdateCommentPayload = { readonly content: string }
+
+export type ToolpathGeneratorManufacturePayload = {
+  readonly material: string
+  readonly machine?: string
+  readonly origin?: "stock-center" | "stock-corner"
+  readonly finishAllowance?: number
+  readonly scallop?: number
+  readonly schemaVersion: 1
+  readonly id: string
+  readonly name: string
+  readonly elements: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly stock?: {
+    readonly width: number
+    readonly height: number
+    readonly depth: number
+    readonly radius?: number
+    readonly x?: number
+    readonly y?: number
+    readonly topZ?: number
+    readonly allowance?: number
+    readonly material?: string
+    readonly elementId?: string
+  }
+  readonly tolerance?: number
+  readonly resolution?: number
+  readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+}
 
 export type ToolpathGeneratorParsePayload = { readonly gcode: string; readonly name?: string }
 
@@ -5025,6 +5054,242 @@ export type ToolpathExtrasRemoveCommentInput = {
 }
 
 export type ToolpathExtrasRemoveCommentOutput = { message: string }
+
+export type ToolpathGeneratorManufactureInput = {
+  readonly material: ToolpathGeneratorManufacturePayload["material"]
+  readonly machine?: ToolpathGeneratorManufacturePayload["machine"]
+  readonly origin?: ToolpathGeneratorManufacturePayload["origin"]
+  readonly finishAllowance?: ToolpathGeneratorManufacturePayload["finishAllowance"]
+  readonly scallop?: ToolpathGeneratorManufacturePayload["scallop"]
+  readonly schemaVersion: ToolpathGeneratorManufacturePayload["schemaVersion"]
+  readonly id: ToolpathGeneratorManufacturePayload["id"]
+  readonly name: ToolpathGeneratorManufacturePayload["name"]
+  readonly elements: ToolpathGeneratorManufacturePayload["elements"]
+  readonly stock?: ToolpathGeneratorManufacturePayload["stock"]
+  readonly tolerance?: ToolpathGeneratorManufacturePayload["tolerance"]
+  readonly resolution?: ToolpathGeneratorManufacturePayload["resolution"]
+  readonly workOffset?: ToolpathGeneratorManufacturePayload["workOffset"]
+}
+
+export type ToolpathGeneratorManufactureOutput =
+  | {
+      status: "ok"
+      value: {
+        schemaVersion: 1
+        jobId: string
+        material: { id: string; name: string; iso: string }
+        machine: { id: string; name: string; post: "generic" | "fanuc" | "grbl" | "linuxcnc" | "haas" }
+        origin: { x: number; y: number; z: number }
+        stockBounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+        operations: Array<{
+          id: string
+          name: string
+          strategy: "face" | "adaptive" | "pocket" | "profile" | "bore" | "drill" | "thread" | "engrave" | "surface"
+          toolId: string
+          cut:
+            | "face"
+            | "slot"
+            | "rough-side"
+            | "adaptive"
+            | "finish-wall"
+            | "finish-floor"
+            | "finish-3d"
+            | "drill"
+            | "spot"
+            | "chamfer"
+            | "engrave"
+            | "thread-mill"
+          status: "ok" | "failed"
+          cutting?: {
+            cut:
+              | "face"
+              | "slot"
+              | "rough-side"
+              | "adaptive"
+              | "finish-wall"
+              | "finish-floor"
+              | "finish-3d"
+              | "drill"
+              | "spot"
+              | "chamfer"
+              | "engrave"
+              | "thread-mill"
+            rpm: number
+            vc: number
+            vcRecommended: number
+            effectiveDiameter: number
+            fz: number
+            chipThickness: number
+            feed: number
+            plungeFeed: number
+            ap: number
+            ae: number
+            stepoverPercent: number
+            rampAngle: number
+            helixPitch: number
+            coolant: "off" | "flood" | "mist"
+            peck?: number
+            chipBreak?: boolean
+            feedPerRev?: number
+            passes?: number
+            mrr: number
+            powerKw: number
+            torqueNm: number
+            forceN: number
+            deflectionMm: number
+            limitedBy: Array<string>
+            warnings: Array<string>
+            exceeded: Array<string>
+            source: string
+          }
+          parameters: { [x: string]: any }
+          overridden: Array<string>
+          warnings: Array<string>
+          startZ?: number
+          cutLength: number
+          timeSeconds: number
+          removedVolume: number
+        }>
+        program: {
+          name: string
+          units: "mm" | "inch"
+          workOffset: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+          toolpaths: Array<{
+            id: string
+            name: string
+            toolId: string
+            spindleRpm: number
+            coolant: "off" | "flood" | "mist"
+            moves: Array<
+              | {
+                  _tag: "Rapid"
+                  to: { x: number; y: number; z: number }
+                  rotary?: { a?: number; b?: number; c?: number }
+                }
+              | {
+                  _tag: "Linear"
+                  to: { x: number; y: number; z: number }
+                  feed: number
+                  rotary?: { a?: number; b?: number; c?: number }
+                }
+              | {
+                  _tag: "Arc"
+                  to: { x: number; y: number; z: number }
+                  center: { x: number; y: number }
+                  clockwise: boolean
+                  feed: number
+                }
+              | { _tag: "Dwell"; seconds: number }
+              | { _tag: "Comment"; text: string }
+              | {
+                  _tag: "Cycle"
+                  cycle: "drill" | "dwell" | "peck" | "chipBreak"
+                  to: { x: number; y: number; z: number }
+                  feed: number
+                  peckDepth: number
+                  dwellSeconds: number
+                  retractHeight: number
+                }
+              | { _tag: "Orient"; a?: number; b?: number; c?: number }
+            >
+          }>
+          metadata?: { [x: string]: string }
+        }
+        tools: Array<{
+          id: string
+          name: string
+          kind: "flat" | "ball" | "bull" | "chamfer" | "spot" | "drill" | "facemill" | "threadmill" | "engraver"
+          diameter: number
+          flutes: number
+          material: "hss" | "hss-co" | "carbide" | "pcd"
+          coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+          cornerRadius?: number
+          angle?: number
+          tipDiameter?: number
+          pitch?: number
+          fluteLength: number
+          shankDiameter: number
+          stickout: number
+          holder?: { diameter: number; length: number }
+          maxRpm?: number
+          number: number
+        }>
+        nc: string
+        claims: Array<{
+          id:
+            | "cutting-data"
+            | "machine-limits"
+            | "operations-complete"
+            | "no-rapid-in-stock"
+            | "holder-clearance"
+            | "no-gouge"
+            | "material-removed"
+            | "nc-replay"
+            | "machine-travel"
+          status: "passed" | "failed" | "unsupported" | "unresolved"
+          detail: string
+        }>
+        issues: Array<{
+          tag:
+            | "InvalidInput"
+            | "UnknownMaterial"
+            | "UnknownTool"
+            | "NoSuitableTool"
+            | "UnsupportedCapability"
+            | "GenerationFailed"
+            | "EmptyToolpath"
+            | "MachineLimit"
+            | "RapidInStock"
+            | "HolderCollision"
+            | "Gouge"
+            | "RemainingStock"
+            | "ReplayMismatch"
+          severity: "error" | "warning"
+          stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
+          message: string
+          operationId?: string
+          line?: number
+          point?: { x: number; y: number; z: number }
+        }>
+        release: "blocked" | "preview" | "verified-program"
+        stock: {
+          initialVolume: number
+          finalVolume: number
+          partVolume: number
+          remainingVolume: number
+          maxRemaining: number
+          cellSize: number
+        }
+        cycleTimeSeconds: number
+        identity: { job: string; part: string; nc: string; algorithm: string }
+        notes: Array<string>
+      }
+    }
+  | {
+      status: "failed"
+      issues: Array<{
+        tag:
+          | "InvalidInput"
+          | "UnknownMaterial"
+          | "UnknownTool"
+          | "NoSuitableTool"
+          | "UnsupportedCapability"
+          | "GenerationFailed"
+          | "EmptyToolpath"
+          | "MachineLimit"
+          | "RapidInStock"
+          | "HolderCollision"
+          | "Gouge"
+          | "RemainingStock"
+          | "ReplayMismatch"
+        severity: "error" | "warning"
+        stage: "prepare" | "plan" | "cutting-data" | "generate" | "post" | "replay" | "evidence"
+        message: string
+        operationId?: string
+        line?: number
+        point?: { x: number; y: number; z: number }
+      }>
+    }
 
 export type ToolpathGeneratorParseInput = {
   readonly gcode: ToolpathGeneratorParsePayload["gcode"]

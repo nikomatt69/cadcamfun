@@ -8,6 +8,7 @@
  */
 import { cam as coreCam } from "@cadcamfun/core"
 import { Schema } from "effect"
+import { CamKernelArtifact } from "@cadcamfun/api"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import type { AppState } from "../../../shared/state/context.ts"
 import { makeToolpathGenerator, type VerifyResponse } from "../../cam/api/generator.ts"
@@ -17,7 +18,7 @@ import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { captureEditorOwner, type EditorOwner } from "./editor-sync.ts"
 
 /** The four actions whose result changes what the CAM page shows; the key is `tool.action`. */
-const CAM_ACTIONS = ["create", "update", "generate", "verify"] as const
+const CAM_ACTIONS = ["create", "update", "generate", "verify", "manufacture"] as const
 type CamAction = (typeof CAM_ACTIONS)[number]
 
 /**
@@ -39,6 +40,8 @@ const parse = (text: string): Record<string, unknown> => {
 export const operationIdOf = (key: string, input: unknown, output: string): string | undefined => {
   const result = parse(output)
   if (result["ok"] === false || typeof result["error"] === "string") return undefined
+  // A receipt is evidence of an earlier commit, not a fresh operation edit to mirror from this call's input.
+  if (result["_tag"] === "ActionCommitted") return undefined
   const fromInput = input !== null && typeof input === "object" ? (input as { operationId?: unknown }).operationId : undefined
   const id = actionOfKey(key) === "create" ? result["operationId"] : fromInput ?? result["operationId"]
   return typeof id === "string" && id !== "" ? id : undefined
@@ -48,6 +51,8 @@ interface OperationRow {
   readonly name?: string | null
   readonly gcode: string | null
   readonly data: { readonly request?: { readonly settings?: ToolpathSettings }; readonly verification?: { readonly report?: VerifyResponse } } | null
+  readonly drawingId?: string | null
+  readonly projectId?: string | null
 }
 
 /** `key` is the call's action key (`cam_edit.generate`). Reads the operation back and mirrors it into the CAM stores. Best effort: a failure leaves the page as it was. */
@@ -75,6 +80,21 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
   try {
     const row = await app.runtime.run(app.client.toolpaths.get({ params: { id } })) as unknown as OperationRow
     if (!owner.current()) return false
+    if (kind === "manufacture") {
+      if (owner.projectId !== row.projectId || owner.drawingId !== row.drawingId) return false
+      const data = row.data as Record<string, unknown> | null
+      const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(data?.["kernelArtifact"])
+      if (artifact.nc !== row.gcode || coreCam.kernel.sha256(artifact.nc) !== artifact.identity.nc || artifact.release === "blocked" || !owner.current()) return false
+      const cam = useCamStore.getState()
+      cam.clearOperationResults()
+      cam.setKernelArtifact(artifact)
+      cam.setSelectedOperationId(id)
+      cam.setGcode(artifact.nc)
+      cam.setProgram(artifact.program)
+      useGeneratorStore.getState().setResult(artifact.nc, [])
+      useVerifyStore.getState().reset()
+      return true
+    }
     const settings = row.data?.request?.settings
     const gcode = row.gcode ?? ""
     const parsesProgram = kind !== "create" && kind !== "update" && gcode.trim() !== ""

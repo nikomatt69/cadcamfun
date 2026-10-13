@@ -91,6 +91,9 @@ apps/sidecar/src/
 
 ## 5. Change log
 
+- 2026-10-14: generated-client integration additionally scopes the existing `packages/httpapi-codegen` Promise type emitter and its regression test: JSON-valued request payloads must emit the recursive `JsonValue` alias even when no response uses it. Generated files remain generator-owned.
+- 2026-10-14: owner-requested additive kernel integration: authenticated `POST /api/toolpaths/manufacture` takes a versioned explicit CAD snapshot with material, machine preset, stock/world origin and quality settings, returning a schema-validated kernel result with exact emitted NC, program, claims and identity. This stateless endpoint enriches the existing generator group and does not mutate saved drawings or toolpaths.
+- 2026-10-14: RM-01 contract amendment: shared CAM action input schemas live in `ai-cam.ts`, reusing core stock/fixture/solid contracts. G-code generation may return a shared tagged action failure or mutation outcome alongside its existing program result. These envelopes must survive the action and desktop adapters unchanged; revision/receipt storage remains RM-03.
 - v1: initial spec.
 - Integration: added the generated `ApiClient` Effect service with `layer({ baseUrl, token })`; client-side authorization middleware supplies the per-launch Bearer token without persisting it. Additional contract groups alone do not count as implemented server routes.
 - System contract: preserve legacy `GET /api/health` and provide authenticated `GET /health` and `GET /version` for the native boot contract. Version returns `{ version }` from the sidecar configuration.

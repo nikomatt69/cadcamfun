@@ -60,6 +60,18 @@ describe("defineActionTool", () => {
     expect(executions).toBe(0)
   })
 
+  test("constructing an action Effect is lazy and cancellation before running it prevents Promise handler entry", async () => {
+    let entries = 0
+    const action = defineAction({ id: "edit.save", kind: "write", parameters: z.object({}), run: async () => { entries++; return { ok: true } } })
+    const controller = new AbortController()
+    const effect = action.run({}, { ...context, signal: controller.signal })
+    expect(entries).toBe(0)
+    controller.abort()
+    const result = await Effect.runPromise(effect.pipe(Effect.match({ onFailure: (failure) => failure._tag, onSuccess: () => "success" })))
+    expect(result).toBe("ActionInterrupted")
+    expect(entries).toBe(0)
+  })
+
   test("cancellation interrupts an in-flight Effect before its write", async () => {
     let entered!: () => void
     const started = new Promise<void>((resolve) => { entered = resolve })

@@ -8,6 +8,8 @@
  */
 import { cam } from "@cadcamfun/core"
 import { toJsonSafeRecord } from "../../../shared/state/json-safe.ts"
+import { CamKernelRequest } from "@cadcamfun/api"
+import { Schema } from "effect"
 
 const g = cam.generator
 
@@ -117,6 +119,39 @@ export const geometryOf = (form: GeometryForm, sources: JobSources): cam.generat
   selectedElements: selectedElements(sources).map((element) => toJsonSafeRecord(element)),
   stock: toJsonSafeRecord(stockOf(sources))
 })
+
+/** Snapshot the selected parts and their Boolean operands, or the whole drawing when nothing is selected. */
+export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset">): CamKernelRequest => {
+  const selected = selectedElements(sources)
+  const roots = selected.length > 0 ? selected : sources.elements.filter((element) => !STOCK_TYPES.has(String(element["type"])))
+  const byId = new Map(sources.elements.map((element) => [String(element["id"]), element]))
+  const included = new Set<CadElement>()
+  const include = (element: CadElement): void => {
+    if (included.has(element)) return
+    included.add(element)
+    if (Array.isArray(element["operands"])) for (const id of element["operands"]) {
+      const operand = byId.get(String(id))
+      if (operand !== undefined) include(operand)
+    }
+  }
+  roots.forEach(include)
+  const hasStock = sources.workpiece.configured || sources.workpiece.elementId || sources.workpieceElementId || sources.elements.some((element) => STOCK_TYPES.has(String(element["type"])))
+  const snapshot = {
+    schemaVersion: 1 as const, name: "CAD manufacturing job", ...options,
+    elements: [...included].map(toJsonSafeRecord), ...(hasStock ? { stock: stockOf(sources) } : {})
+  }
+  return Schema.decodeUnknownSync(CamKernelRequest)({ ...snapshot, id: cam.kernel.digestOf("desktop-cam-job", snapshot) })
+}
+
+/** The resolved kernel stock in the same work coordinates as its program; the CAD workpiece stays unchanged. */
+export const kernelStockOf = (artifact: cam.kernel.CamArtifact): Stock => {
+  const { min, max } = artifact.stockBounds
+  return {
+    width: max.x - min.x, height: max.y - min.y, depth: max.z - min.z, radius: 0, allowance: 0,
+    x: (min.x + max.x) / 2 - artifact.origin.x, y: (min.y + max.y) / 2 - artifact.origin.y,
+    topZ: max.z - artifact.origin.z, material: artifact.material.id
+  }
+}
 
 /** Short label of an element for lists ("cube: Base" / "circle: 4f3a2b1c"). */
 export const elementLabel = (element: CadElement): string =>

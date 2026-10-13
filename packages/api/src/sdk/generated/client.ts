@@ -396,6 +396,8 @@ import type {
   ToolpathExtrasUpdateCommentOutput,
   ToolpathExtrasRemoveCommentInput,
   ToolpathExtrasRemoveCommentOutput,
+  ToolpathGeneratorManufactureInput,
+  ToolpathGeneratorManufactureOutput,
   ToolpathGeneratorParseInput,
   ToolpathGeneratorParseOutput,
   ToolpathGeneratorVerifyInput,
@@ -3440,6 +3442,32 @@ export function make(options: ClientOptions) {
         ),
     },
     toolpathGenerator: {
+      manufacture: (input: ToolpathGeneratorManufactureInput, requestOptions?: RequestOptions) =>
+        request<ToolpathGeneratorManufactureOutput>(
+          {
+            method: "POST",
+            path: `/api/toolpaths/manufacture`,
+            body: {
+              material: input["material"],
+              machine: input["machine"],
+              origin: input["origin"],
+              finishAllowance: input["finishAllowance"],
+              scallop: input["scallop"],
+              schemaVersion: input["schemaVersion"],
+              id: input["id"],
+              name: input["name"],
+              elements: input["elements"],
+              stock: input["stock"],
+              tolerance: input["tolerance"],
+              resolution: input["resolution"],
+              workOffset: input["workOffset"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       parse: (input: ToolpathGeneratorParseInput, requestOptions?: RequestOptions) =>
         request<ToolpathGeneratorParseOutput>(
           {

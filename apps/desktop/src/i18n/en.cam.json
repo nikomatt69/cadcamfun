@@ -366,5 +366,16 @@
   "cam.ribbon.group.lathe": "Turning",
   "cam.ribbon.group.verify": "Verify & Simulate",
   "cam.ribbon.group.post": "Post-Processor",
-  "cam.ribbon.group.libraries": "Libraries"
+  "cam.ribbon.group.libraries": "Libraries",
+  "cam.kernel.title": "Native CAM kernel",
+  "cam.kernel.description": "Plan the selected CAD parts, choose cutters and generate a complete program. With no selection, use the whole drawing.",
+  "cam.kernel.material": "Material grade",
+  "cam.kernel.machine": "Machine preset",
+  "cam.kernel.generate": "Generate from CAD",
+  "cam.kernel.generating": "Planning and verifying…",
+  "cam.kernel.select": "Add a solid CAD part to generate a manufacturing program.",
+  "cam.kernel.release": "Program evidence",
+  "cam.kernel.stale": "The CAD, settings or G-code changed. Generate again to refresh the evidence.",
+  "cam.kernel.summary": "{operations} operations · {tools} tools · {seconds} s",
+  "cam.kernel.scope": "Evidence applies to the emitted program and the modelled machine limits."
 }

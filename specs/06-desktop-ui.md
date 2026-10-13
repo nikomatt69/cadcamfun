@@ -125,6 +125,8 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## Folder roles (`src/app`, `src/pages`, `src/features`, `src/shared`)
 
+Owner-requested kernel integration (2026-10-14): enrich the current CAM generator with a native-kernel section, preserving its operation generator. Selection comes from the CAD stores; the authenticated sidecar returns the kernel program and evidence. Loading the result updates the existing editor and preview, resets previous verification and guards against stale geometry/settings/owner responses. Show stale evidence after NC edits. CADCanvas uses kernel geometry with one placement/gizmo transform and independently owned render resources.
+
 - `src/app/` is the shell: `App.tsx`, `Shell.tsx`, `routes.tsx` (the route table), the API client and global services. Nothing feature-specific.
 - `src/pages/` holds one-line route adapters, one file per legacy Next.js page path (66 routes; `test/app-mount.test.ts` checks the route table against these files). A page only re-exports a screen or a feature page; it contains no logic.
 - `src/features/<name>/` is one folder per product area, with the same inner layout everywhere: `screens/` (route-level views), `components/`, `hooks/`, `lib/` (pure logic), `store/`, `types/`, `api/` and `styles/` only when the feature needs them. Current areas: `ai`, `analytics`, `auth`, `billing`, `cad`, `cam`, `chat`, `companion`, `costs`, `dashboard`, `legal`, `library`, `marketplace`, `mcp`, `organizations`, `plugins`, `profile`, `projects`, `settings`, `toolpaths`, `admin`.

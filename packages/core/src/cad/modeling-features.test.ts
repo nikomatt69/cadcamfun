@@ -1002,9 +1002,16 @@ describe("draft on curved faces", () => {
     expect(rel(historyVolume(r) - before, frustum(10, 10 + 10 * t5, 10) - Math.PI * 100 * 10)).toBeLessThan(0.03)
   })
 
-  test("a neutral plane across the curved face is refused with the reason", () => {
+  test("a neutral plane half way up the boss drafts both ways: the volume is kept, the top narrows and the foot widens", () => {
     const m = bossOnPlate()
+    const before = historyVolume(m.rebuild())
     m.draft({ near: [40, 30, 15], normal: [1, 0, 0], angle: 5, neutral: 15 })
-    expect(m.rebuild().issues[0]!.message).toMatch(/neutral plane crosses this curved face/)
+    const r = m.rebuild()
+    expect(r.issues).toEqual([])
+    // Two frustums about the neutral radius 10: the lost and the gained volume nearly cancel (to second order in tan 5).
+    const expected = frustum(10, 10 - 5 * t5, 5) + frustum(10 + 5 * t5, 10, 5) - Math.PI * 100 * 10
+    expect(Math.abs(historyVolume(r) - before - expected)).toBeLessThan(0.02 * Math.PI * 100 * 10 * t5)
+    expect(meshBounds(cutZ(r.bodies[0]!.mesh, 19.5, 20)).maxX - 30).toBeCloseTo(10 - 5 * t5, 1)
+    expect(meshBounds(cutZ(r.bodies[0]!.mesh, 10.2, 10.6)).maxX - 30).toBeGreaterThan(10.2)
   })
 })
