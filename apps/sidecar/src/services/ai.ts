@@ -177,6 +177,51 @@ const toolHandlers = Effect.gen(function*() {
   const decodePrinter = (input: Record<string, unknown>) => Schema.decodeUnknownSync(cam.generator.PrinterExtrasSchema)(input)
 
   const handlers: ToolHandlersShape = {
+    manufacture: async (projectId, input) => {
+      const loaded = await load(projectId)
+      const elements = loaded.elements.filter((e) => e.type !== "workpiece")
+      if (elements.length === 0) return { ok: false, error: "There is no part to machine.", ...where(loaded) }
+      // The stored stock is centred in CAD X/Y; its `topZ` is the machine reference, so it stands on the part's bottom here.
+      const meshes = cam.model.partMeshes(elements as never, { tolerance: 0.01 })
+      if (meshes === undefined) return { ok: false, error: "No element of the drawing is a solid the kernel can machine.", ...where(loaded) }
+      const zMin = Math.min(...meshes.meshes.map((m) => cam.model.meshBounds(m).min[2]!))
+      const zMax = Math.max(...meshes.meshes.map((m) => cam.model.meshBounds(m).max[2]!))
+      const stored = loaded.data["stock"] !== undefined ? Schema.decodeUnknownSync(cam.generator.StockSchema)(loaded.data["stock"]) : undefined
+      const stock = stored === undefined ? undefined : {
+        min: { x: stored.x - stored.width / 2, y: stored.y - stored.height / 2, z: zMin },
+        max: { x: stored.x + stored.width / 2, y: stored.y + stored.height / 2, z: zMin + Math.max(stored.depth, zMax - zMin) }
+      }
+      const machine = input.machine !== undefined ? cam.kernel.findMachine(input.machine) : undefined
+      if (input.machine !== undefined && machine === undefined) return { ok: false, error: `Unknown machine preset '${input.machine}'. Known: ${cam.kernel.MACHINES.map((m) => m.id).join(", ")}` }
+      const job: cam.kernel.ManufacturingJob = {
+        schemaVersion: 1, id: `${loaded.id}:${drawingRevision(loaded)}`, name: "CAM kernel job", material: input.material,
+        part: { kind: "elements", elements: elements as never }, ...(stock !== undefined ? { stock } : {}),
+        ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
+        quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}) }
+      }
+      const stockNote = stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
+      if (input.planOnly === true) {
+        const plan = cam.kernel.planOnly(job)
+        return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, issues: plan.issues, ...where(loaded) }
+      }
+      const run = cam.kernel.runJob(job)
+      if (run.status === "failed") return { ok: false, issues: run.issues, ...where(loaded) }
+      const a = run.value
+      const lines = a.nc.split("\n")
+      return {
+        ok: true, mutated: false, stockNote, release: a.release, material: a.material, machine: a.machine, cycleTimeSeconds: a.cycleTimeSeconds,
+        claims: a.claims, issues: a.issues.slice(0, 30), notes: a.notes, stock: a.stock, identity: a.identity,
+        tools: a.tools.map((t) => ({ number: t.number, id: t.id, name: t.name, kind: t.kind, diameter: t.diameter, flutes: t.flutes, coating: t.coating })),
+        operations: a.operations.map((o) => ({
+          id: o.id, name: o.name, strategy: o.strategy, tool: o.toolId, cut: o.cut, status: o.status, removedVolume: o.removedVolume,
+          ...(o.cutting ? { rpm: o.cutting.rpm, feed: o.cutting.feed, plungeFeed: o.cutting.plungeFeed, ap: o.cutting.ap, ae: o.cutting.ae, vc: o.cutting.vc, fz: o.cutting.fz, coolant: o.cutting.coolant, powerKw: o.cutting.powerKw, limitedBy: o.cutting.limitedBy } : {}),
+          warnings: o.warnings.slice(0, 3)
+        })),
+        ncLines: lines.length, ncPreview: lines.slice(0, 120).join("\n"),
+        note: "Read-only: nothing was stored. Release 'verified-program' means every replay claim passed for this NC; it is not a machine qualification.",
+        ...where(loaded)
+      }
+    },
     validateMachiningPlan: async (projectId, input) => {
       const loaded = await load(projectId)
       const revision = drawingRevision(loaded)
