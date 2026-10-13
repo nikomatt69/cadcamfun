@@ -22,6 +22,8 @@ import type { PluginManifest } from "@cadcamfun/plugin-sdk"
 
 /** Default wall-clock budget for one plugin call, milliseconds (spec §3). */
 export const CALL_TIMEOUT_MS = 5_000
+/** One AI tool call may run longer than a UI handshake; past this the worker is stopped like any unresponsive plugin. */
+export const AI_TOOL_TIMEOUT_MS = 30_000
 /** Maximum plugin heap, megabytes. A plugin that allocates past this is killed. */
 export const MEMORY_LIMIT_MB = 256
 /** Calls allowed per plugin per minute. */
@@ -113,6 +115,25 @@ export interface PluginContributions {
   readonly panels: ReadonlyArray<{ readonly id: string; readonly title: string; readonly entry: string }>
   readonly postProcessors: ReadonlyArray<string>
   readonly operations: ReadonlyArray<string>
+  /** Tools the plugin offers the AI assistant; present only for a plugin that holds `ai:tool`. */
+  readonly aiTools: ReadonlyArray<PluginAiTool>
+}
+
+/** One tool a plugin offers the assistant, as the manifest declared it. */
+export interface PluginAiTool {
+  readonly id: string
+  readonly description: string
+  readonly kind: "read" | "write"
+  /** JSON Schema of the tool's arguments. */
+  readonly parameters: Readonly<Record<string, unknown>>
+  /** Name of the exported function the worker calls. */
+  readonly entry: string
+}
+
+/** A tool of a running plugin, with the plugin it belongs to. */
+export interface PluginAiToolListing extends PluginAiTool {
+  readonly pluginId: string
+  readonly pluginName: string
 }
 
 /** A running plugin instance. */
@@ -137,6 +158,7 @@ export type HostRequest =
   | { readonly _tag: "toolpath.program"; readonly toolpathId: string }
   | { readonly _tag: "ui.command"; readonly commandId: string }
   | { readonly _tag: "ui.panel"; readonly panel: { readonly id: string } }
+  | { readonly _tag: "ai.tool"; readonly entry: string; readonly args: unknown }
 
 /** The capability each request needs; `undefined` means the request needs none. */
 export const REQUIRED_CAPABILITY: Partial<Record<HostRequest["_tag"], Capability>> = {
@@ -149,7 +171,8 @@ export const REQUIRED_CAPABILITY: Partial<Record<HostRequest["_tag"], Capability
   "toolpath.list": "toolpath:read",
   "toolpath.program": "toolpath:read",
   "ui.command": "ui:panel",
-  "ui.panel": "ui:panel"
+  "ui.panel": "ui:panel",
+  "ai.tool": "ai:tool"
 }
 
 export interface RpcResponse {
@@ -236,6 +259,8 @@ export interface PluginHostEnv {
   /** Spawns a sandboxed worker for the plugin. */
   readonly spawn: (record: PluginRecord) => PluginWorkerHandle
   readonly timeoutMs: number
+  /** Deadline of one AI tool call (a tool does real work); defaults to {@link AI_TOOL_TIMEOUT_MS}. */
+  readonly toolTimeoutMs?: number
 }
 
 /** The host service, as the HTTP layer consumes it. */
@@ -247,6 +272,10 @@ export interface PluginHostService {
   readonly list: () => Effect.Effect<ReadonlyArray<PluginRecord>, never>
   readonly get: (id: string) => Effect.Effect<PluginRecord, PluginError>
   readonly call: (pluginId: string, commandId: string) => Effect.Effect<unknown, PluginFailure>
+  /** The AI tools of the plugins that are running and hold `ai:tool`, as they are now (read on every call, so enabling a plugin shows). */
+  readonly aiTools: () => ReadonlyArray<PluginAiToolListing>
+  /** Runs one contributed AI tool in the plugin's worker. The arguments were validated against the tool's schema by the caller. */
+  readonly callTool: (pluginId: string, toolId: string, args: unknown) => Effect.Effect<unknown, PluginFailure>
   readonly dispose: Effect.Effect<void>
   readonly getConfig: (id: string) => Effect.Effect<Readonly<Record<string, unknown>>, PluginError>
   readonly putConfig: (id: string, config: Readonly<Record<string, unknown>>) => Effect.Effect<void, PluginError>
@@ -296,7 +325,8 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
   /** One RPC, with the capability check, the rate limit and the timeout applied. */
   const call = (
     record: PluginRecord,
-    request: HostRequest
+    request: HostRequest,
+    timeoutMs: number = env.timeoutMs
   ): Effect.Effect<unknown, PluginFailure> =>
     Effect.suspend(() => {
       if (disposed) return Effect.fail(new PluginError({ pluginId: record.id, reason: "plugin host is closed" }))
@@ -338,13 +368,13 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
         pending.set(rpcId, () => finish(Effect.fail(new PluginCrashedError({ pluginId: record.id, message: "plugin host closed" }))))
         const timer = setTimeout(() => {
           // Settle this request before termination rejects the other in-flight calls.
-          finish(Effect.fail(new PluginTimeoutError({ pluginId: record.id, timeoutMs: env.timeoutMs })))
+          finish(Effect.fail(new PluginTimeoutError({ pluginId: record.id, timeoutMs })))
           worker.terminate()
           workers.delete(record.id)
           running.delete(record.id)
           markFaulted(record.id, "faulted")
           trackerOf(record.id).record()
-        }, env.timeoutMs)
+        }, timeoutMs)
 
         unsubscribeMessage = worker.onMessage((response) => {
           if (response.rpcId !== rpcId) return
@@ -420,6 +450,11 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
         panels: Array<{ id: string; title: string; entry: string }>
         postProcessors: Array<string>
         operations: Array<string>
+        aiTools: Array<PluginAiTool>
+      }
+      // A tool is code the assistant calls on the user's behalf: it is listed only for a plugin the user granted `ai:tool`.
+      if (instance.record.capabilities.includes("ai:tool")) {
+        for (const tool of declared.aiTools ?? []) mutable.aiTools.push({ id: tool.id, description: tool.description, kind: tool.kind, parameters: tool.parameters, entry: tool.entry })
       }
       if (instance.record.capabilities.includes("ui:panel")) {
         for (const command of declared.commands ?? []) mutable.commands.push({ id: command.id, title: command.title })
@@ -568,6 +603,24 @@ export const makeHost = (env: PluginHostEnv): PluginHostService => {
         return call(record, { _tag: "ui.command", commandId })
       }),
 
+    aiTools: () =>
+      [...running.values()].flatMap((instance) =>
+        instance.record.state === "enabled" ? instance.contributions.aiTools.map((tool) => ({ ...tool, pluginId: instance.record.id, pluginName: instance.record.name })) : []),
+
+    callTool: (pluginId, toolId, args) =>
+      Effect.suspend(() => {
+        const record = registry.get(pluginId)
+        if (record === undefined) return Effect.fail(notInstalled(pluginId))
+        const instance = running.get(pluginId)
+        if (instance === undefined) return Effect.fail(new PluginError({ pluginId, reason: "plugin is not running" }))
+        const declared = instance.contributions.aiTools.find((tool) => tool.id === toolId)
+        if (declared === undefined) return Effect.fail(new PluginError({ pluginId, reason: `plugin contributes no AI tool "${toolId}"` }))
+        return call(record, { _tag: "ai.tool", entry: declared.entry, args }, env.toolTimeoutMs ?? AI_TOOL_TIMEOUT_MS).pipe(
+          // The worker wraps the result so that a tool answering { ok: false, error } is not mistaken for a refused RPC.
+          Effect.map((reply) => (typeof reply === "object" && reply !== null && "toolResult" in reply ? (reply as { toolResult: unknown }).toolResult : reply))
+        )
+      }),
+
     getConfig: (id) =>
       Effect.suspend(() => {
         if (!registry.has(id)) return Effect.fail(notInstalled(id))
@@ -590,7 +643,8 @@ const emptyContributions = (): {
   panels: Array<{ id: string; title: string; entry: string }>
   postProcessors: Array<string>
   operations: Array<string>
-} => ({ commands: [], panels: [], postProcessors: [], operations: [] })
+  aiTools: Array<PluginAiTool>
+} => ({ commands: [], panels: [], postProcessors: [], operations: [], aiTools: [] })
 
 /** Maps a worker error response onto a host error. */
 const responseError = (
@@ -669,10 +723,20 @@ const handlers = {
   "toolpath.list"() { return granted.includes("toolpath:read") ? host.toolpath.list() : deny("toolpath:read") },
   "toolpath.program"(req) { return granted.includes("toolpath:read") ? host.toolpath.program(req.toolpathId) : deny("toolpath:read") },
   "ui.command"(req) { if (!granted.includes("ui:panel")) return deny("ui:panel"); return host.ui.command({ id: req.commandId }) },
-  "ui.panel"(req) { if (!granted.includes("ui:panel")) return deny("ui:panel"); return host.ui.panel({ id: req.panel.id }) }
+  "ui.panel"(req) { if (!granted.includes("ui:panel")) return deny("ui:panel"); return host.ui.panel({ id: req.panel.id }) },
+  // A contributed AI tool: the plugin module's exported function, run here with only what was granted. The module is the one the
+  // host loaded at startup (\`__cadcamPlugin\`); the result travels in an envelope so a tool that answers { ok: false, error } is a result, not an RPC failure.
+  async "ai.tool"(req) {
+    if (!granted.includes("ai:tool")) return deny("ai:tool");
+    const module = self.__cadcamPlugin;
+    const exported = module?.aiTools ?? module?.default?.aiTools;
+    const run = exported?.[req.entry];
+    if (typeof run !== "function") return { ok: false, error: { _tag: "NoSuchTool", message: "the plugin exports no aiTools." + req.entry } };
+    return { toolResult: await run(req.args) };
+  }
 };
 
-// Replies carry the request id; readiness is handled by the transport.
+// Replies carry the request id; readiness is handled by the transport. A handler may be asynchronous (an AI tool is).
 scope.addEventListener("message", (event) => {
   const req = event.data;
   const handler = handlers[req._tag];
@@ -680,8 +744,8 @@ scope.addEventListener("message", (event) => {
     scope.postMessage({ rpcId: req.rpcId, ok: false, error: { _tag: "NotRunning", message: "unknown request " + req._tag } });
     return;
   }
-  try {
-    const result = handler(req) ?? null;
+  Promise.resolve().then(() => handler(req)).then((value) => {
+    const result = value ?? null;
     // A handler answers a refusal with an ok:false envelope; that has to reach the
     // host as a failure rather than as a successful value wrapping a denial.
     if (result !== null && typeof result === "object" && result.ok === false && result.error) {
@@ -689,9 +753,9 @@ scope.addEventListener("message", (event) => {
       return;
     }
     scope.postMessage({ rpcId: req.rpcId, ok: true, value: result });
-  } catch (error) {
+  }, (error) => {
     scope.postMessage({ rpcId: req.rpcId, ok: false, error: { _tag: "PluginThrew", message: error instanceof Error ? error.message : String(error) } });
-  }
+  });
 });
 `
 
@@ -701,9 +765,11 @@ export const spawnBunWorker = (record: PluginRecord): PluginWorkerHandle => {
   // The host is the only thing allowed to read the plugin's source: the worker has
   // no filesystem access at all, so the code arrives inline.
   const source = readFileSync(entryPath, "utf8")
-  const bundle = `${PLUGIN_BOOTSTRAP}\n${source}\nself.postMessage({ ready: true });\n//# sourceURL=plugin-${record.id}.js`
-  // Bun resolves a string passed to `eval: true` as a module *path*, so the code is
-  // handed over as a blob URL instead.
+  // The plugin is its own module, imported by the bootstrap's module, so the host can call what it exports (`aiTools`). Its top-level
+  // code still runs once, here, before the worker reports ready; the globals above are gone by then. Bun resolves a string passed to
+  // `eval: true` as a module *path*, so both pieces are handed over as blob URLs.
+  const pluginUrl = URL.createObjectURL(new Blob([`${source}\n//# sourceURL=plugin-${record.id}.js`], { type: "text/javascript" }))
+  const bundle = `const __PLUGIN_URL = ${JSON.stringify(pluginUrl)};\n${PLUGIN_BOOTSTRAP}\nself.__cadcamPlugin = await import(__PLUGIN_URL);\nself.postMessage({ ready: true });\n//# sourceURL=bootstrap-${record.id}.js`
   const url = URL.createObjectURL(new Blob([bundle], { type: "text/javascript" }))
   const worker = new Worker(url, {
     // Bun accepts `resourceLimits`; the DOM lib does not model it.
@@ -721,6 +787,7 @@ export const spawnBunWorker = (record: PluginRecord): PluginWorkerHandle => {
     closed = message
     outbox.length = 0
     URL.revokeObjectURL(url)
+    URL.revokeObjectURL(pluginUrl)
     for (const listener of [...crashes]) listener(message)
     crashes.clear()
     messages.clear()
@@ -731,6 +798,7 @@ export const spawnBunWorker = (record: PluginRecord): PluginWorkerHandle => {
       if (ready) return
       ready = true
       URL.revokeObjectURL(url)
+      URL.revokeObjectURL(pluginUrl)
       try { for (const request of outbox.splice(0)) worker.postMessage(request) }
       catch (cause) { close(String(cause)); worker.terminate() }
       return

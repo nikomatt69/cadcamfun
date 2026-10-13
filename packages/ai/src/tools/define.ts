@@ -31,6 +31,8 @@ export interface ToolDefinition<S extends z.ZodType = z.ZodType> {
   /** zod 4 schema; nikcli sends its JSON Schema to the model and validates the call against it. */
   readonly parameters: S
   readonly execute: (input: z.infer<S>, context: ToolContext) => Promise<unknown>
+  /** The host asks the person before each call (an extension tool that changes something: its author is not this application). */
+  readonly approval?: boolean
 }
 
 export interface ToolConfig<S extends z.ZodType> {
@@ -65,6 +67,7 @@ export const toSpec = (definition: ToolDefinition, context: ToolContext): HostTo
   }
   return {
     id: definition.id, description: definition.description, parameters: lenient(definition.parameters),
+    ...(definition.approval === true ? { approval: true } : {}),
     formatValidationError: (error) => formatToolValidationError(definition.id, error),
     execute: async (input, call) => (await run(input, call)).output,
     executeWithFiles: run

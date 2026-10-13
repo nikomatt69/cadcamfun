@@ -5724,7 +5724,8 @@ var CAPABILITIES = [
   "drawing:write",
   "toolpath:read",
   "storage",
-  "ui:panel"
+  "ui:panel",
+  "ai:tool"
 ];
 var CapabilitySchema = Literals(CAPABILITIES);
 var ALL_CAPABILITIES = [...CAPABILITIES];
@@ -5752,11 +5753,19 @@ var OperationContributionSchema = Struct({
   title: String4,
   entry: String4
 });
+var AiToolContributionSchema = Struct({
+  id: String4.check(isPattern2(/^[a-z][a-z0-9_]{0,39}$/)),
+  description: String4.check(isMinLength(10)).check(isMaxLength(2000)),
+  kind: Literals(["read", "write"]),
+  parameters: Record(String4, Unknown2),
+  entry: String4.check(isMinLength(1))
+});
 var ContributionsSchema = Struct({
   commands: optional2(ArraySchema(CommandContributionSchema)),
   panels: optional2(ArraySchema(PanelContributionSchema)),
   postProcessors: optional2(ArraySchema(PostProcessorContributionSchema)),
-  operations: optional2(ArraySchema(OperationContributionSchema))
+  operations: optional2(ArraySchema(OperationContributionSchema)),
+  aiTools: optional2(ArraySchema(AiToolContributionSchema))
 });
 var PluginManifestSchema = Struct({
   id: PluginIdSchema,

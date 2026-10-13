@@ -32,6 +32,8 @@ export interface HostToolSpec {
     input: unknown,
     ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }
   ) => Promise<string>
+  /** The host asks the person before each call, whatever the role (an extension tool that changes something). */
+  readonly approval?: boolean
   readonly executeWithFiles?: (input: unknown, ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }) => Promise<{ readonly output: string; readonly files?: ReadonlyArray<FilePart> }>
 }
 
@@ -209,6 +211,7 @@ export const makeNikCliRuntime = (
             await writeFile(temporary, JSON.stringify(buildHostConfig({
               providers,
               toolIds: toolIdsOf(projectId),
+              askToolIds: toolRegistry.approvalIds(projectId),
               systemPrompt: options.systemPrompt,
               ...(options.compaction ? { compaction: options.compaction } : {}),
               ...(options.timeouts ? { timeouts: options.timeouts } : {}),

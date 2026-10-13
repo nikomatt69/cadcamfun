@@ -4,7 +4,7 @@ import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
-  CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, type BridgeMode, type BridgeTool
+  CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
 import { Context, Effect, Layer, Redacted, Schema } from "effect"
@@ -14,6 +14,7 @@ import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
 import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser } from "./acting-user.ts"
+import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
@@ -796,6 +797,7 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
   const { user: local } = yield* LocalProfile
   const acting = yield* ActingUser
   const { policies = [] } = yield* AiConfig
+  const plugins = yield* AiPlugins
   const actor = {
     get userId() { return acting.get(local).id },
     get name() { return acting.get(local).name ?? "User" },
@@ -807,12 +809,25 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
     ...libraryContributions(handlers),
     ...vcsContributions({ vcs, runner, projects: projectsRepo, actor })
   }
+  /** The tools of the plugins the operator switched on, as the bridge lists them: read tools only (a write tool needs a person's approval). */
+  const pluginBridge = (): ReadonlyArray<BridgeTool> => plugins.listing().filter((entry) => entry.kind === "read").map((entry) => {
+    const id = pluginToolId(entry.pluginId, entry.id)
+    return { id, description: `[Plugin: ${entry.pluginName}] ${entry.description}`, kind: "read" as const, actions: [{ id: `${id}.run`, name: "run", kind: "read" as const }], parameters: entry.parameters }
+  })
   return AiActions.of({
-    list: (mode) => scopeBridge(describeBridge(), policies, mode),
+    list: (mode) => [...scopeBridge(describeBridge(), policies, mode), ...scopeBridge(pluginBridge(), policies, mode)],
     invoke: ({ projectId, tool, input, user, mode, signal }) => Effect.gen(function*() {
-      const admission = bridgeAdmission(tool, input, policies, mode)
+      const admission = tool.startsWith("plugin_")
+        ? (() => {
+            const entry = plugins.listing().find((candidate) => pluginToolId(candidate.pluginId, candidate.id) === tool)
+            if (entry === undefined) return { ok: false as const, error: `Unknown tool "${tool}". List the tools with GET /api/ai/actions.` }
+            if (entry.kind === "write") return { ok: false as const, error: `${tool} changes something and needs a person's approval, which only the application can ask for.` }
+            if (!bridgeAllowed(policies, tool, "run")) return { ok: false as const, error: `The AI policy of this installation does not allow ${tool} from outside the application.` }
+            return { ok: true as const, tool, action: "run", kind: "read" as const }
+          })()
+        : bridgeAdmission(tool, input, policies, mode)
       if (!admission.ok) return yield* Effect.fail({ message: admission.error })
-      const spec = buildTools(handlers, projectId, [], contributions).find((candidate) => candidate.id === tool)
+      const spec = buildTools(handlers, projectId, plugins.tools(), contributions).find((candidate) => candidate.id === tool)
       if (spec === undefined) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })
       // One session per account and project: the owner file and the in-memory binding make a second account's call fail closed.
       const sessionId = `bridge:${projectId}:${user.id}`
@@ -839,6 +854,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const projectsRepo = yield* ProjectsForVcs
   const { user: local } = yield* LocalProfile
   const actingCell = yield* ActingUser
+  const plugins = yield* AiPlugins
   // Read when a tool runs, so the version-control tools act as the account that is chatting.
   const actor = {
     get userId() { return actingCell.get(local).id },
@@ -870,7 +886,7 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
     // what turns "the four providers we declare" into the whole catalogue. Offline tests
     // set the flag and the seed answers "skipped" without touching the network.
     catalogue: { network: !config.aiOffline },
-    toolsFor: (projectId) => buildTools(handlers, projectId, [], contributions).map((spec): HostToolSpec => ({
+    toolsFor: (projectId) => buildTools(handlers, projectId, plugins.tools(), contributions).map((spec): HostToolSpec => ({
       ...spec,
       execute: (input, ctx) => actingCell.invoke(projectId, ctx.sessionId, () => spec.execute(input, ctx), ctx.signal).catch(() => JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." })),
       ...(spec.executeWithFiles ? { executeWithFiles: (input: unknown, ctx: { sessionId: string; projectId: string; signal: AbortSignal }) => actingCell.invoke(projectId, ctx.sessionId, () => spec.executeWithFiles!(input, ctx), ctx.signal).catch(() => ({ output: JSON.stringify({ ok: false, error: "AI invocation denied or interrupted." }) })) } : {})
@@ -911,7 +927,7 @@ export const AiLive = Layer.unwrap(Effect.gen(function*() {
   // Keys are kept in <data dir>/ai/credentials.json (owner-only), so they are not asked for again after a restart.
   const base = Layer.mergeAll(ActingUser.layer, AiCredentials.layerPersisted(jsonFileCredentials(`${config.dataDir}/ai/credentials.json`)), AiConfigLive)
   const withDirect = DirectModel.layerWith(config.aiModelFactory ?? defaultModelFactory).pipe(Layer.provideMerge(base))
-  const withHandlers = AiActionsLive.pipe(Layer.provideMerge(ToolHandlersLive.pipe(Layer.provideMerge(withDirect))))
+  const withHandlers = AiActionsLive.pipe(Layer.provideMerge(ToolHandlersLive.pipe(Layer.provideMerge(AiPluginsLive.pipe(Layer.provideMerge(withDirect))))))
   const withHost = config.aiHost === "direct" ? withHandlers : AiHostLive.pipe(Layer.provideMerge(withHandlers))
   // Build the background runner from the live host once the host is in scope,
   // so the worker's `runner` always closes over the same scheduler the host

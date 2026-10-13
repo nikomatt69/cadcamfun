@@ -37,6 +37,8 @@ export class HostToolRegistry {
   }
 
   ids(projectId: string): ReadonlyArray<string> { return this.tools(projectId).map((tool) => tool.id) }
+  /** The tools the host asks about before every call (see `HostToolSpec.approval`). */
+  approvalIds(projectId: string): ReadonlyArray<string> { return this.tools(projectId).filter((tool) => tool.approval === true).map((tool) => tool.id) }
   catalogue(projectId: string): ReadonlyArray<{ readonly id: string; readonly description: string }> {
     return [...this.tools(projectId).map(({ id, description }) => ({ id, description })), ...NATIVE_TOOLS]
   }

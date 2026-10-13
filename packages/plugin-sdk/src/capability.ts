@@ -20,7 +20,12 @@ export const CAPABILITIES = [
   /** Namespaced key-value storage, private to the plugin. */
   "storage",
   /** Register declarative UI contributions (commands, panels). */
-  "ui:panel"
+  "ui:panel",
+  /**
+   * Offer tools to the AI assistant (and to a standalone nikcli through the action bridge). A tool is code the assistant calls on
+   * the user's behalf, so it is its own grant; a `write` tool is asked about before every call.
+   */
+  "ai:tool"
 ] as const
 
 export const CapabilitySchema = Schema.Literals(CAPABILITIES)
@@ -35,7 +40,8 @@ const IMPLIES: Readonly<Record<Capability, ReadonlyArray<Capability>>> = {
   "drawing:write": ["drawing:read"],
   "toolpath:read": [],
   storage: [],
-  "ui:panel": []
+  "ui:panel": [],
+  "ai:tool": []
 }
 
 /**

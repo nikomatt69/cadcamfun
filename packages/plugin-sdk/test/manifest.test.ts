@@ -138,3 +138,23 @@ describe("requireCapability", () => {
     }
   })
 })
+
+describe("AI tool contributions", () => {
+  const tool = { id: "bolt_circle", description: "Lay out N holes on a bolt circle and return their centres.", kind: "read" as const, entry: "boltCircle", parameters: { type: "object", properties: { n: { type: "integer" } }, required: ["n"] } }
+  const withTools = (aiTools: ReadonlyArray<unknown>) => ({ ...valid, capabilities: ["ai:tool"], contributes: { aiTools } })
+
+  test("a manifest may contribute tools, and `ai:tool` is a capability of its own", () => {
+    const manifest = Effect.runSync(decodeManifest(withTools([tool])))
+    expect(manifest.contributes?.aiTools?.[0]).toMatchObject({ id: "bolt_circle", kind: "read", entry: "boltCircle" })
+    expect(ALL_CAPABILITIES).toContain("ai:tool")
+    // It implies nothing: a plugin that offers tools does not thereby read the drawing.
+    expect(effectiveCapabilities(["ai:tool"])).toEqual(["ai:tool"])
+    expect(hasCapability(["drawing:write"], "ai:tool")).toBe(false)
+  })
+
+  test("the id is a lower-case identifier, the kind is read or write (never destructive), and the description says something", () => {
+    for (const bad of [{ ...tool, id: "Bolt-Circle" }, { ...tool, id: "" }, { ...tool, id: "a".repeat(41) }, { ...tool, kind: "destructive" }, { ...tool, description: "short" }, { ...tool, entry: "" }]) {
+      expect(() => Effect.runSync(decodeManifest(withTools([bad]))), JSON.stringify(bad).slice(0, 60)).toThrow()
+    }
+  })
+})

@@ -62,6 +62,8 @@ export interface HostConfigInput {
   readonly providers: ReadonlyArray<HostProviderSpec>
   /** Ids of the tools registered by this package; the only ones the agent may use. */
   readonly toolIds: ReadonlyArray<string>
+  /** Registered tools the host asks about before every call, in every role that holds them (extension tools that change something). */
+  readonly askToolIds?: ReadonlyArray<string>
   readonly systemPrompt: string
   readonly compaction?: HostCompactionSettings
   /**
@@ -126,6 +128,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   for (const id of NATIVE_APPROVAL_TOOL_IDS) {
     if (toolIds.includes(id)) permission[id] = "ask"
   }
+  for (const id of input.askToolIds ?? []) if (toolIds.includes(id)) permission[id] = "ask"
   for (const tool of NATIVE_TOOLS) if (toolAllowed(policies, tool.id)) permission[tool.id] = "allow"
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.

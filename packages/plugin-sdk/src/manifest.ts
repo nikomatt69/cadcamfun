@@ -61,11 +61,30 @@ export const OperationContributionSchema = Schema.Struct({
 })
 export type OperationContribution = typeof OperationContributionSchema.Type
 
+/**
+ * A tool the plugin offers the AI assistant (RM-11, spec 27 §4.2). `entry` names an exported function of the plugin module,
+ * `aiTools[entry](args) => result`, run in the plugin's worker with only the capabilities the user granted. `parameters` is the
+ * JSON Schema of `args`; the host validates the assistant's arguments against it before the worker sees them. A tool is `read`
+ * (never changes anything) or `write` (the assistant's host asks the person before each call); there is no destructive kind.
+ */
+export const AiToolContributionSchema = Schema.Struct({
+  /** Lower-case identifier; the assistant sees it as `plugin_<plugin>_<id>`. */
+  id: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9_]{0,39}$/)),
+  /** What the tool does and when to use it: the model reads this. */
+  description: Schema.String.check(Schema.isMinLength(10)).check(Schema.isMaxLength(2_000)),
+  kind: Schema.Literals(["read", "write"]),
+  parameters: Schema.Record(Schema.String, Schema.Unknown),
+  /** Name of the exported function. */
+  entry: Schema.String.check(Schema.isMinLength(1))
+})
+export type AiToolContribution = typeof AiToolContributionSchema.Type
+
 export const ContributionsSchema = Schema.Struct({
   commands: Schema.optional(Schema.Array(CommandContributionSchema)),
   panels: Schema.optional(Schema.Array(PanelContributionSchema)),
   postProcessors: Schema.optional(Schema.Array(PostProcessorContributionSchema)),
-  operations: Schema.optional(Schema.Array(OperationContributionSchema))
+  operations: Schema.optional(Schema.Array(OperationContributionSchema)),
+  aiTools: Schema.optional(Schema.Array(AiToolContributionSchema))
 })
 export type Contributions = typeof ContributionsSchema.Type
 
