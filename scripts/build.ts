@@ -5,7 +5,7 @@
  *
  *   1. install     bun install --frozen-lockfile
  *   2. check       bun run typecheck && bun run test
- *   3. compile     bun build --compile the sidecar into src-tauri/binaries/sidecar-<triple>
+ *   3. compile     compile the sidecar (Bun.build, host patch applied) into src-tauri/binaries/sidecar-<triple>
  *   4. resources   copy packages/db/drizzle/ into src-tauri/resources/migrations/
  *   5. bundle      vite build (via @cadcamfun/desktop) then bunx tauri build
  *   6. artifacts   SHA-256 checksums + release notes from the commits since the last tag
@@ -270,14 +270,13 @@ async function stepCompile(): Promise<void> {
     await mkdir(dirname(outfile), { recursive: true });
     await rm(candidate, { force: true });
   }
+  // Through `Bun.build` rather than `bun build --compile`: the embedded nikcli host needs a one-line patch that only a build plugin can
+  // apply once the bundle is compiled in (see `scripts/compile-sidecar.ts`).
   await run([
     "bun",
-    "build",
-    "--compile",
+    "scripts/compile-sidecar.ts",
     SIDECAR_ENTRY,
-    "--target",
     targetInfo(triple).bunTarget,
-    "--outfile",
     dryRun ? outfile : candidate,
   ]);
   if (dryRun) return;

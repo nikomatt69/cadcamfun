@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
-import { MEDIA_RULE_MARKER, patchHostSource } from "../src/nikcli/host-patches.ts"
+import { join } from "node:path"
+import { MEDIA_RULE_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
 
 /** The marker must exist exactly once in the pinned bundle; a bump that moves it fails here, not in a user's chat. */
 describe("host patch: images in tool results", () => {
@@ -45,4 +46,33 @@ describe("host patch: loading", () => {
     await run.exited
     expect(JSON.parse(out.trim().split("\n").at(-1)!)).toEqual({ applied: true, create: "function" })
   }, 60000)
+})
+
+describe("host patch: the bundled sidecar", () => {
+  test("a bundle built with the patch plugin (what `scripts/compile-sidecar.ts` compiles) carries the corrected rule", async () => {
+    // The sidecar is compiled with the host embedded, so a plugin registered at run time never sees it. This builds the same way the
+    // compile does (Bun.build with the plugin) and reads the result: the user-visible bug was a compiled sidecar with the old rule.
+    const entry = join(import.meta.dir, "fixtures", "host-entry.ts")
+    const result = await Bun.build({ entrypoints: [entry], target: "bun", plugins: [hostPatchesPlugin as never] })
+    expect(result.success).toBe(true)
+    const text = await result.outputs[0]!.text()
+    const at = text.indexOf("function supportsMediaInToolResults(model)")
+    expect(at).toBeGreaterThan(-1)
+    const body = text.slice(at, text.indexOf("function isMultiAgent", at))
+    expect(body).toContain("return false;")
+    expect(body).not.toContain("nativeProviders.includes(model.api.npm)")
+    // Run the function as the host does: an Anthropic-protocol model that takes images no longer gets them inside the tool result,
+    // so the host sends them as the user message that follows ("Attached image(s) from tool result:"), which its request lowering accepts.
+    const rule = new Function(`${body}; return supportsMediaInToolResults`)() as (model: unknown) => boolean
+    const visionModel = { capabilities: { input: { image: true } }, api: { npm: "@ai-sdk/anthropic" } }
+    expect(rule(visionModel)).toBe(false)
+    expect(rule({ capabilities: { input: { image: false } }, api: { npm: "@ai-sdk/anthropic" } })).toBe(false)
+    // And without the plugin the same build keeps the old rule, so this test would fail if the plugin stopped working.
+    const plain = await Bun.build({ entrypoints: [entry], target: "bun" })
+    const plainText = await plain.outputs[0]!.text()
+    expect(plainText).toContain("nativeProviders.includes(model.api.npm)")
+    const plainAt = plainText.indexOf("function supportsMediaInToolResults(model)")
+    const oldRule = new Function(`${plainText.slice(plainAt, plainText.indexOf("function isMultiAgent", plainAt))}; return supportsMediaInToolResults`)() as (model: unknown) => boolean
+    expect(oldRule(visionModel)).toBe(true)
+  }, 120000)
 })

@@ -29,21 +29,33 @@ let applied = false
 /** True once the host bundle was loaded through the patch (false when it was loaded unchanged, or not yet). */
 export const hostPatchesApplied = (): boolean => applied
 
-/** Registers the load plugin once per process; a no-op outside Bun. */
+/** The host bundle's module path, in any package layout. */
+export const HOST_BUNDLE_FILTER = /[\\/]@nikcli-ai[\\/]sdk-next[\\/]index\.js$/
+
+/**
+ * The patch as a Bun plugin. It is used twice, because there are two ways the bundle reaches a process: loaded from `node_modules`
+ * (the dev server and the tests: `registerHostPatches`), and compiled into the sidecar executable (`bun build --compile`, see
+ * `scripts/compile-sidecar.ts`). In the executable the bundle is embedded when it is built and is never loaded again, so a plugin
+ * registered at run time never sees it: the patch has to be part of the build too.
+ */
+export const hostPatchesPlugin = {
+  name: "cadcam-nikcli-host-patches",
+  setup: (build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" } | undefined>) => void }) => {
+    build.onLoad({ filter: HOST_BUNDLE_FILTER }, async ({ path }) => {
+      const bun = (globalThis as { Bun?: { file: (path: string) => { text: () => Promise<string> } } }).Bun
+      if (bun === undefined) return undefined
+      const patched = patchHostSource(await bun.file(path).text())
+      if (patched === undefined) return undefined
+      applied = true
+      return { contents: patched, loader: "js" }
+    })
+  }
+}
+
+/** Registers the plugin once per process; a no-op outside Bun. */
 export const registerHostPatches = (): void => {
   if (registered) return
   registered = true
-  const bun = (globalThis as { Bun?: { plugin?: (plugin: unknown) => void; file: (path: string) => { text: () => Promise<string> } } }).Bun
-  if (bun?.plugin === undefined) return
-  bun.plugin({
-    name: "cadcam-nikcli-host-patches",
-    setup: (build: { onLoad: (options: { filter: RegExp }, callback: (args: { path: string }) => Promise<{ contents: string; loader: "js" } | undefined>) => void }) => {
-      build.onLoad({ filter: /[\\/]@nikcli-ai[\\/]sdk-next[\\/]index\.js$/ }, async ({ path }) => {
-        const patched = patchHostSource(await bun.file(path).text())
-        if (patched === undefined) return undefined
-        applied = true
-        return { contents: patched, loader: "js" }
-      })
-    }
-  })
+  const bun = (globalThis as { Bun?: { plugin?: (plugin: unknown) => void } }).Bun
+  bun?.plugin?.(hostPatchesPlugin)
 }
