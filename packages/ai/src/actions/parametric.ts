@@ -39,11 +39,15 @@ export const parametricFastenerSchema = z.object({ size: z.string().min(1).max(2
 export const parametricRecipeSchema = z.object({ recipe: z.enum(recipes), params: z.record(z.string().min(1).max(80), z.unknown()).optional() })
 export const parametricCreateSchema = z.object({ history: historySchema, ...named })
 export const parametricUpdateSchema = z.object({ elementId, parameters: parameterSchema, expectedRevision: z.string().min(1).max(100) })
+/** Reading the conversion builds the history; nothing is created. */
+export const parametricFromElementSchema = z.object({ elementId, depth: length.optional() })
+export const parametricConvertSchema = z.object({ elementId, depth: length.optional(), name: z.string().min(1).max(100).optional() })
 export const parametricRecipeCreateSchema = z.object({ recipe: z.enum(recipes), params: z.record(z.string().min(1).max(80), z.unknown()).optional(), name: z.string().min(1).max(100).optional(), ...placement })
 
 /** The parametric calls that read or write the drawing; the rest are answered by this package itself. */
 export type ParametricHandlerInput =
   | { action: "inspect"; elementId: string }
+  | { action: "convert"; elementId: string; depth?: number; name?: string; create: boolean }
   | { action: "validate"; history: z.input<typeof parametricValidateSchema>["history"] }
   | { action: "test"; elementId: string; cases: z.infer<typeof parametricTestSchema>["cases"] }
   | { action: "create"; history: z.input<typeof parametricCreateSchema>["history"]; name: string; x?: number; y?: number; z?: number; layer?: string }
@@ -98,6 +102,12 @@ const runRecipe = async (
   const createdOk = asRecord(created)?.["ok"] !== false
   return { ...result, ok: createdOk, created }
 }
+
+/** The parametric history of an element already in the drawing (the handler reads it); `create` also stores the parametric twin. */
+export const runParametricFromElement = (input: z.infer<typeof parametricFromElementSchema>, context: ActionContext) =>
+  of({ action: "convert", elementId: input.elementId, create: false, ...(input.depth !== undefined ? { depth: input.depth } : {}) }, context)
+export const runParametricConvert = (input: z.infer<typeof parametricConvertSchema>, context: ActionContext) =>
+  of({ action: "convert", elementId: input.elementId, create: true, ...(input.depth !== undefined ? { depth: input.depth } : {}), ...(input.name !== undefined ? { name: input.name } : {}) }, context)
 
 export const runParametricValidate = (input: z.infer<typeof parametricValidateSchema>) => parametricReport(input.history)
 export const runParametricFastener = (input: z.infer<typeof parametricFastenerSchema>) => lookupFastener(input)

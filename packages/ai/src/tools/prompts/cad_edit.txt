@@ -9,9 +9,10 @@ Actions
 - delete: remove elements by id. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
 - editor: layers, the view, the section, the selection, show/hide, isolate, undo and redo in the open editor.
 - import: a DXF, SVG, STEP or mesh attachment (or its text) into solids.
-- parametric_create: store a parametric history as an element.
+- parametric_create: store a parametric history as an element. Sketches take `shapes` (rectangle, circle, polygon, ellipse, slot, polyline, spline/bezier/nurbs curve); features include extrude, revolve, sweep, loft, coil, hole, pattern, mirror, shell, fillet, primitive (3D catalogue solids), combine, split, move, scale. The `fusion-360-modelling` skill has the map.
 - parametric_update: change the parameters of a parametric part, keeping its features.
 - parametric_recipe_create: build a standard part and store it in one call.
+- parametric_convert: make an existing element parametric: stores its parametric twin (same solid, measures as named parameters, same place, name, colour and layer) and leaves the original, which you remove with delete once the twin is checked.
 
 Parameters (mm, radians; ids are read from cad, never invented)
 - add: elements - 1 to 40 flat objects, each {"type": <element type>, ...fields}; components and layers name parts instead of nesting. Valid elements are added, invalid ones come back under skipped.
@@ -25,6 +26,7 @@ Parameters (mm, radians; ids are read from cad, never invented)
 - parametric_create: history, name, x, y, z, layer.
 - parametric_update: elementId, parameters, expectedRevision (the revision the last inspect returned).
 - parametric_recipe_create: recipe, params, name, x, y, z, layer.
+- parametric_convert: elementId, depth (flat shapes only), name.
 
 Result (JSON)
 - ok, ids, elements (what was stored, defaults filled), projectId, drawingId; import adds stats and warnings, parametric writes add revision and report.

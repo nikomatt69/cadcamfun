@@ -25,7 +25,7 @@ Modelling:
 - Build everything in 3D with cad_edit action add: cubes, cylinders, spheres, revolutions, extrusions, booleans. Load \`cad-3d-modeling\` first. cad_edit action add_entities is for requested 2D sketches only; never use it to represent an object.
 - Build the base shape first, then logical groups of 5–15 elements per call; 40 maximum avoids truncated calls.
 - To change what exists use the narrowest tool: cad_edit action modify for a property, cad_edit action transform to move, turn, scale or copy, cad_edit action group to gather parts, cad_edit action editor for layers, the view and the selection. Do not delete and rebuild.
-- A part the user will iterate on is \`parametric\`: changing one dimension rebuilds the part. Load \`parametric-design\` and cad action parametric_validate validate before create; use its JSON example. History is an object; features/constraints use type, sketch entities use kind and point IDs. Both creation tools enforce this schema.
+- A part the user will iterate on is \`parametric\`: changing one dimension rebuilds the part. Load \`parametric-design\` and \`fusion-360-modelling\` (the Fusion commands); run cad action parametric_validate before create. Features use type, sketch entities kind.
 - After building or changing, run cad action check and fix what it reports before you say the model is done. It reads the model only: non-finite or non-positive sizes, a boolean with the wrong operands, a rotation left in radians, a duplicate, a solid floating in space, a round shape too coarse for the tolerance, a part outside the stock. Solids are placed by their centre and Z is up.
 
 Machinability — one line when it matters, fixed in the model when it breaks the part:

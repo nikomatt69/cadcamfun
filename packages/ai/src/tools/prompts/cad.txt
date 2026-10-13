@@ -16,6 +16,7 @@ Actions
 - parametric_dfm: manufacturability findings for a history or an existing part.
 - parametric_fastener: thread, tap drill, clearance and counterbore sizes for a metric size.
 - parametric_recipe: build a standard part and return its history. `recipe` is one of mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend, duct_transition. Use cad_edit.parametric_recipe_create to put it in the drawing.
+- parametric_from_element: the parametric history of an element already in the drawing (any catalogue solid, a flat shape with a depth, a component of them): its measures become named parameters and the solid is the same. Nothing is created; cad_edit.parametric_convert stores it.
 
 Parameters (mm, radians; ids are read, never invented)
 - describe, check, inspect_layers: none.
@@ -30,6 +31,7 @@ Parameters (mm, radians; ids are read, never invented)
 - parametric_dfm: exactly one of elementId or history; process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
 - parametric_fastener: size (M3 ...), fit (fine|medium|coarse), shaftDiameter.
 - parametric_recipe: recipe (one of the names above), params (the design inputs the recipe asks for).
+- parametric_from_element: elementId, depth (mm, only for a flat shape: its extrusion, default 10).
 
 Result (JSON)
 - ok; for describe the elements, counts and bounds; for inspect the page plus total and nextOffset; for parametric the report with bodyCount, volumeMm3 and any problems.

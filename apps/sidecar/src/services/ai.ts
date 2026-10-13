@@ -308,6 +308,25 @@ const toolHandlers = Effect.gen(function*() {
         if (!report.ok) return report
         return { ...(await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }])) as Record<string, unknown>, mutation: "add" }
       }
+      if (input.action === "convert") {
+        const loaded = await load(projectId)
+        const source = loaded.elements.find((e) => e.id === input.elementId)
+        if (!source) return { ok: false, error: "Element not found in the active drawing.", ...where(loaded) }
+        const converted = cad.parametricFromElement(source, input.depth === undefined ? {} : { depth: input.depth })
+        if ("error" in converted) return { ok: false, error: converted.error, ...where(loaded) }
+        const report = inspectParametric(converted.history)
+        const origin = { id: source.id, type: source.type }
+        if (!report.ok) return { ...report, source: origin, notes: converted.notes }
+        const read = { ...report, source: origin, placement: converted.placement, notes: converted.notes, ...where(loaded) }
+        if (!input.create) return read
+        const { name: carriedName, ...carried } = converted.carry
+        const twin = {
+          type: "parametric", name: input.name ?? `${typeof carriedName === "string" ? carriedName : source.type} (parametric)`, history: converted.history,
+          ...carried, x: converted.placement.x, y: converted.placement.y, z: converted.placement.z
+        }
+        const created = await handlers.addElements(projectId, [twin])
+        return { ...(created as Record<string, unknown>), source: origin, notes: [...converted.notes, "The original is still in the drawing: check the parametric part, then remove the original with cad_edit delete."], report: { ok: report.ok, bodyCount: "bodyCount" in report ? report.bodyCount : undefined, volumeMm3: "volumeMm3" in report ? report.volumeMm3 : undefined } }
+      }
       const loaded = await load(projectId)
       const element = loaded.elements.find((e) => e.id === input.elementId && e.type === "parametric")
       if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }

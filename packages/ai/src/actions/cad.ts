@@ -11,8 +11,8 @@ import { ToolMediaResult } from "../tools/define.ts"
 import { defineAction, type ActionContext, type ActionParameters, type ActionSpec } from "./action.ts"
 import type { CadInspectionInput as CadInspectionInputWire } from "@cadcamfun/api"
 import {
-  parametricDfmSchema, parametricFastenerSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
-  runParametricDfm, runParametricFastener, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
+  parametricDfmSchema, parametricFastenerSchema, parametricFromElementSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
+  runParametricDfm, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
 } from "./parametric.ts"
 
 /** A leaf's own parameters: the wire schema without its `action` literal, which the tool adds as the discriminator. */
@@ -139,5 +139,10 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.parametric_recipe", kind: "read", replaces: "cad_parametric",
     parameters: parametricRecipeSchema,
     run: (input, context) => runParametricRecipe(input, context)
+  }),
+  defineAction({
+    id: "cad.parametric_from_element", kind: "read", replaces: "cad_parametric",
+    parameters: parametricFromElementSchema,
+    run: (input, context) => runParametricFromElement(input, context)
   })
 ]

@@ -31,7 +31,7 @@ export { policyAllows, providerAllowed, toolAllowed, filterProviders, permittedT
 export { resolveLocale, type LocaleConfig, type ResolvedLocale } from "./nikcli/locale.ts"
 export * from "./attachments.ts"
 export * from "./skills/user.ts"
-export { CADCAM_SKILLS } from "./skills/index.ts"
+export { CADCAM_SKILLS, FUSION_EXAMPLE_HISTORY } from "./skills/index.ts"
 export * from "./workspace-context.ts"
 export * from "./heartbeat.ts"
 export { readHostSessionState, type HostSessionState } from "./nikcli/chat.ts"

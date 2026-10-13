@@ -14,8 +14,8 @@ import { attachmentNames, getAttachment } from "../attachments.ts"
 import { validated } from "../tools/define.ts"
 import { defineAction, type ActionContext, type ActionSpec } from "./action.ts"
 import {
-  parametricCreateSchema, parametricRecipeCreateSchema, parametricUpdateSchema,
-  runParametricCreate, runParametricRecipeCreate, runParametricUpdate
+  parametricConvertSchema, parametricCreateSchema, parametricRecipeCreateSchema, parametricUpdateSchema,
+  runParametricConvert, runParametricCreate, runParametricRecipeCreate, runParametricUpdate
 } from "./parametric.ts"
 
 const MAX_DRAWING_CHARS = 2_000_000
@@ -308,5 +308,10 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad_edit.parametric_recipe_create", kind: "write", replaces: "cad_parametric",
     parameters: parametricRecipeCreateSchema,
     run: (input, context) => runParametricRecipeCreate(input, context)
+  }),
+  defineAction({
+    id: "cad_edit.parametric_convert", kind: "write", replaces: "cad_parametric",
+    parameters: parametricConvertSchema,
+    run: (input, context) => runParametricConvert(input, context)
   })
 ]

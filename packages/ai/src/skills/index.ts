@@ -247,6 +247,7 @@ A parametric element holds \`history: { parameters, features }\`.
 
 - \`parameters\`: named dimensions, numbers or expressions of each other (\`"half": "width / 2"\`). Cycles are rejected.
 - \`features\` run in order: \`sketch\`, \`extrude\` (optional \`edge\` chamfer/fillet round the end faces, \`corner\` rounding of the profile and \`taper\` draft angle), \`revolve\`, \`hole\` (\`kind\`: simple, counterbore, countersink), \`pattern\` (linear, circular or grid), \`mirror\`, \`sweep\` (profile along a path sketch, optional \`bendRadius\` for pipe bends), \`loft\` (through sketch sections), \`shell\` (hollow an extrude, full revolve or sweep, optionally open) and \`fillet\` (round or chamfer edges between planar faces). A dimension is a parameter name or an expression.
+- Sketches take parametric \`shapes\` (rectangle, circle, polygon, ellipse, slot, polyline, spline/Bezier/NURBS curve) as well as hand-built entities; more features exist beyond these: \`primitive\` (3D catalogue solids with parametric measures), \`coil\`, \`move\`, \`scale\`, \`split\`, \`combine\`. The \`fusion-360-modelling\` skill maps every Fusion 360 command to one of them.
 - History is a JSON object, never a string. Features and constraints use \`type\`; sketch entities use \`kind: point|line|circle|arc\`. Lines use point IDs in \`p1/p2\`; circles use a point ID in \`center\`. Validate with \`cad\` action \`parametric_validate\` before \`cad_edit\` action \`parametric_create\`, and send this exact example (a Ø20 cylinder) rather than inventing a rectangle entity:
 
 \`\`\`json
@@ -283,6 +284,66 @@ Send it to \`cad\` with \`{"action":"parametric_validate","history":{...}}\`. Ch
 ## Limitations
 
 - Not available in a history: fillets against curved faces, variable-radius fillets, shell of a Boolean result, loft guide rails and tangency, pattern along a path. Say so instead of faking them.`
+
+/** A history the skill quotes: the tests rebuild it, so the example the assistant copies is one that builds. */
+export const FUSION_EXAMPLE_HISTORY = {
+  parameters: { width: 80, depth: 50, thick: 8, slotLength: 30, slotWidth: 6, boss: 5, bossHeight: 10 },
+  features: [
+    { id: "base_sketch", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "plate", kind: "rectangle", at: [0, 0], width: "width", height: "depth", centered: true }] } },
+    { id: "base", type: "extrude", sketch: "base_sketch", depth: "thick", operation: "new" },
+    { id: "slot_sketch", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "slot", kind: "slot", at: [0, 10], length: "slotLength", width: "slotWidth" }] } },
+    { id: "slot_cut", type: "extrude", sketch: "slot_sketch", depth: "thick * 3", direction: "symmetric", operation: "subtract" },
+    { id: "post", type: "primitive", element: "cylinder", params: { radius: "boss", height: "bossHeight" }, at: [-25, -12, "thick + bossHeight / 2"], operation: "union" },
+    { id: "posts", type: "pattern", feature: "post", kind: "linear", count: 3, step: [25, 0, 0] }
+  ]
+} as const
+
+const FUSION = `# Fusion 360 commands in cadcamfun
+
+Every command a designer reaches for in Fusion 360 has a counterpart in the parametric history. Use it instead of loose solids whenever the user may change a size, and tie every measure to a named parameter.
+
+## Sketch (a \`sketch\` feature on plane XY, YZ or ZX, with an \`offset\`)
+
+- Put profiles in \`sketch.shapes\` (no points to place, no constraints to write; fully constrained; every measure takes a number or an expression of the parameters):
+  - 2-point or centre rectangle: \`{id, kind:"rectangle", at:[x,y], width, height, centered?}\`
+  - circle: \`{kind:"circle", at, diameter}\`; polygon: \`{kind:"polygon", at, sides, radius, flats?, rotation?}\`; ellipse: \`{kind:"ellipse", at, radiusX, radiusY}\`
+  - slot: \`{kind:"slot", at, length, width, angle?}\` (length is end to end, round ends included); any outline: \`{kind:"polyline", points:[[x,y],...]}\`
+  - spline through points: \`{kind:"curve", curve:"spline", points}\`; control-point spline: \`curve:"nurbs"\` (degree 3 by default) or \`curve:"bezier"\`. An open curve is a sweep path; \`chord:true\` closes it with a straight line to make a profile; \`closed:true\` closes a spline or nurbs smoothly.
+- Hand-built \`entities\` and \`constraints\` (point, line, circle, arc; tangent, parallel, symmetric, ...) are for drawings the shapes cannot express. A shape's points are named \`<id>.p0\`, \`<id>.v1\`, ... when you need to constrain against them.
+- Two shapes in one sketch, one inside the other, make a ring: the inner loop is a hole.
+
+## Create
+
+- Extrude (one side, \`direction\` down or symmetric, \`taper\` draft, \`edge\` and \`corner\` chamfer or fillet, \`operation\` new, union, subtract or intersect): \`extrude\`. A cut through the part: \`subtract\` with \`direction:"symmetric"\` and a depth larger than the part.
+- Revolve (about the plane's x or y axis, or a line of the sketch; \`angle\` in degrees): \`revolve\`. Sweep (a profile sketch along a path sketch, \`bendRadius\` for pipe bends): \`sweep\`. Loft through two or more sketches, \`smooth\` optional: \`loft\`.
+- Coil, spring or helix about Z: \`coil\` (radius, pitch above the wire diameter, turns, wireDiameter, round or square, right or left hand).
+- Every solid of the 3D catalogue (box, cylinder, cone, sphere, ellipsoid, torus, prism, pyramid, hemisphere, capsule, gear, extrusion, revolution, sweep, loft, spring, bolt, screw, nut, washer, wall, floor, window, door, column, roof, stair): \`primitive\` with \`params\` (the same fields as the 3D elements: width, height, depth, radius, tubeRadius, sides, moduleValue, teeth, ...), \`at\` (the centre), \`rotation\` (degrees) and \`operation\`, so a catalogue solid can also cut.
+- Make what is already drawn parametric: \`cad\` \`parametric_from_element\` returns the history of an element (its measures become named parameters, a flat shape gets a \`depth\`, a component becomes one feature per part), \`cad_edit\` \`parametric_convert\` stores the twin and leaves the original for you to delete once it is checked. Use it whenever the user asks to make something parametric or to change a drawn part by its dimensions.
+- Hole (simple, counterbore, countersink; sized from the fastener tables with \`parametric_fastener\`): \`hole\`.
+
+## Modify and arrange
+
+- Fillet and chamfer edges: \`fillet\` (\`style\`, \`edges\` selection). Shell: \`shell\` (\`open\` top, bottom or both). Draft: \`taper\` on the extrude.
+- Combine bodies by id: \`combine\` (join, cut, intersect; \`keepTools\`). Split Body with a plane: \`split\`. Move/Copy: \`move\` (rotate in degrees, then translate; \`copy\`). Scale: \`scale\` (one factor or three).
+- Rectangular and circular pattern: \`pattern\` (linear, grid, circular) of an earlier tool; mirror: \`mirror\` through XY, YZ or ZX at an offset.
+
+## Parameters
+
+- Fusion's Change Parameters is \`parameters\`: numbers or expressions (\`"half": "width / 2"\`, \`"pitch": "wire * 2.5"\`, units mm cm m in deg rad, functions sin cos sqrt min max ...). Name them for what they mean, not "d1".
+- Change a size later with \`cad_edit\` \`parametric_update\`; try variants first with \`cad\` \`parametric_test\` (nothing is written). A shape's measures are also reachable one by one (width, diameter, radius, length, angle).
+
+## What is not there
+
+Sheet metal, rib and web, emboss, thread modelling (use the fastener tables and a hole), assembly joints (place components and use \`move\`), and face-by-face push/pull. Say so and use the nearest feature rather than inventing a field.
+
+## Example (it builds: a plate with a slot and three posts)
+
+\`\`\`json
+${JSON.stringify(FUSION_EXAMPLE_HISTORY)}
+\`\`\`
+
+Validate with \`cad\` action \`parametric_validate\`, read the issues, then \`cad_edit\` action \`parametric_create\`.
+`
 
 const COMPOSED_CAM = `# Composing CAM programs
 
@@ -414,6 +475,7 @@ export const CADCAM_SKILLS: ReadonlyArray<CadCamSkill> = [
   { name: "drawings-and-images", description: "From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.", category: "cad", tags: ["cad", "import", "dxf", "svg", "image"], body: DRAWINGS },
   { name: "plugin-authoring", description: "Write an extension for the app (command, panel, post-processor, operation): manifest, capabilities, module shape and rules.", category: "dev", tags: ["plugin", "extension", "sdk"], body: PLUGINS },
   { name: "parametric-design", description: "When and how to build a parametric element: named dimensions, expressions, when to choose parametric over loose solids, how to edit later.", category: "cad", tags: ["cad", "parametric", "dimensions"], body: PARAMETRIC },
+  { name: "fusion-360-modelling", description: "Fusion 360 commands mapped to parametric features: shapes, curves (spline, Bezier, NURBS), sweep, revolve, loft, coil, catalogue solids, combine, split, move, scale, patterns and parameters.", category: "cad", tags: ["cad", "parametric", "fusion360", "sweep", "revolve", "nurbs"], body: FUSION },
   { name: "composed-cam-programs", description: "Compose CAM programs with several operations: sequencing, stock carry-over, multi-setup, lathe plus mill, verification per operation.", category: "cam", tags: ["cam", "workflow", "milling", "lathe"], body: COMPOSED_CAM },
   { name: "version-control-cadcam", description: "How the agent uses the git-style version control: branches, commits, pull requests and the rules that keep AI writes safe.", category: "vcs", tags: ["vcs", "branches", "pr"], body: VERSION_CONTROL },
   { name: "workflows-cadcam", description: "How the agent uses the Actions-style workflows: YAML shape, registered uses steps, interpolation, and when to dispatch manually.", category: "workflows", tags: ["workflows", "actions", "automation"], body: WORKFLOWS_CAM },

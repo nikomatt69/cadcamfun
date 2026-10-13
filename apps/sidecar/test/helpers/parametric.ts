@@ -12,6 +12,8 @@ const ROUTES: Readonly<Record<string, readonly [tool: "cad" | "cad_edit", action
   dfm: ["cad", "parametric_dfm"],
   fastener: ["cad", "parametric_fastener"],
   recipe: ["cad", "parametric_recipe"],
+  from_element: ["cad", "parametric_from_element"],
+  convert: ["cad_edit", "parametric_convert"],
   create: ["cad_edit", "parametric_create"],
   update: ["cad_edit", "parametric_update"]
 }
