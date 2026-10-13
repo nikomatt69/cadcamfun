@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { ACTION_CATALOGUE, toolOf, nameOf } from "../src/actions/catalogue.ts"
-import { BRIDGE_EXCLUDED_TOOLS, bridgeAdmission, describeBridge } from "../src/actions/bridge.ts"
+import { BRIDGE_EXCLUDED_TOOLS, bridgeAdmission, describeBridge, scopeBridge } from "../src/actions/bridge.ts"
 
 /** The two faces of the catalogue (in-process host tools, HTTP for a standalone nikcli) are derived from the one list. */
 describe("the action catalogue's HTTP face", () => {
@@ -54,5 +54,34 @@ describe("the action catalogue's HTTP face", () => {
     expect((bridgeAdmission("cad", {}) as { error: string }).error).toContain("needs an \"action\"")
     expect((bridgeAdmission("cad", { action: "frobnicate" }) as { error: string }).error).toContain("describe")
     expect(bridgeAdmission("cad", null)).toMatchObject({ ok: false })
+  })
+})
+
+describe("the operator's policy narrows the bridge (nikcli's policy statements)", () => {
+  const deny = (action: string, resource: string) => ({ effect: "deny" as const, action, resource })
+  const allow = (action: string, resource: string) => ({ effect: "allow" as const, action, resource })
+
+  test("no statement changes nothing; bridge.use on a tool or a tool.action takes it away from outside only", () => {
+    const all = describeBridge()
+    expect(scopeBridge(all, [])).toBe(all)
+    const readOnly = scopeBridge(all, [deny("bridge.use", "cad_edit.*"), deny("bridge.use", "cam_edit.*")])
+    expect(readOnly.map((tool) => tool.id)).not.toContain("cad_edit")
+    expect(readOnly.map((tool) => tool.id)).not.toContain("cam_edit")
+    expect(readOnly.map((tool) => tool.id)).toContain("cad")
+    expect(bridgeAdmission("cad_edit", { action: "add" }, [deny("bridge.use", "cad_edit.*")])).toMatchObject({ ok: false })
+    expect(bridgeAdmission("cad", { action: "describe" }, [deny("bridge.use", "cad_edit.*")])).toMatchObject({ ok: true })
+  })
+
+  test("last match wins, so one action can be let back in", () => {
+    const policy = [deny("bridge.use", "cad_edit.*"), allow("bridge.use", "cad_edit.add")]
+    expect(bridgeAdmission("cad_edit", { action: "add" }, policy)).toMatchObject({ ok: true })
+    expect(bridgeAdmission("cad_edit", { action: "modify" }, policy)).toMatchObject({ ok: false })
+    expect(scopeBridge(describeBridge(), policy).find((tool) => tool.id === "cad_edit")!.actions.map((action) => action.name)).toEqual(["add"])
+  })
+
+  test("tool.use, which already takes a tool from the in-app agent, takes it from outside too", () => {
+    const policy = [deny("tool.use", "vcs_edit")]
+    expect(scopeBridge(describeBridge(), policy).map((tool) => tool.id)).not.toContain("vcs_edit")
+    expect((bridgeAdmission("vcs_edit", { action: "commit" }, policy) as { error: string }).error).toContain("AI policy")
   })
 })

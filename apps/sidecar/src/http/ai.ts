@@ -1,4 +1,4 @@
-import { describeBridge, projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
+import { projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
 import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
@@ -220,7 +220,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     }).pipe(Effect.catchIf((e): e is Exclude<typeof e, AiBadRequest | AiNotFound | AiFailure> => !(e instanceof AiBadRequest || e instanceof AiNotFound || e instanceof AiFailure),
       (e) => Effect.fail(new AiFailure({ error: aiError(e as never) })))))
     // RM-11: the action catalogue for a standalone nikcli. Same bearer token as every other route; project access is checked per call.
-    .handle("actions", () => Effect.sync(() => ({ tools: describeBridge() })))
+    .handle("actions", () => Effect.sync(() => ({ tools: actions.list() })))
     .handle("invokeAction", ({ payload }) => Effect.gen(function*() {
       const actor = yield* CurrentUser
       if (payload.projectId.trim() === "" || payload.projectId === "default") return yield* new BadRequest({ message: "projectId is required: a standalone client always names its project" })
