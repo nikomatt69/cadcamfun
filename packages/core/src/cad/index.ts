@@ -85,3 +85,8 @@ export * from "./stroke-font.ts"
 export * from "./mesh-clean.ts"
 export * from "./mesh-topology.ts"
 export * from "./mesh-normals.ts"
+
+// Exact B-rep kernel (SMLib-style) and the exact replay of parametric histories.
+export * as brep from "./brep/index.ts"
+export * from "./history-brep.ts"
+export * from "./scene-step.ts"

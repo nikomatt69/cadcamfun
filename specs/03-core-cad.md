@@ -148,8 +148,14 @@ according to the resulting face's `reversed` flag, including when an operand is 
 or an imported/reflected solid. Applying the subtraction flip alone loses the orientation of existing
 cavity walls; the chained-Boolean regression covers this case.
 
-The module is not yet exported from the app's CAD barrel or used by `history.ts`. Existing bodies,
-viewport rendering, CAM and AI still use the mesh implementation described in §7b. Integration must
+The CAD barrel exports it as the `brep` namespace, plus `history-brep.ts` and `scene-step.ts`.
+`rebuildExact(history, rebuild?)` replays the same parametric history into exact bodies next to the mesh
+rebuild (`{ result, bodies: [{ id, feature, brep } | { id, feature, reason }] }`); `exactSummary` gives
+exact volume, area, centroid, genus and surface kinds; `historyToStep` and `sceneToStep` / `elementBrep`
+write AP214 STEP from a history or from scene elements. Features without an exact path (fillet, chamfer,
+shell, sweep, loft, coil, draft) report a reason and keep their mesh. The AI reads the exact view through
+`parametricReport.exact` and the `cad.parametric_exact` action. `history.ts` does not call the exact
+kernel: viewport rendering, CAM and sidecar/API still use the mesh bodies of §7b. Integration must
 preserve the exact topology as the model and use tessellation only as the rendering/CAM adapter;
 unsupported exact features must remain explicit. The coordinator must be notified before editing
 `cad/index.ts` or `history.ts`. General B-rep fillets/chamfers, persistent naming and exact B-rep 2D drafting remain
@@ -160,6 +166,10 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 
 ## 8. Change log
 
+- 2026-10-13: merged the `exact-brep` worktree checkpoint on main: `history-brep.ts` (`rebuildExact`,
+  `exactSummary`, `historyToStep`), `scene-step.ts` (`elementBrep`, `sceneToStep`), the barrel exports and the
+  AI `cad.parametric_exact` action / `parametricReport.exact`. Sidecar, API, DB and the CAM geometry adapter
+  are the next integration step (spec 29 `{ kind: "brep" }` part source).
 - 2026-10-13: documented the native B-rep worktree interface and its integration limits. Fixed sewing of
   reversed input faces in chained Booleans; added watertight chained-hole/pocket assertions, cavity
   union/intersection/subtraction in both operand positions, and a STEP-imported reflected plate drilled

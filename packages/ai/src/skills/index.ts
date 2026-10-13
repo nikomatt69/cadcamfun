@@ -270,6 +270,12 @@ Send it to \`cad\` with \`{"action":"parametric_validate","history":{...}}\`. Ch
 - cad action parametric_validate \`action: "recipe"\` generates mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend (long-radius bend by default, \`bendRadius\` 0 = mitred) or duct_transition from design inputs (fastener size, diameters, bolt count); holes follow ISO 273, counterbores ISO 4762 / DIN 974, keyways DIN 6885, and edge distance and spacing rules are enforced. Edit its parameters afterwards.
 - \`action: "fastener"\` returns thread, tap drill, clearance and counterbore sizes. \`action: "dfm"\` returns the manufacturability findings for a process, cutter and material; fix errors before CAM.
 
+## Exact model (B-rep)
+
+- Every validate and recipe report carries \`exact\`: per body the exact solid's volume, area, centroid, \`throughHoles\`, face count and surface kinds (plane, cylinder, cone, sphere, torus, nurbs), or the \`reason\` the body has only its mesh. Quote volumes and masses from \`exact\`, not from the mesh \`volumeMm3\`.
+- cad action \`parametric_exact\` (\`elementId\` or \`history\`, \`includeStep: true\`) returns the same and the STEP AP214 file of the exact bodies, for the user's other CAD systems.
+- Exact features: plain extrude, revolve, hole (all kinds), the analytic catalogue solids (cube, cylinder, cone, sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split, combine and every union, subtract and intersect. Fillet, shell, sweep, loft, coil, edge or corner treatments, drafts and the other catalogue solids keep only the mesh: when a part is for STEP or inspection, build it from exact features and say which bodies are mesh-only.
+
 ## Editing later
 
 - Resize: cad action parametric_validate inspect, then update with the real elementId, returned expectedRevision and \`parameters: {width:70}\`. Features and element ID stay. Inspect again if the revision is stale.

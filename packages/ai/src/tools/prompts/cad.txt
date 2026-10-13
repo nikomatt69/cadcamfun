@@ -1,23 +1,24 @@
 Read the open drawing. All actions are read-only.
 
 Actions
-- describe: the whole drawing, its counts, bounds and layers. Start here.
+- describe: the drawing: counts, bounds and layers. Start here.
 - check: model checks for sizes, rotations, missing Boolean operands, duplicates and floating parts. Fix findings after modelling.
 - relations: nominal bounds, placement, distances and parameter dependencies; equal names do not bind parameters.
 - grep: search ids, names, layers and properties; includes each parametric hit's revision.
 - vision: the real CAD viewport plus scene evidence as an image.
-- inspect_elements: full properties and bounds of elements, in pages.
-- inspect_layers: the layers of the workspace snapshot, and which one is active.
-- inspect_search: elements whose text matches a query, in pages.
-- inspect_property: one property of one element by path, in pages of characters.
-- parametric_validate: rebuild a parametric history and report what it cannot build. Read only.
-- parametric_inspect: the history, parameters and report of one parametric part.
-- drawing: technical sheet from exactly one elementId or history; optional options (size A4|A3|A2, projection first|third, title, drawingNumber, material, revision, author, date, notes, views front/top/right, iso, scale, section {axis,at,from,parent,letter}, detail {view,centre:{x,y,z},radius,factor,letter}, flatness {value,view}). Returns SVG, dimensions, callouts and warnings; failed rebuilds produce no sheet. Coordinates are local model mm; mesh edges are approximate. Read-only artifact; no persistence.
-- parametric_test: run a list of parameter variants and report bodies and volumes; nothing is written.
+- inspect_elements: full properties and bounds of elements, paged.
+- inspect_layers: the workspace layers and the active one.
+- inspect_search: elements whose text matches a query, paged.
+- inspect_property: one property of one element by path, paged by characters.
+- parametric_validate: rebuild a parametric history and report what it cannot build.
+- parametric_inspect: history, parameters and report of one parametric part.
+- drawing: technical sheet from exactly one elementId or history; optional options (size A4|A3|A2, projection first|third, title, drawingNumber, material, revision, author, date, notes, views front/top/right, iso, scale, section {axis,at,from,parent,letter}, detail {view,centre:{x,y,z},radius,factor,letter}, flatness {value,view}). Returns SVG, dimensions, callouts and warnings (no sheet if the rebuild fails); local model mm, mesh edges approximate, nothing stored.
+- parametric_test: run a list of parameter variants and report bodies and volumes.
 - parametric_dfm: manufacturability findings for a history or an existing part.
-- parametric_fastener: thread, tap drill, clearance and counterbore sizes for a metric size.
-- parametric_recipe: build a standard part and return its history. `recipe` is one of mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend, duct_transition. Use cad_edit.parametric_recipe_create to put it in the drawing.
-- parametric_from_element: convert an existing catalogue solid, flat shape or component into a history with named parameters. Reads only; cad_edit.parametric_convert stores it.
+- parametric_exact: exact B-rep per body (volume, area, centroid, throughHoles, faces, surfaces) or why mesh-only; STEP AP214 on request.
+- parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.
+- parametric_recipe: build a standard part and return its history. `recipe` is one of mounting_plate, flange, l_bracket, stepped_shaft, enclosure, pipe_bend, duct_transition. cad_edit.parametric_recipe_create stores it.
+- parametric_from_element: convert an existing catalogue solid, flat shape or component into a history with named parameters; cad_edit.parametric_convert stores it.
 
 Parameters (mm, radians; ids are read, never invented)
 - describe, check, inspect_layers: none.
@@ -29,7 +30,7 @@ Parameters (mm, radians; ids are read, never invented)
 - inspect_property: elementId, path (1-12 property names), offset (default 0), maxChars (default 10000).
 - parametric_validate: history - the part's own history object.
 - parametric_inspect, parametric_test: elementId; test also takes cases: [{name, parameters, expectedBodies?, minVolumeMm3?, maxVolumeMm3?}] (1-12).
-- parametric_dfm: exactly one of elementId or history; process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
+- parametric_dfm, parametric_exact: exactly one of elementId or history. exact: includeStep, name. dfm: process (mill|turn|print), toolDiameter, material (metal|cast|plastic), minWall, envelope {x,y,z}.
 - parametric_fastener: size (M3 ...), fit (fine|medium|coarse), shaftDiameter.
 - parametric_recipe: recipe (one of the names above), params (the design inputs the recipe asks for).
 - parametric_from_element: elementId, depth (mm, only for a flat shape: its extrusion, default 10).
@@ -39,7 +40,7 @@ Result (JSON)
 - Every element carries its id: those are the ids the edit actions take.
 
 Do not use it
-- To change something: cad_edit has add, modify, transform, group, delete, import and the parametric writes.
+- To change something: cad_edit (add, modify, transform, group, delete, import, parametric writes).
 - To machine: cam and cam_edit, not this tool.
 
 After it

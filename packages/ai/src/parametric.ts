@@ -1,6 +1,6 @@
 /** Validated boundary for the existing feature-history engine; no second modeller. */
 import { z } from "zod"
-import { PRIMITIVE_ELEMENTS, cleanMesh, describeTopology, expandShape, meshTopology, rebuild, meshVolume, type History } from "@cadcamfun/core"
+import { PRIMITIVE_ELEMENTS, cleanMesh, describeTopology, exactSummary, expandShape, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
 
 const id = z.string().trim().min(1).max(100)
 const n = z.number().finite()
@@ -179,7 +179,27 @@ export const historySchema = z.object({ parameters: parameterSchema, features: z
   })
 })
 
-/** JSON-safe metrics; meshes stay in the engine/Three.js renderer. */
+/**
+ * The exact (B-rep) view of each body, from the same rebuild: exact volume and area, genus, face count and surface kinds, or the
+ * reason a body has only its mesh. Never throws; a failure is reported as the body's reason.
+ */
+export const exactReport = (history: History, result: ReturnType<typeof rebuild>) => {
+  const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d
+  try {
+    return exactSummary(rebuildExact(history, result)).map((b) =>
+      b.exact
+        ? {
+            id: b.id, exact: true, valid: b.valid, volumeMm3: round(b.volume!), areaMm2: round(b.area!),
+            centroid: { x: round(b.centroid!.x), y: round(b.centroid!.y), z: round(b.centroid!.z) },
+            ...(b.genus === undefined ? {} : { throughHoles: b.genus }), faces: b.faces, edges: b.edges, surfaces: b.surfaces
+          }
+        : { id: b.id, exact: false, reason: b.reason }
+    )
+  } catch (error) {
+    return result.bodies.map((b) => ({ id: b.id, exact: false, reason: `exact model failed: ${error instanceof Error ? error.message : String(error)}` }))
+  }
+}
+
 export const parametricReport = (history: History) => {
   const result = rebuild(history)
   let volume = 0
@@ -193,6 +213,7 @@ export const parametricReport = (history: History) => {
   }
   const finite = Number.isFinite(volume) && (result.bodies.length === 0 || Object.values({ ...min, maxX: max.x, maxY: max.y, maxZ: max.z }).every(Number.isFinite))
   return {
+    exact: exactReport(history, result),
     ok: finite && result.bodies.length > 0 && volume > 0 && !result.issues.some((i) => i.severity === "error"),
     parameters: result.parameters, bodyCount: result.bodies.length, volumeMm3: finite ? volume : null,
     bounds: result.bodies.length > 0 && finite ? { min, max } : null,

@@ -7,8 +7,8 @@
  * are different actions even though the same function answers both.
  */
 import { z } from "zod"
-import { analyzeManufacturability, buildRecipe, drawing, keywayFor, METRIC_THREADS, recipeNames, requireThread, type History } from "@cadcamfun/core"
-import { historySchema, parameterSchema, parametricReport } from "../parametric.ts"
+import { analyzeManufacturability, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, recipeNames, requireThread, type History } from "@cadcamfun/core"
+import { exactReport, historySchema, parameterSchema, parametricReport } from "../parametric.ts"
 import type { ActionContext } from "./action.ts"
 
 const elementId = z.string().min(1).max(100)
@@ -34,7 +34,14 @@ export const parametricDfmSchema = z.object({
   toolDiameter: length.optional(), material: z.enum(["metal", "cast", "plastic"]).optional(), minWall: length.optional(),
   envelope: z.object({ x: length, y: length, z: length }).optional()
 })
-export const parametricFastenerSchema = z.object({ size: z.string().min(1).max(20).optional(), fit: z.enum(["fine", "medium", "coarse"]).optional(), shaftDiameter: length.optional() })
+export const parametricExactSchema = z.object({
+  elementId: elementId.optional(), history: historySchema.optional(),
+  /** Also return the STEP AP214 file of the exact bodies. */
+  includeStep: z.boolean().optional(),
+  /** Product name in the STEP file. */
+  name: z.string().min(1).max(100).optional()
+})
+export const parametricFastenerSchema =z.object({ size: z.string().min(1).max(20).optional(), fit: z.enum(["fine", "medium", "coarse"]).optional(), shaftDiameter: length.optional() })
 /** Reading a recipe never creates it: `create` lives only on the write action. */
 export const parametricRecipeSchema = z.object({ recipe: z.enum(recipes), params: z.record(z.string().min(1).max(80), z.unknown()).optional() })
 export const parametricCreateSchema = z.object({ history: historySchema, ...named })
@@ -168,19 +175,49 @@ export const runParametricCreate = (input: z.infer<typeof parametricCreateSchema
 export const runParametricUpdate = (input: z.infer<typeof parametricUpdateSchema>, context: ActionContext) =>
   of({ action: "update", elementId: input.elementId, parameters: input.parameters, expectedRevision: input.expectedRevision }, context)
 
+/** The history given inline, or read from an existing parametric part; an error result when neither works. */
+const historyOf = async (input: { elementId?: string; history?: unknown }, context: ActionContext): Promise<{ readonly history: History } | { readonly error: unknown }> => {
+  if ((input.elementId === undefined) === (input.history === undefined)) return { error: { ok: false, error: "Send exactly one of elementId (an existing parametric part) or history." } }
+  if (input.history !== undefined) return { history: input.history as History }
+  if (context.handlers.parametric === undefined) return { error: unavailable }
+  const inspected = asRecord(await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }))
+  if (inspected === undefined || inspected["ok"] === false) return { error: inspected ?? { ok: false, error: "The part could not be read." } }
+  const decoded = historySchema.safeParse(inspected["history"])
+  if (!decoded.success) return { error: { ok: false, error: "The part has no readable parametric history." } }
+  return { history: decoded.data as History }
+}
+
+/** STEP text returned inline up to this size; larger files are only summarised. */
+const STEP_INLINE_LIMIT = 400_000
+
+/**
+ * The exact B-rep of each body of a part: exact volume, area, centroid, through-holes, faces and surface kinds, or why a
+ * body has only its mesh; optionally the STEP AP214 file of the exact bodies.
+ */
+export const runParametricExact = async (input: z.infer<typeof parametricExactSchema>, context: ActionContext) => {
+  const got = await historyOf(input, context)
+  if ("error" in got) return got.error
+  const result = rebuild(got.history)
+  const bodies = exactReport(got.history, result)
+  const out: Record<string, unknown> = { ok: !result.issues.some((i) => i.severity === "error"), bodies, issues: result.issues.slice(0, 20) }
+  if (input.includeStep === true) {
+    const step = historyToStep(got.history, input.name ?? "part")
+    out["exported"] = step.exported
+    out["skipped"] = step.skipped
+    if (step.step !== undefined) {
+      out["stepBytes"] = step.step.length
+      if (step.step.length <= STEP_INLINE_LIMIT) out["step"] = step.step
+      else out["stepNote"] = `The STEP file is ${step.step.length} characters; export it from the part instead of inline.`
+    }
+  }
+  return out
+}
+
 /** Manufacturability of a history, or of an existing part read first; neither rebuilds geometry to answer. */
 export const runParametricDfm = async (input: z.infer<typeof parametricDfmSchema>, context: ActionContext) => {
-  if ((input.elementId === undefined) === (input.history === undefined)) return { ok: false, error: "Send exactly one of elementId (an existing parametric part) or history." }
-  let history: History
-  if (input.history !== undefined) history = input.history as History
-  else {
-    if (context.handlers.parametric === undefined) return unavailable
-    const inspected = asRecord(await context.handlers.parametric(context.projectId, { action: "inspect", elementId: input.elementId! }))
-    if (inspected === undefined || inspected["ok"] === false) return inspected ?? { ok: false, error: "The part could not be read." }
-    const decoded = historySchema.safeParse(inspected["history"])
-    if (!decoded.success) return { ok: false, error: "The part has no readable parametric history." }
-    history = decoded.data as History
-  }
+  const got = await historyOf(input, context)
+  if ("error" in got) return got.error
+  const history = got.history
   return {
     ...analyzeManufacturability(history, {
       ...(input.process !== undefined ? { process: input.process } : {}),
