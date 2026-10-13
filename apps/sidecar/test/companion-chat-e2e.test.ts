@@ -82,7 +82,18 @@ describe("the assistant from the phone", () => {
 
     // Phone side: ask the assistant, exactly as the app's chat does, and read the streamed events.
     const events: ChatEvent[] = []
-    for await (const event of phone.chat({ projectId: project.id, message: "Make the plate 140 mm wide and open a pull request for it" })) events.push(event)
+    // `vcs_edit` and `cad_edit` hold a destructive action (restore, delete), so the host asks before any call of them: the person
+    // holding the phone approves each one, exactly as the app's chat does. Unanswered, the turn would stall.
+    const approved: string[] = []
+    for await (const event of phone.chat({ projectId: project.id, message: "Make the plate 140 mm wide and open a pull request for it" })) {
+      events.push(event)
+      if (event.type === "permission_request") {
+        const request = event as unknown as { requestId: string; sessionId: string; permission: string }
+        approved.push(request.permission)
+        await phone.permissionReply(request.sessionId, request.requestId, "once")
+      }
+    }
+    expect(approved).toEqual(["vcs_edit", "cad_edit", "vcs_edit", "vcs_edit"])
     toolsCalled = events.flatMap((e) => (e.type === "tool_call" ? [String((e as { tool: string }).tool)] : []))
     expect(toolsCalled).toEqual(["vcs_edit", "cad_edit", "vcs_edit", "vcs_edit"])
     expect(events.at(-1)?.type).toBe("done")
