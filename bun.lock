@@ -145,6 +145,7 @@
         "zod": "^4.1.8",
       },
       "devDependencies": {
+        "@cadcamfun/nikcli-plugin": "workspace:*",
         "ai": "7.0.127",
       },
     },
@@ -199,6 +200,13 @@
       },
       "devDependencies": {
         "@effect/platform-bun": "4.0.0-rc.112",
+      },
+    },
+    "packages/nikcli-plugin": {
+      "name": "@cadcamfun/nikcli-plugin",
+      "version": "0.1.0",
+      "dependencies": {
+        "zod": "^4.1.8",
       },
     },
     "packages/plugin-sdk": {
@@ -434,6 +442,8 @@
     "@cadcamfun/httpapi-codegen": ["@cadcamfun/httpapi-codegen@workspace:packages/httpapi-codegen"],
 
     "@cadcamfun/mobile": ["@cadcamfun/mobile@workspace:apps/mobile"],
+
+    "@cadcamfun/nikcli-plugin": ["@cadcamfun/nikcli-plugin@workspace:packages/nikcli-plugin"],
 
     "@cadcamfun/plugin-sdk": ["@cadcamfun/plugin-sdk@workspace:packages/plugin-sdk"],
 

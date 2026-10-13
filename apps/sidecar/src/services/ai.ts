@@ -4,10 +4,11 @@ import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, backgroundToolContributionsFor, buildTools, defaultProviderSpecs, makeAiBackgroundLayer,
   searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
-  CONTRIBUTION_KEYS
+  CONTRIBUTION_KEYS, bridgeAdmission
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel } from "@cadcamfun/core"
-import { Effect, Layer, Redacted, Schema } from "effect"
+import { Context, Effect, Layer, Redacted, Schema } from "effect"
+import type { SessionUser } from "@cadcamfun/api"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
@@ -774,6 +775,56 @@ const contributionGuard = (contributions: Readonly<Record<string, ActionContribu
   }
 }
 
+/**
+ * The catalogue's second face (RM-11): what an outside client (a standalone nikcli with `@cadcamfun/nikcli-plugin`) calls over HTTP.
+ * It runs the very tool definitions the embedded host registers, through the same admission (`ActingUser`): the call acts as the
+ * account that holds the token, in a session bound to that account and project, and cannot reach another account's work. It needs
+ * no model and no embedded host, so it is available in every mode. `bridgeAdmission` decides first: destructive actions need a
+ * person's approval, which only the application can ask for, and delegation is in-process only.
+ */
+export class AiActions extends Context.Service<AiActions, {
+  readonly invoke: (call: { readonly projectId: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
+}>()("cadcamfun/AiActions") {}
+
+export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
+  const handlers = yield* ToolHandlers
+  const vcs = yield* ProjectVcs
+  const runner = yield* WorkflowRunner
+  const projectsRepo = yield* ProjectsForVcs
+  const { user: local } = yield* LocalProfile
+  const acting = yield* ActingUser
+  const actor = {
+    get userId() { return acting.get(local).id },
+    get name() { return acting.get(local).name ?? "User" },
+    get email() { return acting.get(local).email ?? "unknown@cadcamfun.local" },
+    get lastPrompt() { return acting.lastPrompt() }
+  }
+  // Delegation (`agent`) is in-process only, so the background contributions are not part of this face.
+  const contributions: Readonly<Record<string, ActionContribution>> = {
+    ...libraryContributions(handlers),
+    ...vcsContributions({ vcs, runner, projects: projectsRepo, actor })
+  }
+  return AiActions.of({
+    invoke: ({ projectId, tool, input, user, signal }) => Effect.gen(function*() {
+      const admission = bridgeAdmission(tool, input)
+      if (!admission.ok) return yield* Effect.fail({ message: admission.error })
+      const spec = buildTools(handlers, projectId, [], contributions).find((candidate) => candidate.id === tool)
+      if (spec === undefined) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })
+      // One session per account and project: the owner file and the in-memory binding make a second account's call fail closed.
+      const sessionId = `bridge:${projectId}:${user.id}`
+      const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`))
+      if (!bound) return yield* Effect.fail({ message: "This project's bridge session belongs to another account." })
+      const output = yield* Effect.promise((abort) => {
+        const cancel = signal ?? abort
+        return acting.invoke(projectId, sessionId, () => spec.execute(input, { sessionId, projectId, signal: cancel }), cancel)
+      }).pipe(Effect.catchDefect(() => Effect.fail({ message: "The call was denied or interrupted." })))
+      let result: unknown
+      try { result = JSON.parse(output) } catch { result = output }
+      return { tool, action: admission.action, result }
+    })
+  })
+}))
+
 /** The embedded nikcli host (the primary path); skipped with `CADCAMFUN_AI_HOST=direct`. */
 const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   const config = yield* AppConfigService
@@ -856,7 +907,7 @@ export const AiLive = Layer.unwrap(Effect.gen(function*() {
   // Keys are kept in <data dir>/ai/credentials.json (owner-only), so they are not asked for again after a restart.
   const base = Layer.mergeAll(ActingUser.layer, AiCredentials.layerPersisted(jsonFileCredentials(`${config.dataDir}/ai/credentials.json`)), AiConfigLive)
   const withDirect = DirectModel.layerWith(config.aiModelFactory ?? defaultModelFactory).pipe(Layer.provideMerge(base))
-  const withHandlers = ToolHandlersLive.pipe(Layer.provideMerge(withDirect))
+  const withHandlers = AiActionsLive.pipe(Layer.provideMerge(ToolHandlersLive.pipe(Layer.provideMerge(withDirect))))
   const withHost = config.aiHost === "direct" ? withHandlers : AiHostLive.pipe(Layer.provideMerge(withHandlers))
   // Build the background runner from the live host once the host is in scope,
   // so the worker's `runner` always closes over the same scheduler the host

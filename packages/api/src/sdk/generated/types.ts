@@ -356,6 +356,12 @@ export type UserCreateTokenPayload = {
   readonly expiresIn?: number | undefined
 }
 
+export type AiInvokeActionPayload = {
+  readonly projectId: string
+  readonly tool: string
+  readonly input: { readonly [x: string]: any }
+}
+
 export type AiSessionControlPayload = {
   readonly sessionId: string
   readonly projectId?: string | undefined
@@ -1792,6 +1798,24 @@ export type UserByIdOutput = {
   createdAt: string
   organizations: Array<{ id: string; name: string; role: string }>
 }
+
+export type AiActionsOutput = {
+  tools: Array<{
+    id: string
+    description: string
+    kind: "read" | "write" | "destructive"
+    actions: Array<{ id: string; name: string; kind: "read" | "write" | "destructive" }>
+    parameters: { [x: string]: any }
+  }>
+}
+
+export type AiInvokeActionInput = {
+  readonly projectId: AiInvokeActionPayload["projectId"]
+  readonly tool: AiInvokeActionPayload["tool"]
+  readonly input: AiInvokeActionPayload["input"]
+}
+
+export type AiInvokeActionOutput = { tool: string; action: string; result: unknown }
 
 export type AiAgentsOutput = Array<{
   id: string

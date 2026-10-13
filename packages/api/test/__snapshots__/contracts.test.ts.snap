@@ -1400,6 +1400,217 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/ai/actions": {
+      "get": {
+        "operationId": "ai.actions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tools": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "actions": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                },
+                                "kind": {
+                                  "enum": [
+                                    "read",
+                                    "write",
+                                    "destructive",
+                                  ],
+                                  "type": "string",
+                                },
+                                "name": {
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "kind",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "description": {
+                            "type": "string",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "read",
+                              "write",
+                              "destructive",
+                            ],
+                            "type": "string",
+                          },
+                          "parameters": {
+                            "type": "object",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "description",
+                          "kind",
+                          "actions",
+                          "parameters",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "tools",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
+    "/api/ai/actions/invoke": {
+      "post": {
+        "operationId": "ai.invokeAction",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "input": {
+                    "type": "object",
+                  },
+                  "projectId": {
+                    "type": "string",
+                  },
+                  "tool": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "projectId",
+                  "tool",
+                  "input",
+                ],
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                    },
+                    "result": {},
+                    "tool": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "tool",
+                    "action",
+                    "result",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "ai",
+        ],
+      },
+    },
     "/api/ai/agents": {
       "get": {
         "operationId": "ai.agents",

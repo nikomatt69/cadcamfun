@@ -63,6 +63,9 @@ import type {
   UserVerifyChangeOutput,
   UserByIdInput,
   UserByIdOutput,
+  AiActionsOutput,
+  AiInvokeActionInput,
+  AiInvokeActionOutput,
   AiAgentsOutput,
   AiSessionControlInput,
   AiSessionControlOutput,
@@ -1095,6 +1098,23 @@ export function make(options: ClientOptions) {
         ),
     },
     ai: {
+      actions: (requestOptions?: RequestOptions) =>
+        request<AiActionsOutput>(
+          { method: "GET", path: `/api/ai/actions`, successStatus: 200, declaredStatuses: [500, 401], empty: false },
+          requestOptions,
+        ),
+      invokeAction: (input: AiInvokeActionInput, requestOptions?: RequestOptions) =>
+        request<AiInvokeActionOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/actions/invoke`,
+            body: { projectId: input["projectId"], tool: input["tool"], input: input["input"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       agents: (requestOptions?: RequestOptions) =>
         request<AiAgentsOutput>(
           { method: "GET", path: `/api/ai/agents`, successStatus: 200, declaredStatuses: [500, 401], empty: false },

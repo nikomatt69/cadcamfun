@@ -1,6 +1,6 @@
 # RM-11 — Everything via nikcli (second adapter)
 
-Status: **pending**. Depends on: RM-01 (catalogue), RM-03 (HTTP families the bridge will call). Design: `27-everything-via-nikcli.md`. Owners: WP8, WP3, WP4, WP9 `packages/plugin-sdk`.
+Status: **in progress** (first slice done 2026-10-13: the HTTP face, the plugin and their tests; scoped tokens and plugin AI-tool contributions remain). Depends on: RM-01 (catalogue), RM-03 (HTTP families the bridge will call). Design: `27-everything-via-nikcli.md`. Owners: WP8, WP3, WP4, WP9 `packages/plugin-sdk`.
 
 ## Problem
 
@@ -39,6 +39,8 @@ Plus the spec-27 compatibility gate against the pinned sdk-next.
 Catalogue-derived parity checks preserve `cad_grep` reachability, parameter/result schemas and read-only authorization through consolidation and bridge exposure; test any explicit in-process-only exception rather than silently dropping coverage.
 
 ## Change log
+
+- 2026-10-13: built the second adapter. `packages/ai/src/actions/bridge.ts` describes the catalogue to an outside client and admits a call per action effect (`read`/`write` yes; `destructive` and the in-process-only `agent` refused). `GET /api/ai/actions` and `POST /api/ai/actions/invoke` (`packages/api`, `apps/sidecar/src/http/ai.ts`, `AiActions` in `services/ai.ts`) run the same tool definitions through `ActingUser` admission, with no model and no embedded host needed. `packages/nikcli-plugin` (`@cadcamfun/nikcli-plugin`) builds nikcli tools from the running application's catalogue. Parity test derives both faces from the catalogue (`packages/ai/test/bridge.test.ts`); `apps/sidecar/test/ai-bridge.test.ts` and `nikcli-plugin.test.ts` cover the routes and the plugin end to end; `compat.test.ts` is the gate against `@nikcli-ai/plugin`. Still open: revocable, project/read-write scoped tokens for external agents, plugin `contributes.aiTools` (deliverable 2), an app-owned mod. The destructive refusal stands until an outside approval flow exists.
 
 - 2026-10-12: [AI-10](../ai/10-nikcli-and-plugin-adapters.md) adds typed parity, scoped revocable tokens and plugin capability/isolated-mod compatibility gates under [spec 28](../28-native-ai-architecture.md). Embedded execution remains in-process; baseline authorization/permissions do not depend on optional mods. Implementation pending.
 

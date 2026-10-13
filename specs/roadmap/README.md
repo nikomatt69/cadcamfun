@@ -29,7 +29,7 @@ Full agent rules: `00-how-to-follow.md`. Effect v4 and architecture vocabulary i
 | 8 | RM-08 | `08-mobile-codriver.md` | **pending** | RM-07 stream recovery | WP13 `apps/mobile`, WP4 companion gateway |
 | 9 | RM-09 | `09-cad-cam-depth.md` | **pending** | RM-02 for pure-core work; RM-03 and RM-06 additionally for precision integration | WP1 CAD, WP2 CAM, WP8 quality/action exposure, WP3/WP4/WP6 after core gates (scopes in step spec) |
 | 10 | RM-10 | `10-observability.md` | **pending** | RM-07 | WP8, WP6 |
-| 11 | RM-11 | `11-nikcli-bridge.md` | **pending** | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
+| 11 | RM-11 | `11-nikcli-bridge.md` | **in progress** (HTTP face + plugin built) | RM-01, RM-03 | WP8, WP3, WP4, WP9 |
 
 Parallelisation: RM-01 is first because every later AI change hits the tool **seam**. After RM-01, RM-02 pure planning/generation, stateless contracts/adapters and non-persisting desktop work may run alongside RM-03 only on explicitly disjoint files; both steps own parts of `packages/api` and `apps/sidecar`, so workspace names alone do not prove disjointness. RM-03 owns document revision/receipt persistence and its WP0 migration first, with no dependency on RM-02. RM-02 persisted setup integration and completion wait for RM-03 to be done; RM-03 must not wait for RM-02 consumers. This scoped parallel allowance is not permission to bypass the persistence gate. RM-04 waits on the routes it ports. After RM-02, RM-09 pure-core work is independent of RM-03/RM-06; precision integration waits for both rows to be done and its core tests to pass.
 

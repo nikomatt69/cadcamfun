@@ -1,4 +1,4 @@
-import { projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
+import { describeBridge, projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
 import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
@@ -11,6 +11,7 @@ import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
+import { AiActions } from "../services/ai.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
 
 const fail = (message: string) => (e: unknown) =>
@@ -33,6 +34,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const credentials = yield* AiCredentials
   const actingUser = yield* ActingUser
   const host = yield* Effect.serviceOption(AiHost)
+  const actions = yield* AiActions
   const { query } = yield* Database
   const kv = yield* KvStore
   const appConfig = yield* AppConfigService
@@ -217,6 +219,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       return { reply: result.text || "No response generated", hasMcpData: mcpData !== undefined }
     }).pipe(Effect.catchIf((e): e is Exclude<typeof e, AiBadRequest | AiNotFound | AiFailure> => !(e instanceof AiBadRequest || e instanceof AiNotFound || e instanceof AiFailure),
       (e) => Effect.fail(new AiFailure({ error: aiError(e as never) })))))
+    // RM-11: the action catalogue for a standalone nikcli. Same bearer token as every other route; project access is checked per call.
+    .handle("actions", () => Effect.sync(() => ({ tools: describeBridge() })))
+    .handle("invokeAction", ({ payload }) => Effect.gen(function*() {
+      const actor = yield* CurrentUser
+      if (payload.projectId.trim() === "" || payload.projectId === "default") return yield* new BadRequest({ message: "projectId is required: a standalone client always names its project" })
+      yield* checkProject(payload.projectId)
+      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
+    }))
     .handle("chatStream", ({ payload }) => Effect.gen(function*() {
       if (!payload.message || !payload.message.trim()) return yield* new BadRequest({ message: "Message is required" })
       // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).

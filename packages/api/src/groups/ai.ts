@@ -193,12 +193,25 @@ export const SessionControlReply = Schema.Struct({ goal: opt(Schema.NullOr(Sessi
     provider: opt(Schema.String), model: opt(Schema.String), contextWindow: opt(Schema.Number), maxOutput: opt(Schema.Number), inputWindow: opt(Schema.Number), requestOutput: opt(Schema.Number), compactAt: opt(Schema.Number), tokens: opt(Schema.Number), compacted: Schema.Boolean,
     /** nikcli `SessionContext.breakdown` summed per category; only on the `context` action. */
     breakdown: opt(Schema.Struct({ estimatedTotal: Schema.Number, categories: Schema.Array(Schema.Struct({ category: Schema.String, tokens: Schema.Number })) })) }) })
+/** RM-11: the action catalogue as a standalone nikcli sees it (`packages/ai/src/actions/bridge.ts`). */
+export const BridgeAction = Schema.Struct({ id: Schema.String, name: Schema.String, kind: Schema.Literals(["read", "write", "destructive"]) })
+export const BridgeTool = Schema.Struct({
+  id: Schema.String, description: Schema.String, kind: Schema.Literals(["read", "write", "destructive"]),
+  actions: Schema.Array(BridgeAction),
+  /** JSON Schema of the tool's arguments: a union over its actions, discriminated by `action`. */
+  parameters: Schema.Record(Schema.String, Schema.Unknown)
+})
+export const BridgeTools = Schema.Struct({ tools: Schema.Array(BridgeTool) })
+export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
+export const BridgeInvokeReply = Schema.Struct({ tool: Schema.String, action: Schema.String, result: Schema.Unknown })
 const message = Schema.Struct({ message: Schema.String })
 const providerParam = { provider: Schema.String }
 const chatEvents = Schema.Union([AiStreamEventSchema, Schema.Struct({ type: Schema.Literal("heartbeat") })])
 
 export class AiGroup extends HttpApiGroup.make("ai")
   .add(
+    HttpApiEndpoint.get("actions", "/api/ai/actions", { success: BridgeTools, error: [InternalError] }),
+    HttpApiEndpoint.post("invokeAction", "/api/ai/actions/invoke", { payload: BridgeInvokeBody, success: BridgeInvokeReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("agents", "/api/ai/agents", { success: Schema.Array(AssistantAgent), error: [InternalError] }),
     HttpApiEndpoint.post("sessionControl", "/api/ai/sessions/control", { payload: SessionControlBody, success: SessionControlReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),
