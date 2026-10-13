@@ -32,6 +32,19 @@ describe("a scoped bridge token", () => {
   const invoke = (token: string, tool: string, input: Record<string, unknown>) =>
     app.call("/api/ai/actions/invoke", { method: "POST", auth: false, headers: { authorization: `Bearer ${token}` }, json: { projectId, tool, input } })
 
+  test("the action listing an outside client reads carries the new actions, each in its scope", async () => {
+    const list = async (token: string) => (await app.call("/api/ai/actions", { auth: false, headers: { authorization: `Bearer ${token}` } })).body.tools as Array<{ id: string; actions: Array<{ name: string; kind: string }>; parameters: unknown }>
+    const read = await list(await issue("read"))
+    const write = await list(await issue("write"))
+    const names = (tools: typeof read, id: string) => tools.find((t) => t.id === id)?.actions.map((a) => a.name) ?? []
+    expect(names(read, "cad")).toEqual(expect.arrayContaining(["parametric_from_element", "parametric_validate"]))
+    expect(names(read, "cad_edit")).toEqual([])
+    expect(names(write, "cad_edit")).toEqual(expect.arrayContaining(["parametric_convert", "parametric_create"]))
+    // The parameters are published, so a client can build the call: the history schema names the new shapes and features.
+    const published = JSON.stringify(read.find((t) => t.id === "cad")!.parameters)
+    for (const word of ["slot", "nurbs", "primitive", "coil", "combine", "split"]) expect(published, word).toContain(word)
+  })
+
   test("a read token validates a history with the new features but cannot create the part", async () => {
     const token = await issue("read")
     const checked = await invoke(token, "cad", { action: "parametric_validate", history: newFeatures })

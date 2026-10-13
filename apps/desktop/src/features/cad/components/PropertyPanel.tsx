@@ -7,6 +7,7 @@ import { getFieldsForElementType, type PropertyField } from "../lib/propertyFiel
 import ParametricPanel from "./ParametricPanel.tsx"
 import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
 import SurfacingPanel from "./SurfacingPanel.tsx"
+import { canMakeParametric, makeParametric } from "../lib/makeParametric.ts"
 import { ColorListInput, ElementListInput, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
 
 const SOLID_TYPES_FOR_SURFACING = new Set(["box", "cube", "cylinder", "sphere", "cone", "torus", "extrude", "revolve"])
@@ -36,6 +37,22 @@ export default function PropertyPanel(): JSX.Element {
   const locked = () => layer()?.locked ?? false
   const disabled = () => !editing() || locked()
   const set = (name: string, value: unknown) => setProperties((previous) => ({ ...previous, [name]: value }))
+
+  // Make the element parametric: its measures become named parameters. The original stays unless the person chooses to replace it.
+  const [conversion, setConversion] = createSignal("")
+  const convert = (replace: boolean) => {
+    const current = elements.selectedElement
+    if (!current) return
+    const result = makeParametric(current as unknown as Record<string, unknown>)
+    if (!result.ok) { setConversion(result.error); return }
+    const id = elements.addElement(result.twin)
+    if (id === "") { setConversion("There is no active layer to put the parametric part on"); return }
+    // Same layer as the original, not the active one.
+    if (current.layerId !== undefined) elements.updateElement(id, { layerId: current.layerId })
+    if (replace) elements.deleteElement(current.id)
+    elements.selectElement(id)
+    setConversion(result.notes.join("; "))
+  }
 
   const change = (event: Event & { currentTarget: HTMLInputElement | HTMLSelectElement }) => {
     const target = event.currentTarget as HTMLInputElement
@@ -145,6 +162,17 @@ export default function PropertyPanel(): JSX.Element {
 
         <Show when={selected().type === "parametric" && selected().history}>
           <ParametricPanel element={selected()} locked={locked()} />
+        </Show>
+
+        <Show when={canMakeParametric(selected())}>
+          <div class="mt-6 space-y-2 border-t border-gray-200 pt-4 dark:border-gray-600">
+            <p class="text-sm text-gray-600 dark:text-gray-300">Turn this {String(selected().type)} into a parametric part: its measures become named parameters you can edit or drive by a formula.</p>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" disabled={locked()} onClick={() => convert(false)}>Make parametric</button>
+              <button type="button" class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:text-gray-200 dark:border-gray-600" disabled={locked()} onClick={() => { if (window.confirm("Replace this element with its parametric twin?")) convert(true) }}>Replace with parametric</button>
+            </div>
+            <Show when={conversion() !== ""}><p class="text-xs text-gray-500 dark:text-gray-400">{conversion()}</p></Show>
+          </div>
         </Show>
 
         <Show when={SOLID_TYPES_FOR_SURFACING.has(String(selected().type))}>

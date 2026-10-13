@@ -131,6 +131,28 @@ export default function ParametricPanel(props: { readonly element: Element; read
     if (source === undefined) { setError("A grid pattern needs a hole or a tool feature to copy"); return }
     append({ id: nextId("grid"), type: "pattern", feature: source.id, kind: "grid", count: 3, countB: 2, step: [10, 0, 0], stepB: [0, 10, 0] })
   }
+  // Fusion-style body commands. Each starts from a neutral value (a copy beside the part, a split through the middle, a scale of 1)
+  // that the dimension fields below then change.
+  const bodiesBox = () => {
+    const boxes = built()?.bodies.map((b) => meshBounds(b.mesh)) ?? []
+    if (boxes.length === 0) return undefined
+    return { minX: Math.min(...boxes.map((b) => b.minX)), maxX: Math.max(...boxes.map((b) => b.maxX)), minZ: Math.min(...boxes.map((b) => b.minZ)), maxZ: Math.max(...boxes.map((b) => b.maxZ)) }
+  }
+  const addCoil = () => append({ id: nextId("coil"), type: "coil", radius: 10, pitch: 4, turns: 5, wireDiameter: 2, operation: "new" })
+  const addCopy = () => {
+    const box = bodiesBox()
+    if (box === undefined) { setError("There is no solid to copy yet"); return }
+    append({ id: nextId("copy"), type: "move", translate: [Math.round((box.maxX - box.minX + 10) * 10) / 10, 0, 0], copy: true })
+  }
+  const addSplit = () => {
+    const box = bodiesBox()
+    if (box === undefined) { setError("There is no solid to split yet"); return }
+    append({ id: nextId("split"), type: "split", plane: "XY", offset: Math.round(((box.minZ + box.maxZ) / 2) * 10) / 10, keep: "both" })
+  }
+  const addScale = () => {
+    if (bodiesBox() === undefined) { setError("There is no solid to scale yet"); return }
+    append({ id: nextId("scale"), type: "scale", factor: 1 })
+  }
   const issuesOf = (id: string) => (built()?.issues ?? []).filter((i) => i.feature === id)
 
   // Design rules: the history is checked against a process, a cutter and a material on demand (it rebuilds and samples the solid).
@@ -334,6 +356,10 @@ export default function ParametricPanel(props: { readonly element: Element; read
             <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("top")}>Shell, open top</button>
             <button type="button" class={SMALL} disabled={props.locked} onClick={() => addShell("none")}>Shell, closed</button>
             <button type="button" class={SMALL} disabled={props.locked} onClick={addGrid}>Grid pattern</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addCoil}>Coil</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addCopy}>Copy body</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addSplit}>Split body</button>
+            <button type="button" class={SMALL} disabled={props.locked} onClick={addScale}>Scale</button>
           </div>
         </div>
       </div>
