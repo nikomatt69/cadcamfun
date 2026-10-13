@@ -132,6 +132,70 @@ export const roundedRectangleLoop = (x0: number, y0: number, x1: number, y1: num
   return segs
 }
 
+// ------------------------------------------------ corner treatments
+
+/** Turn above which a junction is a corner (the mesh treatment's `CORNER_TURN`). */
+const CORNER_TURN = (10 * Math.PI) / 180
+
+const segmentTangent = (s: ProfileSegment, atEnd: boolean): Vec2 => {
+  const f = atEnd ? 1 : 0
+  const h = 1e-6
+  const a = segmentPoint(s, atEnd ? f - h : f), b = segmentPoint(s, atEnd ? f : f + h)
+  const l = Math.hypot(b.x - a.x, b.y - a.y)
+  return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }
+}
+
+/**
+ * The loop with its sharp corners rounded (`fillet`, an exact tangent arc of radius `size`) or bevelled (`chamfer`, a line
+ * with setback `size` along both edges), as `treatCorners` does to a polygon. Junctions that turn less than 10 degrees are
+ * left alone. Corners between two lines are exact; a sharp corner touching an arc is a `RangeError` (no exact model yet),
+ * as is a treatment that needs more of an edge than it has.
+ */
+export const treatLoopCorners = (loop: ProfileLoop, style: "fillet" | "chamfer", size: number): ProfileLoop => {
+  if (!(size > 0)) throw new RangeError(`A corner ${style} needs a positive size (it is ${size})`)
+  const n = loop.length
+  // Junction j is between segment j (incoming) and segment j+1 (outgoing), at the end of segment j.
+  const corners = loop.map((s, j) => {
+    const next = loop[(j + 1) % n]!
+    const tin = segmentTangent(s, true), tout = segmentTangent(next, false)
+    const turn = Math.acos(Math.max(-1, Math.min(1, tin.x * tout.x + tin.y * tout.y)))
+    if (turn < CORNER_TURN) return undefined
+    if (s.kind !== "line" || next.kind !== "line") throw new RangeError(`A corner ${style} next to an arc or a spline has no exact model yet`)
+    const phi = Math.PI - turn
+    const setback = style === "chamfer" ? size : size / Math.tan(phi / 2)
+    return { B: s.b, u1: { x: -tin.x, y: -tin.y }, u2: tout, phi, setback }
+  })
+  // Trimmed lines: each line gives `setback` to the corner at each of its ends.
+  const out: ProfileSegment[] = []
+  loop.forEach((s, j) => {
+    const startCorner = corners[(j + n - 1) % n]
+    const endCorner = corners[j]
+    if (s.kind === "line") {
+      const len = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y)
+      const s0 = startCorner?.setback ?? 0, s1 = endCorner?.setback ?? 0
+      if (s0 + s1 > len + 1e-9) throw new RangeError(`The corner ${style} of ${size} mm does not fit: an edge of ${len.toFixed(3)} mm has to give ${(s0 + s1).toFixed(3)} mm to its two corners`)
+      const d = { x: (s.b.x - s.a.x) / len, y: (s.b.y - s.a.y) / len }
+      const a = { x: s.a.x + d.x * s0, y: s.a.y + d.y * s0 }, b = { x: s.b.x - d.x * s1, y: s.b.y - d.y * s1 }
+      if (Math.hypot(b.x - a.x, b.y - a.y) > 1e-9) out.push({ kind: "line", a, b })
+    } else out.push(s)
+    if (endCorner === undefined) return
+    const { B, u1, u2, phi, setback } = endCorner
+    const t1 = { x: B.x + u1.x * setback, y: B.y + u1.y * setback }
+    const t2 = { x: B.x + u2.x * setback, y: B.y + u2.y * setback }
+    if (style === "chamfer") { out.push({ kind: "line", a: t1, b: t2 }); return }
+    const bl = Math.hypot(u1.x + u2.x, u1.y + u2.y)
+    const bis = { x: (u1.x + u2.x) / bl, y: (u1.y + u2.y) / bl }
+    const dist = size / Math.sin(phi / 2)
+    const centre = { x: B.x + bis.x * dist, y: B.y + bis.y * dist }
+    const a1 = Math.atan2(t1.y - centre.y, t1.x - centre.x)
+    let delta = Math.atan2(t2.y - centre.y, t2.x - centre.x) - a1
+    while (delta > Math.PI) delta -= 2 * Math.PI
+    while (delta < -Math.PI) delta += 2 * Math.PI
+    out.push({ kind: "arc", center: centre, radius: size, start: a1, end: a1 + delta })
+  })
+  return out
+}
+
 // ================================================================ 3D curves of segments
 
 /** The segment as an exact 3D curve in `f` (sketch x/y → frame x/y), its range, and whether it runs forward. */

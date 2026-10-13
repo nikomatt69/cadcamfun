@@ -7,7 +7,7 @@
 export type BrowserKind = "bodies" | "sketches" | "components"
 export type GroupMode = "kind" | "layer" | "flat"
 
-const BODIES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "ellipsoid", "capsule", "prism", "extrude", "revolve", "solid", "extrusion", "revolution", "sweep", "loft", "parametric", "boolean-union", "boolean-subtract", "boolean-intersect"])
+const BODIES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "ellipsoid", "capsule", "prism", "extrude", "revolve", "solid", "extrusion", "revolution", "sweep", "loft", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"])
 const COMPONENTS = new Set(["component", "group", "assembly", "custom", "composite"])
 
 /** The Fusion-style section of an element type: 3D solids are bodies, containers are components, the rest sketches. */

@@ -130,7 +130,7 @@ Added after v6.0, each with tests; all pure, in `cad/`:
 - **`history.ts`** — a parametric feature history: a parameter table and an ordered list of features (sketch on XY / YZ / ZX with an offset, extrude, revolve, hole, linear and circular pattern), replayed from the top by `rebuild`. Dimensions are numbers or expressions, so `withParameter(history, "width", 60)` re-solves every sketch and rebuilds every solid and Boolean after it. Bodies are meshes; `cam/model` turns them into a part model (`buildPartModelFromMeshes`). A feature that cannot be built is an entry in `issues` and is skipped.
 - **Not covered:** fillet, chamfer, shell, draft, sweep, loft; sketch constraints between entities of different sketches (projection); an editor UI for the sketch and the timeline.
 
-## 7c. Native B-rep kernel (application integration pending)
+## 7c. Native B-rep kernel (integrated; exact features still growing)
 
 `cad/brep/index.ts` is the kernel interface, integrated from the `exact-brep` worktree. It exposes plain JSON-serializable
 `Brep` topology (`vertices`, `edges`, `faces`, `shells`) and exact analytic/rational geometry, primitive
@@ -148,18 +148,36 @@ according to the resulting face's `reversed` flag, including when an operand is 
 or an imported/reflected solid. Applying the subtraction flip alone loses the orientation of existing
 cavity walls; the chained-Boolean regression covers this case.
 
-The CAD barrel exports it as the `brep` namespace, plus `history-brep.ts` and `scene-step.ts`.
-`rebuildExact(history, rebuild?)` replays the same parametric history into exact bodies next to the mesh
-rebuild (`{ result, bodies: [{ id, feature, brep } | { id, feature, reason }] }`); `exactSummary` gives
-exact volume, area, centroid, genus and surface kinds; `historyToStep` and `sceneToStep` / `elementBrep`
-write AP214 STEP from a history or from scene elements. Features without an exact path (fillet, chamfer,
-shell, sweep, loft, coil, draft) report a reason and keep their mesh. The AI reads the exact view through
-`parametricReport.exact` and the `cad.parametric_exact` action. `history.ts` does not call the exact
-kernel: viewport rendering, CAM and sidecar/API still use the mesh bodies of §7b. Integration must
-preserve the exact topology as the model and use tessellation only as the rendering/CAM adapter;
-unsupported exact features must remain explicit. The coordinator must be notified before editing
-`cad/index.ts` or `history.ts`. General B-rep fillets/chamfers, persistent naming and exact B-rep 2D drafting remain
-pending, so the professional kernel acceptance gate is not claimed complete.
+**Integration (one model, every consumer).** The CAD barrel exports the kernel as the `brep` namespace plus:
+
+- `history-brep.ts` — `rebuildExact(history, rebuild?)` replays a history as exact B-reps from `rebuild`'s
+  parameters and solved sketches (`history.ts` is unchanged): one entry per mesh body, same ids, each with a
+  `brep` or the `reason` it has none. Exact: plain extrude (sketch lines, arcs and circles kept exact), revolve,
+  hole (simple, counterbore, countersink), the analytic catalogue solids (cube, cylinder, cone, sphere,
+  hemisphere, torus, prism, pyramid, extrusion, revolution) with their rotation, move, uniform scale, mirror,
+  pattern, split, combine and every union / subtract / intersect. Fillet, shell, sweep, loft, coil, edge and
+  corner treatments, drafts, non-uniform scale and the other catalogue solids keep their mesh and say so.
+  `exactSummary`, `historyToStep(history, name)`, `catalogueBrep`, `exactSketchLoops`, `brepBox`. Sketches on named
+  or tilted work planes use the frame `rebuild` resolved; a hole on a non-base work plane keeps its mesh and says so.
+- `scene-step.ts` — `elementBrep(element, byId)` is the exact solid of a drawing element placed exactly as
+  `placeElementMesh` places its mesh (Boolean elements are computed exactly on their operands);
+  `sceneToStep(elements)` writes the drawing as STEP AP214 (exact solids, faceted copies of mesh-only solids
+  marked `exact: false`, the stock and 2D elements skipped with a reason); `stepToElements(text)` imports a
+  STEP file as `brep` elements with a validity report.
+- A drawing element `{ type: "brep", brep, x, y, z, rotation, ... }` carries an exact solid. `cam/model`
+  `elementMesh` tessellates it (so the viewport bounds, the part model and every CAM path machine it), and
+  `sceneToStep` writes it back without loss.
+- AI: every `parametricReport` carries `exact` per body (exact volume, area, centroid, through-holes, faces,
+  surface kinds, or the reason); the read action `cad.parametric_exact` returns the same and, with
+  `includeStep`, the STEP file. The parametric skill tells the assistant to quote exact numbers.
+- Desktop: the Import/Export dialog writes a real STEP file through `sceneToStep` (it used to write the JSON
+  drawing with a `.step` extension) and imports `.step` / `.stp` as `brep` elements; `brep` elements render as
+  pickable faces with exact normals (`userData.brepFace`, `surface`, `faceName`) and B-rep edge lines
+  (`userData.brepEdge`); the property panel edits their placement and shows an "Exact model" section for every
+  solid with an exact model (volume, area, centre of mass, topology, surfaces, validity, its own STEP).
+
+General B-rep fillets/chamfers, shell/draft on B-reps, persistent naming and 2D drafting remain pending, so the
+professional kernel acceptance gate is not claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
@@ -174,6 +192,11 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
   reversed input faces in chained Booleans; added watertight chained-hole/pocket assertions, cavity
   union/intersection/subtraction in both operand positions, and a STEP-imported reflected plate drilled
   again. Application integration remains pending.
+- 2026-10-13: integrated the B-rep kernel: `brep` namespace in the CAD barrel, exact history replay
+  (`history-brep.ts`), drawing ⇄ STEP (`scene-step.ts`), the `brep` drawing element (tessellated for the viewport
+  and the CAM), `exact` in the AI parametric report and `cad.parametric_exact`, real STEP export/import and an
+  exact-model panel in the desktop. Tests: `history-brep.test.ts`, `scene-step.test.ts`,
+  `packages/ai/test/parametric-exact.test.ts`, `apps/desktop/test/cad-brep*.test.ts`.
 
 - Current drawing migration direct-decodes complete tagged documents, preserving every entity kind, recursive blocks, transforms and metadata. Legacy lower-case documents and sparse early tagged exports retain migration compatibility. Import reporting no longer counts preserved current entities as dropped. Invalid current drawings and future versions still fail with `DrawingMigrationError`.
 

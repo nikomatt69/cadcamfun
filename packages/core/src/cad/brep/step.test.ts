@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
+
+// Kernel tests tessellate and integrate exact geometry; under a full-suite run the default 5 s is too short.
+setDefaultTimeout(60_000)
 import {
   arcControl,
   circleProfileLoop,
