@@ -4,6 +4,7 @@ import type { SketchEntity } from "./sketch.ts"
 import { meshVolume } from "./solid.ts"
 import { buildRecipe } from "./recipes.ts"
 import { rebuildExact } from "./history-brep.ts"
+import { model } from "./script.ts"
 import { massProperties, validateBrep } from "./brep/index.ts"
 
 setDefaultTimeout(60_000)
@@ -165,6 +166,47 @@ describe("exact replay of a parametric history", () => {
     expect(rebuildExact(both).bodies[0]!.reason).toContain("straight edges and full circles only")
   }, 180_000)
 
+  test("a drafted extrusion leans its walls exactly: planes tilt, arcs become cones, holes widen towards the top", () => {
+    const k = Math.tan((5 * PI) / 180), h = 6
+    const drafted = (base: History) => ({ ...base, features: base.features.map((f) => (f.id === "plate" ? { ...f, taper: 5 } : f)) })
+    // The area at height z is a quadratic in z; Simpson's rule integrates it exactly.
+    const simpson = (area: (z: number) => number) => (h / 6) * (area(0) + 4 * area(h / 2) + area(h))
+    const rect = (z: number) => (40 - 2 * k * z) * (25 - 2 * k * z)
+    expect(rel(exactVolume(drafted(plate())), simpson(rect))).toBeLessThan(1e-9)
+    // A bore of radius 4 in the profile widens by k per mm of height.
+    const [s1, extrude] = plate().features as [SketchFeature, Extract<Feature, { type: "extrude" }>]
+    const bored = history([{ ...s1, sketch: { entities: [...s1.sketch.entities, pt("c", 20, 12.5), { id: "k", kind: "circle", center: "c", radius: 4 }], constraints: [...s1.sketch.constraints, { type: "fixed", point: "c" }] } }, { ...extrude, taper: 5 }], plate().parameters)
+    expect(rel(exactVolume(bored), simpson((z) => rect(z) - PI * (4 + k * z) ** 2))).toBeLessThan(1e-9)
+    // Rounded corners (r = 5) shrink to concentric arcs: cones at the corners.
+    const rounded = drafted({ ...plate(), features: plate().features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 } } : f)) })
+    const r = rebuildExact(rounded)
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(rel(v, simpson((z) => rect(z) - (4 - PI) * (5 - k * z) ** 2))).toBeLessThan(1e-9)
+    expect(r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "cone").length).toBe(4)
+    expect(rel(v, meshVolume(r.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+  })
+
+  test("a face draft leans a planar face about its hinge: material removed above the neutral plane, added below", () => {
+    const k = Math.tan((5 * PI) / 180)
+    const draft = (neutral: number, angle = 5): Feature => ({ id: "lean", type: "draft", near: [40, 12.5, 3], normal: [1, 0, 0], angle, neutral })
+    // Hinge on the bottom edge: a wedge 6 high and 6 tan(5) deep leaves the 25 mm wide face.
+    const removed = rebuildExact(plate([draft(0)]))
+    expect(rel(massProperties(removed.bodies[0]!.brep!).volume, 6000 - 25 * (36 * k) / 2)).toBeLessThan(1e-9)
+    expect(rel(massProperties(removed.bodies[0]!.brep!).volume, meshVolume(removed.result.bodies[0]!.mesh))).toBeLessThan(1e-6)
+    // Hinge on the top edge: the face leans out below it, the wedge is added.
+    expect(rel(exactVolume(plate([draft(6)])), 6000 + 25 * (36 * k) / 2)).toBeLessThan(1e-9)
+    // Hinge half way up: both, and they cancel.
+    expect(rel(exactVolume(plate([draft(3)])), 6000)).toBeLessThan(1e-9)
+  })
+
+  test("features without an exact counterpart are never skipped silently", () => {
+    const pushed = rebuildExact(plate([{ id: "pp", type: "pushpull", near: [40, 12.5, 3], distance: 2 }]))
+    expect(pushed.bodies[0]!.reason).toContain("push-pull")
+    // A hole wall is curved: its draft says so instead of leaving the body as it was.
+    const bored = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle: 3 }])
+    expect(rebuildExact(bored).bodies[0]!.reason).toContain("curved face")
+  })
+
   test("a shell hollows the extrusion exactly: closed, open at the top, a tube around a bore, a rounded box", () => {
     const shell = (open: "none" | "top" | "bottom" | "both", base = plate()): History =>
       history([...base.features, { id: "hollow", type: "shell", feature: "plate", thickness: 1, open }], base.parameters)
@@ -183,11 +225,91 @@ describe("exact replay of a parametric history", () => {
     expect(rel(v, meshVolume(r.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
   }, 180_000)
 
-  test("a shell of something other than an extrusion says why it has no exact model", () => {
-    const ring = history([rectangle("s1", "XY", 5, 0, 3, 10), { id: "ring", type: "revolve", sketch: "s1", axis: "y", operation: "new" }, { id: "hollow", type: "shell", feature: "ring", thickness: 0.5 }])
-    const r = rebuildExact(ring)
-    expect(r.bodies[0]!.reason).toContain("only extrusions are shelled exactly")
+  test("a shell of a full revolution: a hollow ring, an open ring, a cup and a closed can, exactly", () => {
+    const turned = (x: number, w: number, h: number, open: "none" | "top" | "bottom" | "both", t: number, degrees?: number) =>
+      history([rectangle("s1", "XY", x, 0, w, h), { id: "ring", type: "revolve", sketch: "s1", axis: "y", ...(degrees !== undefined ? { angle: degrees } : {}), operation: "new" }, { id: "hollow", type: "shell", feature: "ring", thickness: t, open }])
+    // A ring of section 5..8 x 0..10: the cavity is 5.5..7.5 x 0.5..9.5, or through the top.
+    expect(rel(exactVolume(turned(5, 3, 10, "none", 0.5)), PI * (64 - 25) * 10 - PI * (7.5 ** 2 - 5.5 ** 2) * 9)).toBeLessThan(1e-9)
+    expect(rel(exactVolume(turned(5, 3, 10, "top", 0.5)), PI * (64 - 25) * 10 - PI * (7.5 ** 2 - 5.5 ** 2) * 9.5)).toBeLessThan(1e-9)
+    // A solid cylinder r 10 x 20 (its profile on the axis): a cup with a 1 mm wall and floor, and a closed can.
+    const cup = rebuildExact(turned(0, 10, 20, "top", 1))
+    expect(cup.bodies[0]!.reason).toBeUndefined()
+    const v = massProperties(cup.bodies[0]!.brep!).volume
+    expect(rel(v, PI * 100 * 20 - PI * 81 * 19)).toBeLessThan(1e-9)
+    expect(rel(v, meshVolume(cup.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+    expect(rel(exactVolume(turned(0, 10, 20, "none", 1)), PI * 100 * 20 - PI * 81 * 18)).toBeLessThan(1e-9)
+    // A partial revolution cannot be shelled: the rebuild reports it on the feature, and both views keep the half ring.
+    const part = rebuildExact(turned(5, 3, 10, "none", 0.5, 180))
+    expect(part.result.issues.some((i) => i.feature === "hollow" && i.severity === "error")).toBe(true)
+    expect(rel(massProperties(part.bodies[0]!.brep!).volume, (PI * (64 - 25) * 10) / 2)).toBeLessThan(1e-9)
   })
+
+  test("fillets between curved faces of a turned part: cylinder to cone (convex) and cone to cylinder (concave), exact tori", () => {
+    const shaft = history([
+      { id: "s1", type: "sketch", plane: "XY", sketch: { entities: [
+        pt("a", 0, 0), pt("b", 10, 0), pt("c", 10, 20), pt("d", 6, 24), pt("e", 6, 50), pt("f", 0, 50),
+        line("l1", "a", "b"), line("l2", "b", "c"), line("l3", "c", "d"), line("l4", "d", "e"), line("l5", "e", "f"), line("l6", "f", "a")
+      ], constraints: ["a", "b", "c", "d", "e", "f"].map((p) => ({ type: "fixed", point: p }) as DimConstraint) } },
+      { id: "shaft", type: "revolve", sketch: "s1", axis: "y", operation: "new" },
+      { id: "round", type: "fillet", radius: 1, edges: { curved: true, kind: "both", within: { min: [-11, 19, -11], max: [11, 25, 11] } } }
+    ])
+    // The ring a rolling ball of radius rho leaves at a corner P of the section (r, a) between faces with outward normals
+    // nA, nB, by Pappus: the area between the corner and the ball (kite minus sector) times the path of its centroid.
+    const ring = (P: [number, number], nA: [number, number], nB: [number, number], rho: number, convex: boolean): number => {
+      const alpha = Math.acos(nA[0] * nB[0] + nA[1] * nB[1])
+      const s = [nA[0] + nB[0], nA[1] + nB[1]], sl = Math.hypot(s[0]!, s[1]!)
+      const w = convex ? [-s[0]! / sl, -s[1]! / sl] : [s[0]! / sl, s[1]! / sl]
+      const d = rho / Math.cos(alpha / 2)
+      const C = [P[0] + w[0]! * d, P[1] + w[1]! * d]
+      const k = convex ? 1 : -1
+      const T1 = [C[0]! + k * nA[0] * rho, C[1]! + k * nA[1] * rho], T2 = [C[0]! + k * nB[0] * rho, C[1]! + k * nB[1] * rho]
+      const kite = rho * rho * Math.tan(alpha / 2), sector = rho * rho * (alpha / 2)
+      const gk = (2 * P[0] + T1[0]! + T2[0]! + 2 * C[0]!) / 6
+      const gs = C[0]! - w[0]! * (2 * rho * Math.sin(alpha / 2)) / (3 * (alpha / 2))
+      const area = kite - sector
+      return 2 * PI * ((kite * gk - sector * gs) / area) * area
+    }
+    // A 45 degree cone: the mesh blend, and the exact one with it, leave shallower junctions (under 25 degrees) alone.
+    const l = Math.SQRT2
+    const cone: [number, number] = [1 / l, 1 / l]
+    const plain = PI * 100 * 20 + (PI * 4 / 3) * (100 + 60 + 36) + PI * 36 * 26
+    const r = rebuildExact(shaft)
+    expect(r.bodies[0]!.reason).toBeUndefined()
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(rel(v, plain - ring([10, 20], [1, 0], cone, 1, true) + ring([6, 24], cone, [1, 0], 1, false))).toBeLessThan(1e-9)
+    expect(r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "torus").length).toBe(2)
+  }, 180_000)
+
+  test("a sweep along a path is exact: mitred elbows, bent pipes (tori), tubes, and the shell of a sweep", () => {
+    // A 4 mm round profile on XY, swept up 20 mm along z and then 20 mm along x (the path sketch on ZX: u = z, v = x).
+    const pipe = (bendRadius?: number, tube = false, shell?: "both" | "none") => {
+      const m = model()
+      const profile = m.sketch("XY").circle([0, 0], 4)
+      if (tube) profile.circle([0, 0], 3)
+      const path = m.sketch("ZX").path([[0, 0], [20, 0], [20, 20]])
+      const swept = m.sweep(profile, path, { ...(bendRadius !== undefined ? { bendRadius } : {}), id: "pipe" })
+      if (shell !== undefined) m.shell(swept, { thickness: 0.5, open: shell })
+      return rebuildExact(m.build())
+    }
+    const volume = (r: ReturnType<typeof pipe>) => {
+      expect(r.bodies[0]!.reason).toBeUndefined()
+      expect(validateBrep(r.bodies[0]!.brep!).issues).toEqual([])
+      return massProperties(r.bodies[0]!.brep!).volume
+    }
+    // A mitred elbow keeps the section area times the centre-line length; a bend of radius 5 replaces 10 mm of corner by a
+    // quarter circle (Pappus).
+    expect(rel(volume(pipe()), PI * 4 * 40)).toBeLessThan(1e-9)
+    const bent = pipe(5)
+    expect(rel(volume(bent), PI * 4 * (30 + 2.5 * PI))).toBeLessThan(1e-9)
+    expect(bent.bodies[0]!.brep!.faces.some((f) => f.surface.kind === "torus")).toBe(true)
+    // The mesh sweeps an inscribed polygon of the 2 mm circle (0.01 mm sagitta, about 32 sides): about 0.65 % less section.
+    const meshRel = (volume(bent) - meshVolume(bent.result.bodies[0]!.mesh)) / volume(bent)
+    expect(meshRel).toBeGreaterThan(0)
+    expect(meshRel).toBeLessThan(8e-3)
+    expect(rel(volume(pipe(5, true)), PI * (4 - 2.25) * (30 + 2.5 * PI))).toBeLessThan(1e-9)
+    // Shelled with a 0.5 mm wall and open at both ends: the tube of the same path.
+    expect(rel(volume(pipe(5, false, "both")), PI * (4 - 2.25) * (30 + 2.5 * PI))).toBeLessThan(1e-9)
+  }, 180_000)
 
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
     const r = 1

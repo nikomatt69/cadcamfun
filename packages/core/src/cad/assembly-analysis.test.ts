@@ -1,5 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
-import { assemblyInterference, billOfMaterials, type AssemblyPart } from "./assembly-analysis.ts"
+import { assemblyInterference, billOfMaterials, jointsFromHoles, type AssemblyPart } from "./assembly-analysis.ts"
 import { frame, makeBox, type Brep } from "./brep/index.ts"
 import { rebuildExact } from "./history-brep.ts"
 import { model } from "./script.ts"
@@ -20,6 +20,34 @@ const block = (z0: number, h: number, d: number, depth: number): Brep => {
   expect(r.bodies.map((b) => b.reason)).toEqual([undefined])
   return r.bodies[0]!.brep!
 }
+
+describe("joints from coaxial holes", () => {
+  test("two shared axes fix a plate to its base; one shared axis is a pin; a stack of three parts gives a chain", () => {
+    const base = block(0, 20, 6.8, 16)
+    const plate = block(20, 8, 9, 8)
+    const [fixed] = jointsFromHoles([{ id: "plate", brep: plate }, { id: "base", brep: base }])
+    expect(fixed).toMatchObject({ parent: "base", child: "plate", kind: "fixed", axes: 2 })
+    near(fixed!.origin.z, 20)
+    near(fixed!.axis.z, -1)
+
+    // A link with one hole on the base's first hole: free to turn about it.
+    const m = model()
+    m.extrude(m.sketch("XY", 20).rectangle([5, 5], 40, 20), { depth: 5, id: "link" })
+    m.hole({ plane: "XY", offset: 25, at: [15, 15], diameter: 9, depth: 5, id: "pin" })
+    const link = rebuildExact(m.build()).bodies[0]!.brep!
+    const [pin] = jointsFromHoles([{ id: "base", brep: base }, { id: "link", brep: link }])
+    expect(pin).toMatchObject({ parent: "base", child: "link", kind: "revolute", axes: 1 })
+    near(pin!.origin.x, 15)
+    near(pin!.origin.y, 15)
+    near(pin!.origin.z, 20)
+
+    // Plate on a spacer on the base: plate-spacer and spacer-base.
+    const spacer = block(20, 4, 9, 4)
+    const lifted = block(24, 8, 9, 8)
+    const chain = jointsFromHoles([{ id: "base", brep: base }, { id: "spacer", brep: spacer }, { id: "plate", brep: lifted }])
+    expect(chain.map((j) => [j.child, j.parent, j.kind]).sort()).toEqual([["plate", "spacer", "fixed"], ["spacer", "base", "fixed"]])
+  })
+})
 
 describe("exact interference", () => {
   test("overlapping boxes clash by their exact common volume; boxes in face contact only touch; distant ones are not checked", () => {

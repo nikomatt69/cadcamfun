@@ -24,7 +24,7 @@
  * failed Boolean) is reported with its reason and left alone: nothing is approximated.
  */
 import { add3, cross3, dot3, frame, length3, madd3, MODEL_TOL, neg3, normalize3, scale3, sub3, type Vec2, type Vec3 } from "./math.ts"
-import { curveDerivs, curvePoint, surfaceNormal, surfaceProject } from "./geom.ts"
+import { curveDerivs, curvePoint, surfaceNormal, surfaceProject, type Surface } from "./geom.ts"
 import { BooleanError, booleanBrep } from "./boolean.ts"
 import { makeSphere, polyhedron } from "./primitives.ts"
 import { extrudeProfile, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
@@ -111,21 +111,36 @@ export const blendCandidates = (b: Brep, minAngleDegrees = 0.5): BlendCandidate[
       return
     }
     if (e.curve.kind === "circle" && e.v0 === e.v1) {
-      const planeUse = fa.surface.kind === "plane" ? u[0]! : fb.surface.kind === "plane" ? u[1]! : undefined
-      const cylUse = fa.surface.kind === "cylinder" ? u[0]! : fb.surface.kind === "cylinder" ? u[1]! : undefined
-      if (planeUse === undefined || cylUse === undefined) return
-      const cyl = b.faces[cylUse.face]!.surface, pl = b.faces[planeUse.face]!.surface
-      if (cyl.kind !== "cylinder" || pl.kind !== "plane") return
-      if (Math.abs(Math.abs(dot3(cyl.frame.z, pl.frame.z)) - 1) > 1e-9) return
+      // A rim between two faces whose sections through the axis are straight: a plane square to the axis, a cylinder or a
+      // cone about it (a hole's mouth, a boss's foot, a turned shoulder, a cone meeting a cylinder or another cone). The
+      // rolling ball's section is then the same 2D corner as for a straight edge, revolved: an exact torus.
+      type Straight = Extract<Surface, { kind: "plane" | "cylinder" | "cone" }>
+      const straight = (s: Surface): s is Straight => s.kind === "plane" || s.kind === "cylinder" || s.kind === "cone"
+      const pair = [fa.surface, fb.surface]
+      if (!pair.every(straight)) return
+      // The axis: the first face of revolution's; every face must share it.
+      const rev = (pair as Straight[]).find((s) => s.kind !== "plane")
+      if (rev === undefined) return
+      const dir = rev.frame.z
       const p0 = b.vertices[e.v0]!.point
-      const nA = outwardNormal(b, planeUse.face, p0), nB = outwardNormal(b, cylUse.face, p0)
-      const intoA = cross3(nA, coedgeTangent(b, ei, e.t0, planeUse.reversed))
-      const centre = madd3(cyl.frame.origin, cyl.frame.z, dot3(sub3(p0, cyl.frame.origin), cyl.frame.z))
-      const reachA = faceBoundaryPoints(b, planeUse.face).reduce((m, p) => Math.max(m, Math.abs(radialAxial(p, centre, cyl.frame.z)[0] - cyl.radius)), 0)
-      const reachB = faceBoundaryPoints(b, cylUse.face).reduce((m, p) => Math.max(m, Math.abs(radialAxial(p, centre, cyl.frame.z)[1])), 0)
+      const centre = madd3(rev.frame.origin, dir, dot3(sub3(p0, rev.frame.origin), dir))
+      for (const s of pair as Straight[]) {
+        if (Math.abs(Math.abs(dot3(s.frame.z, dir)) - 1) > 1e-9) return
+        if (s.kind !== "plane" && length3(cross3(sub3(s.frame.origin, rev.frame.origin), dir)) > 1e-7) return
+      }
+      // The edge must be the circle about that axis through p0.
+      if (length3(cross3(sub3(e.curve.frame.origin, rev.frame.origin), dir)) > 1e-7) return
+      const nA = outwardNormal(b, u[0]!.face, p0), nB = outwardNormal(b, u[1]!.face, p0)
+      // A plane face goes first (the cross-section is symmetric in the two faces; the order only names them).
+      const [ua, ub, na, nb] = fa.surface.kind === "plane" || fb.surface.kind !== "plane" ? [u[0]!, u[1]!, nA, nB] : [u[1]!, u[0]!, nB, nA]
+      if (length3(cross3(na, nb)) < Math.max(1e-9, minSin)) return // tangent faces: nothing to blend
+      const intoA = cross3(na, coedgeTangent(b, ei, e.t0, ua.reversed))
+      const [rho, h0] = radialAxial(p0, centre, dir)
+      // How far each face reaches from the edge along its section (a straight line through the edge's point).
+      const reach = (fi: number) => faceBoundaryPoints(b, fi).reduce((m, p) => { const [r, h] = radialAxial(p, centre, dir); return Math.max(m, Math.hypot(r - rho, h - h0)) }, 0)
       out.push({
-        edge: ei, curve: "circle", a: p0, b: p0, nA, nB, faceA: planeUse.face, faceB: cylUse.face, convex: dot3(intoA, nB) < 0,
-        length: 2 * Math.PI * cyl.radius, reachA, reachB, axis: { origin: centre, dir: cyl.frame.z, radius: cyl.radius }, curved: true
+        edge: ei, curve: "circle", a: p0, b: p0, nA: na, nB: nb, faceA: ua.face, faceB: ub.face, convex: dot3(intoA, nb) < 0,
+        length: 2 * Math.PI * rho, reachA: reach(ua.face), reachB: reach(ub.face), axis: { origin: centre, dir, radius: rho }, curved: true
       })
     }
   })

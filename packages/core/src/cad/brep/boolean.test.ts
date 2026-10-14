@@ -12,7 +12,9 @@ import {
   makeSphere,
   massProperties,
   meshEdgeDefects,
+  polygonProfileLoop,
   readStepBreps,
+  revolveProfile,
   tessellateBrep,
   transformBrep,
   validateBrep,
@@ -57,6 +59,15 @@ describe("Booleans of boxes (planar, exact)", () => {
     // The void's faces point into the cavity: its shell alone has a negative volume.
     expect(v.faces.length).toBe(12)
   })
+  test("a profile with solver noise (1e-12) still cuts cleanly: the intersection circle is not broken into pieces", () => {
+    // The sketch solver leaves the ring's top line 1.2e-12 off square; the cavity's cylinders cross that face. Both
+    // triangles beside a crossing used to round it outside and drop a segment of the circle.
+    const axis = { x: 0, y: -1, z: 0 }, radial = { x: 1, y: 0, z: 0 }
+    const ring = revolveProfile({ loops: [polygonProfileLoop([{ x: 5.000000000000018, y: -3.17020870101501e-12 }, { x: 8.000000000000023, y: -4.371969112636563e-12 }, { x: 8.000000000000025, y: -10.000000000005148 }, { x: 5.000000000000019, y: -10.000000000005416 }])] }, 2 * PI, { axis, radial })
+    const cavity = revolveProfile({ loops: [polygonProfileLoop([{ x: 5.5, y: -9.5 }, { x: 7.5, y: -9.5 }, { x: 7.5, y: 1 }, { x: 5.5, y: 1 }])] }, 2 * PI, { axis, radial })
+    check(ring, cavity, "subtract", PI * (39 * 10 - 26 * 9.5), 1e-9)
+  })
+
   test("solids that only touch, or are apart, intersect in the empty solid; a subtraction can remove everything", () => {
     // Face contact (a washer on a plate), a cylinder standing on a face, and a gap.
     for (const B of [makeBox(10, 10, 10, at(5, 5, 10)), makeCylinder(3, 5, at(5, 5, 10)), makeBox(4, 4, 4, at(20, 20, 20))]) {

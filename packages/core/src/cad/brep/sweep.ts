@@ -351,9 +351,14 @@ export interface ExtrudeOptions {
   readonly placement?: Frame
   /** Face name prefix for persistent naming (`<prefix>.bottom`, `.top`, `.side<i>.<j>`). */
   readonly name?: string
+  /**
+   * Draft: the top profile is the bottom one moved `inset` into the material (`offsetLoop`; holes grow by it), so the walls
+   * lean: lines sweep tilted planes, arcs cones. Positive narrows the solid towards the top. Lines and arcs only.
+   */
+  readonly inset?: number
 }
 
-/** Linear sweep of a closed profile by `distance` along the sketch normal. */
+/** Linear sweep of a closed profile by `distance` along the sketch normal (tapered by `inset`). */
 export const extrudeProfile = (profile: Profile, distance: number, options: ExtrudeOptions = {}): Brep => {
   if (!(Number.isFinite(distance) && Math.abs(distance) > MODEL_TOL)) throw new RangeError("extrude distance must be non-zero")
   const base = options.placement ?? WORLD
@@ -363,20 +368,28 @@ export const extrudeProfile = (profile: Profile, distance: number, options: Extr
   const f1: Frame = { ...f0, origin: fromFrame(f0, 0, 0, d) }
   const prefix = options.name ?? "extrude"
   const loops = normalizeProfile(profile)
+  const inset = options.inset ?? 0
+  // The outer loop narrows by the inset, holes widen by it (offsetLoop moves into each loop's own interior).
+  const tops = inset === 0 ? loops : loops.map((l, li) => offsetLoop(l, li === 0 ? inset : -inset))
   const b = new BrepBuilder()
   const bottomLoops: Array<Array<readonly [number, boolean]>> = []
   const topLoops: Array<Array<readonly [number, boolean]>> = []
   loops.forEach((loop, li) => {
     const n = loop.length
+    const upper = tops[li]!
     const vb = loop.map((s) => b.newVertex(fromFrame(f0, segmentStart(s).x, segmentStart(s).y)))
-    const vt = loop.map((s) => b.newVertex(fromFrame(f1, segmentStart(s).x, segmentStart(s).y)))
-    const verticals = loop.map((_, i) => b.edge(lineCurve(b.vertices[vb[i]!]!.point, f0.z), 0, d, vb[i], vt[i]))
+    const vt = upper.map((s) => b.newVertex(fromFrame(f1, segmentStart(s).x, segmentStart(s).y)))
+    const verticals = loop.map((_, i) => {
+      const p0 = b.vertices[vb[i]!]!.point, p1 = b.vertices[vt[i]!]!.point
+      const v = sub3(p1, p0)
+      return b.edge(lineCurve(p0, v), 0, Math.hypot(v.x, v.y, v.z), vb[i], vt[i])
+    })
     const bottom: Array<readonly [number, boolean]> = []
     const top: Array<readonly [number, boolean]> = []
     loop.forEach((s, i) => {
       const j = (i + 1) % n
       const cb = segmentCurve(s, f0)
-      const ct = segmentCurve(s, f1)
+      const ct = segmentCurve(upper[i]!, f1)
       const [b0, b1] = cb.forward ? [vb[i]!, vb[j]!] : [vb[j]!, vb[i]!]
       const [t0, t1] = cb.forward ? [vt[i]!, vt[j]!] : [vt[j]!, vt[i]!]
       const eb = b.edge(cb.curve, cb.t0, cb.t1, b0, b1)
@@ -389,14 +402,22 @@ export const extrudeProfile = (profile: Profile, distance: number, options: Extr
         case "line": {
           const a = b.vertices[vb[i]!]!.point, c = b.vertices[vb[j]!]!.point
           const dir = normalize3(sub3(c, a))
-          surface = { kind: "plane", frame: frame(a, cross3(dir, f0.z), dir) }
+          // The wall contains the edge and the (possibly leaning) vertical edge from its start.
+          const up = sub3(b.vertices[vt[i]!]!.point, a)
+          surface = { kind: "plane", frame: frame(a, normalize3(cross3(dir, up)), dir) }
           break
         }
-        case "arc":
-          surface = { kind: "cylinder", frame: { ...f0, origin: fromFrame(f0, s.center.x, s.center.y) }, radius: s.radius }
+        case "arc": {
+          const centre = { ...f0, origin: fromFrame(f0, s.center.x, s.center.y) }
+          const r1 = (upper[i] as Extract<ProfileSegment, { kind: "arc" }>).radius
+          surface = inset === 0
+            ? { kind: "cylinder", frame: centre, radius: s.radius }
+            : { kind: "cone", frame: centre, radius: s.radius, semiAngle: Math.atan((r1 - s.radius) / d) }
           reversed = s.end < s.start
           break
+        }
         case "nurbs":
+          if (inset !== 0) throw new RangeError("a drafted extrusion of a spline profile has no exact model yet")
           surface = { kind: "extrusion", curve: cb.curve, dir: f0.z }
           break
       }
