@@ -26,6 +26,8 @@ import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
 import { FaceParams, generateFace } from "../operations/face.ts"
 import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
 import { fiveAxisKinematic } from "../five-axis.ts"
+import { tableRotation, type RotaryAngles, type RotaryLayout } from "../indexing.ts"
+import { remainingVolume, removeTipPath, voxelStock, type VoxelStock } from "./stock.ts"
 import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile } from "../operations/profile.ts"
@@ -172,6 +174,27 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
 }
 
 const shift2 = (p: Vec2, o: Vec3): Vec2 => ({ x: p.x - o.x, y: p.y - o.y })
+
+/** What the five-axis moves removed from the raw stock, as the bracket of the voxel stock; the height field does not cover them. */
+const fiveAxisRemovalText = (vs: VoxelStock): string => {
+  const raw = vs.nx * vs.ny * vs.nz * vs.voxel ** 3
+  const left = remainingVolume(vs)
+  return `Five-axis moves remove between ${(raw - left.upper).toFixed(0)} and ${(raw - left.lower).toFixed(0)} mm³ of the raw stock; the three-axis height field does not cover them`
+}
+
+/**
+ * Removes the cutter of a feed move made with the table turned. The NC position is the tip in machine coordinates, so the tip in the
+ * part is `Rᵀ (m - pivot) + pivot`, and the tool axis (up from the tip) in the part is `Rᵀ ẑ`. The stock voxels are measured along it.
+ */
+const removeTurnedMove = (vs: VoxelStock, cutter: Cutter, layout: RotaryLayout, pivot: Vec3, from: Vec3, to: Vec3, angles: RotaryAngles): void => {
+  const m = tableRotation(angles, layout)
+  const toPart = (p: Vec3): Vec3 => {
+    const x = p.x - pivot.x, y = p.y - pivot.y, z = p.z - pivot.z
+    return { x: m[0] * x + m[3] * y + m[6] * z + pivot.x, y: m[1] * x + m[4] * y + m[7] * z + pivot.y, z: m[2] * x + m[5] * y + m[8] * z + pivot.z }
+  }
+  const axis: Vec3 = { x: m[6], y: m[7], z: m[8] }
+  removeTipPath(vs, cutter, [toPart(from), toPart(to)], [axis, axis])
+}
 
 /** The cone of a chamfer mill / spot drill / engraver. */
 const coneOf = (c: Cutter): { readonly radius: number; readonly tipRadius: number; readonly halfAngle: number } =>
@@ -583,6 +606,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
   // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
   let turnedMoves = 0
+  let turnedVoxels: VoxelStock | undefined
   const firstFinding = new Map<string, CamIssue>()
   const finding = (key: string, make: () => CamIssue): void => { if (!firstFinding.has(key)) firstFinding.set(key, make()) }
   let gougeColumns = 0, gougeDepth = 0
@@ -603,9 +627,26 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   if (interpreted !== undefined) {
     let lastOp: number | undefined
     const cellSize = Math.min(hf.cellX, hf.cellY)
+    // The five-axis removal is tracked on its own voxel stock from the raw stock; the height field keeps the three-axis removal.
+    const five = machine.fiveAxis
+    const turnedStock: VoxelStock | undefined = five === undefined ? undefined : voxelStock(
+      { x: stock.min.x - origin.x, y: stock.min.y - origin.y, z: stock.min.z - origin.z },
+      { x: stock.max.x - origin.x, y: stock.max.y - origin.y, z: stock.max.z - origin.z },
+      2
+    )
+    turnedVoxels = turnedStock
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
       if (s.kind === "dwell") continue
-      if (s.kind !== "arc" && s.rotary !== undefined) { turnedMoves++; continue }
+      if (s.kind !== "arc" && s.rotary !== undefined) {
+        turnedMoves++
+        const n = toolAtLine[s.line]
+        const cutter = n === undefined ? undefined : cutterByNumber.get(n)
+        if (turnedStock !== undefined && five !== undefined && s.kind === "linear" && cutter !== undefined) {
+          const r = s.rotary
+          removeTurnedMove(turnedStock, cutter, five.layout, five.pivot, s.from, s.to, { a: r.a ?? 0, b: r.b ?? 0, c: r.c ?? 0 })
+        }
+        continue
+      }
       const op = opAtLine[s.line]
       if (op !== lastOp) { checkGouges(lastOp); lastOp = op }
       const n = toolAtLine[s.line]
@@ -740,7 +781,10 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     { id: "no-gouge", status: interpreted === undefined ? "unresolved" : gougeColumns > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their cuts are not checked against the part` : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)` },
     {
       id: "material-removed", status: interpreted === undefined ? "unresolved" : maxRemaining > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed",
-      detail: maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm` : `The replayed stock matches the part within ${allowed.toFixed(3)} mm`
+      detail: [
+        maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm` : `The replayed stock matches the part within ${allowed.toFixed(3)} mm`,
+        ...(turnedMoves > 0 && turnedVoxels !== undefined ? [fiveAxisRemovalText(turnedVoxels)] : [])
+      ].join("; ")
     },
     {
       id: "nc-replay", status: interpreted === undefined ? "unresolved" : interpreted.errors.length > 0 || noTool > 0 || !extentAgrees ? "failed" : "passed",

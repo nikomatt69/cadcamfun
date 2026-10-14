@@ -32,6 +32,11 @@ describe("five-axis operations in the kernel", () => {
     // Moves that turn the table are not checked against the height field, so the stock and gouge claims cannot pass.
     expect(a.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
     expect(a.claims.find((c) => c.id === "material-removed")!.status).not.toBe("passed")
+    // The five-axis removal is bracketed on the raw stock: a positive removal, lower bound not above the upper bound.
+    const bracket = /between (\d+) and (\d+) mm³/.exec(a.claims.find((c) => c.id === "material-removed")!.detail)
+    expect(bracket).not.toBeNull()
+    expect(Number(bracket![1])).toBeGreaterThan(0)
+    expect(Number(bracket![1])).toBeLessThanOrEqual(Number(bracket![2]))
     expect(a.claims.find((c) => c.id === "machine-clearance")!.status).toBe("unsupported")
   })
 
