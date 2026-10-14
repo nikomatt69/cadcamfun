@@ -15,6 +15,7 @@
  *   motion        simultaneous five-axis: locations -> table poses, each move split into blocks and checked for collision
  *   stock         volumetric stock as voxels: sure / possible removal by the cutter's sampled sweep, remaining-volume bracket
  *   machine-clearance  holder and shank against the table over every NC move (certified; rotary moves reported, not passed)
+ *   convex        exact distance between convex hulls (GJK), and the prism that bounds a cylinder with flat ends
  */
 export * from "./materials.ts"
 export * from "./cutters.ts"
@@ -34,3 +35,4 @@ export { checkMotion, cylinderSolid, boxSolid, headScene, trunnionScene, tableBo
 export { planSimultaneous, type CutterLocation, type MotionSegment, type PartEnvelope, type SimultaneousInput, type SimultaneousPlan } from "./motion.ts"
 export { voxelStock, removeTipPath, remainingVolume, type VoxelStock } from "./stock.ts"
 export { checkNcClearance, ARC_SAGITTA, type ClearanceFinding, type ClearanceResult, type TableGeometry } from "./machine-clearance.ts"
+export { hullDistance, cylinderPrism, boxVertices, type HullDistance } from "./convex.ts"
