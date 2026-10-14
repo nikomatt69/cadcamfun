@@ -1,10 +1,11 @@
 /**
- * Assembly checks on the exact model (Fusion's Interference and Bill of Materials): which parts overlap and by how much,
+ * Assembly checks on the exact model (Fusion's Interference, Bill of Materials and joints): which parts overlap and by how much,
  * which only touch, and the parts list with quantities and masses. Every number comes from the B-rep: the overlap is the
  * exact Boolean intersection of two parts, the mass the exact volume times the material's density.
  */
 import { booleanBrep, massProperties, type Brep, type Vec3 } from "./brep/index.ts"
 import { brepBox } from "./history-brep.ts"
+import { holeStacks } from "./smart-fasteners.ts"
 
 export interface AssemblyPart {
   readonly id: string
@@ -75,6 +76,46 @@ export const assemblyInterference = (parts: ReadonlyArray<AssemblyPart>, options
     }
   }
   return { interferences, touching, undetermined, checked }
+}
+
+export interface InferredJoint {
+  /** The part further along the stacks' downward axis (the base the other sits on), and the part on it. */
+  readonly parent: string
+  readonly child: string
+  /** One shared hole axis leaves the child free to turn about it (a pin); two or more fix it. */
+  readonly kind: "revolute" | "fixed"
+  /** Where the parts meet on the first shared axis, and that axis (pointing from the child into the parent). */
+  readonly origin: Vec3
+  readonly axis: Vec3
+  /** Distinct hole axes the two parts share. */
+  readonly axes: number
+}
+
+/**
+ * Joints inferred from coaxial holes (Fusion's joints snapped to hole centres): every two parts whose holes touch on a shared
+ * axis are joined there, revolute about one axis, fixed by two or more.
+ */
+export const jointsFromHoles = (bodies: ReadonlyArray<{ readonly id: string; readonly brep: Brep }>): ReadonlyArray<InferredJoint> => {
+  const pairs = new Map<string, { parent: string; child: string; origin: Vec3; axis: Vec3; lines: Array<{ origin: Vec3; axis: Vec3 }> }>()
+  for (const stack of holeStacks(bodies)) {
+    for (let i = 0; i + 1 < stack.holes.length; i++) {
+      const upper = stack.holes[i]!, lower = stack.holes[i + 1]!
+      if (upper.body === lower.body) continue
+      const t = (Math.max(upper.hi, upper.lo) + lower.lo) / 2
+      const at = { x: stack.origin.x + stack.axis.x * t, y: stack.origin.y + stack.axis.y * t, z: stack.origin.z + stack.axis.z * t }
+      const key = [upper.body, lower.body].sort().join("\u0000")
+      const pair = pairs.get(key)
+      const sameLine = (l: { origin: Vec3; axis: Vec3 }) => {
+        const w = { x: at.x - l.origin.x, y: at.y - l.origin.y, z: at.z - l.origin.z }
+        const along = w.x * l.axis.x + w.y * l.axis.y + w.z * l.axis.z
+        return Math.abs(Math.abs(l.axis.x * stack.axis.x + l.axis.y * stack.axis.y + l.axis.z * stack.axis.z) - 1) < 1e-6 &&
+          Math.hypot(w.x - l.axis.x * along, w.y - l.axis.y * along, w.z - l.axis.z * along) < 0.01
+      }
+      if (pair === undefined) pairs.set(key, { parent: lower.body, child: upper.body, origin: at, axis: stack.axis, lines: [{ origin: at, axis: stack.axis }] })
+      else if (!pair.lines.some(sameLine)) pair.lines.push({ origin: at, axis: stack.axis })
+    }
+  }
+  return [...pairs.values()].map((p) => ({ parent: p.parent, child: p.child, kind: p.lines.length >= 2 ? "fixed" as const : "revolute" as const, origin: p.origin, axis: p.axis, axes: p.lines.length }))
 }
 
 export interface BomRow {

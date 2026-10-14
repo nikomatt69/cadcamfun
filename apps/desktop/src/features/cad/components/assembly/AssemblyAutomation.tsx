@@ -1,13 +1,15 @@
 /**
- * Component automations of the assembly workspace, on the exact model: insert the fasteners the parts' shared holes need
- * (one undo step), check every pair of parts for interference, and list the bill of materials (with a CSV export).
+ * Component automations of the assembly workspace, on the exact model: insert the fasteners the parts' shared holes need, join
+ * the parts on their shared hole axes (assembly joints), check every pair of parts for interference, and list the bill of
+ * materials (with a CSV export).
  * The kernel work runs after the busy state has painted; results are snapshots that a change of the drawing clears.
  */
 import { For, Show, createEffect, createSignal, on, type JSX } from "solid-js"
 import type { BomRow } from "@cadcamfun/core"
 import { t } from "../../../../i18n/index.ts"
 import { useElementsStore } from "../../store/elementsStore.ts"
-import { bomCsv, fastenScene, sceneBom, sceneInterference, type FastenResult, type SceneInterference } from "../../lib/component-automation.ts"
+import { applyJoints, bomCsv, fastenScene, sceneBom, sceneInterference, sceneJoints, type FastenResult, type JointTarget, type SceneInterference } from "../../lib/component-automation.ts"
+import { useAssemblyStore } from "../../store/assemblyStore.ts"
 
 type Skipped = ReadonlyArray<{ readonly id: string; readonly name: string; readonly reason: string }>
 
@@ -17,7 +19,8 @@ const button = "px-2 py-1 text-xs rounded border border-gray-300 dark:border-gra
 
 export default function AssemblyAutomation(): JSX.Element {
   const store = useElementsStore()
-  const [busy, setBusy] = createSignal<"fasten" | "interference" | "bom" | undefined>(undefined)
+  const [busy, setBusy] = createSignal<"fasten" | "joints" | "interference" | "bom" | undefined>(undefined)
+  const [jointed, setJointed] = createSignal<{ added: number; existing: number; joints: string[]; skipped: Skipped } | undefined>(undefined)
   const [fastened, setFastened] = createSignal<FastenResult | undefined>(undefined)
   const [clashes, setClashes] = createSignal<SceneInterference | undefined>(undefined)
   const [bom, setBom] = createSignal<{ rows: ReadonlyArray<BomRow>; skipped: Skipped } | undefined>(undefined)
@@ -27,7 +30,7 @@ export default function AssemblyAutomation(): JSX.Element {
   // A report describes the drawing it was computed on.
   createEffect(on(() => store.elements, () => { setClashes(undefined); setBom(undefined) }, { defer: true }))
 
-  const run = (what: "fasten" | "interference" | "bom", work: () => void) => {
+  const run = (what: "fasten" | "joints" | "interference" | "bom", work: () => void) => {
     setBusy(what)
     setError(undefined)
     setTimeout(() => {
@@ -38,6 +41,11 @@ export default function AssemblyAutomation(): JSX.Element {
     const result = fastenScene(store.elements as never, { washers: washers() })
     if (result.elements.length > 0) store.addElements(result.elements as never)
     setFastened(result)
+  })
+  const joints = () => run("joints", () => {
+    const inferred = sceneJoints(store.elements as never)
+    const outcome = applyJoints(inferred, () => useAssemblyStore.getState() as unknown as JointTarget)
+    setJointed({ ...outcome, joints: inferred.joints.map((j) => `${inferred.names.get(j.child) ?? j.child} → ${inferred.names.get(j.parent) ?? j.parent}: ${j.kind}`), skipped: inferred.skipped })
   })
   const interference = () => run("interference", () => setClashes(sceneInterference(store.elements as never)))
   const listBom = () => run("bom", () => setBom(sceneBom(store.elements as never)))
@@ -95,6 +103,19 @@ export default function AssemblyAutomation(): JSX.Element {
                   <For each={r().unfastened}>{(u) => <li>{u.bodies.join(" / ")}: {u.reason}</li>}</For>
                 </ul>
               </Show>
+              <SkippedList items={r().skipped} />
+            </div>
+          )}
+        </Show>
+      </div>
+
+      <div class="space-y-2">
+        <button type="button" class={button} disabled={busy() !== undefined} onClick={joints}>{busy() === "joints" ? t("cad.automation.working") : t("cad.automation.joints")}</button>
+        <Show when={jointed()}>
+          {(r) => (
+            <div class="space-y-1 text-xs text-gray-700 dark:text-gray-300" data-testid="joints-result">
+              <p>{t("cad.automation.jointsAdded")}: {r().added} · {t("cad.automation.alreadyJoined")}: {r().existing}</p>
+              <ul><For each={r().joints}>{(j) => <li>{j}</li>}</For></ul>
               <SkippedList items={r().skipped} />
             </div>
           )}

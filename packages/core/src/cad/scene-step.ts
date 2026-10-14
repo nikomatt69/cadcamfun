@@ -28,15 +28,25 @@ export type ElementBrep = { readonly brep: Brep; readonly reason?: undefined } |
 
 /** Gizmo transform of an element about the centre of its solid's box, as `placeElementMesh` applies it. */
 const gizmo = (e: Element, b: Brep): ElementBrep => {
+  const tr = gizmoTransform(e, brepBox(b))
+  if (typeof tr === "string") return { reason: tr }
+  return { brep: tr === undefined ? b : transformBrep(b, tr) }
+}
+
+/**
+ * The gizmo fields of an element (rotation in degrees, scale, translateX/Y/Z) as a rigid or uniformly scaled transform about
+ * the centre of `box`, the pivot the viewport uses (the centre of the element's bounding box); undefined when the fields
+ * leave it where it is, the reason when the scale is not uniform. Components use it with the box of all their parts.
+ */
+export const gizmoTransform = (e: Element, box: { readonly lo: Vec3; readonly hi: Vec3 }): Transform | string | undefined => {
   const r = typeof e["rotation"] === "object" && e["rotation"] !== null ? (e["rotation"] as Record<string, unknown>) : {}
   const s = typeof e["scale"] === "object" && e["scale"] !== null ? (e["scale"] as Record<string, unknown>) : {}
   const rx = num(r["x"]), ry = num(r["y"]), rz = num(r["z"])
   const sx = num(s["x"], 1), sy = num(s["y"], 1), sz = num(s["z"], 1)
   const tx = num(e["translateX"]), ty = num(e["translateY"]), tz = num(e["translateZ"])
-  if (rx === 0 && ry === 0 && rz === 0 && sx === 1 && sy === 1 && sz === 1 && tx === 0 && ty === 0 && tz === 0) return { brep: b }
+  if (rx === 0 && ry === 0 && rz === 0 && sx === 1 && sy === 1 && sz === 1 && tx === 0 && ty === 0 && tz === 0) return undefined
   if (!(Math.abs(Math.abs(sx) - Math.abs(sy)) < 1e-12 && Math.abs(Math.abs(sx) - Math.abs(sz)) < 1e-12) || sx === 0)
-    return { reason: "a non-uniform scale has no exact model (it turns circles into ellipses)" }
-  const box = brepBox(b)
+    return "a non-uniform scale has no exact model (it turns circles into ellipses)"
   const c: Vec3 = { x: (box.lo.x + box.hi.x) / 2, y: (box.lo.y + box.hi.y) / 2, z: (box.lo.z + box.hi.z) / 2 }
   const a = (rx * Math.PI) / 180, bb = (ry * Math.PI) / 180, cc = (rz * Math.PI) / 180
   const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(bb), sb = Math.sin(bb), ck = Math.cos(cc), sk = Math.sin(cc)
@@ -44,8 +54,7 @@ const gizmo = (e: Element, b: Brep): ElementBrep => {
   // M = R · diag(sx, sy, sz)
   const m = [R[0]! * sx, R[1]! * sy, R[2]! * sz, R[3]! * sx, R[4]! * sy, R[5]! * sz, R[6]! * sx, R[7]! * sy, R[8]! * sz] as const
   const Mc = { x: m[0] * c.x + m[1] * c.y + m[2] * c.z, y: m[3] * c.x + m[4] * c.y + m[5] * c.z, z: m[6] * c.x + m[7] * c.y + m[8] * c.z }
-  const tr: Transform = { m, t: { x: c.x + tx - Mc.x, y: c.y + ty - Mc.y, z: c.z + tz - Mc.z } }
-  return { brep: transformBrep(b, tr) }
+  return { m, t: { x: c.x + tx - Mc.x, y: c.y + ty - Mc.y, z: c.z + tz - Mc.z } }
 }
 
 /**

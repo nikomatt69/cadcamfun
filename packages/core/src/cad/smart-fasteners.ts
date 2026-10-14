@@ -134,14 +134,20 @@ const fmt = (x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))
  * hole (or a counterbore) of some size and every following hole is a clearance hole of the same size, the last one possibly
  * a tap drill of that size; anything else is reported in `unfastened` with the reason.
  */
-export const planFasteners = (bodies: ReadonlyArray<FastenerBody>, options: FastenerOptions = {}): FastenerAnalysis => {
-  const gap = options.gap ?? 0.2
-  const withWashers = options.washers ?? true
+/** Holes of different parts on one axis that touch along it, ordered along `axis` (which points down, see `downward`). */
+export interface HoleStack {
+  readonly origin: Vec3
+  readonly axis: Vec3
+  readonly holes: ReadonlyArray<{ readonly body: string; readonly hole: RecognizedHole; readonly lo: number; readonly hi: number }>
+}
+
+const AXIS_TOL = 0.01
+
+/** Every hole of the bodies, grouped into stacks: same axis line (within 0.01 mm), touching along it (within `gap`). */
+const stacksOf = (bodies: ReadonlyArray<FastenerBody>, gap: number): { stacks: Array<{ origin: Vec3; axis: Vec3; holes: Placed[] }>; holes: Array<{ body: FastenerBody; hole: RecognizedHole }> } => {
   const holes: Array<{ body: FastenerBody; hole: RecognizedHole }> = []
   for (const body of bodies) for (const hole of recognizeHoles(body.brep)) holes.push({ body, hole })
-  // Group by axis line.
   const lines: Array<{ origin: Vec3; axis: Vec3; members: Array<{ body: FastenerBody; hole: RecognizedHole }> }> = []
-  const AXIS_TOL = 0.01
   for (const h of holes) {
     const d = h.hole.direction
     const line = lines.find((l) => {
@@ -153,8 +159,7 @@ export const planFasteners = (bodies: ReadonlyArray<FastenerBody>, options: Fast
     if (line !== undefined) line.members.push(h)
     else lines.push({ origin: h.hole.entry, axis: downward(d), members: [h] })
   }
-  const plans: FastenerPlan[] = []
-  const unfastened: UnfastenedStack[] = []
+  const stacks: Array<{ origin: Vec3; axis: Vec3; holes: Placed[] }> = []
   for (const line of lines) {
     // Place every hole on the line's axis (pointing down), then cut into stacks of touching holes.
     const placed: Placed[] = line.members.map(({ body, hole }) => {
@@ -163,13 +168,31 @@ export const planFasteners = (bodies: ReadonlyArray<FastenerBody>, options: Fast
       const a = t, c = t + s * hole.depth
       return { body, hole, lo: Math.min(a, c), hi: Math.max(a, c) }
     }).sort((x, y) => x.lo - y.lo || x.body.id.localeCompare(y.body.id))
-    const stacks: Placed[][] = []
+    const own: Placed[][] = []
     for (const p of placed) {
-      const last = stacks[stacks.length - 1]
+      const last = own[own.length - 1]
       if (last !== undefined && p.lo <= Math.max(...last.map((q) => q.hi)) + gap) last.push(p)
-      else stacks.push([p])
+      else own.push([p])
     }
-    for (const stack of stacks) {
+    for (const s of own) stacks.push({ origin: line.origin, axis: line.axis, holes: s })
+  }
+  return { stacks, holes }
+}
+
+/** The hole stacks of an assembly (see `planFasteners`), each with at least `min` holes (default 2: parts that share an axis). */
+export const holeStacks = (bodies: ReadonlyArray<FastenerBody>, options: { readonly gap?: number; readonly min?: number } = {}): ReadonlyArray<HoleStack> =>
+  stacksOf(bodies, options.gap ?? 0.2).stacks.filter((s) => s.holes.length >= (options.min ?? 2))
+    .map((s) => ({ origin: s.origin, axis: s.axis, holes: s.holes.map((p) => ({ body: p.body.id, hole: p.hole, lo: p.lo, hi: p.hi })) }))
+
+export const planFasteners = (bodies: ReadonlyArray<FastenerBody>, options: FastenerOptions = {}): FastenerAnalysis => {
+  const gap = options.gap ?? 0.2
+  const withWashers = options.washers ?? true
+  const { stacks: all, holes } = stacksOf(bodies, gap)
+  const plans: FastenerPlan[] = []
+  const unfastened: UnfastenedStack[] = []
+  for (const { origin, axis, holes: stack } of all) {
+    const line = { origin, axis }
+    {
       const at = add3(line.origin, scale3(line.axis, stack[0]!.lo))
       const ids = stack.map((p) => p.body.id)
       if (new Set(ids).size !== ids.length) { unfastened.push({ bodies: ids, at, reason: "two holes of one part on the same stack" }); continue }
