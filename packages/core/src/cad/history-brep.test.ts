@@ -243,6 +243,42 @@ describe("exact replay of a parametric history", () => {
     expect(rel(massProperties(part.bodies[0]!.brep!).volume, (PI * (64 - 25) * 10) / 2)).toBeLessThan(1e-9)
   })
 
+  test("fillets between curved faces of a turned part: cylinder to cone (convex) and cone to cylinder (concave), exact tori", () => {
+    const shaft = history([
+      { id: "s1", type: "sketch", plane: "XY", sketch: { entities: [
+        pt("a", 0, 0), pt("b", 10, 0), pt("c", 10, 20), pt("d", 6, 24), pt("e", 6, 50), pt("f", 0, 50),
+        line("l1", "a", "b"), line("l2", "b", "c"), line("l3", "c", "d"), line("l4", "d", "e"), line("l5", "e", "f"), line("l6", "f", "a")
+      ], constraints: ["a", "b", "c", "d", "e", "f"].map((p) => ({ type: "fixed", point: p }) as DimConstraint) } },
+      { id: "shaft", type: "revolve", sketch: "s1", axis: "y", operation: "new" },
+      { id: "round", type: "fillet", radius: 1, edges: { curved: true, kind: "both", within: { min: [-11, 19, -11], max: [11, 25, 11] } } }
+    ])
+    // The ring a rolling ball of radius rho leaves at a corner P of the section (r, a) between faces with outward normals
+    // nA, nB, by Pappus: the area between the corner and the ball (kite minus sector) times the path of its centroid.
+    const ring = (P: [number, number], nA: [number, number], nB: [number, number], rho: number, convex: boolean): number => {
+      const alpha = Math.acos(nA[0] * nB[0] + nA[1] * nB[1])
+      const s = [nA[0] + nB[0], nA[1] + nB[1]], sl = Math.hypot(s[0]!, s[1]!)
+      const w = convex ? [-s[0]! / sl, -s[1]! / sl] : [s[0]! / sl, s[1]! / sl]
+      const d = rho / Math.cos(alpha / 2)
+      const C = [P[0] + w[0]! * d, P[1] + w[1]! * d]
+      const k = convex ? 1 : -1
+      const T1 = [C[0]! + k * nA[0] * rho, C[1]! + k * nA[1] * rho], T2 = [C[0]! + k * nB[0] * rho, C[1]! + k * nB[1] * rho]
+      const kite = rho * rho * Math.tan(alpha / 2), sector = rho * rho * (alpha / 2)
+      const gk = (2 * P[0] + T1[0]! + T2[0]! + 2 * C[0]!) / 6
+      const gs = C[0]! - w[0]! * (2 * rho * Math.sin(alpha / 2)) / (3 * (alpha / 2))
+      const area = kite - sector
+      return 2 * PI * ((kite * gk - sector * gs) / area) * area
+    }
+    // A 45 degree cone: the mesh blend, and the exact one with it, leave shallower junctions (under 25 degrees) alone.
+    const l = Math.SQRT2
+    const cone: [number, number] = [1 / l, 1 / l]
+    const plain = PI * 100 * 20 + (PI * 4 / 3) * (100 + 60 + 36) + PI * 36 * 26
+    const r = rebuildExact(shaft)
+    expect(r.bodies[0]!.reason).toBeUndefined()
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(rel(v, plain - ring([10, 20], [1, 0], cone, 1, true) + ring([6, 24], cone, [1, 0], 1, false))).toBeLessThan(1e-9)
+    expect(r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "torus").length).toBe(2)
+  }, 180_000)
+
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
     const r = 1
     const holed = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "round", type: "fillet", radius: r, edges: { curved: true, within: { min: [10, 5, -1], max: [30, 20, 7] } } }])
