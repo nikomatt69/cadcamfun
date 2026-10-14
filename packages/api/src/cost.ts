@@ -54,16 +54,37 @@ type ToolpathData = {
   parameters?: { feedrate?: number }
 }
 
+/**
+ * What a program made by the native CAM kernel says about its own cost: the cut length of every operation, the cycle time
+ * (cutting, rapids and tool changes, from the replay of the NC) and the volume of the raw stock. A saved kernel program
+ * carries no legacy `operations[].pathLength` or `stockDimensions`, so without this it would be priced at the setup alone.
+ */
+const kernelFacts = (data: unknown): { readonly pathLengthMm: number; readonly volumeM3: number; readonly minutes: number } | undefined => {
+  const artifact = (data as { kernelArtifact?: unknown } | null)?.kernelArtifact as
+    | { cycleTimeSeconds?: unknown; stock?: { initialVolume?: unknown }; operations?: ReadonlyArray<{ cutLength?: unknown }> }
+    | undefined
+  if (artifact === null || typeof artifact !== "object") return undefined
+  const seconds = artifact.cycleTimeSeconds, volume = artifact.stock?.initialVolume
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0 || typeof volume !== "number" || !Number.isFinite(volume) || volume < 0 || !Array.isArray(artifact.operations)) return undefined
+  let length = 0
+  for (const op of artifact.operations) if (typeof op.cutLength === "number" && Number.isFinite(op.cutLength)) length += op.cutLength
+  return { pathLengthMm: length, volumeM3: volume / 1e9, minutes: seconds / 60 }
+}
+
 export function calculateEstimate({ toolpath, settings, toolWear, materialCost }: CostInput): CostResult {
   const data = (toolpath.data ?? {}) as ToolpathData
+  const kernel = kernelFacts(toolpath.data)
 
   let totalPathLengthMm = 0
   if (Array.isArray(data.operations)) {
     for (const op of data.operations) if (typeof op.pathLength === "number") totalPathLengthMm += op.pathLength
   }
-  const materialVolumeM3 = data.stockDimensions
-    ? (data.stockDimensions.x * data.stockDimensions.y * data.stockDimensions.z) / (1000 * 1000 * 1000)
-    : 0
+  if (kernel !== undefined) totalPathLengthMm = kernel.pathLengthMm
+  const materialVolumeM3 = kernel !== undefined
+    ? kernel.volumeM3
+    : data.stockDimensions
+      ? (data.stockDimensions.x * data.stockDimensions.y * data.stockDimensions.z) / (1000 * 1000 * 1000)
+      : 0
 
   let calculatedToolWearCost = 0
   if (toolWear && totalPathLengthMm > 0) {
@@ -78,8 +99,9 @@ export function calculateEstimate({ toolpath, settings, toolWear, materialCost }
   }
 
   // `||` (not `??`) on purpose: a feed rate of 0 falls back to 1000, as in legacy.
-  const feedRateMmMin = (data.parameters?.feedrate as number) || 1000
-  const machineTimeMinutes = totalPathLengthMm > 0 && feedRateMmMin > 0 ? totalPathLengthMm / feedRateMmMin : 0
+  // A kernel program knows its time (from the replay of the NC), so its effective feed is cut length over time.
+  const feedRateMmMin = kernel !== undefined && kernel.minutes > 0 && totalPathLengthMm > 0 ? totalPathLengthMm / kernel.minutes : (data.parameters?.feedrate as number) || 1000
+  const machineTimeMinutes = kernel !== undefined ? kernel.minutes : totalPathLengthMm > 0 && feedRateMmMin > 0 ? totalPathLengthMm / feedRateMmMin : 0
 
   const machineRate = settings.defaultMachineHourlyRate
   const operatorRate = settings.defaultOperatorHourlyRate

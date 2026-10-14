@@ -42,8 +42,8 @@ export interface ToolpathCostInput {
   readonly materialId: string | null
 }
 
-export type PathLengthSource = "gcode" | "moves" | "operations" | "none"
-export type VolumeSource = "stockDimensions" | "solid" | "drawing" | "none"
+export type PathLengthSource = "kernel" | "gcode" | "moves" | "operations" | "none"
+export type VolumeSource = "kernel" | "stockDimensions" | "solid" | "drawing" | "none"
 
 export interface CostMeasurement {
   /** Cutting (feed) moves only, millimetres. */
@@ -52,6 +52,8 @@ export interface CostMeasurement {
   readonly feedRateMmMin: number
   readonly pathLengthSource: PathLengthSource
   readonly volumeSource: VolumeSource
+  /** Machine time when the program knows it (a native kernel program: the replayed cycle time, tool changes included). */
+  readonly machineMinutes?: number
 }
 
 export interface CostEstimateInput {
@@ -170,6 +172,14 @@ const arcLength = (
  * update the current position.
  */
 export const measureGcode = (gcode: string): GcodeMeasurement => {
+  // A program with subprograms (`M98`) runs the same text several times, and a canned cycle (`G81`, `G83`, ...) is a drilling stroke
+  // with its retract, not a move to its X Y Z: only the interpreter that replays the kernel's NC follows either.
+  if (/^\s*(?:N\d+\s+)?M98\b/im.test(gcode) || /\bG(?:73|8[123])\b/i.test(gcode.replace(/\([^)]*\)|;.*$/gm, " "))) {
+    const run = cam.testing.interpretGcode(gcode)
+    let feed: number | undefined
+    for (const s of run.segments) if (s.kind === "linear" || s.kind === "arc") feed = s.feed
+    return { lengthMm: run.cutLength, feedMmMin: feed }
+  }
   let x = 0
   let y = 0
   let z = 0
@@ -308,9 +318,33 @@ const measureVolume = (data: unknown): { readonly materialVolumeM3: number; read
   return { materialVolumeM3: 0, source: "none" }
 }
 
+/**
+ * What a native kernel program says about its own cost: the cut length of every operation, the cycle time of the replayed NC
+ * (cutting, rapids, tool changes) and the volume of the raw stock. Its stored `data` has no legacy `stockDimensions`, and its NC
+ * may call subprograms, so these figures are the ones to price.
+ */
+const measureKernel = (record: Record<string, unknown>): CostMeasurement | undefined => {
+  const artifact = record["kernelArtifact"]
+  if (!isRecord(artifact) || !Array.isArray(artifact["operations"]) || !isRecord(artifact["stock"])) return undefined
+  const seconds = finite(artifact["cycleTimeSeconds"]), volume = finite(artifact["stock"]["initialVolume"])
+  if (seconds === undefined || seconds < 0 || volume === undefined || volume < 0) return undefined
+  let length = 0
+  for (const op of artifact["operations"]) {
+    const cut = isRecord(op) ? finite(op["cutLength"]) : undefined
+    if (cut !== undefined && cut > 0) length += cut
+  }
+  const minutes = seconds / 60
+  return {
+    totalPathLengthMm: length, materialVolumeM3: volume / MM3_PER_M3, machineMinutes: minutes,
+    feedRateMmMin: minutes > 0 && length > 0 ? length / minutes : 1000, pathLengthSource: "kernel", volumeSource: "kernel"
+  }
+}
+
 const measure = (toolpath: ToolpathCostInput): CostMeasurement => {
   const data = toolpath.data ?? {}
   const record = isRecord(data) ? data : {}
+  const native = measureKernel(record)
+  if (native !== undefined) return native
   const gcode = typeof toolpath.gcode === "string" && toolpath.gcode.length > 0
     ? toolpath.gcode
     : typeof record.gcode === "string" && record.gcode.length > 0
@@ -356,9 +390,9 @@ const estimate = (input: CostEstimateInput): CostEstimate => {
   const measured = measure(toolpath)
 
   const totalSetupTimeMinutes = settings.defaultSetupTime || 0
-  const machineTimeMinutes = measured.totalPathLengthMm > 0 && measured.feedRateMmMin > 0
+  const machineTimeMinutes = measured.machineMinutes ?? (measured.totalPathLengthMm > 0 && measured.feedRateMmMin > 0
     ? measured.totalPathLengthMm / measured.feedRateMmMin
-    : 0
+    : 0)
 
   const calculatedToolWearCost = toolWear && measured.totalPathLengthMm > 0
     ? ((measured.totalPathLengthMm / 1000) * toolWear.wearRatePerMeter / 100) * toolWear.replacementCost

@@ -46,13 +46,16 @@ export const CamManufactureInput = Schema.Struct({
   /** Cutter library with flute length, stickout and holder; replaces the default crib. */
   tools: Schema.optionalKey(Schema.Array(cam.kernel.CutterSchema).check(Schema.isMinLength(1), Schema.isMaxLength(200))),
   /** Break the top edges with a chamfer of this width, mm (2D chamfer operations). */
-  deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5)))
+  deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5))),
+  /** Write toolpaths that repeat translated (hole patterns, copies of a pocket) once as an `M98` subprogram (Fanuc and Haas posts). */
+  subprograms: Schema.optionalKey(Schema.Boolean)
 })
 export const CamManufactureOperationInput = Schema.Struct({
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
   scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
-  operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr
+  operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr,
+  subprograms: CamManufactureInput.fields.subprograms
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

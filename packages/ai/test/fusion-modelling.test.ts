@@ -89,7 +89,7 @@ describe("the assistant is told about them", () => {
     expect(parametric.body).toContain("fusion-360-modelling")
     const modeler = await Bun.file(new URL("../src/nikcli/prompts/modeler.txt", import.meta.url)).text()
     expect(modeler).toContain("fusion-360-modelling")
-    const system = await Bun.file(new URL("../src/prompts/system.ts", import.meta.url)).text()
+    const system = await Bun.file(new URL("../src/prompts/base/modelling.txt", import.meta.url)).text()
     expect(system).toContain("fusion-360-modelling")
   })
 })

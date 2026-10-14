@@ -19,7 +19,8 @@ export const CamKernelRequest = Schema.Struct({
   operations: CamManufactureInput.fields.operations,
   /** Cutter library with holders (the kernel's default crib when absent). */
   tools: CamManufactureInput.fields.tools,
-  deburr: CamManufactureInput.fields.deburr
+  deburr: CamManufactureInput.fields.deburr,
+  subprograms: CamManufactureInput.fields.subprograms
 })
 export type CamKernelRequest = typeof CamKernelRequest.Type
 

@@ -2,8 +2,11 @@
  * The exact model of a drawing element, as the property panel shows it: what the B-rep kernel (`@cadcamfun/core` `brep`)
  * says about the solid, not about its display mesh. Every element with an exact model counts: STEP imports (`brep`),
  * catalogue solids, parametric parts and Boolean elements (computed exactly on their operands).
+ *
+ * The analysis is the one the sidecar (`/api/cad/exact/analyze`) and the assistant (`cad.exact`) run, `analyzeBrep` of
+ * `@cadcamfun/core`, so the panel, the API and the CAM planner agree on holes and on how the part will be machined.
  */
-import { brep, elementBrep } from "@cadcamfun/core"
+import { analyzeBrep, brep, elementBrep, type SceneHole, type SceneMachining } from "@cadcamfun/core"
 
 export type ExactAnalysis =
   | {
@@ -19,6 +22,10 @@ export type ExactAnalysis =
       readonly holes: number | undefined
       readonly valid: boolean
       readonly issues: ReadonlyArray<string>
+      /** The holes the kernel recognises on the faces (drilled, counterbored, countersunk), as the CAM planner will drill them. */
+      readonly drilled: ReadonlyArray<SceneHole>
+      /** Whether the CAM planner machines the solid by its features (holes, pockets, outlines) or as a 3D surface job, and why. */
+      readonly machining: SceneMachining
     }
   | { readonly ok: false; readonly reason: string }
 
@@ -36,23 +43,11 @@ export const analyzeExact = (element: Record<string, unknown>, all: ReadonlyArra
     return { ok: false, reason: cause instanceof Error ? cause.message : String(cause) }
   }
   if (placed.brep === undefined) return { ok: false, reason: placed.reason }
-  const b = placed.brep
-  const report = brep.validateBrep(b)
-  const mass = brep.massProperties(b)
-  const surfaces: Record<string, number> = {}
-  for (const f of b.faces) surfaces[f.surface.kind] = (surfaces[f.surface.kind] ?? 0) + 1
+  const a = analyzeBrep(String(element["id"] ?? ""), String(element["name"] ?? element["type"] ?? "part"), placed.brep)
   return {
-    ok: true,
-    faces: b.faces.length,
-    edges: b.edges.length,
-    vertices: b.vertices.length,
-    surfaces,
-    volume: mass.volume,
-    area: mass.area,
-    centroid: mass.centroid,
-    holes: report.genus,
-    valid: report.valid,
-    issues: report.issues.slice(0, 5).map((i) => i.message)
+    ok: true, faces: a.faces, edges: a.edges, vertices: a.vertices, surfaces: a.surfaces,
+    volume: a.volume, area: a.area, centroid: a.centroid, holes: a.throughHoles, valid: a.valid, issues: a.issues.slice(0, 5),
+    drilled: a.holes, machining: a.machining
   }
 }
 

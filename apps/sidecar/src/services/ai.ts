@@ -13,6 +13,7 @@ import { drawingRevision } from "./cam-program.ts"
 import { z } from "zod"
 import { AppConfigService } from "../config.ts"
 import { captureViewport } from "./ai-vision.ts"
+import { assemblyForModel, exactForModel } from "./ai-exact.ts"
 import { changeParameters, historyRevision, inspectParametric, testParametric } from "./ai-parametric.ts"
 import { ActingUser } from "./acting-user.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
@@ -195,6 +196,7 @@ const toolHandlers = Effect.gen(function*() {
         part: { kind: "elements", elements: elements as never }, ...(stock !== undefined ? { stock } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
+        ...(input.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}) }
       }
       const stockNote = stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."
@@ -411,6 +413,20 @@ const toolHandlers = Effect.gen(function*() {
       const p = origin(first), q = origin(second)
       const gaps = a && b ? Object.fromEntries((["x", "y", "z"] as const).map((axis) => [axis, Math.max(0, a.min[axis] - b.max[axis], b.min[axis] - a.max[axis])])) : null
       return { ok: true, first: { id: first.id, placement: p, bounds: a ?? null, parametric: componentParameters(first) }, second: { id: second.id, placement: q, bounds: b ?? null, parametric: componentParameters(second) }, originDistanceMm: Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z), originConvention: "Nominal x,y,z placement fields; actual renderer origins and pivots are available in cad_vision spatial evidence", boundingGapsMm: gaps, explicitReferences: [first, second].flatMap((e) => Array.isArray(e["operands"]) ? e["operands"].filter((id) => id === first.id || id === second.id).map((id) => ({ from: e.id, to: id, kind: "boolean operand" })) : []), note: "Nominal bounding measurements only. Equal parameter names are not shared bindings; bounding overlap does not prove interference.", ...where(loaded) }
+    },
+    cadExact: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try {
+        return exactForModel(cad.analyzeScene(loaded.elements, { ...(input.ids !== undefined ? { ids: input.ids } : {}), ...(input.machining !== undefined ? { machining: input.machining } : {}) }), where(loaded))
+      } catch (error) { return { ok: false, error: `The exact analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
+    },
+    cadAssembly: async (projectId, input) => {
+      if (!(await Effect.runPromise(projects.find(acting().id, projectId)))) return { ok: false, error: "Project not found or not accessible." }
+      const loaded = await load(projectId)
+      try {
+        return assemblyForModel(cad.assemblyReport(loaded.elements, input.washers !== undefined ? { washers: input.washers } : {}), where(loaded))
+      } catch (error) { return { ok: false, error: `The assembly analysis failed: ${error instanceof Error ? error.message : String(error)}` } }
     },
     webSearch: async (input, signal) => appConfig.aiOffline ? { ok: false, error: "Web search is disabled in offline mode." } : searchWeb(input, signal),
     vision: async (projectId, mode, focus, signal) => {

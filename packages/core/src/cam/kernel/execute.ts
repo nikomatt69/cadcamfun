@@ -746,9 +746,16 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       stock: { initialVolume: Math.round(initialVolume), finalVolume: Math.round(hf.volume()), partVolume: Math.round(partVolume), remainingVolume: Math.round(remainingVolume * 10) / 10, maxRemaining: Math.round(maxRemaining * 1000) / 1000, cellSize: Math.round(Math.max(hf.cellX, hf.cellY) * 1000) / 1000 },
       cycleTimeSeconds,
       identity: { job: jobDigest, part: digestOf("cam-kernel/part@1", job.part), nc: sha256(nc), algorithm: KERNEL_ALGORITHM },
-      notes: prepared.plan?.notes ?? []
+      notes: [...(prepared.plan?.notes ?? []), ...subprogramNotes(nc)]
     }
   }
+}
+
+/** One note when the NC calls subprograms (`post.options.subprograms`): how many, how many calls, how many blocks they save. */
+const subprogramNotes = (nc: string): ReadonlyArray<string> => {
+  const calls = (nc.match(/^(?:N\d+ )?M98 P\d+/gm) ?? []).length
+  const programs = new Set([...nc.matchAll(/^(?:N\d+ )?M98 P(\d+)/gm)].map((m) => m[1])).size
+  return calls === 0 ? [] : [`The NC repeats ${calls} toolpaths through ${programs} subprogram${programs === 1 ? "" : "s"} (M98): the same motion at another place is written once`]
 }
 
 /** Prepares and runs a job. */

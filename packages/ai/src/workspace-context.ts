@@ -80,6 +80,9 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   const listedCount = arr(s["elements"]).length
   const total = count(s["totalElementCount"]) ?? (Array.isArray(s["elements"]) ? listedCount + (count(s["omittedElementCount"]) ?? 0) : undefined)
   lines.push(`Model: ${total ?? "unknown count of"} element${total === 1 ? "" : "s"}${total !== undefined && total > 0 ? ` (${countsOf(arr(s["elements"]))}${(total > listedCount) ? ", more not listed" : ""})` : ""}; ${Array.isArray(s["selectedIds"]) ? `${selectedIds.length} selected` : "selection unknown"}${selectedIds.length > 0 ? ` (${selectedIds.join(", ")})` : ""}.`)
+  const solids = rec(s["solids"])
+  const exactSolids = count(solids["brep"]) ?? 0, historySolids = count(solids["parametric"]) ?? 0
+  if (exactSolids + historySolids > 0) lines.push(`Kernel solids: ${exactSolids} exact B-rep (STEP), ${historySolids} parametric. Per-solid validity and how CAM will machine them: cad action exact.`)
   const layers = arr(s["layers"]).map(rec)
   if (layers.length > 0) lines.push(`Layers: ${layers.slice(0, 12).map((l) => `${label(l["name"])}${l["visible"] === false ? " (hidden)" : ""}${l["locked"] === true ? " (locked)" : ""}`).join(", ")}${layers.length > 12 ? `, +${layers.length - 12} more` : ""}; active ${str(s["activeLayer"]) ?? "?"}.`)
   const stock = rec(s["workpiece"])
@@ -105,6 +108,28 @@ export const renderWorkspaceContext = (snapshot: unknown, options: RenderOptions
   if (values.length) lines.push(`Cutting settings: ${values.join(", ")}.`)
   const toolpaths = arr(cam["toolpaths"]).map(rec)
   if (toolpaths.length > 0) lines.push(`Toolpaths: ${toolpaths.slice(0, 8).map((t) => `${label(t["name"])} [${str(t["id"]) ?? "id unknown"}] (${n(t["moveCount"])} moves)`).join(", ")}${toolpaths.length > 8 ? `, +${toolpaths.length - 8} more` : ""}.`)
+
+  // Native CAM kernel: the presets the next manufacture run uses and the last release with its claims.
+  const kernel = rec(cam["kernel"])
+  const kernelSettings = rec(kernel["settings"])
+  if (Object.keys(kernelSettings).length > 0) {
+    const preset = [
+      str(kernelSettings["material"]) !== undefined ? `grade ${str(kernelSettings["material"])}` : undefined,
+      str(kernelSettings["machine"]) !== undefined ? `machine ${str(kernelSettings["machine"])}` : undefined,
+      str(kernelSettings["origin"]) !== undefined ? `origin ${str(kernelSettings["origin"])}` : undefined,
+      num(kernelSettings["finishAllowance"]) !== undefined ? `finish allowance ${n(kernelSettings["finishAllowance"])} mm` : undefined,
+      num(kernelSettings["scallop"]) !== undefined ? `scallop ${n(kernelSettings["scallop"])} mm` : undefined,
+      kernelSettings["subprograms"] === true ? "subprograms on" : undefined,
+      (count(kernelSettings["plannedOperations"]) ?? 0) > 0 ? `${count(kernelSettings["plannedOperations"])} planned operations` : undefined
+    ].filter((x): x is string => x !== undefined)
+    lines.push(`CAM kernel: ${preset.join(", ")}.`)
+  }
+  const artifact = rec(kernel["artifact"])
+  if (str(artifact["release"]) !== undefined) {
+    const claims = arr(artifact["claims"]).map(rec)
+    const open = claims.filter((claim) => str(claim["status"]) !== "passed").map((claim) => `${label(claim["id"])} ${label(claim["status"])}`)
+    lines.push(`Kernel run: release ${str(artifact["release"])}${str(artifact["machine"]) ? ` on ${label(artifact["machine"])}` : ""}, ${claims.length - open.length} of ${claims.length} claims passed${open.length > 0 ? `; open: ${open.slice(0, 6).join(", ")}` : ""}${(count(artifact["issues"]) ?? 0) > 0 ? `; ${count(artifact["issues"])} issues` : ""}. Evidence: cam review.`)
+  }
 
   // 4. Verification.
   const verification = rec(cam["verification"])

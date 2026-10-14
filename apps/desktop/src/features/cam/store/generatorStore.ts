@@ -17,7 +17,7 @@ export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
 /** The kernel job the panel builds: presets, quality, and the edited plan / cutter library (absent = the kernel decides). */
-export type KernelSettings = Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "operations" | "tools">
+export type KernelSettings = Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "subprograms" | "operations" | "tools">
 const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
@@ -230,8 +230,14 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
 /** Restoring the captured request also restores the controls that produced its native evidence. */
 export const restoreKernelSettings = (request: CamKernelRequest): void => {
   const state = useGeneratorStore.getState()
+  // Absent keys, never undefined values (the request schema takes the former): deburr, the edited plan, the cutter library and the subprogram choice come back too.
+  const optional: Record<string, unknown> = {
+    finishAllowance: request.finishAllowance, scallop: request.scallop, resolution: request.resolution,
+    deburr: request.deburr, subprograms: request.subprograms, operations: request.operations, tools: request.tools
+  }
+  for (const key of Object.keys(optional)) if (optional[key] === undefined) delete optional[key]
   useGeneratorStore.setState({
-    kernelSettings: { material: request.material, machine: request.machine ?? cam.kernel.DEFAULT_MACHINE.id, origin: request.origin ?? "stock-center", finishAllowance: request.finishAllowance, scallop: request.scallop, resolution: request.resolution },
+    kernelSettings: { material: request.material, machine: request.machine ?? cam.kernel.DEFAULT_MACHINE.id, origin: request.origin ?? "stock-center", ...optional } as KernelSettings,
     settings: { ...state.settings, tolerance: request.tolerance ?? 0.01, workOffset: request.workOffset ?? "G54" }
   })
 }

@@ -29,6 +29,9 @@ test("the property panel shows the exact model of a STEP import at once", async 
     expect(stats!.textContent).toContain("mm³")
     expect(stats!.textContent).toContain("cylinder 1")
     expect(stats!.textContent).toContain("yes")
+    // The same analysis the sidecar and the assistant run: the hole the faces show, and how the CAM planner will take the part.
+    expect(root.querySelector("[data-testid='exact-drilled']")!.textContent).toContain("Ø10")
+    expect(root.querySelector("[data-testid='exact-machining']")!.textContent).toBe("By features: 1 holes, 0 pockets, 1 outlines")
   } finally { dispose() }
 })
 

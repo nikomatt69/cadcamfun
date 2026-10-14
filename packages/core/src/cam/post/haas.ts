@@ -1,4 +1,5 @@
 import { emitProgram } from "./emitter.ts"
+import { fanucProgramNumber, fanucSubprograms } from "./fanuc.ts"
 import type { Dialect, Post } from "./types.ts"
 
 /**
@@ -24,11 +25,8 @@ export const haasDialect: Dialect = {
   uppercaseComments: true,
   rotary: true,
   tcp: "G234",
-  begin: (program) => {
-    const requested = Number(program.metadata?.["programNumber"])
-    const number = Number.isInteger(requested) && requested >= 1 && requested <= 9999 ? requested : 1000
-    return ["%", `O${String(number).padStart(4, "0")}`]
-  },
+  begin: (program) => ["%", `O${String(fanucProgramNumber(program)).padStart(4, "0")}`],
+  subprograms: fanucSubprograms,
   setup: ["G90", "G17", "G94", "G40", "G49", "G80"],
   toolChange: (n) => [`T${n} M6`, `G43 H${n}`],
   end: "M30",

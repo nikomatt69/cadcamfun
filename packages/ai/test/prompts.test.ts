@@ -8,7 +8,8 @@
  */
 import { describe, expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
+import { BASE_LAYERS, CADCAM_SYSTEM_PROMPT, MODE_PROMPTS, systemPrompt, turnSystemPrompt } from "../src/prompts/system.ts"
+import { CADCAM_SKILLS } from "../src/skills/index.ts"
 
 const literals = (schema: unknown): ReadonlyArray<string> =>
   ((schema as { members?: ReadonlyArray<{ literal: unknown }> }).members ?? []).map((m) => String(m.literal))
@@ -91,13 +92,45 @@ describe("manufacturing judgement in the system prompt", () => {
   })
 })
 
+describe("layered base prompt (the way nikcli builds its system prompt)", () => {
+  test("the base is its layers in order, one file each, with the engineering standards among them", () => {
+    expect(BASE_LAYERS.map((layer) => layer.id)).toEqual(["identity", "recovery", "modelling", "engineering", "machinability", "machining", "workflow", "evidence"])
+    for (const layer of BASE_LAYERS) {
+      expect(layer.text.length).toBeGreaterThan(300)
+      expect(CADCAM_SYSTEM_PROMPT).toContain(layer.text)
+    }
+  })
+
+  test("the engineering layer carries the mechanical and industrial rules", () => {
+    const text = BASE_LAYERS.find((layer) => layer.id === "engineering")!.text
+    for (const phrase of ["ISO 2768", "ISO 286", "H7/h6", "ISO 273", "ISO 4762", "ISO 13715", "ISO 513", "DIN 76", "ISO 21920", "dimensioned by rule, not proven"]) expect(text).toContain(phrase)
+  })
+
+  test("the industrial-standards skill holds the tables the engineering layer points to", () => {
+    const skill = CADCAM_SKILLS.find((candidate) => candidate.name === "industrial-standards")!
+    expect(BASE_LAYERS.find((layer) => layer.id === "engineering")!.text).toContain("industrial-standards")
+    for (const phrase of ["ISO 2768-1", "H7/g6", "6.6", "ISO 4762", "DIN 6885", "ISO 54", "Sheet metal", "dimensioned by rule, not analysed"]) expect(skill.body).toContain(phrase)
+  })
+
+  test("every turn states the environment: date, units, default standards, axes", () => {
+    const now = new Date("2026-10-14T10:00:00Z")
+    for (const prompt of [systemPrompt(undefined, "cad", undefined, undefined, now), turnSystemPrompt(undefined, "cad", undefined, undefined, now)]) {
+      expect(prompt).toContain("<env>")
+      expect(prompt).toContain("Today's date: Wed Oct 14 2026")
+      expect(prompt).toContain("ISO 2768-mK")
+      expect(prompt).toContain("Z up")
+    }
+  })
+})
+
 describe("prompt size", () => {
   test("the prompt itself stays inside the per-turn token budget", () => {
     // nikcli prepends the system prompt on every turn, so it is a recurring
     // cost, not a one-off: ~10 000 characters is roughly 2 500 tokens charged
     // to every request. The prompt was 8.3k before the machining knowledge was
-    // added; this ceiling keeps the next edit accountable for what it adds.
-    expect(CADCAM_SYSTEM_PROMPT.length).toBeLessThan(10_400)
+    // added; the engineering-standards layer (ISO / DIN rules a professional part follows) took it to 12.6k on purpose, so
+    // this ceiling keeps the next edit accountable for what it adds. Reference material belongs in a skill.
+    expect(CADCAM_SYSTEM_PROMPT.length).toBeLessThan(12_900)
   })
 
   test("the mode block is a whole second prompt and stays short", () => {
@@ -161,8 +194,8 @@ describe("reply language wiring (nikcli locale resolver)", () => {
   })
 
   test("the language line does not bloat the prompt beyond the per-turn budget", () => {
-    // Even the longest plausible name must leave the prompt well under 11k characters.
+    // Even the longest plausible name must leave the prompt (base, mode, environment, language) well under 13.6k characters.
     const prompt = systemPrompt(undefined, "general", undefined, { tag: "zh", name: "Chinese" })
-    expect(prompt.length).toBeLessThan(11_000)
+    expect(prompt.length).toBeLessThan(13_600)
   })
 })

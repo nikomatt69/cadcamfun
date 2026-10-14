@@ -21,6 +21,7 @@ import { ProjectToolpathsHandlers, ToolpathsHandlers } from "./http/toolpaths.ts
 import { ToolpathExtrasHandlers } from "./http/toolpath-extras.ts"
 import { ToolpathLibrary } from "./repos/toolpath-library.ts"
 import { ToolpathGeneratorHandlers } from "./http/toolpath-generator.ts"
+import { CadExactHandlers } from "./http/cad-exact.ts"
 import { ToolpathRepo } from "./repos/toolpath-repo.ts"
 import { LibraryHandlers } from "./http/library.ts"
 import { LibraryRepo } from "./repos/library-repo.ts"
@@ -73,7 +74,7 @@ import { EventsHandlers } from "./http/events.ts"
 import { LiveEvents } from "./services/live-events.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
-export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers)
+export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers)
 
 /**
  * The version-control services themselves. `LocalProfile` is provided here (not in `RepoServices`)
@@ -115,7 +116,7 @@ export const Services = AiLive.pipe(Layer.provideMerge(BridgeTokens.layer.pipe(L
 export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
-  Api.groups.drawings, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.projectToolpaths, Api.groups.library,
+  Api.groups.drawings, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.projectToolpaths, Api.groups.library,
   Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion
 ) {}
 
