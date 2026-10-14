@@ -49257,6 +49257,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                     "type": "object",
                   },
+                  "subprograms": {
+                    "type": "boolean",
+                  },
                   "tolerance": {
                     "exclusiveMinimum": 0,
                     "type": "number",

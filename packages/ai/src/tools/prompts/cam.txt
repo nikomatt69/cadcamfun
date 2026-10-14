@@ -10,7 +10,7 @@ Actions
 - analyze: static G-code and machine-axis findings, not a safety verdict.
 - stock: configured stock, volume and workpieceMatchesStock.
 - vision: the displayed CAM preview and its evidence.
-- chain_suggest: recommend the next operation.
+- chain_suggest: next operation.
 - chain_status: previous operation, rest tool, warnings.
 - materials, cutting_data, manufacture: CAM kernel grades; feeds/speeds of a cutter in a material; plan, NC and replay claims.
 
@@ -25,7 +25,7 @@ Parameters (mm, mm/min, rpm)
 - vision: focus.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, deburr, planOnly, operations, tools.
+- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, deburr, planOnly, operations, tools, subprograms (M98 for repeated toolpaths).
 
 Result (JSON)
 - ok and data/findings. Empty analyze issues means "no static findings", never "safe".

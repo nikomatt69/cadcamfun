@@ -196,6 +196,7 @@ const toolHandlers = Effect.gen(function*() {
         part: { kind: "elements", elements: elements as never }, ...(stock !== undefined ? { stock } : {}),
         ...(machine !== undefined ? { machine } : {}), ...(input.origin !== undefined ? { origin: input.origin } : {}),
         ...(input.operations !== undefined ? { operations: input.operations } : {}), ...(input.tools !== undefined ? { tools: input.tools } : {}),
+        ...(input.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
         quality: { ...(input.finishAllowance !== undefined ? { finishAllowance: input.finishAllowance } : {}), ...(input.scallop !== undefined ? { scallop: input.scallop } : {}), ...(input.deburr !== undefined ? { deburr: input.deburr } : {}) }
       }
       const stockNote = stored === undefined ? "No stock configured: the kernel used the part bounds plus 2 mm on the sides and 1 mm on top." : "Configured stock, standing on the part's bottom."

@@ -3470,6 +3470,7 @@ export function make(options: ClientOptions) {
               operations: input["operations"],
               tools: input["tools"],
               deburr: input["deburr"],
+              subprograms: input["subprograms"],
             },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],

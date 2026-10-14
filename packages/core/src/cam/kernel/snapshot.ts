@@ -24,6 +24,8 @@ export interface KernelSnapshot {
   readonly tolerance?: number
   readonly resolution?: number
   readonly deburr?: number
+  /** Write toolpaths that repeat translated as `M98` subprograms (Fanuc and Haas posts). */
+  readonly subprograms?: boolean
   readonly elements: ReadonlyArray<Readonly<Record<string, unknown>>>
   /** The editor's stock: centre X/Y and size; its bottom is the part's lowest point. */
   readonly stock?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly depth: number }
@@ -54,6 +56,7 @@ export const jobOfSnapshot = (s: KernelSnapshot): CamResult<ManufacturingJob> =>
       part: { kind: "elements", elements: s.elements }, ...(machine !== undefined ? { machine } : {}), ...(stock !== undefined ? { stock } : {}),
       ...(s.origin !== undefined ? { origin: s.origin } : {}), ...(s.workOffset !== undefined ? { workOffset: s.workOffset } : {}),
       ...(s.operations !== undefined ? { operations: s.operations } : {}), ...(s.tools !== undefined ? { tools: s.tools } : {}),
+      ...(s.subprograms === true ? { post: { options: { subprograms: true } } } : {}),
       quality
     }
   }

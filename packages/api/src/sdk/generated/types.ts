@@ -1328,6 +1328,7 @@ export type ToolpathGeneratorManufacturePayload = {
     readonly number?: number
   }>
   readonly deburr?: number
+  readonly subprograms?: boolean
 }
 
 export type ToolpathGeneratorParsePayload = { readonly gcode: string; readonly name?: string }
@@ -5314,6 +5315,7 @@ export type ToolpathGeneratorManufactureInput = {
   readonly operations?: ToolpathGeneratorManufacturePayload["operations"]
   readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
   readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
+  readonly subprograms?: ToolpathGeneratorManufacturePayload["subprograms"]
 }
 
 export type ToolpathGeneratorManufactureOutput =
