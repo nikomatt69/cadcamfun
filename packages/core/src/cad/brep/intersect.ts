@@ -505,10 +505,19 @@ export const refineSsiPolyline = (
   const refined: SsiPoint[] = []
   const n = pts.length
   for (let i = 0; i < n; i++) {
-    const prev = pts[Math.max(0, i - 1)]!, next = pts[Math.min(n - 1, i + 1)]!
-    const dir = closed ? normalize3(sub3(pts[(i + 1) % n]!.p, pts[(i - 1 + n) % n]!.p)) : normalize3(sub3(next.p, prev.p))
-    const q = refineSurfaceSurface(sa, sb, pts[i]!.p, { u: pts[i]!.uva.x, v: pts[i]!.uva.y }, { u: pts[i]!.uvb.x, v: pts[i]!.uvb.y }, length3(dir) > 0 ? dir : undefined, tol)
-    if (q !== undefined && (refined.length === 0 || dist3(q.p, refined[refined.length - 1]!.p) > tol)) refined.push(q)
+    const prevP = closed ? pts[(i - 1 + n) % n]!.p : pts[Math.max(0, i - 1)]!.p, nextP = closed ? pts[(i + 1) % n]!.p : pts[Math.min(n - 1, i + 1)]!.p
+    let dir = normalize3(sub3(nextP, prevP))
+    // The seeds come from triangle-triangle crossings and may zigzag: when the surfaces cross transversally, their exact
+    // tangent fixes the constraint plane. A plane almost containing the curve lets Newton slide along it without bound (a
+    // straight line where two parallel cylinders meet ran off to z = 2e8).
+    const ua = { u: pts[i]!.uva.x, v: pts[i]!.uva.y }, ub = { u: pts[i]!.uvb.x, v: pts[i]!.uvb.y }
+    const exact = cross3(surfaceNormal(sa, ua.u, ua.v), surfaceNormal(sb, ub.u, ub.v))
+    if (length3(exact) > 0.05 && (length3(dir) === 0 || Math.abs(dot3(dir, normalize3(exact))) < 0.7)) dir = normalize3(exact)
+    const q = refineSurfaceSurface(sa, sb, pts[i]!.p, ua, ub, length3(dir) > 0 ? dir : undefined, tol)
+    // A point far from its seed (more than the seeds' own spacing) slid along the curve or jumped branches: dropped.
+    const reach = Math.max(dist3(prevP, pts[i]!.p), dist3(nextP, pts[i]!.p), tol) * 2
+    if (q === undefined || dist3(q.p, pts[i]!.p) > reach) continue
+    if (refined.length === 0 || dist3(q.p, refined[refined.length - 1]!.p) > tol) refined.push(q)
   }
   if (refined.length < 2) return undefined
   // Adaptive subdivision between consecutive points.

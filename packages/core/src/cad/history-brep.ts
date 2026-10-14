@@ -4,11 +4,13 @@
  * the mesh for the viewport and the CAM's dexels, the B-rep for measuring, STEP exchange and the operations a mesh cannot
  * carry (exact Booleans, face and edge selection).
  *
- * Exact today: extrude (plain), revolve, hole (simple, counterbore, countersink), the analytic catalogue primitives (cube,
- * cylinder, cone, sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern,
- * split and combine, and the union / subtract / intersect of every tool. A body that went through anything else (fillet,
- * shell, sweep, loft, coil, edge or corner treatments, drafts, a non-uniform scale, another catalogue element) keeps its
- * mesh and says why it has no exact model; nothing is approximated behind the caller's back.
+ * Exact today: extrude (with rounded or bevelled profile corners, and its end rims filleted or chamfered), revolve, hole
+ * (simple, counterbore, countersink), fillet and chamfer of straight edges and plane-cylinder rims, the shell of an
+ * extrusion (its profile offset exactly by `offsetLoop`), the analytic catalogue primitives (cube, cylinder, cone, sphere,
+ * hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine, and the
+ * union / subtract / intersect of every tool. A body that went through anything else (the shell of a revolution or a
+ * sweep, sweep, loft, coil, drafts, blends of curved edges, a non-uniform scale, another catalogue element) keeps its mesh
+ * and says why it has no exact model; nothing is approximated behind the caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import type { Sketch } from "./sketch.ts"
@@ -19,6 +21,7 @@ import {
   booleanBrep,
   BooleanError,
   compose,
+  edgePointAt,
   extrudeProfile,
   frame,
   makeBox,
@@ -26,6 +29,7 @@ import {
   makeSphere,
   makeTorus,
   normalizeProfile,
+  offsetLoop,
   polyhedron,
   revolveProfile,
   rotation,
@@ -130,12 +134,16 @@ const insideLoop = (p: Vec2, loop: ProfileLoop): boolean => {
 
 /** Loops grouped into profiles by even-odd nesting: each solid loop with the holes directly inside it. */
 export const profilesOfLoops = (loops: ReadonlyArray<ProfileLoop>): Array<{ readonly loops: ProfileLoop[] }> => {
-  const probe = loops.map((l) => segmentPoint(l[0]!, 0.5))
-  const depth = loops.map((_, i) => loops.filter((o, j) => j !== i && insideLoop(probe[i]!, o)).length)
+  // A loop is nested in another only when all of it is inside: loops whose boundaries cross (two overlapping circles, the
+  // mixer's figure-eight boss) are separate regions, extruded apart and united, as the mesh rebuild unites them. One probe
+  // point per loop took the second circle for a hole of the first.
+  const probes = loops.map((l) => l.flatMap((s) => [0.25, 0.5, 0.75].map((f) => segmentPoint(s, f))))
+  const within = (i: number, j: number): boolean => probes[i]!.every((p) => insideLoop(p, loops[j]!))
+  const depth = loops.map((_, i) => loops.filter((_, j) => j !== i && within(i, j)).length)
   const out: Array<{ loops: ProfileLoop[] }> = []
   loops.forEach((l, i) => {
     if (depth[i]! % 2 !== 0) return
-    const holes = loops.filter((h, j) => depth[j] === depth[i]! + 1 && insideLoop(probe[j]!, l))
+    const holes = loops.filter((_, j) => depth[j] === depth[i]! + 1 && within(j, i))
     out.push({ loops: [l, ...holes] })
   })
   return out
@@ -165,6 +173,34 @@ const ok = (brep: Brep): Exact => ({ brep })
 const no = (reason: string): Exact => ({ reason })
 
 const unionAll = (parts: ReadonlyArray<Brep>): Brep => parts.slice(1).reduce((acc, b) => booleanBrep(acc, b, "union").brep, parts[0]!)
+
+/**
+ * An extrusion's edge treatment on the exact solid: the rims of its end faces (`<id>.top`, `<id>.bottom`), the outer boundary
+ * and, with `holes`, the inner loops, filleted or chamfered by `blendBrep`. A rim the exact blend cannot make (the arc of a
+ * rounded profile corner, a face too narrow) is the reason the body has no exact model: never a partial treatment.
+ */
+const treatEndRims = (b: Brep, id: string, ends: "top" | "bottom" | "both", holes: boolean, size: number, style: "fillet" | "chamfer"): Brep | string => {
+  const names = new Set(ends === "both" ? [`${id}.top`, `${id}.bottom`] : [`${id}.${ends}`])
+  const wanted = new Set<number>()
+  b.faces.forEach((face) => {
+    if (face.name === undefined || !names.has(face.name)) return
+    // The outer loop of a planar face is the one with the largest box.
+    const extent = face.loops.map((l) => {
+      const pts = l.coedges.flatMap((c) => [edgePointAt(b.edges[c.edge]!, 0), edgePointAt(b.edges[c.edge]!, 0.5)])
+      const span = (k: "x" | "y" | "z") => Math.max(...pts.map((p) => p[k])) - Math.min(...pts.map((p) => p[k]))
+      return Math.hypot(span("x"), span("y"), span("z"))
+    })
+    const outer = extent.indexOf(Math.max(...extent))
+    face.loops.forEach((l, li) => { if (li === outer || holes) for (const c of l.coedges) wanted.add(c.edge) })
+  })
+  if (wanted.size === 0) return b
+  const candidates = blendCandidates(b, 0).filter((c) => wanted.has(c.edge))
+  if (candidates.length < wanted.size) return `the exact ${style} of an extrusion's rim takes straight edges and full circles only (the profile has arcs or curves)`
+  const res = blendBrep(b, candidates, size, style)
+  if (res.failures.length > 0) return `exact ${style} failed: ${res.failures[0]}`
+  if (res.rejected.length > 0) return `exact ${style} refused: ${res.rejected[0]}`
+  return res.brep
+}
 
 /** A closed polygon as a profile loop of lines. */
 export const polygonLoop = (ring: ReadonlyArray<Vec2>): ProfileLoop => ring.map((a, i) => ({ kind: "line", a, b: ring[(i + 1) % ring.length]! }) as const)
@@ -295,6 +331,8 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   const dim = (d: Dimension): number => dimensionValue(d, values)
   const bodies: Array<{ id: string; feature: string; exact: Exact }> = []
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
+  // What a shell needs of an extrusion: its exact (corner-treated) loops, sketch frame and extent along the normal.
+  const extrusions = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly frame: { readonly origin: Vec3; readonly n: Vec3; readonly u: Vec3 }; readonly from: number; readonly to: number }>()
 
   const boolean = (a: Exact, b: Exact, op: "union" | "subtract" | "intersect"): Exact => {
     if (a.brep === undefined) return a
@@ -346,8 +384,8 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         case "extrude": {
           const sk = sketchOf(f.sketch)
           if (sk === undefined) break
-          if (f.edge !== undefined || (f.taper !== undefined && dim(f.taper) !== 0)) {
-            unsupported(f, "edge treatments and drafts of an extrusion have no exact model yet")
+          if (f.taper !== undefined && dim(f.taper) !== 0) {
+            unsupported(f, "a drafted extrusion has no exact model yet")
             break
           }
           const depth = dim(f.depth)
@@ -369,7 +407,14 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
           const solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id }))
           if (solids.length === 0) break
-          const tool = ok(unionAll(solids))
+          extrusions.set(f.id, { loops, frame: F, from, to: from + depth })
+          let united = unionAll(solids)
+          if (f.edge !== undefined) {
+            const treated = treatEndRims(united, f.id, f.edge.ends ?? "both", f.edge.holes === true, dim(f.edge.size), f.edge.style)
+            if (typeof treated === "string") { unsupported(f, treated); break }
+            united = treated
+          }
+          const tool = ok(united)
           tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
           break
@@ -588,9 +633,33 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           }
           break
         }
-        case "shell":
-          for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) bodies[bodies.indexOf(b)] = { ...b, exact: no("a shell has no exact model yet") }
+        case "shell": {
+          // The mesh rebuild's cavity, exact: each region of the extrusion's profile moved inwards by the wall (its holes
+          // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
+          const ex = extrusions.get(f.feature)
+          if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (only extrusions are shelled exactly)`); break }
+          const t = dim(f.thickness)
+          const open = f.open ?? "none"
+          const z0 = ex.from + (open === "bottom" || open === "both" ? -1 : t)
+          const z1 = ex.to + (open === "top" || open === "both" ? 1 : -t)
+          let cavity: Brep
+          try {
+            const at = (z: number) => frame({ x: ex.frame.origin.x + ex.frame.n.x * z, y: ex.frame.origin.y + ex.frame.n.y * z, z: ex.frame.origin.z + ex.frame.n.z * z }, ex.frame.n, ex.frame.u)
+            const pieces = profilesOfLoops(ex.loops).map((p) => {
+              const [outer, ...holes] = p.loops
+              let piece = extrudeProfile({ loops: [offsetLoop(outer!, t)] }, z1 - z0, { placement: at(z0), name: `${f.id}.cavity` })
+              for (const h of holes) piece = booleanBrep(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract").brep
+              return piece
+            })
+            cavity = unionAll(pieces)
+          } catch (e) {
+            unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+            break
+          }
+          tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, ok(cavity), "subtract", f.targets, f.id)
           break
+        }
         case "sweep":
         case "loft":
         case "coil":

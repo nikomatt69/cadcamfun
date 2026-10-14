@@ -201,7 +201,29 @@ and seams), the inner edges of curved faces as silhouette candidates, and the wa
 occluder. `generateSheet` draws from it when every body of the history has an exact model (option `exact`,
 reported as `edgeSource`); a smooth edge whose two faces are both seen edge-on is drawn as outline.
 
-Fillets of edges between curved faces (variable radius, setbacks), shell/draft on B-reps, persistent naming
+**Feature recognition (`brep/features.ts`).** `recognizeHoles(brep)` reads the holes of any solid from its
+faces (STEP imports, Boolean results and parametric parts alike): coaxial concave cylinders and cones that go
+all the way round their axis, joined when they touch along it. Each hole has its entry, direction, depth,
+drill diameter, form (`simple`, `counterbore`, `countersink`, with the head diameter and counterbore depth),
+bottom (`through`, `flat`, `drill-point`, decided by classifying the point on the axis just past each end)
+and its segments. Fillets and partial bores are not holes; coaxial bores separated by air are two holes.
+
+**Component automations (`smart-fasteners.ts`, `assembly-analysis.ts`).** `planFasteners(bodies)` stacks
+the holes of different parts that share an axis and touch, sizes the screw from the ISO 273 clearance
+holes (`holeRole`; a tap drill marks the tapped end), and picks the ISO 4762 length from the clamped
+thickness plus `threadEngagement` of the tapped part's material (bounded by the tapped depth less two
+pitches) or plus washer, ISO 4032 nut and two pitches; ISO 7089 washers go under heads that are not in a
+counterbore and under nuts. A stack that cannot be fastened is reported with the reason (mismatched sizes,
+a lone part, a blind clearance hole). `fastenerSolids(plan)` builds the exact screw (revolved profile with
+head and tip chamfers, hexagon socket), washers and nut on the hole axis. `assemblyInterference(parts)`
+intersects every pair whose boxes meet with the exact Boolean: clashes with their volume and centroid,
+declared overlaps (a screw's thread in its tapped hole) as `expected`, contact as `touching`, and Boolean
+failures as `undetermined`, never as clear. `billOfMaterials(parts)` groups by designation or by geometry
+and material, with exact volumes and masses. The desktop's assembly panel runs all three on the canvas
+(`apps/desktop/src/features/cad/lib/component-automation.ts`: components are flattened, fasteners are
+inserted as `brep` elements in one undo step and are not inserted twice; the BOM exports as CSV).
+
+Fillets of edges between curved faces (variable radius, setbacks), shells of revolutions and sweeps, drafts, persistent naming
 and 2D drafting remain pending, so the professional kernel acceptance gate is not claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
@@ -209,6 +231,24 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 
 ## 8. Change log
 
+- 2026-10-14: exact shell of an extrusion: `offsetLoop` (`brep/sweep.ts`) moves a line/arc profile exactly (parallel
+  lines, concentric arcs, mitred joints as `moveRing`, tangent joints kept, collapse and self-crossing refused);
+  `rebuildExact`'s `shell` subtracts the mesh rebuild's cavity built from it (closed, open top / bottom / both,
+  holes grown by the wall). A shell of a revolution or a sweep still says it has no exact model. Tests:
+  `brep/offset.test.ts` (exact Green areas to 1e-9), `history-brep.test.ts` (analytic volumes to 1e-9).
+
+- 2026-10-14: an extrusion's edge treatment (`edge`: fillet or chamfer of the end rims, `ends`, `holes`) is exact:
+  `rebuildExact` blends the rims of `<id>.top` / `<id>.bottom` with `blendBrep`; a rim it cannot blend (the arc
+  of a rounded profile corner) leaves the body without an exact model and says why. The `mounting_plate` and
+  `flange` recipes with a chamfer are now exact. Test: `history-brep.test.ts` (analytic volumes to 1e-9).
+
+- 2026-10-14: hole recognition on the exact model (`brep/features.ts`), smart fasteners (`smart-fasteners.ts`:
+  ISO 273 / 4762 / 7089 / 4032, thread engagement by material), exact interference and bill of materials
+  (`assembly-analysis.ts`), and their desktop automation in the assembly panel. Boolean: a result with no
+  faces (solids apart or only touching under `intersect`, everything removed under `subtract`) is the empty
+  solid instead of a validation error. Tests: `brep/features.test.ts`, `smart-fasteners.test.ts`,
+  `assembly-analysis.test.ts` (overlap volumes to 1e-6 of the analytic value),
+  `apps/desktop/test/cad-assembly-automation.test.ts`.
 - 2026-10-14: exact fillets and chamfers (`brep/blend.ts`) wired into `rebuildExact`'s `fillet` feature;
   exact drawing edges (`brep/drawing-edges.ts`) in `generateSheet`. Boolean: exact plane x cylinder
   ellipses, face-local meshing, overlapping edges, tangential end hits, robust fragment samples (scanline

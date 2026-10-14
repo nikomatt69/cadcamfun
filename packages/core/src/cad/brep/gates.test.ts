@@ -16,6 +16,7 @@ import { brepBox, rebuildExact, type ExactRebuild } from "../history-brep.ts"
 import type { History } from "../history.ts"
 import { buildRecipe } from "../recipes.ts"
 import { model } from "../script.ts"
+import { meshVolume } from "../solid.ts"
 import { massProperties } from "./mass.ts"
 import { readStepBreps, writeStepBreps } from "./step.ts"
 import { compactBrep, type Brep } from "./topology.ts"
@@ -23,15 +24,20 @@ import { validateBrep } from "./validate.ts"
 
 setDefaultTimeout(60_000)
 
-/** Relative tolerance on volume and area through a STEP round trip (measured worst 4.5e-15). */
-const STEP_REL = 1e-12
+/**
+ * Relative tolerance on volume and area through a STEP round trip. The file is lossless (17 significant digits); what moves is
+ * the quadrature, which integrates the re-read faces on their own parameterisation: measured worst 4.5e-15 on the analytic
+ * parts, 3.0e-12 on the Liquid mixer (fitted intersection curves).
+ */
+const STEP_REL = 1e-11
 /** Absolute tolerance on the bounding box through a STEP round trip, mm (measured 0). */
 const STEP_BOX_MM = 1e-9
 /**
- * Exact rebuild budget of the flange recipe, ms. Measured at load 19-22 with other builds running: 13.1-21.6 s warm or
- * cold, 51.6 s at the worst; the budget is that worst run plus ~75 % (the Boolean costs ~2 s per bolt hole: see the change log).
+ * Exact rebuild budget of a reference part (the flange recipe, the Liquid mixer), ms. Measured 2026-10-14 at load 20-37 with
+ * other builds running: flange 2.0-2.3 s, mixer 2.6 s (before the face-local Boolean and the strip tessellation of cylinders:
+ * flange 13-52 s, mixer not exact). The budget leaves ~6x for load spikes and still catches a return of the old costs.
  */
-const BUDGET_MS = 90_000
+const BUDGET_MS = 15_000
 const TIMESTAMP = "2026-01-01T00:00:00"
 
 const holedPlate = (): History => {
@@ -108,6 +114,16 @@ describe("gate: budget", () => {
     expect(ms).toBeLessThan(BUDGET_MS)
     expect(r.bodies.every((b) => b.brep !== undefined)).toBe(true)
   })
+
+  test(`the Liquid mixer rebuilds exactly within ${BUDGET_MS} ms`, () => {
+    const t0 = performance.now()
+    const r = rebuildExact(liquidMixerHistory())
+    const ms = performance.now() - t0
+    mixerRebuild = r
+    console.log(`[gate budget] Liquid mixer exact rebuild: ${ms.toFixed(0)} ms (budget ${BUDGET_MS} ms)`)
+    expect(ms).toBeLessThan(BUDGET_MS)
+    expect(r.bodies.every((b) => b.brep !== undefined)).toBe(true)
+  })
 })
 
 describe("gate: validity", () => {
@@ -126,14 +142,15 @@ describe("gate: validity", () => {
     })
   }
 
-  test("liquid mixer: a body without an exact model says why, the mesh body stays", () => {
+  test("liquid mixer: every body exact and valid, its volume the mesh's within the meshing error", () => {
     const r = mixer()
     expect(r.result.bodies.length).toBe(r.bodies.length)
     for (const b of r.bodies) {
-      if (b.brep !== undefined) expect(validateBrep(b.brep).issues).toEqual([])
-      else expect((b.reason ?? "").length).toBeGreaterThan(0)
+      expect(b.reason).toBeUndefined()
+      expect(validateBrep(b.brep!).issues).toEqual([])
+      const mesh = meshVolume(r.result.bodies.find((m) => m.id === b.id)!.mesh)
+      expect(Math.abs(massProperties(b.brep!).volume - mesh) / mesh).toBeLessThan(2e-3)
     }
-    expect(r.result.bodies.every((b) => b.mesh.indices.length > 0)).toBe(true)
   })
 })
 
@@ -144,9 +161,7 @@ describe(`gate: STEP round trip (volume and area within ${STEP_REL} relative, bo
     })
   }
 
-  // Open: the mixer's figure-eight boss (two overlapping cylinders with coplanar caps) fails the exact union ("edge used 3
-  // times"), so the mixer has no exact body yet. When the Boolean is fixed this test fails: turn it into a plain `test`.
-  test.failing("liquid mixer: exact body and STEP round trip", () => {
+  test("liquid mixer: exact body and STEP round trip", () => {
     const r = mixer()
     expect(r.bodies.every((b) => b.brep !== undefined)).toBe(true)
     for (const b of r.bodies) roundTrip(`mixer-${b.id}`, b.brep!)

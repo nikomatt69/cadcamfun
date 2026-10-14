@@ -196,6 +196,130 @@ export const treatLoopCorners = (loop: ProfileLoop, style: "fillet" | "chamfer",
   return out
 }
 
+// ------------------------------------------------ offset
+
+type Carrier =
+  | { readonly kind: "line"; readonly p: Vec2; readonly d: Vec2 }
+  | { readonly kind: "circle"; readonly c: Vec2; readonly r: number }
+
+const lineCircle = (p: Vec2, d: Vec2, c: Vec2, r: number): Vec2[] => {
+  const fx = p.x - c.x, fy = p.y - c.y
+  const b = fx * d.x + fy * d.y, cc = fx * fx + fy * fy - r * r
+  const disc = b * b - cc
+  if (disc < -1e-9 * r * r) return []
+  const s = Math.sqrt(Math.max(0, disc))
+  return [-b - s, -b + s].map((t) => ({ x: p.x + d.x * t, y: p.y + d.y * t }))
+}
+
+const intersectCarriers = (a: Carrier, b: Carrier): Vec2[] => {
+  if (a.kind === "line" && b.kind === "line") {
+    const den = a.d.x * b.d.y - a.d.y * b.d.x
+    if (Math.abs(den) < 1e-14) return []
+    const t = ((b.p.x - a.p.x) * b.d.y - (b.p.y - a.p.y) * b.d.x) / den
+    return [{ x: a.p.x + a.d.x * t, y: a.p.y + a.d.y * t }]
+  }
+  if (a.kind === "line" && b.kind === "circle") return lineCircle(a.p, a.d, b.c, b.r)
+  if (a.kind === "circle" && b.kind === "line") return lineCircle(b.p, b.d, a.c, a.r)
+  const A = a as Extract<Carrier, { kind: "circle" }>, B = b as Extract<Carrier, { kind: "circle" }>
+  const dx = B.c.x - A.c.x, dy = B.c.y - A.c.y, D = Math.hypot(dx, dy)
+  if (D < 1e-14) return []
+  const x = (D * D + A.r * A.r - B.r * B.r) / (2 * D)
+  const h2 = A.r * A.r - x * x
+  if (h2 < -1e-9 * A.r * A.r) return []
+  const h = Math.sqrt(Math.max(0, h2))
+  const ux = dx / D, uy = dy / D
+  return [-1, 1].map((s) => ({ x: A.c.x + ux * x - uy * h * s, y: A.c.y + uy * x + ux * h * s }))
+}
+
+/** Unit tangent of a line or arc at its start or end, in the direction of travel (analytic, unlike `segmentTangent`). */
+const exactTangent = (s: ProfileSegment, atEnd: boolean): Vec2 => {
+  if (s.kind === "line") {
+    const l = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y)
+    return { x: (s.b.x - s.a.x) / l, y: (s.b.y - s.a.y) / l }
+  }
+  if (s.kind === "arc") {
+    const t = atEnd ? s.end : s.start, k = Math.sign(s.end - s.start)
+    return { x: -Math.sin(t) * k, y: Math.cos(t) * k }
+  }
+  return segmentTangent(s, atEnd)
+}
+
+/** True when two closed polylines' edges cross (shared end points of neighbouring edges excepted). */
+const polylineCrosses = (pts: ReadonlyArray<Vec2>): boolean => {
+  const n = pts.length
+  const cross = (o: Vec2, a: Vec2, b: Vec2) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+  for (let i = 0; i < n; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % n]!
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue
+      const c = pts[j]!, d = pts[(j + 1) % n]!
+      const d1 = cross(a, b, c), d2 = cross(a, b, d), d3 = cross(c, d, a), d4 = cross(c, d, b)
+      if (((d1 > 1e-12 && d2 < -1e-12) || (d1 < -1e-12 && d2 > 1e-12)) && ((d3 > 1e-12 && d4 < -1e-12) || (d3 < -1e-12 && d4 > 1e-12))) return true
+    }
+  }
+  return false
+}
+
+/**
+ * The loop with its boundary moved `distance` into its interior (negative: outwards), exactly: lines move parallel, arcs keep
+ * their centre and change their radius, and neighbouring pieces meet where their moved curves intersect (a mitre, as
+ * `moveRing` does to a polygon; tangent junctions stay tangent). A move that collapses a piece, turns an arc inside out or
+ * makes the loop cross itself is a `RangeError`, as is a spline piece (no exact offset curve).
+ */
+export const offsetLoop = (loop: ProfileLoop, distance: number): ProfileLoop => {
+  if (distance === 0) return loop
+  const area = loopArea(loop)
+  // Offsets are taken to the left of the travel: the interior of a counter-clockwise loop.
+  const d = area > 0 ? distance : -distance
+  const n = loop.length
+  const carriers: Carrier[] = loop.map((s) => {
+    if (s.kind === "line") {
+      const len = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y)
+      const u = { x: (s.b.x - s.a.x) / len, y: (s.b.y - s.a.y) / len }
+      return { kind: "line", p: { x: s.a.x - u.y * d, y: s.a.y + u.x * d }, d: u }
+    }
+    if (s.kind === "arc") {
+      // Counter-clockwise travel has the centre on its left: moving left shrinks the radius.
+      const r = s.radius - Math.sign(s.end - s.start) * d
+      if (!(r > MODEL_TOL)) throw new RangeError(`A ${Math.abs(distance)} mm offset collapses an arc of radius ${s.radius} mm`)
+      return { kind: "circle", c: s.center, r }
+    }
+    throw new RangeError("A spline in the profile has no exact offset")
+  })
+  // Joint j: where piece j (incoming) meets piece j + 1 (outgoing).
+  const joints: Vec2[] = loop.map((s, j) => {
+    const next = loop[(j + 1) % n]!
+    const P = segmentEnd(s)
+    const tin = exactTangent(s, true), tout = exactTangent(next, false)
+    if (Math.abs(tin.x * tout.y - tin.y * tout.x) < 1e-9 && tin.x * tout.x + tin.y * tout.y > 0) return { x: P.x - tin.y * d, y: P.y + tin.x * d }
+    const hits = intersectCarriers(carriers[j]!, carriers[(j + 1) % n]!)
+    if (hits.length === 0) throw new RangeError(`A ${Math.abs(distance)} mm offset leaves two pieces of the profile apart`)
+    return hits.reduce((best, q) => (Math.hypot(q.x - P.x, q.y - P.y) < Math.hypot(best.x - P.x, best.y - P.y) ? q : best))
+  })
+  const out: ProfileSegment[] = loop.map((s, j) => {
+    const a = joints[(j + n - 1) % n]!, b = joints[j]!
+    if (s.kind === "line") {
+      if ((b.x - a.x) * (s.b.x - s.a.x) + (b.y - a.y) * (s.b.y - s.a.y) <= 0) throw new RangeError(`A ${Math.abs(distance)} mm offset collapses an edge of the profile`)
+      return { kind: "line", a, b }
+    }
+    const arc = s as Extract<ProfileSegment, { kind: "arc" }>
+    const sweep = arc.end - arc.start
+    const start = Math.atan2(a.y - arc.center.y, a.x - arc.center.x)
+    let raw = Math.atan2(b.y - arc.center.y, b.x - arc.center.x) - start
+    // A full circle meets itself: its sweep stays a full turn.
+    if (n === 1) raw = sweep
+    else raw += TAU * Math.round((sweep - raw) / TAU)
+    if (raw * sweep <= 0) throw new RangeError(`A ${Math.abs(distance)} mm offset turns an arc of the profile inside out`)
+    return { kind: "arc", center: arc.center, radius: (carriers[j] as Extract<Carrier, { kind: "circle" }>).r, start, end: start + raw }
+  })
+  const moved = loopArea(out)
+  if (moved * area <= 0 || (distance > 0 ? Math.abs(moved) >= Math.abs(area) : Math.abs(moved) <= Math.abs(area)))
+    throw new RangeError(`A ${Math.abs(distance)} mm offset makes the profile vanish or turn inside out`)
+  const samples = out.flatMap((s) => (s.kind === "line" ? [s.a] : Array.from({ length: 16 }, (_, k) => segmentPoint(s, k / 16))))
+  if (polylineCrosses(samples)) throw new RangeError(`A ${Math.abs(distance)} mm offset makes the profile cross itself`)
+  return out
+}
+
 // ================================================================ 3D curves of segments
 
 /** The segment as an exact 3D curve in `f` (sketch x/y → frame x/y), its range, and whether it runs forward. */
