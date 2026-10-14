@@ -66,7 +66,7 @@ export class ToolpathsGroup extends HttpApiGroup.make("toolpaths")
       success: Schema.Array(ToolpathRow), error: InternalError
     }),
     HttpApiEndpoint.post("create", "/api/toolpaths", {
-      payload: ToolpathBody, success: ToolpathRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
+      payload: ToolpathBody, success: ToolpathRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, Forbidden, NotFound, InternalError]
     }),
     HttpApiEndpoint.get("get", "/api/toolpaths/:id", { params: id, success: ToolpathDetail, error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.put("update", "/api/toolpaths/:id", {
@@ -75,7 +75,7 @@ export class ToolpathsGroup extends HttpApiGroup.make("toolpaths")
     HttpApiEndpoint.delete("remove", "/api/toolpaths/:id", { params: id, success: Message, error: [BadRequest, Forbidden, NotFound, InternalError] }),
     HttpApiEndpoint.get("listForDrawing", "/api/drawings/:id/toolpaths", { params: id, success: Schema.Array(ToolpathWithRefs), error: [BadRequest, NotFound, InternalError] }),
     HttpApiEndpoint.post("createForDrawing", "/api/drawings/:id/toolpaths", {
-      params: id, payload: ToolpathBody, success: ToolpathRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, NotFound, InternalError]
+      params: id, payload: ToolpathBody, success: ToolpathRow.pipe(Schema.annotate({ httpApiStatus: 201 })), error: [BadRequest, Forbidden, NotFound, InternalError]
     })
   )
 {}

@@ -7,7 +7,7 @@
  * mirrors it into the CAM store and asks the sidecar to parse it into the program the 3D views play back, so
  * generated, imported and hand-edited code all share one pipeline.
  */
-import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
+import { Show, createEffect, createMemo, createSignal, on, onCleanup, onMount, untrack, type JSX } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { Box, ChevronLeft, ChevronRight, ShieldCheck, Wrench } from "lucide-solid"
@@ -35,6 +35,13 @@ import { CostsModal, ToolLibraryModal } from "../components/CamModals.tsx"
 import CamRibbon from "../components/CamRibbon.tsx"
 import { FixedCycleEditor } from "../components/generator/FixedCyclesSection.tsx"
 import "../../../styles/workstation.css"
+import SaveCamModal from "../components/SaveCamModal.tsx"
+import { restoreCamProgram, SavedCamProgram } from "../lib/saved-program.ts"
+import { Schema } from "effect"
+import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
+import { useVerifyStore } from "../store/verifyStore.ts"
+import { mountCamHistory, useCamHistoryStore } from "../store/camHistoryStore.ts"
+import CamHistoryModal from "../components/CamHistoryModal.tsx"
 
 const rise = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 const PARSE_DELAY_MS = 400
@@ -63,6 +70,8 @@ export default function CamPage(): JSX.Element {
   const [sidebarTab, setSidebarTab] = createSignal<SidebarTab>("machine")
   const [showLibrary, setShowLibrary] = createSignal(false)
   const [showCosts, setShowCosts] = createSignal(false)
+  const [showHistory, setShowHistory] = createSignal(false)
+  const [saveRequest, setSaveRequest] = createSignal<{ readonly code: string; readonly extension: string; readonly projectOnly: boolean }>()
   let ribbonFilePicker: HTMLInputElement | undefined
 
   const setGcode = (next: string): void => {
@@ -75,6 +84,18 @@ export default function CamPage(): JSX.Element {
 
   // The raw piece follows the CAD (legacy `syncWorkpieceFromCAD` on mount).
   onMount(() => { syncDocumentSettings(app); camStore.syncWorkpieceFromCAD() })
+  onMount(() => {
+    const stopHistory = mountCamHistory()
+    const key = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.altKey || document.querySelector('[role="dialog"]')) return
+      const lower = event.key.toLowerCase(), history = useCamHistoryStore.getState()
+      if (lower !== "z" && lower !== "y") return
+      event.preventDefault(); event.stopPropagation()
+      if (lower === "y" || event.shiftKey) history.redo(); else history.undo()
+    }
+    window.addEventListener("keydown", key, { capture: true })
+    onCleanup(() => { stopHistory(); window.removeEventListener("keydown", key, { capture: true }) })
+  })
 
   // Preview and Toolpath play a program; for any G-code text (imported, edited, generated) the sidecar parses it.
   createEffect(on(gcode, (text) => {
@@ -84,13 +105,15 @@ export default function CamPage(): JSX.Element {
     if (camStore.operationResults.length > 0 && text === combineOperationResults(camStore.operationResults).gcode) return
     // The kernel returned this exact program with named operations/tool changes; reparsing would discard that structure.
     if (camStore.kernelArtifact?.nc === text) return
+    const controller = new AbortController()
+    const owner = captureEditorOwner()
     const timer = setTimeout(() => {
-      void app.runtime.run(generator.parse(text)).then(
-        (parsed) => camStore.setProgram(parsed.program as never),
+      void app.runtime.run(generator.parse(text), { signal: controller.signal }).then(
+        (parsed) => { if (!controller.signal.aborted && owner.current() && camStore.gcode === text) camStore.setProgram(parsed.program) },
         () => undefined
       )
     }, PARSE_DELAY_MS)
-    onCleanup(() => clearTimeout(timer))
+    onCleanup(() => { clearTimeout(timer); controller.abort() })
   }, { defer: true }))
 
   const duration = createMemo(() => buildPlayback(camStore.program).duration)
@@ -110,7 +133,7 @@ export default function CamPage(): JSX.Element {
     })
   })
 
-  const loadFromStorage = (key: string): { readonly id?: string; readonly name?: string; readonly gcode?: string } | undefined => {
+  const loadFromStorage = (key: string): { readonly id?: string; readonly name?: string; readonly gcode?: string; readonly data?: unknown } | undefined => {
     try {
       const stored = localStorage.getItem(key)
       return stored ? JSON.parse(stored) : undefined
@@ -122,20 +145,27 @@ export default function CamPage(): JSX.Element {
     setSearch({ [name]: undefined }, { replace: true, state: {} })
   }
 
-  // `?loadToolpath=<id>`: the toolpaths page leaves the program in localStorage (legacy hand-off).
+  // Read the saved original through the API; the legacy local hand-off remains usable for old unsaved entries.
   createEffect(() => {
     const id = search.loadToolpath
     if (typeof id !== "string") return
-    const data = loadFromStorage("toolpathToLoadInCAM")
-    if (!data) { toast.error(t("cam.toast.toolpathNotFound")); clearParam("loadToolpath", "toolpathToLoadInCAM"); return }
-    if (!data.id || data.id !== id) { toast.error(t("cam.toast.toolpathInvalid")); return }
-    if (data.gcode) {
-      setGcode(data.gcode)
-      camStore.setActiveTab("editor")
-      setTimeout(() => toast.success(t("cam.toast.switchToToolpath")), 1500)
-    }
-    toast.success(t("cam.toast.toolpathLoaded", { name: data.name ?? "" }))
-    clearParam("loadToolpath", "toolpathToLoadInCAM")
+    const cached = loadFromStorage("toolpathToLoadInCAM")
+    const controller = new AbortController(), owner = captureEditorOwner()
+    const previousCode = untrack(() => camStore.gcode)
+    const current = () => !controller.signal.aborted && owner.current()
+    onCleanup(() => controller.abort())
+    void app.runtime.run(app.client.toolpaths.get({ params: { id } }), { signal: controller.signal }).then(async (row) => {
+      await restoreCamProgram(app, row, () => current() && camStore.gcode === previousCode)
+      if (current()) { toast.success(t("cam.toast.toolpathLoaded", { name: row.name })); clearParam("loadToolpath", "toolpathToLoadInCAM") }
+    }, () => {
+      if (!current()) return
+      if (cached?.id === id && cached.gcode && cached.data === undefined) {
+        camStore.clearOperationResults(); camStore.setKernelArtifact(undefined); camStore.setSavedProgram(undefined)
+        setGcode(cached.gcode); camStore.setActiveTab("editor")
+        toast.success(t("cam.toast.toolpathLoaded", { name: cached.name ?? "" }))
+      } else toast.error(t("cam.toast.toolpathNotFound"))
+      clearParam("loadToolpath", "toolpathToLoadInCAM")
+    }).catch((cause) => { if (current()) { toast.error(cause instanceof Error ? cause.message : String(cause)); clearParam("loadToolpath", "toolpathToLoadInCAM") } })
   })
 
   // `?loadTool=<id>`: the tools page leaves the tool in localStorage; it becomes the generator's tool.
@@ -152,24 +182,27 @@ export default function CamPage(): JSX.Element {
   })
 
   const importGCode = (file: File): void => {
-    void file.text().then(
-      (text) => setGcode(text),
-      () => toast.error(t("cam.toast.readFailed"))
-    )
+    const owner = captureEditorOwner()
+    const previousCode = camStore.gcode
+    const current = () => owner.current() && camStore.gcode === previousCode
+    void file.text().then(async (text) => {
+      if (!current()) return
+      if (file.name.toLowerCase().endsWith(".json")) {
+        const snapshot = Schema.decodeUnknownSync(SavedCamProgram)(JSON.parse(text))
+        await restoreCamProgram(app, { id: "", name: snapshot.program.name, projectId: "", drawingId: null, gcode: snapshot.gcode, data: snapshot }, current)
+      } else {
+        camStore.clearOperationResults(); camStore.setKernelArtifact(undefined); camStore.setSavedProgram(undefined)
+        useVerifyStore.getState().reset()
+        setGcode(text)
+      }
+    }).catch((cause) => toast.error(cause instanceof Error ? cause.message : t("cam.toast.readFailed")))
   }
 
-  const saveGCode = (): void => {
+  const saveGCode = (projectOnly = false): void => {
     const code = camStore.activeTab === "post" && processedGcode() ? processedGcode() : gcode()
     if (!code) return
     const extension = selectedPostProcessor() === "heidenhain" ? ".h" : ".nc"
-    const url = URL.createObjectURL(new Blob([code], { type: "text/plain" }))
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `toolpath-${new Date().toISOString().slice(0, 10)}${extension}`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    setSaveRequest({ code, extension, projectOnly })
   }
 
   const toggleSimulation = (): void => {
@@ -258,6 +291,7 @@ export default function CamPage(): JSX.Element {
           onToggleSimulation={toggleSimulation}
           onOpenLibrary={() => setShowLibrary(true)}
           onOpenCosts={() => setShowCosts(true)}
+          onOpenHistory={() => setShowHistory(true)}
           onToggleAi={toggleAi}
           onToggleChat={() => app.setPanelOpen(!app.panelOpen())}
         />
@@ -283,7 +317,7 @@ export default function CamPage(): JSX.Element {
           ref={ribbonFilePicker}
           type="file"
           class="hidden"
-          accept=".nc,.gcode,.cnc,.txt"
+          accept=".nc,.gcode,.cnc,.txt,.h,.json"
           aria-label="Import G-Code"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0]
@@ -355,7 +389,7 @@ export default function CamPage(): JSX.Element {
             <Show when={camStore.rightOpen}>
               <div class="workstation-generator min-h-0 flex-1 overflow-y-auto">
                 <Show when={camStore.rightTab === "generator" || camStore.rightTab === "control"}>
-                  <ToolpathGenerator onGCodeGenerated={setGcode} />
+                  <ToolpathGenerator onGCodeGenerated={setGcode} onSave={() => saveGCode(true)} />
                 </Show>
                 <Show when={camStore.rightTab === "verify"}>
                   <VerifyPanel />
@@ -395,6 +429,8 @@ export default function CamPage(): JSX.Element {
 
       <ToolLibraryModal isOpen={showLibrary()} onClose={() => setShowLibrary(false)} />
       <CostsModal isOpen={showCosts()} onClose={() => setShowCosts(false)} />
+      <CamHistoryModal open={showHistory()} onClose={() => setShowHistory(false)} />
+      <Show when={saveRequest()}>{(request) => <SaveCamModal code={request().code} extension={request().extension} projectOnly={request().projectOnly} onClose={() => setSaveRequest(undefined)} />}</Show>
     </Motion.div>
   )
 }

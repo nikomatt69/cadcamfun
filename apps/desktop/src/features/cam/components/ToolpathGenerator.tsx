@@ -6,8 +6,7 @@
  * result goes to the CAM page (`onGCodeGenerated`) and into the CAM store, where the viewport, the post-processor
  * and the assistant read it.
  */
-import { Show, type JSX } from "solid-js"
-import { useNavigate } from "@solidjs/router"
+import { Show, createSignal, type JSX } from "solid-js"
 import { AlertTriangle, Check, Code, Cpu, CircleHelp, Maximize2, Minimize2, Save, Settings, Upload } from "lucide-solid"
 import { Motion } from "solid-motionone"
 import { toast } from "../../../shared/ui/toast.tsx"
@@ -31,8 +30,10 @@ import { PrinterParamsSection } from "./generator/PrinterParamsSection.tsx"
 import { ToolSection } from "./generator/ToolSection.tsx"
 import CapabilitiesOverview from "./CapabilitiesOverview.tsx"
 import KernelSection from "./generator/KernelSection.tsx"
+import SaveCamModal from "./SaveCamModal.tsx"
 
 export interface ToolpathGeneratorProps {
+  readonly onSave?: () => void
   /** Receives the generated (or cycle-edited) program text. */
   readonly onGCodeGenerated: (gcode: string) => void
   readonly onToolSelected?: (tool: LibraryTool) => void
@@ -40,7 +41,7 @@ export interface ToolpathGeneratorProps {
 
 export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.Element {
   const app = useApp()
-  const navigate = useNavigate()
+  const [saveOpen, setSaveOpen] = createSignal(false)
   const gen = useGeneratorStore()
   const camStore = useCamStore()
   const job = useJob()
@@ -78,14 +79,9 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
   }
 
   const saveAsToolpath = (): void => {
-    if (!gen.currentGCode) { toast.error(t("cam.generator.noGcode")); return }
-    // The toolpaths page picks these up to create a toolpath (same hand-off as the legacy app).
-    try {
-      localStorage.setItem("gcodeFromToolpathGenerator", gen.currentGCode)
-      localStorage.setItem("settingsFromToolpathGenerator", JSON.stringify(gen.settings))
-    } catch { /* storage blocked: the toolpaths page opens empty */ }
-    navigate("/toolpaths?fromGenerator=true")
-    toast.success(t("cam.generator.readyToast"))
+    if (!camStore.gcode) { toast.error(t("cam.generator.noGcode")); return }
+    if (props.onSave) props.onSave()
+    else setSaveOpen(true)
   }
 
   return (
@@ -96,6 +92,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       class={`workstation-generator__form dark:text-white ${gen.showFullscreen ? "fixed p-6 m-4 inset-0 z-50 overflow-auto bg-white dark:bg-gray-900" : "p-2"}`}
       data-testid="toolpath-generator"
     >
+      <Show when={saveOpen()}><SaveCamModal code={camStore.gcode} extension=".nc" projectOnly onClose={() => setSaveOpen(false)} /></Show>
       <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} class="flex justify-between items-center gap-2 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
         <div class="flex items-center space-x-3">
           <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg"><Settings size={24} class="text-blue-600 dark:text-blue-400" /></div>

@@ -2,6 +2,7 @@ import type { DrawingDetail, DrawingRow } from "@cadcamfun/api"
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
+import { cam } from "@cadcamfun/core"
 
 type Row = typeof schema.drawingTable.$inferSelect
 export const toDrawingRow = (d: Row): DrawingRow => ({ ...d, createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString() })
@@ -65,7 +66,14 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             const request = stored["request"] !== null && typeof stored["request"] === "object" ? stored["request"] as Record<string, unknown> : undefined
             const geometry = request?.["geometry"] !== null && typeof request?.["geometry"] === "object" ? request["geometry"] as Record<string, unknown> : {}
             const fresh = { ...stored }
-            delete fresh["response"]; delete fresh["verification"]
+            for (const key of ["response", "verification", "kernelArtifact", "kernelRequest", "sourceRevision", "operations"]) delete fresh[key]
+            if (fresh["format"] === "cadcamfun-cam") {
+              fresh["gcode"] = ""
+              fresh["program"] = cam.makeProgram(path.name, [], {})
+              fresh["stock"] = stock
+              const source = fresh["drawing"] !== null && typeof fresh["drawing"] === "object" ? fresh["drawing"] as Record<string, unknown> : {}
+              fresh["drawing"] = { ...source, stock }
+            }
             if (request) fresh["request"] = { ...request, geometry: { ...geometry, stock } }
             tx.update(schema.toolpathTable).set({ data: fresh, gcode: null, updatedAt: new Date() }).where(eq(schema.toolpathTable.id, path.id)).run()
             invalidated.push(path.id)

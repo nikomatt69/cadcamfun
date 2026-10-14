@@ -57,7 +57,10 @@ describe("CAM page", () => {
       ;(URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:test"
       ;(URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined
       proto.click = function (this: HTMLAnchorElement) { downloads.push(this.download) }
-      try { await click('button[title="Save G-Code"]') } finally {
+      try {
+        await click('button[title="Save G-Code"]')
+        await click('[data-testid="workspace-export-file"]')
+      } finally {
         proto.click = nativeClick
         URL.createObjectURL = nativeCreate
         URL.revokeObjectURL = nativeRevoke

@@ -6,7 +6,7 @@
  * Versions (history with restore) and Comments. Writes go through the typed client; a save also records a
  * version, as the legacy page did.
  */
-import { For, Show, createEffect, createSignal, on, onMount, type JSX } from "solid-js"
+import { For, Show, createEffect, createSignal, on, onCleanup, onMount, type JSX } from "solid-js"
 import { A, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { ArrowLeft, Calendar, Cpu, Download, Edit, Layers, MessageCircle, Save, Share2, Trash2 } from "lucide-solid"
@@ -16,6 +16,7 @@ import { useRead } from "../../../app/queries.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { Modal, OPERATION_LABEL, TYPE_LABEL, formatDate, handOffToCam, type ToolpathRow } from "../components/shared.tsx"
 import { ToolpathFormModal } from "../components/ToolpathFormModal.tsx"
+import { ToolpathProgramDetails } from "../components/ToolpathProgramDetails.tsx"
 import "../../../styles/workstation.css"
 
 type Tab = "details" | "gcode" | "versions" | "comments"
@@ -71,6 +72,9 @@ export function ToolpathDetailScreen(): JSX.Element {
   const me = useRead((client) => client.user.profile())
 
   const [row, setRow] = createSignal<ToolpathRow>()
+  const [drawing, setDrawing] = createSignal<unknown>()
+  let drawingController: AbortController | undefined
+  onCleanup(() => drawingController?.abort())
   const [loading, setLoading] = createSignal(true)
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
@@ -91,6 +95,11 @@ export function ToolpathDetailScreen(): JSX.Element {
     try {
       const found = await run<ToolpathRow>(app.client.toolpaths.get({ params: { id: params.id } }))
       setRow(found)
+      setDrawing(undefined)
+      drawingController?.abort()
+      drawingController = new AbortController()
+      const controller = drawingController
+      if (found.drawingId) void app.runtime.run(app.client.drawings.get({ params: { id: found.drawingId } }), { signal: controller.signal }).then((value) => { if (!controller.signal.aborted && row()?.id === found.id) setDrawing(value.data) }, () => undefined)
       if (!editing()) setDraft(draftOf(found))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -153,7 +162,7 @@ export function ToolpathDetailScreen(): JSX.Element {
       // A saved revision is also recorded in the version history, as the legacy page did.
       await run(app.client.toolpathExtras.createVersion({
         params: { id: current.id },
-        payload: { data: current.data ?? {}, gcode: value.gcode, changeMessage: `Manual save on ${new Date().toLocaleDateString()}` }
+        payload: { data: updated.data ?? {}, gcode: updated.gcode ?? "", changeMessage: `Manual save on ${new Date().toLocaleDateString()}` }
       }))
       setRow(updated)
       setEditing(false)
@@ -306,6 +315,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                               <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Machine Type</h3><p class="font-medium text-gray-900 dark:text-white">{typeLabel(current().type)}</p></div>
                               <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Operation Type</h3><p class="font-medium text-gray-900 dark:text-white">{operationLabel(current().operationType)}</p></div>
                             </div>
+                            <ToolpathProgramDetails row={current()} drawing={drawing()} />
                             <Show when={current().data && Object.keys(current().data as object).length > 0}>
                               <div>
                                 <h3 class="mb-2 text-lg font-medium text-gray-900 dark:text-white">Toolpath Settings</h3>
@@ -334,6 +344,7 @@ export function ToolpathDetailScreen(): JSX.Element {
                                 <div>
                                   <label for="detail-operation" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Operation Type</label>
                                   <select id="detail-operation" name="operationType" class={INPUT} value={value().operationType} onChange={(e) => patch({ operationType: e.currentTarget.value })}>
+                                    <Show when={value().operationType === "multi-operation" || value().operationType === "kernel"}><option value={value().operationType}>{operationLabel(value().operationType)}</option></Show>
                                     <Show when={value().type === "mill"}>
                                       <option value="contour">Contour</option><option value="pocket">Pocket</option><option value="drill">Drill</option><option value="engrave">Engrave</option><option value="profile">3D Profile</option><option value="threading">Threading</option>
                                     </Show>

@@ -128,13 +128,18 @@ export default function MultiToolpathGenerator(props: MultiToolpathGeneratorProp
 
   // The combined program replaces the viewport's: G-code text for the editor, the parsed IR for the simulation.
   const sendToVisualizer = async (): Promise<void> => {
-    const combined = store.generateCombinedGCode()
-    camStore.setGcode(combined)
-    props.onGCodeGenerated(combined)
+    const generated = [...store.toolpaths].sort((a, b) => a.order - b.order).filter((path) => path.gcode.trim())
     try {
-      const parsed = await app.runtime.run(makeToolpathGenerator(app.client).parse(combined, "Multi-toolpath"))
-      camStore.setProgram(parsed.program as never)
-    } catch { /* the page parses the text itself when the editor receives it */ }
+      const results = await Promise.all(generated.map(async (path) => ({
+        id: path.id, name: path.elementName, gcode: path.gcode,
+        program: (await app.runtime.run(makeToolpathGenerator(app.client).parse(path.gcode, path.elementName))).program,
+        settings: path.toolpathSettings, elementIds: [path.elementId], tool: `${path.toolpathSettings.toolType} Ø${path.toolpathSettings.toolDiameter}`
+      })))
+      camStore.clearOperationResults()
+      camStore.setKernelArtifact(undefined); camStore.setKernelRequest(undefined)
+      for (const result of results) camStore.upsertOperationResult(result)
+      props.onGCodeGenerated(useCamStore.getState().gcode)
+    } catch (cause) { toast.error(cause instanceof Error ? cause.message : String(cause)); return }
     toast.success("G-code inviato al visualizzatore")
   }
 

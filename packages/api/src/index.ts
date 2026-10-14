@@ -103,3 +103,4 @@ export class Api extends HttpApi.make("cadcamfun")
 {}
 
 export * from "./ai-events.ts"
+export * from "./cam-program.ts"

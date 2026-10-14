@@ -8,12 +8,12 @@
  */
 import { cam as coreCam } from "@cadcamfun/core"
 import { Schema } from "effect"
-import { CamKernelArtifact } from "@cadcamfun/api"
+import { CamKernelArtifact, CamKernelRequest } from "@cadcamfun/api"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import type { AppState } from "../../../shared/state/context.ts"
 import { makeToolpathGenerator, type VerifyResponse } from "../../cam/api/generator.ts"
 import { useCamStore } from "../../cam/store/camStore.ts"
-import { useGeneratorStore, type ToolpathSettings } from "../../cam/store/generatorStore.ts"
+import { restoreKernelSettings, useGeneratorStore, type ToolpathSettings } from "../../cam/store/generatorStore.ts"
 import { useVerifyStore } from "../../cam/store/verifyStore.ts"
 import { captureEditorOwner, type EditorOwner } from "./editor-sync.ts"
 
@@ -48,6 +48,8 @@ export const operationIdOf = (key: string, input: unknown, output: string): stri
 }
 
 interface OperationRow {
+  readonly description?: string | null
+  readonly isPublic?: boolean
   readonly name?: string | null
   readonly gcode: string | null
   readonly data: { readonly request?: { readonly settings?: ToolpathSettings }; readonly verification?: { readonly report?: VerifyResponse } } | null
@@ -88,7 +90,10 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
       const cam = useCamStore.getState()
       cam.clearOperationResults()
       cam.setKernelArtifact(artifact)
+      cam.setKernelRequest(data?.["kernelRequest"] !== undefined ? Schema.decodeUnknownSync(CamKernelRequest)(data["kernelRequest"]) : undefined)
+      if (cam.kernelRequest) restoreKernelSettings(cam.kernelRequest)
       cam.setSelectedOperationId(id)
+      if (row.projectId) cam.setSavedProgram({ id, name: row.name ?? "Native CAM program", projectId: row.projectId, drawingId: row.drawingId ?? null, description: row.description ?? null, isPublic: row.isPublic ?? false })
       cam.setGcode(artifact.nc)
       cam.setProgram(artifact.program)
       useGeneratorStore.getState().setResult(artifact.nc, [])
@@ -115,7 +120,7 @@ export async function mirrorCamResult(app: AppState, key: string, input: unknown
     if (gcode.trim() === "") return settings !== undefined
     const name = typeof row.name === "string" && row.name !== "" ? row.name : settings?.operationType ?? id
     const tool = settings !== undefined ? `${settings.toolType} Ø${settings.toolDiameter}` : undefined
-    cam.upsertOperationResult({ id, name, gcode, program: (parsed?.program as never) ?? coreCam.makeProgram(name, [], {}), ...(tool !== undefined ? { tool } : {}) })
+    cam.upsertOperationResult({ id, name, gcode, program: (parsed?.program as never) ?? coreCam.makeProgram(name, [], {}), ...(tool !== undefined ? { tool } : {}), ...(settings !== undefined ? { settings } : {}) })
     useGeneratorStore.getState().setResult(gcode, [])
     if (kind === "verify" && report !== undefined) {
       useVerifyStore.getState().finish(report, gcode)

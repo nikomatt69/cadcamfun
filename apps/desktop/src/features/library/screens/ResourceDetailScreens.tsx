@@ -8,13 +8,16 @@
  * machine configurations are free-form (`config` JSON), so their fields are read defensively.
  */
 import { For, Show, createEffect, createMemo, createSignal, on, type JSX } from "solid-js"
-import { A, useNavigate, useParams } from "@solidjs/router"
+import { A, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import { ArrowLeft, Cpu, Layers, Package, Save, Settings, Trash2, Wrench, Box, Edit } from "lucide-solid"
 import { toast } from "../../../shared/ui/feedback.tsx"
 import { useApp } from "../../../shared/state/context.ts"
 import { invalidatePrefix } from "../../../shared/state/query-cache.ts"
 import { Modal } from "../../toolpaths/components/shared.tsx"
+import { ResourceGeometryPreview, resourceElements } from "../components/ResourceGeometryPreview.tsx"
+import { componentEntries } from "../../cad/lib/component-assembly.ts"
+import { t } from "../../../i18n/index.ts"
 import "../../../styles/workstation.css"
 
 type Kind = "materials" | "tools" | "machines" | "components"
@@ -81,6 +84,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const app = useApp()
   const params = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [urlParams] = useSearchParams()
   const run = app.runtime.run as <A>(effect: unknown) => Promise<A>
   const meta = CONFIG[props.kind]
 
@@ -91,7 +95,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
   const [error, setError] = createSignal<string>()
   const [busy, setBusy] = createSignal(false)
   const [editing, setEditing] = createSignal(false)
-  const [tab, setTab] = createSignal<"overview" | "details" | "raw">("overview")
+  const [tab, setTab] = createSignal<"overview" | "details" | "raw" | "preview" | "structure">(props.kind === "components" && (urlParams.preview === "true" || urlParams.tab === "preview") ? "preview" : props.kind === "components" && urlParams.tab === "structure" ? "structure" : "overview")
   const [deleteOpen, setDeleteOpen] = createSignal(false)
 
   const load = async (): Promise<void> => {
@@ -192,7 +196,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
               <Show when={row()}>{(current) => (
                 <>
                   <nav class="mb-4 flex gap-6 border-b border-gray-200 dark:border-gray-700" aria-label={`${meta.title} sections`}>
-                    <For each={[{ id: "overview" as const, label: "Overview" }, { id: "details" as const, label: "Details" }, { id: "raw" as const, label: "Raw data" }]}>{(item) => (
+                    <For each={[{ id: "overview" as const, label: "Overview" }, { id: "details" as const, label: "Details" }, { id: "raw" as const, label: "Raw data" }, ...(props.kind === "components" ? [{ id: "preview" as const, label: t("cam.resource.previewTab") }, { id: "structure" as const, label: t("cam.resource.structure") }] : [])]}>{(item) => (
                       <button type="button" aria-pressed={tab() === item.id} class={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${tab() === item.id ? TAB_ON : TAB_OFF}`} onClick={() => setTab(item.id)}>{item.label}</button>
                     )}</For>
                   </nav>
@@ -204,6 +208,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                         <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="italic text-gray-500 dark:text-gray-400">No description provided</p>}>
                           <p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{str(current()["description"] ?? current()["notes"])}</p>
                         </Show>
+                        <Show when={props.kind === "components"}><div class="mt-5"><ResourceGeometryPreview elements={resourceElements(current()["data"])} /></div></Show>
                         <div class="mt-5 grid grid-cols-2 gap-4">
                           <For each={summaryFields(props.kind, current())}>{(field) => (
                             <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{field.label}</h3><p class="font-medium text-gray-900 dark:text-white">{field.value}</p></div>
@@ -219,6 +224,19 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                           <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Visibility</dt><dd class={`font-medium ${current()["isPublic"] === true ? "text-green-600 dark:text-green-400" : "text-gray-600 dark:text-gray-400"}`}>{current()["isPublic"] === true ? "Public" : "Private"}</dd></div>
                         </dl>
                       </aside>
+                    </div>
+                  </Show>
+
+                  <Show when={props.kind === "components" && tab() === "preview"}>
+                    <div class={PANEL}><ResourceGeometryPreview elements={resourceElements(current()["data"])} /></div>
+                  </Show>
+                  <Show when={props.kind === "components" && tab() === "structure"}>
+                    <div class={PANEL} data-testid="component-resource-structure">
+                      <h3 class="mb-3 font-medium text-gray-900 dark:text-white">{t("cam.resource.structure")}</h3>
+                      <p class="mb-3 text-sm text-gray-500">{t("cam.resource.elementCount", { count: componentEntries(resourceElements(current()["data"])).length })}</p>
+                      <ol class="space-y-1 text-sm text-gray-700 dark:text-gray-300"><For each={componentEntries(resourceElements(current()["data"]))}>{({ element, depth }) =>
+                        <li style={{ "padding-left": `${depth * 16}px` }}>{String(element["name"] ?? element.type)} <span class="text-xs text-gray-500">· {element.type}</span></li>
+                      }</For></ol>
                     </div>
                   </Show>
 

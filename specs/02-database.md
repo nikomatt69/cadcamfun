@@ -64,6 +64,8 @@ See `01-conventions.md` §3. Every schema change ships with: updated `schema.ts`
 
 ## 5. Change log
 
+- 2026-10-14: native CAM Save reuses the existing Toolpath/ToolpathVersion JSON, G-code and project/drawing foreign keys. The versioned document contract is owned by API `CamProgramDocument`; sidecar validates original NC/artifact/source attribution before repository writes. No added columns or migration are required for these integrations.
+
 - v1: initial import from Prisma, migration `20261004223029_careful_monster_badoon`, service + tests.
 - v2: WP0 upgrade-safety contract documented before implementation: optional backup directory, WAL-consistent last-five snapshots, atomic migration/journal rollback, and scoped shutdown; no sidecar changes required.
 - v3: finishing prior agent edits; clarify deterministic snapshot retention and busy-checkpoint cleanup before implementation and verification.

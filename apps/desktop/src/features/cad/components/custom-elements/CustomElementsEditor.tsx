@@ -6,7 +6,7 @@
  * store; "Add to scene" saves (if needed) and drops an instance on the CAD canvas at the origin.
  */
 import { For, Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js"
-import { Download, Play, Plus, Save, Upload } from "lucide-solid"
+import { Check, Download, Play, Plus, Save, Upload } from "lucide-solid"
 import { Modal } from "../../../../shared/ui/modal.tsx"
 import { toast } from "../../../../shared/ui/toast.tsx"
 import { t, type Key } from "../../../../i18n/index.ts"
@@ -16,6 +16,7 @@ import { useCustomElementsStore } from "../../store/customElementsStore.ts"
 import { useElementsStore } from "../../store/elementsStore.ts"
 import type { CustomElementDefinition } from "../../types/customElements.ts"
 import CustomElementPreview from "./CustomElementPreview.tsx"
+import CustomElementAssistant from "./CustomElementAssistant.tsx"
 import JsonEditor from "./JsonEditor.tsx"
 import ParameterControls from "./ParameterControls.tsx"
 import SavedElementsPanel from "./SavedElementsPanel.tsx"
@@ -25,7 +26,7 @@ export interface CustomElementsEditorProps {
   readonly onClose: () => void
 }
 
-type Tab = "code" | "parameters" | "preview" | "saved" | "settings"
+type Tab = "code" | "parameters" | "assistant" | "preview" | "saved" | "settings"
 
 const FIELD = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
 const ACTION = "px-3 py-1 rounded text-white flex items-center gap-1 disabled:opacity-50"
@@ -160,6 +161,7 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
   const tabs: ReadonlyArray<{ readonly id: Tab; readonly labelKey: Key }> = [
     { id: "code", labelKey: "cad.customElements.tabCode" },
     { id: "parameters", labelKey: "cad.customElements.tabParameters" },
+    { id: "assistant", labelKey: "cad.customElements.tabAssistant" },
     { id: "preview", labelKey: "cad.customElements.tabPreview" },
     { id: "saved", labelKey: "cad.customElements.tabSaved" },
     { id: "settings", labelKey: "cad.customElements.tabSettings" },
@@ -181,43 +183,35 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
   }
 
   return (
-    <Modal open={props.isOpen} onClose={props.onClose} size="lg"
+    <Modal open={props.isOpen} onClose={props.onClose} size="xl"
       title={store.editorMode === "create" ? t("cad.customElements.createTitle") : t("cad.customElements.editTitle")}
     >
       <Show when={definition()} keyed={false}>
         {(active) => (
-          <div class="flex h-[calc(100dvh-11rem)] min-h-[28rem] flex-col">
-            <div class="flex flex-wrap items-center justify-between gap-2 pb-3">
-              <div class="flex flex-wrap items-center gap-2">
+          <div class="flex h-[min(78dvh,58rem)] min-h-[24rem] flex-col">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-700">
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{active().name}</span>
                 <Show when={unsavedChanges()}>
-                  <span class="text-sm text-orange-600">{t("cad.customElements.unsaved")}</span>
+                  <span class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">{t("cad.customElements.unsaved")}</span>
                 </Show>
                 <Show when={store.validationErrors.length === 0} fallback={
-                  <span class="text-sm text-red-600">{t("cad.customElements.errorCount", { count: store.validationErrors.length })}</span>
+                  <span class="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-medium text-red-700 dark:bg-red-950/60 dark:text-red-300">{t("cad.customElements.errorCount", { count: store.validationErrors.length })}</span>
                 }>
-                  <span class="text-sm text-green-600">{t("cad.customElements.valid")}</span>
-                </Show>
-                <Show when={store.editorMode === "create"}>
-                  <For each={Object.keys(customElementTemplates)}>
-                    {(key) => (
-                      <button type="button" class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600" onClick={() => handleApplyTemplate(key)}>
-                        {customElementTemplates[key]?.name ?? key}
-                      </button>
-                    )}
-                  </For>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"><Check size={12} />{t("cad.customElements.valid")}</span>
                 </Show>
               </div>
 
               <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class={ACTION + " bg-blue-600 hover:bg-blue-700"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
+                <button type="button" class={ACTION + " h-9 bg-slate-100 text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-slate-700 dark:text-white dark:ring-slate-600 dark:hover:bg-slate-600"} disabled={store.isGeneratingPreview || store.validationErrors.length > 0} onClick={generatePreview}>
                   <Play class="w-4 h-4" />
                   <span>{t("cad.customElements.preview")}</span>
                 </button>
-                <button type="button" class={ACTION + " bg-green-600 hover:bg-green-700"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
+                <button type="button" class={ACTION + " h-9 bg-blue-600 hover:bg-blue-700"} disabled={store.validationErrors.length > 0} onClick={handleSave}>
                   <Save class="w-4 h-4" />
                   <span>{t("cad.customElements.save")}</span>
                 </button>
-                <button type="button" class={ACTION + " bg-purple-600 hover:bg-purple-700"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
+                <button type="button" class={ACTION + " h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"} disabled={store.validationErrors.length > 0} onClick={handleAddToScene}>
                   <Plus class="w-4 h-4" />
                   <span>{t("cad.customElements.addToScene")}</span>
                 </button>
@@ -230,10 +224,19 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
               </div>
             </div>
 
-            <div class="flex border-b border-gray-200 dark:border-gray-700">
+            <Show when={store.editorMode === "create"}>
+              <div class="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-slate-200 py-2 dark:border-slate-700">
+                <span class="sticky left-0 shrink-0 bg-white pr-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:bg-slate-800">{t("cad.customElements.templates")}</span>
+                <For each={Object.keys(customElementTemplates)}>
+                  {(key) => <button type="button" class="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800 dark:hover:bg-blue-950/40 dark:hover:text-blue-300" onClick={() => handleApplyTemplate(key)}>{customElementTemplates[key]?.name ?? key}</button>}
+                </For>
+              </div>
+            </Show>
+
+            <div class="flex shrink-0 gap-1 overflow-x-auto border-b border-gray-200 pt-2 dark:border-gray-700">
               <For each={tabs}>
                 {(entry) => (
-                  <button type="button" onClick={() => setTab(entry.id)} class={`${TAB} ${tab() === entry.id ? "border-blue-600 text-blue-600" : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"}`}>
+                  <button type="button" onClick={() => setTab(entry.id)} class={`${TAB} rounded-t-md ${tab() === entry.id ? "border-blue-600 bg-blue-50/70 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300" : "border-transparent text-gray-600 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-slate-800"}`}>
                     {t(entry.labelKey)}
                   </button>
                 )}
@@ -252,6 +255,9 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
                     onChange={(name, value) => store.updatePreviewParameters({ ...store.previewParameters, [name]: value })}
                     onDefinitionChange={handleDefinitionChange}
                   />
+                </Show>
+                <Show when={tab() === "assistant"}>
+                  <CustomElementAssistant definition={active()} onGenerated={() => { setUnsavedChanges(true); setTab("parameters") }} />
                 </Show>
                 <Show when={tab() === "saved"}>
                   <SavedElementsPanel onEdit={editSaved} />
@@ -279,8 +285,8 @@ export default function CustomElementsEditor(props: CustomElementsEditorProps): 
               </div>
 
               <div class="flex-1 min-h-72 flex flex-col">
-                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 class="text-lg font-medium text-gray-900 dark:text-white">{t("cad.customElements.livePreview")}</h3>
+                <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                  <div><h3 class="text-sm font-semibold text-gray-900 dark:text-white">{t("cad.customElements.livePreview")}</h3><p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{active().description || t("cad.customElements.previewSubheading")}</p></div>
                   <Show when={store.previewError}>
                     {(error) => <div class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-300 text-sm">{error()}</div>}
                   </Show>

@@ -914,6 +914,7 @@ html.dark .ui-badge-gradient { color: rgb(196, 181, 253); }
 .ui-modal-sm { width: min(28rem, 100%); }
 .ui-modal-md { width: min(40rem, 100%); }
 .ui-modal-lg { width: min(56rem, 100%); }
+.ui-modal-xl { width: min(88rem, 100%); }
 .ui-modal-header {
   display: flex;
   align-items: center;

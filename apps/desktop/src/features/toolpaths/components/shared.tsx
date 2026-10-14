@@ -11,6 +11,7 @@ export type { ToolpathRow }
 export const TYPE_LABEL: Readonly<Record<string, string>> = { mill: "Mill", lathe: "Lathe", "3dprinter": "3D Printer" }
 
 export const OPERATION_LABEL: Readonly<Record<string, string>> = {
+  "multi-operation": "Multiple operations", kernel: "Native CAM",
   contour: "Contour", pocket: "Pocket", drill: "Drill", engrave: "Engrave", profile: "3D Profile", threading: "Threading",
   turning: "Turning", facing: "Facing", boring: "Boring", grooving: "Grooving", parting: "Parting",
   standard: "Standard Print", vase: "Vase Mode", support: "Support", infill: "Infill", raft: "Raft", brim: "Brim"

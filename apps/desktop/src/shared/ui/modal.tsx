@@ -15,17 +15,19 @@ import { prefersReducedMotion } from "./animated-section.tsx"
 const reduced = prefersReducedMotion
 
 export interface ModalProps {
+  readonly variant?: "default" | "workspace"
   readonly open: boolean
   readonly onClose: () => void
   readonly title?: string
   readonly children: JSX.Element
-  readonly size?: "sm" | "md" | "lg"
+  readonly size?: "sm" | "md" | "lg" | "xl"
 }
 
-const sizeClass = (size: "sm" | "md" | "lg"): string => {
+const sizeClass = (size: "sm" | "md" | "lg" | "xl"): string => {
   switch (size) {
     case "sm": return "ui-modal ui-modal-sm"
     case "lg": return "ui-modal ui-modal-lg"
+    case "xl": return "ui-modal ui-modal-xl"
     default: return "ui-modal ui-modal-md"
   }
 }
@@ -88,7 +90,7 @@ export function Modal(props: ModalProps): JSX.Element {
     <Show when={props.open}>
       <Portal>
         <Motion.div
-          class="ui-modal-scrim"
+          class={props.variant === "workspace" ? "fixed inset-0 bg-gray-600/50 dark:bg-black/60 flex items-center justify-center z-[1000] p-4" : "ui-modal-scrim"}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -97,7 +99,8 @@ export function Modal(props: ModalProps): JSX.Element {
         >
           <Motion.div
             ref={onDialogRef}
-            class={sizeClass(size())}
+            class={props.variant === "workspace" ? "bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700 max-h-[calc(100dvh-2rem)] overflow-y-auto" : sizeClass(size())}
+            style={props.variant === "workspace" ? { "font-family": '"CADCAM Rounded", sans-serif', "font-size": "12px", "line-height": "1.4" } : undefined}
             // Entry: scale 0.96 + y 24, never scale(0) (Emil). Exit mirrors
             // entry so the modal returns where it came from.
             initial={reduced() ? { opacity: 0 } : { opacity: 0, y: 24, scale: 0.96 }}
@@ -111,14 +114,14 @@ export function Modal(props: ModalProps): JSX.Element {
             onClick={(event) => event.stopPropagation()}
           >
             <Show when={props.title !== undefined}>
-              <header class="ui-modal-header">
-                <h3 class="ui-modal-title">{props.title}</h3>
-                <button type="button" class="ui-modal-close" aria-label="Close" onClick={() => props.onClose()}>
+              <header class={props.variant === "workspace" ? "px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center" : "ui-modal-header"}>
+                <h3 class={props.variant === "workspace" ? "text-lg font-medium text-gray-900 dark:text-white" : "ui-modal-title"}>{props.title}</h3>
+                <button type="button" class={props.variant === "workspace" ? "text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors" : "ui-modal-close"} aria-label="Close" onClick={() => props.onClose()}>
                   <X size={18} aria-hidden="true" />
                 </button>
               </header>
             </Show>
-            <div class="ui-modal-body">{props.children}</div>
+            <div class={props.variant === "workspace" ? "" : "ui-modal-body"}>{props.children}</div>
           </Motion.div>
         </Motion.div>
       </Portal>

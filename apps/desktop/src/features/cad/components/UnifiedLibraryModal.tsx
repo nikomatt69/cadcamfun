@@ -1,5 +1,6 @@
 import { Show, type JSX } from "solid-js"
-import { Motion, Presence } from "solid-motionone"
+import { Motion } from "solid-motionone"
+import { Portal } from "solid-js/web"
 import { X } from "lucide-solid"
 
 interface UnifiedLibraryModalProps {
@@ -12,11 +13,11 @@ interface UnifiedLibraryModalProps {
 /** The "Unified Library" dialog frame: holographic panel over a blurred backdrop. */
 export default function UnifiedLibraryModal(props: UnifiedLibraryModalProps): JSX.Element {
   return (
-    <Presence>
-      <Show when={props.isOpen}>
-        <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => props.onClose()} class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.5 }} class="w-full max-w-6xl h-[85vh] flex flex-col pointer-events-auto">
+    <Show when={props.isOpen}>
+      <Portal>
+        <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => props.onClose()} class="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm" />
+        <div class="fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none" role="dialog" aria-modal="true" aria-label="Unified Library" onKeyDown={(event) => { if (event.key === "Escape") props.onClose() }}>
+          <Motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.5 }} class="w-full max-w-6xl h-[85vh] flex flex-col pointer-events-auto" style={{ "font-family": '"CADCAM Rounded", sans-serif', "font-size": "12px", "line-height": "1.4" }}>
             <div class="relative w-full h-full">
               <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-50/90 via-white/95 to-purple-50/90 dark:from-gray-900/95 dark:via-gray-800/95 dark:to-blue-900/90 backdrop-blur-xl shadow-2xl border border-white/20 dark:border-gray-700/30">
                 <div class="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-400/10 via-purple-400/10 to-pink-400/10 animate-pulse" />
@@ -37,7 +38,7 @@ export default function UnifiedLibraryModal(props: UnifiedLibraryModalProps): JS
                     <X size={20} />
                   </Motion.button>
                 </Motion.div>
-                <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} class="flex-1 overflow-hidden">{props.children}</Motion.div>
+                <Motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} class="flex-1 min-h-0 overflow-hidden">{props.children}</Motion.div>
               </div>
               <div class="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-blue-400/30 rounded-tl-lg" />
               <div class="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-purple-400/30 rounded-tr-lg" />
@@ -46,7 +47,7 @@ export default function UnifiedLibraryModal(props: UnifiedLibraryModalProps): JS
             </div>
           </Motion.div>
         </div>
-      </Show>
-    </Presence>
+      </Portal>
+    </Show>
   )
 }

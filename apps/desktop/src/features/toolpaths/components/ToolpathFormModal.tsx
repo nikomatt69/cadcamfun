@@ -52,7 +52,7 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
   // Keep the operation valid for the chosen machine type.
   createEffect(on(type, (next) => {
     const allowed = OPERATIONS_BY_TYPE[next] ?? []
-    if (!allowed.includes(operationType())) setOperationType(allowed[0] ?? "contour")
+    if (!allowed.includes(operationType()) && operationType() !== "multi-operation" && operationType() !== "kernel") setOperationType(allowed[0] ?? "contour")
   }, { defer: true }))
 
   const submit = (event: Event): void => {
@@ -89,6 +89,7 @@ export function ToolpathFormModal(props: ToolpathFormModalProps): JSX.Element {
         <div>
           <label for="toolpath-operation" class={LABEL}>Operation Type</label>
           <select id="toolpath-operation" name="operationType" class={INPUT} value={operationType()} onChange={(e) => setOperationType(e.currentTarget.value)}>
+            <Show when={props.row?.operationType === "multi-operation" || props.row?.operationType === "kernel"}><option value={props.row!.operationType!}>{OPERATION_LABEL[props.row!.operationType!]}</option></Show>
             <For each={OPERATIONS_BY_TYPE[type()] ?? []}>{(value) => <option value={value}>{OPERATION_LABEL[value]}</option>}</For>
           </select>
         </div>

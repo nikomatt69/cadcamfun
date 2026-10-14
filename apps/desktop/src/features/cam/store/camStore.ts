@@ -14,6 +14,7 @@
  */
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
+import { combineCamOperations, type CamKernelRequest, type CamProgramOperation } from "@cadcamfun/api"
 import { create } from "../../../shared/state/zustand.ts"
 import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
@@ -45,6 +46,10 @@ export interface DerivedWorkpieceDimensions {
 }
 
 interface CAMState {
+  kernelRequest: CamKernelRequest | undefined
+  setKernelRequest(request: CamKernelRequest | undefined): void
+  savedProgram: { readonly id: string; readonly projectId: string; readonly drawingId: string | null; readonly name: string; readonly description?: string | null; readonly isPublic?: boolean } | undefined
+  setSavedProgram(program: CAMState["savedProgram"]): void
   kernelArtifact: cam.kernel.CamArtifact | undefined
   setKernelArtifact(artifact: cam.kernel.CamArtifact | undefined): void
   // Persistent state
@@ -123,27 +128,13 @@ interface CAMState {
 }
 
 /** One stored operation's generated program, as the page shows it. */
-export interface OperationResult {
-  readonly id: string
-  readonly name: string
-  readonly gcode: string
-  readonly program: cam.Program
-  /** The cutter, as the preview names and colours it (`endmill Ø6`): one colour per tool across operations. */
-  readonly tool?: string
-}
+export type OperationResult = CamProgramOperation
 
 /**
  * The page's program and editor text for a set of operation results: every toolpath of every operation (ids prefixed with the
  * operation, so two operations' `tp-1` never collide) and every program text, each under a comment naming its operation.
  */
-export const combineOperationResults = (results: ReadonlyArray<OperationResult>): { readonly program: cam.Program; readonly gcode: string } => {
-  if (results.length === 0) return { program: cam.makeProgram("untitled", [], {}), gcode: "" }
-  const first = results[0]!.program
-  const toolpaths = results.flatMap((r) => r.program.toolpaths.map((tp) => ({ ...tp, id: `${r.id}:${tp.id}`, toolId: r.tool ?? `${r.id}:${tp.toolId}`, name: results.length > 1 ? `${r.name} · ${tp.name}` : tp.name })))
-  const program = cam.makeProgram(results.length > 1 ? `${results.length} operations` : first.name, toolpaths, { units: first.units, workOffset: first.workOffset })
-  const gcode = results.length === 1 ? results[0]!.gcode : results.map((r, i) => `; ===== Operation ${i + 1}/${results.length}: ${r.name} =====\n${r.gcode.trimEnd()}`).join("\n\n")
-  return { program, gcode }
-}
+export const combineOperationResults = combineCamOperations
 
 const legacyInitial = {
   operationResults: [] as ReadonlyArray<OperationResult>,
@@ -164,6 +155,10 @@ const initialWorkpiece: Workpiece = { x: 300, y: 180, z: 10 }
 const initialProgram = cam.makeProgram("untitled", [], {})
 
 export const useCamStore = create<CAMState>((set, get) => ({
+  kernelRequest: undefined,
+  setKernelRequest: (kernelRequest) => set({ kernelRequest }),
+  savedProgram: undefined,
+  setSavedProgram: (savedProgram) => set({ savedProgram }),
   workpiece: initialWorkpiece,
   material: "",
   controller: "gcode",
@@ -270,6 +265,8 @@ export const useCamStore = create<CAMState>((set, get) => ({
   },
 
   reset: () => set({
+    kernelRequest: undefined,
+    savedProgram: undefined,
     kernelArtifact: undefined,
     workpiece: initialWorkpiece,
     material: "",

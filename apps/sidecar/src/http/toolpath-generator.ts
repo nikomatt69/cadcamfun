@@ -1,7 +1,8 @@
-import { Api, BadRequest, CamKernelResult, InternalError } from "@cadcamfun/api"
+import { Api, BadRequest, InternalError } from "@cadcamfun/api"
 import { cam } from "@cadcamfun/core"
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { runKernelRequest } from "../services/cam-program.ts"
 
 const g = cam.generator
 
@@ -13,33 +14,7 @@ const guarded = <A>(label: string, run: () => A) =>
 
 export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGenerator", Effect.fn(function*(handlers) {
   return handlers
-    .handle("manufacture", ({ payload }) => Effect.gen(function*() {
-      const machine = payload.machine !== undefined ? cam.kernel.findMachine(payload.machine) : undefined
-      if (payload.machine !== undefined && machine === undefined) return yield* new BadRequest({ message: `Unknown machine preset '${payload.machine}'` })
-      const result = yield* guarded("Failed to run CAM kernel", () => {
-        // The editor stock is centred in CAD XY; its topZ is the machine reference. Anchor the raw block on the CAD part bottom.
-        const meshes = payload.stock !== undefined ? cam.model.partMeshes(payload.elements, { tolerance: payload.tolerance ?? 0.01 }) : undefined
-        const bottom = meshes !== undefined ? Math.min(...meshes.meshes.map((mesh) => cam.model.meshBounds(mesh).min[2])) : 0
-        const stock = payload.stock
-        return cam.kernel.runJob({
-        schemaVersion: payload.schemaVersion, id: payload.id, name: payload.name, material: payload.material,
-        part: { kind: "elements", elements: payload.elements },
-        ...(machine !== undefined ? { machine } : {}), ...(stock !== undefined ? { stock: {
-          min: { x: stock.x - stock.width / 2, y: stock.y - stock.height / 2, z: bottom },
-          max: { x: stock.x + stock.width / 2, y: stock.y + stock.height / 2, z: bottom + stock.depth }
-        } } : {}),
-        ...(payload.origin !== undefined ? { origin: payload.origin } : {}),
-        ...(payload.workOffset !== undefined ? { workOffset: payload.workOffset } : {}),
-        quality: {
-          ...(payload.finishAllowance !== undefined ? { finishAllowance: payload.finishAllowance } : {}),
-          ...(payload.scallop !== undefined ? { scallop: payload.scallop } : {}),
-          ...(payload.tolerance !== undefined ? { tolerance: payload.tolerance } : {}),
-          ...(payload.resolution !== undefined ? { resolution: payload.resolution } : {})
-        }
-      }) })
-      return yield* Schema.decodeUnknownEffect(CamKernelResult)(result).pipe(
-        Effect.mapError(() => new InternalError({ message: "CAM kernel returned an invalid artifact" })))
-    }))
+    .handle("manufacture", ({ payload }) => runKernelRequest(payload))
     .handle("generate", ({ payload }) =>
       Effect.gen(function*() {
         const outcome = yield* guarded("Failed to generate toolpath", () => g.generateToolpath(payload))

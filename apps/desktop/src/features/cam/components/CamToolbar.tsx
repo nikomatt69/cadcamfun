@@ -9,12 +9,13 @@ import { For, Show, type JSX } from "solid-js"
 import { A } from "@solidjs/router"
 import { Motion } from "solid-motionone"
 import {
-  Brain, Code, DollarSign, Eye, Folder, Grid3x3, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, Save, Settings, Sun, Upload, Wrench, Zap
+  Brain, Code, DollarSign, Eye, Folder, Grid3x3, History, Menu, Moon, Pause, PanelRight, PanelRightClose, Play, RotateCcw, RotateCw, Save, Settings, Sun, Upload, Wrench, Zap
 } from "lucide-solid"
 import { useCamStore, type ActiveTab } from "../store/camStore.ts"
 import { t } from "../../../i18n/index.ts"
 import { useApp } from "../../../shared/state/context.ts"
 import { prefersDark } from "../../../shared/state/settings.ts"
+import { useCamHistoryStore } from "../store/camHistoryStore.ts"
 
 export interface CamToolbarProps {
   /** Whether there is G-code to save (the save button is disabled otherwise). */
@@ -29,6 +30,7 @@ export interface CamToolbarProps {
   readonly onOpenCosts: () => void
   readonly onToggleAi: () => void
   readonly onToggleChat: () => void
+  readonly onOpenHistory?: () => void
 }
 
 /** Legacy `btn btn-sm btn-outline` buttons (classes defined in `styles/globals.css`). */
@@ -46,6 +48,7 @@ const TABS: ReadonlyArray<{ readonly id: ActiveTab; readonly label: "cam.preview
 
 export default function CamToolbar(props: CamToolbarProps): JSX.Element {
   const cam = useCamStore()
+  const history = useCamHistoryStore()
   const app = useApp()
   const dark = (): boolean => {
     const theme = app.settings.settings().theme
@@ -88,7 +91,7 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
             <input
               type="file"
               class="hidden"
-              accept=".nc,.gcode,.cnc,.txt"
+              accept=".nc,.gcode,.cnc,.txt,.h,.json"
               aria-label={t("cam.import")}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0]
@@ -97,6 +100,9 @@ export default function CamToolbar(props: CamToolbarProps): JSX.Element {
               }}
             />
           </label>
+          <button type="button" title={t("cad.undo")} aria-label={t("cad.undo")} class={OUTLINE} disabled={history.index <= 0} onClick={() => history.undo()}><RotateCcw size={16} /></button>
+          <button type="button" title={t("cad.redo")} aria-label={t("cad.redo")} class={OUTLINE} disabled={history.index >= history.entries.length - 1} onClick={() => history.redo()}><RotateCw size={16} /></button>
+          <button type="button" title={t("cam.history.title")} aria-label={t("cam.history.title")} class={OUTLINE} onClick={() => props.onOpenHistory?.()}><History size={16} /></button>
           <button
             onClick={() => props.onToggleSimulation()}
             class={`btn btn-sm ${props.isSimulating ? "btn-danger dark:bg-red-600 dark:hover:bg-red-700" : "btn-success dark:bg-green-600 dark:hover:bg-green-700"} flex items-center`}

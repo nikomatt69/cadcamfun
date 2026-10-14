@@ -7,6 +7,8 @@ import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { ToolpathLibrary } from "../repos/toolpath-library.ts"
+import { DrawingRepo } from "../repos/drawing-repo.ts"
+import { prepareCamProgramData } from "../services/cam-program.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -14,6 +16,7 @@ const fail = (message: string) => (e: unknown) =>
 export const ToolpathExtrasHandlers = HttpApiBuilder.group(Api, "toolpathExtras", Effect.fn(function*(handlers) {
   const repo = yield* ToolpathRepo
   const library = yield* ToolpathLibrary
+  const drawings = yield* DrawingRepo
 
   /** Visible toolpath (created by the user, in their organisation, or public) — the legacy `findFirst` guard. */
   const visible = Effect.fn("toolpathExtras.visible")(function*(id: string) {
@@ -33,11 +36,14 @@ export const ToolpathExtrasHandlers = HttpApiBuilder.group(Api, "toolpathExtras"
         Effect.catchTag("DatabaseError", fail("Failed to fetch toolpath versions"))))
     .handle("createVersion", ({ params, payload }) =>
       Effect.gen(function*() {
-        const { user } = yield* visible(params.id)
+        const { user, found } = yield* visible(params.id)
+        if (!found.canWrite) return yield* new NotFound({ message: "Toolpath not found or access denied" })
         if (payload.data === undefined && (payload.gcode === undefined || payload.gcode === "")) {
           return yield* new BadRequest({ message: "Either data or gcode must be provided" })
         }
-        const created = yield* repo.createVersion(params.id, user.id, payload)
+        const drawing = found.row.drawingId ? yield* drawings.find(user.id, found.row.drawingId) : undefined
+        const data = payload.data !== undefined ? yield* prepareCamProgramData({ data: payload.data, gcode: payload.gcode, previous: found.row.data, drawing }) : undefined
+        const created = yield* repo.createVersion(params.id, user.id, { ...payload, ...(data !== undefined ? { data } : {}) })
         return { ...created, message: "Version created successfully" }
       }).pipe(Effect.catchTag("DatabaseError", fail("Failed to create toolpath version"))))
     .handle("restoreVersion", ({ params, payload }) =>

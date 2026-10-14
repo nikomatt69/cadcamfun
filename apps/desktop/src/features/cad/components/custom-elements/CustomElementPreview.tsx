@@ -18,9 +18,6 @@ export interface CustomElementPreviewProps {
   readonly isLoading?: boolean
 }
 
-const HELP_OVERLAY = "absolute bottom-4 left-4 bg-black/75 text-white text-xs p-2 rounded"
-const INFO_OVERLAY = "absolute top-4 left-4 bg-black/75 text-white text-xs p-2 rounded"
-
 /**
  * Three's renderer, or `null` where there is no WebGL context (a headless test window, a machine
  * without a GPU). The panel then shows an empty stage instead of failing the whole editor.
@@ -50,7 +47,7 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
     target = new THREE.Vector3(...(config?.camera?.target ?? [0, 0, 0]))
 
     const built = new THREE.Scene()
-    built.background = new THREE.Color(config?.background ?? "#f0f0f0")
+    built.background = new THREE.Color(config?.background ?? "#e9eef5")
     scene = built
 
     const view = new THREE.PerspectiveCamera(75, rect.width / rect.height, 0.1, 1000)
@@ -80,7 +77,9 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
       built.add(fill)
     }
 
-    built.add(new THREE.GridHelper(10, 10, 0xcccccc, 0xeeeeee))
+    const grid = new THREE.GridHelper(10, 10, 0x94a3b8, 0xdbe2ea)
+    grid.name = "custom-element-grid"
+    built.add(grid)
     built.add(new THREE.AxesHelper(2))
 
     // Orbit around the definition's own target; phi is clamped so the camera never flips.
@@ -146,7 +145,7 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
     const stage = scene
     const config = props.definition.previewConfig
     if (!stage) return
-    stage.background = new THREE.Color(config?.background ?? "#f0f0f0")
+    stage.background = new THREE.Color(config?.background ?? "#e9eef5")
     target = new THREE.Vector3(...(config?.camera?.target ?? [0, 0, 0]))
   })
 
@@ -174,21 +173,28 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
     stage.add(object)
     shown = object
 
-    const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3())
+    const bounds = new THREE.Box3().setFromObject(object)
+    const size = bounds.getSize(new THREE.Vector3())
     const largest = Math.max(size.x, size.y, size.z)
     if (largest > 0 && camera) {
+      target.copy(bounds.getCenter(new THREE.Vector3()))
       const orbit = spherical()
       orbit.setFromVector3(camera.position.clone().sub(target))
-      orbit.radius = Math.max(largest * 2, 3)
+      orbit.radius = Math.max(largest * 1.75, 3)
       camera.position.setFromSpherical(orbit).add(target)
       camera.lookAt(target)
+      const grid = stage.getObjectByName("custom-element-grid")
+      if (grid) {
+        grid.position.set(target.x, bounds.min.y, target.z)
+        grid.scale.setScalar(Math.max(largest / 10, 1))
+      }
     }
   })
 
   const triangles = (): number | undefined => (props.object ? triangleCount(props.object) : undefined)
 
   return (
-    <div class="relative w-full h-full bg-gray-50 dark:bg-gray-900">
+    <div class="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-900">
       <div ref={mount} class="w-full h-full" />
 
       <Show when={props.isLoading}>
@@ -210,13 +216,13 @@ export default function CustomElementPreview(props: CustomElementPreviewProps): 
         </div>
       </Show>
 
-      <div class={HELP_OVERLAY}>
+      <div class="absolute bottom-3 left-3 rounded-lg border border-slate-700/60 bg-slate-950/80 px-3 py-2 text-[10px] leading-4 text-slate-100 shadow-lg backdrop-blur">
         <div>🖱️ {t("cad.customElements.dragRotate")}</div>
         <div>🔘 {t("cad.customElements.scrollZoom")}</div>
       </div>
 
       <Show when={props.object && !props.isLoading}>
-        <div class={INFO_OVERLAY}>
+        <div class="absolute left-3 top-3 rounded-lg border border-slate-700/60 bg-slate-950/80 px-3 py-2 text-[10px] leading-4 text-slate-100 shadow-lg backdrop-blur">
           <div>{t("cad.customElements.triangles", { count: triangles() ?? 0 })}</div>
           <div>
             {t("cad.customElements.objectType")}: {props.object?.type}

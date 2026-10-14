@@ -73,6 +73,26 @@ describe("resource detail pages", () => {
     } finally { dispose() }
   }, PAGE_TIMEOUT)
 
+  test("component resource preserves nested structure and exposes the reference preview tabs", async () => {
+    const data = { elements: [{ id: "assembly", type: "component", name: "Assembly", layerId: "default", elements: [
+      { id: "plate", type: "cube", name: "Base plate", width: 30, height: 20, depth: 5, layerId: "default" },
+      { id: "insert", type: "component", name: "Insert", layerId: "default", elements: [{ id: "pin", name: "Pin", type: "cylinder", radius: 2, height: 10, layerId: "default" }] }
+    ] }] }
+    const row = (await app.sidecar.call(`/api/projects/${projectId}/components`, { method: "POST", json: { name: "Nested assembly", type: "composite", data } })).body
+    const view = app.visit(`/components/${row.id}`)
+    try {
+      await app.wait(() => byText("h1", "Nested assembly"), 30_000)
+      expect(document.querySelector("[data-testid='resource-geometry-preview']")).not.toBeNull()
+      byText("button", "Structure")!.click()
+      const structure = await find("[data-testid='component-resource-structure']")
+      expect(structure.textContent).toContain("Elements: 4")
+      for (const name of ["Assembly", "Base plate", "Insert", "Pin"]) expect(structure.textContent).toContain(name)
+      byText("button", "Preview")!.click()
+      await find("[data-testid='resource-geometry-preview']")
+      expect((await app.sidecar.call(`/api/components/${row.id}`)).body.data).toEqual(data)
+    } finally { view.dispose() }
+  }, PAGE_TIMEOUT)
+
   test("Edit saves the material through the typed client", async () => {
     resetStores()
     const { dispose } = app.visit(`/materials/${materialId}`)

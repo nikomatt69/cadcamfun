@@ -307,4 +307,6 @@ The architecture is fixed enough to implement its foundation. Qualification addi
 
 ## Change log
 
+- 2026-10-14: owner-requested additive CAM Save integration uses existing project/drawing/toolpath/version APIs. Portable JSON retains exact native NC and IR; edited or postprocessed NC cannot retain native release evidence. Stored programs reopen through the existing CAM/library flow. Desktop scopes and failure/version behavior are defined in spec 06; no new DB schema or atomic receipt implementation.
+
 - 2026-10-13: owner-requested native CAM kernel architecture. Recorded current-source gaps, deep kernel Interface, authoritative geometry Seam, stock lineage, radian/frame migration, continuous machine motion, independent final-NC replay, capability/evidence release rules, owner scopes, dependency gates and adversarial acceptance fixtures. Design only; no source code, background task, commit, implementation status or commercial parity claim.

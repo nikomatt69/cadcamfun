@@ -15197,6 +15197,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
             },
             "description": "Unauthorized",
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
           "404": {
             "content": {
               "application/json": {
@@ -44977,6 +44987,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               },
             },
             "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
           },
           "404": {
             "content": {

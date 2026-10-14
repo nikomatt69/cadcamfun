@@ -7,6 +7,7 @@
  * a library tool overwrites type / diameter / flutes / rpm.
  */
 import { cam } from "@cadcamfun/core"
+import type { CamKernelRequest } from "@cadcamfun/api"
 import { create } from "../../../shared/state/zustand.ts"
 import { depthForSelection } from "../lib/job.ts"
 
@@ -15,6 +16,8 @@ const g = cam.generator
 export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
+export type KernelSettings = Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution">
+const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
   readonly id?: string
@@ -30,6 +33,8 @@ export interface DetectedCycle { readonly gcode: string }
 
 interface GeneratorState {
   settings: ToolpathSettings
+  kernelSettings: KernelSettings
+  patchKernelSettings: (patch: Partial<KernelSettings>) => void
   expanded: Record<string, boolean>
   geometryType: GeometryType
   rectangleWidth: number
@@ -101,12 +106,13 @@ let successTimer: ReturnType<typeof setTimeout> | undefined
 let errorTimer: ReturnType<typeof setTimeout> | undefined
 
 const initial = (): Pick<GeneratorState,
-  "settings" | "expanded" | "geometryType" | "rectangleWidth" | "rectangleHeight" | "circleRadius" | "polygonSides" | "polygonRadius" | "customPath" |
+  "settings" | "kernelSettings" | "expanded" | "geometryType" | "rectangleWidth" | "rectangleHeight" | "circleRadius" | "polygonSides" | "polygonRadius" | "customPath" |
   "printer" | "selectedLibraryTool" | "showFullscreen" | "isGenerating" | "isAIProcessing" | "error" | "success" | "aiSuggestions" | "currentGCode" |
   "detectedCycles" | "selectedCycle" | "depthSetManually"
 > => ({
   settings: initialSettings(),
-  expanded: { ...g.DEFAULT_EXPANDED },
+  kernelSettings: initialKernelSettings(),
+  expanded: { ...g.DEFAULT_EXPANDED, kernel: true },
   geometryType: "rectangle",
   rectangleWidth: 100,
   rectangleHeight: 50,
@@ -130,6 +136,7 @@ const initial = (): Pick<GeneratorState,
 
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   ...initial(),
+  patchKernelSettings: patch => set(state => ({ kernelSettings: { ...state.kernelSettings, ...patch } })),
 
   toggleSection: section => set(state => ({ expanded: { ...state.expanded, [section]: !state.expanded[section] } })),
 
@@ -207,6 +214,15 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
 
   reset: () => set(initial())
 }))
+
+/** Restoring the captured request also restores the controls that produced its native evidence. */
+export const restoreKernelSettings = (request: CamKernelRequest): void => {
+  const state = useGeneratorStore.getState()
+  useGeneratorStore.setState({
+    kernelSettings: { material: request.material, machine: request.machine ?? cam.kernel.DEFAULT_MACHINE.id, origin: request.origin ?? "stock-center", finishAllowance: request.finishAllowance, scallop: request.scallop, resolution: request.resolution },
+    settings: { ...state.settings, tolerance: request.tolerance ?? 0.01, workOffset: request.workOffset ?? "G54" }
+  })
+}
 
 /** "Save Config" / "Load Config" of the legacy panel (`localStorage["toolpath-config"]`), guarded for blocked storage. */
 export const saveConfig = (settings: ToolpathSettings): boolean => {

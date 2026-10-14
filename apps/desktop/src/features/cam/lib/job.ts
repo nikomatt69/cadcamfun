@@ -121,7 +121,7 @@ export const geometryOf = (form: GeometryForm, sources: JobSources): cam.generat
 })
 
 /** Snapshot the selected parts and their Boolean operands, or the whole drawing when nothing is selected. */
-export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset">): CamKernelRequest => {
+export const kernelRequestOf = (sources: JobSources, options: Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "tolerance" | "workOffset" | "resolution">): CamKernelRequest => {
   const selected = selectedElements(sources)
   const roots = selected.length > 0 ? selected : sources.elements.filter((element) => !STOCK_TYPES.has(String(element["type"])))
   const byId = new Map(sources.elements.map((element) => [String(element["id"]), element]))
