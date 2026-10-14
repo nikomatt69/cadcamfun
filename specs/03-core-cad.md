@@ -231,6 +231,11 @@ Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 
 ## 8. Change log
 
+- 2026-10-14: an extrusion's edge treatment (`edge`: fillet or chamfer of the end rims, `ends`, `holes`) is exact:
+  `rebuildExact` blends the rims of `<id>.top` / `<id>.bottom` with `blendBrep`; a rim it cannot blend (the arc
+  of a rounded profile corner) leaves the body without an exact model and says why. The `mounting_plate` and
+  `flange` recipes with a chamfer are now exact. Test: `history-brep.test.ts` (analytic volumes to 1e-9).
+
 - 2026-10-14: hole recognition on the exact model (`brep/features.ts`), smart fasteners (`smart-fasteners.ts`:
   ISO 273 / 4762 / 7089 / 4032, thread engagement by material), exact interference and bill of materials
   (`assembly-analysis.ts`), and their desktop automation in the assembly panel. Boolean: a result with no

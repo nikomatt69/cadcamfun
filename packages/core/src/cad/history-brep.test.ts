@@ -137,6 +137,34 @@ describe("exact replay of a parametric history", () => {
     expect(rel(exactVolume(plate([{ id: "bevel", type: "fillet", style: "chamfer", radius: c }])), 6000 - 2 * c * c * (40 + 25 + 6) + 6 * c ** 3)).toBeLessThan(1e-9)
   }, 180_000)
 
+  test("an extrusion's edge treatment: its end rims chamfered or filleted exactly, holes when asked", () => {
+    const c = 2
+    const withEdge = (edge: NonNullable<Extract<Feature, { type: "extrude" }>["edge"]>, extra: Feature[] = []) =>
+      ({ ...plate(extra), features: plate(extra).features.map((f) => (f.id === "plate" ? { ...f, edge } : f)) })
+    // Top rim only: four 45-degree prisms along the perimeter, overlapping by c^3 / 3 at each corner.
+    expect(rel(exactVolume(withEdge({ style: "chamfer", size: c, ends: "top" })), 6000 - (c * c / 2) * 130 + 4 * (c ** 3 / 3))).toBeLessThan(1e-9)
+    // Both rims: twice that.
+    expect(rel(exactVolume(withEdge({ style: "chamfer", size: c })), 6000 - 2 * ((c * c / 2) * 130 - 4 * (c ** 3 / 3)))).toBeLessThan(1e-9)
+    // A hole's rims too: the outer chamfers plus a revolved triangle at each end of the bore (Pappus).
+    // The bore is a circle in the plate's own sketch, so it is an inner loop of the end faces.
+    const [s1, extrude] = plate().features as [SketchFeature, Extract<Feature, { type: "extrude" }>]
+    const holed = history([
+      { ...s1, sketch: { entities: [...s1.sketch.entities, pt("c", 20, 12.5), { id: "k", kind: "circle", center: "c", radius: 4 }], constraints: [...s1.sketch.constraints, { type: "fixed", point: "c" }] } },
+      { ...extrude, edge: { style: "chamfer", size: 1, holes: true } }
+    ], plate().parameters)
+    const outer = 6000 - 2 * ((1 / 2) * 130 - 4 * (1 / 3))
+    const bore = PI * 16 * 6 + 2 * (2 * PI * (4 + 1 / 3) * (1 / 2))
+    expect(rel(exactVolume(holed), outer - bore)).toBeLessThan(1e-9)
+    // A fillet agrees with the mesh rebuild's.
+    const rounded = rebuildExact(withEdge({ style: "fillet", size: 1 }))
+    expect(rounded.bodies[0]!.reason).toBeUndefined()
+    expect(validateBrep(rounded.bodies[0]!.brep!).issues).toEqual([])
+    expect(rel(massProperties(rounded.bodies[0]!.brep!).volume, meshVolume(rounded.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+    // A rounded profile corner's arc is not a rim the exact blend takes: the reason, not an approximation.
+    const both = { ...plate(), features: plate().features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 }, edge: { style: "chamfer" as const, size: 1 } } : f)) }
+    expect(rebuildExact(both).bodies[0]!.reason).toContain("straight edges and full circles only")
+  }, 180_000)
+
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
     const r = 1
     const holed = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "round", type: "fillet", radius: r, edges: { curved: true, within: { min: [10, 5, -1], max: [30, 20, 7] } } }])
@@ -154,6 +182,15 @@ describe("exact replay of a parametric history", () => {
         expect(rel(massProperties(b.brep).volume, mesh)).toBeLessThan(2e-3)
       }
       expect(r.bodies.some((b) => b.brep !== undefined)).toBe(true)
+    }
+    // Recipes with an edge chamfer on their extrusion: every body exact.
+    for (const [name, input] of [["mounting_plate", { chamfer: 1 }], ["flange", { chamfer: 1 }]] as const) {
+      const r = rebuildExact(buildRecipe(name, input).history)
+      for (const b of r.bodies) {
+        expect(b.reason).toBeUndefined()
+        const mesh = meshVolume(r.result.bodies.find((m) => m.id === b.id)!.mesh)
+        expect(rel(massProperties(b.brep!).volume, mesh)).toBeLessThan(2e-3)
+      }
     }
   })
 })
