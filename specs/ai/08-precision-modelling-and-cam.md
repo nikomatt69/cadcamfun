@@ -6,7 +6,7 @@ Status: specified / implementation pending.
 
 Controlling step: [RM-09](../roadmap/09-cad-cam-depth.md), dependent on [RM-02](../roadmap/02-multi-op-setup.md) for pure-core work, additionally [RM-03](../roadmap/03-api-parity.md) receipts and [RM-06](../roadmap/06-context-awareness.md) intent/context for precision integration. [Roadmap](../roadmap/README.md) and [process](../roadmap/00-how-to-follow.md) alone control implementation sequence. RM-01 is current. This publication neither advances RM-09 nor makes precision work an alternate execution track. Core-only work does not waive the later integration prerequisites.
 
-RM-09's actual deliverables remain: swept-cutter/holder collision in `cam.verify`; drop-cutter pencil/scallop/flowline mill operations; parametric `fillet`, `shell`, `pattern-along-path`; skill/prompt exposure only after RM-01 catalogue and deterministic core tests. Precision contracts below require contract-first additions to RM-09, not silent substitution for that list. No exact B-rep kernel in RM-09.
+RM-09's actual deliverables remain: swept-cutter/holder collision in `cam.verify`; drop-cutter pencil/scallop/flowline mill operations; parametric `fillet`, `shell`, `pattern-along-path`; skill/prompt exposure only after RM-01 catalogue and deterministic core tests. Precision contracts below require contract-first additions to RM-09, not silent substitution for that list. RM-09 adopts no new exact kernel: the native `cad/brep/` kernel (spec 03 §7c, STEP read/write, `history-brep.ts` exact feature replay) already exists and is the exact model precision work measures against.
 
 Effect `4.0.0-rc.112`, `@nikcli-ai/sdk-next@1.428.0`, Bun, SolidJS, Tauri and SQLite stay. Application workflows use `Context.Service`, explicit Layers, named `Effect.fn`, tagged failures and scope cancellation after reading installed v4 docs. `packages/core` geometry, constraint, mesh, toolpath and measurement hot loops are pure functions over readonly data; no Effect runtime in them. nikcli owns bounded modeler orchestration; AI SDK v7 does not become a second mutation loop.
 
@@ -101,9 +101,9 @@ Setups bind part revision, stock, WCS, fixtures, cutter/holder, machine/post, un
 
 ## Non-goals and future B-rep ADR gate
 
-No exact B-rep/STEP round-trip claim, commercial Fusion/hyperMILL equivalence, global micron guarantee, new kernel/dependency, simultaneous 5-axis expansion or machine actuation. Mesh repair cannot fabricate exact topology. Existing import dependencies do not prove editable exact B-rep modelling.
+No STEP round-trip equality claim without recorded corpus evidence (the native kernel reads and writes STEP; equality within declared tolerance is not yet evidenced), no exact claim for a body outside the documented exact feature set (such a body keeps its mesh and says so), no commercial Fusion/hyperMILL equivalence, global micron guarantee, new kernel/dependency, simultaneous 5-axis expansion or machine actuation. Mesh repair cannot fabricate exact topology.
 
-A future separately approved ADR and ordered roadmap extension must evaluate licensing/distribution, deterministic topology and stable feature references, real STEP export/re-import, Bun compiled-sidecar/Tauri packaging, measured numerical accuracy, performance/resource budgets and representative Boolean/fillet/shell/feature corpus. Include migration, dual-representation ownership and rollback before adopting a kernel. This is an investigation gate outside RM-09, not permission to implement now.
+Replacing or supplementing the native kernel with a third-party one needs a separately approved ADR and ordered roadmap extension evaluating licensing/distribution, deterministic topology and stable feature references, STEP export/re-import equality, Bun compiled-sidecar/Tauri packaging, measured numerical accuracy, performance/resource budgets and representative Boolean/fillet/shell/feature corpus, with migration, dual-representation ownership and rollback. This is an investigation gate outside RM-09, not permission to implement now.
 
 ## Migration, failure and rollback
 
@@ -143,9 +143,10 @@ Native responsiveness and packaged-sidecar checks require separate recorded loca
 - [ ] Preview does not mutate; digest/expected-revision atomic commit, duplicate receipts and conflict/cancel/crash behavior verified.
 - [ ] Bounded repair cannot save failed preview or silently relax intent.
 - [ ] Swept verification, finishing operations and named parametric features pass deterministic corpus before exposure.
-- [ ] Exact stored NC/hash verified; no exact B-rep, commercial-parity or certification claim.
+- [ ] Exact stored NC/hash verified; no exact claim beyond the native kernel's documented and evidenced feature set, no commercial-parity or certification claim.
 - [ ] Verify evidence recorded by owners before RM-09 completion; future kernel remains ADR-gated.
 
 ## Change log
 
+- 2026-10-14: corrected the B-rep statements: the native `cad/brep/` kernel with STEP read/write exists (spec 03 §7c); RM-09 adds no new kernel and claims nothing beyond recorded evidence (AI-11 Step 0). Documentation only.
 - 2026-10-12: Documentation-only precision contract specified from approved plan. Added explicit legacy-degree migration, tolerance/measurement limits and digest-bound preview/commit design while retaining actual RM-09 deliverables. Required cross-owner amendments and future B-rep ADR gate recorded, not implemented. No tests executed.
