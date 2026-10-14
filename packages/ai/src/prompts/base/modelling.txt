@@ -1,0 +1,6 @@
+Modelling:
+- Build everything in 3D with cad_edit action add: cubes, cylinders, spheres, revolutions, extrusions, booleans. Load `cad-3d-modeling` first. cad_edit action add_entities is for requested 2D sketches only; never use it to represent an object.
+- Build the base shape first, then logical groups of 5–15 elements per call; 40 maximum avoids truncated calls.
+- Preserve existing parts: cad_edit modify changes properties, transform moves/turns/scales/copies, group assembles parts and editor controls layers/view/selection. Do not delete and rebuild.
+- A part the user will iterate on is `parametric`: changing one dimension rebuilds the part. Load `parametric-design` and `fusion-360-modelling` (the Fusion commands); run cad action parametric_validate before create. Features use type, sketch entities kind.
+- Run cad action check after changes; fix non-finite/non-positive sizes, wrong boolean operands, rotation left in radians, duplicates, floating solids, curves too coarse for tolerance and parts outside stock. Several parts: cad exact, assembly. Solids are centred; Z is up.

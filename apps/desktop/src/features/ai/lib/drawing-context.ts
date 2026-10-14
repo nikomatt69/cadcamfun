@@ -46,6 +46,27 @@ export const verificationState = (): { readonly state: "not-run" | "stale" | "ok
   return { state: errors > 0 ? "errors" : "ok", errors, issues }
 }
 
+/**
+ * The native CAM kernel as the panel holds it: the job presets the next run uses and, when one ran, its release level and the
+ * state of each claim. Nothing is computed here, so building the context stays cheap.
+ */
+export const kernelState = () => {
+  const { kernelSettings } = useGeneratorStore.getState()
+  const artifact = useCamStore.getState().kernelArtifact
+  return {
+    settings: {
+      material: kernelSettings.material, machine: kernelSettings.machine, origin: kernelSettings.origin,
+      finishAllowance: kernelSettings.finishAllowance, scallop: kernelSettings.scallop, deburr: kernelSettings.deburr,
+      subprograms: kernelSettings.subprograms === true, plannedOperations: kernelSettings.operations?.length ?? 0, toolsOverridden: kernelSettings.tools?.length ?? 0
+    },
+    artifact: artifact === undefined ? null : {
+      release: artifact.release, material: artifact.material.name, machine: artifact.machine.name, operations: artifact.operations.length,
+      issues: artifact.issues.length, claims: artifact.claims.map((claim) => ({ id: claim.id, status: claim.status })), cycleTimeSeconds: artifact.cycleTimeSeconds,
+      notes: artifact.notes.slice(0, 4)
+    }
+  }
+}
+
 /** The workspace as the assistant sees it. `page` is where the user is: the CAD editor or the CAM page. */
 export function currentDrawingContext(app: AppState) {
   const elements = useElementsStore.getState().elements as ReadonlyArray<Record<string, unknown>>
@@ -73,6 +94,8 @@ export function currentDrawingContext(app: AppState) {
     viewMode: cad.viewMode,
     coordinateSystem: { axes: "right-handed XYZ; Z up", originOffset: cad.originOffset, positionUnit: "mm", elementRotationUnit: "degrees", section: cad.section },
     totalElementCount: elements.length,
+    // Solids that carry an exact B-rep or a rebuildable history; cad action exact gives the per-solid verdict.
+    solids: { brep: elements.filter((e) => e["type"] === "brep").length, parametric: elements.filter((e) => e["type"] === "parametric").length },
     selectedElementCount: selectedIds.size,
     selectedIds: [...selectedIds],
     elements: listed.map(summary),
@@ -89,6 +112,7 @@ export function currentDrawingContext(app: AppState) {
       controller: camStore.controller,
       postProcessor: app.settings.settings().postProcessor,
       selectedOperationId: camStore.selectedOperationId ?? null,
+      kernel: kernelState(),
       toolpaths: program.toolpaths.map((toolpath) => ({
         id: toolpath.id, name: toolpath.name, toolId: toolpath.toolId, moveCount: toolpath.moves.length,
         duration: estimateTime(toolpath, RAPID_RATE_MM_PER_MIN)

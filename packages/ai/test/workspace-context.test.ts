@@ -30,6 +30,24 @@ describe("workspace context", () => {
     expect(text).toContain("hidden (hidden) (locked)")
   })
 
+  test("the native kernel is part of the context: exact solids, the job presets, the last release and its open claims", () => {
+    const text = renderWorkspaceContext({
+      ...snapshot(2),
+      solids: { brep: 2, parametric: 1 },
+      cam: {
+        kernel: {
+          settings: { material: "6061", machine: "generic-3axis", origin: "stock-center", finishAllowance: 0.2, scallop: 0.05, subprograms: true, plannedOperations: 3 },
+          artifact: { release: "preview", machine: "Generic 3-axis", issues: 1, claims: [{ id: "replay", status: "passed" }, { id: "machine-clearance", status: "failed" }] }
+        }
+      }
+    })
+    expect(text).toContain("Kernel solids: 2 exact B-rep (STEP), 1 parametric")
+    expect(text).toContain("cad action exact")
+    expect(text).toContain("CAM kernel: grade 6061, machine generic-3axis, origin stock-center, finish allowance 0.2 mm, scallop 0.05 mm, subprograms on, 3 planned operations.")
+    expect(text).toContain("Kernel run: release preview on Generic 3-axis, 1 of 2 claims passed; open: machine-clearance failed; 1 issues. Evidence: cam review.")
+    expect(renderWorkspaceContext(snapshot(1))).not.toContain("Kernel")
+  })
+
   test("machining and verification are summarised, the state is not guessed", () => {
     const text = renderWorkspaceContext(snapshot(1))
     expect(text).toContain("machine lathe")

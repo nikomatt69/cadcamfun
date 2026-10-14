@@ -50,11 +50,11 @@ export type CadGrepInput = z.infer<typeof cadGrepParameters>
 
 /** The exact kernel over the whole drawing: `ids` narrows it to some elements, `machining` skips the CAM feature evaluation. */
 export const cadExactParameters = z.object({
-  ids: z.array(z.string().min(1).max(100)).min(1).max(40).optional(),
-  machining: z.boolean().optional()
+  ids: z.array(z.string().min(1).max(100)).min(1).max(40).optional().describe("Element ids to analyse (default: every solid of the drawing)."),
+  machining: z.boolean().optional().describe("Include how the CAM planner machines each solid (features or 3D surface job); default true.")
 })
 export type CadExactInput = z.infer<typeof cadExactParameters>
-export const cadAssemblyParameters = z.object({ washers: z.boolean().optional() })
+export const cadAssemblyParameters = z.object({ washers: z.boolean().optional().describe("Count missing washers as missing fasteners; default true.") })
 export type CadAssemblyInput = z.infer<typeof cadAssemblyParameters>
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>

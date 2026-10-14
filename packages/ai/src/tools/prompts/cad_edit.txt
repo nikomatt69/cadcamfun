@@ -8,7 +8,7 @@ Actions
 - group: gather elements into one component, or open a component into its parts.
 - delete: remove elements by id. Destructive: send confirm true only after the user asked for it, and the host still asks before the tool runs.
 - editor: layers, the view, the section, the selection, show/hide, isolate, undo and redo in the open editor.
-- import: a DXF, SVG, STEP or mesh attachment (or its text) into solids.
+- import: a DXF, SVG, STEP (exact B-rep solids) or mesh attachment (or its text) into solids.
 - parametric_create: store a parametric history as an element. Sketches take `shapes` (rectangle, circle, polygon, ellipse, slot, polyline, spline/bezier/nurbs curve); features include extrude, revolve, sweep, loft, coil, hole, pattern, mirror, shell, fillet, primitive (3D catalogue solids), combine, split, move, scale. The `fusion-360-modelling` skill has the map.
 - parametric_update: change the parameters of a parametric part, keeping its features.
 - parametric_recipe_create: build a standard part and store it in one call.
@@ -37,4 +37,4 @@ Do not use it
 - To move or turn something, use transform; to change one property, use modify. Do not delete and rebuild.
 
 After it
-- cad.check the result, or cad.describe it, before telling the user it is done.
+- cad.check the result, or cad.describe it, before telling the user it is done. For several parts also cad.exact (validity, how CAM will machine each solid) and cad.assembly (clashes, missing fasteners).
