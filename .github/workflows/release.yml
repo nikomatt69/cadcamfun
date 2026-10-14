@@ -306,18 +306,35 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: Publish @nikoemme_/cadcamfun-nikcli-plugin
+      - name: Publish the nikcli plugin (@nikoemme_ scope, else @cadcamfun/cadcamfun)
         working-directory: packages/nikcli-plugin
+        shell: bash
+        env:
+          FALLBACK_NAME: "@cadcamfun/cadcamfun"
         run: |
+          set -uo pipefail
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "::warning::NPM_TOKEN is not set; skipping the npm publish"
             exit 0
           fi
-          name=$(node -p "require('./package.json').name")
+          primary=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          if npm view "$name@$version" version > /dev/null 2>&1; then
-            echo "$name@$version is already on npm; nothing to publish"
+          for candidate in "$primary" "$FALLBACK_NAME"; do
+            if npm view "$candidate@$version" version > /dev/null 2>&1; then
+              echo "$candidate@$version is already on npm; nothing to publish"
+              exit 0
+            fi
+          done
+          case "$version" in *-*) channel=next ;; *) channel=latest ;; esac
+          if npm publish --access public --tag "$channel" 2>&1 | tee publish.log; then
+            echo "Published $primary@$version"
             exit 0
           fi
-          case "$version" in *-*) channel=next ;; *) channel=latest ;; esac
+          # Fall back only when the scope itself is the problem; any other failure (network, expired token) must stay red.
+          if ! grep -qE "Scope not found|E404|E403|403 Forbidden|You do not have permission" publish.log; then
+            echo "::error::npm publish failed for $primary" >&2
+            exit 1
+          fi
+          echo "::warning::$primary could not be published (scope missing or not writable); publishing as $FALLBACK_NAME"
+          npm pkg set name="$FALLBACK_NAME"
           npm publish --access public --tag "$channel"
