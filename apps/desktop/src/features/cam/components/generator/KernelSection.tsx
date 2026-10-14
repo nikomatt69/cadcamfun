@@ -107,7 +107,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       if (i !== index) return op
       const merged: Record<string, unknown> = { ...op, ...patch }
       for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key]
-      return merged as Operation
+      return merged as unknown as Operation
     })
     setOperations(next)
   }
@@ -122,7 +122,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
     const ids = new Set([...operations().map((op) => op.tool), ...(artifact()?.tools.map((t) => t.id) ?? [])])
     return library().filter((c) => ids.has(c.id))
   })
-  const patchCutter = (id: string, patch: Partial<Cutter> & { readonly holder?: Cutter["holder"] | null }): void => {
+  const patchCutter = (id: string, patch: Omit<Partial<Cutter>, "holder"> & { readonly holder?: Cutter["holder"] | null }): void => {
     gen.patchKernelSettings({
       tools: library().map((c) => {
         if (c.id !== id) return c
@@ -130,7 +130,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
         const next: Record<string, unknown> = { ...c, ...rest }
         if (holder === null) delete next["holder"]
         else if (holder !== undefined) next["holder"] = holder
-        return next as Cutter
+        return next as unknown as Cutter
       })
     })
   }

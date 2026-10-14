@@ -67,11 +67,14 @@ export const chamferGeometry = (cone: ChamferCone, width: number, tipOffset: num
 
 const ccw = (ring: ReadonlyArray<Vec2>): Vec2[] => (signedArea(ring) >= 0 ? [...ring] : [...ring].reverse())
 
-/** The ring grown (d > 0) or shrunk (d < 0); its largest loop, or undefined when it collapses. */
+/**
+ * The ring grown (d > 0) or shrunk (d < 0); its largest loop, or undefined when it collapses. Convex corners are rounded
+ * (tangent-chord arcs within 0.1 µm), so the tool centre keeps its distance from the edge and the chamfer its width there.
+ */
 const offsetLoop = (ring: ReadonlyArray<Vec2>, d: number): Vec2[] | undefined => {
   if (Math.abs(d) < 1e-9) return ccw(ring)
   let best: Vec2[] | undefined
-  for (const l of offsetPolyline(ccw(ring), d, true)) if (best === undefined || Math.abs(signedArea(l)) > Math.abs(signedArea(best))) best = l
+  for (const l of offsetPolyline(ccw(ring), d, true, { arcJoins: true, arcTolerance: 1e-4 })) if (best === undefined || Math.abs(signedArea(l)) > Math.abs(signedArea(best))) best = l
   return best === undefined || best.length < 3 ? undefined : ccw(best)
 }
 

@@ -131,3 +131,46 @@ test("a source change interrupts pending kernel generation and a late result can
     expect(useGeneratorStore.getState().isGenerating).toBe(false)
   } finally { dispose(); runtime.dispose() }
 })
+
+test("the kernel plan is editable: remove an operation, override a stepdown, give a cutter a holder, and the run follows the list", async () => {
+  const { buildRecipe } = await import("../../../packages/core/src/cad/recipes.ts")
+  const recipe = buildRecipe("mounting_plate", { width: 60, depth: 40, thickness: 8, fastener: "M4", counterbore: false })
+  useElementsStore.getState().addElements([{ id: "plate", type: "parametric", name: "Plate", x: 0, y: 0, z: 0, layerId: "default", history: recipe.history } as never])
+  useElementsStore.setState({ selectedElement: null })
+  const view = app.visit("/cam")
+  const change = (input: HTMLInputElement, value: string): void => { input.value = value; input.dispatchEvent(new window.Event("change", { bubbles: true })) }
+  try {
+    const planButton = await app.wait(() => document.querySelector<HTMLButtonElement>("[data-testid='kernel-plan-button']:not([disabled])"), 30_000)
+    planButton.click()
+    const rows = await app.wait(() => { const r = document.querySelectorAll("[data-testid='kernel-plan-operation']"); return r.length > 1 ? r : null }, 30_000)
+    const planned = rows.length
+    expect(useGeneratorStore.getState().kernelSettings.operations).toHaveLength(planned)
+    // Each operation shows its cutter to scale and offers only cutters of a kind it can run with.
+    expect(rows[0]!.querySelector("[data-testid='tool-silhouette']")).not.toBeNull()
+
+    change(rows[0]!.querySelector<HTMLInputElement>("[data-testid='kernel-plan-stepdown']")!, "1.5")
+    const removes = document.querySelectorAll<HTMLButtonElement>("[data-testid='kernel-plan-remove']")
+    removes[removes.length - 1]!.click()
+    await app.wait(() => document.querySelectorAll("[data-testid='kernel-plan-operation']").length === planned - 1 ? true : null)
+    const edited = useGeneratorStore.getState().kernelSettings.operations!
+    expect(edited).toHaveLength(planned - 1)
+    expect(edited[0]!.stepdown).toBe(1.5)
+
+    const holderInput = await app.wait(() => document.querySelector<HTMLInputElement>("[data-testid='kernel-cutter'] [data-testid='kernel-cutter-holder']"))
+    change(holderInput, "30")
+    const withHolder = useGeneratorStore.getState().kernelSettings.tools!.find((c) => c.holder?.diameter === 30)
+    expect(withHolder).toBeDefined()
+
+    document.querySelector<HTMLButtonElement>("[data-testid='kernel-generate']")!.click()
+    await app.wait(() => document.querySelector("[data-testid='kernel-evidence']"), 60_000)
+    const artifact = useCamStore.getState().kernelArtifact!
+    expect(artifact.operations.map((o) => o.id)).toEqual(edited.map((o) => o.id))
+    expect(artifact.operations[0]!.overridden).toContain("stepdown")
+    expect(useCamStore.getState().kernelRequest?.operations).toHaveLength(planned - 1)
+    if (artifact.tools.some((c) => c.id === withHolder!.id)) expect(artifact.tools.find((c) => c.id === withHolder!.id)!.holder?.diameter).toBe(30)
+
+    // Back to the automatic plan.
+    document.querySelector<HTMLButtonElement>("[data-testid='kernel-plan-reset']")!.click()
+    expect(useGeneratorStore.getState().kernelSettings.operations).toBeUndefined()
+  } finally { view.dispose(); useGeneratorStore.getState().patchKernelSettings({ operations: undefined, tools: undefined }) }
+})

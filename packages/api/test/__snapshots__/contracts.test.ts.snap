@@ -46757,6 +46757,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "deburr": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 5,
+                    "type": "number",
+                  },
                   "elements": {
                     "items": {
                       "type": "object",
@@ -46787,6 +46792,1093 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "name": {
                     "minLength": 1,
                     "type": "string",
+                  },
+                  "operations": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "face",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowance": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "region": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "boundary": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "maxItems": 20000,
+                                  "minItems": 3,
+                                  "type": "array",
+                                },
+                                "islands": {
+                                  "items": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 20000,
+                                    "minItems": 3,
+                                    "type": "array",
+                                  },
+                                  "maxItems": 500,
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "boundary",
+                              ],
+                              "type": "object",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "adaptive",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "region",
+                            "top",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowance": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "finish": {
+                              "type": "boolean",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "region": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "boundary": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "maxItems": 20000,
+                                  "minItems": 3,
+                                  "type": "array",
+                                },
+                                "islands": {
+                                  "items": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 20000,
+                                    "minItems": 3,
+                                    "type": "array",
+                                  },
+                                  "maxItems": 500,
+                                  "type": "array",
+                                },
+                              },
+                              "required": [
+                                "boundary",
+                              ],
+                              "type": "object",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "pocket",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "region",
+                            "top",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowance": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "finish": {
+                              "type": "boolean",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "loop": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 20000,
+                              "minItems": 3,
+                              "type": "array",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "side": {
+                              "enum": [
+                                "outside",
+                                "inside",
+                              ],
+                              "type": "string",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "profile",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "loop",
+                            "side",
+                            "top",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowance": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "center": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                              ],
+                              "type": "object",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "diameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "bore",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "center",
+                            "diameter",
+                            "top",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "cut": {
+                              "enum": [
+                                "drill",
+                                "spot",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "points": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 5000,
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "drill",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "points",
+                            "top",
+                            "bottom",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "center": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "x": {
+                                  "type": "number",
+                                },
+                                "y": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                              ],
+                              "type": "object",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "diameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "internal": {
+                              "type": "boolean",
+                            },
+                            "length": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "pitch": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rightHand": {
+                              "type": "boolean",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "thread",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "center",
+                            "diameter",
+                            "pitch",
+                            "internal",
+                            "top",
+                            "length",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "depth": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "paths": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "closed": {
+                                    "type": "boolean",
+                                  },
+                                  "points": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "minItems": 2,
+                                    "type": "array",
+                                  },
+                                },
+                                "required": [
+                                  "points",
+                                  "closed",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 2000,
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "engrave",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "paths",
+                            "top",
+                            "depth",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "loops": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "points": {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "x": {
+                                          "type": "number",
+                                        },
+                                        "y": {
+                                          "type": "number",
+                                        },
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                      ],
+                                      "type": "object",
+                                    },
+                                    "maxItems": 20000,
+                                    "minItems": 3,
+                                    "type": "array",
+                                  },
+                                  "side": {
+                                    "enum": [
+                                      "outside",
+                                      "inside",
+                                    ],
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "points",
+                                  "side",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 2000,
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "chamfer",
+                              ],
+                              "type": "string",
+                            },
+                            "tipOffset": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                            "width": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "loops",
+                            "top",
+                            "width",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowance": {
+                              "minimum": 0,
+                              "type": "number",
+                            },
+                            "angle": {
+                              "type": "number",
+                            },
+                            "clearing": {
+                              "enum": [
+                                "contour",
+                                "adaptive",
+                              ],
+                              "type": "string",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "mode": {
+                              "enum": [
+                                "roughing",
+                                "parallel",
+                                "waterline",
+                              ],
+                              "type": "string",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "restFrom": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "scallop": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "maximum": 100,
+                              "minimum": 1,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "surface",
+                              ],
+                              "type": "string",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "strategy",
+                            "mode",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 500,
+                    "type": "array",
                   },
                   "origin": {
                     "enum": [
@@ -46861,6 +47953,139 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "tolerance": {
                     "exclusiveMinimum": 0,
                     "type": "number",
+                  },
+                  "tools": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "angle": {
+                          "maximum": 180,
+                          "minimum": 1,
+                          "type": "number",
+                        },
+                        "coating": {
+                          "enum": [
+                            "none",
+                            "tin",
+                            "ticn",
+                            "altin",
+                            "alcrn",
+                            "zrn",
+                            "dlc",
+                            "diamond",
+                          ],
+                          "type": "string",
+                        },
+                        "cornerRadius": {
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                        "diameter": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "fluteLength": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "flutes": {
+                          "maximum": 24,
+                          "minimum": 1,
+                          "type": "integer",
+                        },
+                        "holder": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "diameter": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "length": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "diameter",
+                            "length",
+                          ],
+                          "type": "object",
+                        },
+                        "id": {
+                          "maxLength": 80,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "kind": {
+                          "enum": [
+                            "flat",
+                            "ball",
+                            "bull",
+                            "chamfer",
+                            "spot",
+                            "drill",
+                            "facemill",
+                            "threadmill",
+                            "engraver",
+                          ],
+                          "type": "string",
+                        },
+                        "material": {
+                          "enum": [
+                            "hss",
+                            "hss-co",
+                            "carbide",
+                            "pcd",
+                          ],
+                          "type": "string",
+                        },
+                        "maxRpm": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "name": {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        "number": {
+                          "maximum": 999,
+                          "minimum": 1,
+                          "type": "integer",
+                        },
+                        "pitch": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "shankDiameter": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "stickout": {
+                          "exclusiveMinimum": 0,
+                          "type": "number",
+                        },
+                        "tipDiameter": {
+                          "minimum": 0,
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "kind",
+                        "diameter",
+                        "flutes",
+                        "material",
+                        "coating",
+                        "fluteLength",
+                        "shankDiameter",
+                        "stickout",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 200,
+                    "minItems": 1,
+                    "type": "array",
                   },
                   "workOffset": {
                     "enum": [
@@ -47368,6 +48593,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "drill",
                                       "thread",
                                       "engrave",
+                                      "chamfer",
                                       "surface",
                                     ],
                                     "type": "string",

@@ -14,7 +14,7 @@ Parameters (mm, mm/min, rpm, angles in degrees)
 - generate: operationId (the newest operation when omitted), maxLines (1-200, default 40).
 - verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance. Omitted fields are not modelled.
 - stock_set: stock {width, height, depth, radius, x, y, topZ, allowance, material?, elementId?}.
-- manufacture: material grade (cam materials), machine preset, origin (stock-center|stock-corner), finishAllowance (0-5 mm), scallop (>0, <=1 mm), expectedRevision (optional). Blocked releases are not saved.
+- manufacture: as cam manufacture (material, machine, origin, finishAllowance, scallop, deburr, operations, tools) plus expectedRevision. Blocked releases are not saved.
 
 Result (JSON)
 - ok; create: operationId; generate: stats/preview; verify: issues, stats, modelling limits; stock_set: stock/workpiece, invalidated operations.

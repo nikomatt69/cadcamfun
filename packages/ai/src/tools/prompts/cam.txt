@@ -25,7 +25,7 @@ Parameters (mm, mm/min, rpm)
 - vision: focus.
 - chain_suggest: fromOperationId, materialHint, toolHint.
 - chain_status: operationId.
-- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, deburr (edge chamfer mm), planOnly; operations (edit the planOnly list: tool, rpm/feed/stepdown/stepover, drop or reorder) and tools (cutters with fluteLength, stickout, holder) override the plan and the default crib.
+- materials: query. cutting_data: material, cut, tool, machine, depth/ae/ap/scallop. manufacture: material, machine, origin, finishAllowance, scallop, deburr, planOnly, operations, tools.
 
 Result (JSON)
 - ok and data/findings. Empty analyze issues means "no static findings", never "safe".
