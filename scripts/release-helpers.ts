@@ -11,6 +11,24 @@ export const RELEASE_PLATFORM_TRIPLES: Readonly<Record<string, string>> = {
 
 export const RELEASE_PLATFORM_KEYS = Object.freeze(Object.keys(RELEASE_PLATFORM_TRIPLES));
 
+/** Suffix of a platform's own GitHub release: `v6.0.0` is shipped as `v6.0.0-macos-arm64`, `v6.0.0-windows-x64`, ... */
+export const RELEASE_PLATFORM_SLUGS: Readonly<Record<string, string>> = {
+  "aarch64-apple-darwin": "macos-arm64",
+  "x86_64-apple-darwin": "macos-x64",
+  "aarch64-pc-windows-msvc": "windows-arm64",
+  "x86_64-pc-windows-msvc": "windows-x64",
+  "aarch64-unknown-linux-gnu": "linux-arm64",
+  "x86_64-unknown-linux-gnu": "linux-x64",
+};
+
+const PLATFORM_TAG = /-(?:macos|windows|linux)-(?:arm64|x64)$/;
+
+export function platformReleaseTag(tag: string, triple: string): string {
+  const slug = RELEASE_PLATFORM_SLUGS[triple];
+  if (!slug) throw new Error(`Unsupported target: ${triple}`);
+  return `${tag}-${slug}`;
+}
+
 export function targetInfo(triple: string): { platform: "darwin" | "linux" | "windows"; arch: "aarch64" | "x86_64"; bunTarget: string } {
   const arch = triple.split("-")[0];
   if (arch !== "aarch64" && arch !== "x86_64") throw new Error(`Unsupported target: ${triple}`);
@@ -68,7 +86,7 @@ export function selectReleaseRef(event: string, ref: string, input: string | und
 }
 
 export function previousReleaseTag(tags: readonly string[], currentTag: string | null): string | null {
-  return tags.find((tag) => tag !== currentTag && /^v\d+\.\d+\.\d+/.test(tag)) ?? null;
+  return tags.find((tag) => tag !== currentTag && /^v\d+\.\d+\.\d+/.test(tag) && !PLATFORM_TAG.test(tag)) ?? null;
 }
 
 export function assertSigningConfig(config: unknown, env: Readonly<Record<string, string | undefined>>, platform: string, release: boolean): void {

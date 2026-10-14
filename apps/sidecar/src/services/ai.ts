@@ -1030,7 +1030,7 @@ const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
 }))
 
 /**
- * The catalogue's second face (RM-11): what an outside client (a standalone nikcli with `@cadcamfun/nikcli-plugin`) calls over HTTP.
+ * The catalogue's second face (RM-11): what an outside client (a standalone nikcli with `@nikoemme_/cadcamfun-nikcli-plugin`) calls over HTTP.
  * It runs the very tool definitions the embedded host registers, through the same admission (`ActingUser`): the call acts as the
  * account that holds the token, in a session bound to that account and project, and cannot reach another account's work. It needs
  * no model and no embedded host, so it is available in every mode. `bridgeAdmission` decides first: destructive actions need a

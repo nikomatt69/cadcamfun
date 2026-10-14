@@ -1,5 +1,5 @@
 /**
- * `@cadcamfun/nikcli-plugin` (RM-11, spec 27 §4.4): the application's CAD/CAM action catalogue as tools of a standalone nikcli.
+ * `@nikoemme_/cadcamfun-nikcli-plugin` (RM-11, spec 27 §4.4): the application's CAD/CAM action catalogue as tools of a standalone nikcli.
  *
  * Install it in nikcli's config next to a running CADCAMFUN:
  *
@@ -64,7 +64,7 @@ const fromEnvironment = (options: Record<string, unknown> = {}): CadcamPluginOpt
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
   const url = String(options["url"] ?? env["CADCAMFUN_URL"] ?? "")
   const token = String(options["token"] ?? env["CADCAMFUN_TOKEN"] ?? "")
-  if (!url || !token) throw new Error("@cadcamfun/nikcli-plugin needs the running application's url and token (plugin options, or CADCAMFUN_URL and CADCAMFUN_TOKEN).")
+  if (!url || !token) throw new Error("@nikoemme_/cadcamfun-nikcli-plugin needs the running application's url and token (plugin options, or CADCAMFUN_URL and CADCAMFUN_TOKEN).")
   const projectId = options["projectId"] ?? env["CADCAMFUN_PROJECT"]
   return { url, token, ...(typeof projectId === "string" && projectId !== "" ? { projectId } : {}) }
 }
