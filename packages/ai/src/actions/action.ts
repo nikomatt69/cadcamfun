@@ -41,6 +41,9 @@ export interface ActionSpec<S extends ActionParameters = ActionParameters> {
   readonly parameters: S
   /** What the action touches and the result it must answer with (`ACTION_CONTRACTS` in `@cadcamfun/api`). */
   readonly contract: ActionContract
+  /** The contract's effects and success result, read directly. */
+  readonly effects: ActionContract["effects"]
+  readonly result: ActionContract["result"]
   readonly run: (input: z.infer<S>, context: ActionContext) => Effect.Effect<unknown, ActionFailure>
   /** The per-verb tool id this action replaced; the parity test maps every retired id here. */
   readonly replaces?: string
@@ -78,6 +81,8 @@ export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>
   kind: config.kind,
   parameters: config.parameters,
   contract: contractOf(config.id),
+  effects: contractOf(config.id).effects,
+  result: contractOf(config.id).result,
   ...(config.replaces !== undefined ? { replaces: config.replaces } : {}),
   run: Effect.fn(`actions.${config.id}`)(function*(input: z.infer<S>, context: ActionContext) {
     // Constructing an Effect must not start a Promise handler: cancellation and admission happen before execution.

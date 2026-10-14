@@ -6,15 +6,15 @@ const revision = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 export const ActionKind = Schema.Literals(["read", "write", "destructive"])
 
 /**
- * What an action touches besides reading the project, declared per action and never inferred from its tool:
- * `domain` the drawing/operations/stock, `program` stored NC, `report` stored verification evidence, `library` the
- * user's materials/tools/machines/components, `memory` notes and the project context, `vcs` history and branches,
- * `workflow` triggered runs, `session` delegated specialists, `ui` the open editor or its viewport, `external` the network.
- * A `read` action may only have `ui` or `external`; every write names at least one persistent effect.
+ * What an action changes or reaches beyond reading the open document, declared per action (`ACTION_CONTRACTS`) and never
+ * inferred from its tool. `interface` is the editor or viewport on the user's screen, `external` the network, `task` the
+ * delegation scheduler. A `read` action may only have `interface` or `external`; every write names a persistent effect.
  */
-export const ActionEffect = Schema.Literals(["domain", "program", "report", "library", "memory", "vcs", "workflow", "session", "ui", "external"])
+export const ActionEffect = Schema.Literals([
+  "drawing", "operation", "program", "report", "stock", "component", "library", "memory", "context", "history", "workflow", "task", "interface", "external"
+])
 export type ActionEffect = typeof ActionEffect.Type
-export const PERSISTENT_EFFECTS: ReadonlyArray<ActionEffect> = ["domain", "program", "report", "library", "memory", "vcs", "workflow", "session"]
+export const PERSISTENT_EFFECTS: ReadonlyArray<ActionEffect> = ActionEffect.literals.filter((effect) => effect !== "interface" && effect !== "external")
 
 /** Trusted admission data; never a field in model-visible action parameters. */
 export const ActionInvocation = Schema.Struct({

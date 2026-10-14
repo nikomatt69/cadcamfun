@@ -34,7 +34,7 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
-    // Regenerates the program and stores it with the report on the operation, which is why it is a write.
+    // Replays the stored program and stores the report on the operation, which is why it is a write; it never rewrites NC.
     id: "cam_edit.verify", kind: "write", replaces: "cam_verify_toolpath",
     parameters: CAM_ACTION_INPUTS["cam_edit.verify"],
     run: ({ operationId, tool, fixtures, targetSolids, stock, resolution, tolerance, start }, { handlers, projectId }) =>

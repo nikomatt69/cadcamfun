@@ -12,7 +12,7 @@ export const AGENT_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "agent.start", kind: "write", replaces: "agent_task", contribution: "agent.start",
     parameters: INPUTS["agent.start"]
   }),
-  contributedAction({ id: "agent.list", kind: "write", replaces: "agent_tasks", contribution: "agent.list", parameters: INPUTS["agent.list"] }),
-  contributedAction({ id: "agent.read", kind: "write", replaces: "agent_task_read", contribution: "agent.read", parameters: INPUTS["agent.read"] }),
+  contributedAction({ id: "agent.list", kind: "read", replaces: "agent_tasks", contribution: "agent.list", parameters: INPUTS["agent.list"] }),
+  contributedAction({ id: "agent.read", kind: "read", replaces: "agent_task_read", contribution: "agent.read", parameters: INPUTS["agent.read"] }),
   contributedAction({ id: "agent.cancel", kind: "write", replaces: "agent_task_cancel", contribution: "agent.cancel", parameters: INPUTS["agent.cancel"] })
 ]

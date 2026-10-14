@@ -71,17 +71,17 @@ const vision = (mode: "cad" | "cam", filename: string) => async (input: z.infer<
 
 export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineAction({
-    id: "cad.describe", kind: "read", effects: [], replaces: "cad_describe_drawing",
+    id: "cad.describe", kind: "read", replaces: "cad_describe_drawing",
     parameters: z.object({}),
     run: (_input, { handlers, projectId }) => handlers.describeDrawing(projectId)
   }),
   defineAction({
-    id: "cad.check", kind: "read", effects: [], replaces: "cad_check_design",
+    id: "cad.check", kind: "read", replaces: "cad_check_design",
     parameters: z.object({}),
     run: (_input, { handlers, projectId }) => handlers.checkDesign(projectId)
   }),
   defineAction({
-    id: "cad.relations", kind: "read", effects: [], replaces: "cad_component_relations",
+    id: "cad.relations", kind: "read", replaces: "cad_component_relations",
     parameters: z.object({ firstId: z.string().min(1), secondId: z.string().min(1) }),
     run: (input, { handlers, projectId }) =>
       handlers.cadComponentRelations === undefined
@@ -89,90 +89,90 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
         : handlers.cadComponentRelations(projectId, input)
   }),
   defineAction({
-    id: "cad.grep", kind: "read", effects: [], replaces: "cad_grep",
+    id: "cad.grep", kind: "read", replaces: "cad_grep",
     parameters: cadGrepParameters,
     run: (input, { handlers, projectId }) =>
       handlers.grep === undefined ? { ok: false, error: "Drawing search is unavailable in this host." } : handlers.grep(projectId, input)
   }),
   defineAction({
-    id: "cad.vision", kind: "read", effects: ["ui"], replaces: "cad_vision",
+    id: "cad.vision", kind: "read", replaces: "cad_vision",
     parameters: visionInputSchema,
     run: vision("cad", "cad-viewport.png")
   }),
   defineAction({
-    id: "cad.inspect_elements", kind: "read", effects: [], replaces: "cad_inspect",
+    id: "cad.inspect_elements", kind: "read", replaces: "cad_inspect",
     parameters: leaf(nikcliWireSchema(CadInspectionElements)),
     run: inspect("elements")
   }),
   defineAction({
-    id: "cad.inspect_layers", kind: "read", effects: [], replaces: "cad_inspect",
+    id: "cad.inspect_layers", kind: "read", replaces: "cad_inspect",
     parameters: leaf(nikcliWireSchema(CadInspectionLayers)),
     run: inspect("layers")
   }),
   defineAction({
-    id: "cad.inspect_search", kind: "read", effects: [], replaces: "cad_inspect",
+    id: "cad.inspect_search", kind: "read", replaces: "cad_inspect",
     parameters: leaf(nikcliWireSchema(CadInspectionSearch)),
     run: inspect("search")
   }),
   defineAction({
-    id: "cad.inspect_property", kind: "read", effects: [], replaces: "cad_inspect",
+    id: "cad.inspect_property", kind: "read", replaces: "cad_inspect",
     parameters: leaf(nikcliWireSchema(CadInspectionProperty)),
     run: inspect("property")
   }),
   defineAction({
-    id: "cad.drawing", kind: "read", effects: [],
+    id: "cad.drawing", kind: "read",
     parameters: parametricDrawingSchema,
     run: (input, context) => runParametricDrawing(input, context)
   }),
   defineAction({
-    id: "cad.parametric_validate", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_validate", kind: "read", replaces: "cad_parametric",
     parameters: parametricValidateSchema,
     run: (input) => runParametricValidate(input)
   }),
   defineAction({
-    id: "cad.parametric_inspect", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_inspect", kind: "read", replaces: "cad_parametric",
     parameters: parametricInspectSchema,
     run: (input, context) => runParametricInspect(input, context)
   }),
   defineAction({
-    id: "cad.parametric_test", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_test", kind: "read", replaces: "cad_parametric",
     parameters: parametricTestSchema,
     run: (input, context) => runParametricTest(input, context)
   }),
   defineAction({
-    id: "cad.parametric_dfm", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_dfm", kind: "read", replaces: "cad_parametric",
     parameters: parametricDfmSchema,
     run: (input, context) => runParametricDfm(input, context)
   }),
   defineAction({
-    id: "cad.parametric_exact", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_exact", kind: "read", replaces: "cad_parametric",
     parameters: parametricExactSchema,
     run: (input, context) => runParametricExact(input, context)
   }),
   defineAction({
-    id: "cad.exact", kind: "read", effects: [],
+    id: "cad.exact", kind: "read",
     parameters: cadExactParameters,
     run: (input, { handlers, projectId }) =>
       handlers.cadExact === undefined ? { ok: false, error: "Exact analysis is unavailable in this host." } : handlers.cadExact(projectId, input)
   }),
   defineAction({
-    id: "cad.assembly", kind: "read", effects: [],
+    id: "cad.assembly", kind: "read",
     parameters: cadAssemblyParameters,
     run: (input, { handlers, projectId }) =>
       handlers.cadAssembly === undefined ? { ok: false, error: "Assembly analysis is unavailable in this host." } : handlers.cadAssembly(projectId, input)
   }),
   defineAction({
-    id: "cad.parametric_fastener", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_fastener", kind: "read", replaces: "cad_parametric",
     parameters: parametricFastenerSchema,
     run: (input) => runParametricFastener(input)
   }),
   defineAction({
-    id: "cad.parametric_recipe", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_recipe", kind: "read", replaces: "cad_parametric",
     parameters: parametricRecipeSchema,
     run: (input, context) => runParametricRecipe(input, context)
   }),
   defineAction({
-    id: "cad.parametric_from_element", kind: "read", effects: [], replaces: "cad_parametric",
+    id: "cad.parametric_from_element", kind: "read", replaces: "cad_parametric",
     parameters: parametricFromElementSchema,
     run: (input, context) => runParametricFromElement(input, context)
   })

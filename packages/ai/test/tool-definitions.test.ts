@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 import { z } from "zod"
 import { BUILT_IN_TOOLS, TOOL_IDS, buildTools, defineTool } from "../src/tools/catalogue.ts"
-import { ACTION_CATALOGUE, REPLACED_TOOL_IDS, actionsOf, toolOf } from "../src/actions/catalogue.ts"
+import { ACTION_CATALOGUE, ACTION_EXPOSURES, REPLACED_TOOL_IDS, actionsOf, toolOf } from "../src/actions/catalogue.ts"
 
 const dir = new URL("../src/tools/", import.meta.url).pathname
 const calls: Array<{ method: string; args: unknown[] }> = []
@@ -30,7 +30,8 @@ describe("one action tool per capability boundary (nikcli style)", () => {
   test("every capability is declared once: the catalogue is the only source of tool ids", () => {
     const ids = new Set(ACTION_CATALOGUE.map((action) => action.id))
     expect(ids.size).toBe(ACTION_CATALOGUE.length)
-    expect(TOOL_IDS.every((tool) => ACTION_CATALOGUE.some((action) => toolOf(action) === tool))).toBe(true)
+    // An exposure (`cam_verify`) carries existing catalogue actions under another tool id; it declares nothing new.
+    expect(TOOL_IDS.every((tool) => ACTION_CATALOGUE.some((action) => toolOf(action) === tool) || ACTION_EXPOSURES[tool] !== undefined)).toBe(true)
     expect(BUILT_IN_TOOLS.every((tool) => Object.keys(actionsOf(tool.id)).length > 0)).toBe(true)
     // Every retired per-verb id is mapped to the action that replaced it (spec 26 §6.2).
     for (const replaced of REPLACED_TOOL_IDS) expect(ACTION_CATALOGUE.some((action) => action.replaces === replaced), replaced).toBe(true)

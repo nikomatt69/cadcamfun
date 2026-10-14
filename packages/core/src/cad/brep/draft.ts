@@ -132,7 +132,10 @@ export const draftPlanarFace = (b: Brep, o: DraftOptions): Brep | string => {
   try {
     // Out of the body where the leaning plane lies outside the face, into it where it lies inside.
     if (sMax > MODEL_TOL) {
-      const add = booleanBrep(pushed(-margin, sMax + margin), slab(-1), "intersect").brep
+      // The pushed outline minus the half-space beyond the leaning plane. Intersecting with the half-space behind it is the
+      // same set, but with the hinge on an edge of the face and the outline a solver residual (1e-11) off square, that
+      // intersection left open edges.
+      const add = booleanBrep(pushed(-margin, sMax + margin), slab(1), "subtract").brep
       if (add.faces.length > 0) out = booleanBrep(out, add, "union").brep
     }
     if (sMin < -MODEL_TOL) {
