@@ -98,6 +98,8 @@ apps/desktop/src-tauri/binaries/sidecar-*
 apps/desktop/src-tauri/resources/migrations/
 release/
 data/
+# The sidecar imports this catalogue as source; `data/` above is for runtime databases.
+!apps/sidecar/src/data/
 
 apps/mobile/native/target/
 apps/mobile/src-tauri/target/

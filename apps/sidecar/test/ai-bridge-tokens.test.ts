@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { z } from "zod"
-import { createCadcamTools, type ToolFactory } from "@cadcamfun/nikcli-plugin"
+import { createCadcamTools, type ToolFactory } from "@nikoemme/cadcamfun-nikcli-plugin"
 import { makeApp } from "./helpers.ts"
 
 /** RM-11 scoping: a bridge token is for one project, read-only or read-write, opens only the bridge routes, and can be revoked. */

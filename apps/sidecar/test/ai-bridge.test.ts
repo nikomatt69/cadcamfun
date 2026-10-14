@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { makeApp } from "./helpers.ts"
 
-/** RM-11: the catalogue's HTTP face, as a standalone nikcli with `@cadcamfun/nikcli-plugin` uses it. No model, no embedded host. */
+/** RM-11: the catalogue's HTTP face, as a standalone nikcli with `@nikoemme/cadcamfun-nikcli-plugin` uses it. No model, no embedded host. */
 let app: Awaited<ReturnType<typeof makeApp>>
 let projectId: string
 beforeAll(async () => {

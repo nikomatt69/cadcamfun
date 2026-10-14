@@ -1,10 +1,23 @@
 {
-  "name": "@cadcamfun/nikcli-plugin",
+  "name": "@nikoemme/cadcamfun-nikcli-plugin",
   "version": "0.1.0",
   "description": "Drive a running CADCAMFUN instance from a standalone nikcli: the application's CAD/CAM action catalogue as nikcli tools.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nikomatt69/cadcamfun-tauri.git",
+    "directory": "packages/nikcli-plugin"
+  },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "typecheck": "tsgo -p tsconfig.json --noEmit"
