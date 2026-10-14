@@ -4,6 +4,7 @@ import type { SketchEntity } from "./sketch.ts"
 import { meshVolume } from "./solid.ts"
 import { buildRecipe } from "./recipes.ts"
 import { rebuildExact } from "./history-brep.ts"
+import { model } from "./script.ts"
 import { massProperties, validateBrep } from "./brep/index.ts"
 
 setDefaultTimeout(60_000)
@@ -277,6 +278,37 @@ describe("exact replay of a parametric history", () => {
     const v = massProperties(r.bodies[0]!.brep!).volume
     expect(rel(v, plain - ring([10, 20], [1, 0], cone, 1, true) + ring([6, 24], cone, [1, 0], 1, false))).toBeLessThan(1e-9)
     expect(r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "torus").length).toBe(2)
+  }, 180_000)
+
+  test("a sweep along a path is exact: mitred elbows, bent pipes (tori), tubes, and the shell of a sweep", () => {
+    // A 4 mm round profile on XY, swept up 20 mm along z and then 20 mm along x (the path sketch on ZX: u = z, v = x).
+    const pipe = (bendRadius?: number, tube = false, shell?: "both" | "none") => {
+      const m = model()
+      const profile = m.sketch("XY").circle([0, 0], 4)
+      if (tube) profile.circle([0, 0], 3)
+      const path = m.sketch("ZX").path([[0, 0], [20, 0], [20, 20]])
+      const swept = m.sweep(profile, path, { ...(bendRadius !== undefined ? { bendRadius } : {}), id: "pipe" })
+      if (shell !== undefined) m.shell(swept, { thickness: 0.5, open: shell })
+      return rebuildExact(m.build())
+    }
+    const volume = (r: ReturnType<typeof pipe>) => {
+      expect(r.bodies[0]!.reason).toBeUndefined()
+      expect(validateBrep(r.bodies[0]!.brep!).issues).toEqual([])
+      return massProperties(r.bodies[0]!.brep!).volume
+    }
+    // A mitred elbow keeps the section area times the centre-line length; a bend of radius 5 replaces 10 mm of corner by a
+    // quarter circle (Pappus).
+    expect(rel(volume(pipe()), PI * 4 * 40)).toBeLessThan(1e-9)
+    const bent = pipe(5)
+    expect(rel(volume(bent), PI * 4 * (30 + 2.5 * PI))).toBeLessThan(1e-9)
+    expect(bent.bodies[0]!.brep!.faces.some((f) => f.surface.kind === "torus")).toBe(true)
+    // The mesh sweeps an inscribed polygon of the 2 mm circle (0.01 mm sagitta, about 32 sides): about 0.65 % less section.
+    const meshRel = (volume(bent) - meshVolume(bent.result.bodies[0]!.mesh)) / volume(bent)
+    expect(meshRel).toBeGreaterThan(0)
+    expect(meshRel).toBeLessThan(8e-3)
+    expect(rel(volume(pipe(5, true)), PI * (4 - 2.25) * (30 + 2.5 * PI))).toBeLessThan(1e-9)
+    // Shelled with a 0.5 mm wall and open at both ends: the tube of the same path.
+    expect(rel(volume(pipe(5, false, "both")), PI * (4 - 2.25) * (30 + 2.5 * PI))).toBeLessThan(1e-9)
   }, 180_000)
 
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {

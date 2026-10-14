@@ -13,7 +13,8 @@
  * and says why it has no exact model; nothing is approximated behind the caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
-import type { Sketch } from "./sketch.ts"
+import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
+import { length3, sub3 } from "./vec.ts"
 import { rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
 import {
   blendBrep,
@@ -33,8 +34,12 @@ import {
   normalizeProfile,
   offsetLoop,
   pickPlanarFace,
+  pieceEnd,
+  pieceLength,
+  pieceTangent,
   polyhedron,
   revolveProfile,
+  sweepPath,
   rotation,
   segmentEnd,
   segmentPoint,
@@ -51,6 +56,8 @@ import {
   uniformScale,
   type Brep,
   type Frame,
+  type PathFrame,
+  type PathPiece,
   type ProfileLoop,
   type ProfileSegment,
   type Transform,
@@ -178,6 +185,150 @@ const ok = (brep: Brep): Exact => ({ brep })
 const no = (reason: string): Exact => ({ reason })
 
 const unionAll = (parts: ReadonlyArray<Brep>): Brep => parts.slice(1).reduce((acc, b) => booleanBrep(acc, b, "union").brep, parts[0]!)
+
+type SketchFrame = { readonly origin: Vec3; readonly u: Vec3; readonly v: Vec3; readonly n: Vec3 }
+const onFrame = (F: SketchFrame, p: Vec2): Vec3 => ({ x: F.origin.x + F.u.x * p.x + F.v.x * p.y, y: F.origin.y + F.u.y * p.x + F.v.y * p.y, z: F.origin.z + F.u.z * p.x + F.v.z * p.y })
+
+/**
+ * A sweep path as exact pieces in world space, in the order the mesh rebuild walks it (`sketchProfiles`: from the first line or
+ * arc of the sketch, forward through shared points), or one circle as a closed ring starting at angle 0. A sketch with
+ * anything else (several chains, a spline) is the reason.
+ */
+export const exactSketchPath = (sketch: Sketch, F: SketchFrame): { readonly pieces: PathPiece[]; readonly closed: boolean } | string => {
+  const pts = new Map<string, Vec2>()
+  for (const e of sketch.entities) if (e.kind === "point") pts.set(e.id, { x: e.x, y: e.y })
+  const at = (id: string): Vec2 => pts.get(id)!
+  const edges = sketch.entities.filter((e) => e.kind === "line" || e.kind === "arc")
+  const circles = sketch.entities.filter((e) => e.kind === "circle")
+  if (edges.length === 0) {
+    if (circles.length !== 1 || circles[0]!.kind !== "circle") return "the path sketch must hold one chain of lines and arcs, or one closed loop"
+    const c = at(circles[0]!.center), r = circles[0]!.radius
+    return { pieces: [{ kind: "arc", center: onFrame(F, c), axis: F.n, from: onFrame(F, { x: c.x + r, y: c.y }), angle: 2 * Math.PI }], closed: true }
+  }
+  if (circles.length > 0) return "the path sketch must hold one chain of lines and arcs, or one closed loop"
+  const ends = (e: (typeof edges)[number]) => (e.kind === "line" ? [e.p1, e.p2] : e.kind === "arc" ? [e.start, e.end] : [])
+  const piece = (e: (typeof edges)[number], forward: boolean): PathPiece => {
+    if (e.kind === "line") { const [a, b] = forward ? [at(e.p1), at(e.p2)] : [at(e.p2), at(e.p1)]; return { kind: "line", a: onFrame(F, a), b: onFrame(F, b) } }
+    const arc = e as Extract<(typeof edges)[number], { kind: "arc" }>
+    const c = at(arc.center), s = at(arc.start), t = at(arc.end)
+    const a0 = Math.atan2(s.y - c.y, s.x - c.x)
+    let sweep = Math.atan2(t.y - c.y, t.x - c.x) - a0
+    while (sweep <= 1e-12) sweep += 2 * Math.PI
+    // Counter-clockwise in the sketch from start to end: about the sketch normal; walked backwards, about its opposite.
+    return { kind: "arc", center: onFrame(F, c), axis: forward ? F.n : { x: -F.n.x, y: -F.n.y, z: -F.n.z }, from: onFrame(F, forward ? s : t), angle: sweep }
+  }
+  const used = new Set<number>([0])
+  const pieces: PathPiece[] = [piece(edges[0]!, true)]
+  const start = ends(edges[0]!)[0]!
+  let head = ends(edges[0]!)[1]!
+  for (;;) {
+    if (head === start) break
+    const next = edges.findIndex((e, i) => !used.has(i) && ends(e).includes(head))
+    if (next < 0) break
+    used.add(next)
+    const forward = ends(edges[next]!)[0] === head
+    pieces.push(piece(edges[next]!, forward))
+    head = ends(edges[next]!)[forward ? 1 : 0]!
+  }
+  if (used.size !== edges.length) return "the path sketch must hold one chain of lines and arcs, or one closed loop"
+  return { pieces, closed: head === start }
+}
+
+/**
+ * The path with every corner between two straight runs that turns more than 5 degrees replaced by a tangent bend of centre-line
+ * radius `radius` (the mesh rebuild's `roundPath`, with true arcs); a sharp corner next to an arc is the reason.
+ */
+export const roundExactPath = (pieces: ReadonlyArray<PathPiece>, radius: number): PathPiece[] | string => {
+  const out: PathPiece[] = pieces.map((p) => ({ ...p }))
+  const setbacks = out.map(() => [0, 0])
+  const bends: Array<PathPiece | undefined> = out.map(() => undefined)
+  for (let i = 0; i + 1 < out.length; i++) {
+    const d1 = pieceTangent(out[i]!, true), d2 = pieceTangent(out[i + 1]!, false)
+    const turnAngle = Math.acos(Math.max(-1, Math.min(1, d1.x * d2.x + d1.y * d2.y + d1.z * d2.z)))
+    if (turnAngle < (5 * Math.PI) / 180) continue
+    if (out[i]!.kind !== "line" || out[i + 1]!.kind !== "line") return "a sharp corner next to an arc of the path has no exact bend"
+    const phi = Math.PI - turnAngle
+    const s = radius / Math.tan(phi / 2)
+    setbacks[i]![1] = s
+    setbacks[i + 1]![0] = s
+    const B = pieceEnd(out[i]!)
+    const t1 = { x: B.x - d1.x * s, y: B.y - d1.y * s, z: B.z - d1.z * s }
+    const axis = (() => { const c = { x: d1.y * d2.z - d1.z * d2.y, y: d1.z * d2.x - d1.x * d2.z, z: d1.x * d2.y - d1.y * d2.x }; const l = Math.hypot(c.x, c.y, c.z); return { x: c.x / l, y: c.y / l, z: c.z / l } })()
+    // The centre is square to the incoming run at the bend's start, on the inside of the turn.
+    const inward = { x: axis.y * d1.z - axis.z * d1.y, y: axis.z * d1.x - axis.x * d1.z, z: axis.x * d1.y - axis.y * d1.x }
+    bends[i] = { kind: "arc", center: { x: t1.x + inward.x * radius, y: t1.y + inward.y * radius, z: t1.z + inward.z * radius }, axis, from: t1, angle: turnAngle }
+  }
+  const result: PathPiece[] = []
+  for (let i = 0; i < out.length; i++) {
+    const p = out[i]! as Extract<PathPiece, { kind: "line" }> | Extract<PathPiece, { kind: "arc" }>
+    if (p.kind === "line") {
+      const L = pieceLength(p), [s0, s1] = setbacks[i]!
+      if (s0! + s1! > L + 1e-9) return `A bend radius of ${radius} mm needs ${(s0! + s1!).toFixed(2)} mm of the ${L.toFixed(2)} mm straight run ${i + 1}`
+      const d = pieceTangent(p, false)
+      const a = { x: p.a.x + d.x * s0!, y: p.a.y + d.y * s0!, z: p.a.z + d.z * s0! }, b = { x: p.b.x - d.x * s1!, y: p.b.y - d.y * s1!, z: p.b.z - d.z * s1! }
+      if (pieceLength({ kind: "line", a, b }) > 1e-9) result.push({ kind: "line", a, b })
+    } else result.push(p)
+    if (bends[i] !== undefined) result.push(bends[i]!)
+  }
+  return result
+}
+
+/** The path shortened by `s` at its start (negative: carried on straight by -s), with the frame carried to its new start. */
+const trimPathStart = (pieces: ReadonlyArray<PathPiece>, s: number, start: PathFrame): { pieces: PathPiece[]; start: PathFrame } | string => {
+  if (s < 0) {
+    const p0 = pieces[0]!, t = pieceTangent(p0, false), a = p0.kind === "line" ? p0.a : p0.from
+    return { pieces: [{ kind: "line", a: { x: a.x + t.x * s, y: a.y + t.y * s, z: a.z + t.z * s }, b: a }, ...pieces], start }
+  }
+  const rest = [...pieces]
+  let left = s, X = start.x, Y = start.y
+  while (left > 1e-12) {
+    const p = rest[0]
+    if (p === undefined) return "The wall is thicker than the path is long"
+    const L = pieceLength(p)
+    if (L > left + 1e-9) {
+      if (p.kind === "line") { const d = pieceTangent(p, false); rest[0] = { kind: "line", a: { x: p.a.x + d.x * left, y: p.a.y + d.y * left, z: p.a.z + d.z * left }, b: p.b } }
+      else {
+        const phi = left / length3(sub3(p.from, p.center))
+        const turnBy = (v: Vec3) => applyPointRotation(p.axis, phi, v)
+        rest[0] = { kind: "arc", center: p.center, axis: p.axis, from: add3v(p.center, turnBy(sub3(p.from, p.center))), angle: p.angle - phi }
+        X = turnBy(X); Y = turnBy(Y)
+      }
+      break
+    }
+    // The whole piece goes: carry the frame across it and the corner after it.
+    if (p.kind === "arc") { X = applyPointRotation(p.axis, p.angle, X); Y = applyPointRotation(p.axis, p.angle, Y) }
+    rest.shift()
+    if (rest[0] !== undefined) {
+      const t0 = pieceTangent(p, true), t1 = pieceTangent(rest[0], false)
+      const c = { x: t0.y * t1.z - t0.z * t1.y, y: t0.z * t1.x - t0.x * t1.z, z: t0.x * t1.y - t0.y * t1.x }, l = Math.hypot(c.x, c.y, c.z)
+      if (l > 1e-12) { const k = { x: c.x / l, y: c.y / l, z: c.z / l }, ang = Math.atan2(l, t0.x * t1.x + t0.y * t1.y + t0.z * t1.z); X = applyPointRotation(k, ang, X); Y = applyPointRotation(k, ang, Y) }
+    }
+    left -= L
+  }
+  return { pieces: rest, start: { x: X, y: Y } }
+}
+const add3v = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z })
+const applyPointRotation = (axis: Vec3, angle: number, v: Vec3): Vec3 => {
+  const c = Math.cos(angle), s = Math.sin(angle), d = axis.x * v.x + axis.y * v.y + axis.z * v.z
+  const x = { x: axis.y * v.z - axis.z * v.y, y: axis.z * v.x - axis.x * v.z, z: axis.x * v.y - axis.y * v.x }
+  return { x: v.x * c + x.x * s + axis.x * d * (1 - c), y: v.y * c + x.y * s + axis.y * d * (1 - c), z: v.z * c + x.z * s + axis.z * d * (1 - c) }
+}
+/** The path reversed: the same pieces walked from its end. */
+const reversePath = (pieces: ReadonlyArray<PathPiece>): PathPiece[] => [...pieces].reverse().map((p): PathPiece => p.kind === "line" ? { kind: "line", a: p.b, b: p.a } : { kind: "arc", center: p.center, axis: { x: -p.axis.x, y: -p.axis.y, z: -p.axis.z }, from: pieceEnd(p), angle: p.angle })
+
+/** The mesh sweep's start frame: the rotation that takes the profile plane's normal to the path's first tangent, applied to its axes. */
+const sweepStartFrame = (F: SketchFrame, t0: Vec3): PathFrame => {
+  const d = Math.max(-1, Math.min(1, F.n.x * t0.x + F.n.y * t0.y + F.n.z * t0.z))
+  if (d > 1 - 1e-12) return { x: F.u, y: F.v }
+  let axis = { x: F.n.y * t0.z - F.n.z * t0.y, y: F.n.z * t0.x - F.n.x * t0.z, z: F.n.x * t0.y - F.n.y * t0.x }
+  if (Math.hypot(axis.x, axis.y, axis.z) < 1e-9) {
+    const a = F.n, ref = Math.abs(a.x) < 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 }
+    axis = { x: a.y * ref.z - a.z * ref.y, y: a.z * ref.x - a.x * ref.z, z: a.x * ref.y - a.y * ref.x }
+  }
+  const l = Math.hypot(axis.x, axis.y, axis.z), k = { x: axis.x / l, y: axis.y / l, z: axis.z / l }
+  const angle = Math.acos(d)
+  return { x: applyPointRotation(k, angle, F.u), y: applyPointRotation(k, angle, F.v) }
+}
 
 /**
  * The cavity profile of a shelled revolution, exactly as the mesh rebuild's `shellRevolveProfile` builds it from a polygon:
@@ -401,6 +552,8 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
   // What a shell needs of an extrusion: its exact (corner-treated) loops, sketch frame and extent along the normal.
   const extrusions = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly frame: { readonly origin: Vec3; readonly n: Vec3; readonly u: Vec3 }; readonly from: number; readonly to: number }>()
+  // And of a sweep: its profile about the path, the start frame and the path.
+  const sweeps = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly start: PathFrame; readonly pieces: ReadonlyArray<PathPiece>; readonly closed: boolean }>()
   // And of a revolution: its (radial, axial) profile and axis.
   const revolutions = new Map<string, { readonly loop: ProfileLoop; readonly full: boolean; readonly origin: Vec3; readonly axis: Vec3; readonly radial: Vec3 }>()
 
@@ -715,6 +868,32 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           const t = dim(f.thickness)
           const open = f.open ?? "none"
           const rev = revolutions.get(f.feature)
+          const sw = sweeps.get(f.feature)
+          if (ex === undefined && sw !== undefined) {
+            // The mesh's cavity: every loop moved by the wall (the outline in, the holes out), swept along the path shortened by
+            // the wall at a closed end and carried 1 mm past an open one.
+            let cavity: Brep
+            try {
+              const inner = sw.loops.map((l, i) => offsetLoop(l, i === 0 ? t : -t))
+              let pieces: ReadonlyArray<PathPiece> = sw.pieces, start = sw.start
+              if (!sw.closed) {
+                const s0 = open === "bottom" || open === "both" ? -1 : t, s1 = open === "top" || open === "both" ? -1 : t
+                const a = trimPathStart(pieces, s0, start)
+                if (typeof a === "string") throw new RangeError(a)
+                const b = trimPathStart(reversePath(a.pieces), s1, { x: { x: 0, y: 0, z: 1 }, y: { x: 0, y: 1, z: 0 } })
+                if (typeof b === "string") throw new RangeError(b)
+                pieces = reversePath(b.pieces); start = a.start
+                // An extension at the start turns nothing; a trim may have carried the frame round a bend.
+              }
+              cavity = sweepPath({ loops: inner }, start, pieces, { closed: sw.closed, name: `${f.id}.cavity` })
+            } catch (e) {
+              unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+              break
+            }
+            tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, ok(cavity), "subtract", f.targets, f.id)
+            break
+          }
           if (ex === undefined && rev !== undefined) {
             if (!rev.full) { unsupported({ ...f, operation: "subtract" }, "only a full revolution (360 degrees) can be shelled"); break }
             let cavity: Brep
@@ -779,7 +958,40 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         case "plane":
           // Construction geometry only: no body changes.
           break
-        case "sweep":
+        case "sweep": {
+          const prof = sketchOf(f.profile), route = sketchOf(f.path)
+          if (prof === undefined || route === undefined) break
+          let path = exactSketchPath(route.solve.sketch, route.frame)
+          if (typeof path === "string") { unsupported(f, path); break }
+          const bend = f.bendRadius === undefined ? 0 : dim(f.bendRadius)
+          if (bend > 0 && !path.closed) {
+            const rounded = roundExactPath(path.pieces, bend)
+            if (typeof rounded === "string") { unsupported(f, rounded); break }
+            path = { pieces: rounded, closed: false }
+          }
+          // The mesh sweep carries the profile by its outer ring's vertex mean (the polygon `sketchProfiles` draws).
+          const { loops } = exactSketchLoops(prof.solve.sketch)
+          const polys = sketchProfiles(prof.solve.sketch).loops
+          if (polys.length === 0 || loops.length === 0) break
+          const outerPoly = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))
+          const c2 = { x: outerPoly.reduce((s, p) => s + p.x, 0) / outerPoly.length, y: outerPoly.reduce((s, p) => s + p.y, 0) / outerPoly.length }
+          const groups = profilesOfLoops(loops)
+          if (groups.length !== 1) { unsupported(f, "a sweep of several separate profiles has no exact model yet"); break }
+          const shift = (l: ProfileLoop): ProfileLoop => l.map((s): ProfileSegment => s.kind === "line" ? { kind: "line", a: { x: s.a.x - c2.x, y: s.a.y - c2.y }, b: { x: s.b.x - c2.x, y: s.b.y - c2.y } } : s.kind === "arc" ? { ...s, center: { x: s.center.x - c2.x, y: s.center.y - c2.y } } : s)
+          const profileLoops = groups[0]!.loops.map(shift)
+          const start = sweepStartFrame(prof.frame, pieceTangent(path.pieces[0]!, false))
+          let solid: Brep
+          try {
+            solid = sweepPath({ loops: profileLoops }, start, path.pieces, { closed: path.closed, name: f.id })
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          sweeps.set(f.id, { loops: profileLoops, start, pieces: path.pieces, closed: path.closed })
+          tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, ok(solid), f.operation, f.targets, f.id)
+          break
+        }
         case "loft":
         case "coil":
         case "rib":
