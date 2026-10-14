@@ -1,6 +1,6 @@
 /** Validated boundary for the existing feature-history engine; no second modeller. */
 import { z } from "zod"
-import { PRIMITIVE_ELEMENTS, cam, cleanMesh, describeTopology, exactSummary, expandShape, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
+import { PRIMITIVE_ELEMENTS, brep, cam, cleanMesh, describeTopology, exactSummary, expandShape, meshTopology, rebuild, rebuildExact, meshVolume, type History } from "@cadcamfun/core"
 
 const id = z.string().trim().min(1).max(100)
 const n = z.number().finite()
@@ -179,14 +179,20 @@ export const historySchema = z.object({ parameters: parameterSchema, features: z
   })
 })
 
+/** Time the exact view may add to every validation report (the assistant's hot path, on the sidecar's thread). */
+export const REPORT_EXACT_BUDGET_MS = 1_500
+/** Time `parametric_exact`, which the assistant asks for on purpose, may take. */
+export const EXACT_ACTION_BUDGET_MS = 60_000
+
 /**
  * The exact (B-rep) view of each body, from the same rebuild: exact volume and area, genus, face count and surface kinds, or the
- * reason a body has only its mesh. Never throws; a failure is reported as the body's reason.
+ * reason a body has only its mesh. Never throws; a failure is reported as the body's reason. The exact work stops after
+ * `budgetMs` (the bodies then say so), so a heavy history never holds the thread that serves every other tool.
  */
-export const exactReport = (history: History, result: ReturnType<typeof rebuild>) => {
+export const exactReport = (history: History, result: ReturnType<typeof rebuild>, budgetMs = REPORT_EXACT_BUDGET_MS) => {
   const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d
   try {
-    return exactSummary(rebuildExact(history, result)).map((b) =>
+    return brep.withBudget(budgetMs, () => exactSummary(rebuildExact(history, result))).map((b) =>
       b.exact
         ? {
             id: b.id, exact: true, valid: b.valid, volumeMm3: round(b.volume!), areaMm2: round(b.area!),

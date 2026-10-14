@@ -55,6 +55,19 @@ Objects are built in 3D, always: cad_edit action add for every part, shape or as
 - **Work like a coding agent**: for anything bigger than one shape, say the plan in a line, build it in steps (a few calls, one subsystem each, on its own layer), call cad action check after the model is complete and fix what it reports, then go on to CAM (cam_edit action create, cam_edit action generate, cam_edit action verify) when the user wants it machined.
 - One call holds at most 40 elements (a long call is cut off by the model's output limit): build big things in steps, each a few calls, in the order a person would build it. Each element in a call is judged on its own: the valid ones are added, the invalid ones are listed under \`skipped\` with their index; resend only those, corrected.
 
+## Product quality: how a finished model is built
+
+The bar is a model a designer would show: it reads as the real object from every side, at its real size, with its real detail. Work the way a good build went (a CPU: 6 parametric bodies and about 340 detail solids on 5 layers):
+
+1. **Study the object first.** List its real dimensions (look them up with research action search when you do not know them), its sub-assemblies, and the material and colour of each. Write the plan as todo items, one per sub-assembly.
+2. **Main bodies are parametric** (the parts the user may resize): a base outline with rounded corners (\`extrude\` with \`corner\`), edges softened (\`edge\` chamfer or fillet), cut-outs as \`hole\` or a \`subtract\` extrude, lettering as a \`text\` feature. Name every measure as a parameter.
+3. **Detail is what makes it real.** Pads, screws, LEDs, buttons, vents, grilles, fasteners, labels: catalogue solids (\`cube\`, \`cylinder\`, \`sphere\`, \`torus\`, \`capsule\`, \`text3d\`) at their true size and pitch. A product has tens to hundreds of them: compute rows, grids and rings in \`code_mode\` loops, each call at most 40 elements, each program short (a program is stopped after 30 s: one sub-assembly per program).
+4. **Organic shapes are never boxes.** Frames, handles, bottles, housings with curved sides: \`revolution\` of a half section, \`loft\` between sections, \`sweep\` along a path, sketch outlines as \`polyline\` or \`curve\` (spline) shapes with enough points to read smooth (one every few millimetres on a curve), \`ellipsoid\`/\`capsule\` for blobs. Round every outside corner a consumer product has. Sharp rectangles on a curved object are a defect.
+5. **Organise it.** One layer per subsystem with its real colour (\`"#rrggbb"\`), parts of one assembly as a \`component\`, names that say what each part is.
+6. **Check like a reviewer**, then fix and check again: cad action check; in \`code_mode\`, the bounds from cad action describe for overlaps, parts floating off their support and duplicates; cad action vision to look at it from the front, side and top against the real object. Report what is simplified.
+
+Arguments the tools refuse (seen in real sessions): a colour as a number (write \`"#ff9300"\`); an array or a history sent as a JSON string (send the array itself); a \`text\` feature \`at\` with three numbers (it is \`[x, y]\` on its plane); a todo item without \`priority\`.
+
 ## Recipes
 - **Block with a hole**: \`cube\` + \`cylinder\` (taller than the block), then \`boolean-subtract\` with \`operands: [0, 1]\` (indexes of the two elements in the same call).
 - **Bottle, vase, shaft, pulley**: ONE \`revolution\`. Give the half section as profile points from the axis outwards, bottom to top, e.g. \`[{x:0,y:0},{x:30,y:0},{x:30,y:150},{x:10,y:200},{x:10,y:260}]\`; use 32+ segments (default).
@@ -272,9 +285,9 @@ Send it to \`cad\` with \`{"action":"parametric_validate","history":{...}}\`. Ch
 
 ## Exact model (B-rep)
 
-- Every validate and recipe report carries \`exact\`: per body the exact solid's volume, area, centroid, \`throughHoles\`, face count and surface kinds (plane, cylinder, cone, sphere, torus, nurbs), or the \`reason\` the body has only its mesh. Quote volumes and masses from \`exact\`, not from the mesh \`volumeMm3\`.
+- Every validate and recipe report carries \`exact\`: per body the exact solid's volume, area, centroid, \`throughHoles\`, face count and surface kinds (plane, cylinder, cone, sphere, torus, nurbs), or the \`reason\` the body has only its mesh. Quote volumes and masses from \`exact\`, not from the mesh \`volumeMm3\`. The report spends at most 1.5 s on it: a heavy part (many fillets) says "time budget" instead; then ask cad action \`parametric_exact\`, which takes up to a minute. Do not wait on it while building.
 - cad action \`parametric_exact\` (\`elementId\` or \`history\`, \`includeStep: true\`) returns the same and the STEP AP214 file of the exact bodies, for the user's other CAD systems.
-- Exact features: plain extrude, revolve, hole (all kinds), the analytic catalogue solids (cube, cylinder, cone, sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split, combine and every union, subtract and intersect. Fillet, shell, sweep, loft, coil, edge or corner treatments, drafts and the other catalogue solids keep only the mesh: when a part is for STEP or inspection, build it from exact features and say which bodies are mesh-only.
+- Exact features: extrude (with corner and edge treatments and taper), revolve, sweep, loft, hole (all kinds), shell, fillet and chamfer of straight edges and coaxial rims, draft and push/pull of planar faces, mate, the analytic catalogue solids (cube, cylinder, cone, sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split, combine and every union, subtract and intersect. Coil, rib, sheet, text, modelled threads and the other catalogue solids keep only the mesh: when a part is for STEP or inspection, say which bodies are mesh-only.
 
 ## Editing later
 

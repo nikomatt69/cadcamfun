@@ -15,6 +15,7 @@
 import { cross3, dist3, dot3, length3, normalize3, sub3, unwrapNear, type Vec3 } from "./math.ts"
 import { curveDerivs, curvePoint, curve2Point, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Surface, type SurfaceParam } from "./geom.ts"
 import { Cdt } from "./cdt.ts"
+import { checkBudget } from "./budget.ts"
 import type { Brep, Coedge, Edge, Face } from "./topology.ts"
 
 export interface TessellateOptions {
@@ -735,6 +736,7 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const triFace: number[] = []
   b.faces.forEach((_, fi) => {
     if (options.faces !== undefined && !options.faces.has(fi)) return
+    checkBudget()
     const fm = tessellateFace(fi, b, edges, pts, chord, angle, maxEdge, maxPoints, options.paramStep, warnings)
     if (fm === undefined) return
     faces.push(fm)

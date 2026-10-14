@@ -22,6 +22,7 @@ import { compactBrep, edgeUses, EMPTY_BREP, type Brep, type Coedge, type Edge, t
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
 import { Cdt } from "./cdt.ts"
+import { checkBudget } from "./budget.ts"
 import {
   edgeEdgeHits,
   edgeOnSurface,
@@ -389,6 +390,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   A.faces.forEach((fa, ia) => {
     B.faces.forEach((fbF, ib) => {
       if (!boxOverlap(S[0].faceBox[ia]!, S[1].faceBox[ib]!, 0)) return
+      checkBudget()
       if (coincidentSurfaces(fa.surface, fbF.surface, S[1], ib)) return
       const ta = S[0].tri[ia], tb = S[1].tri[ib], bvb = S[1].bvh[ib]
       if (ta === undefined || tb === undefined || bvb === undefined) return
@@ -591,6 +593,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   for (const s of [0, 1] as const) {
     const sd = S[s], other = S[1 - s]!
     sd.brep.faces.forEach((face, fi) => {
+      checkBudget()
       if (sd.fb.synthetic[fi]) throw new BooleanError(`face ${fi} of operand ${s === 0 ? "A" : "B"} has a loop wrapping a period without a seam edge (not supported)`)
       const surf = face.surface
       const per = surfacePeriods(surf)

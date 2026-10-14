@@ -33,6 +33,9 @@ import {
   makeSphere,
   makeTorus,
   draftPlanarFace,
+  BudgetExceeded,
+  checkBudget,
+  withBudget,
   loftBrep,
   loftSection,
   loopArea,
@@ -550,11 +553,17 @@ export const catalogueBrep = (
 
 /**
  * Replays `history` as exact B-reps alongside the mesh rebuild (computed when not given). Never throws: a body without
- * an exact model carries the reason.
+ * an exact model carries the reason. With `budgetMs` the exact work stops once that time is spent (`brep/budget.ts`), and
+ * every body says so: the caller's thread is never held longer.
  */
-export const rebuildExact = (history: History, given?: RebuildResult): ExactRebuild => {
+export const rebuildExact = (history: History, given?: RebuildResult, options: { readonly budgetMs?: number } = {}): ExactRebuild =>
+  options.budgetMs === undefined ? replayExact(history, given) : withBudget(options.budgetMs, () => replayExact(history, given))
+
+const replayExact = (history: History, given?: RebuildResult): ExactRebuild => {
   const result = given ?? rebuild(history)
   const warnings: string[] = []
+  // Why the replay stopped early (its time budget ran out), for the bodies it never reached.
+  let stopped: string | undefined
   const values = result.parameters
   const failed = new Set(result.issues.filter((i) => i.severity === "error").map((i) => i.feature))
   const dim = (d: Dimension): number => dimensionValue(d, values)
@@ -573,6 +582,7 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
     try {
       return ok(booleanBrep(a.brep, b.brep, op).brep)
     } catch (e) {
+      if (e instanceof BudgetExceeded) throw e
       return no(e instanceof BooleanError ? `exact ${op} failed: ${e.message}` : String(e))
     }
   }
@@ -611,6 +621,7 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   for (const f of history.features) {
     if (failed.has(f.id)) continue
     try {
+      checkBudget()
       switch (f.type) {
         case "sketch":
           break
@@ -1086,6 +1097,13 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         }
       }
     } catch (e) {
+      // Out of time: every body says so (a later feature could have changed any of them), and the replay stops.
+      if (e instanceof BudgetExceeded) {
+        warnings.push(`${f.id}: ${e.message}`)
+        stopped = `${e.message} (stopped at ${f.id}); ask for the exact model alone`
+        for (const b of bodies) b.exact = no(stopped)
+        break
+      }
       warnings.push(`${f.id}: ${e instanceof Error ? e.message : String(e)}`)
       for (const b of bodies) if (b.feature === f.id) b.exact = no(`exact model of ${f.id} failed: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -1094,7 +1112,7 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   const byId = new Map(bodies.map((b) => [b.id, b]))
   const out: ExactBody[] = result.bodies.map((mb) => {
     const b = byId.get(mb.id)
-    if (b === undefined) return { id: mb.id, feature: mb.feature, reason: "the exact replay has no body of this id" }
+    if (b === undefined) return { id: mb.id, feature: mb.feature, reason: stopped ?? "the exact replay has no body of this id" }
     return b.exact.brep !== undefined ? { id: mb.id, feature: mb.feature, brep: b.exact.brep } : { id: mb.id, feature: mb.feature, reason: b.exact.reason ?? "no exact model" }
   })
   return { result, bodies: out, warnings }
@@ -1134,8 +1152,14 @@ export interface ExactBodySummary {
 export const exactSummary = (ex: ExactRebuild): ReadonlyArray<ExactBodySummary> =>
   ex.bodies.map((b) => {
     if (b.brep === undefined) return { id: b.id, exact: false, reason: b.reason ?? "no exact model" }
-    const rep = validateBrep(b.brep, { skipVolume: true })
-    const mp = massProperties(b.brep)
+    let rep: ReturnType<typeof validateBrep>, mp: ReturnType<typeof massProperties>
+    try {
+      rep = validateBrep(b.brep, { skipVolume: true })
+      mp = massProperties(b.brep)
+    } catch (e) {
+      if (e instanceof BudgetExceeded) return { id: b.id, exact: false, reason: `${e.message} while measuring the body; ask for the exact model alone` }
+      throw e
+    }
     const surfaces: Record<string, number> = {}
     for (const f of b.brep.faces) surfaces[f.surface.kind] = (surfaces[f.surface.kind] ?? 0) + 1
     return {

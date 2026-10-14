@@ -15,11 +15,30 @@ const TEXT_KEYS = new Set([
   "material", "materialId", "toolId", "machineConfigId"
 ])
 
+/**
+ * Keys whose value is always a list or an object: a model that sends one of them as JSON text (`"shapes": "[{...}]"`) meant
+ * the structure. Only these are parsed, so text and code that merely look like JSON are never touched.
+ */
+const STRUCTURE_KEYS = new Set([
+  "history", "parameters", "features", "sketch", "entities", "constraints", "shapes", "points", "elements", "actions", "profile",
+  "path", "params", "positions", "radii", "todos", "ids", "operands", "targets", "at", "step", "stepB", "centre", "near", "normal"
+])
+
 const NUMBER = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
 
+const parsedStructure = (value: string): unknown => {
+  const text = value.trim()
+  if (!((text.startsWith("[") && text.endsWith("]")) || (text.startsWith("{") && text.endsWith("}")))) return undefined
+  try { return JSON.parse(text) as unknown } catch { return undefined }
+}
+
 export const sanitizeArguments = (value: unknown, key = ""): unknown => {
+  if (typeof value === "string" && STRUCTURE_KEYS.has(key)) {
+    const parsed = parsedStructure(value)
+    if (parsed !== undefined) return sanitizeArguments(parsed, key)
+  }
   if (Array.isArray(value)) return value.map((entry) => sanitizeArguments(entry, key))
   if (isRecord(value)) {
     const keys = Object.keys(value)

@@ -268,6 +268,25 @@ describe("exact replay of a parametric history", () => {
     expect(v).toBeGreaterThan(256 * 25)
   })
 
+  test("a time budget stops the exact replay quickly and every body says why; within its budget the result is unchanged", () => {
+    const heavy = plate([
+      { id: "h1", type: "hole", plane: "XY", offset: 6, at: [10, 12.5], diameter: 6, depth: 6 },
+      { id: "h2", type: "hole", plane: "XY", offset: 6, at: [30, 12.5], diameter: 6, depth: 6 },
+      { id: "round", type: "fillet", radius: 1 }
+    ])
+    // The mesh rebuild is not under the budget: time the exact part alone.
+    const mesh = rebuildExact(heavy, undefined, { budgetMs: 1 }).result
+    const t = performance.now()
+    const stopped = rebuildExact(heavy, mesh, { budgetMs: 1 })
+    expect(performance.now() - t).toBeLessThan(1_000)
+    expect(stopped.bodies[0]!.brep).toBeUndefined()
+    expect(stopped.bodies[0]!.reason).toContain("time budget")
+    // The mesh rebuild is untouched, and a generous budget gives the same exact model as none.
+    expect(stopped.result.bodies[0]!.mesh.indices.length).toBeGreaterThan(0)
+    const simple = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }])
+    expect(massProperties(rebuildExact(simple, undefined, { budgetMs: 60_000 }).bodies[0]!.brep!).volume).toBe(massProperties(rebuildExact(simple).bodies[0]!.brep!).volume)
+  })
+
   test("features without an exact counterpart are never skipped silently", () => {
     const lettered = rebuildExact(plate([{ id: "t", type: "text", plane: "XY", offset: 6, at: [5, 5], text: "A", height: 5, depth: 1, operation: "union" }]))
     expect(lettered.bodies[0]!.reason).toContain("text")

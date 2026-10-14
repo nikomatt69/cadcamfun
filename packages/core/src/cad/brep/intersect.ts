@@ -13,6 +13,7 @@ import { cross3, dist3, dot3, length3, normalize3, solve2, solveDense, sub3, unw
 import { curveDerivs, curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface, type SurfaceParam } from "./geom.ts"
 import type { Edge } from "./topology.ts"
 import type { FaceMesh } from "./tessellate.ts"
+import { checkBudget } from "./budget.ts"
 
 // ================================================================ triangle BVH
 
@@ -413,6 +414,7 @@ export const meshIntersectionPolylines = (A: TriSet, B: TriSet, bvhB: TriBvh, sa
     }
   }
   A.tris.forEach((ta, ia) => {
+    if ((ia & 255) === 0) checkBudget()
     const a = A.pos(ta[0]), b = A.pos(ta[1]), c = A.pos(ta[2])
     const na = cross3(sub3(b, a), sub3(c, a))
     const lo = { x: Math.min(a.x, b.x, c.x), y: Math.min(a.y, b.y, c.y), z: Math.min(a.z, b.z, c.z) }
