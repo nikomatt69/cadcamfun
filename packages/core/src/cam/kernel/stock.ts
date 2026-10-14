@@ -10,7 +10,8 @@
  *
  * The remaining volume is therefore bracketed: the material not possibly removed is definitely left, the material not surely
  * removed may be left. The bracket is what the replay reports; a voxel is never called removed without a sampled cutter covering it.
- * Only vertical (3-axis) tool moves are removed here: the tool axis is +Z and the tip path is a polyline. Units: mm.
+ * The tool may tilt: each tip point carries the tool axis there (interpolated between the points), and a voxel is measured along
+ * that axis, so a five-axis sweep is bracketed by the same two tests. Units: mm.
  */
 import type { Vec3 } from "../../cad/vec.ts"
 import { assemblyProfile } from "./assembly.ts"
@@ -73,43 +74,66 @@ export const voxelStock = (min: Vec3, max: Vec3, voxel: number): VoxelStock => {
 
 const index = (s: VoxelStock, i: number, j: number, k: number): number => (k * s.ny + j) * s.nx + i
 
+const UP: Vec3 = { x: 0, y: 0, z: 1 }
+
+/** A unit vector; the tool axis +Z when none (or a zero vector) is given. */
+const unitOf = (v: Vec3 | undefined): Vec3 => {
+  if (v === undefined) return UP
+  const l = Math.hypot(v.x, v.y, v.z)
+  return l < 1e-12 ? UP : { x: v.x / l, y: v.y / l, z: v.z / l }
+}
+
 /**
- * Remove the cutter along a polyline of tip points (3-axis, tool axis +Z; each point is the tip, the flutes rise from it). The
- * path is sampled every `stock.step` mm; between samples the cutter's expansion covers the motion.
+ * Remove the cutter along a polyline of tip points. The flutes rise from each tip along the tool axis: +Z, unless `axes` gives it at
+ * each point (any non-zero vector pointing from the tip up into the holder; it is interpolated and normalised between the points).
+ * The path is sampled every `stock.step` mm; between samples the cutter's expansion covers the motion.
  */
-export const removeTipPath = (stock: VoxelStock, cutter: Cutter, path: ReadonlyArray<Vec3>): void => {
+export const removeTipPath = (stock: VoxelStock, cutter: Cutter, path: ReadonlyArray<Vec3>, axes?: ReadonlyArray<Vec3>): void => {
   const { segs, top, maxRadius } = cuttingSegments(cutter)
   const h = stock.voxel, hd = (Math.sqrt(3) / 2) * h, e = stock.step / 2
-  const samples: Vec3[] = []
+  // A voxel is possibly removed when its centre lies within `delta` of the cutter: the cube's half diagonal plus the sample expansion.
+  const delta = hd + e
+  const reach = maxRadius + delta
+  const axialTop = top + delta
+  const samples: Array<{ readonly p: Vec3; readonly d: Vec3 }> = []
   for (let i = 0; i < path.length; i++) {
     const p = path[i]!
-    if (i === 0) { samples.push(p); continue }
+    const d = unitOf(axes?.[i])
+    if (i === 0) { samples.push({ p, d }); continue }
     const q = path[i - 1]!
+    const dq = unitOf(axes?.[i - 1])
     const len = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)
     const n = Math.max(1, Math.ceil(len / stock.step))
-    for (let k = 1; k <= n; k++) samples.push({ x: q.x + ((p.x - q.x) * k) / n, y: q.y + ((p.y - q.y) * k) / n, z: q.z + ((p.z - q.z) * k) / n })
+    for (let k = 1; k <= n; k++) {
+      const f = k / n
+      const mix = { x: dq.x + (d.x - dq.x) * f, y: dq.y + (d.y - dq.y) * f, z: dq.z + (d.z - dq.z) * f }
+      samples.push({ p: { x: q.x + ((p.x - q.x) * k) / n, y: q.y + ((p.y - q.y) * k) / n, z: q.z + ((p.z - q.z) * k) / n }, d: unitOf(mix) })
+    }
   }
-  for (const tip of samples) {
-    // Voxels whose cube could meet the expanded cutter: a box around the tip of radius maxRadius + diagonal + expansion.
-    const reach = maxRadius + hd + e
-    const i0 = Math.max(0, Math.floor((tip.x - reach - stock.origin.x) / h)), i1 = Math.min(stock.nx - 1, Math.floor((tip.x + reach - stock.origin.x) / h))
-    const j0 = Math.max(0, Math.floor((tip.y - reach - stock.origin.y) / h)), j1 = Math.min(stock.ny - 1, Math.floor((tip.y + reach - stock.origin.y) / h))
-    const k0 = Math.max(0, Math.floor((tip.z - e - hd - stock.origin.z) / h)), k1 = Math.min(stock.nz - 1, Math.floor((tip.z + top + e + hd - stock.origin.z) / h))
+  for (const { p: tip, d } of samples) {
+    // Voxels whose centre could meet the expanded cutter. Every point of it lies within `reach` of the axis and within `axialTop`
+    // along it, so each coordinate is within reach + axialTop·|d_k| of the tip.
+    const ex = reach + axialTop * Math.abs(d.x), ey = reach + axialTop * Math.abs(d.y), ez = reach + axialTop * Math.abs(d.z)
+    const i0 = Math.max(0, Math.floor((tip.x - ex - stock.origin.x) / h)), i1 = Math.min(stock.nx - 1, Math.floor((tip.x + ex - stock.origin.x) / h))
+    const j0 = Math.max(0, Math.floor((tip.y - ey - stock.origin.y) / h)), j1 = Math.min(stock.ny - 1, Math.floor((tip.y + ey - stock.origin.y) / h))
+    const k0 = Math.max(0, Math.floor((tip.z - ez - stock.origin.z) / h)), k1 = Math.min(stock.nz - 1, Math.floor((tip.z + ez - stock.origin.z) / h))
     for (let k = k0; k <= k1; k++) {
       const cz = stock.origin.z + (k + 0.5) * h
-      const dz = cz - tip.z
       for (let j = j0; j <= j1; j++) {
         const cy = stock.origin.y + (j + 0.5) * h
         for (let i = i0; i <= i1; i++) {
           const cx = stock.origin.x + (i + 0.5) * h
-          const d = Math.hypot(cx - tip.x, cy - tip.y)
+          // The voxel centre in the tool's frame: s up the axis from the tip, rho from the axis.
+          const vx = cx - tip.x, vy = cy - tip.y, vz = cz - tip.z
+          const s = vx * d.x + vy * d.y + vz * d.z
+          const rho = Math.sqrt(Math.max(0, vx * vx + vy * vy + vz * vz - s * s))
           const id = index(stock, i, j, k)
           // Sure: the cube is inside the cutter at this position. The radius is the least over the cube's height.
-          const low = radiusAt(segs, top, Math.max(0, dz - hd)), mid = radiusAt(segs, top, dz), high = radiusAt(segs, top, Math.min(top, dz + hd))
+          const low = radiusAt(segs, top, Math.max(0, s - hd)), mid = radiusAt(segs, top, s), high = radiusAt(segs, top, Math.min(top, s + hd))
           const rMin = Math.min(low, mid, high)
-          if (dz - hd >= 0 && dz + hd <= top && rMin >= 0 && d + hd <= rMin) stock.removedSure[id] = 1
-          // Possible: the cube meets the cutter, with the cutter's radius and height widened by the expansion.
-          if (dz >= -(hd + e) && dz <= top + hd + e && d - hd - e <= maxRadius) stock.removedPossible[id] = 1
+          if (s - hd >= 0 && s + hd <= top && rMin >= 0 && rho + hd <= rMin) stock.removedSure[id] = 1
+          // Possible: the centre lies within the cutter's expansion (the flutes' ends widened by delta, and its radius).
+          if (s >= -delta && s <= axialTop && rho <= reach) stock.removedPossible[id] = 1
         }
       }
     }
