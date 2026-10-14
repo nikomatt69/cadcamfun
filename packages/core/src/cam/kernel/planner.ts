@@ -339,8 +339,8 @@ export const planJob = (input: PlanInput): Plan => {
     }
     if (ball === undefined) unmachined.push("No ball mill for 3D finishing")
     else {
-      ops.push({ id: "surface-finish", name: "3D parallel finishing", strategy: "surface", mode: "parallel", tool: ball.id, allowance: 0, scallop: input.scallop, angle: 45 })
-      ops.push({ id: "surface-waterline", name: "3D waterline finishing (steep walls)", strategy: "surface", mode: "waterline", tool: ball.id, allowance: 0, scallop: input.scallop })
+      // One finish: waterline on the walls, raster on the flats (each where it keeps the cusp; no pass repeated over the other).
+      ops.push({ id: "surface-finish", name: "3D steep and shallow finishing", strategy: "surface", mode: "steep-shallow", tool: ball.id, allowance: 0, scallop: input.scallop, angle: 45 })
     }
     if (prismatic) notes.push(`Elements without a feature history are machined with the 3D strategies: ${freeform.map((e) => String(e["name"] ?? e["type"])).join(", ")}`)
   }

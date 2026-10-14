@@ -8,6 +8,9 @@
  *   parallel   Raster finishing: lines at `angle`, the tool dropped on the surface along each (drop-cutter), zig-zag or one way,
  *              stepover from the cusp height `scallop` for a ball cutter or from the stepover percentage.
  *   waterline  Constant-Z finishing: the contour of the surface at each depth, tool-centre offset by the cutter's own shape.
+ *   steep-shallow  Waterline where the surface is steeper than `slopeAngle`, parallel raster where it is shallower, the two
+ *              overlapping by `overlap` degrees so they meet: constant-Z passes do not open up on flats and raster lines do not
+ *              stretch apart on walls. The slope is the gradient of the drop-cutter surface itself (the cutter's own shape).
  *   (clearing) Roughing and rest clear each region with `clearing`: "contour" (the pocket engine, contour-parallel) or "adaptive"
  *              (`adaptive.ts`, the radial depth of cut held at `engagement` % of the tool diameter wherever the tool goes).
  *   (rest finishing) `parallel` and `waterline` with `restFrom` finish only where the previous tool did not reach as low: the new tool's
@@ -34,7 +37,7 @@ import { restField } from "./rest.ts"
 import { Surface, contour, cutterOf, nest, sampleNodes, simplify, simplify3, type Cutter, type Rect } from "./surface-field.ts"
 import { ToolKindSchema } from "../tool.ts"
 
-export const SurfaceStrategySchema = Schema.Literals(["roughing", "parallel", "waterline", "rest"])
+export const SurfaceStrategySchema = Schema.Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow"])
 export type SurfaceStrategy = typeof SurfaceStrategySchema.Type
 
 /** The tool whose roughing a `rest` operation continues, and the stock it left on the part. */
@@ -75,7 +78,11 @@ export class SurfaceParams extends Schema.Class<SurfaceParams>("cam/SurfaceParam
     /** How `roughing` and `rest` clear a region: contour-parallel offsets, or adaptive clearing at a bounded radial engagement. */
     clearing: withDefault(Schema.Literals(["contour", "adaptive"]), "contour" as const),
     /** `adaptive` only: the maximum radial depth of cut, as a percentage of the tool diameter. */
-    engagement: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 50 })), 12)
+    engagement: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 50 })), 12),
+    /** `steep-shallow`: slope from the horizontal, degrees, above which the surface is finished by waterline. */
+    slopeAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 })), 45),
+    /** `steep-shallow`: degrees both passes extend past `slopeAngle`, so they overlap instead of leaving a seam. */
+    overlap: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 20 })), 3)
   }).check(heightsOrdered)
 ) {}
 
@@ -231,24 +238,66 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
     return done(b.moves)
   }
 
-  if (params.strategy === "waterline") {
+  /** Waterline passes; with `region` only the stretches of each contour where it holds. */
+  const waterline = (region?: (x: number, y: number) => boolean): void => {
     const step = Math.max(cell, Math.min(params.tolerance * 25, tool.diameter / 6, 0.5))
     const margin = cutter.radius + 2 * step
     const rect: Rect = { x0: part.bounds.min[0] - margin, y0: part.bounds.min[1] - margin, x1: part.bounds.max[0] + margin, y1: part.bounds.max[1] + margin }
     const value = (x: number, y: number): number => surface.tip(cutter, x, y)
     const nodes = sampleNodes(value, rect, step)
+    /**
+     * The contour is interpolated linearly between grid nodes; where the drop-cutter surface curves (a ball rolling over an
+     * edge) that misses the level by more than the tolerance. A few Newton steps along the gradient put the point on the level
+     * of the true drop-cutter surface; a step that leaves the surface or jumps further than half a cell keeps the point.
+     */
+    const onLevel = (p: Vec2, level: number): Vec2 => {
+      let q = p
+      const h = Math.max(step / 8, 1e-4)
+      for (let k = 0; k < 4; k++) {
+        const f = value(q.x, q.y) - level
+        if (!Number.isFinite(f) || Math.abs(f) <= params.tolerance / 20) break
+        const gx = (value(q.x + h, q.y) - value(q.x - h, q.y)) / (2 * h), gy = (value(q.x, q.y + h) - value(q.x, q.y - h)) / (2 * h)
+        const g2 = gx * gx + gy * gy
+        if (!Number.isFinite(g2) || g2 < 1e-12) break
+        const next = { x: q.x - (f * gx) / g2, y: q.y - (f * gy) / g2 }
+        if (Math.hypot(next.x - p.x, next.y - p.y) > step / 2 || !Number.isFinite(value(next.x, next.y))) break
+        q = next
+      }
+      // Still above the level (a cliff: the surface ends within the cell, where the gradient is meaningless): bisect downhill
+      // to where the cutter is no lower than the surface, so the point never puts the tool into the part.
+      const v0 = value(q.x, q.y)
+      if (Number.isFinite(v0) && v0 - level > params.tolerance / 20) {
+        let dx = 0, dy = 0
+        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const v = value(q.x + ox * h, q.y + oy * h)
+          const drop = Number.isFinite(v) ? v0 - v : 1e6
+          dx += ox * drop; dy += oy * drop
+        }
+        const len = Math.hypot(dx, dy)
+        if (len > 1e-12) {
+          const ux = dx / len, uy = dy / len
+          const below = (t: number): boolean => { const v = value(q.x + ux * t, q.y + uy * t); return !Number.isFinite(v) || v <= level + params.tolerance / 20 }
+          let lo = 0, hi = step / 2
+          if (below(hi)) {
+            for (let k = 0; k < 24; k++) { const mid = (lo + hi) / 2; if (below(mid)) hi = mid; else lo = mid }
+            q = { x: q.x + ux * hi, y: q.y + uy * hi }
+          }
+        }
+      }
+      return q
+    }
     let at: Vec2 | undefined
     for (const z of levels.passZ) {
       const level = Math.max(z, bottomZ)
       if (level >= partTop + cutter.lift) continue
-      const loops = contour(value, level, rect, step, false, nodes).map((l) => simplify(l, params.tolerance, true)).filter((l) => l.length >= 3)
+      const loops = contour(value, level, rect, step, false, nodes).map((l) => simplify(l.map((p) => onLevel(p, level)), params.tolerance, true)).filter((l) => l.length >= 3)
       if (loops.length === 0) continue
       stats.levels += 1
       // The contours run with the part on their left: that is climb milling; the other direction is conventional.
       // With a previous tool only the stretches it left material on are cut, as open pieces.
       const remaining = loops
         .map((l) => (params.climb ? l : [...l].reverse()))
-        .flatMap((l) => (previous === undefined ? [{ pts: l, closed: true }] : piecesWhere(l, l.map((p) => leftAt(p.x, p.y, level)))))
+        .flatMap((l) => (previous === undefined && region === undefined ? [{ pts: l, closed: true }] : piecesWhere(l, l.map((p) => leftAt(p.x, p.y, level) && (region === undefined || region(p.x, p.y))))))
       while (remaining.length > 0) {
         let bi = 0, bd = Infinity
         remaining.forEach((l, i) => { const d = at === undefined ? 0 : Math.min(...l.pts.map((p) => distance(p, at!))); if (d < bd) { bd = d; bi = i } })
@@ -265,83 +314,102 @@ export const generateSurface = (params: SurfaceParams, part: PartModel, tool: To
         stats.points += ring.length
       }
     }
-    if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no contour of the part at the requested depths" : "nothing to cut: the previous tool left no material this tool can reach")
-    if (b.started) finish(b, levels)
-    return done(b.moves)
   }
 
-  // ---- parallel (raster) finishing
-  const R = tool.diameter / 2
-  const spacing = params.scallop > 0 && (tool.kind === "ballnose")
-    ? scallopSpacing(R + params.allowance, Math.min(params.scallop, R))
-    : (params.stepover / 100) * tool.diameter
-  if (!(spacing > 0)) {
-    warnings.push("The cusp height or the stepover gives a zero line spacing")
-    return done(b.moves)
-  }
-  const ang = (params.angle * Math.PI) / 180
-  const ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux
-  // Extent of the part along and across the lines (corners of its box, widened by the cutter).
-  const lo = part.bounds.min, hi = part.bounds.max
-  const corners: Array<[number, number]> = [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]]
-  const sAll = corners.map(([x, y]) => x * ux + y * uy), tAll = corners.map(([x, y]) => x * nx + y * ny)
-  const s0 = Math.min(...sAll) - cutter.radius, s1 = Math.max(...sAll) + cutter.radius
-  const t0 = Math.min(...tAll), t1 = Math.max(...tAll)
-  const lines = Math.max(1, Math.ceil((t1 - t0) / spacing - 1e-9) + 1)
-  const ds = Math.max(Math.min(cell, params.tolerance * 5), params.tolerance)
-  const dropAt = (s: number, t: number): [number, number, number] | undefined => {
-    const x = s * ux + t * nx, y = s * uy + t * ny
-    const tip = surface.tip(cutter, x, y)
-    return tip === -Infinity || !leftAt(x, y, tip) ? undefined : [x, y, Math.max(tip, bottomZ)]
-  }
-  type P3 = readonly [number, number, number]
-  const runs: P3[][] = []
-  for (let i = 0; i < lines; i++) {
-    const t = lines === 1 ? (t0 + t1) / 2 : t0 + ((t1 - t0) * i) / (lines - 1)
-    const forward = params.oneWay ? params.climb : (params.climb ? i % 2 === 0 : i % 2 === 1)
-    let current: P3[] = []
-    const n = Math.max(1, Math.ceil((s1 - s0) / ds))
-    for (let k = 0; k <= n; k++) {
-      const s = forward ? s0 + ((s1 - s0) * k) / n : s1 - ((s1 - s0) * k) / n
-      const p = dropAt(s, t)
-      if (p === undefined) { if (current.length > 1) runs.push(simplify3(current, params.tolerance)); current = []; continue }
-      current.push(p)
+  /** Raster passes; with `region` only where it holds (the tool lifts between the pieces). */
+  const parallel = (region?: (x: number, y: number) => boolean): void => {
+    const R = tool.diameter / 2
+    const spacing = params.scallop > 0 && (tool.kind === "ballnose")
+      ? scallopSpacing(R + params.allowance, Math.min(params.scallop, R))
+      : (params.stepover / 100) * tool.diameter
+    if (!(spacing > 0)) {
+      warnings.push("The cusp height or the stepover gives a zero line spacing")
+      return
     }
-    if (current.length > 1) runs.push(simplify3(current, params.tolerance))
-  }
-  stats.lines = runs.length
-  const linkOk = (a: P3, c: P3): P3[] | undefined => {
-    // Stay down between neighbouring runs when the surface under the straight link is all there is to follow.
-    const len = Math.hypot(c[0] - a[0], c[1] - a[1])
-    // Between pieces of a rest finish there is nothing to follow: the tool lifts.
-    if (previous !== undefined || len > 2.5 * spacing + 2 * cutter.radius * 0.1) return undefined
-    const n = Math.max(1, Math.ceil(len / ds))
-    const out: P3[] = []
-    for (let k = 1; k < n; k++) {
-      const x = a[0] + ((c[0] - a[0]) * k) / n, y = a[1] + ((c[1] - a[1]) * k) / n
+    const ang = (params.angle * Math.PI) / 180
+    const ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux
+    // Extent of the part along and across the lines (corners of its box, widened by the cutter).
+    const lo = part.bounds.min, hi = part.bounds.max
+    const corners: Array<[number, number]> = [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]]
+    const sAll = corners.map(([x, y]) => x * ux + y * uy), tAll = corners.map(([x, y]) => x * nx + y * ny)
+    const s0 = Math.min(...sAll) - cutter.radius, s1 = Math.max(...sAll) + cutter.radius
+    const t0 = Math.min(...tAll), t1 = Math.max(...tAll)
+    const lines = Math.max(1, Math.ceil((t1 - t0) / spacing - 1e-9) + 1)
+    const ds = Math.max(Math.min(cell, params.tolerance * 5), params.tolerance)
+    const dropAt = (s: number, t: number): [number, number, number] | undefined => {
+      const x = s * ux + t * nx, y = s * uy + t * ny
       const tip = surface.tip(cutter, x, y)
-      if (tip === -Infinity) return undefined
-      out.push([x, y, Math.max(tip, bottomZ)])
+      return tip === -Infinity || !leftAt(x, y, tip) || (region !== undefined && !region(x, y)) ? undefined : [x, y, Math.max(tip, bottomZ)]
     }
-    return out
-  }
-  let last: P3 | undefined
-  for (const run of runs) {
-    const first = run[0]!
-    const link = last === undefined ? undefined : linkOk(last, first)
-    if (link !== undefined) {
-      for (const p of simplify3([last!, ...link, first], params.tolerance).slice(1)) b.linear({ x: p[0], y: p[1], z: p[2] }, params.feed)
-    } else {
-      if (b.started) liftTo(b, levels.retractZ)
-      approach(b, { x: first[0], y: first[1] }, levels)
-      b.rapid({ x: first[0], y: first[1], z: Math.max(levels.entryZ, first[2] + 1) })
-      b.linear({ x: first[0], y: first[1], z: first[2] }, params.plungeFeed)
+    type P3 = readonly [number, number, number]
+    const runs: P3[][] = []
+    for (let i = 0; i < lines; i++) {
+      const t = lines === 1 ? (t0 + t1) / 2 : t0 + ((t1 - t0) * i) / (lines - 1)
+      const forward = params.oneWay ? params.climb : (params.climb ? i % 2 === 0 : i % 2 === 1)
+      let current: P3[] = []
+      const n = Math.max(1, Math.ceil((s1 - s0) / ds))
+      for (let k = 0; k <= n; k++) {
+        const s = forward ? s0 + ((s1 - s0) * k) / n : s1 - ((s1 - s0) * k) / n
+        const p = dropAt(s, t)
+        if (p === undefined) { if (current.length > 1) runs.push(simplify3(current, params.tolerance)); current = []; continue }
+        current.push(p)
+      }
+      if (current.length > 1) runs.push(simplify3(current, params.tolerance))
     }
-    for (let k = 1; k < run.length; k++) b.linear({ x: run[k]![0], y: run[k]![1], z: run[k]![2] }, params.feed)
-    last = run[run.length - 1]
-    stats.points += run.length
+    stats.lines = runs.length
+    const linkOk = (a: P3, c: P3): P3[] | undefined => {
+      // Stay down between neighbouring runs when the surface under the straight link is all there is to follow.
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1])
+      // Between pieces of a rest finish there is nothing to follow: the tool lifts.
+      if (previous !== undefined || region !== undefined || len > 2.5 * spacing + 2 * cutter.radius * 0.1) return undefined
+      const n = Math.max(1, Math.ceil(len / ds))
+      const out: P3[] = []
+      for (let k = 1; k < n; k++) {
+        const x = a[0] + ((c[0] - a[0]) * k) / n, y = a[1] + ((c[1] - a[1]) * k) / n
+        const tip = surface.tip(cutter, x, y)
+        if (tip === -Infinity) return undefined
+        out.push([x, y, Math.max(tip, bottomZ)])
+      }
+      return out
+    }
+    let last: P3 | undefined
+    for (const run of runs) {
+      const first = run[0]!
+      const link = last === undefined ? undefined : linkOk(last, first)
+      if (link !== undefined) {
+        for (const p of simplify3([last!, ...link, first], params.tolerance).slice(1)) b.linear({ x: p[0], y: p[1], z: p[2] }, params.feed)
+      } else {
+        if (b.started) liftTo(b, levels.retractZ)
+        approach(b, { x: first[0], y: first[1] }, levels)
+        b.rapid({ x: first[0], y: first[1], z: Math.max(levels.entryZ, first[2] + 1) })
+        b.linear({ x: first[0], y: first[1], z: first[2] }, params.plungeFeed)
+      }
+      for (let k = 1; k < run.length; k++) b.linear({ x: run[k]![0], y: run[k]![1], z: run[k]![2] }, params.feed)
+      last = run[run.length - 1]
+      stats.points += run.length
+    }
   }
-  if (runs.length === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along any line" : "nothing to cut: the previous tool left no material this tool can reach")
+
+  /** Slope of the drop-cutter surface at (x, y), degrees from the horizontal; a cliff (no surface on one side) is vertical. */
+  const slopeAt = (x: number, y: number): number => {
+    const h = Math.max(cell, params.tolerance * 5)
+    const xp = surface.tip(cutter, x + h, y), xm = surface.tip(cutter, x - h, y), yp = surface.tip(cutter, x, y + h), ym = surface.tip(cutter, x, y - h)
+    if (![xp, xm, yp, ym].every(Number.isFinite)) return 90
+    return (Math.atan(Math.hypot((xp - xm) / (2 * h), (yp - ym) / (2 * h))) * 180) / Math.PI
+  }
+
+  if (params.strategy === "waterline") {
+    waterline()
+    if (stats.loops === 0) b.comment(previous === undefined ? "nothing to cut: no contour of the part at the requested depths" : "nothing to cut: the previous tool left no material this tool can reach")
+  } else if (params.strategy === "steep-shallow") {
+    waterline((x, y) => slopeAt(x, y) >= params.slopeAngle - params.overlap)
+    const steepLoops = stats.loops
+    parallel((x, y) => slopeAt(x, y) <= params.slopeAngle + params.overlap)
+    if (steepLoops === 0 && stats.lines === 0) b.comment("nothing to cut: no steep wall and no shallow area reachable")
+  } else {
+    parallel()
+    if (stats.lines === 0) b.comment(previous === undefined ? "nothing to cut: the cutter finds no surface along any line" : "nothing to cut: the previous tool left no material this tool can reach")
+  }
   if (b.started) finish(b, levels)
   return done(b.moves)
 }

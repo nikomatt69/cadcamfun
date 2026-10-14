@@ -47,7 +47,8 @@ export const OperationSpecSchema = Schema.Union([
   Schema.Struct({ ...overrides, strategy: Schema.Literal("engrave"), paths: Schema.Array(Schema.Struct({ points: Schema.Array(point).check(Schema.isMinLength(2)), closed: Schema.Boolean })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, depth: positive }),
   Schema.Struct({ ...overrides, strategy: Schema.Literal("chamfer"), loops: Schema.Array(Schema.Struct({ points: ring, side: Schema.Literals(["outside", "inside"]) })).check(Schema.isMinLength(1), Schema.isMaxLength(2000)), top: Schema.Finite, width: positive, tipOffset: Schema.optionalKey(nonNegative) }),
   Schema.Struct({
-    ...overrides, strategy: Schema.Literal("surface"), mode: Schema.Literals(["roughing", "parallel", "waterline"]),
+    ...overrides, strategy: Schema.Literal("surface"), mode: Schema.Literals(["roughing", "parallel", "waterline", "steep-shallow"]),
+    slopeAngle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 }))),
     allowance: Schema.optionalKey(nonNegative), scallop: Schema.optionalKey(positive), clearing: Schema.optionalKey(Schema.Literals(["contour", "adaptive"])),
     angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id)
   })

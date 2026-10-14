@@ -310,7 +310,8 @@ describe("running a job: NC plus evidence about that NC", () => {
       schemaVersion: 1, id: "j", name: "Dome", material: "6061", part: { kind: "elements", elements: [base, dome] },
       stock: { min: { x: -22, y: -22, z: 0 }, max: { x: 22, y: 22, z: 17 } }, quality: { resolution: 0.4, scallop: 0.02 }
     }))
-    expect(a.operations.map((o) => o.strategy)).toEqual(["face", "surface", "surface", "surface"])
+    // Roughing, then one steep-and-shallow finish (waterline on the walls, raster on the dome) with a ball.
+    expect(a.operations.map((o) => o.strategy)).toEqual(["face", "surface", "surface"])
     expect(a.operations[1]!.cut).toBe("adaptive")
     expect(a.operations[2]!.toolId.startsWith("ball-")).toBe(true)
     expect(a.operations[2]!.cut).toBe("finish-3d")

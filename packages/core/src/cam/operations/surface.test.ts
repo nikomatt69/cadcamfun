@@ -186,3 +186,50 @@ describe("roughing", () => {
     expect(r.warnings.join(" ")).toContain("drill cannot machine a surface")
   })
 })
+
+describe("steep and shallow finishing", () => {
+  // A box with a flat top (shallow) and four vertical walls (steep), standing on the stock floor: top at z = 0, 8 mm high.
+  const box = () => buildPartModel([{ type: "cube", width: 30, height: 20, depth: 8, z: -4 }], { cell: 0.1, tolerance: 0.002 })!
+  const run = (strategy: string, extra: Record<string, unknown> = {}) =>
+    generateSurface(params({ strategy, totalDepth: 8, stepdown: 1, scallop: 0.01, tolerance: 0.01, ...extra }), box(), ball(4), stockAt(-20, -15, 40, 30, 8, 0))
+
+  test("raster on the flat top, waterline on the walls, each only where its slope says", () => {
+    const part = box()
+    const surface = new Surface(part.grid, part.dexels.top(-Infinity))
+    const cutter = cutterOf(ball(4))
+    const r = run("steep-shallow")
+    expect(r.stats.lines).toBeGreaterThan(0)
+    expect(r.stats.loops).toBeGreaterThan(0)
+    const cuts = moves(r).filter((m) => m.tag === "Linear")
+    // On the flat top (raster) the tool rides the drop-cutter surface.
+    const top = cuts.filter((p) => p.z > -0.5)
+    expect(top.length).toBeGreaterThan(0)
+    for (const p of top) expect(p.z).toBeGreaterThanOrEqual(surface.tip(cutter, p.x, p.y) - 0.002)
+    // Down the walls (waterline) the ball keeps its radius from the vertical faces. The part is a 0.1 mm height field, which
+    // represents the box's edges to half a cell (a corner to half a cell diagonal): that is the bound here.
+    const deep = cuts.filter((p) => p.z < -2.5)
+    expect(deep.length).toBeGreaterThan(0)
+    for (const p of deep) {
+      const dx = Math.max(0, Math.abs(p.x) - 15), dy = Math.max(0, Math.abs(p.y) - 10)
+      expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(2 - 0.05 * Math.SQRT2 - 1e-3)
+    }
+  })
+
+  test("it does less than parallel plus waterline: no raster down the walls, no waterline loop on the flat top", () => {
+    const both = run("parallel").stats.points + run("waterline").stats.points
+    const combined = run("steep-shallow").stats.points
+    expect(combined).toBeLessThan(both)
+    // A steeper threshold sends more of the surface to the raster: the walls stay waterline, the top stays raster.
+    expect(run("steep-shallow", { slopeAngle: 80 }).stats.loops).toBeGreaterThan(0)
+  })
+
+  test("the verifier finds no gouge against the box it was cut from", () => {
+    const r = run("steep-shallow")
+    const report = verifyToolpath({
+      program: makeProgram("ss", [r.toolpath]), stock: { minX: -20, maxX: 20, minY: -15, maxY: 15, minZ: -8, maxZ: 0 },
+      tool: { kind: "ballnose", diameter: 4 }, fixtures: [], tolerance: 0.05,
+      target: { solids: [{ _tag: "Box", origin: { x: -15, y: -10, z: -8 }, size: { x: 30, y: 20, z: 8 } }] }
+    })
+    expect(report.issues.filter((i) => i.code === "Gouge")).toEqual([])
+  })
+})

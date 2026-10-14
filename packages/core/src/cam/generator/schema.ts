@@ -72,7 +72,9 @@ export const ToolpathSettingsSchema = Schema.Struct({
    * `3d_surface` only. `roughing` clears the stock level by level around the part (and, with `finishingPass`, is followed by the
    * finishing strategy below); `parallel` and `waterline` finish the surface directly.
    */
-  surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline"]), "roughing"),
+  surfaceStrategy: withDefault(Schema.Literals(["roughing", "parallel", "waterline", "steep-shallow"]), "roughing"),
+  /** `steep-shallow`: slope, degrees from the horizontal, above which the surface is finished by waterline instead of raster. */
+  steepAngle: withDefault(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 })), 45),
   /**
    * `3d_surface` roughing (and rest roughing) only: how each region is cleared. `contour` is contour-parallel offsets at `stepover`;
    * `adaptive` keeps the radial depth of cut at `adaptiveEngagement` percent of the tool diameter wherever the tool goes.
