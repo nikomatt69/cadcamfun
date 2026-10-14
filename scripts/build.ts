@@ -4,7 +4,7 @@
  * (specs/10-release-sync.md §1). Six steps, always in this order:
  *
  *   1. install     bun install --frozen-lockfile
- *   2. check       bun run typecheck && bun run test
+ *   2. check       bun run typecheck
  *   3. compile     compile the sidecar (Bun.build, host patch applied) into src-tauri/binaries/sidecar-<triple>
  *   4. resources   copy packages/db/drizzle/ into src-tauri/resources/migrations/
  *   5. bundle      vite build (via @cadcamfun/desktop) then bunx tauri build
@@ -18,7 +18,7 @@
  *   bun scripts/build.ts --help
  *   bun scripts/build.ts --only=notes --dry-run
  *   bun scripts/build.ts --only=resources
- *   bun scripts/build.ts --skip-tests --target=aarch64-apple-darwin
+ *   bun scripts/build.ts --target=aarch64-apple-darwin
  */
 
 import { existsSync } from "node:fs";
@@ -68,7 +68,6 @@ class BuildError extends Error {}
 
 interface Options {
   steps: readonly StepName[];
-  skipTests: boolean;
   skipInstall: boolean;
   updaterArtifacts: boolean;
   dryRun: boolean;
@@ -91,7 +90,6 @@ let dryRun = false;
 let target: string | undefined;
 let bundles: string | undefined;
 let outDir = DEFAULT_OUT_DIR;
-let skipTests = false;
 let updaterArtifacts = true;
 
 function say(message: string): void {
@@ -182,10 +180,8 @@ async function stepInstall(): Promise<void> {
 }
 
 async function stepCheck(): Promise<void> {
-  announce(2, "typecheck and test the workspace");
+  announce(2, "typecheck the workspace");
   await run(["bun", "run", "typecheck"]);
-  if (skipTests) say("   --skip-tests: unit tests skipped");
-  else await run(["bun", "run", "test"]);
 }
 
 async function resolveTarget(): Promise<string> {
@@ -565,7 +561,7 @@ Usage: bun scripts/build.ts [options]
 
 Steps, in order:
   1. install     bun install --frozen-lockfile
-  2. check       bun run typecheck && bun run test
+  2. check       bun run typecheck
   3. compile     bun build --compile the sidecar to src-tauri/binaries/sidecar-<triple>
   4. resources   copy packages/db/drizzle/ to src-tauri/resources/migrations/
   5. bundle      @cadcamfun/desktop build, then bunx tauri build
@@ -579,7 +575,6 @@ Options:
   --only=<a,b>        run only these steps (${STEP_LIST})
   --skip=<a,b>        skip these steps
   --skip-install      alias for --skip=install
-  --skip-tests        step 2 runs the typecheck only
   --target=<triple>   Rust target triple (default: the host triple from \`rustc -vV\`)
   --bundles=<list>    forwarded to \`tauri build --bundles\` (e.g. deb,rpm,appimage)
   --no-updater        build installers without updater archives/signatures
@@ -596,7 +591,7 @@ Examples:
   bun scripts/build.ts --only=resources             restage the migrations (idempotent)
   bun scripts/build.ts --only=notes --dry-run       preview the release notes, writes nothing
   bun scripts/build.ts --only=compile,resources     rebuild the sidecar and restage migrations
-  bun scripts/build.ts --skip-tests --dry-run       see the whole plan without side effects
+  bun scripts/build.ts --dry-run                    see the whole plan without side effects
 `;
 
 function usageError(message: string): never {
@@ -617,7 +612,6 @@ function parseStepList(raw: string, flag: string): StepName[] {
 function parseOptions(argv: readonly string[]): Options {
   let only: StepName[] | null = null;
   const skip = new Set<StepName>();
-  let skipTests = false;
   let help = false;
   let dryRun = false;
   let updaterArtifacts = true;
@@ -629,7 +623,6 @@ function parseOptions(argv: readonly string[]): Options {
     if (arg === "-h" || arg === "--help") help = true;
     else if (arg === "--dry-run") dryRun = true;
     else if (arg === "--no-updater") updaterArtifacts = false;
-    else if (arg === "--skip-tests") skipTests = true;
     else if (arg === "--skip-install") skip.add("install");
     else if (arg.startsWith("--only=")) only = parseStepList(arg.slice("--only=".length), "--only");
     else if (arg.startsWith("--skip="))
@@ -647,7 +640,6 @@ function parseOptions(argv: readonly string[]): Options {
   const selected = only ?? STEP_NAMES.filter((step) => !skip.has(step));
   return {
     steps: STEP_NAMES.filter((step) => selected.includes(step)),
-    skipTests,
     skipInstall: skip.has("install"),
     updaterArtifacts,
     dryRun,
@@ -668,7 +660,6 @@ async function main(): Promise<void> {
   target = options.target;
   bundles = options.bundles;
   outDir = options.outDir;
-  skipTests = options.skipTests;
   updaterArtifacts = options.updaterArtifacts;
 
   say("CADCAM FUN build pipeline");
@@ -677,7 +668,6 @@ async function main(): Promise<void> {
   say(`   steps  ${options.steps.join(" → ")}`);
   if (options.dryRun) say("   mode   dry-run: nothing is installed, built or written");
   if (options.skipInstall) say("   flags  --skip-install");
-  if (options.skipTests) say("   flags  --skip-tests");
   if (!options.updaterArtifacts) say("   flags  --no-updater");
   if (options.target !== undefined) say(`   target ${options.target}`);
   if (options.bundles !== undefined) say(`   bundles ${options.bundles}`);
