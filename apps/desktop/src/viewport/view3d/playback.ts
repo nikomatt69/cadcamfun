@@ -40,11 +40,21 @@ export const buildPlayback = (program: cam.Program, rapidRate = 5000, tolerance 
   return { segments, duration: time, end: from }
 }
 
-export const positionAt = (playback: Playback, seconds: number): Vec3 => {
+/** Index of the segment playing at `seconds` (the segment count past the end). */
+export const segmentIndexAt = (playback: Playback, seconds: number): number => {
   const time = Math.max(0, Math.min(playback.duration, seconds))
   let lo = 0, hi = playback.segments.length
   while (lo < hi) { const mid = (lo + hi) >>> 1; const s = playback.segments[mid]; if (s && s.start + s.duration < time) lo = mid + 1; else hi = mid }
-  const s = playback.segments[lo]
+  return lo
+}
+
+/** The tool in the spindle at `seconds`: the toolpath's `toolId` of the playing segment (the last one past the end). */
+export const toolAt = (playback: Playback, seconds: number): string | undefined =>
+  (playback.segments[segmentIndexAt(playback, seconds)] ?? playback.segments[playback.segments.length - 1])?.toolId
+
+export const positionAt = (playback: Playback, seconds: number): Vec3 => {
+  const time = Math.max(0, Math.min(playback.duration, seconds))
+  const s = playback.segments[segmentIndexAt(playback, seconds)]
   if (!s) return playback.end
   const t = s.duration > 0 ? Math.max(0, Math.min(1, (time - s.start) / s.duration)) : 1
   return { x: s.from.x + (s.to.x - s.from.x) * t, y: s.from.y + (s.to.y - s.from.y) * t, z: s.from.z + (s.to.z - s.from.z) * t }

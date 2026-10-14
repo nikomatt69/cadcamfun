@@ -7,7 +7,7 @@
  * gizmos. The shell hosts only the controls that are CAM-specific (playback
  * timeline, simulator overlay).
  */
-import { Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { RotateCcw, Settings, X } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
@@ -23,6 +23,10 @@ export interface ToolpathVisualizerProps {
   readonly playbackTime: number
   readonly playbackRate: number
   readonly onPlaybackTimeChange: (seconds: number) => void
+  /** Cutters by the toolpaths' `toolId` (the kernel's tool library); playback draws the one in the spindle in 3D. */
+  readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
+  /** Cutter for the toolpaths `tools` does not name (the generator's tool settings). */
+  readonly defaultTool?: cam.kernel.Cutter
 }
 
 const rise = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 } }
@@ -49,6 +53,17 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
   const [stockVisible, setStockVisible] = createSignal(true)
   const [stockOpacity, setStockOpacity] = createSignal(0.6)
   const [arcTolerance, setArcTolerance] = createSignal(0.1)
+  const [showTool, setShowTool] = createSignal(true)
+  const [showHolder, setShowHolder] = createSignal(true)
+  /** The cutters the program uses, as the viewport draws them, for the stats overlay. */
+  const usedTools = createMemo(() => {
+    const seen = new Map<string, cam.kernel.Cutter>()
+    for (const tp of props.program.toolpaths) {
+      const cutter = props.tools?.get(tp.toolId) ?? props.defaultTool
+      if (cutter !== undefined && !seen.has(tp.toolId)) seen.set(tp.toolId, cutter)
+    }
+    return [...seen.values()]
+  })
   const overlay = createMemo(() => toolpathOverlayModel(props.program))
 
   const stock = createMemo(() => ({
@@ -71,6 +86,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
     setStockVisible(true)
     setStockOpacity(0.6)
     setArcTolerance(0.1)
+    setShowTool(true)
+    setShowHolder(true)
     props.onPlaybackTimeChange(0)
   }
 
@@ -96,6 +113,8 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
           <View3D
             visionMode="cam"
             program={props.program}
+            {...(props.tools !== undefined ? { tools: props.tools } : {})}
+            {...(props.defaultTool !== undefined ? { defaultTool: props.defaultTool } : {})}
             preset={preset()}
             renderMode={mode()}
             gridVisible={gridVisible()}
@@ -105,7 +124,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             playbackRate={props.playbackRate}
             onPlaybackTimeChange={props.onPlaybackTimeChange}
             stock={stock()}
-            toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance() }}
+            toolpathDisplay={{ showPoints: showPoints(), showPointLabels: showPointLabels(), pointFilter: pointFilter(), pointSize: pointSize(), showArcCenters: showArcCenters(), showArcRadii: showArcRadii(), stockVisible: stockVisible(), stockOpacity: stockOpacity(), arcTolerance: arcTolerance(), showTool: showTool(), showHolder: showHolder() }}
             showControls
             onPresetChange={setPreset}
             onRenderModeChange={setMode}
@@ -161,6 +180,7 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
             <div>{t("cam.visualizer.moves")}: <span class="text-white">{overlay().moveCount}</span></div>
             <div>{t("cam.visualizer.points")}: <span class="text-white">{overlay().points.length}</span></div>
             <div>{t("cam.visualizer.arcs")}: <span class="text-white">{overlay().arcs.length}</span></div>
+            <For each={usedTools()}>{(c) => <div data-testid="visualizer-tool">{t("cam.visualizer.activeTool")}: <span class="text-white">{c.name} · Ø{c.diameter} · {c.fluteLength} mm flutes · {c.stickout} mm out{c.holder ? ` · holder Ø${c.holder.diameter}` : ""}</span></div>}</For>
           </div>
         </Show>
         <Show when={settingsOpen()}>
@@ -193,6 +213,11 @@ export default function ToolpathVisualizer(props: ToolpathVisualizerProps): JSX.
                 <label class="block text-xs text-slate-200">{t("cam.visualizer.arcTolerance")} <span class="float-right text-slate-400">{arcTolerance().toFixed(2)} mm</span>
                   <input class="mt-1 w-full accent-blue-500" type="range" min="0.01" max="1" step="0.01" value={arcTolerance()} onInput={(event) => setArcTolerance(Number(event.currentTarget.value))} />
                 </label>
+              </section>
+              <section class="space-y-2 border-t border-slate-700 pt-3">
+                <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.tool")}</h4>
+                {toggle(t("cam.visualizer.showTool"), showTool, setShowTool)}
+                <Show when={showTool()}>{toggle(t("cam.visualizer.showHolder"), showHolder, setShowHolder)}</Show>
               </section>
               <section class="space-y-2 border-t border-slate-700 pt-3">
                 <h4 class="text-xs font-semibold text-blue-300">{t("cam.visualizer.workpiece")}</h4>

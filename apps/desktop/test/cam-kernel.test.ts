@@ -26,6 +26,10 @@ test("the additive kernel section runs through the real sidecar and fills the ex
     button.click()
     const evidence = await app.wait(() => document.querySelector("[data-testid='kernel-evidence']"), 30_000)
     expect(evidence.textContent).toContain("nc-replaypassed")
+    // Each cutter the kernel used is drawn to scale: cutting zone, shank and (generic, dashed) holder.
+    const silhouettes = document.querySelectorAll("[data-testid='kernel-tools'] [data-testid='tool-silhouette']")
+    expect(silhouettes.length).toBeGreaterThan(0)
+    expect([...silhouettes[0]!.querySelectorAll("polygon")].map((p) => p.getAttribute("data-part"))).toEqual(["cutting", "shank", "holder"])
     const store = useCamStore.getState()
     expect(store.gcode).toContain("M30")
     expect(store.program.toolpaths.length).toBeGreaterThan(0)

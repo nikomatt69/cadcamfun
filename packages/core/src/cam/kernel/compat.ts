@@ -27,6 +27,25 @@ export const legacyCutClass = (s: ToolpathSettings): CutClass => {
   }
 }
 
+/**
+ * The cutter the generator settings describe: kind and diameter from the tool fields, a standard-length body (flutes 3 x D,
+ * shank of the cutting diameter, stickout 4 x D + 10). Used for the cutting data and for drawing the tool.
+ */
+export const settingsCutter = (
+  s: ToolpathSettings,
+  options: { readonly toolMaterial?: ToolMaterial; readonly coating?: Cutter["coating"]; readonly stickout?: number } = {}
+): Cutter => {
+  const kind = KIND[s.toolType] ?? "flat"
+  const d = s.toolDiameter
+  return {
+    id: "settings-tool", name: `${s.toolType} Ø${d}`, kind, diameter: d, flutes: s.flutes, material: options.toolMaterial ?? "carbide",
+    coating: options.coating ?? "none", fluteLength: Math.max(1, 3 * d), shankDiameter: Math.max(3, d), stickout: options.stickout ?? Math.max(10, 4 * d + 10),
+    ...(kind === "engraver" || kind === "chamfer" ? { angle: s.toolType === "chamfer" ? 90 : 60, tipDiameter: 0.2 } : {}),
+    ...(kind === "drill" ? { angle: 140 } : {}),
+    ...(kind === "threadmill" ? { pitch: s.threadPitch } : {})
+  }
+}
+
 export interface LegacyRecommendation {
   readonly material: WorkpieceMaterial
   readonly cutter: Cutter
@@ -46,15 +65,7 @@ export const recommendForSettings = (
   if (s.machineType !== "mill") return undefined
   const material = (options.grade !== undefined ? findMaterial(options.grade) : undefined) ?? findMaterial(LEGACY_MATERIAL_GRADE[s.material] ?? s.material)
   if (material === undefined) return undefined
-  const kind = KIND[s.toolType] ?? "flat"
-  const d = s.toolDiameter
-  const cutter: Cutter = {
-    id: "settings-tool", name: `${s.toolType} Ø${d}`, kind, diameter: d, flutes: s.flutes, material: options.toolMaterial ?? "carbide",
-    coating: material.iso === "N" ? "none" : "altin", fluteLength: Math.max(1, 3 * d), shankDiameter: Math.max(3, d), stickout: options.stickout ?? Math.max(10, 4 * d + 10),
-    ...(kind === "engraver" || kind === "chamfer" ? { angle: 60, tipDiameter: 0.2 } : {}),
-    ...(kind === "drill" ? { angle: 140 } : {}),
-    ...(kind === "threadmill" ? { pitch: s.threadPitch } : {})
-  }
+  const cutter = settingsCutter(s, { ...(options.toolMaterial !== undefined ? { toolMaterial: options.toolMaterial } : {}), coating: material.iso === "N" ? "none" : "altin", ...(options.stickout !== undefined ? { stickout: options.stickout } : {}) })
   const machine: MachineLimits = { maxRpm: options.machine?.maxRpm ?? 24000, maxFeed: options.machine?.maxFeed ?? 10000, ...options.machine }
   const cut = legacyCutClass(s)
   const data = cuttingData({ material, cutter, cut, machine, depth: s.depth })

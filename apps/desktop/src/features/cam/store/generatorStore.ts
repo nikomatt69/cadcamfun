@@ -16,7 +16,8 @@ const g = cam.generator
 export type ToolpathSettings = cam.generator.ToolpathSettings
 export type GeometryType = cam.generator.GeometryType
 export type PrinterExtras = cam.generator.PrinterExtras
-export type KernelSettings = Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution">
+/** The kernel job the panel builds: presets, quality, and the edited plan / cutter library (absent = the kernel decides). */
+export type KernelSettings = Pick<CamKernelRequest, "material" | "machine" | "origin" | "finishAllowance" | "scallop" | "resolution" | "deburr" | "operations" | "tools">
 const initialKernelSettings = (): KernelSettings => ({ material: "6061", machine: cam.kernel.DEFAULT_MACHINE.id, origin: "stock-center" })
 
 export interface LibraryTool {
@@ -142,7 +143,12 @@ const initial = (): Pick<GeneratorState,
 
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   ...initial(),
-  patchKernelSettings: patch => set(state => ({ kernelSettings: { ...state.kernelSettings, ...patch } })),
+  // An `undefined` in the patch removes the key: the request schema takes absent keys, never undefined values.
+  patchKernelSettings: patch => set(state => {
+    const next: Record<string, unknown> = { ...state.kernelSettings, ...patch }
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key]
+    return { kernelSettings: next as KernelSettings }
+  }),
 
   toggleSection: section => set(state => ({ expanded: { ...state.expanded, [section]: !state.expanded[section] } })),
 

@@ -9,7 +9,7 @@ import { ViewportControls, viewportLabels } from "./viewport-controls.tsx"
 import { creasedNormals, isClosedShape, meshOf, tessellate, cam, type Drawing, type Solid, type Vec3 } from "@cadcamfun/core"
 import { entityPaths, renderEntity } from "../editor2d/render.ts"
 import { t } from "../../i18n/index.ts"
-import { buildPlayback, positionAt, toolColors, type Playback } from "./playback.ts"
+import { buildPlayback, positionAt, toolAt, toolColors, type Playback } from "./playback.ts"
 import { toolpathOverlayModel, type ToolpathPointKind } from "./toolpath-overlays.ts"
 
 export type ViewPreset = "perspective" | "top" | "front" | "right" | "isometric" | "bottom" | "back" | "left" | "four-view"
@@ -49,6 +49,10 @@ export interface View3DProps {
   readonly solids?: readonly Solid[]
   readonly extrusionHeight?: number
   readonly program?: cam.Program
+  /** Cutters of the program by `toolId`; playback draws the one in the spindle as its 3D assembly. */
+  readonly tools?: ReadonlyMap<string, cam.kernel.Cutter>
+  /** Cutter for a `toolId` that `tools` does not know (the generator's settings tool). */
+  readonly defaultTool?: cam.kernel.Cutter
   readonly preset?: ViewPreset
   readonly playing?: boolean
   readonly playbackTime?: number
@@ -77,6 +81,10 @@ export interface View3DProps {
     readonly stockVisible: boolean
     readonly stockOpacity: number
     readonly arcTolerance: number
+    /** Draw the cutter, shank and holder during playback (default true). */
+    readonly showTool?: boolean
+    /** Draw the holder, a generic one when the cutter has none (default true). */
+    readonly showHolder?: boolean
   }
 }
 
@@ -109,7 +117,7 @@ export function View3D(props: View3DProps) {
   let rebuild = () => {}, setPreset = () => {}
   let playback: Playback = { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
   let seconds = 0
-  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; untrack(rebuild) })
+  createEffect(() => { props.drawing; props.solids; props.extrusionHeight; props.program; props.stock; props.toolpathDisplay; props.tools; props.defaultTool; untrack(rebuild) })
   createEffect(() => { if (props.preset) updatePreset(props.preset) })
   createEffect(() => { preset(); untrack(setPreset) })
   createEffect(() => { if (props.renderMode) updateMode(props.renderMode) })
@@ -231,6 +239,34 @@ export function View3D(props: View3DProps) {
     }
     const marker = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf59e0b }))
     scene.add(marker)
+    // The tool in the spindle as its 3D assembly (cutting zone in the tool's colour, shank, holder), one group per toolId.
+    const toolGroups = new Map<string, THREE.Group | null>()
+    let toolColorOf: ReadonlyMap<string, number> = new Map()
+    const disposeTools = (): void => { for (const g of toolGroups.values()) if (g) { scene.remove(g); disposeGroup(g) } toolGroups.clear() }
+    const toolGroupFor = (id: string): THREE.Group | null => {
+      const known = toolGroups.get(id)
+      if (known !== undefined) return known
+      const cutter = props.tools?.get(id) ?? props.defaultTool
+      if (cutter === undefined || props.toolpathDisplay?.showTool === false) { toolGroups.set(id, null); return null }
+      const group = new THREE.Group()
+      group.name = `tool:${id}`
+      for (const part of cam.kernel.assemblyMeshes(cutter, { assumeHolder: props.toolpathDisplay?.showHolder !== false, segments: 40 })) {
+        if (part.part === "holder" && props.toolpathDisplay?.showHolder === false) continue
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute("position", new THREE.BufferAttribute(part.positions, 3))
+        geometry.setAttribute("normal", new THREE.BufferAttribute(part.normals, 3))
+        geometry.setIndex(new THREE.BufferAttribute(part.indices, 1))
+        const color = part.part === "cutting" ? toolColorOf.get(id) ?? 0xf59e0b : part.part === "shank" ? 0xb8bec6 : 0x4b5563
+        const material = new THREE.MeshStandardMaterial({ color, metalness: part.part === "holder" ? 0.4 : 0.75, roughness: part.part === "cutting" ? 0.3 : 0.45, transparent: part.assumed, opacity: part.assumed ? 0.35 : 1, side: THREE.DoubleSide })
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.name = `${part.part}${part.assumed ? " (assumed)" : ""}`
+        group.add(mesh)
+      }
+      group.visible = false
+      scene.add(group)
+      toolGroups.set(id, group)
+      return group
+    }
     let radius = 100
     const meshJobs = new MeshWorkerQueue({
       create: () => new Worker(new URL("./mesh-worker.ts", import.meta.url), { type: "module" }),
@@ -331,6 +367,8 @@ export function View3D(props: View3DProps) {
       playback = props.program ? buildPlayback(props.program, 5000, props.toolpathDisplay?.arcTolerance ?? .1) : { segments: [], duration: 0, end: { x: 0, y: 0, z: 0 } }
       // Rapids dashed; cuts one colour per tool, so the operations of a multi-tool program read apart.
       const colors = props.program ? toolColors(props.program) : new Map<string, number>()
+      disposeTools()
+      toolColorOf = colors
       const rapid: number[] = [], cuts = new Map<string, number[]>()
       for (const s of playback.segments) {
         const into = s.rapid ? rapid : cuts.get(s.toolId) ?? (cuts.set(s.toolId, []), cuts.get(s.toolId)!)
@@ -424,9 +462,17 @@ export function View3D(props: View3DProps) {
       }
       previous = now
       const p = positionAt(playback, seconds)
-      const moved = marker.position.x !== p.x || marker.position.y !== p.y || marker.position.z !== p.z
       const visible = playback.segments.length > 0
-      if (moved || marker.visible !== visible) { marker.position.set(p.x, p.y, p.z); marker.visible = visible; invalidate() }
+      const activeId = visible ? toolAt(playback, seconds) : undefined
+      const active = activeId !== undefined ? toolGroupFor(activeId) : null
+      for (const [id, g] of toolGroups) if (g && id !== activeId && g.visible) { g.visible = false; invalidate() }
+      if (active) {
+        if (!active.visible || active.position.x !== p.x || active.position.y !== p.y || active.position.z !== p.z) { active.position.set(p.x, p.y, p.z); active.visible = true; invalidate() }
+        if (marker.visible) { marker.visible = false; invalidate() }
+      } else {
+        const moved = marker.position.x !== p.x || marker.position.y !== p.y || marker.position.z !== p.z
+        if (moved || marker.visible !== visible) { marker.position.set(p.x, p.y, p.z); marker.visible = visible; invalidate() }
+      }
       const cameraMoved = controls.update()
       if (!document.hidden && (dirty || cameraMoved || props.playing)) { dirty = false; renderFrame() }
       const playing = !!props.playing && seconds < playback.duration && (props.playbackRate ?? 1) > 0
@@ -442,7 +488,7 @@ export function View3D(props: View3DProps) {
       renderFrame()
       return { canvas: renderer.domElement, camera: { position: [activeCamera.position.x, activeCamera.position.y, activeCamera.position.z], target: [controls.target.x, controls.target.y, controls.target.z] }, ...(props.visionMode === "cam" && props.program ? { programText: cam.programGeometryText(props.program) } : {}) }
     })
-    onCleanup(() => { unregisterCapture(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
+    onCleanup(() => { unregisterCapture(); frames?.dispose(); document.removeEventListener("visibilitychange", visibility); observer.disconnect(); meshJobs.dispose(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointerup", pick); host?.removeEventListener("keydown", key); gizmo.removeEventListener("dragging-changed", dragging); gizmo.removeEventListener("mouseUp", commit); gizmo.removeEventListener("change", invalidate); gizmo.dispose(); controls.dispose(); disposeGroup(content); disposeGroup(helpers); disposeTools(); marker.geometry.dispose(); marker.material.dispose(); renderer.dispose(); renderer.domElement.remove(); rebuild = () => {}; setPreset = () => {}; appearance = () => {}; transform = () => {}; fit = () => {}; invalidate = () => {} })
   })
   return <div class="vp3-root">
     <div ref={host} class="vp3-canvas" tabIndex={0} aria-label={t("cam.preview")} />

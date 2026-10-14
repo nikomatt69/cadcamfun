@@ -16,7 +16,7 @@
 import { Schema } from "effect"
 import type { Mesh } from "../../cad/solid.ts"
 import type { Vec2, Vec3 } from "../../cad/vec.ts"
-import { pointInRing } from "../geometry.ts"
+import { distanceToChain, pointInRing } from "../geometry.ts"
 import { estimateTime, makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import { buildPartModelFromMeshes, partMeshes, type PartModel } from "../model/model.ts"
 import { meshBounds, type Mesh64 } from "../model/element-mesh.ts"
@@ -28,6 +28,7 @@ import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile } from "../operations/profile.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
 import { ThreadParams, generateThread } from "../operations/thread.ts"
+import { ChamferParams, chamferGeometry, generateChamfer } from "../operations/chamfer.ts"
 import { getPost } from "../post/index.ts"
 import { genericPost } from "../post/generic.ts"
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
@@ -134,7 +135,7 @@ export const prepareJob = (job: ManufacturingJob): CamResult<PreparedJob> => {
   const finishAllowance = job.quality?.finishAllowance ?? material.finishAllowance
   const scallop = job.quality?.scallop ?? 0.01
   const plan = job.operations === undefined
-    ? planJob({ elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop })
+    ? planJob({ elements, bounds, stock, tools, material, rigidity: machine.limits.rigidity ?? "standard", finishAllowance, scallop, ...(job.quality?.deburr !== undefined ? { deburr: job.quality.deburr } : {}) })
     : undefined
   const operations = job.operations ?? plan!.operations
   if (operations.length === 0) return { status: "failed", issues: [issue("InvalidInput", "plan", "No operation to run: the part needs no machining or no feature could be planned"), ...(plan?.unmachined ?? []).map((m) => issue("UnsupportedCapability", "plan", m))] }
@@ -160,11 +161,16 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "drill": return op.cut === "spot" || tool.kind === "spot" || tool.kind === "chamfer" ? "spot" : "drill"
     case "thread": return "thread-mill"
     case "engrave": return "engrave"
+    case "chamfer": return "chamfer"
     case "surface": return op.mode === "roughing" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : "finish-3d"
   }
 }
 
 const shift2 = (p: Vec2, o: Vec3): Vec2 => ({ x: p.x - o.x, y: p.y - o.y })
+
+/** The cone of a chamfer mill / spot drill / engraver. */
+const coneOf = (c: Cutter): { readonly radius: number; readonly tipRadius: number; readonly halfAngle: number } =>
+  ({ radius: c.diameter / 2, tipRadius: c.kind === "spot" ? 0 : (c.tipDiameter ?? 0) / 2, halfAngle: ((c.angle ?? 90) * Math.PI) / 360 })
 
 /** Column test of the region an operation's cutter can sweep, in work coordinates. */
 const sweptRegion = (op: OperationSpec, o: Vec3, radius: number): { readonly box: readonly [number, number, number, number]; readonly inside: (x: number, y: number) => boolean } | undefined => {
@@ -199,6 +205,10 @@ const sweptRegion = (op: OperationSpec, o: Vec3, radius: number): { readonly box
     }
     case "engrave": {
       const pts = op.paths.flatMap((p) => p.points.map((q) => shift2(q, o)))
+      return { box: boxOf(pts, radius), inside: () => true }
+    }
+    case "chamfer": {
+      const pts = op.loops.flatMap((l) => l.points.map((q) => shift2(q, o)))
       return { box: boxOf(pts, radius), inside: () => true }
     }
     case "face":
@@ -302,10 +312,11 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       : op.strategy === "surface" ? partBottom
       : op.strategy === "thread" ? op.top - o.z - op.length
       : op.strategy === "engrave" ? op.top - o.z - op.depth
+      : op.strategy === "chamfer" ? op.top - o.z - chamferGeometry(coneOf(tool), op.width, op.tipOffset ?? 0.2).tipDepth
       : op.bottom - o.z
-    const finishing = cut === "finish-wall" || cut === "finish-3d" || cut === "thread-mill" || cut === "engrave" || cut === "spot"
+    const finishing = cut === "finish-wall" || cut === "finish-3d" || cut === "thread-mill" || cut === "engrave" || cut === "spot" || cut === "chamfer"
     // Enter from the material really left over the region: above the feature top when stock is still there, lower when it is gone.
-    let start = op.strategy === "thread" ? opTop : materialTop > opTop + 1e-6 ? materialTop : finishing || materialTop === -Infinity ? opTop : Math.max(materialTop, opBottom)
+    let start = op.strategy === "thread" || op.strategy === "chamfer" ? opTop : materialTop > opTop + 1e-6 ? materialTop : finishing || materialTop === -Infinity ? opTop : Math.max(materialTop, opBottom)
     if (op.strategy === "face") start = Math.max(materialTop, opBottom)
     const warnings: string[] = []
     const overridden: string[] = []
@@ -411,6 +422,16 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
           generated = { toolpath: generateEngrave(params, op.paths.map((p) => ({ points: p.points.map((q) => shift2(q, o)), closed: p.closed })), legacy, opStock), warnings: [] }
           break
         }
+        case "chamfer": {
+          if (tool.kind !== "chamfer" && tool.kind !== "spot" && tool.kind !== "engraver") { fail("NoSuitableTool", `${op.id}: ${tool.name} is not a cone cutter (chamfer mill, spot drill or engraver)`, data); return }
+          const tipDepth = chamferGeometry(coneOf(tool), op.width, op.tipOffset ?? 0.2).tipDepth
+          const params = decode(ChamferParams, { ...common, totalDepth: tipDepth, stepdown: tipDepth, width: op.width, tipOffset: op.tipOffset ?? 0.2, lead: Math.max(1, radius) })
+          const r = generateChamfer(params, op.loops.map((l) => ({ points: l.points.map((p) => shift2(p, o)), side: l.side })), coneOf(tool), legacy, opTop)
+          if (r.skipped.length > 0 && !cuts(r.toolpath)) { fail("NoSuitableTool", `${op.id}: ${r.skipped.join("; ")}`, data); return }
+          for (const m of r.skipped) issues.push(issue("UnsupportedCapability", "generate", `${op.id}: ${m}`, { operationId: op.id, severity: "warning" }))
+          generated = { toolpath: r.toolpath, warnings: [...r.warnings, ...r.skipped] }
+          break
+        }
         case "surface": {
           const model = part()
           if (model === undefined) { fail("InvalidInput", `${op.id}: the part has no surface model`, data); return }
@@ -481,6 +502,27 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     const c = shift2(a.center, o), floor = a.floor - o.z - a.depth - 1e-3
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       if (Math.hypot(hf.centreX(i) - c.x, hf.centreY(j) - c.y) <= a.radius + Math.max(hf.cellX, hf.cellY)) {
+        const k = j * nx + i
+        limit[k] = Math.min(limit[k]!, floor)
+      }
+    }
+  }
+  // Declared removal the model does not carry: the band of a chamfer may go down to the chamfer's bottom at the edge.
+  for (const op of operations) {
+    if (op.strategy !== "chamfer") continue
+    const t = toolOf(op.tool)
+    const g = chamferGeometry(coneOf(t), op.width, op.tipOffset ?? 0.2)
+    const floor = op.top - o.z - g.depth - 1e-3
+    for (const loop of op.loops) {
+      const ring = loop.points.map((p) => shift2(p, o))
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (const p of ring) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y) }
+      const reach = op.width + 2 * Math.max(hf.cellX, hf.cellY)
+      const i0 = Math.max(0, Math.floor((x0 - reach - hf.minX) / hf.cellX)), i1 = Math.min(nx - 1, Math.ceil((x1 + reach - hf.minX) / hf.cellX))
+      const j0 = Math.max(0, Math.floor((y0 - reach - hf.minY) / hf.cellY)), j1 = Math.min(ny - 1, Math.ceil((y1 + reach - hf.minY) / hf.cellY))
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const p = { x: hf.centreX(i), y: hf.centreY(j) }
+        if (distanceToChain(p, ring, true) > reach) continue
         const k = j * nx + i
         limit[k] = Math.min(limit[k]!, floor)
       }

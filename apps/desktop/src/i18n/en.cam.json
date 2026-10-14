@@ -119,6 +119,10 @@
   "cam.visualizer.arcTolerance": "Arc tolerance",
   "cam.visualizer.workpiece": "Workpiece",
   "cam.visualizer.showWorkpiece": "Show workpiece",
+  "cam.visualizer.tool": "Tool",
+  "cam.visualizer.showTool": "Show cutter and shank",
+  "cam.visualizer.showHolder": "Show holder (generic when not given)",
+  "cam.visualizer.activeTool": "Tool",
   "cam.visualizer.opacity": "Opacity",
   "cam.toggleSidebar": "Toggle sidebar",
   "cam.toggleProperties": "Toggle properties panel",
@@ -443,5 +447,15 @@
   "cam.resource.noOperations": "No saved operation breakdown.",
   "cam.resource.elementCount": "Elements: {count}",
   "cam.resource.moves": "Moves: {count}",
-  "cam.resource.multi": "Multiple operations"
+  "cam.resource.multi": "Multiple operations",
+  "cam.kernel.deburr": "Deburr edges, chamfer width mm (0 = off)",
+  "cam.kernel.plan": "Plan operations",
+  "cam.kernel.planHint": "The kernel's plan from the part. Change a tool, override rpm / feed / stepdown / stepover, reorder or remove an operation; Generate runs this list.",
+  "cam.kernel.planReset": "Automatic plan",
+  "cam.kernel.operations": "Operations",
+  "cam.kernel.cutters": "Cutters",
+  "cam.kernel.cuttersHint": "Flute length, stickout and holder of the cutters the plan uses: the 3D view, the holder check and the cutting data use them.",
+  "cam.kernel.cuttersReset": "Default cutters",
+  "cam.kernel.fromData": "auto",
+  "cam.kernel.holderNone": "0 = no holder"
 }

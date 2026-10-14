@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { cam } from "@cadcamfun/core"
-import { buildPlayback, positionAt } from "./playback.ts"
+import { buildPlayback, positionAt, toolAt } from "./playback.ts"
 
 const program = (moves: cam.Move[]): cam.Program => ({ name: "Test", units: "mm", workOffset: "G54", toolpaths: [{ id: "path", name: "path", toolId: "tool", spindleRpm: 1000, coolant: "off", moves }] })
 
@@ -26,4 +26,19 @@ test("full-circle helical arcs tessellate and interpolate Z", () => {
 
 test("empty programs remain at origin", () => {
   expect(positionAt(buildPlayback(program([])), 10)).toEqual({ x: 0, y: 0, z: 0 })
+})
+
+test("the tool in the spindle follows the toolpaths: each segment knows its toolId", () => {
+  const two: cam.Program = {
+    name: "Two", units: "mm", workOffset: "G54",
+    toolpaths: [
+      { id: "a", name: "a", toolId: "flat-10", spindleRpm: 1000, coolant: "off", moves: [{ _tag: "Linear", to: { x: 10, y: 0, z: 0 }, feed: 60 }] },
+      { id: "b", name: "b", toolId: "drill-5", spindleRpm: 1000, coolant: "off", moves: [{ _tag: "Linear", to: { x: 10, y: 0, z: -10 }, feed: 60 }] }
+    ]
+  }
+  const path = buildPlayback(two)
+  expect(toolAt(path, 5)).toBe("flat-10")
+  expect(toolAt(path, 15)).toBe("drill-5")
+  expect(toolAt(path, 1000)).toBe("drill-5")
+  expect(toolAt(buildPlayback(program([])), 0)).toBeUndefined()
 })

@@ -7,6 +7,8 @@
  *   planner       CAD features -> ordered operations with their cutters
  *   execute       prepare / run: strategies, post, independent NC replay, stock lineage, claims and release level
  *   compat        the legacy generator settings in and out of the kernel's cutting data
+ *   schema        Effect Schemas of the caller-supplied cutters and operations (HTTP, assistant)
+ *   assembly      the 3D tool assembly (cutting zone, shank, holder) as a profile and its solid of revolution
  */
 export * from "./materials.ts"
 export * from "./cutters.ts"
@@ -17,3 +19,6 @@ export * from "./machines.ts"
 export { planJob, inscribedRadius, type Plan, type PlanInput } from "./planner.ts"
 export { prepareJob, executeJob, runJob, planOnly, KERNEL_ALGORITHM, type PreparedJob } from "./execute.ts"
 export * from "./compat.ts"
+export * from "./assembly.ts"
+export { CutterSchema, OperationSpecSchema } from "./schema.ts"
+export { jobOfSnapshot, type KernelSnapshot } from "./snapshot.ts"

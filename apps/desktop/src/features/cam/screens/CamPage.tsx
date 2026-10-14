@@ -38,6 +38,7 @@ import "../../../styles/workstation.css"
 import SaveCamModal from "../components/SaveCamModal.tsx"
 import { restoreCamProgram, SavedCamProgram } from "../lib/saved-program.ts"
 import { Schema } from "effect"
+import { cam } from "@cadcamfun/core"
 import { captureEditorOwner } from "../../ai/lib/editor-sync.ts"
 import { useVerifyStore } from "../store/verifyStore.ts"
 import { mountCamHistory, useCamHistoryStore } from "../store/camHistoryStore.ts"
@@ -58,6 +59,11 @@ export default function CamPage(): JSX.Element {
   const gen = useGeneratorStore()
   const cadStore = useCADStore()
   const elementStore = useElementsStore()
+  /** The kernel's cutters by toolpath id when the preview shows its program; the generator's tool otherwise. */
+  const previewTools = createMemo(() => camStore.kernelArtifact?.nc === camStore.gcode
+    ? new Map(camStore.kernelArtifact.tools.map((c) => [c.id, c as cam.kernel.Cutter]))
+    : undefined)
+  const previewDefaultTool = createMemo(() => gen.settings.machineType === "mill" ? cam.kernel.settingsCutter(gen.settings) : undefined)
   const previewStock = createMemo(() => camStore.kernelArtifact?.nc === camStore.gcode
     ? kernelStockOf(camStore.kernelArtifact)
     : stockOf({ elements: elementStore.elements, selectedElement: null, selectedIds: [], workpiece: cadStore.workpiece, workpieceElementId: camStore.selectedWorkpieceElementId, stockAllowance: camStore.stockAllowance }))
@@ -350,7 +356,7 @@ export default function CamPage(): JSX.Element {
           >
             <Show when={camStore.activeTab === "preview"}>
               <div class="h-full">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "editor"}>
@@ -360,7 +366,7 @@ export default function CamPage(): JSX.Element {
             </Show>
             <Show when={camStore.activeTab === "toolpath"}>
               <div class="h-full rounded-xl">
-                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} />
+                <ToolpathVisualizer stock={previewStock()} program={camStore.program} workpiece={camStore.workpiece} playing={camStore.playing} playbackTime={camStore.playbackTime} playbackRate={1} onPlaybackTimeChange={camStore.setPlaybackTime} {...(previewTools() !== undefined ? { tools: previewTools()! } : {})} {...(previewDefaultTool() !== undefined ? { defaultTool: previewDefaultTool()! } : {})} />
               </div>
             </Show>
             <Show when={camStore.activeTab === "post"}>

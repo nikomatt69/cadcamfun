@@ -4,7 +4,7 @@
  *
  *   face the stock top  ->  rough around the outlines and inside the pockets (adaptive / contour, wall allowance)
  *   ->  counterbores, spot drilling, drilling (or helical boring), countersinks, thread milling
- *   ->  finish the walls  ->  3D roughing and finishing of the freeform bodies
+ *   ->  finish the walls  ->  break the top edges (2D chamfer, when `deburr` is asked)  ->  3D roughing and finishing of the freeform bodies
  *
  * The features come from the parametric history (`generator/history-features.ts`, the same derivation the generator and
  * DFM use), so the operations machine the holes, pockets and outlines the CAD model really has. A body without a feature
@@ -35,6 +35,8 @@ export interface PlanInput {
   readonly rigidity: Rigidity
   readonly finishAllowance: number
   readonly scallop: number
+  /** Chamfer width that breaks the top edges of outlines, pockets and holes, mm (no deburring when absent). */
+  readonly deburr?: number
 }
 
 export interface Plan {
@@ -292,6 +294,37 @@ export const planJob = (input: PlanInput): Plan => {
   }
   ops.push(...threads)
   ops.push(...finishes)
+
+  // ------------------------------------------------------------ deburring
+  if (input.deburr !== undefined && input.deburr > 0 && prismatic) {
+    const w = input.deburr
+    // Edges by the height of their top face: one chamfer operation per level.
+    const levels = new Map<number, Array<{ points: ReadonlyArray<Vec2>; side: "outside" | "inside" }>>()
+    const add = (top: number, points: ReadonlyArray<Vec2>, side: "outside" | "inside"): void => {
+      const key = r3(top)
+      const list = levels.get(key) ?? (levels.set(key, []), levels.get(key)!)
+      list.push({ points: ccw(points), side })
+    }
+    for (const o of outlines) add(o.top, o.outer, "outside")
+    for (const p of pocketRegions) add(p.top, p.loop, "inside")
+    for (const h of holes) {
+      if (!isDown(h) || h.kind === "countersink") continue
+      const d = h.kind === "counterbore" && h.headDiameter !== undefined ? h.headDiameter : h.diameter
+      add(h.entry.z, circleRing({ x: h.entry.x, y: h.entry.y }, d / 2), "inside")
+    }
+    // The smallest 90° cone whose top radius reaches the chamfer: small holes need a small cone.
+    const cones = tools.filter((t) => t.kind === "chamfer" || t.kind === "spot").sort((a, b) => a.diameter - b.diameter)
+    const reach = (t: Cutter): number => (t.kind === "spot" ? 0 : (t.tipDiameter ?? 0) / 2) + (w / Math.tan(((t.angle ?? 90) * Math.PI) / 360) + 0.2) * Math.tan(((t.angle ?? 90) * Math.PI) / 360)
+    const cone = cones.find((t) => reach(t) <= t.diameter / 2 + 1e-9)
+    if (cone === undefined) unmachined.push(`Deburring ${w} mm: no chamfer mill or spot drill reaches that width`)
+    else {
+      let n = 0
+      for (const [top, loops] of [...levels.entries()].sort((a, b) => b[0] - a[0])) {
+        n++
+        ops.push({ id: `chamfer-${n}`, name: `Chamfer ${w} mm, edges at Z${top}`, strategy: "chamfer", tool: cone.id, loops, top, width: w })
+      }
+    }
+  }
 
   // ------------------------------------------------------------ freeform bodies
   if (surfaceOnly) {

@@ -5,6 +5,8 @@ import { useRead } from "../../../../app/queries.ts"
 import { useGeneratorStore, type LibraryTool, type ToolpathSettings } from "../../store/generatorStore.ts"
 import { t } from "../../../../i18n/index.ts"
 import { CHECKBOX, INPUT, LABEL, NumberField, Section } from "./ui.tsx"
+import { cam } from "@cadcamfun/core"
+import { ToolSilhouette } from "../ToolSilhouette.tsx"
 
 const MILL_TYPES = ["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer"]
 const LATHE_TYPES = ["turning", "facing", "boring", "threading", "grooving", "parting"]
@@ -94,7 +96,11 @@ export function ToolSection(): JSX.Element {
           <div class="text-xs text-gray-500">{gen.selectedLibraryTool ? `${gen.selectedLibraryTool.name || "Custom tool"}` : "Generic tool"}</div>
         </div>
         <div class="flex items-center">
-          <div class="w-20 h-20 mr-4 bg-white rounded-md border border-gray-200 flex items-center justify-center"><ToolSketch /></div>
+          <div class="w-20 h-20 mr-4 bg-white rounded-md border border-gray-200 flex items-center justify-center">
+            <Show when={gen.settings.machineType === "mill"} fallback={<ToolSketch />}>
+              <ToolSilhouette cutter={cam.kernel.settingsCutter(gen.settings)} height={76} />
+            </Show>
+          </div>
           <div class="flex-1">
             <table class="w-full text-xs">
               <tbody>

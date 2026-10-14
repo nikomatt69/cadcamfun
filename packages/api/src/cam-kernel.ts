@@ -14,7 +14,12 @@ export const CamKernelRequest = Schema.Struct({
   elements: Schema.Array(Schema.Record(Schema.String, Schema.Json)).check(Schema.isMinLength(1), Schema.isMaxLength(2000)),
   stock: Schema.optionalKey(CamStockSetInput.fields.stock),
   tolerance: Schema.optionalKey(positive), resolution: Schema.optionalKey(positive),
-  workOffset: Schema.optionalKey(cam.WorkOffsetSchema)
+  workOffset: Schema.optionalKey(cam.WorkOffsetSchema),
+  /** Explicit operations in machining order (the kernel plans them from the part when absent). */
+  operations: CamManufactureInput.fields.operations,
+  /** Cutter library with holders (the kernel's default crib when absent). */
+  tools: CamManufactureInput.fields.tools,
+  deburr: CamManufactureInput.fields.deburr
 })
 export type CamKernelRequest = typeof CamKernelRequest.Type
 
@@ -52,7 +57,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   origin: cad.Vec3Schema,
   stockBounds: Schema.Struct({ min: cad.Vec3Schema, max: cad.Vec3Schema }),
   operations: Schema.Array(Schema.Struct({
-    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "surface"]),
+    id, name: Schema.String, strategy: Schema.Literals(["face", "adaptive", "pocket", "profile", "bore", "drill", "thread", "engrave", "chamfer", "surface"]),
     toolId: id, cut: cutting.fields.cut, status: Schema.Literals(["ok", "failed"]), cutting: Schema.optionalKey(cutting),
     parameters: Schema.Record(Schema.String, Schema.Unknown), overridden: strings, warnings: strings, startZ: Schema.optionalKey(Schema.Finite),
     cutLength: Schema.Finite, timeSeconds: Schema.Finite, removedVolume: Schema.Finite

@@ -40,12 +40,19 @@ export const CamManufactureInput = Schema.Struct({
   machine: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(60))),
   origin: Schema.optionalKey(Schema.Literals(["stock-center", "stock-corner"])),
   finishAllowance: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 5 }))),
-  scallop: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))), planOnly: Schema.optionalKey(Schema.Boolean)
+  scallop: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(1))), planOnly: Schema.optionalKey(Schema.Boolean),
+  /** Explicit operations in machining order, CAD world mm (`planOnly` returns the planned ones to start from). */
+  operations: Schema.optionalKey(Schema.Array(cam.kernel.OperationSpecSchema).check(Schema.isMaxLength(500))),
+  /** Cutter library with flute length, stickout and holder; replaces the default crib. */
+  tools: Schema.optionalKey(Schema.Array(cam.kernel.CutterSchema).check(Schema.isMinLength(1), Schema.isMaxLength(200))),
+  /** Break the top edges with a chamfer of this width, mm (2D chamfer operations). */
+  deburr: Schema.optionalKey(positive.check(Schema.isLessThanOrEqualTo(5)))
 })
 export const CamManufactureOperationInput = Schema.Struct({
   material: CamManufactureInput.fields.material, machine: CamManufactureInput.fields.machine,
   origin: CamManufactureInput.fields.origin, finishAllowance: CamManufactureInput.fields.finishAllowance,
-  scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision)
+  scallop: CamManufactureInput.fields.scallop, expectedRevision: Schema.optionalKey(revision),
+  operations: CamManufactureInput.fields.operations, tools: CamManufactureInput.fields.tools, deburr: CamManufactureInput.fields.deburr
 })
 
 export const CamCreateInput = Schema.Struct({ type: id, params: Schema.optionalKey(params), expectedRevision: Schema.optionalKey(revision) })

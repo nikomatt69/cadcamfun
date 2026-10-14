@@ -15,20 +15,9 @@ export const drawingRevision = (loaded: { readonly id: string; readonly elements
 
 /** The same request adapter serves preview generation and persistence revalidation. */
 export const runKernelRequest = Effect.fn("cam.runKernelRequest")(function*(payload: CamKernelRequest) {
-  const machine = payload.machine !== undefined ? cam.kernel.findMachine(payload.machine) : undefined
-  if (payload.machine !== undefined && machine === undefined) return yield* new BadRequest({ message: `Unknown machine preset '${payload.machine}'` })
-  const result = yield* Effect.try({ try: () => {
-    const meshes = payload.stock !== undefined ? cam.model.partMeshes(payload.elements, { tolerance: payload.tolerance ?? 0.01 }) : undefined
-    const bottom = meshes !== undefined ? Math.min(...meshes.meshes.map((mesh) => cam.model.meshBounds(mesh).min[2])) : 0
-    const stock = payload.stock
-    return cam.kernel.runJob({
-      schemaVersion: payload.schemaVersion, id: payload.id, name: payload.name, material: payload.material,
-      part: { kind: "elements", elements: payload.elements }, ...(machine !== undefined ? { machine } : {}),
-      ...(stock !== undefined ? { stock: { min: { x: stock.x - stock.width / 2, y: stock.y - stock.height / 2, z: bottom }, max: { x: stock.x + stock.width / 2, y: stock.y + stock.height / 2, z: bottom + stock.depth } } } : {}),
-      ...(payload.origin !== undefined ? { origin: payload.origin } : {}), ...(payload.workOffset !== undefined ? { workOffset: payload.workOffset } : {}),
-      quality: { ...(payload.finishAllowance !== undefined ? { finishAllowance: payload.finishAllowance } : {}), ...(payload.scallop !== undefined ? { scallop: payload.scallop } : {}), ...(payload.tolerance !== undefined ? { tolerance: payload.tolerance } : {}), ...(payload.resolution !== undefined ? { resolution: payload.resolution } : {}) }
-    })
-  }, catch: () => new BadRequest({ message: "The CAM kernel request could not be evaluated" }) })
+  const job = cam.kernel.jobOfSnapshot(payload)
+  if (job.status === "failed") return yield* new BadRequest({ message: job.issues.map((i) => i.message).join("; ") })
+  const result = yield* Effect.try({ try: () => cam.kernel.runJob(job.value), catch: () => new BadRequest({ message: "The CAM kernel request could not be evaluated" }) })
   return yield* Schema.decodeUnknownEffect(CamKernelResult)(result).pipe(Effect.mapError(() => new BadRequest({ message: "The CAM kernel returned an invalid artifact" })))
 })
 
