@@ -18,7 +18,7 @@
 import { add3, cross3, dist3, dot3, length3, normalize3, scale3, sub3, unwrapNear, type Frame, type Vec2, type Vec3 } from "./math.ts"
 import { curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface } from "./geom.ts"
 import { interpolateCurve } from "./nurbs.ts"
-import { compactBrep, edgeUses, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
+import { compactBrep, edgeUses, EMPTY_BREP, type Brep, type Coedge, type Edge, type Face, type Loop } from "./topology.ts"
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
 import { Cdt } from "./cdt.ts"
@@ -854,6 +854,9 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     if (reversed) loops = loops.map((l) => ({ coedges: [...l.coedges].reverse().map((c) => ({ edge: c.edge, reversed: !c.reversed })) }))
     return orig.name === undefined ? { surface: orig.surface, reversed, loops } : { surface: orig.surface, reversed, loops, name: orig.name }
   })
+  const stats = { intersectionCurves: ssis.length, splitPoints: reg.pts.length, fragments: fragments.length, keptFaces: faces.length }
+  // Nothing kept: the intersection of solids that are apart or only touch, or a subtraction that removes everything.
+  if (faces.length === 0) return { brep: EMPTY_BREP, warnings, stats }
   let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
   result = mergeCoplanarFaces(result)
   result = compactBrep(result)
@@ -862,7 +865,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   return {
     brep: result,
     warnings,
-    stats: { intersectionCurves: ssis.length, splitPoints: reg.pts.length, fragments: fragments.length, keptFaces: faces.length }
+    stats
   }
 }
 

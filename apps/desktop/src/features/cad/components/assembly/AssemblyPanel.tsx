@@ -1,6 +1,7 @@
 /**
  * The assembly workspace of the CAD editor: the node tree, the joints between nodes and the
- * constraints that pin relationships (legacy `components/cad/assembly/`).
+ * constraints that pin relationships (legacy `components/cad/assembly/`), and the automations that work on the exact
+ * model of the parts (fasteners, interference, bill of materials).
  *
  * All three panels read the same store, so the node picked in the tree is the node the joint and
  * constraint forms offer; the underlying `AssemblyManager`/`JointSystem` (including undo/redo)
@@ -11,6 +12,7 @@ import { t } from "../../../../i18n/index.ts"
 import AssemblyBrowser from "./AssemblyBrowser.tsx"
 import AssemblyConstraints from "./AssemblyConstraints.tsx"
 import JointCreator from "./JointCreator.tsx"
+import AssemblyAutomation from "./AssemblyAutomation.tsx"
 import { useAssemblyStore } from "../../store/assemblyStore.ts"
 
 export default function AssemblyPanel(): JSX.Element {
@@ -37,6 +39,7 @@ export default function AssemblyPanel(): JSX.Element {
       <AssemblyBrowser />
       <JointCreator />
       <AssemblyConstraints />
+      <AssemblyAutomation />
     </div>
   )
 }

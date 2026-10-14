@@ -57,6 +57,15 @@ describe("Booleans of boxes (planar, exact)", () => {
     // The void's faces point into the cavity: its shell alone has a negative volume.
     expect(v.faces.length).toBe(12)
   })
+  test("solids that only touch, or are apart, intersect in the empty solid; a subtraction can remove everything", () => {
+    // Face contact (a washer on a plate), a cylinder standing on a face, and a gap.
+    for (const B of [makeBox(10, 10, 10, at(5, 5, 10)), makeCylinder(3, 5, at(5, 5, 10)), makeBox(4, 4, 4, at(20, 20, 20))]) {
+      const r = booleanBrep(A, B, "intersect")
+      expect(r.brep.faces.length).toBe(0)
+      expect(r.brep.shells.length).toBe(0)
+    }
+    expect(booleanBrep(makeBox(4, 4, 4, at(3, 3, 3)), A, "subtract").brep.faces.length).toBe(0)
+  })
 })
 
 describe("Booleans with curved faces", () => {
