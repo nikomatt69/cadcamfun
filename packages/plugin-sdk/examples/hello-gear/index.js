@@ -6208,6 +6208,8 @@ var ICC_BOUND = (10 + 96 * EPS) * EPS;
 
 // packages/core/src/cad/brep/tessellate.ts
 var TAU3 = Math.PI * 2;
+var objectIds = new WeakMap;
+var faceMeshes = new WeakMap;
 
 // packages/core/src/cam/model/element-mesh.ts
 var TAU4 = 2 * Math.PI;
@@ -6264,669 +6266,9 @@ var CORNER_TURN2 = 10 * Math.PI / 180;
 var SOLID_KINDS = new Set(["MANIFOLD_SOLID_BREP", "BREP_WITH_VOIDS", "SHELL_BASED_SURFACE_MODEL", "FACETED_BREP"]);
 // packages/core/src/cad/brep/boolean.ts
 var TAU7 = Math.PI * 2;
-// packages/core/src/cam/ir.ts
-var Positive = Finite.check(isGreaterThan2(0));
-var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
-var RotarySchema = Struct({
-  a: optionalKey2(Finite),
-  b: optionalKey2(Finite),
-  c: optionalKey2(Finite)
-});
-var RapidSchema = TaggedStruct("Rapid", {
-  to: Vec3Schema,
-  rotary: optionalKey2(RotarySchema)
-});
-var LinearSchema = TaggedStruct("Linear", {
-  to: Vec3Schema,
-  feed: Positive,
-  rotary: optionalKey2(RotarySchema)
-});
-var ArcSchema2 = TaggedStruct("Arc", {
-  to: Vec3Schema,
-  center: Vec2Schema,
-  clockwise: Boolean3,
-  feed: Positive
-});
-var DwellSchema = TaggedStruct("Dwell", { seconds: NonNegative });
-var CommentSchema = TaggedStruct("Comment", { text: String4 });
-var OrientSchema = TaggedStruct("Orient", {
-  a: optionalKey2(Finite),
-  b: optionalKey2(Finite),
-  c: optionalKey2(Finite)
-});
-var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak"]);
-var CycleSchema = TaggedStruct("Cycle", {
-  cycle: CycleKindSchema,
-  to: Vec3Schema,
-  feed: Positive,
-  peckDepth: NonNegative,
-  dwellSeconds: NonNegative,
-  retractHeight: Finite
-});
-var MoveSchema = Union2([
-  RapidSchema,
-  LinearSchema,
-  ArcSchema2,
-  DwellSchema,
-  CommentSchema,
-  CycleSchema,
-  OrientSchema
-]);
-var CoolantSchema = Literals(["off", "flood", "mist"]);
-var ProgramUnitsSchema = Literals(["mm", "inch"]);
-var WorkOffsetSchema = Literals(["G54", "G55", "G56", "G57", "G58", "G59"]);
-var ToolpathSchema = Struct({
-  id: String4.check(isMinLength(1)),
-  name: String4,
-  toolId: String4.check(isMinLength(1)),
-  spindleRpm: NonNegative,
-  coolant: CoolantSchema,
-  moves: ArraySchema(MoveSchema)
-});
-var ProgramSchema = Struct({
-  name: String4.check(isMinLength(1)),
-  units: ProgramUnitsSchema,
-  workOffset: WorkOffsetSchema,
-  toolpaths: ArraySchema(ToolpathSchema),
-  metadata: optionalKey2(Record(String4, String4))
-});
-var decodeToolpath = decodeUnknownEffect2(ToolpathSchema);
-var encodeToolpath = encodeEffect(ToolpathSchema);
-var decodeProgram = decodeUnknownEffect2(ProgramSchema);
-var encodeProgram = encodeEffect(ProgramSchema);
-var MachineProfileSchema = Struct({
-  id: String4.check(isMinLength(1)),
-  travel: Struct({
-    minX: Finite,
-    maxX: Finite,
-    minY: Finite,
-    maxY: Finite,
-    minZ: Finite,
-    maxZ: Finite
-  }),
-  maxFeed: optionalKey2(Positive),
-  maxSpindleRpm: optionalKey2(NonNegative),
-  rotary: optionalKey2(Struct({
-    a: optionalKey2(Struct({ min: Finite, max: Finite })),
-    b: optionalKey2(Struct({ min: Finite, max: Finite })),
-    c: optionalKey2(Struct({ min: Finite, max: Finite }))
-  })),
-  tools: optionalKey2(ArraySchema(Struct({ id: String4.check(isMinLength(1)) })))
-});
-var validateProgramInput = decodeUnknownSync(ProgramSchema, { errors: "all" });
-var validateMachineInput = decodeUnknownSync(MachineProfileSchema, { errors: "all" });
-// packages/core/src/cam/tool.ts
-var ToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
-var NonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
-var Positive2 = Finite.check(isGreaterThan2(0));
-var ToolSchema = Struct({
-  id: String4.check(isMinLength(1)),
-  name: String4,
-  kind: ToolKindSchema,
-  diameter: Positive2,
-  flutes: Int.check(isGreaterThanOrEqualTo2(1)),
-  maxRpm: Positive2,
-  stickout: optionalKey2(Positive2),
-  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
-  tipRadius: optionalKey2(Positive2)
-});
-var decodeTool = decodeUnknownEffect2(ToolSchema);
-var encodeTool = encodeEffect(ToolSchema);
-var StockSchema = Struct({
-  x: Positive2,
-  y: Positive2,
-  z: Positive2,
-  origin: Struct({ x: Finite, y: Finite, z: Finite }),
-  material: String4
-});
-var decodeStock = decodeUnknownEffect2(StockSchema);
-var encodeStock = encodeEffect(StockSchema);
-// packages/core/src/cam/indexing.ts
-var DEG2 = 180 / Math.PI;
-var RAD = Math.PI / 180;
-// packages/core/src/cam/params.ts
-var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
-var Positive3 = Finite.check(isGreaterThan2(0));
-var withDefault2 = (schema, value) => withConstructorDefault2(succeed5(value))(withDecodingDefaultTypeKey(succeed5(value))(schema));
-var OperationFields = {
-  id: withDefault2(String4.check(isMinLength(1)), "operation"),
-  name: withDefault2(String4, "Operation"),
-  clearanceHeight: withDefault2(Finite, 10),
-  safeHeight: withDefault2(Finite, 5),
-  retractHeight: withDefault2(Finite, 2),
-  totalDepth: Positive3,
-  stepdown: Positive3,
-  feed: withDefault2(Positive3, 800),
-  plungeFeed: withDefault2(Positive3, 300),
-  spindleRpm: withDefault2(Positive3, 1e4),
-  coolant: withDefault2(CoolantSchema, "off")
-};
-var heightsOrdered = makeFilter2((p) => p.clearanceHeight >= p.safeHeight && p.safeHeight >= p.retractHeight ? undefined : "heights must satisfy clearanceHeight >= safeHeight >= retractHeight");
-// packages/core/src/cam/operations/profile.ts
-var ProfileSideSchema = Literals(["outside", "inside", "onLine"]);
-var LeadInSchema = Literals(["direct", "ramp", "helix", "arc"]);
-var TabSchema = Struct({
-  position: Finite.check(isBetween({ minimum: 0, maximum: 1 })),
-  width: NonNegative3,
-  height: NonNegative3
-});
-
-class ProfileParams extends Class3("cam/ProfileParams")(Struct({
-  ...OperationFields,
-  side: withDefault2(ProfileSideSchema, "outside"),
-  climb: withDefault2(Boolean3, true),
-  allowance: withDefault2(NonNegative3, 0),
-  leadIn: withDefault2(LeadInSchema, "direct"),
-  helixPitch: withDefault2(Positive3, 1),
-  helixRadius: withDefault2(NonNegative3, 0),
-  leadRadius: withDefault2(Positive3, 2),
-  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
-  tabs: withDefault2(ArraySchema(TabSchema), []),
-  arcFit: withDefault2(Boolean3, false),
-  tolerance: withDefault2(Positive3, 0.01)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/pocket.ts
-var PocketEntrySchema = Literals(["plunge", "ramp", "helix"]);
-var PocketOrderSchema = Literals(["insideOut", "outsideIn"]);
-
-class PocketParams extends Class3("cam/PocketParams")(Struct({
-  ...OperationFields,
-  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 40),
-  allowance: withDefault2(NonNegative3, 0),
-  finishPass: withDefault2(Boolean3, false),
-  climb: withDefault2(Boolean3, true),
-  entry: withDefault2(PocketEntrySchema, "helix"),
-  order: withDefault2(PocketOrderSchema, "insideOut"),
-  helixPitch: withDefault2(Positive3, 1),
-  helixRadius: withDefault2(NonNegative3, 0),
-  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
-  tolerance: withDefault2(Positive3, 0.01),
-  toolCentre: withDefault2(Boolean3, false)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/drill.ts
-var { stepdown: _stepdown, feed: _feed, ...commonFields } = OperationFields;
-
-class DrillParams extends Class3("cam/DrillParams")(Struct({
-  ...commonFields,
-  peck: withDefault2(NonNegative3, 0),
-  chipBreak: withDefault2(Boolean3, false),
-  dwell: withDefault2(NonNegative3, 0)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/face.ts
-class FaceParams extends Class3("cam/FaceParams")(Struct({
-  ...OperationFields,
-  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 60),
-  overshoot: withDefault2(NonNegative3, 0),
-  alongX: withDefault2(Boolean3, true),
-  tolerance: withDefault2(Positive3, 0.01)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/engrave.ts
-class EngraveParams extends Class3("cam/EngraveParams")(Struct({
-  ...OperationFields,
-  tolerance: withDefault2(Positive3, 0.01)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/adaptive.ts
-class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
-  ...OperationFields,
-  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
-  climb: withDefault2(Boolean3, true),
-  helixPitch: withDefault2(Positive3, 1),
-  tolerance: withDefault2(Positive3, 0.01)
-}).check(heightsOrdered)) {
-}
-
-// packages/core/src/cam/operations/surface.ts
-var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest"]);
-var RestFromSchema = Struct({
-  diameter: Positive3,
-  kind: withDefault2(ToolKindSchema, "endmill"),
-  tipRadius: optionalKey2(Positive3),
-  allowance: optionalKey2(NonNegative3)
-});
-
-class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
-  ...OperationFields,
-  strategy: withDefault2(SurfaceStrategySchema, "roughing"),
-  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 40),
-  scallop: withDefault2(NonNegative3, 0),
-  angle: withDefault2(Finite, 0),
-  oneWay: withDefault2(Boolean3, false),
-  climb: withDefault2(Boolean3, true),
-  allowance: withDefault2(NonNegative3, 0),
-  tolerance: withDefault2(Positive3, 0.01),
-  entry: withDefault2(PocketEntrySchema, "helix"),
-  helixPitch: withDefault2(Positive3, 1),
-  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
-  restFrom: optionalKey2(RestFromSchema),
-  restThreshold: withDefault2(Positive3, 0.02),
-  clearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
-  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/thread.ts
-class ThreadParams extends Class3("cam/ThreadParams")(Struct({
-  ...OperationFields,
-  stepdown: withDefault2(Positive3, 1e6),
-  x: withDefault2(Finite, 0),
-  y: withDefault2(Finite, 0),
-  diameter: Positive3,
-  pitch: Positive3,
-  internal: withDefault2(Boolean3, true),
-  rightHand: withDefault2(Boolean3, true),
-  climb: withDefault2(Boolean3, true),
-  passes: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
-  springPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
-  compensateFeed: withDefault2(Boolean3, true),
-  leadIn: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 2 })), 0.5),
-  tolerance: withDefault2(NonNegative3, 0.01)
-}).check(heightsOrdered)) {
-}
-// packages/core/src/cam/operations/multiaxis.ts
-var MultiaxisStrategySchema = Literals(["parallel", "contour"]);
-var ToolAxisSchema = Literals(["normal", "lead"]);
-var Degrees = Finite.check(isBetween({ minimum: -85, maximum: 85 }));
-
-class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
-  ...OperationFields,
-  strategy: withDefault2(MultiaxisStrategySchema, "parallel"),
-  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 30),
-  scallop: withDefault2(NonNegative3, 0),
-  angle: withDefault2(Finite, 0),
-  oneWay: withDefault2(Boolean3, false),
-  toolAxis: withDefault2(ToolAxisSchema, "normal"),
-  lead: withDefault2(Degrees, 10),
-  tilt: withDefault2(Degrees, 0),
-  gouge: withDefault2(Boolean3, true),
-  gougeAngle: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 85 })), 30),
-  gougeClearance: withDefault2(NonNegative3, 0.02),
-  maxRotaryStep: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 180 })), 30),
-  sampling: withDefault2(Positive3, 0.5),
-  tolerance: withDefault2(Positive3, 0.01),
-  flute: withDefault2(Finite.check(isBetween({ minimum: 0.5, maximum: 6 })), 2)
-}).check(heightsOrdered)) {
-}
-var RAD2 = Math.PI / 180;
-// packages/core/src/cam/generator/cycles.ts
-var FixedCycleType = {
-  DRILLING: "drilling",
-  DRILLING_DWELL: "drilling_dwell",
-  PECK_DRILLING: "peck_drilling",
-  RIGHT_TAPPING: "right_tapping",
-  BORING: "boring",
-  BORING_DWELL: "boring_dwell",
-  BACK_BORING: "back_boring",
-  LEFT_TAPPING: "left_tapping",
-  BORING_WITH_RETRACT: "boring_retract",
-  CUSTOM: "custom"
-};
-var WORDS = {
-  G81: FixedCycleType.DRILLING,
-  G82: FixedCycleType.DRILLING_DWELL,
-  G83: FixedCycleType.PECK_DRILLING,
-  G84: FixedCycleType.RIGHT_TAPPING,
-  G85: FixedCycleType.BORING,
-  G86: FixedCycleType.BORING_DWELL,
-  G87: FixedCycleType.BACK_BORING,
-  G88: FixedCycleType.CUSTOM,
-  G74: FixedCycleType.LEFT_TAPPING,
-  G89: FixedCycleType.BORING_WITH_RETRACT
-};
-var CODE_OF = {
-  [FixedCycleType.DRILLING]: "G81",
-  [FixedCycleType.DRILLING_DWELL]: "G82",
-  [FixedCycleType.PECK_DRILLING]: "G83",
-  [FixedCycleType.RIGHT_TAPPING]: "G84",
-  [FixedCycleType.BORING]: "G85",
-  [FixedCycleType.BORING_DWELL]: "G86",
-  [FixedCycleType.BACK_BORING]: "G87",
-  [FixedCycleType.LEFT_TAPPING]: "G74",
-  [FixedCycleType.BORING_WITH_RETRACT]: "G89",
-  [FixedCycleType.CUSTOM]: "G81"
-};
-
-// packages/core/src/cam/model/dexel.ts
-var EMPTY2 = new Float64Array(0);
-
-// packages/core/src/cam/model/model.ts
-var BOOLEANS2 = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
-
-// packages/core/src/cam/generator/history-features.ts
-var cache = new Map;
-
-// packages/core/src/cam/generator/unified-geometry.ts
-var SOLID_TYPES = new Set([
-  "cube",
-  "sphere",
-  "hemisphere",
-  "cylinder",
-  "cone",
-  "capsule",
-  "pyramid",
-  "prism",
-  "ellipsoid",
-  "rectangle",
-  "circle",
-  "polygon",
-  "ellipse",
-  "triangle",
-  "mesh",
-  "custom",
-  "imported"
-]);
-
-// packages/core/src/cam/generator/schema.ts
-var Num2 = Finite;
-var PositiveInt = Int.check(isGreaterThan2(0));
-var Percent = Finite.check(isGreaterThan2(0), isLessThanOrEqualTo2(100));
-var MachineTypeSchema = Literals(["mill", "lathe", "3dprinter"]);
-var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing", "multiaxis"]);
-var LatheOperationSchema = Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]);
-var PrinterOperationSchema = Literals(["standard", "vase", "support", "infill", "raft", "brim"]);
-var OperationTypeSchema = Union2([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema]);
-var MaterialTypeSchema = Literals(["aluminum", "steel", "wood", "plastic", "brass", "titanium", "composite", "other"]);
-var ToolTypeSchema = Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer", "probe", "toolsetter"]);
-var LatheToolTypeSchema = Literals(["turning", "facing", "threading", "grooving", "boring", "parting"]);
-var PrinterNozzleSchema = Literals(["brass", "hardened", "ruby", "standard"]);
-var AllToolTypeSchema = Union2([ToolTypeSchema, LatheToolTypeSchema, PrinterNozzleSchema]);
-var OriginTypeSchema = Literals(["workpiece-center", "workpiece-corner", "workpiece-corner2", "machine-zero", "custom"]);
-var GeometryTypeSchema = Literals([
-  "rectangle",
-  "circle",
-  "polygon",
-  "custom",
-  "selected",
-  "cube",
-  "sphere",
-  "cylinder",
-  "cone",
-  "extrude",
-  "line",
-  "pyramid",
-  "hemisphere",
-  "ellipsoid",
-  "capsule",
-  "triangle",
-  "ellipse",
-  "prism"
-]);
-var ToolpathSettingsSchema = Struct({
-  machineType: withDefault2(MachineTypeSchema, "mill"),
-  operationType: withDefault2(OperationTypeSchema, "contour"),
-  material: withDefault2(MaterialTypeSchema, "aluminum"),
-  toolType: withDefault2(AllToolTypeSchema, "endmill"),
-  toolDiameter: withDefault2(Positive3, 6),
-  flutes: withDefault2(PositiveInt, 2),
-  depth: withDefault2(Positive3, 5),
-  stepdown: withDefault2(Positive3, 1),
-  stepover: withDefault2(Percent, 40),
-  feedrate: withDefault2(Positive3, 800),
-  plungerate: withDefault2(Positive3, 300),
-  rpm: withDefault2(Positive3, 1e4),
-  tolerance: withDefault2(NonNegative3, 0.01),
-  offset: withDefault2(Literals(["inside", "outside", "center"]), "outside"),
-  direction: withDefault2(Literals(["climb", "conventional"]), "climb"),
-  coolant: withDefault2(Boolean3, true),
-  finishingPass: withDefault2(Boolean3, false),
-  finishingAllowance: withDefault2(NonNegative3, 0.2),
-  finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
-  surfaceStrategy: withDefault2(Literals(["roughing", "parallel", "waterline"]), "roughing"),
-  surfaceClearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
-  adaptiveEngagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
-  scallop: withDefault2(NonNegative3, 0),
-  rasterAngle: withDefault2(Num2, 0),
-  rasterOneWay: withDefault2(Boolean3, false),
-  useAI: withDefault2(Boolean3, false),
-  aiDifficulty: withDefault2(Literals(["simple", "moderate", "complex"]), "moderate"),
-  aiOptimize: withDefault2(Literals(["speed", "quality", "balance"]), "balance"),
-  optimizePath: withDefault2(Boolean3, false),
-  useArcFitting: withDefault2(Boolean3, false),
-  useHighSpeedMode: withDefault2(Boolean3, false),
-  useExactStop: withDefault2(Boolean3, false),
-  useToolCompensation: withDefault2(Boolean3, false),
-  useAdaptiveFeeds: withDefault2(Boolean3, false),
-  useRestMachining: withDefault2(Boolean3, false),
-  restToolDiameter: withDefault2(Positive3, 10),
-  fiveAxisStrategy: withDefault2(Literals(["parallel", "contour"]), "parallel"),
-  fiveAxisToolAxis: withDefault2(Literals(["normal", "lead"]), "lead"),
-  fiveAxisLead: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 10),
-  fiveAxisTilt: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 0),
-  fiveAxisGouge: withDefault2(Boolean3, true),
-  toolNumber: withDefault2(PositiveInt, 1),
-  workOffset: withDefault2(Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
-  probeCycle: withDefault2(Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
-  probeFeed: withDefault2(Positive3, 100),
-  probeSearch: withDefault2(Positive3, 10),
-  probeStylus: withDefault2(Positive3, 4),
-  probeDialect: withDefault2(Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
-  probeFeatureSize: withDefault2(Positive3, 20),
-  threadPitch: withDefault2(Positive3, 1.5),
-  threadType: withDefault2(Literals(["internal", "external"]), "internal"),
-  threadHand: withDefault2(Literals(["right", "left"]), "right"),
-  threadPasses: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
-  threadSpringPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
-  latheZero: withDefault2(Literals(["face", "chuck"]), "face"),
-  bedOrigin: withDefault2(Literals(["corner", "center"]), "corner"),
-  nozzleDiameter: withDefault2(Positive3, 0.4),
-  filamentDiameter: withDefault2(Positive3, 1.75),
-  layerHeight: withDefault2(Positive3, 0.2),
-  extrusionWidth: withDefault2(Positive3, 0.4),
-  printSpeed: withDefault2(Positive3, 60),
-  printTemperature: withDefault2(Positive3, 200),
-  bedWidth: withDefault2(Positive3, 220),
-  bedDepth: withDefault2(Positive3, 220),
-  centerOnBed: withDefault2(Boolean3, true),
-  bedTemperature: withDefault2(NonNegative3, 60),
-  stockDiameter: withDefault2(Positive3, 50),
-  stockLength: withDefault2(Positive3, 100),
-  spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
-  turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
-  applyToolCompensation: withDefault2(Boolean3, true),
-  originType: withDefault2(OriginTypeSchema, "workpiece-center"),
-  originX: withDefault2(Num2, 0),
-  originY: withDefault2(Num2, 0),
-  originZ: withDefault2(Num2, 0)
-});
-var DEFAULT_SETTINGS = decodeUnknownSync(ToolpathSettingsSchema)({});
-var StockSchema2 = Struct({
-  width: Positive3,
-  height: Positive3,
-  depth: Positive3,
-  radius: withDefault2(NonNegative3, 0),
-  x: withDefault2(Num2, 0),
-  y: withDefault2(Num2, 0),
-  topZ: withDefault2(Num2, 0),
-  allowance: withDefault2(NonNegative3, 1),
-  material: optionalKey2(String4),
-  elementId: optionalKey2(String4)
-});
-var CadElementSchema = Record(String4, Unknown2);
-var GeometrySchema = Struct({
-  geometryType: withDefault2(GeometryTypeSchema, "rectangle"),
-  rectangleWidth: withDefault2(Positive3, 100),
-  rectangleHeight: withDefault2(Positive3, 50),
-  circleRadius: withDefault2(Positive3, 25),
-  polygonSides: withDefault2(Int.check(isGreaterThanOrEqualTo2(3)), 6),
-  polygonRadius: withDefault2(Positive3, 30),
-  customPath: withDefault2(String4, ""),
-  selectedElements: withDefault2(ArraySchema(CadElementSchema), []),
-  stock: optionalKey2(StockSchema2)
-});
-var DEFAULT_GEOMETRY = decodeUnknownSync(GeometrySchema)({});
-var PrinterExtrasSchema = Struct({
-  infillDensity: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 100 })), 20),
-  infillPattern: withDefault2(Literals(["grid", "lines", "triangles", "honeycomb"]), "grid"),
-  supportType: withDefault2(Literals(["none", "minimal", "full"]), "minimal"),
-  shellCount: withDefault2(PositiveInt, 2),
-  printResolution: withDefault2(Literals(["standard", "high", "low"]), "standard"),
-  printOrientation: withDefault2(Literals(["original", "auto-optimal"]), "original")
-});
-var DEFAULT_PRINTER_EXTRAS = decodeUnknownSync(PrinterExtrasSchema)({});
-var RotaryRangeSchema = Struct({ min: Finite, max: Finite });
-var MachineForProgramSchema = Struct({
-  id: String4,
-  name: withDefault2(String4, ""),
-  axes: withDefault2(Literals([3, 4, 5]), 3),
-  controller: withDefault2(String4, "generic"),
-  fiveAxis: optionalKey2(Struct({
-    layout: Literals(["table-AC", "table-BC"]),
-    tilt: RotaryRangeSchema,
-    rotation: optionalKey2(RotaryRangeSchema),
-    pivot: optionalKey2(Struct({ x: Finite, y: Finite, z: Finite })),
-    tcp: withDefault2(Literals(["control", "program"]), "control")
-  }))
-});
-var GenerateRequestSchema = Struct({
-  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
-  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY),
-  printer: withDefault2(PrinterExtrasSchema, DEFAULT_PRINTER_EXTRAS),
-  machine: optionalKey2(MachineForProgramSchema),
-  stamp: optionalKey2(String4)
-});
-var GcodeStatsSchema = Struct({
-  lines: Int,
-  cutLength: Finite,
-  rapidLength: Finite,
-  minZ: Finite,
-  maxZ: Finite,
-  estimatedSeconds: Finite,
-  bounds: Struct({
-    min: Struct({ x: Finite, y: Finite, z: Finite }),
-    max: Struct({ x: Finite, y: Finite, z: Finite })
-  })
-});
-var GenerateResponseSchema = Struct({
-  gcode: String4,
-  cycles: ArraySchema(Struct({ gcode: String4 })),
-  warnings: ArraySchema(String4),
-  stats: GcodeStatsSchema,
-  program: ProgramSchema
-});
-var ParseRequestSchema = Struct({
-  gcode: String4,
-  name: withDefault2(String4, "Program")
-});
-var ParseResponseSchema = Struct({
-  warnings: ArraySchema(String4),
-  stats: GcodeStatsSchema,
-  program: ProgramSchema
-});
-var SuggestRequestSchema = Struct({
-  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
-  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY)
-});
-var SuggestResponseSchema = Struct({
-  parameters: optionalKey2(Struct({
-    depth: Finite,
-    stepdown: Finite,
-    operationType: OperationTypeSchema
-  })),
-  suggestions: ArraySchema(String4),
-  feedback: String4,
-  statistics: Struct({
-    cuttingSpeed: Finite,
-    chipLoad: Finite,
-    materialRemovalRate: Finite,
-    effectiveStepover: Finite
-  }),
-  operation: Struct({ title: String4, description: String4 }),
-  warnings: ArraySchema(String4)
-});
-// packages/core/src/cam/verify/schema.ts
-var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
-var VerifyToolSchema = Struct({
-  kind: withDefault2(VerifyToolKindSchema, "endmill"),
-  diameter: Positive3,
-  cuttingLength: optionalKey2(Positive3),
-  shankDiameter: optionalKey2(Positive3),
-  stickout: optionalKey2(Positive3),
-  holderDiameter: optionalKey2(Positive3),
-  holderLength: optionalKey2(Positive3),
-  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 179 }))),
-  tipRadius: optionalKey2(Positive3)
-});
-var BoundsSchema = Struct({
-  minX: Finite,
-  maxX: Finite,
-  minY: Finite,
-  maxY: Finite,
-  minZ: Finite,
-  maxZ: Finite
-});
-var VerifyFixtureSchema = Struct({
-  id: String4.check(isMinLength(1)),
-  bounds: BoundsSchema
-});
-var VerifyRequestSchema = Struct({
-  gcode: optionalKey2(String4),
-  program: optionalKey2(ProgramSchema),
-  stock: BoundsSchema,
-  tool: VerifyToolSchema,
-  fixtures: withDefault2(ArraySchema(VerifyFixtureSchema), []),
-  target: optionalKey2(Struct({ solids: ArraySchema(SolidSchema) })),
-  resolution: optionalKey2(Positive3),
-  tolerance: withDefault2(NonNegative3, 0.05),
-  start: optionalKey2(Vec3Schema)
-});
-var VerifyCodeSchema = Literals([
-  "InvalidInput",
-  "InterpreterWarning",
-  "RapidInMaterial",
-  "ShankCollision",
-  "HolderCollision",
-  "FixtureCollision",
-  "BelowStock",
-  "Gouge",
-  "UncutStock",
-  "ResolutionCoarsened"
-]);
-var VerifySeveritySchema = Literals(["error", "warning", "info"]);
-var VerifyIssueSchema = Struct({
-  code: VerifyCodeSchema,
-  severity: VerifySeveritySchema,
-  message: String4,
-  line: optionalKey2(Int),
-  point: optionalKey2(Vec3Schema),
-  count: Int,
-  fixtureId: optionalKey2(String4)
-});
-var VerifyStatsSchema = Struct({
-  cellSize: Finite,
-  cellsX: Int,
-  cellsY: Int,
-  samples: Int,
-  stockVolume: Finite,
-  removedVolume: Finite,
-  remainingVolume: Finite,
-  engagedLength: Finite,
-  airCutLength: Finite,
-  gougeVolume: optionalKey2(Finite),
-  maxGouge: optionalKey2(Finite),
-  uncutVolume: optionalKey2(Finite),
-  maxUncut: optionalKey2(Finite)
-});
-var VerifyPreviewSchema = Struct({
-  nx: Int,
-  ny: Int,
-  minX: Finite,
-  minY: Finite,
-  cellX: Finite,
-  cellY: Finite,
-  minZ: Finite,
-  maxZ: Finite,
-  heights: ArraySchema(Finite),
-  gouge: ArraySchema(Int)
-});
-var VerifyResponseSchema = Struct({
-  ok: Boolean3,
-  issues: ArraySchema(VerifyIssueSchema),
-  stats: VerifyStatsSchema,
-  preview: VerifyPreviewSchema
-});
+// packages/core/src/cad/brep/features.ts
+var TAU8 = 2 * Math.PI;
+var MAX_GAP = Math.PI / 3;
 // packages/core/src/cam/kernel/materials.ts
 var m = (x) => x;
 var MATERIALS = [
@@ -7904,6 +7246,415 @@ var INDEX = (() => {
         map.set(normalise(a), mat);
   return map;
 })();
+
+// packages/core/src/cad/scene-automation.ts
+var SOLID_TYPES = new Set(["cube", "box", "sphere", "cylinder", "cone", "torus", "pyramid", "hemisphere", "prism", "extrusion", "revolution", "parametric", "brep", "boolean-union", "boolean-subtract", "boolean-intersect"]);
+var CONTAINERS2 = new Set(["component", "group", "assembly"]);
+// packages/core/src/cam/brep-part.ts
+var cache = new WeakMap;
+// packages/core/src/cam/ir.ts
+var Positive = Finite.check(isGreaterThan2(0));
+var NonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
+var RotarySchema = Struct({
+  a: optionalKey2(Finite),
+  b: optionalKey2(Finite),
+  c: optionalKey2(Finite)
+});
+var RapidSchema = TaggedStruct("Rapid", {
+  to: Vec3Schema,
+  rotary: optionalKey2(RotarySchema)
+});
+var LinearSchema = TaggedStruct("Linear", {
+  to: Vec3Schema,
+  feed: Positive,
+  rotary: optionalKey2(RotarySchema)
+});
+var ArcSchema2 = TaggedStruct("Arc", {
+  to: Vec3Schema,
+  center: Vec2Schema,
+  clockwise: Boolean3,
+  feed: Positive
+});
+var DwellSchema = TaggedStruct("Dwell", { seconds: NonNegative });
+var CommentSchema = TaggedStruct("Comment", { text: String4 });
+var OrientSchema = TaggedStruct("Orient", {
+  a: optionalKey2(Finite),
+  b: optionalKey2(Finite),
+  c: optionalKey2(Finite)
+});
+var CycleKindSchema = Literals(["drill", "dwell", "peck", "chipBreak"]);
+var CycleSchema = TaggedStruct("Cycle", {
+  cycle: CycleKindSchema,
+  to: Vec3Schema,
+  feed: Positive,
+  peckDepth: NonNegative,
+  dwellSeconds: NonNegative,
+  retractHeight: Finite
+});
+var MoveSchema = Union2([
+  RapidSchema,
+  LinearSchema,
+  ArcSchema2,
+  DwellSchema,
+  CommentSchema,
+  CycleSchema,
+  OrientSchema
+]);
+var CoolantSchema = Literals(["off", "flood", "mist"]);
+var ProgramUnitsSchema = Literals(["mm", "inch"]);
+var WorkOffsetSchema = Literals(["G54", "G55", "G56", "G57", "G58", "G59"]);
+var ToolpathSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  toolId: String4.check(isMinLength(1)),
+  spindleRpm: NonNegative,
+  coolant: CoolantSchema,
+  moves: ArraySchema(MoveSchema)
+});
+var ProgramSchema = Struct({
+  name: String4.check(isMinLength(1)),
+  units: ProgramUnitsSchema,
+  workOffset: WorkOffsetSchema,
+  toolpaths: ArraySchema(ToolpathSchema),
+  metadata: optionalKey2(Record(String4, String4))
+});
+var decodeToolpath = decodeUnknownEffect2(ToolpathSchema);
+var encodeToolpath = encodeEffect(ToolpathSchema);
+var decodeProgram = decodeUnknownEffect2(ProgramSchema);
+var encodeProgram = encodeEffect(ProgramSchema);
+var MachineProfileSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  travel: Struct({
+    minX: Finite,
+    maxX: Finite,
+    minY: Finite,
+    maxY: Finite,
+    minZ: Finite,
+    maxZ: Finite
+  }),
+  maxFeed: optionalKey2(Positive),
+  maxSpindleRpm: optionalKey2(NonNegative),
+  rotary: optionalKey2(Struct({
+    a: optionalKey2(Struct({ min: Finite, max: Finite })),
+    b: optionalKey2(Struct({ min: Finite, max: Finite })),
+    c: optionalKey2(Struct({ min: Finite, max: Finite }))
+  })),
+  tools: optionalKey2(ArraySchema(Struct({ id: String4.check(isMinLength(1)) })))
+});
+var validateProgramInput = decodeUnknownSync(ProgramSchema, { errors: "all" });
+var validateMachineInput = decodeUnknownSync(MachineProfileSchema, { errors: "all" });
+// packages/core/src/cam/tool.ts
+var ToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
+var NonNegative2 = Finite.check(isGreaterThanOrEqualTo2(0));
+var Positive2 = Finite.check(isGreaterThan2(0));
+var ToolSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  name: String4,
+  kind: ToolKindSchema,
+  diameter: Positive2,
+  flutes: Int.check(isGreaterThanOrEqualTo2(1)),
+  maxRpm: Positive2,
+  stickout: optionalKey2(Positive2),
+  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
+  tipRadius: optionalKey2(Positive2)
+});
+var decodeTool = decodeUnknownEffect2(ToolSchema);
+var encodeTool = encodeEffect(ToolSchema);
+var StockSchema = Struct({
+  x: Positive2,
+  y: Positive2,
+  z: Positive2,
+  origin: Struct({ x: Finite, y: Finite, z: Finite }),
+  material: String4
+});
+var decodeStock = decodeUnknownEffect2(StockSchema);
+var encodeStock = encodeEffect(StockSchema);
+// packages/core/src/cam/indexing.ts
+var DEG2 = 180 / Math.PI;
+var RAD = Math.PI / 180;
+// packages/core/src/cam/params.ts
+var NonNegative3 = Finite.check(isGreaterThanOrEqualTo2(0));
+var Positive3 = Finite.check(isGreaterThan2(0));
+var withDefault2 = (schema, value) => withConstructorDefault2(succeed5(value))(withDecodingDefaultTypeKey(succeed5(value))(schema));
+var OperationFields = {
+  id: withDefault2(String4.check(isMinLength(1)), "operation"),
+  name: withDefault2(String4, "Operation"),
+  clearanceHeight: withDefault2(Finite, 10),
+  safeHeight: withDefault2(Finite, 5),
+  retractHeight: withDefault2(Finite, 2),
+  totalDepth: Positive3,
+  stepdown: Positive3,
+  feed: withDefault2(Positive3, 800),
+  plungeFeed: withDefault2(Positive3, 300),
+  spindleRpm: withDefault2(Positive3, 1e4),
+  coolant: withDefault2(CoolantSchema, "off")
+};
+var heightsOrdered = makeFilter2((p) => p.clearanceHeight >= p.safeHeight && p.safeHeight >= p.retractHeight ? undefined : "heights must satisfy clearanceHeight >= safeHeight >= retractHeight");
+// packages/core/src/cam/operations/profile.ts
+var ProfileSideSchema = Literals(["outside", "inside", "onLine"]);
+var LeadInSchema = Literals(["direct", "ramp", "helix", "arc"]);
+var TabSchema = Struct({
+  position: Finite.check(isBetween({ minimum: 0, maximum: 1 })),
+  width: NonNegative3,
+  height: NonNegative3
+});
+
+class ProfileParams extends Class3("cam/ProfileParams")(Struct({
+  ...OperationFields,
+  side: withDefault2(ProfileSideSchema, "outside"),
+  climb: withDefault2(Boolean3, true),
+  allowance: withDefault2(NonNegative3, 0),
+  leadIn: withDefault2(LeadInSchema, "direct"),
+  helixPitch: withDefault2(Positive3, 1),
+  helixRadius: withDefault2(NonNegative3, 0),
+  leadRadius: withDefault2(Positive3, 2),
+  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
+  tabs: withDefault2(ArraySchema(TabSchema), []),
+  arcFit: withDefault2(Boolean3, false),
+  tolerance: withDefault2(Positive3, 0.01)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/pocket.ts
+var PocketEntrySchema = Literals(["plunge", "ramp", "helix"]);
+var PocketOrderSchema = Literals(["insideOut", "outsideIn"]);
+
+class PocketParams extends Class3("cam/PocketParams")(Struct({
+  ...OperationFields,
+  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 40),
+  allowance: withDefault2(NonNegative3, 0),
+  finishPass: withDefault2(Boolean3, false),
+  climb: withDefault2(Boolean3, true),
+  entry: withDefault2(PocketEntrySchema, "helix"),
+  order: withDefault2(PocketOrderSchema, "insideOut"),
+  helixPitch: withDefault2(Positive3, 1),
+  helixRadius: withDefault2(NonNegative3, 0),
+  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
+  tolerance: withDefault2(Positive3, 0.01),
+  toolCentre: withDefault2(Boolean3, false)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/drill.ts
+var { stepdown: _stepdown, feed: _feed, ...commonFields } = OperationFields;
+
+class DrillParams extends Class3("cam/DrillParams")(Struct({
+  ...commonFields,
+  peck: withDefault2(NonNegative3, 0),
+  chipBreak: withDefault2(Boolean3, false),
+  dwell: withDefault2(NonNegative3, 0)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/face.ts
+class FaceParams extends Class3("cam/FaceParams")(Struct({
+  ...OperationFields,
+  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 60),
+  overshoot: withDefault2(NonNegative3, 0),
+  alongX: withDefault2(Boolean3, true),
+  tolerance: withDefault2(Positive3, 0.01)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/engrave.ts
+class EngraveParams extends Class3("cam/EngraveParams")(Struct({
+  ...OperationFields,
+  tolerance: withDefault2(Positive3, 0.01)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/adaptive.ts
+class AdaptiveParams extends Class3("cam/AdaptiveParams")(Struct({
+  ...OperationFields,
+  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
+  climb: withDefault2(Boolean3, true),
+  helixPitch: withDefault2(Positive3, 1),
+  tolerance: withDefault2(Positive3, 0.01)
+}).check(heightsOrdered)) {
+}
+
+// packages/core/src/cam/operations/surface.ts
+var SurfaceStrategySchema = Literals(["roughing", "parallel", "waterline", "rest", "steep-shallow"]);
+var RestFromSchema = Struct({
+  diameter: Positive3,
+  kind: withDefault2(ToolKindSchema, "endmill"),
+  tipRadius: optionalKey2(Positive3),
+  allowance: optionalKey2(NonNegative3)
+});
+
+class SurfaceParams extends Class3("cam/SurfaceParams")(Struct({
+  ...OperationFields,
+  strategy: withDefault2(SurfaceStrategySchema, "roughing"),
+  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 40),
+  scallop: withDefault2(NonNegative3, 0),
+  angle: withDefault2(Finite, 0),
+  oneWay: withDefault2(Boolean3, false),
+  climb: withDefault2(Boolean3, true),
+  allowance: withDefault2(NonNegative3, 0),
+  tolerance: withDefault2(Positive3, 0.01),
+  entry: withDefault2(PocketEntrySchema, "helix"),
+  helixPitch: withDefault2(Positive3, 1),
+  rampAngle: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 45 })), 3),
+  restFrom: optionalKey2(RestFromSchema),
+  restThreshold: withDefault2(Positive3, 0.02),
+  clearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
+  engagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
+  slopeAngle: withDefault2(Finite.check(isBetween({ minimum: 5, maximum: 85 })), 45),
+  overlap: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 20 })), 3)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/thread.ts
+class ThreadParams extends Class3("cam/ThreadParams")(Struct({
+  ...OperationFields,
+  stepdown: withDefault2(Positive3, 1e6),
+  x: withDefault2(Finite, 0),
+  y: withDefault2(Finite, 0),
+  diameter: Positive3,
+  pitch: Positive3,
+  internal: withDefault2(Boolean3, true),
+  rightHand: withDefault2(Boolean3, true),
+  climb: withDefault2(Boolean3, true),
+  passes: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
+  springPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
+  compensateFeed: withDefault2(Boolean3, true),
+  leadIn: withDefault2(Finite.check(isBetween({ minimum: 0.1, maximum: 2 })), 0.5),
+  tolerance: withDefault2(NonNegative3, 0.01)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/chamfer.ts
+class ChamferParams extends Class3("cam/ChamferParams")(Struct({
+  ...OperationFields,
+  width: Positive3,
+  tipOffset: withDefault2(NonNegative3, 0.2),
+  lead: withDefault2(Positive3, 1)
+}).check(heightsOrdered)) {
+}
+// packages/core/src/cam/operations/multiaxis.ts
+var MultiaxisStrategySchema = Literals(["parallel", "contour"]);
+var ToolAxisSchema = Literals(["normal", "lead"]);
+var Degrees = Finite.check(isBetween({ minimum: -85, maximum: 85 }));
+
+class MultiaxisParams extends Class3("cam/MultiaxisParams")(Struct({
+  ...OperationFields,
+  strategy: withDefault2(MultiaxisStrategySchema, "parallel"),
+  stepover: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 100 })), 30),
+  scallop: withDefault2(NonNegative3, 0),
+  angle: withDefault2(Finite, 0),
+  oneWay: withDefault2(Boolean3, false),
+  toolAxis: withDefault2(ToolAxisSchema, "normal"),
+  lead: withDefault2(Degrees, 10),
+  tilt: withDefault2(Degrees, 0),
+  gouge: withDefault2(Boolean3, true),
+  gougeAngle: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 85 })), 30),
+  gougeClearance: withDefault2(NonNegative3, 0.02),
+  maxRotaryStep: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 180 })), 30),
+  sampling: withDefault2(Positive3, 0.5),
+  tolerance: withDefault2(Positive3, 0.01),
+  flute: withDefault2(Finite.check(isBetween({ minimum: 0.5, maximum: 6 })), 2)
+}).check(heightsOrdered)) {
+}
+var RAD2 = Math.PI / 180;
+// packages/core/src/cam/generator/cycles.ts
+var FixedCycleType = {
+  DRILLING: "drilling",
+  DRILLING_DWELL: "drilling_dwell",
+  PECK_DRILLING: "peck_drilling",
+  RIGHT_TAPPING: "right_tapping",
+  BORING: "boring",
+  BORING_DWELL: "boring_dwell",
+  BACK_BORING: "back_boring",
+  LEFT_TAPPING: "left_tapping",
+  BORING_WITH_RETRACT: "boring_retract",
+  CUSTOM: "custom"
+};
+var WORDS = {
+  G81: FixedCycleType.DRILLING,
+  G82: FixedCycleType.DRILLING_DWELL,
+  G83: FixedCycleType.PECK_DRILLING,
+  G84: FixedCycleType.RIGHT_TAPPING,
+  G85: FixedCycleType.BORING,
+  G86: FixedCycleType.BORING_DWELL,
+  G87: FixedCycleType.BACK_BORING,
+  G88: FixedCycleType.CUSTOM,
+  G74: FixedCycleType.LEFT_TAPPING,
+  G89: FixedCycleType.BORING_WITH_RETRACT
+};
+var CODE_OF = {
+  [FixedCycleType.DRILLING]: "G81",
+  [FixedCycleType.DRILLING_DWELL]: "G82",
+  [FixedCycleType.PECK_DRILLING]: "G83",
+  [FixedCycleType.RIGHT_TAPPING]: "G84",
+  [FixedCycleType.BORING]: "G85",
+  [FixedCycleType.BORING_DWELL]: "G86",
+  [FixedCycleType.BACK_BORING]: "G87",
+  [FixedCycleType.LEFT_TAPPING]: "G74",
+  [FixedCycleType.BORING_WITH_RETRACT]: "G89",
+  [FixedCycleType.CUSTOM]: "G81"
+};
+
+// packages/core/src/cam/kernel/identity.ts
+var K = new Uint32Array([
+  1116352408,
+  1899447441,
+  3049323471,
+  3921009573,
+  961987163,
+  1508970993,
+  2453635748,
+  2870763221,
+  3624381080,
+  310598401,
+  607225278,
+  1426881987,
+  1925078388,
+  2162078206,
+  2614888103,
+  3248222580,
+  3835390401,
+  4022224774,
+  264347078,
+  604807628,
+  770255983,
+  1249150122,
+  1555081692,
+  1996064986,
+  2554220882,
+  2821834349,
+  2952996808,
+  3210313671,
+  3336571891,
+  3584528711,
+  113926993,
+  338241895,
+  666307205,
+  773529912,
+  1294757372,
+  1396182291,
+  1695183700,
+  1986661051,
+  2177026350,
+  2456956037,
+  2730485921,
+  2820302411,
+  3259730800,
+  3345764771,
+  3516065817,
+  3600352804,
+  4094571909,
+  275423344,
+  430227734,
+  506948616,
+  659060556,
+  883997877,
+  958139571,
+  1322822218,
+  1537002063,
+  1747873779,
+  1955562222,
+  2024104815,
+  2227730452,
+  2361852424,
+  2428436474,
+  2756734187,
+  3204031479,
+  3329325298
+]);
+
 // packages/core/src/cam/kernel/cutters.ts
 var HOLDER = { diameter: 40, length: 50 };
 var flat = (d, flutes, material = "carbide", coating = "altin", suffix = "") => ({
@@ -7976,76 +7727,395 @@ var DEFAULT_CUTTERS = [
   }),
   ...DRILL_SIZES.map(drill2)
 ];
+
 // packages/core/src/cam/kernel/cutting-data.ts
 var FERROUS = new Set(["P", "M", "K", "S", "H"]);
 var FINISH = new Set(["finish-wall", "finish-floor", "finish-3d", "engrave"]);
-// packages/core/src/cam/kernel/identity.ts
-var K = new Uint32Array([
-  1116352408,
-  1899447441,
-  3049323471,
-  3921009573,
-  961987163,
-  1508970993,
-  2453635748,
-  2870763221,
-  3624381080,
-  310598401,
-  607225278,
-  1426881987,
-  1925078388,
-  2162078206,
-  2614888103,
-  3248222580,
-  3835390401,
-  4022224774,
-  264347078,
-  604807628,
-  770255983,
-  1249150122,
-  1555081692,
-  1996064986,
-  2554220882,
-  2821834349,
-  2952996808,
-  3210313671,
-  3336571891,
-  3584528711,
-  113926993,
-  338241895,
-  666307205,
-  773529912,
-  1294757372,
-  1396182291,
-  1695183700,
-  1986661051,
-  2177026350,
-  2456956037,
-  2730485921,
-  2820302411,
-  3259730800,
-  3345764771,
-  3516065817,
-  3600352804,
-  4094571909,
-  275423344,
-  430227734,
-  506948616,
-  659060556,
-  883997877,
-  958139571,
-  1322822218,
-  1537002063,
-  1747873779,
-  1955562222,
-  2024104815,
-  2227730452,
-  2361852424,
-  2428436474,
-  2756734187,
-  3204031479,
-  3329325298
+
+// packages/core/src/cam/model/dexel.ts
+var EMPTY2 = new Float64Array(0);
+
+// packages/core/src/cam/model/model.ts
+var BOOLEANS2 = new Set(["boolean-union", "boolean-subtract", "boolean-intersect"]);
+
+// packages/core/src/cam/generator/history-features.ts
+var cache2 = new Map;
+
+// packages/core/src/cam/generator/unified-geometry.ts
+var SOLID_TYPES2 = new Set([
+  "cube",
+  "sphere",
+  "hemisphere",
+  "cylinder",
+  "cone",
+  "capsule",
+  "pyramid",
+  "prism",
+  "ellipsoid",
+  "rectangle",
+  "circle",
+  "polygon",
+  "ellipse",
+  "triangle",
+  "mesh",
+  "custom",
+  "imported"
 ]);
+
+// packages/core/src/cam/generator/evidence.ts
+var PART_TYPES = new Set(["parametric", "brep", "mesh"]);
+
+// packages/core/src/cam/generator/schema.ts
+var Num2 = Finite;
+var PositiveInt = Int.check(isGreaterThan2(0));
+var Percent = Finite.check(isGreaterThan2(0), isLessThanOrEqualTo2(100));
+var MachineTypeSchema = Literals(["mill", "lathe", "3dprinter"]);
+var MillOperationSchema = Literals(["contour", "pocket", "drill", "engrave", "profile", "threading", "3d_surface", "probing", "multiaxis"]);
+var LatheOperationSchema = Literals(["facing", "turning", "boring", "threading", "grooving", "parting", "knurling"]);
+var PrinterOperationSchema = Literals(["standard", "vase", "support", "infill", "raft", "brim"]);
+var OperationTypeSchema = Union2([MillOperationSchema, LatheOperationSchema, PrinterOperationSchema]);
+var MaterialTypeSchema = Literals(["aluminum", "steel", "wood", "plastic", "brass", "titanium", "composite", "other"]);
+var ToolTypeSchema = Literals(["endmill", "ballnose", "drill", "vbit", "chamfer", "threadmill", "reamer", "probe", "toolsetter"]);
+var LatheToolTypeSchema = Literals(["turning", "facing", "threading", "grooving", "boring", "parting"]);
+var PrinterNozzleSchema = Literals(["brass", "hardened", "ruby", "standard"]);
+var AllToolTypeSchema = Union2([ToolTypeSchema, LatheToolTypeSchema, PrinterNozzleSchema]);
+var OriginTypeSchema = Literals(["workpiece-center", "workpiece-corner", "workpiece-corner2", "machine-zero", "custom"]);
+var GeometryTypeSchema = Literals([
+  "rectangle",
+  "circle",
+  "polygon",
+  "custom",
+  "selected",
+  "cube",
+  "sphere",
+  "cylinder",
+  "cone",
+  "extrude",
+  "line",
+  "pyramid",
+  "hemisphere",
+  "ellipsoid",
+  "capsule",
+  "triangle",
+  "ellipse",
+  "prism"
+]);
+var ToolpathSettingsSchema = Struct({
+  machineType: withDefault2(MachineTypeSchema, "mill"),
+  operationType: withDefault2(OperationTypeSchema, "contour"),
+  material: withDefault2(MaterialTypeSchema, "aluminum"),
+  toolType: withDefault2(AllToolTypeSchema, "endmill"),
+  toolDiameter: withDefault2(Positive3, 6),
+  flutes: withDefault2(PositiveInt, 2),
+  depth: withDefault2(Positive3, 5),
+  stepdown: withDefault2(Positive3, 1),
+  stepover: withDefault2(Percent, 40),
+  feedrate: withDefault2(Positive3, 800),
+  plungerate: withDefault2(Positive3, 300),
+  rpm: withDefault2(Positive3, 1e4),
+  tolerance: withDefault2(NonNegative3, 0.01),
+  offset: withDefault2(Literals(["inside", "outside", "center"]), "outside"),
+  direction: withDefault2(Literals(["climb", "conventional"]), "climb"),
+  coolant: withDefault2(Boolean3, true),
+  finishingPass: withDefault2(Boolean3, false),
+  finishingAllowance: withDefault2(NonNegative3, 0.2),
+  finishingStrategy: withDefault2(Literals(["contour", "parallel", "spiral", "radial"]), "contour"),
+  surfaceStrategy: withDefault2(Literals(["roughing", "parallel", "waterline", "steep-shallow"]), "roughing"),
+  steepAngle: withDefault2(Finite.check(isBetween({ minimum: 5, maximum: 85 })), 45),
+  surfaceClearing: withDefault2(Literals(["contour", "adaptive"]), "contour"),
+  adaptiveEngagement: withDefault2(Finite.check(isBetween({ minimum: 1, maximum: 50 })), 12),
+  scallop: withDefault2(NonNegative3, 0),
+  rasterAngle: withDefault2(Num2, 0),
+  rasterOneWay: withDefault2(Boolean3, false),
+  useAI: withDefault2(Boolean3, false),
+  aiDifficulty: withDefault2(Literals(["simple", "moderate", "complex"]), "moderate"),
+  aiOptimize: withDefault2(Literals(["speed", "quality", "balance"]), "balance"),
+  optimizePath: withDefault2(Boolean3, false),
+  useArcFitting: withDefault2(Boolean3, false),
+  useHighSpeedMode: withDefault2(Boolean3, false),
+  useExactStop: withDefault2(Boolean3, false),
+  useToolCompensation: withDefault2(Boolean3, false),
+  useAdaptiveFeeds: withDefault2(Boolean3, false),
+  useRestMachining: withDefault2(Boolean3, false),
+  restToolDiameter: withDefault2(Positive3, 10),
+  fiveAxisStrategy: withDefault2(Literals(["parallel", "contour"]), "parallel"),
+  fiveAxisToolAxis: withDefault2(Literals(["normal", "lead"]), "lead"),
+  fiveAxisLead: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 10),
+  fiveAxisTilt: withDefault2(Finite.check(isBetween({ minimum: -85, maximum: 85 })), 0),
+  fiveAxisGouge: withDefault2(Boolean3, true),
+  toolNumber: withDefault2(PositiveInt, 1),
+  workOffset: withDefault2(Literals(["G54", "G55", "G56", "G57", "G58", "G59"]), "G54"),
+  probeCycle: withDefault2(Literals(["zSurface", "edgeX", "edgeY", "corner", "bore", "boss", "toolLength"]), "zSurface"),
+  probeFeed: withDefault2(Positive3, 100),
+  probeSearch: withDefault2(Positive3, 10),
+  probeStylus: withDefault2(Positive3, 4),
+  probeDialect: withDefault2(Literals(["linuxcnc", "fanuc"]), "linuxcnc"),
+  probeFeatureSize: withDefault2(Positive3, 20),
+  threadPitch: withDefault2(Positive3, 1.5),
+  threadType: withDefault2(Literals(["internal", "external"]), "internal"),
+  threadHand: withDefault2(Literals(["right", "left"]), "right"),
+  threadPasses: withDefault2(Int.check(isBetween({ minimum: 1, maximum: 20 })), 2),
+  threadSpringPasses: withDefault2(Int.check(isBetween({ minimum: 0, maximum: 5 })), 0),
+  latheZero: withDefault2(Literals(["face", "chuck"]), "face"),
+  bedOrigin: withDefault2(Literals(["corner", "center"]), "corner"),
+  nozzleDiameter: withDefault2(Positive3, 0.4),
+  filamentDiameter: withDefault2(Positive3, 1.75),
+  layerHeight: withDefault2(Positive3, 0.2),
+  extrusionWidth: withDefault2(Positive3, 0.4),
+  printSpeed: withDefault2(Positive3, 60),
+  printTemperature: withDefault2(Positive3, 200),
+  bedWidth: withDefault2(Positive3, 220),
+  bedDepth: withDefault2(Positive3, 220),
+  centerOnBed: withDefault2(Boolean3, true),
+  bedTemperature: withDefault2(NonNegative3, 60),
+  stockDiameter: withDefault2(Positive3, 50),
+  stockLength: withDefault2(Positive3, 100),
+  spindleDirection: withDefault2(Literals(["cw", "ccw"]), "cw"),
+  turningOperation: withDefault2(Literals(["external", "internal", "face"]), "external"),
+  applyToolCompensation: withDefault2(Boolean3, true),
+  originType: withDefault2(OriginTypeSchema, "workpiece-center"),
+  originX: withDefault2(Num2, 0),
+  originY: withDefault2(Num2, 0),
+  originZ: withDefault2(Num2, 0)
+});
+var DEFAULT_SETTINGS = decodeUnknownSync(ToolpathSettingsSchema)({});
+var StockSchema2 = Struct({
+  width: Positive3,
+  height: Positive3,
+  depth: Positive3,
+  radius: withDefault2(NonNegative3, 0),
+  x: withDefault2(Num2, 0),
+  y: withDefault2(Num2, 0),
+  topZ: withDefault2(Num2, 0),
+  allowance: withDefault2(NonNegative3, 1),
+  material: optionalKey2(String4),
+  elementId: optionalKey2(String4)
+});
+var CadElementSchema = Record(String4, Unknown2);
+var GeometrySchema = Struct({
+  geometryType: withDefault2(GeometryTypeSchema, "rectangle"),
+  rectangleWidth: withDefault2(Positive3, 100),
+  rectangleHeight: withDefault2(Positive3, 50),
+  circleRadius: withDefault2(Positive3, 25),
+  polygonSides: withDefault2(Int.check(isGreaterThanOrEqualTo2(3)), 6),
+  polygonRadius: withDefault2(Positive3, 30),
+  customPath: withDefault2(String4, ""),
+  selectedElements: withDefault2(ArraySchema(CadElementSchema), []),
+  stock: optionalKey2(StockSchema2)
+});
+var DEFAULT_GEOMETRY = decodeUnknownSync(GeometrySchema)({});
+var PrinterExtrasSchema = Struct({
+  infillDensity: withDefault2(Finite.check(isBetween({ minimum: 0, maximum: 100 })), 20),
+  infillPattern: withDefault2(Literals(["grid", "lines", "triangles", "honeycomb"]), "grid"),
+  supportType: withDefault2(Literals(["none", "minimal", "full"]), "minimal"),
+  shellCount: withDefault2(PositiveInt, 2),
+  printResolution: withDefault2(Literals(["standard", "high", "low"]), "standard"),
+  printOrientation: withDefault2(Literals(["original", "auto-optimal"]), "original")
+});
+var DEFAULT_PRINTER_EXTRAS = decodeUnknownSync(PrinterExtrasSchema)({});
+var RotaryRangeSchema = Struct({ min: Finite, max: Finite });
+var MachineForProgramSchema = Struct({
+  id: String4,
+  name: withDefault2(String4, ""),
+  axes: withDefault2(Literals([3, 4, 5]), 3),
+  controller: withDefault2(String4, "generic"),
+  fiveAxis: optionalKey2(Struct({
+    layout: Literals(["table-AC", "table-BC"]),
+    tilt: RotaryRangeSchema,
+    rotation: optionalKey2(RotaryRangeSchema),
+    pivot: optionalKey2(Struct({ x: Finite, y: Finite, z: Finite })),
+    tcp: withDefault2(Literals(["control", "program"]), "control")
+  }))
+});
+var GenerateRequestSchema = Struct({
+  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
+  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY),
+  printer: withDefault2(PrinterExtrasSchema, DEFAULT_PRINTER_EXTRAS),
+  machine: optionalKey2(MachineForProgramSchema),
+  stamp: optionalKey2(String4),
+  evidence: optionalKey2(Boolean3)
+});
+var GcodeStatsSchema = Struct({
+  lines: Int,
+  cutLength: Finite,
+  rapidLength: Finite,
+  minZ: Finite,
+  maxZ: Finite,
+  estimatedSeconds: Finite,
+  bounds: Struct({
+    min: Struct({ x: Finite, y: Finite, z: Finite }),
+    max: Struct({ x: Finite, y: Finite, z: Finite })
+  })
+});
+var CuttingReferenceSchema = Struct({
+  table: Literal2("MATERIALS"),
+  row: String4,
+  rowName: String4,
+  columns: Record(String4, Finite),
+  factors: Record(String4, Finite),
+  basis: String4
+});
+var ProgramCheckSchema = Struct({
+  id: Literals(["generated", "cutting-data", "safe-height", "no-rapid-in-material", "tool-clearance", "within-stock", "no-gouge", "nc-interpretation"]),
+  status: Literals(["passed", "failed", "unresolved", "not-run"]),
+  detail: String4,
+  line: optionalKey2(Int)
+});
+var ProgramRecordSchema = Struct({
+  schema: Literal2("cadcamfun/program-record@1"),
+  inputs: Struct({
+    digest: String4,
+    machineType: String4,
+    operationType: String4,
+    material: String4,
+    elements: ArraySchema(String4),
+    stock: optionalKey2(Struct({ width: Finite, height: Finite, depth: Finite, topZ: Finite }))
+  }),
+  tool: Struct({ type: String4, diameter: Finite, flutes: Finite }),
+  process: Struct({ rpm: Finite, feed: Finite, plunge: Finite, stepdown: Finite, stepover: Finite, coolant: Boolean3 }),
+  cuttingData: Struct({
+    status: Literals(["kernel", "manual", "not-applicable"]),
+    detail: String4,
+    recommended: optionalKey2(Struct({ rpm: Finite, feed: Finite, plunge: Finite, stepdown: Finite })),
+    reference: optionalKey2(CuttingReferenceSchema)
+  }),
+  program: Struct({ sha256: String4, lines: Int, cutLength: Finite, estimatedSeconds: Finite }),
+  checks: ArraySchema(ProgramCheckSchema),
+  result: Literals(["passed", "warnings", "failed"])
+});
+var GenerateResponseSchema = Struct({
+  gcode: String4,
+  cycles: ArraySchema(Struct({ gcode: String4 })),
+  warnings: ArraySchema(String4),
+  stats: GcodeStatsSchema,
+  program: ProgramSchema,
+  evidence: optionalKey2(ProgramRecordSchema)
+});
+var ParseRequestSchema = Struct({
+  gcode: String4,
+  name: withDefault2(String4, "Program")
+});
+var ParseResponseSchema = Struct({
+  warnings: ArraySchema(String4),
+  stats: GcodeStatsSchema,
+  program: ProgramSchema
+});
+var SuggestRequestSchema = Struct({
+  settings: withDefault2(ToolpathSettingsSchema, DEFAULT_SETTINGS),
+  geometry: withDefault2(GeometrySchema, DEFAULT_GEOMETRY)
+});
+var SuggestResponseSchema = Struct({
+  parameters: optionalKey2(Struct({
+    depth: Finite,
+    stepdown: Finite,
+    operationType: OperationTypeSchema
+  })),
+  suggestions: ArraySchema(String4),
+  feedback: String4,
+  statistics: Struct({
+    cuttingSpeed: Finite,
+    chipLoad: Finite,
+    materialRemovalRate: Finite,
+    effectiveStepover: Finite
+  }),
+  operation: Struct({ title: String4, description: String4 }),
+  warnings: ArraySchema(String4)
+});
+// packages/core/src/cam/verify/schema.ts
+var VerifyToolKindSchema = Literals(["endmill", "ballnose", "drill", "vbit", "facemill"]);
+var VerifyToolSchema = Struct({
+  kind: withDefault2(VerifyToolKindSchema, "endmill"),
+  diameter: Positive3,
+  cuttingLength: optionalKey2(Positive3),
+  shankDiameter: optionalKey2(Positive3),
+  stickout: optionalKey2(Positive3),
+  holderDiameter: optionalKey2(Positive3),
+  holderLength: optionalKey2(Positive3),
+  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 179 }))),
+  tipRadius: optionalKey2(Positive3)
+});
+var BoundsSchema = Struct({
+  minX: Finite,
+  maxX: Finite,
+  minY: Finite,
+  maxY: Finite,
+  minZ: Finite,
+  maxZ: Finite
+});
+var VerifyFixtureSchema = Struct({
+  id: String4.check(isMinLength(1)),
+  bounds: BoundsSchema
+});
+var VerifyRequestSchema = Struct({
+  gcode: optionalKey2(String4),
+  program: optionalKey2(ProgramSchema),
+  stock: BoundsSchema,
+  tool: VerifyToolSchema,
+  fixtures: withDefault2(ArraySchema(VerifyFixtureSchema), []),
+  target: optionalKey2(Struct({
+    solids: ArraySchema(SolidSchema),
+    meshes: optionalKey2(ArraySchema(Struct({ positions: ArraySchema(Finite), indices: ArraySchema(Int) }))),
+    reliefs: optionalKey2(ArraySchema(Struct({ x: Finite, y: Finite, radius: Positive3, bottom: Finite, reason: String4 })))
+  })),
+  resolution: optionalKey2(Positive3),
+  tolerance: withDefault2(NonNegative3, 0.05),
+  start: optionalKey2(Vec3Schema)
+});
+var VerifyCodeSchema = Literals([
+  "InvalidInput",
+  "InterpreterWarning",
+  "RapidInMaterial",
+  "ShankCollision",
+  "HolderCollision",
+  "FixtureCollision",
+  "BelowStock",
+  "Gouge",
+  "UncutStock",
+  "ResolutionCoarsened"
+]);
+var VerifySeveritySchema = Literals(["error", "warning", "info"]);
+var VerifyIssueSchema = Struct({
+  code: VerifyCodeSchema,
+  severity: VerifySeveritySchema,
+  message: String4,
+  line: optionalKey2(Int),
+  point: optionalKey2(Vec3Schema),
+  count: Int,
+  fixtureId: optionalKey2(String4)
+});
+var VerifyStatsSchema = Struct({
+  cellSize: Finite,
+  cellsX: Int,
+  cellsY: Int,
+  samples: Int,
+  stockVolume: Finite,
+  removedVolume: Finite,
+  remainingVolume: Finite,
+  engagedLength: Finite,
+  airCutLength: Finite,
+  gougeVolume: optionalKey2(Finite),
+  maxGouge: optionalKey2(Finite),
+  uncutVolume: optionalKey2(Finite),
+  maxUncut: optionalKey2(Finite)
+});
+var VerifyPreviewSchema = Struct({
+  nx: Int,
+  ny: Int,
+  minX: Finite,
+  minY: Finite,
+  cellX: Finite,
+  cellY: Finite,
+  minZ: Finite,
+  maxZ: Finite,
+  heights: ArraySchema(Finite),
+  gouge: ArraySchema(Int)
+});
+var VerifyResponseSchema = Struct({
+  ok: Boolean3,
+  issues: ArraySchema(VerifyIssueSchema),
+  stats: VerifyStatsSchema,
+  preview: VerifyPreviewSchema
+});
 // packages/core/src/cam/kernel/machines.ts
 var MACHINES = [
   {
@@ -8053,6 +8123,7 @@ var MACHINES = [
     name: "Vertical machining centre (BT40, 12 000 rpm, 11 kW)",
     post: "fanuc",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    table: { length: 1000, width: 500, gap: 30 },
     rapidFeed: 30000,
     toolChangeSeconds: 6
   },
@@ -8061,6 +8132,7 @@ var MACHINES = [
     name: "Haas VF-2 class (8 100 rpm, 22 kW)",
     post: "haas",
     limits: { maxRpm: 8100, minRpm: 50, maxFeed: 16500, powerKw: 22.4, torqueNm: 122, rigidity: "standard" },
+    table: { length: 762, width: 406, gap: 30 },
     rapidFeed: 25400,
     toolChangeSeconds: 4
   },
@@ -8069,6 +8141,7 @@ var MACHINES = [
     name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)",
     post: "generic",
     limits: { maxRpm: 30000, minRpm: 3000, maxFeed: 20000, powerKw: 7, torqueNm: 8, rigidity: "standard" },
+    table: { length: 600, width: 400, gap: 30 },
     rapidFeed: 40000,
     toolChangeSeconds: 5
   },
@@ -8077,6 +8150,7 @@ var MACHINES = [
     name: "Benchtop mill (10 000 rpm, 0.75 kW)",
     post: "generic",
     limits: { maxRpm: 1e4, minRpm: 300, maxFeed: 3000, powerKw: 0.75, torqueNm: 3, rigidity: "light" },
+    table: { length: 300, width: 200, gap: 15 },
     rapidFeed: 3000,
     toolChangeSeconds: 30
   },
@@ -8085,11 +8159,77 @@ var MACHINES = [
     name: "CNC router (24 000 rpm spindle, 2.2 kW)",
     post: "grbl",
     limits: { maxRpm: 24000, minRpm: 6000, maxFeed: 6000, powerKw: 2.2, torqueNm: 1.2, rigidity: "hobby" },
+    table: { length: 1200, width: 900, gap: 20 },
     rapidFeed: 8000,
     toolChangeSeconds: 30
   }
 ];
 var DEFAULT_MACHINE = MACHINES[0];
+// packages/core/src/cam/kernel/head.ts
+var DEG3 = Math.PI / 180;
+
+// packages/core/src/cam/kernel/collision.ts
+var DEG4 = Math.PI / 180;
+// packages/core/src/cam/kernel/schema.ts
+var positive = Finite.check(isGreaterThan2(0));
+var nonNegative = Finite.check(isGreaterThanOrEqualTo2(0));
+var id = String4.check(isMinLength(1), isMaxLength(80));
+var point = Struct({ x: Finite, y: Finite });
+var ring2 = ArraySchema(point).check(isMinLength(3), isMaxLength(20000));
+var CutterSchema = Struct({
+  id,
+  name: String4.check(isMaxLength(120)),
+  kind: Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),
+  diameter: positive,
+  flutes: Int.check(isBetween({ minimum: 1, maximum: 24 })),
+  material: Literals(["hss", "hss-co", "carbide", "pcd"]),
+  coating: Literals(["none", "tin", "ticn", "altin", "alcrn", "zrn", "dlc", "diamond"]),
+  cornerRadius: optionalKey2(nonNegative),
+  angle: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 180 }))),
+  tipDiameter: optionalKey2(nonNegative),
+  pitch: optionalKey2(positive),
+  fluteLength: positive,
+  shankDiameter: positive,
+  stickout: positive,
+  holder: optionalKey2(Struct({ diameter: positive, length: positive })),
+  maxRpm: optionalKey2(positive),
+  number: optionalKey2(Int.check(isBetween({ minimum: 1, maximum: 999 })))
+});
+var overrides = {
+  id,
+  name: optionalKey2(String4.check(isMaxLength(120))),
+  tool: id,
+  rpm: optionalKey2(positive),
+  feed: optionalKey2(positive),
+  plungeFeed: optionalKey2(positive),
+  stepdown: optionalKey2(positive),
+  stepover: optionalKey2(Finite.check(isBetween({ minimum: 1, maximum: 100 }))),
+  coolant: optionalKey2(CoolantSchema),
+  radialEngagement: optionalKey2(positive)
+};
+var region = Struct({ boundary: ring2, islands: optionalKey2(ArraySchema(ring2).check(isMaxLength(500))) });
+var OperationSpecSchema = Union2([
+  Struct({ ...overrides, strategy: Literal2("face"), bottom: Finite }),
+  Struct({ ...overrides, strategy: Literal2("adaptive"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative) }),
+  Struct({ ...overrides, strategy: Literal2("pocket"), region, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("profile"), loop: ring2, side: Literals(["outside", "inside"]), top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative), finish: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("bore"), center: point, diameter: positive, top: Finite, bottom: Finite, allowance: optionalKey2(nonNegative) }),
+  Struct({ ...overrides, strategy: Literal2("drill"), points: ArraySchema(point).check(isMinLength(1), isMaxLength(5000)), top: Finite, bottom: Finite, cut: optionalKey2(Literals(["drill", "spot"])) }),
+  Struct({ ...overrides, strategy: Literal2("thread"), center: point, diameter: positive, pitch: positive, internal: Boolean3, top: Finite, length: positive, rightHand: optionalKey2(Boolean3) }),
+  Struct({ ...overrides, strategy: Literal2("engrave"), paths: ArraySchema(Struct({ points: ArraySchema(point).check(isMinLength(2)), closed: Boolean3 })).check(isMinLength(1), isMaxLength(2000)), top: Finite, depth: positive }),
+  Struct({ ...overrides, strategy: Literal2("chamfer"), loops: ArraySchema(Struct({ points: ring2, side: Literals(["outside", "inside"]) })).check(isMinLength(1), isMaxLength(2000)), top: Finite, width: positive, tipOffset: optionalKey2(nonNegative) }),
+  Struct({
+    ...overrides,
+    strategy: Literal2("surface"),
+    mode: Literals(["roughing", "parallel", "waterline", "steep-shallow"]),
+    slopeAngle: optionalKey2(Finite.check(isBetween({ minimum: 5, maximum: 85 }))),
+    allowance: optionalKey2(nonNegative),
+    scallop: optionalKey2(positive),
+    clearing: optionalKey2(Literals(["contour", "adaptive"])),
+    angle: optionalKey2(Finite),
+    restFrom: optionalKey2(id)
+  })
+]);
 // packages/core/src/drawing/sheet.ts
 var LAYERS = [
   { id: "frame", name: "FRAME", color: "#000000", width: 0.7 },

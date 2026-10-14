@@ -31,6 +31,7 @@ import { EventsGroup } from "./groups/events.ts"
 
 export * from "./errors.ts"
 export * from "./ai-actions.ts"
+export * from "./ai-action-results.ts"
 export * from "./ai-inspection.ts"
 export * from "./ai-cam.ts"
 export * from "./cam-kernel.ts"

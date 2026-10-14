@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Steps 1–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 in progress (outcome contract built, CAD family migrated); Steps 2–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -82,16 +82,31 @@ D: Step 0. Placement: RM-01. Start: `packages/ai/src/actions/action.ts` (`Action
 `tools/handlers.ts`, `packages/api/src/ai-actions.ts`. Today most implementations return `unknown`; inputs and results have
 no uniform guarantee.
 
-- [ ] Add a result schema and effect metadata to `ActionSpec`.
+- [x] Add a result schema and effect metadata to `ActionSpec` (`contract`, from `ACTION_CONTRACTS` in `packages/api/src/ai-action-results.ts`).
 - [ ] Extend the authoritative Effect schemas; derive the nikcli representation from them.
-- [ ] Distinguish success, partial, refusal, conflict, cancellation and uncertain outcome.
-- [ ] Migrate by family: CAD → CAM → libraries/parts → memory/research → VCS/delegation.
+- [x] Distinguish success, partial, refusal, conflict, cancellation and uncertain outcome (`packages/ai/src/actions/outcome.ts`).
+- [ ] Migrate by family: CAD → CAM → libraries/parts → memory/research → VCS/delegation. CAD done (32 actions).
 - [ ] Move domain handlers to Effect; keep the Promise conversion at the SDK seam only.
 - [ ] Keep the compatible argument normalisation, with no correction that changes units, identifiers or authority.
 - [ ] Update the failing host test to assert the missing fields and that the handler did not run, instead of an obsolete sentence.
 
 Tests: extend `action-tool.test.ts`, `wire-schema.test.ts`, `tool-definitions.test.ts`, `packages/api/test/ai-actions.test.ts`.
 Gate: every action validated on input and output; no arbitrary public result crosses the adapters as success.
+
+Progress (2026-10-14):
+
+- **V** `packages/ai/test/action-outcome.test.ts` (13 tests): every catalogue action has a contract; a CAD answer outside its
+  declared result is `uncertain`, never success (a read says nothing changed, a write says to inspect before retrying); an add
+  that skipped elements is `partial`; untagged refusals get the shared `{ ok: false, _tag, actionId, error }` shape and keep
+  their details; a stale-revision answer is a `conflict`; typed conflicts pass unchanged; a throwing write is `uncertain`, a
+  throwing read `refused`; cancellation before entry never runs the handler, an abort while a write runs is `uncertain`.
+- **V** The contract found a real defect: `cad_edit.parametric_convert` answered without `mutation`, so the desktop's
+  `opsFor` treated the new parametric twin as an update of an unknown id and never added it to the editor. The sidecar now
+  answers `mutation: "add"` (`apps/sidecar/src/services/ai.ts`, regression in `ai-parametric-convert.test.ts`).
+- Test fakes that answered shapes no real handler returns (`{ ok: true, count: 1 }` for `describeDrawing`, `{ ok: true, ids: [] }`
+  for `addElements`) were updated to the contract.
+- Effects classification (C): `cad_edit.editor` is kind `write` but touches only the interface; `agent.list` and `agent.read`
+  are kind `write` with no effect (pinned in the test; Step 3).
 
 ### Step 2 — Separate structured data from tool text
 

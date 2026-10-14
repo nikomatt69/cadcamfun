@@ -27,7 +27,8 @@ const handlerCalls: Array<{ name: string; projectId: string }> = []
 const handlers = new Proxy({} as ToolHandlersShape, {
   get: (_target, name: string) => async (projectId: string) => {
     handlerCalls.push({ name, projectId })
-    return { ok: true, count: 1 }
+    // `cad.describe` answers with its contract's shape (`ACTION_CONTRACTS`); a looser fake is refused as outside it.
+    return name === "describeDrawing" ? { total: 1, counts: { cube: 1 }, drawingId: "drawing-1", projectId } : { ok: true, count: 1 }
   }
 })
 

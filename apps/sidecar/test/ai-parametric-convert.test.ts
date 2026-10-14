@@ -40,6 +40,8 @@ describe("every kind of element, made parametric", () => {
       expect(read.source).toEqual({ id, type: input["type"] })
       const made = await run({ action: "convert", elementId: id })
       expect(made.ok, JSON.stringify(made).slice(0, 300)).toBe(true)
+      // The editor adds the twin only when the result says it is new.
+      expect(made.mutation).toBe("add")
       const twin = made.elements[0]
       expect(twin).toMatchObject({ type: "parametric", x: element["x"] ?? 0, y: element["y"] ?? 0, z: element["z"] ?? 0 })
       if (input["color"] !== undefined) expect(twin.color).toBe(input["color"])
