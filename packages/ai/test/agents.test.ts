@@ -5,7 +5,7 @@ import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/ni
 import { backgroundToolContributions } from "../src/nikcli/background-tools.ts"
 import { buildHostConfig, defaultProviderSpecs } from "../src/nikcli/config.ts"
 import { mapHostEvent, newMapperState } from "../src/nikcli/event-mapper.ts"
-import { ACTION_CATALOGUE, ACTION_TOOL_IDS, toolKind } from "../src/actions/catalogue.ts"
+import { ACTION_CATALOGUE, EXPOSED_TOOL_IDS, exposedActions, toolKind } from "../src/actions/catalogue.ts"
 import { DESTRUCTIVE_TOOL_IDS, READ_TOOL_IDS, WRITE_TOOL_IDS } from "../src/tools/project-tools.ts"
 import { TOOL_IDS } from "../src/tools/registry.ts"
 
@@ -44,7 +44,7 @@ describe("specialist roster", () => {
   })
 
   test("every tool a specialist names exists, and only the editors can change the document", () => {
-    for (const id of SUBAGENT_IDS) for (const tool of SUBAGENTS[id].tools) expect(ACTION_TOOL_IDS).toContain(tool)
+    for (const id of SUBAGENT_IDS) for (const tool of SUBAGENTS[id].tools) expect(EXPOSED_TOOL_IDS).toContain(tool)
     // Derived from the catalogue's effects, not from a hand-written list of ids.
     for (const id of SUBAGENT_IDS) {
       const writes = SUBAGENTS[id].tools.filter((tool) => toolKind(tool) !== "read")
@@ -76,14 +76,21 @@ describe("specialist roster", () => {
     for (const id of SUBAGENT_IDS.filter((other) => other !== "machinist")) expect(SUBAGENTS[id].tools).not.toContain("library_edit")
   })
 
-  test("no tool mixes read and write effects, which is what makes the allow-lists safe", () => {
-    for (const tool of ACTION_TOOL_IDS) {
-      const kinds = new Set(ACTION_CATALOGUE.filter((action) => action.id.startsWith(`${tool}.`)).map((action) => action.kind))
-      // A tool may hold several actions, but they must share one effect: `write` beside `destructive` is fine
-      // (the whole tool asks), while any `read` would hand a read-only specialist a write.
-      expect(kinds.has("read") && kinds.size > 1, `${tool} mixes ${[...kinds].join(", ")}`).toBe(false)
-      expect(toolKind(tool) === (kinds.has("destructive") ? "destructive" : kinds.has("write") ? "write" : "read")).toBe(true)
+  test("a tool's permission class is its strongest action, so a read-only role never reaches a write", () => {
+    for (const tool of EXPOSED_TOOL_IDS) {
+      const kinds = new Set(exposedActions(tool).map((action) => action.kind))
+      // Honest reads may sit beside writes (listing delegated tasks); the tool is then a write tool and asks as one.
+      expect(toolKind(tool), tool).toBe(kinds.has("destructive") ? "destructive" : kinds.has("write") ? "write" : "read")
     }
+    for (const id of SUBAGENT_IDS.filter((other) => !SUBAGENTS[other].edits)) {
+      for (const tool of SUBAGENTS[id].tools) expect(toolKind(tool), `${id} holds ${tool}`).toBe("read")
+    }
+  })
+
+  test("the verifier's exposure carries generate and verify only, under their canonical ids", () => {
+    expect(exposedActions("cam_verify").map((action) => action.id)).toEqual(["cam_edit.generate", "cam_edit.verify"])
+    expect(ACTION_CATALOGUE.some((action) => action.id.startsWith("cam_verify."))).toBe(false)
+    expect(toolKind("cam_verify")).toBe("write")
   })
 
   test("the host config has one deny-by-default agent per specialist with only its tools", () => {
@@ -291,9 +298,12 @@ describe("the nikcli-style roster for CAD/CAM", () => {
   })
 
   test("the verifier and the optimizer change operations only: no drawing edits, no library rows, no commits", () => {
+    expect(SUBAGENTS.optimizer.tools).toContain("cam_edit")
+    // The verifier generates and verifies; it cannot create, update, set stock or release.
+    expect(SUBAGENTS.verifier.tools).toContain("cam_verify")
+    expect(SUBAGENTS.verifier.tools).not.toContain("cam_edit")
     for (const id of ["verifier", "optimizer"] as const) {
       expect(SUBAGENTS[id].edits, id).toBe(true)
-      expect(SUBAGENTS[id].tools, id).toContain("cam_edit")
       for (const tool of ["cad_edit", "library_edit", "parts", "vcs_edit", "memory_edit", "agent"]) expect(SUBAGENTS[id].tools, `${id} must not have ${tool}`).not.toContain(tool)
     }
   })

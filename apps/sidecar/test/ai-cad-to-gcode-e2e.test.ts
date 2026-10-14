@@ -97,7 +97,7 @@ describe("specialist CAD → DFM → checked plan → CAM → review", () => {
         expect(gcode).toMatch(/Y43\.000/)
       }
       if (proposal.type === "3d_surface") expect(analysis.stats.lines).toBeLessThan(20_000)
-      const verified = await step(id, "verifier", "cam_edit", { action: "verify", operationId: op })
+      const verified = await step(id, "verifier", "cam_verify", { action: "verify", operationId: op })
       expect(verified.issues.filter((i) => i.severity === "error")).toEqual([])
       const review = await step(id, "reviewer", "cam", { action: "review", operationId: op })
       expect(review).toMatchObject({ ok: true, status: "pass", revision: plan.revision, modelled: { holder: false, shank: false, fixtures: 0, target: false } })
@@ -125,7 +125,7 @@ describe("specialist CAD → DFM → checked plan → CAM → review", () => {
     expect(finish).toContain("Z-130.000")
     const analysis = await step(id, "reviewer", "cam", { action: "analyze", operationId: op, machineType: "lathe" })
     expect(analysis.issues.filter((i) => i.severity === "error")).toEqual([])
-    const verified = await step(id, "verifier", "cam_edit", { action: "verify", operationId: op })
+    const verified = await step(id, "verifier", "cam_verify", { action: "verify", operationId: op })
     expect(verified).toMatchObject({ ok: false, error: "Verification supports milling operations only" })
     expect((await step(id, "reviewer", "cam", { action: "review", operationId: op })).status).toBe("unverified")
     await step(id, "machinist", "cam_edit", { action: "stock_set", stock: { width: 140, height: 40, depth: 32, x: 65, y: 0, topZ: 15 } })
@@ -179,7 +179,9 @@ describe("specialist CAD → DFM → checked plan → CAM → review", () => {
     expect(plan.ok).toBe(true)
     const op = await operation(id, "drill", params, plan.revision)
     const fixtures = [{ id: "vise", bounds: { minX: -70, maxX: 70, minY: -50, maxY: 50, minZ: -10, maxZ: 20 } }]
-    const verify = () => step(id, "verifier", "cam_edit", { action: "verify", operationId: op, fixtures })
+    const verify = () => step(id, "verifier", "cam_verify", { action: "verify", operationId: op, fixtures })
+    // The verifier generates the missing program first: verification only replays what is stored.
+    await step(id, "verifier", "cam_verify", { action: "generate", operationId: op })
     expect((await verify()).status).toBe("failed")
     for (let round = 1; round <= 3; round++) {
       expect((await step(id, "machinist", "cam_edit", { action: "update", operationId: op, params: { feedrate: 800 - round * 100 }, expectedRevision: plan.revision })).ok).toBe(true)

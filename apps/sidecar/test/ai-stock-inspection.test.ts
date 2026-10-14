@@ -43,6 +43,7 @@ test("explicit stock drives real removal simulation and invalidates generated pr
   const stock = { width: 50, height: 40, depth: 10, x: 2, y: 3, topZ: 0, allowance: 1, radius: 0, material: "Aluminium" }
   expect((await run("cam_edit", { action: "stock_set", stock })).volumeMm3).toBe(20_000)
   const operation = await run("cam_edit", { action: "create", type: "contour", params: { toolDiameter: 6, depth: 3, stepdown: 1 } })
+  await run("cam_edit", { action: "generate", operationId: operation.operationId })
   const report = await run("cam_edit", { action: "verify", operationId: operation.operationId, resolution: 1 })
   expect(report.stockSource).toBe("configured drawing stock")
   expect(report.stats.stockVolume).toBeCloseTo(20_000, 4)

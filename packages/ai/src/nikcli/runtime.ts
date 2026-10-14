@@ -1,6 +1,6 @@
 /// <reference path="./sdk-next.d.ts" />
 import type { FilePart } from "../attachments.ts"
-import type { z } from "zod"
+import { z } from "zod"
 import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { rename, rm, writeFile } from "node:fs/promises"
@@ -34,8 +34,23 @@ export interface HostToolSpec {
   ) => Promise<string>
   /** The host asks the person before each call, whatever the role (an extension tool that changes something). */
   readonly approval?: boolean
-  readonly executeWithFiles?: (input: unknown, ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }) => Promise<{ readonly output: string; readonly files?: ReadonlyArray<FilePart> }>
+  /**
+   * The full answer: `output` is the bounded text the model reads, `value` the whole validated result that Code Mode and
+   * the stored part receive (absent for a tool that only has text), `bounded` whether the text leaves anything out.
+   */
+  readonly executeWithFiles?: (input: unknown, ctx: { readonly sessionId: string; readonly projectId: string; readonly signal: AbortSignal }) => Promise<HostToolAnswer>
 }
+
+export interface HostToolAnswer {
+  readonly output: string
+  readonly value?: unknown
+  readonly outcome?: string
+  readonly bounded?: boolean
+  readonly files?: ReadonlyArray<FilePart>
+}
+
+/** Code Mode receives a tool's whole value through this codec; any JSON value passes (the action contract already checked it). */
+const ANY_VALUE = z.unknown()
 
 export interface NikCliRuntimeOptions {
   /** Application data directory; all host state lives under `<dataDir>/ai/nikcli`. */
@@ -245,6 +260,8 @@ export const makeNikCliRuntime = (
         sdk.Tool.define(spec.id, async () => ({
           description: spec.description,
           parameters: spec.parameters,
+          // Declaring an output makes Code Mode read `value` (the whole result) instead of the bounded text.
+          ...(spec.executeWithFiles ? { output: ANY_VALUE } : {}),
           ...(spec.formatValidationError ? { formatValidationError: spec.formatValidationError } : {}),
           execute: async (args: never, ctx: ToolExecuteContext) => {
             assertOpen()
@@ -253,14 +270,23 @@ export const makeNikCliRuntime = (
             const call = { sessionId: ctx.sessionID, projectId, signal: ctx.abort }
             // Under `code_mode` the call id is the program's, not this tool's: record what happened so the program's inner calls
             // reach the editor as they finish (see `program-calls.ts`).
-            const result: { readonly output: string; readonly files?: ReadonlyArray<FilePart> } = await (spec.executeWithFiles
+            const result: HostToolAnswer = await (spec.executeWithFiles
               ? spec.executeWithFiles(args, call)
               : spec.execute(args, call).then((output) => ({ output }))).catch((cause: unknown) => {
               recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: cause instanceof Error ? cause.message : String(cause), failed: true })
               throw cause
             })
-            recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: result.output, failed: false })
-            return { title: spec.id, output: result.output, metadata: {}, attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID })) }
+            // Inner Code Mode calls reach the editor with the whole value, exactly as a direct call's stored part does.
+            const full = result.value === undefined ? result.output : JSON.stringify(result.value)
+            recordProgramCall(ctx.callID, { tool: spec.id, input: args, output: full, failed: false })
+            return {
+              title: spec.id, output: result.output,
+              ...(spec.executeWithFiles ? { value: result.value ?? null } : {}),
+              // `truncated` is declared, so the host keeps our bounded text instead of cutting it again; `value` is the
+              // stored, complete answer the desktop and recovery read.
+              metadata: { truncated: result.bounded === true, ...(result.outcome !== undefined ? { outcome: result.outcome } : {}), ...(result.value !== undefined && result.bounded === true ? { value: result.value } : {}) },
+              attachments: result.files?.map((file) => ({ ...file, id: `part_${crypto.randomUUID().replaceAll("-", "")}`, sessionID: ctx.sessionID, messageID: ctx.messageID }))
+            }
           }
         }))
       )

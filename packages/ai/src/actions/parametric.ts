@@ -123,7 +123,8 @@ const runRecipe = async (
     ...(input.z !== undefined ? { z: input.z } : {}), ...(input.layer !== undefined ? { layer: input.layer } : {})
   })
   const createdOk = asRecord(created)?.["ok"] !== false
-  return { ...result, ok: createdOk, created }
+  if (!createdOk) return { ...result, ok: false, error: typeof asRecord(created)?.["error"] === "string" ? String(asRecord(created)!["error"]) : "The part was built but could not be stored.", created }
+  return { ...result, ok: true, created }
 }
 
 /** The parametric history of an element already in the drawing (the handler reads it); `create` also stores the parametric twin. */

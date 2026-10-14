@@ -225,14 +225,14 @@ const NEEDS_LAYER = new Set(["layer_create", "layer_rename", "layer_color", "lay
 const NEEDS_IDS = new Set(["select", "show", "hide", "isolate"])
 
 export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
-  defineAction({ id: "cad_edit.add", kind: "write", replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),
+  defineAction({ id: "cad_edit.add", kind: "write", effects: ["domain"], replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),
   defineAction({
-    id: "cad_edit.add_entities", kind: "write", replaces: "cad_add_entities",
+    id: "cad_edit.add_entities", kind: "write", effects: ["domain"], replaces: "cad_add_entities",
     parameters: z.object({ entities: z.array(entityZod).min(1).max(500) }),
     run: ({ entities }, { handlers, projectId }) => handlers.addEntities(projectId, entities.map((e) => validated(EntityInput, e)))
   }),
   defineAction({
-    id: "cad_edit.modify", kind: "write", replaces: "cad_modify_entities",
+    id: "cad_edit.modify", kind: "write", effects: ["domain"], replaces: "cad_modify_entities",
     parameters: z.object({ changes: z.array(z.object({ id: z.string().min(1), changes: z.record(z.string(), z.unknown()) })).min(1) }),
     // EntityChanges checks the fields it knows (sizes > 0, points); the rest (x, y, z, rotation, scale, history, parameters, any other
     // field of the element) passes through untouched and is judged against the element's own type by the handler.
@@ -240,7 +240,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       handlers.modifyEntities(projectId, changes.map((c) => ({ id: c.id, changes: { ...c.changes, ...validated(EntityChanges, c.changes) } })))
   }),
   defineAction({
-    id: "cad_edit.transform", kind: "write", replaces: "cad_transform_entities",
+    id: "cad_edit.transform", kind: "write", effects: ["domain"], replaces: "cad_transform_entities",
     parameters: z.object({
       ids: z.array(z.string().min(1)).min(1).max(100),
       dx: z.number().optional(), dy: z.number().optional(), dz: z.number().optional(),
@@ -260,7 +260,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineAction({
-    id: "cad_edit.group", kind: "write", replaces: "cad_group_entities",
+    id: "cad_edit.group", kind: "write", effects: ["domain"], replaces: "cad_group_entities",
     parameters: z.object({
       ids: z.array(z.string().min(1)).min(1).max(200),
       name: z.string().min(1).optional(), ungroup: z.boolean().optional(), layer: z.string().min(1).optional()
@@ -269,7 +269,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       handlers.groupEntities(projectId, { ids, ungroup: ungroup === true, ...(name !== undefined ? { name } : {}), ...(layer !== undefined ? { layer } : {}) })
   }),
   defineAction({
-    id: "cad_edit.delete", kind: "destructive", replaces: "cad_delete_entities",
+    id: "cad_edit.delete", kind: "destructive", effects: ["domain"], replaces: "cad_delete_entities",
     // `confirm: true` is the model's own acknowledgement that the user asked for this; the native `ask` permission the host
     // registers for `cad_edit` is the human decision. Both are required, and neither one alone is enough.
     parameters: z.object({ ids: z.array(z.string().min(1)).min(1), confirm: z.literal(true) }),
@@ -278,7 +278,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineAction({
     // The layers, the view and the selection live in the open editor, not in the stored drawing: this checks the actions are
     // complete and hands them back; the editor performs them when it reads the result.
-    id: "cad_edit.editor", kind: "write", replaces: "cad_editor",
+    id: "cad_edit.editor", kind: "write", effects: ["ui", "domain"], replaces: "cad_editor",
     parameters: editorParameters,
     run: ({ actions }) => {
       const problems = actions.flatMap((a, index) => {
@@ -293,24 +293,24 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       return { ok: true, actions, note: "The editor performs these actions as it reads this result." }
     }
   }),
-  defineAction({ id: "cad_edit.import", kind: "write", replaces: "cad_import_drawing", parameters: importParameters, run: runImport }),
+  defineAction({ id: "cad_edit.import", kind: "write", effects: ["domain"], replaces: "cad_import_drawing", parameters: importParameters, run: runImport }),
   defineAction({
-    id: "cad_edit.parametric_create", kind: "write", replaces: "cad_parametric",
+    id: "cad_edit.parametric_create", kind: "write", effects: ["domain"], replaces: "cad_parametric",
     parameters: parametricCreateSchema,
     run: (input, context) => runParametricCreate(input, context)
   }),
   defineAction({
-    id: "cad_edit.parametric_update", kind: "write", replaces: "cad_parametric",
+    id: "cad_edit.parametric_update", kind: "write", effects: ["domain"], replaces: "cad_parametric",
     parameters: parametricUpdateSchema,
     run: (input, context) => runParametricUpdate(input, context)
   }),
   defineAction({
-    id: "cad_edit.parametric_recipe_create", kind: "write", replaces: "cad_parametric",
+    id: "cad_edit.parametric_recipe_create", kind: "write", effects: ["domain"], replaces: "cad_parametric",
     parameters: parametricRecipeCreateSchema,
     run: (input, context) => runParametricRecipeCreate(input, context)
   }),
   defineAction({
-    id: "cad_edit.parametric_convert", kind: "write", replaces: "cad_parametric",
+    id: "cad_edit.parametric_convert", kind: "write", effects: ["domain"], replaces: "cad_parametric",
     parameters: parametricConvertSchema,
     run: (input, context) => runParametricConvert(input, context)
   })

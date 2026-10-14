@@ -5,6 +5,17 @@ const revision = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 export const ActionKind = Schema.Literals(["read", "write", "destructive"])
 
+/**
+ * What an action touches besides reading the project, declared per action and never inferred from its tool:
+ * `domain` the drawing/operations/stock, `program` stored NC, `report` stored verification evidence, `library` the
+ * user's materials/tools/machines/components, `memory` notes and the project context, `vcs` history and branches,
+ * `workflow` triggered runs, `session` delegated specialists, `ui` the open editor or its viewport, `external` the network.
+ * A `read` action may only have `ui` or `external`; every write names at least one persistent effect.
+ */
+export const ActionEffect = Schema.Literals(["domain", "program", "report", "library", "memory", "vcs", "workflow", "session", "ui", "external"])
+export type ActionEffect = typeof ActionEffect.Type
+export const PERSISTENT_EFFECTS: ReadonlyArray<ActionEffect> = ["domain", "program", "report", "library", "memory", "vcs", "workflow", "session"]
+
 /** Trusted admission data; never a field in model-visible action parameters. */
 export const ActionInvocation = Schema.Struct({
   actorId: identifier,
@@ -28,6 +39,12 @@ export class ActionInvalidInput extends Schema.TaggedError<ActionInvalidInput>()
 }) {}
 
 export class ActionInterrupted extends Schema.TaggedError<ActionInterrupted>()("ActionInterrupted", {
+  actionId: identifier,
+  message: Schema.String
+}) {}
+
+/** The call may have committed (a write whose answer could not be read): reconcile by inspecting, never retry blindly. */
+export class ActionUncertain extends Schema.TaggedError<ActionUncertain>()("ActionUncertain", {
   actionId: identifier,
   message: Schema.String
 }) {}
@@ -65,5 +82,31 @@ export const ActionCommitted = Schema.Struct({
   receipt: ActionReceipt
 })
 
-export const ActionFailure = Schema.Union([ActionDenied, ActionInvalidInput, ActionInterrupted])
+export const ActionFailure = Schema.Union([ActionDenied, ActionInvalidInput, ActionInterrupted, ActionUncertain])
 export const ActionMutationOutcome = Schema.Union([ActionCommitted, ActionConflict])
+
+/**
+ * How one call ended, as every adapter reports it: `succeeded` (including a read whose finding is negative, such as a
+ * failing check), `partial` (part of the answer or part of the batch), `refused` (nothing done: invalid, denied,
+ * unavailable, nothing to do), `conflict` (the document moved on: inspect again), `cancelled` and `uncertain`.
+ */
+export const ActionOutcomeStatus = Schema.Literals(["succeeded", "partial", "refused", "conflict", "cancelled", "uncertain"])
+export type ActionOutcomeStatus = typeof ActionOutcomeStatus.Type
+
+const record = (value: unknown): Record<string, unknown> | undefined =>
+  value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+
+/** Classifies a validated action result; the one rule the host text, Code Mode, the desktop and the bridge share. */
+export const actionOutcome = (value: unknown): ActionOutcomeStatus => {
+  const result = record(value)
+  if (result === undefined) return "succeeded"
+  const tag = result["_tag"]
+  if (tag === "ActionInterrupted") return "cancelled"
+  if (tag === "ActionUncertain") return "uncertain"
+  if (tag === "ActionConflict" || result["status"] === "stale" || result["status"] === "conflict") return "conflict"
+  if (result["ok"] === false && (typeof result["error"] === "string" || typeof tag === "string")) return "refused"
+  const skipped = result["skipped"]
+  if (result["complete"] === false || (typeof result["omitted"] === "number" && result["omitted"] > 0) || (Array.isArray(skipped) && skipped.length > 0)) return "partial"
+  if (typeof result["nextOffset"] === "number") return "partial"
+  return "succeeded"
+}

@@ -3,9 +3,10 @@
  * way `defineTool` turns a schema into one (spec 26 §2.3).
  *
  * The whole point of grouping is that the model spends one description per capability instead of one per verb. The
- * price is that the host's permission map is keyed by tool id, so a tool may not mix effects: a read-only specialist
- * given `cad_edit` would gain every write in it. A group that contains a destructive action is registered as `ask`
- * (one native confirmation) rather than an invented action-level permission.
+ * price is that the host's permission map is keyed by tool id, so a tool's kind is the strongest kind of its actions:
+ * a group with one write is a write tool, which a read-only role never receives, whatever honest `read` actions it
+ * also carries (listing delegated tasks is a read, yet `agent` is a write tool). A group that contains a destructive
+ * action is registered as `ask` (one native confirmation) rather than an invented action-level permission.
  */
 import { z } from "zod"
 import { defineTool, ToolMediaResult, type ToolContext, type ToolDefinition } from "./define.ts"
@@ -23,9 +24,6 @@ export const defineActionTool = (id: string, actions: Readonly<Record<string, Ac
   const entries = Object.entries(actions)
   if (entries.length === 0) throw new Error(`Action tool ${id} has no actions`)
   const kinds = new Set(entries.map(([, action]) => action.kind))
-  if (kinds.has("read") && (kinds.has("write") || kinds.has("destructive"))) {
-    throw new Error(`Action tool ${id} mixes read and write effects; the host's permissions are keyed by tool id, so split the group`)
-  }
   for (const [name, action] of entries) {
     if ("action" in action.parameters.shape) throw new Error(`Action ${id}.${name} must not redefine the discriminator`)
   }

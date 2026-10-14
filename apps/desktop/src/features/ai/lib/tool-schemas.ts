@@ -28,6 +28,7 @@ export const ToolInputSchemas: Record<ToolId, Schema.Top> = {
   cad_edit: actionCall,
   cam: actionCall,
   cam_edit: actionCall,
+  cam_verify: actionCall,
   library: actionCall,
   parts: actionCall,
   library_edit: actionCall,

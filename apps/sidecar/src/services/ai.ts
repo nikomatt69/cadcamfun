@@ -135,8 +135,12 @@ const toolHandlers = Effect.gen(function*() {
     if (write) await assertWrite(project.id)
     const rows = await Effect.runPromise(drawings.listByProject(project.id))
     const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
-    // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project.
-    let row = (snapshot?.projectId === project.id && typeof snapshot.drawingId === "string" ? rows.find((drawing) => drawing.id === snapshot.drawingId) : undefined) ?? rows[0]
+    // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project. A bound drawing
+    // that is gone is refused, never replaced by another one; without a binding only an unambiguous project resolves.
+    const bound = snapshot?.projectId === project.id && typeof snapshot.drawingId === "string" ? snapshot.drawingId : undefined
+    let row = bound !== undefined ? rows.find((drawing) => drawing.id === bound) : rows.length === 1 ? rows[0] : undefined
+    if (!row && bound !== undefined) throw new Error("The drawing open in the editor no longer exists in this project; open a drawing and retry. Nothing was changed.")
+    if (!row && rows.length > 1) throw new Error(`The project has ${rows.length} drawings and none is open in the editor; open the one to work on and retry. Nothing was changed.`)
     if (!row) {
       if (!write) throw new Error("The project has no drawing. Create a drawing before inspection.")
       row = await Effect.runPromise(drawings.create(project.id, { name: "Drawing 1", data: { elements: [], version: "1.0" } }))
@@ -211,10 +215,10 @@ const toolHandlers = Effect.gen(function*() {
       const { job, stockNote } = built
       if (input.planOnly === true) {
         const plan = cam.kernel.planOnly(job)
-        return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, issues: plan.issues, ...where(loaded) }
+        return plan.status === "ok" ? { ok: true, mutated: false, stockNote, ...plan.value, ...where(loaded) } : { ok: false, error: "The kernel could not plan this job; see issues.", issues: plan.issues, ...where(loaded) }
       }
       const run = cam.kernel.runJob(job)
-      if (run.status === "failed") return { ok: false, issues: run.issues, ...where(loaded) }
+      if (run.status === "failed") return { ok: false, error: "The kernel could not machine this job; see issues.", issues: run.issues, ...where(loaded) }
       const a = run.value
       const lines = a.nc.split("\n")
       return {
@@ -238,8 +242,8 @@ const toolHandlers = Effect.gen(function*() {
       const built = manufacturingJob(loaded, input)
       if (!built.ok) return { ...built, ...where(loaded) }
       const result = cam.kernel.runJob(built.job)
-      if (result.status === "failed") return { ok: false, issues: result.issues, ...where(loaded) }
-      if (result.value.release === "blocked") return { ok: false, release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
+      if (result.status === "failed") return { ok: false, error: "The kernel could not machine this job; nothing was stored.", issues: result.issues, ...where(loaded) }
+      if (result.value.release === "blocked") return { ok: false, error: "The program is blocked by its own replay claims; nothing was stored.", release: "blocked", issues: result.value.issues, claims: result.value.claims, ...where(loaded) }
       const artifact = Schema.decodeUnknownSync(CamKernelArtifact)(result.value)
       const kernelRequest = Schema.decodeUnknownSync(CamKernelRequest)({
         ...input, schemaVersion: 1, id: built.job.id, name: built.job.name,
@@ -317,7 +321,8 @@ const toolHandlers = Effect.gen(function*() {
       const evidence = record(data["verification"])
       const revision = drawingRevision(loaded)
       const report = record(evidence["report"])
-      const status = evidence["revision"] === undefined ? "unverified" : evidence["revision"] !== revision || evidence["requestRevision"] !== identity(found.request) || evidence["programRevision"] !== identity(stored?.row.gcode) ? "stale" : report["ok"] === true ? "pass" : "failed"
+      const programChanged = evidence["programRevision"] !== identity(stored?.row.gcode) || (evidence["programHash"] !== undefined && evidence["programHash"] !== cam.kernel.sha256(stored?.row.gcode ?? ""))
+      const status = evidence["revision"] === undefined ? "unverified" : evidence["revision"] !== revision || evidence["requestRevision"] !== identity(found.request) || programChanged ? "stale" : report["ok"] === true ? "pass" : "failed"
       const refinement = record(data["refinement"])
       const rounds = refinement["revision"] === revision && typeof refinement["rounds"] === "number" ? refinement["rounds"] : 0
       return { ok: status === "pass", status, operationId, drawingId: loaded.id, revision, verifiedRevision: evidence["revision"] ?? null, refinements: { used: rounds, remaining: Math.max(0, 3 - rounds) }, ...(status === "pass" || status === "failed" ? { issues: report["issues"], stats: report["stats"], modelled: evidence["modelled"], start: record(evidence["request"])["start"] } : {}), note: "A pass covers only the saved simulation model at this drawing and program revision." }
@@ -481,7 +486,7 @@ const toolHandlers = Effect.gen(function*() {
       if (input.action === "validate") return inspectParametric(input.history)
       if (input.action === "create") {
         const report = inspectParametric(input.history)
-        if (!report.ok) return report
+        if (!report.ok) return { ...report, ok: false, error: "error" in report ? report.error : "The part does not rebuild into a valid solid; nothing was created." }
         return { ...(await handlers.addElements(projectId, [{ type: "parametric", name: input.name, history: input.history, x: input.x ?? 0, y: input.y ?? 0, z: input.z ?? 0, ...(input.layer ? { layer: input.layer } : {}) }])) as Record<string, unknown>, mutation: "add" }
       }
       if (input.action === "convert") {
@@ -492,7 +497,7 @@ const toolHandlers = Effect.gen(function*() {
         if ("error" in converted) return { ok: false, error: converted.error, ...where(loaded) }
         const report = inspectParametric(converted.history)
         const origin = { id: source.id, type: source.type }
-        if (!report.ok) return { ...report, source: origin, notes: converted.notes }
+        if (!report.ok) return { ...report, source: origin, notes: converted.notes, ...(input.create ? { ok: false, error: "The converted history does not rebuild into a valid solid; nothing was created." } : {}) }
         const read = { ...report, source: origin, placement: converted.placement, notes: converted.notes, ...where(loaded) }
         if (!input.create) return read
         const { name: carriedName, ...carried } = converted.carry
@@ -743,15 +748,26 @@ const toolHandlers = Effect.gen(function*() {
       if (identity(record(found.row.data)["request"]) !== identity(current.request)) return { ok: false, error: "The drawing or stock changed since generation. Generate and verify the operation again." }
       return { ok: true, operationId, gcode: found.row.gcode }
     },
+    /**
+     * Replays the program stored on the operation; it never generates, replaces or rewrites NC. The report is bound to
+     * that program's hash, the rebuilt manufacturing request (geometry, stock, settings) and the drawing revision, and it
+     * is recorded only while all three are still what was checked: a concurrent change leaves nothing behind.
+     */
     verifyOperation: async (drawingId, operationId, options) => {
       await assertWrite(drawingId)
       const loaded = await load(drawingId)
       const revision = drawingRevision(loaded)
       const found = await operation(drawingId, operationId)
-      if ("error" in found) return { ok: false, error: found.error }
-      const { response, error } = cam.generator.generateToolpath(found.request as never)
-      if (error) return { ok: false, error }
-      const built = cam.verify.verifyRequestFor(found.request as never, response.gcode, {
+      if ("error" in found) return { ok: false, error: found.error, operationId }
+      const stored = await Effect.runPromise(toolpaths.find(acting().id, found.id))
+      const program = stored?.row.gcode
+      if (!stored || !program) return { ok: false, error: "The operation has no stored program: run cam_edit generate first, then verify that program.", operationId }
+      const requestRevision = identity(found.request)
+      if (identity(record(stored.row.data)["request"]) !== requestRevision) {
+        return { ok: false, status: "stale", operationId, error: "The drawing, stock or operation settings changed since the stored program was generated. Generate it again, then verify." }
+      }
+      const programHash = cam.kernel.sha256(program)
+      const built = cam.verify.verifyRequestFor(found.request as never, program, {
         ...(options.tool !== undefined ? { tool: options.tool } : {}),
         ...(options.stock !== undefined ? { stock: options.stock } : {}),
         ...(options.fixtures !== undefined ? { fixtures: options.fixtures } : {}),
@@ -760,23 +776,36 @@ const toolHandlers = Effect.gen(function*() {
         ...(options.tolerance !== undefined ? { tolerance: options.tolerance } : {}),
         ...(options.start !== undefined ? { start: options.start } : {})
       })
-      if (!built.ok) return { ok: false, error: built.error }
+      if (!built.ok) return { ok: false, error: built.error, operationId }
       const report = cam.verify.verifyToolpath(built.request)
-      // Keep the full report (with the height map) and the program it is about on the operation: the CAM page shows it.
-      const row = await Effect.runPromise(toolpaths.find(acting().id, found.id))
-      const previous = row?.row.data !== null && typeof row?.row.data === "object" ? (row!.row.data as Record<string, unknown>) : {}
-      await assertWrite(drawingId)
-      if (drawingRevision(await load(drawingId)) !== revision) return { ok: false, status: "stale", error: "The drawing changed during verification. Generate and verify again." }
       const modelled = { holder: built.request.tool.holderDiameter !== undefined, shank: built.request.tool.cuttingLength !== undefined, fixtures: built.request.fixtures.length, target: built.request.target !== undefined }
-      const { refinement: previousRefinement, ...metadata } = previous
-      await Effect.runPromise(toolpaths.update(found.id, { data: { ...metadata, ...(!report.ok && previousRefinement !== undefined ? { refinement: previousRefinement } : {}), request: found.request, response, verification: { report, revision, requestRevision: identity(found.request), programRevision: identity(response.gcode), modelled, request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures, start: built.request.start }, at: new Date().toISOString() } }, gcode: response.gcode }))
+      const evidence = {
+        report, revision, requestRevision, programRevision: identity(program), programHash, modelled,
+        request: { stock: built.request.stock, tool: built.request.tool, fixtures: built.request.fixtures, start: built.request.start, resolution: built.request.resolution },
+        at: new Date().toISOString()
+      }
+      await assertWrite(drawingId)
+      // The full report (with the height map) is kept on the operation for the CAM page; the program column is not touched.
+      const recorded = await Effect.runPromise(toolpaths.updateWhere(found.id,
+        (row, drawingData) => {
+          const data = record(drawingData)
+          return row.gcode === program && identity(record(row.data)["request"]) === requestRevision && drawingRevision({ id: loaded.id, data, elements: elementsOf(data) }) === revision
+        },
+        (row) => {
+          const { refinement: previousRefinement, verification: _previous, ...metadata } = record(row.data)
+          return { data: { ...metadata, ...(!report.ok && previousRefinement !== undefined ? { refinement: previousRefinement } : {}), verification: evidence } }
+        }))
+      if (recorded === undefined) return { ok: false, status: "stale", operationId, error: "The program, its inputs or the drawing changed during verification; no report was recorded. Verify again." }
+      const shown = report.issues.slice(0, 20)
       // The height field is for the UI; the model gets the verdict, the numbers and where it went wrong.
       return {
-        ok: report.ok, status: report.ok ? "pass" : "failed", revision, issues: report.issues.slice(0, 20), stats: report.stats, start: built.request.start, startSource: options.start !== undefined ? "explicit tool pose" : "assumed generator clearance pose",
+        ok: report.ok, status: report.ok ? "pass" : "failed", revision, operationId, programHash, issues: shown, stats: report.stats,
+        coverage: { resolutionMm: report.stats.cellSize, requestedResolutionMm: built.request.resolution ?? null, issuesReturned: shown.length, issuesOmitted: report.issues.length - shown.length, modelled },
+        start: built.request.start, startSource: options.start !== undefined ? "explicit tool pose" : "assumed generator clearance pose",
         stock: built.request.stock, tool: built.request.tool,
         stockSource: options.stock !== undefined ? "verification override" : (found.request.geometry as Record<string, unknown>)["stock"] !== undefined ? "configured drawing stock" : "inferred from geometry/toolpath",
         modelled,
-        note: "A passing report covers only what is modelled; it is not a machine certification."
+        note: "The stored program was replayed unchanged. A passing report covers only what is modelled at this program, drawing and stock revision; it is not a machine certification."
       }
     },
     remember: async (key, value) => { actingCell.assertActive(); await Effect.runPromise(kv.set(`ai.memory.${key}`, value)); return { ok: true, key } },

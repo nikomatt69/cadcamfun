@@ -13,6 +13,7 @@ import { useCADStore } from "../../cad/store/cadStore.ts"
 import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { useLayerStore } from "../../cad/store/layerStore.ts"
 import { mergeSection } from "../../cad/lib/section.ts"
+import { canonicalTool } from "./tools.ts"
 
 export interface EditorOwner {
   readonly projectId: string | null
@@ -44,7 +45,9 @@ export const captureEditorOwner = (): EditorOwner => {
  */
 export const actionKey = (tool: string, input: unknown): string => {
   const action = input !== null && typeof input === "object" ? (input as { action?: unknown }).action : undefined
-  return typeof action === "string" && action !== "" && !tool.includes(".") ? `${tool}.${action}` : tool
+  // An exposure (`cam_verify`) carries canonical actions: its calls are keyed by the canonical id (`cam_edit.verify`).
+  const canonical = canonicalTool(tool)
+  return typeof action === "string" && action !== "" && !canonical.includes(".") ? `${canonical}.${action}` : canonical
 }
 
 export type SyncOp =

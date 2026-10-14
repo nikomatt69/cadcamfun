@@ -21,6 +21,8 @@ declare module "@nikcli-ai/sdk-next" {
   export interface ToolExecuteResult {
     readonly title: string
     readonly output: string
+    /** The success value Code Mode receives when the tool declares an `output` codec. */
+    readonly value?: unknown
     readonly metadata: Record<string, unknown>
     readonly attachments?: ReadonlyArray<{ readonly id: string; readonly sessionID: string; readonly messageID: string; readonly type: "file"; readonly mime: string; readonly filename?: string; readonly url: string }>
   }
@@ -29,6 +31,8 @@ declare module "@nikcli-ai/sdk-next" {
     readonly description: string
     /** A zod 4 object schema. */
     readonly parameters: unknown
+    /** A zod codec for `value`; when present, Code Mode reads `value` instead of the text `output`. */
+    readonly output?: unknown
     readonly formatValidationError?: (error: z.ZodError) => string
     readonly execute: (args: never, ctx: ToolExecuteContext) => Promise<ToolExecuteResult>
   }

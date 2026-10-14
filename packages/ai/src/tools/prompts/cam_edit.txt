@@ -4,20 +4,20 @@ Actions
 - create: add an operation.
 - update: change settings; invalidate NC.
 - generate: store NC; return stats and preview.
-- verify: store stock-removal, collision and gouge findings with modelling limits.
+- verify: replay the program stored on the operation (never regenerated or changed) and store stock-removal, collision and gouge findings bound to its programHash; no stored program means generate first.
 - stock_set: change stock; invalidate programs.
 - manufacture: the kernel route for a whole part: store its multi-tool NC (M98 subprograms for repeated toolpaths) and release evidence. Preview with cam manufacture first; read the evidence with cam review.
 
 Parameters (mm, mm/min, rpm, angles in degrees)
 - create: type (contour, pocket, drill, engrave, profile, threading, 3d_surface, probing, multiaxis, facing, turning_od, parting_od, ...), params - the generator settings: toolType, toolDiameter, depth, stepdown, feedrate, rpm, material (aluminum, steel, wood, plastic, brass, titanium, composite, other), offset (inside|outside|center), workOffset (G54..G59), originType, machineType, and printer extras (infillDensity, supportType, shellCount).
 - update: operationId, params (changed fields only).
-- generate: operationId (the newest operation when omitted), maxLines (1-200, default 40).
+- generate: operationId (required; list them with cam operations), maxLines (1-200, default 40).
 - verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance. Omitted fields are not modelled.
 - stock_set: stock {width, height, depth, radius, x, y, topZ, allowance, material?, elementId?}.
 - manufacture: as cam manufacture (material, machine, origin, finishAllowance, scallop, deburr, operations, tools, subprograms) plus expectedRevision. Blocked releases are not saved.
 
 Result (JSON)
-- ok; create: operationId; generate: stats/preview; verify: issues, stats, modelling limits; stock_set: stock/workpiece, invalidated operations.
+- ok; create: operationId; generate: programHash, lines/returned/omitted, preview head (the stored program is complete); verify: status, programHash, issues, stats, coverage (resolution, omitted issues), modelling limits; stock_set: stock/workpiece, invalidated operations.
 - ok:false: empty drawing, missing operation or refusal.
 - manufacture: operationId, release, NC identity. Desktop loads the original; cam manufacture previews without writing.
 

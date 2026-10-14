@@ -41,7 +41,7 @@ describe("cam kernel actions", () => {
 
   test("manufacture is delegated to the host, and says so when the host has no kernel", async () => {
     const calls: unknown[] = []
-    const done = await run("cam.manufacture", { material: "C45", planOnly: true }, { manufacture: async (_p: string, input: unknown) => { calls.push(input); return { ok: true } } })
+    const done = await run("cam.manufacture", { material: "C45", planOnly: true }, { manufacture: async (_p: string, input: unknown) => { calls.push(input); return { ok: true, mutated: false, drawingId: "d", projectId: "p" } } })
     expect(done["ok"]).toBe(true)
     expect(calls).toEqual([{ material: "C45", planOnly: true }])
     expect((await run("cam.manufacture", { material: "C45" }))["ok"]).toBe(false)

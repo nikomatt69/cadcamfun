@@ -14,7 +14,7 @@ import { t } from "../../../i18n/index.ts"
 import type { AiToolCall } from "../lib/types.ts"
 import { isVcsTool, toolFacts } from "../lib/tool-facts.ts"
 import { actionOf } from "../lib/tool-schemas.ts"
-import { toolTitle } from "../lib/tools.ts"
+import { canonicalTool, toolTitle } from "../lib/tools.ts"
 
 const SPECIALISTS = ["researcher", "editor", "modeler", "machinist", "reviewer", "planner", "diagnostician", "verifier", "optimizer"] as const
 /** The specialist's name in the user's language (an agent this version does not know keeps its own name). */
@@ -368,7 +368,8 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
   const view = createMemo<View>(() => {
     // One host tool, many actions: the row renders the capability and what it was asked to do (`cad_edit` `delete`).
     const action = str(input()["action"]) ?? ""
-    const make = VIEWS[action === "" ? props.tool : `${props.tool}.${action}`]
+    const tool = canonicalTool(props.tool)
+    const make = VIEWS[action === "" ? tool : `${tool}.${action}`]
     try {
       return make ? make({ input: input(), data: data(), output: props.call?.output }) : genericView(props.tool, input())
     } catch {

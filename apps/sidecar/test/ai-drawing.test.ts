@@ -18,12 +18,21 @@ test("cad.drawing reads the accessible active part without changing the document
   const elementId = created.ids[0]
   const inspect = () => cad.execute({ action: "parametric_inspect", elementId }, context)
   const before = await inspect()
-  const sheet = JSON.parse(await cad.execute({ action: "drawing", elementId, options: { size: "A4", title: "Plate drawing" } }, context))
+  // Two faces of one answer: the whole sheet is the value (Code Mode, the stored part, the desktop); the model reads a
+  // bounded text that keeps the identity and says what it left out of the long SVG.
+  const answer = await cad.executeWithFiles!({ action: "drawing", elementId, options: { size: "A4", title: "Plate drawing" } }, context)
+  const sheet = answer.value as { ok: boolean; mutated: boolean; elementId: string; size: unknown; svg: string }
   expect(sheet.ok).toBe(true)
   expect(sheet.mutated).toBe(false)
   expect(sheet.elementId).toBe(elementId)
   expect(sheet.size).toEqual({ width: 297, height: 210 })
   expect(sheet.svg).toContain("Plate drawing")
+  expect(answer.output.length).toBeLessThanOrEqual(24_000)
+  if (answer.bounded) {
+    const text = JSON.parse(answer.output) as { ok: boolean; elementId: string; _preview: { complete: boolean; omitted: Array<{ path: string }> } }
+    expect(text).toMatchObject({ ok: true, elementId, _preview: { complete: false } })
+    expect(text._preview.omitted.some((omission) => omission.path === "svg")).toBe(true)
+  }
   expect(await inspect()).toEqual(before)
   expect(JSON.parse(await cad.execute({ action: "drawing", elementId: "missing" }, context)).ok).toBe(false)
   expect(JSON.parse(await cad.execute({ action: "drawing", elementId, history: plateTemplate() }, context)).ok).toBe(false)

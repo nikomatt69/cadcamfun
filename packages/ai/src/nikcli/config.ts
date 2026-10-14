@@ -6,6 +6,7 @@ import { PRIMARIES, PRIMARY_IDS } from "./primaries.ts"
 import { NATIVE_TOOLS } from "./tool-registry.ts"
 import { permittedTools, toolAllowed, type PolicyStatement } from "./policy.ts"
 import compactionPrompt from "./prompts/compaction.txt" with { type: "text" }
+import { ACTION_EXPOSURES } from "../actions/catalogue.ts"
 
 /**
  * Builds the host's global `nikcli.json`. It contains no secrets: keys are
@@ -125,7 +126,8 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   const policies = input.policies ?? []
   const toolIds = permittedTools(policies, input.toolIds)
   const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
-  for (const id of toolIds) permission[id] = "allow"
+  // Exposures (`cam_verify`) are narrow views for one specialist; the main agent already holds the canonical tool.
+  for (const id of toolIds) if (!Object.hasOwn(ACTION_EXPOSURES, id)) permission[id] = "allow"
   for (const id of NATIVE_APPROVAL_TOOL_IDS) {
     if (toolIds.includes(id)) permission[id] = "ask"
   }

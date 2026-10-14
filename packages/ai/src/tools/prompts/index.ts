@@ -11,6 +11,7 @@ import cad from "./cad.txt" with { type: "text" }
 import cad_edit from "./cad_edit.txt" with { type: "text" }
 import cam from "./cam.txt" with { type: "text" }
 import cam_edit from "./cam_edit.txt" with { type: "text" }
+import cam_verify from "./cam_verify.txt" with { type: "text" }
 import library from "./library.txt" with { type: "text" }
 import parts from "./parts.txt" with { type: "text" }
 import library_edit from "./library_edit.txt" with { type: "text" }
@@ -26,6 +27,7 @@ const PROMPTS = {
   cad_edit,
   cam,
   cam_edit,
+  cam_verify,
   library,
   parts,
   library_edit,

@@ -357,7 +357,9 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
             state.toolCalls += 1
             out.push({ type: "tool_call", sessionId, callId, tool, input: toolState?.["input"] ?? {} })
           }
-          const finalOutput = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
+          // A bounded answer stores its whole value in the metadata: the editor mirrors that, never the model's shortened text.
+          const stored = status === "completed" ? rec(toolState?.["metadata"])?.["value"] : undefined
+          const finalOutput = (stored !== undefined ? JSON.stringify(stored) : status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
           const failure = toolFailure(status, finalOutput)
           const unresolved = failure ?? partialProblem(outputRecord(finalOutput))
           if (unresolved !== undefined) state.toolErrors.set(tool, unresolved)

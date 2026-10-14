@@ -6,12 +6,17 @@
  * This file holds only what the interface cannot derive — the title and category the UI shows per tool. The list of
  * ids is a contract in its own right, and `ai.test.ts` compares it against the catalogue's tools: a tool the host
  * registers and the desktop does not know would be rejected by the SSE validation layer as "not allowed", so the two
- * must name the same thirteen capabilities.
+ * must name the same capabilities. `cam_verify` is an exposure: the verifier's narrow view of `cam_edit` (generate and
+ * verify only), with the same action ids, so it renders as `cam_edit` does.
  */
 export const TOOL_IDS = [
   "cad", "cad_edit", "cam", "cam_edit", "library", "parts", "library_edit",
-  "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent"
+  "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent", "cam_verify"
 ] as const
+
+/** The canonical tool an exposure carries actions of: the row, the facts and the mirrors key on the canonical id. */
+export const CANONICAL_TOOL: Readonly<Record<string, string>> = { cam_verify: "cam_edit" }
+export const canonicalTool = (tool: string): string => CANONICAL_TOOL[tool] ?? tool
 
 export type ToolId = (typeof TOOL_IDS)[number]
 
@@ -31,6 +36,7 @@ export const TOOL_SUMMARIES: ReadonlyArray<ToolSummary> = [
   { id: "cad_edit", category: "cad", title: "Edit the drawing", description: "Add 3D elements and 2D entities, modify, transform, group, import a drawing, create or update a parametric part, control the editor and delete — the destructive actions ask first." },
   { id: "cam", category: "cam", title: "Read the machining", description: "The machine's axes and zeros, the operations, the stock, suggested cutting parameters, static G-code analysis and the CAM viewport." },
   { id: "cam_edit", category: "cam", title: "Machine", description: "Create and update an operation, generate its G-code and verify the program against the stock, the holder, the fixtures and the finished part." },
+  { id: "cam_verify", category: "cam", title: "Verify a program", description: "The verifier's view of machining: generate an existing operation's program and verify the stored program, without creating or changing operations or stock." },
   { id: "library", category: "library", title: "Read the libraries", description: "Saved components, materials, cutters and machine configurations the user already owns." },
   { id: "parts", category: "library", title: "Reusable parts", description: "Save a group of elements as a component, place it again, or remove it." },
   { id: "library_edit", category: "library", title: "Write the libraries", description: "Create or replace a material, a cutter or a machine configuration and set the project defaults." },

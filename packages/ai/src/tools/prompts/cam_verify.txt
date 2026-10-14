@@ -1,0 +1,21 @@
+Generate and verify the program of an existing operation; nothing else. It cannot create or change operations, stock or releases.
+
+Actions
+- generate: store the NC of the operation from its current settings; return its programHash, size and a preview head.
+- verify: replay the program stored on the operation (never regenerated or changed) and store stock-removal, collision and gouge findings bound to its programHash; no stored program means generate first.
+
+Parameters (mm)
+- generate: operationId (required; list them with cam operations), maxLines (1-200, default 40).
+- verify: operationId, tool {cuttingLength, shankDiameter, stickout, holderDiameter, holderLength}, fixtures [{id, bounds:{minX,maxX,minY,maxY,minZ,maxZ}}], targetSolids, stock (same bounds), resolution, tolerance, start {x,y,z}. Omitted fields are not modelled.
+
+Result (JSON)
+- generate: ok, operationId, programHash, lines/returned/omitted, preview.
+- verify: ok, status pass|failed, revision, programHash, issues, stats, coverage (resolution, omitted issues), modelling limits.
+- ok:false with error: missing operation, no stored program, or a stale program (the drawing or settings changed after generation: generate again).
+
+Do not use it
+- To create, change or release operations or stock: that is the machinist's cam_edit.
+
+After it
+- Read cam review for the stored report. A clean report proves only what was modelled: name the coverage and the limits.
+- A failed check goes back to the machinist with the cause; you do not change settings.

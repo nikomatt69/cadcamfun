@@ -6,19 +6,19 @@
  * names here are the groupings the host needs (read-only tools, the actions the application contributes), so that a
  * specialist's allow-list and the host's registrations cannot disagree.
  */
-import { ACTION_CATALOGUE, ACTION_TOOL_IDS, toolKind } from "../actions/catalogue.ts"
+import { ACTION_CATALOGUE, EXPOSED_TOOL_IDS, toolKind } from "../actions/catalogue.ts"
 
-/** Every tool id the host registers for a project: the catalogue's, in catalogue order. */
-export const TOOL_IDS = ACTION_TOOL_IDS
+/** Every tool id the host registers for a project: the catalogue's groups in catalogue order, then the exposures. */
+export const TOOL_IDS = EXPOSED_TOOL_IDS
 
 /** The tools that only read: safe for a read-only specialist, whatever actions they carry. */
-export const READ_TOOL_IDS: ReadonlyArray<string> = ACTION_TOOL_IDS.filter((tool) => toolKind(tool) === "read")
+export const READ_TOOL_IDS: ReadonlyArray<string> = EXPOSED_TOOL_IDS.filter((tool) => toolKind(tool) === "read")
 
 /** The tools whose kind is not `read`: a specialist that may not change anything has none of them. */
-export const WRITE_TOOL_IDS: ReadonlyArray<string> = ACTION_TOOL_IDS.filter((tool) => toolKind(tool) !== "read")
+export const WRITE_TOOL_IDS: ReadonlyArray<string> = EXPOSED_TOOL_IDS.filter((tool) => toolKind(tool) !== "read")
 
 /** Tools with a destructive action: the host registers them as `ask` (one native confirmation per tool). */
-export const DESTRUCTIVE_TOOL_IDS: ReadonlyArray<string> = ACTION_TOOL_IDS.filter((tool) => toolKind(tool) === "destructive")
+export const DESTRUCTIVE_TOOL_IDS: ReadonlyArray<string> = EXPOSED_TOOL_IDS.filter((tool) => toolKind(tool) === "destructive")
 
 /** Every action id, `tool.action`. */
 export const ACTION_IDS: ReadonlyArray<string> = ACTION_CATALOGUE.map((action) => action.id)

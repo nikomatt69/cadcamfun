@@ -12,6 +12,7 @@ import type { ToolHandlersShape } from "./handlers.ts"
 import { lenient, sanitizeArguments } from "./lenient-arguments.ts"
 import { formatToolValidationError, toolValidationFailure } from "../tool-validation.ts"
 import { TOOL_PROMPT_IDS, toolPrompt, type ToolPromptId } from "./prompts/index.ts"
+import { toolOutput } from "./tool-output.ts"
 
 /** An implementation the application contributes for a catalogue action it owns (libraries, version control, delegation). */
 export type ActionContribution = (input: never, context: ToolContext) => Promise<unknown>
@@ -55,15 +56,23 @@ export class ToolMediaResult {
   constructor(readonly value: unknown, readonly files: ReadonlyArray<FilePart>) {}
 }
 
+/**
+ * The host spec of one tool. Every answer has two faces (`tool-output.ts`): the whole validated value, which Code Mode
+ * and the stored part receive, and the bounded text the model reads, which declares anything it leaves out.
+ */
 export const toSpec = (definition: ToolDefinition, context: ToolContext): HostToolSpec => {
+  const answer = (value: unknown, files?: ReadonlyArray<FilePart>) => {
+    const out = toolOutput(value)
+    return { output: out.text, value, outcome: out.outcome, bounded: out.bounded, ...(files !== undefined ? { files } : {}) }
+  }
   const run = async (input: unknown, call: { signal: AbortSignal; sessionId: string }) => {
     try {
-      if (call.signal.aborted) return { output: json({ ok: false, error: "Tool execution cancelled." }) }
+      if (call.signal.aborted) return answer({ ok: false, error: "Tool execution cancelled." })
       const parsed = definition.parameters.safeParse(sanitizeArguments(input))
-      if (!parsed.success) return { output: json(toolValidationFailure(definition.id, parsed.error)) }
+      if (!parsed.success) return answer(toolValidationFailure(definition.id, parsed.error))
       const result = await definition.execute(parsed.data, { ...context, signal: call.signal, sessionId: call.sessionId })
-      return result instanceof ToolMediaResult ? { output: json(result.value), files: result.files } : { output: json(result) }
-    } catch (error) { return { output: json({ ok: false, error: safeToolError(error) }) } }
+      return result instanceof ToolMediaResult ? answer(result.value, result.files) : answer(result)
+    } catch (error) { return answer({ ok: false, error: safeToolError(error) }) }
   }
   return {
     id: definition.id, description: definition.description, parameters: lenient(definition.parameters),

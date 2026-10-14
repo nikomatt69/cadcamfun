@@ -5,7 +5,7 @@
  * and registered next to these.
  */
 import type { HostToolSpec } from "../nikcli/runtime.ts"
-import { ACTION_TOOL_IDS } from "../actions/catalogue.ts"
+import { EXPOSED_TOOL_IDS } from "../actions/catalogue.ts"
 import type { ActionContribution } from "../actions/action.ts"
 import { toSpec, type ToolContext, type ToolDefinition } from "./define.ts"
 import type { ActionTool } from "./action.ts"
@@ -14,6 +14,7 @@ import { cadTool } from "./cad.ts"
 import { cadEditTool } from "./cad_edit.ts"
 import { camTool } from "./cam.ts"
 import { camEditTool } from "./cam_edit.ts"
+import { camVerifyTool } from "./cam_verify.ts"
 import { libraryTool } from "./library.ts"
 import { partsTool } from "./parts.ts"
 import { libraryEditTool } from "./library_edit.ts"
@@ -24,16 +25,17 @@ import { vcsTool } from "./vcs.ts"
 import { vcsEditTool } from "./vcs_edit.ts"
 import { agentTool } from "./agent.ts"
 
-/** The built-in tools, in catalogue order. Every id is an action tool: there is no second declaration path. */
+/** The built-in tools, in catalogue order, then the exposures. Every id is an action tool: there is no second declaration path. */
 export const BUILT_IN_TOOLS: ReadonlyArray<ActionTool> = [
   cadTool, cadEditTool, camTool, camEditTool,
   libraryTool, partsTool, libraryEditTool,
   memoryTool, memoryEditTool, researchTool,
-  vcsTool, vcsEditTool, agentTool
+  vcsTool, vcsEditTool, agentTool,
+  camVerifyTool
 ] as const
 
-/** The built-in tool ids; derived from the catalogue so the two cannot drift. */
-export const TOOL_IDS: ReadonlyArray<string> = [...ACTION_TOOL_IDS]
+/** The built-in tool ids; derived from the catalogue (groups and exposures) so the two cannot drift. */
+export const TOOL_IDS: ReadonlyArray<string> = [...EXPOSED_TOOL_IDS]
 
 /**
  * The host tools of one project: the catalogue's tools plus any extension tools (an id may not repeat).

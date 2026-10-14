@@ -259,7 +259,12 @@ describe("cam_list_operations / cam_update_operation / cam_suggest_parameters", 
 describe("cam_verify_toolpath", () => {
   test("verifies the stored operation against its stock and reports what is modelled", async () => {
     await run("cam_edit", { action: "update", operationId, params: { depth: 3 } })
+    // The update dropped the program; verification replays a stored program only, it never makes one.
+    expect(await run("cam_edit", { action: "verify", operationId })).toMatchObject({ ok: false, error: expect.stringContaining("generate") })
+    const generated = await run("cam_edit", { action: "generate", operationId })
     const out = await run("cam_edit", { action: "verify", operationId })
+    expect(out.programHash).toBe(generated.programHash)
+    expect(out.coverage).toMatchObject({ resolutionMm: expect.any(Number), issuesOmitted: expect.any(Number) })
     expect(out.stats.removedVolume).toBeGreaterThan(0)
     expect(out.modelled).toEqual({ holder: false, shank: false, fixtures: 0, target: false })
     expect(out.note).toContain("not a machine certification")
@@ -268,6 +273,7 @@ describe("cam_verify_toolpath", () => {
 
   test("a short cutter with a holder is checked against the depth", async () => {
     await run("cam_edit", { action: "update", operationId, params: { depth: 8 } })
+    await run("cam_edit", { action: "generate", operationId })
     const out = await run("cam_edit", { action: "verify", 
       operationId,
       tool: { cuttingLength: 3, stickout: 4, holderDiameter: 30, holderLength: 40 },
@@ -280,6 +286,7 @@ describe("cam_verify_toolpath", () => {
 
   test("fixtures and a target part are validated and used", async () => {
     await run("cam_edit", { action: "update", operationId, params: { depth: 3 } })
+    await run("cam_edit", { action: "generate", operationId })
     const out = await run("cam_edit", { action: "verify", 
       operationId,
       stock: { minX: -30, maxX: 30, minY: -25, maxY: 25, minZ: -10, maxZ: 0 },
@@ -290,6 +297,22 @@ describe("cam_verify_toolpath", () => {
     expect(out.stats.gougeVolume).toBeDefined()
     // A malformed solid is rejected by the schema before the handler runs.
     expect(await run("cam_edit", { action: "verify", operationId, targetSolids: [{ _tag: "Nope" }] })).toMatchObject({ ok: false, error: expect.any(String) })
+  })
+
+  test("verifying never changes the stored program, and the report is bound to it", async () => {
+    await run("cam_edit", { action: "update", operationId, params: { depth: 3 } })
+    const generated = await run("cam_edit", { action: "generate", operationId })
+    const before = await handlers.operationProgram!("default", operationId)
+    const out = await run("cam_edit", { action: "verify", operationId })
+    const after = await handlers.operationProgram!("default", operationId)
+    expect(before.ok && after.ok && after.gcode === before.gcode).toBe(true)
+    expect(out).toMatchObject({ operationId, programHash: generated.programHash })
+    expect(await run("cam", { action: "review", operationId })).toMatchObject({ status: out.ok ? "pass" : "failed" })
+    // The stored NC text is untouched, but its manufacturing input (the drawing) moved on: the report no longer applies.
+    const extra = await run("cad_edit", { action: "add", elements: [{ type: "cube", width: 4, height: 4, depth: 4, x: 80 }] })
+    expect((await handlers.operationProgram!("default", operationId)).ok).toBe(false)
+    expect(await run("cam", { action: "review", operationId })).toMatchObject({ status: "stale" })
+    await run("cad_edit", { action: "delete", ids: extra.ids, confirm: true })
   })
 
   test("unknown operations and non-mill operations are explained, not thrown", async () => {

@@ -38,12 +38,36 @@ export const ACTION_TOOL_IDS: ReadonlyArray<string> = [...new Set(ACTION_CATALOG
 
 /** The actions of one tool, keyed by action name: what `defineActionTool` turns into a host tool. */
 export const actionsOf = (tool: string): Readonly<Record<string, ActionSpec>> => {
-  const entries = ACTION_CATALOGUE.filter((spec) => toolOf(spec) === tool).map((spec) => [nameOf(spec), spec] as const)
+  const entries = exposedActions(tool).map((spec) => [nameOf(spec), spec] as const)
   if (entries.length === 0) throw new Error(`Unknown action tool: ${tool}`)
   return Object.freeze(Object.fromEntries(entries))
 }
 
 export const actionById = (id: string): ActionSpec | undefined => ACTION_CATALOGUE.find((spec) => spec.id === id)
+
+/**
+ * Exposures: extra tools that carry a named subset of canonical actions, so a role can receive exactly what it needs
+ * without a second declaration. The action keeps its id (`cam_edit.verify`), effects, contract and implementation; only
+ * the tool the host registers (and its permission key) differs. The verifier generates and verifies a program through
+ * `cam_verify` and never receives `cam_edit`, which would also let it create, update, set stock or release.
+ */
+export const ACTION_EXPOSURES: Readonly<Record<string, ReadonlyArray<string>>> = {
+  cam_verify: ["cam_edit.generate", "cam_edit.verify"]
+}
+
+/** Every tool id the host registers: the canonical groups, then the exposures. */
+export const EXPOSED_TOOL_IDS: ReadonlyArray<string> = [...ACTION_TOOL_IDS, ...Object.keys(ACTION_EXPOSURES)]
+
+/** The canonical actions a registered tool carries (a group or an exposure). */
+export const exposedActions = (tool: string): ReadonlyArray<ActionSpec> => {
+  const exposure = ACTION_EXPOSURES[tool]
+  if (exposure === undefined) return ACTION_CATALOGUE.filter((spec) => toolOf(spec) === tool)
+  return exposure.map((id) => {
+    const spec = ACTION_CATALOGUE.find((candidate) => candidate.id === id)
+    if (spec === undefined) throw new Error(`Exposure ${tool} names an unknown action: ${id}`)
+    return spec
+  })
+}
 
 /** The effect of a tool: the strongest one it contains, so a group with a destructive action asks. */
 export const toolKind = (tool: string): "read" | "write" | "destructive" => {
@@ -53,7 +77,7 @@ export const toolKind = (tool: string): "read" | "write" | "destructive" => {
 
 /** Every tool id of a kind; what the specialists' allow-lists are derived from. */
 export const toolIdsOfKind = (...kinds: ReadonlyArray<"read" | "write" | "destructive">): ReadonlyArray<string> =>
-  ACTION_TOOL_IDS.filter((tool) => kinds.includes(toolKind(tool)))
+  EXPOSED_TOOL_IDS.filter((tool) => kinds.includes(toolKind(tool)))
 
 /** The per-verb tool ids the catalogue replaced, in catalogue order: the parity map of spec 26 §6.2. */
 export const REPLACED_TOOL_IDS: ReadonlyArray<string> = [...new Set(ACTION_CATALOGUE.map((spec) => spec.replaces).filter((id): id is string => id !== undefined))]

@@ -141,8 +141,8 @@ export const SUBAGENTS: Readonly<Record<SubagentId, SubagentSpec>> = {
     host: "cadcam-verifier",
     description: "Test runner (nikcli's test-runner): generates a missing program, runs the model checks, the DFM rules, the static G-code analysis and the toolpath simulation, and reports what passed, what failed and what was not modelled. Does not fix.",
     prompt: specialistPrompt("verifier"),
-    // Verification stores a program and a report, which is a write on the operation, so this role is an editor of operations only by prompt; it holds no `cad_edit`.
-    tools: ["cad", "cam", "cam_edit", "library", "vcs", "memory"],
+    // `cam_verify`, not `cam_edit`: it generates and verifies an existing program; it cannot create, update, set stock or release.
+    tools: ["cad", "cam", "cam_verify", "library", "vcs", "memory"],
     edits: true,
     background: false,
     steps: 40,

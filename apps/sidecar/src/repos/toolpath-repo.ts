@@ -48,6 +48,11 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
   find(userId: string, id: string): Effect.Effect<{ row: ToolpathRow; project: { id: string; name: string; ownerId: string; organizationId: string | null }; canWrite: boolean } | undefined, DatabaseError>
   create(userId: string, d: ToolpathInput & { name: string; projectId: string; drawingId?: string; applyDefaults?: boolean }): Effect.Effect<ToolpathRow, DatabaseError>
   update(id: string, patch: Partial<ToolpathInput>): Effect.Effect<ToolpathRow, DatabaseError>
+  /**
+   * Compare-and-set: inside one synchronous transaction, reads the toolpath and its drawing's data, and applies `patch`
+   * only while `guard` still holds for both. `undefined` when the row is gone or the guard failed: nothing was written.
+   */
+  updateWhere(id: string, guard: (row: ToolpathRow, drawingData: unknown) => boolean, patch: (row: ToolpathRow) => Partial<ToolpathInput>): Effect.Effect<ToolpathRow | undefined, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
   listForDrawing(drawingId: string): Effect.Effect<Array<ToolpathRow & { Material: unknown; MachineConfig: unknown; Tool: unknown }>, DatabaseError>
   /** Project-scoped list used by the envelope route: own, public, or organisation members' toolpaths, with project/organisation names. */
@@ -118,6 +123,16 @@ export class ToolpathRepo extends Context.Service<ToolpathRepo, {
             const [row] = await db.update(T).set({ ...patch, updatedAt: new Date() }).where(eq(T.id, id)).returning()
             return toToolpathRow(row!)
           }),
+        updateWhere: (id, guard, patch) =>
+          query("toolpaths.updateWhere", (db) => db.transaction((tx) => {
+            const current = tx.select().from(T).where(eq(T.id, id)).get()
+            if (!current) return undefined
+            const row = toToolpathRow(current)
+            const drawing = current.drawingId === null ? undefined : tx.select({ data: schema.drawingTable.data }).from(schema.drawingTable).where(eq(schema.drawingTable.id, current.drawingId)).get()
+            if (!guard(row, drawing?.data)) return undefined
+            const [updated] = tx.update(T).set({ ...patch(row), updatedAt: new Date() }).where(eq(T.id, id)).returning().all()
+            return updated === undefined ? undefined : toToolpathRow(updated)
+          })),
         remove: (id) => query("toolpaths.remove", async (db) => void (await db.delete(T).where(eq(T.id, id)))),
         listForDrawing: (drawingId) =>
           query("toolpaths.listForDrawing", async (db) => {

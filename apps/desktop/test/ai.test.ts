@@ -54,7 +54,7 @@ describe("AI tool catalogue (spec 08-ai.md §3)", () => {
     // without being listed here fails — which is the point.
     expect(new Set(TOOL_IDS)).toEqual(new Set([
       "cad", "cad_edit", "cam", "cam_edit", "library", "parts", "library_edit",
-      "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent"
+      "memory", "memory_edit", "research", "vcs", "vcs_edit", "agent", "cam_verify"
     ]))
     // No tool is registered twice under the same id. (Spread first: the source list is a literal
     // tuple, and comparing its literal length against `Set.size` would only restate the type.)

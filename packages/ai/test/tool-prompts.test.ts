@@ -7,6 +7,7 @@ import { ACTION_CATALOGUE, nameOf, toolOf } from "../src/actions/catalogue.ts"
 import { TOOL_IDS, buildTools } from "../src/tools/catalogue.ts"
 import { TOOL_PROMPT_IDS, rawToolPrompt, toolPrompt } from "../src/tools/prompts/index.ts"
 import { readdirSync } from "node:fs"
+import { ACTION_EXPOSURES } from "../src/actions/catalogue.ts"
 
 const handlers = new Proxy({} as never, { get: () => async () => ({ ok: true }) })
 const tools = buildTools(handlers, "p")
@@ -54,7 +55,8 @@ describe("tool prompts (one .txt per tool, every action inside it)", () => {
       const text = toolPrompt(id)
       expect(text, id).not.toContain("{{")
       expect(text.length, id).toBeLessThan(4000)
-      total += text.length
+      // An exposure's prompt is read only by the specialist it is granted to, never with the main catalogue.
+      if (!Object.hasOwn(ACTION_EXPOSURES, id)) total += text.length
     }
     // Spec 26 §6.6: the model-visible catalogue must cost less than 24 000 characters (the per-verb tree cost 66 684).
     // Raised to 25 000 when the exact-kernel actions (cad exact / assembly) and the kernel route of cam manufacture were added.
