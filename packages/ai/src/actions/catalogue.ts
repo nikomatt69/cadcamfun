@@ -11,6 +11,7 @@
  * two tools, because notes and the project's standing context are writes and the host cannot ask per action.
  */
 import { z } from "zod"
+import { toolValidationFailure } from "../tool-validation.ts"
 import { actionFailureResult, executeAction, type ActionContext, type ActionSpec } from "./action.ts"
 import { CAD_ACTIONS } from "./cad.ts"
 import { CAD_EDIT_ACTIONS } from "./cad-edit.ts"
@@ -91,7 +92,7 @@ export const runAction = async (id: string, input: unknown, context: ActionConte
   const spec = actionById(id)
   if (spec === undefined) return { ok: false, _tag: "ActionInvalidInput", actionId: id, error: `Unknown action: ${id}` }
   const parsed = (spec.parameters as z.ZodType).safeParse(input)
-  if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: id, error: "The arguments do not match the action's schema." }
+  if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: id, error: `The arguments do not match the action's schema. ${toolValidationFailure(id, parsed.error).problems.join("; ")}` }
   return executeAction(spec, parsed.data, context)
 }
 

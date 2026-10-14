@@ -106,7 +106,7 @@ describe("Effect-owned action inputs", () => {
     })
     expect(entered).toBe(0)
     expect(result).toMatchObject({ kind: "refused", value: { _tag: "ActionInvalidInput", actionId: "agent.start" } })
-    expect(String((result.value as { error: string }).error)).toContain(`["description"]`)
+    expect(String((result.value as { error: string }).error)).toContain("description: Expected a value with a length of at least 1")
   })
 
   test("the contribution receives the decoded value, never the raw arguments", async () => {

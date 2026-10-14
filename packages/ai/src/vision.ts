@@ -1,5 +1,4 @@
 import { z } from "zod"
-export const visionInputSchema = z.object({ focus: z.string().trim().min(1).max(1000).optional() })
 export const visionCaptureSchema = z.object({
   requestId: z.string().uuid(), projectId: z.string().min(1), mode: z.enum(["cad", "cam"]),
   capturedAt: z.number().finite(), mime: z.literal("image/png"),
