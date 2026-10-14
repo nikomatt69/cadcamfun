@@ -13,7 +13,7 @@
  *
  * Nothing unsupported is guessed: unknown entities are reported in `warnings` and their faces skipped.
  */
-import { compose, frame, IDENTITY, length3, neg3, normalize3, sub3, type Frame, type Transform, type Vec3 } from "./math.ts"
+import { compose, cross3, dot3, frame, IDENTITY, length3, neg3, normalize3, sub3, type Frame, type Transform, type Vec3 } from "./math.ts"
 import { curvePeriod, curvePoint, curveProject, curveRange, type Curve3, type Surface } from "./geom.ts"
 import type { NurbsCurveData, NurbsSurfaceData } from "./nurbs.ts"
 import { BrepBuilder, transformBrep, type Brep, type Coedge, type Shell } from "./topology.ts"
@@ -773,6 +773,8 @@ const num = (x: number): string => {
 const str = (s: string): string => `'${s.replace(/'/g, "''").replace(/[^\x20-\x7e]/g, (ch) => `\\X2\\${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0")}\\X0\\`)}'`
 const refs = (ids: ReadonlyArray<number>): string => `(${ids.map((i) => `#${i}`).join(",")})`
 
+const leftHanded = (f: Frame): boolean => dot3(cross3(f.x, f.y), f.z) < 0
+
 export interface StepWriteOptions {
   readonly author?: string
   readonly organization?: string
@@ -786,6 +788,12 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
   const P = (p: Vec3) => w.add(`CARTESIAN_POINT('',(${num(p.x)},${num(p.y)},${num(p.z)}))`)
   const D = (d: Vec3) => { const u = normalize3(d); return w.add(`DIRECTION('',(${num(u.x)},${num(u.y)},${num(u.z)}))`) }
   const A2 = (f: Frame) => w.add(`AXIS2_PLACEMENT_3D('',#${P(f.origin)},#${D(f.z)},#${D(f.x)})`)
+  // STEP placements are right-handed (y = z x x). A mirrored body carries left-handed frames: a circle or ellipse keeps its
+  // parameterisation with the axis written as x x y (= -z); an analytic surface's natural normal S_u x S_v turns over in the
+  // right-handed frame the reader builds, so its face is written with the opposite sense.
+  const curveFrame = (f: Frame): Frame => (leftHanded(f) ? { ...f, z: neg3(f.z) } : f)
+  const mirroredSurface = (s: Surface): boolean =>
+    (s.kind === "plane" || s.kind === "cylinder" || s.kind === "cone" || s.kind === "sphere" || s.kind === "torus") && leftHanded(s.frame)
   const appCtx = w.add(`APPLICATION_CONTEXT('core data for automotive mechanical design processes')`)
   w.add(`APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#${appCtx})`)
   const prodCtx = w.add(`PRODUCT_CONTEXT('',#${appCtx},'mechanical')`)
@@ -810,11 +818,11 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
           return w.add(`LINE('',#${P(c.origin)},#${vec})`)
         }
         case "circle":
-          return w.add(`CIRCLE('',#${A2(c.frame)},${num(c.radius)})`)
+          return w.add(`CIRCLE('',#${A2(curveFrame(c.frame))},${num(c.radius)})`)
         case "ellipse":
           return c.a >= c.b
-            ? w.add(`ELLIPSE('',#${A2(c.frame)},${num(c.a)},${num(c.b)})`)
-            : w.add(`ELLIPSE('',#${A2({ ...c.frame, x: c.frame.y, y: neg3(c.frame.x) })},${num(c.b)},${num(c.a)})`)
+            ? w.add(`ELLIPSE('',#${A2(curveFrame(c.frame))},${num(c.a)},${num(c.b)})`)
+            : w.add(`ELLIPSE('',#${A2(curveFrame({ ...c.frame, x: c.frame.y, y: neg3(c.frame.x) }))},${num(c.b)},${num(c.a)})`)
         case "nurbs": {
           const d = c.data
           const pts = d.points.map((q) => P({ x: q[0]!, y: q[1]!, z: q[2] ?? 0 }))
@@ -873,7 +881,7 @@ export const writeStepBreps = (parts: ReadonlyArray<{ readonly name: string; rea
           const loop = w.add(`EDGE_LOOP('',${refs(oes)})`)
           return w.add(`${li === 0 ? "FACE_OUTER_BOUND" : "FACE_BOUND"}('',#${loop},${flipped ? ".F." : ".T."})`)
         })
-        const sense = flipped ? f.reversed : !f.reversed
+        const sense = (flipped ? f.reversed : !f.reversed) !== mirroredSurface(f.surface)
         return w.add(`ADVANCED_FACE(${str(f.name ?? "")},${refs(bounds)},#${surfaceId(f.surface)},${sense ? ".T." : ".F."})`)
       })
     })

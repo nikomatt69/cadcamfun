@@ -77,7 +77,7 @@ describe("sheets drawn from the exact model", () => {
 
   test("a feature with no exact model falls back to the mesh, and says so", () => {
     const m = plate()
-    m.fillet({ radius: 1 })
+    m.scale({ factor: [1, 2, 1] })
     const sheet = generateSheet(m.build(), { views: ["front"], iso: false })
     expect(sheet.edgeSource).toBe("mesh")
     expect(sheet.warnings.some((w) => w.includes("drawn from the mesh") && w.includes("no exact model"))).toBe(true)

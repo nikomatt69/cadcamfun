@@ -32,6 +32,8 @@ export interface TessellateOptions {
    * surface on the triangles; used by the mass properties.
    */
   readonly paramStep?: number
+  /** Tessellate only these faces (the Boolean meshes only the faces near the other operand); default every face. */
+  readonly faces?: ReadonlySet<number>
 }
 
 export interface FaceMesh {
@@ -521,6 +523,10 @@ const tessellateFace = (
   }
   su = su / n || 1
   sv = sv / n || 1
+  // Cylinders and cones are straight along v: any triangle may be long in v, and a Delaunay criterion
+  // that sees v compressed joins boundary points at matching u across the face (strips) instead of diagonals across the
+  // curvature, which the refinement then broke up into thousands of small triangles. The chord test still decides.
+  if (s.kind === "cylinder" || s.kind === "cone") sv *= 0.02
   const cdt = new Cdt({ minX: u0 * su, minY: v0 * sv, maxX: u1 * su, maxY: v1 * sv })
   // Local vertex table.
   const localG: number[] = []
@@ -728,6 +734,7 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const welded: number[] = []
   const triFace: number[] = []
   b.faces.forEach((_, fi) => {
+    if (options.faces !== undefined && !options.faces.has(fi)) return
     const fm = tessellateFace(fi, b, edges, pts, chord, angle, maxEdge, maxPoints, options.paramStep, warnings)
     if (fm === undefined) return
     faces.push(fm)
