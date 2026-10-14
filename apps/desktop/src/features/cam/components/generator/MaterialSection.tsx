@@ -2,6 +2,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { Package } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { predefinedMaterials } from "../../../cad/lib/predefinedLibraries.ts"
+import { CuttingReferenceView } from "./EvidenceSection.tsx"
 import { useRead } from "../../../../app/queries.ts"
 import { useJob } from "../../hooks/useJob.ts"
 import { useGeneratorStore, type ToolpathSettings } from "../../store/generatorStore.ts"
@@ -108,6 +109,7 @@ export function MaterialSection(): JSX.Element {
               <div>{r().data.rpm} rpm · F {r().data.feed} mm/min · plunge {r().data.plungeFeed} · Vc {Math.round(r().data.vc)} m/min · fz {r().data.fz} mm</div>
               <div>ap {r().data.ap} mm · ae {r().data.ae} mm · {r().data.coolant} · {r().data.powerKw} kW · deflection {r().data.deflectionMm} mm</div>
               <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-amber-700">⚠ {w}</div>}</For>
+              <CuttingReferenceView reference={r().data.reference} />
             </div>
           )}
         </Show>

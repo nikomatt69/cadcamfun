@@ -46,7 +46,7 @@ export default function KernelSection(props: { readonly onGCodeGenerated: (code:
       Math.abs(stock.x - (value.stockBounds.max.x + value.stockBounds.min.x) / 2) > 1e-9 ||
       Math.abs(stock.y - (value.stockBounds.max.y + value.stockBounds.min.y) / 2) > 1e-9
     ) : source?.stock !== undefined
-    return !current || value.nc !== store.gcode || value.material.id !== current.material || value.machine.id !== current.machine ||
+    return !current || value.nc !== store.gcode || value.material.id !== (cam.kernel.findMaterial(current.material)?.id ?? current.material) || value.machine.id !== current.machine ||
       stockChanged || value.program.workOffset !== (current.workOffset ?? "G54") ||
       source !== undefined && ((source.tolerance ?? 0.01) !== (current.tolerance ?? 0.01) || (source.origin ?? "stock-center") !== (current.origin ?? "stock-center") || source.finishAllowance !== current.finishAllowance || source.scallop !== current.scallop || source.resolution !== current.resolution) ||
       value.identity.part !== cam.kernel.digestOf("cam-kernel/part@1", { kind: "elements", elements: current.elements })

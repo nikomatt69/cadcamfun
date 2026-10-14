@@ -229,9 +229,20 @@ export const verifyToolpath = (request: VerifyRequest): VerifyResponse => {
 
   // ------------------------------------------------------------ target comparison
   let gougeCells: Uint8Array | undefined
-  if (request.target !== undefined && request.target.solids.length > 0) {
-    const meshes = request.target.solids.map((solid) => meshOf(solid, Math.max(0.01, Math.min(0.1, grid.cell / 2))))
+  if (request.target !== undefined && (request.target.solids.length > 0 || (request.target.meshes?.length ?? 0) > 0)) {
+    const meshes = [
+      ...request.target.solids.map((solid) => meshOf(solid, Math.max(0.01, Math.min(0.1, grid.cell / 2)))),
+      ...(request.target.meshes ?? []).map((m) => ({ positions: Float32Array.from(m.positions), indices: Uint32Array.from(m.indices) }))
+    ]
     const target = field.rasterise(meshes)
+    for (const r of request.target.reliefs ?? []) {
+      for (let j = 0; j < field.ny; j++) for (let i = 0; i < field.nx; i++) {
+        if (Math.hypot(field.centreX(i) - r.x, field.centreY(j) - r.y) <= r.radius) {
+          const k = j * field.nx + i
+          target[k] = Math.min(target[k]!, r.bottom)
+        }
+      }
+    }
     const around = field.neighbourhood(target)
     const tolerance = request.tolerance
     const area = field.cellArea

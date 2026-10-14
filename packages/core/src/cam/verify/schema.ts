@@ -58,7 +58,16 @@ export const VerifyRequestSchema = Schema.Struct({
   tool: VerifyToolSchema,
   fixtures: withDefault(Schema.Array(VerifyFixtureSchema), []),
   /** Finished part. Without it, only collisions and the removal statistics are reported. */
-  target: Schema.optionalKey(Schema.Struct({ solids: Schema.Array(SolidSchema) })),
+  target: Schema.optionalKey(Schema.Struct({
+    solids: Schema.Array(SolidSchema),
+    /** Triangle meshes of the part in the program's coordinates (parametric, B-rep or imported parts). */
+    meshes: Schema.optionalKey(Schema.Array(Schema.Struct({ positions: Schema.Array(Schema.Finite), indices: Schema.Array(Schema.Int) }))),
+    /**
+     * Declared removal the model does not carry (the thread form of a tapped hole modelled at its tap drill): vertical
+     * cylinders where the part may be cut down to `bottom`. Each one is explicit, so a relief never hides an undeclared gouge.
+     */
+    reliefs: Schema.optionalKey(Schema.Array(Schema.Struct({ x: Schema.Finite, y: Schema.Finite, radius: Positive, bottom: Schema.Finite, reason: Schema.String })))
+  })),
   /** Grid cell size, mm. Default: a tenth of the tool diameter, coarsened to fit the compute budget. */
   resolution: Schema.optionalKey(Positive),
   /** Allowed deviation from the target before a cell counts as gouged / uncut, mm. */

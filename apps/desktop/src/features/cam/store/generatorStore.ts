@@ -54,6 +54,10 @@ interface GeneratorState {
   currentGCode: string
   detectedCycles: DetectedCycle[]
   selectedCycle: DetectedCycle | null
+  /** Evidence record of the last generated program (`cam.generator.programRecord`). */
+  evidence: cam.generator.ProgramRecord | null
+  /** The NC text was edited after generation: the record no longer describes these bytes. */
+  evidenceStale: boolean
   /** The depth was typed by the user: element-driven suggestions must not overwrite it. */
   depthSetManually: boolean
 
@@ -79,7 +83,7 @@ interface GeneratorState {
   flashError: (message: string, ms?: number) => void
   setAiSuggestions: (suggestions: string[]) => void
   addAiSuggestion: (suggestion: string) => void
-  setResult: (gcode: string, cycles: ReadonlyArray<DetectedCycle>) => void
+  setResult: (gcode: string, cycles: ReadonlyArray<DetectedCycle>, evidence?: cam.generator.ProgramRecord) => void
   setCurrentGCode: (gcode: string) => void
   setSelectedCycle: (cycle: DetectedCycle | null) => void
   reset: () => void
@@ -108,7 +112,7 @@ let errorTimer: ReturnType<typeof setTimeout> | undefined
 const initial = (): Pick<GeneratorState,
   "settings" | "kernelSettings" | "expanded" | "geometryType" | "rectangleWidth" | "rectangleHeight" | "circleRadius" | "polygonSides" | "polygonRadius" | "customPath" |
   "printer" | "selectedLibraryTool" | "showFullscreen" | "isGenerating" | "isAIProcessing" | "error" | "success" | "aiSuggestions" | "currentGCode" |
-  "detectedCycles" | "selectedCycle" | "depthSetManually"
+  "detectedCycles" | "selectedCycle" | "depthSetManually" | "evidence" | "evidenceStale"
 > => ({
   settings: initialSettings(),
   kernelSettings: initialKernelSettings(),
@@ -131,7 +135,9 @@ const initial = (): Pick<GeneratorState,
   currentGCode: "",
   detectedCycles: [],
   selectedCycle: null,
-  depthSetManually: false
+  depthSetManually: false,
+  evidence: null,
+  evidenceStale: false
 })
 
 export const useGeneratorStore = create<GeneratorState>((set, get) => ({
@@ -208,8 +214,8 @@ export const useGeneratorStore = create<GeneratorState>((set, get) => ({
   setAiSuggestions: suggestions => set({ aiSuggestions: suggestions }),
   addAiSuggestion: suggestion => set(state => ({ aiSuggestions: [...state.aiSuggestions, suggestion] })),
 
-  setResult: (gcode, cycles) => set({ currentGCode: gcode, detectedCycles: [...cycles] }),
-  setCurrentGCode: gcode => set({ currentGCode: gcode }),
+  setResult: (gcode, cycles, evidence) => set({ currentGCode: gcode, detectedCycles: [...cycles], evidence: evidence ?? null, evidenceStale: false }),
+  setCurrentGCode: gcode => set(state => ({ currentGCode: gcode, evidenceStale: state.evidence !== null && gcode !== state.currentGCode ? true : state.evidenceStale })),
   setSelectedCycle: cycle => set({ selectedCycle: cycle }),
 
   reset: () => set(initial())

@@ -25,6 +25,7 @@
 import { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 import { detectFixedCycles } from "./cycles.ts"
 import { analyseGcode } from "./analysis.ts"
+import { programRecord } from "./evidence.ts"
 import { generateLatheGCode } from "./lathe.ts"
 import { turnedProfileOf } from "./history-features.ts"
 import { generateMillGCode } from "./mill.ts"
@@ -50,6 +51,7 @@ export { elementToolpath } from "./element-paths.ts"
 export { generate3DPrinterGCodeForElement, generateCompositeElement3D, calculateExtrusion, printStartGCode, printEndGCode, type PrinterSettings } from "./printer.ts"
 export { adaptFeeds, convertLinesToArcs, optimizeToolpath } from "./postpass.ts"
 export * from "./cycles.ts"
+export { programRecord, targetMeshesFor, reliefsFor, firstHorizontalRapidZ, type Relief } from "./evidence.ts"
 export {
   calculate3DComponentDetails,
   calculateComponentDimensions,
@@ -150,7 +152,8 @@ export const generateToolpath = (request: GenerateRequest): GenerateOutcome => {
       cycles: detectFixedCycles(gcode),
       warnings: [...warningsIn(gcode), ...(generated.warnings ?? [])],
       stats: analysis.stats,
-      program: analysis.program
+      program: analysis.program,
+      ...(request.evidence === false ? {} : { evidence: programRecord(request, gcode, analysis.stats, generated.error) })
     },
     ...(generated.error !== undefined ? { error: generated.error } : {})
   }

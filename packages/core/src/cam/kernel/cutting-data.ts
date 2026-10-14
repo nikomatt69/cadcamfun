@@ -103,6 +103,36 @@ export interface CuttingData {
   /** Limits the cut still exceeds after every reduction (spindle power / torque, deflection): the cut is not feasible as planned. */
   readonly exceeded: ReadonlyArray<string>
   readonly source: string
+  /** Where every number comes from: the table row read and the factors applied to it. */
+  readonly reference: CuttingReference
+}
+
+/**
+ * Traceable source of a cutting-data result: the row of the material table (`materials.ts` `MATERIALS`) and the columns
+ * read from it, then each factor of this module that scaled them. `vc = columns.vc × factors.coating × factors.cutSpeed`,
+ * `fz = columns.fz10 × factors.diameterScale × factors.rigidityFeed × factors.toolMaterialFeed × factors.cutFeed` (before
+ * chip thinning and the machine / load limits, which `limitedBy` lists).
+ */
+export interface CuttingReference {
+  readonly table: "MATERIALS"
+  /** Material id (the row). */
+  readonly row: string
+  readonly rowName: string
+  /** Column name -> value read from the row. */
+  readonly columns: Readonly<Record<string, number>>
+  /** Factor name -> multiplier applied by the calculation. */
+  readonly factors: Readonly<Record<string, number>>
+  readonly basis: string
+}
+
+export const REFERENCE_BASIS = "Handbook starting values (order of magnitude of Sandvik Coromant, Kennametal and Machinery's Handbook tables), not a supplier's certified data for this cutter"
+
+/** The speed column a tool material reads, its raw value, and the factor `toolSpeed` applies to it. */
+const speedRead = (tm: ToolMaterial, mat: WorkpieceMaterial, finish: boolean): { readonly column: string; readonly value: number; readonly factor: number } => {
+  const key = finish ? "finish" : "rough"
+  const hss = (tm === "hss" || tm === "hss-co") && mat.vcHss !== undefined
+  const value = hss ? mat.vcHss![key] : mat.vcCarbide[key]
+  return { column: hss ? `vcHss.${key}` : `vcCarbide.${key}`, value, factor: r3(toolSpeed(tm, mat, finish, []) / value) }
 }
 
 const FERROUS: ReadonlySet<IsoGroup> = new Set(["P", "M", "K", "S", "H"])
@@ -308,7 +338,13 @@ const drilling = (req: CuttingRequest, warnings: string[], limitedBy: string[]):
     feed: Math.round(feed), plungeFeed: Math.round(feed), ap: r3(depth), ae: d, stepoverPercent: 100, rampAngle, helixPitch, coolant: mat.coolant,
     ...(peck !== undefined ? { peck } : {}), ...(chipBreak !== undefined ? { chipBreak } : {}), feedPerRev: r3(feedPerRev),
     mrr: r3((Math.PI * d * d * feed) / 4 / 1000), powerKw: r3(powerKw), torqueNm: r3(torqueNm), forceN: Math.round(thrust), deflectionMm: 0,
-    limitedBy, warnings, exceeded, source: `${mat.name}: drill feed ${mat.drillFeed10} mm/rev at Ø10, Vc ${Math.round(vcRecommended)} m/min (handbook starting values)`
+    limitedBy, warnings, exceeded, source: `${mat.name}: drill feed ${mat.drillFeed10} mm/rev at Ø10, Vc ${Math.round(vcRecommended)} m/min (handbook starting values)`,
+    reference: {
+      table: "MATERIALS", row: mat.id, rowName: mat.name,
+      columns: { [speedRead(c.material, mat, false).column]: speedRead(c.material, mat, false).value, drillSpeedFactor: mat.drillSpeedFactor, drillFeed10: mat.drillFeed10, kc11: mat.kc11, mc: mat.mc, peckFactor: mat.peckFactor },
+      factors: { toolMaterialSpeed: speedRead(c.material, mat, false).factor, coating: r3(coatingFactor(c.coating, mat, [])), cutSpeed: CUT_SPEED[req.cut], cutFeed: CUT_FEED[req.cut], diameterScale: r3(Math.pow(Math.min(d, 25) / 10, 0.8)), rigidityFeed: rigidity.feed, toolMaterialFeed: hss ? 0.8 : 1 },
+      basis: REFERENCE_BASIS
+    }
   }
 }
 
@@ -406,6 +442,19 @@ export const cuttingData = (req: CuttingRequest): CuttingData => {
     coolant: mat.coolant, ...(passes !== undefined ? { passes } : {}),
     mrr: r3((ap * ae * feed) / 1000), powerKw: r3(load.powerKw / eta), torqueNm: r3(load.torqueNm), forceN: Math.round(load.forceN), deflectionMm: Math.round(defl * 10000) / 10000,
     limitedBy, warnings, exceeded,
-    source: `${mat.name} (ISO ${mat.iso}): Vc ${Math.round(vcRecommended)} m/min, fz ${r3(target)} mm at Ø${d}, kc1.1 ${mat.kc11} N/mm² mc ${mat.mc} (handbook starting values)`
+    source: `${mat.name} (ISO ${mat.iso}): Vc ${Math.round(vcRecommended)} m/min, fz ${r3(target)} mm at Ø${d}, kc1.1 ${mat.kc11} N/mm² mc ${mat.mc} (handbook starting values)`,
+    reference: {
+      table: "MATERIALS", row: mat.id, rowName: mat.name,
+      columns: {
+        [speedRead(c.material, mat, finish).column]: speedRead(c.material, mat, finish).value, fz10: mat.fz10, kc11: mat.kc11, mc: mat.mc, minFz: mat.minFz,
+        ...(cut === "rough-side" ? { sideAp: mat.sideAp, sideAe: mat.sideAe } : cut === "slot" ? { slotAp: mat.slotAp } : cut === "adaptive" ? { adaptiveAe: mat.adaptiveAe } : cut === "finish-wall" || cut === "finish-floor" ? { finishAllowance: mat.finishAllowance } : cut === "thread-mill" ? { threadPasses: mat.threadPasses } : {})
+      },
+      factors: {
+        toolMaterialSpeed: speedRead(c.material, mat, finish).factor, coating: r3(coatingFactor(c.coating, mat, [])), cutSpeed: CUT_SPEED[cut], cutFeed: CUT_FEED[cut],
+        diameterScale: r3(baseChipLoad(mat, cut === "face" ? Math.min(d, 10) : d) / mat.fz10), rigidityDepth: rigidity.depth, rigidityFeed: rigidity.feed,
+        toolMaterialFeed: hss ? 0.8 : 1, chipThinning: r3(thinning)
+      },
+      basis: REFERENCE_BASIS
+    }
   }
 }

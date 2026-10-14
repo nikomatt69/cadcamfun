@@ -258,7 +258,9 @@ export const GenerateRequestSchema = Schema.Struct({
    */
   machine: Schema.optionalKey(MachineForProgramSchema),
   /** Injected into the header; omitted by default so the output is deterministic. */
-  stamp: Schema.optionalKey(Schema.String)
+  stamp: Schema.optionalKey(Schema.String),
+  /** Build the evidence record (default true): replays the NC on the stock and, for a part, checks gouges. */
+  evidence: Schema.optionalKey(Schema.Boolean)
 })
 export type GenerateRequest = typeof GenerateRequestSchema.Type
 
@@ -278,6 +280,56 @@ export const GcodeStatsSchema = Schema.Struct({
 })
 export type GcodeStats = typeof GcodeStatsSchema.Type
 
+/** Traceable source of cutting data: material table row, columns read, factors applied (`kernel/cutting-data.ts` `CuttingReference`). */
+export const CuttingReferenceSchema = Schema.Struct({
+  table: Schema.Literal("MATERIALS"),
+  row: Schema.String,
+  rowName: Schema.String,
+  columns: Schema.Record(Schema.String, Schema.Finite),
+  factors: Schema.Record(Schema.String, Schema.Finite),
+  basis: Schema.String
+})
+
+export const ProgramCheckSchema = Schema.Struct({
+  id: Schema.Literals(["generated", "cutting-data", "safe-height", "no-rapid-in-material", "tool-clearance", "within-stock", "no-gouge", "nc-interpretation"]),
+  /** `not-run`: the check does not apply to this machine / operation. `unresolved`: it applies but the inputs to decide it are missing. */
+  status: Schema.Literals(["passed", "failed", "unresolved", "not-run"]),
+  detail: Schema.String,
+  /** First NC line the finding refers to. */
+  line: Schema.optionalKey(Schema.Int)
+})
+export type ProgramCheck = typeof ProgramCheckSchema.Type
+
+/**
+ * Evidence record of one generated program: what went in (digest of the request), the tool and process values, where the
+ * cutting data comes from, the exact NC (SHA-256), every check run on that NC and the result. Same request, same record.
+ */
+export const ProgramRecordSchema = Schema.Struct({
+  schema: Schema.Literal("cadcamfun/program-record@1"),
+  inputs: Schema.Struct({
+    /** SHA-256 of the canonical request (settings, geometry, printer, machine, stamp). */
+    digest: Schema.String,
+    machineType: Schema.String,
+    operationType: Schema.String,
+    material: Schema.String,
+    elements: Schema.Array(Schema.String),
+    stock: Schema.optionalKey(Schema.Struct({ width: Schema.Finite, height: Schema.Finite, depth: Schema.Finite, topZ: Schema.Finite }))
+  }),
+  tool: Schema.Struct({ type: Schema.String, diameter: Schema.Finite, flutes: Schema.Finite }),
+  process: Schema.Struct({ rpm: Schema.Finite, feed: Schema.Finite, plunge: Schema.Finite, stepdown: Schema.Finite, stepover: Schema.Finite, coolant: Schema.Boolean }),
+  cuttingData: Schema.Struct({
+    /** `kernel`: the values match the kernel's table within 15 %. `manual`: they differ (the deviation is in `detail`). */
+    status: Schema.Literals(["kernel", "manual", "not-applicable"]),
+    detail: Schema.String,
+    recommended: Schema.optionalKey(Schema.Struct({ rpm: Schema.Finite, feed: Schema.Finite, plunge: Schema.Finite, stepdown: Schema.Finite })),
+    reference: Schema.optionalKey(CuttingReferenceSchema)
+  }),
+  program: Schema.Struct({ sha256: Schema.String, lines: Schema.Int, cutLength: Schema.Finite, estimatedSeconds: Schema.Finite }),
+  checks: Schema.Array(ProgramCheckSchema),
+  result: Schema.Literals(["passed", "warnings", "failed"])
+})
+export type ProgramRecord = typeof ProgramRecordSchema.Type
+
 export const GenerateResponseSchema = Schema.Struct({
   gcode: Schema.String,
   /** Canned-cycle lines found in the program (legacy `detectedCycles`). */
@@ -285,7 +337,9 @@ export const GenerateResponseSchema = Schema.Struct({
   warnings: Schema.Array(Schema.String),
   stats: GcodeStatsSchema,
   /** Machine-neutral IR rebuilt from the text, what the viewport draws. */
-  program: ProgramSchema
+  program: ProgramSchema,
+  /** Evidence about this exact NC (`evidence.ts`); absent only when the request turned it off. */
+  evidence: Schema.optionalKey(ProgramRecordSchema)
 })
 export type GenerateResponse = typeof GenerateResponseSchema.Type
 

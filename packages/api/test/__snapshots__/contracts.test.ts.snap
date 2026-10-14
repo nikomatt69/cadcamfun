@@ -45039,6 +45039,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "evidence": {
+                    "type": "boolean",
+                  },
                   "geometry": {
                     "additionalProperties": false,
                     "properties": {
@@ -45749,6 +45752,295 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         "type": "object",
                       },
                       "type": "array",
+                    },
+                    "evidence": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "checks": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "detail": {
+                                "type": "string",
+                              },
+                              "id": {
+                                "enum": [
+                                  "generated",
+                                  "cutting-data",
+                                  "safe-height",
+                                  "no-rapid-in-material",
+                                  "tool-clearance",
+                                  "within-stock",
+                                  "no-gouge",
+                                  "nc-interpretation",
+                                ],
+                                "type": "string",
+                              },
+                              "line": {
+                                "type": "integer",
+                              },
+                              "status": {
+                                "enum": [
+                                  "passed",
+                                  "failed",
+                                  "unresolved",
+                                  "not-run",
+                                ],
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "detail",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "cuttingData": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "detail": {
+                              "type": "string",
+                            },
+                            "recommended": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "feed": {
+                                  "type": "number",
+                                },
+                                "plunge": {
+                                  "type": "number",
+                                },
+                                "rpm": {
+                                  "type": "number",
+                                },
+                                "stepdown": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "rpm",
+                                "feed",
+                                "plunge",
+                                "stepdown",
+                              ],
+                              "type": "object",
+                            },
+                            "reference": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "basis": {
+                                  "type": "string",
+                                },
+                                "columns": {
+                                  "additionalProperties": {
+                                    "type": "number",
+                                  },
+                                  "type": "object",
+                                },
+                                "factors": {
+                                  "additionalProperties": {
+                                    "type": "number",
+                                  },
+                                  "type": "object",
+                                },
+                                "row": {
+                                  "type": "string",
+                                },
+                                "rowName": {
+                                  "type": "string",
+                                },
+                                "table": {
+                                  "enum": [
+                                    "MATERIALS",
+                                  ],
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "table",
+                                "row",
+                                "rowName",
+                                "columns",
+                                "factors",
+                                "basis",
+                              ],
+                              "type": "object",
+                            },
+                            "status": {
+                              "enum": [
+                                "kernel",
+                                "manual",
+                                "not-applicable",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "status",
+                            "detail",
+                          ],
+                          "type": "object",
+                        },
+                        "inputs": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "digest": {
+                              "type": "string",
+                            },
+                            "elements": {
+                              "items": {
+                                "type": "string",
+                              },
+                              "type": "array",
+                            },
+                            "machineType": {
+                              "type": "string",
+                            },
+                            "material": {
+                              "type": "string",
+                            },
+                            "operationType": {
+                              "type": "string",
+                            },
+                            "stock": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "depth": {
+                                  "type": "number",
+                                },
+                                "height": {
+                                  "type": "number",
+                                },
+                                "topZ": {
+                                  "type": "number",
+                                },
+                                "width": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "width",
+                                "height",
+                                "depth",
+                                "topZ",
+                              ],
+                              "type": "object",
+                            },
+                          },
+                          "required": [
+                            "digest",
+                            "machineType",
+                            "operationType",
+                            "material",
+                            "elements",
+                          ],
+                          "type": "object",
+                        },
+                        "process": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "coolant": {
+                              "type": "boolean",
+                            },
+                            "feed": {
+                              "type": "number",
+                            },
+                            "plunge": {
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "rpm",
+                            "feed",
+                            "plunge",
+                            "stepdown",
+                            "stepover",
+                            "coolant",
+                          ],
+                          "type": "object",
+                        },
+                        "program": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "cutLength": {
+                              "type": "number",
+                            },
+                            "estimatedSeconds": {
+                              "type": "number",
+                            },
+                            "lines": {
+                              "type": "integer",
+                            },
+                            "sha256": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "sha256",
+                            "lines",
+                            "cutLength",
+                            "estimatedSeconds",
+                          ],
+                          "type": "object",
+                        },
+                        "result": {
+                          "enum": [
+                            "passed",
+                            "warnings",
+                            "failed",
+                          ],
+                          "type": "string",
+                        },
+                        "schema": {
+                          "enum": [
+                            "cadcamfun/program-record@1",
+                          ],
+                          "type": "string",
+                        },
+                        "tool": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "diameter": {
+                              "type": "number",
+                            },
+                            "flutes": {
+                              "type": "number",
+                            },
+                            "type": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "type",
+                            "diameter",
+                            "flutes",
+                          ],
+                          "type": "object",
+                        },
+                      },
+                      "required": [
+                        "schema",
+                        "inputs",
+                        "tool",
+                        "process",
+                        "cuttingData",
+                        "program",
+                        "checks",
+                        "result",
+                      ],
+                      "type": "object",
                     },
                     "gcode": {
                       "type": "string",
@@ -46942,6 +47234,47 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "rampAngle": {
                                         "type": "number",
                                       },
+                                      "reference": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "basis": {
+                                            "type": "string",
+                                          },
+                                          "columns": {
+                                            "additionalProperties": {
+                                              "type": "number",
+                                            },
+                                            "type": "object",
+                                          },
+                                          "factors": {
+                                            "additionalProperties": {
+                                              "type": "number",
+                                            },
+                                            "type": "object",
+                                          },
+                                          "row": {
+                                            "type": "string",
+                                          },
+                                          "rowName": {
+                                            "type": "string",
+                                          },
+                                          "table": {
+                                            "enum": [
+                                              "MATERIALS",
+                                            ],
+                                            "type": "string",
+                                          },
+                                        },
+                                        "required": [
+                                          "table",
+                                          "row",
+                                          "rowName",
+                                          "columns",
+                                          "factors",
+                                          "basis",
+                                        ],
+                                        "type": "object",
+                                      },
                                       "rpm": {
                                         "type": "number",
                                       },
@@ -46992,6 +47325,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "warnings",
                                       "exceeded",
                                       "source",
+                                      "reference",
                                     ],
                                     "type": "object",
                                   },
@@ -49636,6 +49970,63 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                   "target": {
                     "additionalProperties": false,
                     "properties": {
+                      "meshes": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "indices": {
+                              "items": {
+                                "type": "integer",
+                              },
+                              "type": "array",
+                            },
+                            "positions": {
+                              "items": {
+                                "type": "number",
+                              },
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "positions",
+                            "indices",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                      "reliefs": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "bottom": {
+                              "type": "number",
+                            },
+                            "radius": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "reason": {
+                              "type": "string",
+                            },
+                            "x": {
+                              "type": "number",
+                            },
+                            "y": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "radius",
+                            "bottom",
+                            "reason",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
                       "solids": {
                         "items": {
                           "anyOf": [

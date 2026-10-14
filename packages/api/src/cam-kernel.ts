@@ -32,7 +32,8 @@ const cutting = Schema.Struct({
   coolant: cam.CoolantSchema,
   peck: Schema.optionalKey(Schema.Finite), chipBreak: Schema.optionalKey(Schema.Boolean), feedPerRev: Schema.optionalKey(Schema.Finite), passes: Schema.optionalKey(Schema.Finite),
   mrr: Schema.Finite, powerKw: Schema.Finite, torqueNm: Schema.Finite, forceN: Schema.Finite, deflectionMm: Schema.Finite,
-  limitedBy: strings, warnings: strings, exceeded: strings, source: Schema.String
+  limitedBy: strings, warnings: strings, exceeded: strings, source: Schema.String,
+  reference: cam.generator.CuttingReferenceSchema
 })
 const cutter = Schema.Struct({
   id, name: Schema.String, kind: Schema.Literals(["flat", "ball", "bull", "chamfer", "spot", "drill", "facemill", "threadmill", "engraver"]),

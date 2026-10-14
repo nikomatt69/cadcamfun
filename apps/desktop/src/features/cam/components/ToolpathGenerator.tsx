@@ -20,6 +20,7 @@ import { loadConfig, saveConfig, useGeneratorStore, type LibraryTool } from "../
 import { AdvancedSection } from "./generator/AdvancedSection.tsx"
 import { AiSection } from "./generator/AiSection.tsx"
 import { CuttingSection } from "./generator/CuttingSection.tsx"
+import { EvidenceSection } from "./generator/EvidenceSection.tsx"
 import { FixedCyclesSection } from "./generator/FixedCyclesSection.tsx"
 import { LatheSection } from "./generator/LatheSection.tsx"
 import { MachineSection } from "./generator/MachineSection.tsx"
@@ -57,7 +58,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
         geometry: geometryOf(gen, job.sources()),
         printer: gen.printer
       }))
-      gen.setResult(response.gcode, response.cycles)
+      gen.setResult(response.gcode, response.cycles, response.evidence)
       camStore.setGcode(response.gcode)
       camStore.setProgram(response.program)
       for (const warning of response.warnings) toast(warning)
@@ -139,6 +140,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
       <CuttingSection />
       <AdvancedSection />
       <AiSection />
+      <EvidenceSection />
 
       <Show when={gen.error}>
         <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md flex items-start" role="alert">
@@ -165,6 +167,7 @@ export default function ToolpathGenerator(props: ToolpathGeneratorProps): JSX.El
           press={{ scale: 0.98 }}
           onClick={() => void generate()}
           disabled={gen.isGenerating}
+          data-testid="generate-toolpath"
           class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <Show when={gen.isGenerating} fallback={<><Code size={20} class="mr-2" />{t("cam.generator.generate")}</>}>
