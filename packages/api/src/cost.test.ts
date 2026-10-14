@@ -3,6 +3,33 @@ import { SYSTEM_DEFAULT_SETTINGS, calculateEstimate } from "./cost.ts"
 
 const toolpath = (data: unknown) => ({ id: "tp", data, toolId: "t1", materialId: "m1" })
 
+describe("calculateEstimate of a native kernel program", () => {
+  const artifact = { cycleTimeSeconds: 600, stock: { initialVolume: 500_000 }, operations: [{ cutLength: 1200 }, { cutLength: 800 }, { cutLength: "x" }] }
+
+  test("is priced on the replayed cycle time, the cut length and the raw stock, not at the setup alone", () => {
+    const r = calculateEstimate({
+      toolpath: toolpath({ kernelArtifact: artifact }), settings: SYSTEM_DEFAULT_SETTINGS,
+      toolWear: { wearRatePerMeter: 2, replacementCost: 40 }, materialCost: { costPerUnit: 20000, wasteFactor: 10, minimumCharge: 0 }
+    })
+    expect(r.machineTime).toBe(10)
+    expect(r.details.calculatedValues).toMatchObject({ totalPathLengthMm: 2000, materialVolumeM3: 0.0005, machineTimeMinutes: 10, feedRateMmMin: 200 })
+    expect(r.materialCost).toBeCloseTo(0.0005 * 1.1 * 20000, 10)
+    expect(r.toolWearCost).toBeCloseTo(((2 * 2) / 100) * 40, 10)
+    expect(r.machineTimeCost).toBeCloseTo((10 / 60) * 50, 10)
+    expect(r.totalCost).toBeGreaterThan(r.setupCost + r.operatorTimeCost)
+  })
+
+  test("a malformed or partial artifact falls back to the legacy reading, and legacy documents are untouched", () => {
+    const legacy = { operations: [{ pathLength: 3000 }], stockDimensions: { x: 100, y: 100, z: 50 }, parameters: { feedrate: 500 } }
+    const base = calculateEstimate({ toolpath: toolpath(legacy), settings: SYSTEM_DEFAULT_SETTINGS, toolWear: null, materialCost: null })
+    for (const bad of [{ cycleTimeSeconds: "10" }, { cycleTimeSeconds: 10 }, { cycleTimeSeconds: -1, stock: { initialVolume: 1 }, operations: [] }, null]) {
+      const r = calculateEstimate({ toolpath: toolpath({ ...legacy, kernelArtifact: bad }), settings: SYSTEM_DEFAULT_SETTINGS, toolWear: null, materialCost: null })
+      expect(r.details.calculatedValues).toEqual(base.details.calculatedValues)
+    }
+    expect(base.machineTime).toBe(6)
+  })
+})
+
 describe("calculateEstimate (legacy golden values)", () => {
   test("no path and no stock: only the setup cost (30 min at 50+30 EUR/h)", () => {
     const r = calculateEstimate({ toolpath: toolpath({}), settings: SYSTEM_DEFAULT_SETTINGS, toolWear: null, materialCost: null })

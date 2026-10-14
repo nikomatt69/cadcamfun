@@ -61,6 +61,9 @@ export default function ExactModelPanel(props: Props): JSX.Element {
                   <dt>Centre of mass</dt><dd>{fmt(v.centroid.x)}, {fmt(v.centroid.y)}, {fmt(v.centroid.z)}</dd>
                   <dt>Faces / edges / vertices</dt><dd>{v.faces} / {v.edges} / {v.vertices}</dd>
                   <dt>Through-holes</dt><dd>{v.holes ?? "–"}</dd>
+                  <dt>Holes (recognised)</dt><dd data-testid="exact-drilled">{v.drilled.length === 0 ? "–" : v.drilled.map((h) => `Ø${fmt(h.diameter)}${h.form === "simple" ? "" : ` ${h.form}`} × ${fmt(h.depth)}`).join(", ")}</dd>
+                  <dt>CAM</dt>
+                  <dd data-testid="exact-machining">{v.machining.prismatic ? `By features: ${v.machining.holes} holes, ${v.machining.pockets} pockets, ${v.machining.outlines} outlines` : `3D surface job: ${v.machining.reason}`}</dd>
                   <dt>Surfaces</dt><dd><For each={Object.entries(v.surfaces)}>{([k, n]) => <span class="mr-1">{k} {n}</span>}</For></dd>
                   <dt>Valid solid</dt><dd class={v.valid ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{v.valid ? "yes" : `no: ${v.issues.join("; ")}`}</dd>
                 </dl>

@@ -1,9 +1,9 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { massProperties } from "../cad/brep/index.ts"
-import { rebuildExact } from "../cad/history-brep.ts"
+import { historyToStep, rebuildExact } from "../cad/history-brep.ts"
 import type { Feature, History } from "../cad/history.ts"
 import { buildRecipe } from "../cad/recipes.ts"
-import { elementBrep } from "../cad/scene-step.ts"
+import { elementBrep, stepToElements } from "../cad/scene-step.ts"
 import { signedArea } from "../cad/shapes.ts"
 import { brepFeatures, exactFeatures } from "./brep-part.ts"
 import { historyFeatures } from "./generator/history-features.ts"
@@ -150,6 +150,24 @@ describe("the planner uses them", () => {
     if (drill.strategy !== "drill") throw new Error("not a drill")
     expect(drill.points[0]!.x).toBeCloseTo(75, 6)
     expect(drill.points[0]!.y).toBeCloseTo(30, 6)
+  })
+
+  test("a STEP file written by the kernel and read back is planned like the part it came from", () => {
+    const out = historyToStep(stepped, "stepped")
+    expect(out.step).toMatch(/^ISO-10303-21;/)
+    const imported = stepToElements(out.step!)
+    expect(imported.elements).toHaveLength(1)
+    expect(imported.report[0]!.valid).toBe(true)
+    const element = { id: "stp", ...imported.elements[0]! }
+    const f = exactFeatures(element)!.features!
+    expect(f.holes).toHaveLength(1)
+    expect(f.pockets).toHaveLength(1)
+    expect(f.outlines.map((o) => [o.bottom, o.top])).toEqual([[10, 18], [0, 10]])
+    expect(f.holes[0]!.diameter).toBeCloseTo(5, 6)
+    const r = planOnly(job(element))
+    if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
+    expect(r.value.operations.map((o) => o.strategy)).toContain("drill")
+    expect(r.value.operations.map((o) => o.strategy)).not.toContain("surface")
   })
 
   test("a part the exact kernel cannot read is still planned, with the reason in the notes", () => {

@@ -1,8 +1,8 @@
 /**
- * Reference G-code interpreter. **Test-only helper**: it parses the text the
- * posts emit and replays it into plain segments, so tests can assert geometry
- * (depth, arc radii, path length, rapids at depth) independently of the IR and
- * of the emitter that produced the text.
+ * Reference G-code interpreter: it parses the text the posts emit (or the user pastes) and replays it
+ * into plain segments, independently of the IR and of the emitter that produced the text. The post tests
+ * assert geometry on it (depth, arc radii, path length, rapids at depth); in production it is the replay
+ * behind the kernel's evidence, the verifier, the G-code parser and the cost measure.
  *
  * Supported: `G0 G1 G2 G3` (I/J or R), `G4`, `G17`, `G20/G21`, `G90/G91` (X Y Z; arc centres are always
  * relative to the start point), `G98/G99`, canned cycles `G73 G81 G82 G83` + `G80` (absolute only), modal
