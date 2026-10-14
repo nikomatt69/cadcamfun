@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import * as THREE from "three"
 import { resourceElements, resourcePreviewElements } from "../src/features/library/lib/resource-geometry.ts"
+import { createComponentPreviewObject } from "../src/features/library/lib/component-preview.ts"
 import { createThreeObject } from "../src/features/cad/lib/createThreeObject.ts"
 import { initializeElementTransform, type ElementTransformFields } from "../src/features/cad/lib/element-transform.ts"
 import { disposeObject } from "../src/features/cad/lib/sceneHelpers.ts"
@@ -22,6 +23,33 @@ test("saved preview geometry keeps nested component poses without changing the s
     expect(size.x).toBeGreaterThan(10)
     expect(size.y).toBeGreaterThan(2)
     expect(data).toEqual(before)
+  } finally { disposeObject(object) }
+})
+
+test("saved preview geometry unwraps legacy JSON envelopes and maps box primitives", () => {
+  const source = JSON.stringify({ data: JSON.stringify({ componentData: { children: [
+    { id: "legacy-box", type: "box", width: 12, height: 8, depth: 4 }
+  ] } }) })
+  const elements = resourcePreviewElements(resourceElements(source))
+  expect(elements).toHaveLength(1)
+  expect(elements[0]!.type).toBe("cube")
+  const object = createThreeObject(elements[0]!, { x: 0, y: 0, z: 0 })!
+  try { expect(new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3()).toArray()).toEqual([12, 8, 4]) }
+  finally { disposeObject(object) }
+})
+
+test("component details preview builds legacy primitives and nested custom components directly", () => {
+  const elements = resourceElements({ elements: [{ id: "custom", type: "custom", x: 2, elements: [
+    { id: "cylinder", type: "cylinder", x: 4, radius: 3, height: 8 },
+    { id: "nested", type: "component", y: 5, elements: [{ id: "sphere", type: "sphere", radius: 2 }] }
+  ] }] })
+  const object = createComponentPreviewObject(elements[0]!)!
+  try {
+    expect(object.children).toHaveLength(2)
+    expect(object.position.x).toBe(2)
+    const bounds = new THREE.Box3().setFromObject(object)
+    expect(bounds.getSize(new THREE.Vector3()).x).toBeGreaterThan(7)
+    expect(bounds.getSize(new THREE.Vector3()).y).toBeGreaterThan(5)
   } finally { disposeObject(object) }
 })
 

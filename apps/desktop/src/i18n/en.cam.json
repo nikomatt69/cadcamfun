@@ -424,6 +424,7 @@
   "cam.resource.fit": "Fit view",
   "cam.resource.noWebgl": "3D preview requires WebGL. Saved geometry and operations are available below.",
   "cam.resource.geometryError": "Some saved geometry could not be displayed.",
+  "cam.resource.previewEmpty": "No 3D geometry was found in this component's saved data.",
   "cam.resource.orbit": "Drag to orbit · Right-drag to pan · Scroll to zoom",
   "cam.resource.operations": "Operations ({count})",
   "cam.resource.noGeometry": "This toolpath has no saved component geometry.",

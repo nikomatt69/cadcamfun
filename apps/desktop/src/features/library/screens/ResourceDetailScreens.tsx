@@ -208,7 +208,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                         <Show when={str(current()["description"] ?? current()["notes"])} fallback={<p class="italic text-gray-500 dark:text-gray-400">No description provided</p>}>
                           <p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{str(current()["description"] ?? current()["notes"])}</p>
                         </Show>
-                        <Show when={props.kind === "components"}><div class="mt-5"><ResourceGeometryPreview elements={resourceElements(current()["data"])} /></div></Show>
+                        <Show when={props.kind === "components"}><div class="mt-5"><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div></Show>
                         <div class="mt-5 grid grid-cols-2 gap-4">
                           <For each={summaryFields(props.kind, current())}>{(field) => (
                             <div class="rounded-md bg-gray-50 p-3 dark:bg-gray-900"><h3 class="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{field.label}</h3><p class="font-medium text-gray-900 dark:text-white">{field.value}</p></div>
@@ -228,7 +228,7 @@ export function ResourceDetailScreen(props: ResourceDetailProps): JSX.Element {
                   </Show>
 
                   <Show when={props.kind === "components" && tab() === "preview"}>
-                    <div class={PANEL}><ResourceGeometryPreview elements={resourceElements(current()["data"])} /></div>
+                    <div class={PANEL}><ResourceGeometryPreview elements={resourceElements(current()["data"] ?? current())} /></div>
                   </Show>
                   <Show when={props.kind === "components" && tab() === "structure"}>
                     <div class={PANEL} data-testid="component-resource-structure">
