@@ -255,6 +255,19 @@ describe("exact replay of a parametric history", () => {
     for (const v of exact.vertices) expect(Math.min(...corners.map((k) => Math.hypot(k.x - v.point.x, k.y - v.point.y)))).toBeLessThan(1e-9)
   })
 
+  test("a loft is exact: square to square a frustum of planes, circle to square rational columns that agree with the mesh", () => {
+    const frustum = rebuildExact(history([rectangle("s1", "XY", 0, 0, 20, 20), rectangle("s2", "XY", 5, 5, 10, 10, 30), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    expect(frustum.bodies[0]!.reason).toBeUndefined()
+    expect(rel(massProperties(frustum.bodies[0]!.brep!).volume, 10 * (400 + 100 + 200))).toBeLessThan(1e-9)
+    expect(frustum.bodies[0]!.brep!.faces.every((f) => f.surface.kind === "plane")).toBe(true)
+    const round = { ...circles("s1", "XY", 10, 10, [10]), offset: 0 }
+    const mixed = rebuildExact(history([round, rectangle("s2", "XY", 2, 2, 16, 16, 25), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    const v = exactVolume(history([round, rectangle("s2", "XY", 2, 2, 16, 16, 25), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    expect(rel(v, meshVolume(mixed.result.bodies[0]!.mesh))).toBeLessThan(5e-3)
+    expect(v).toBeLessThan(PI * 100 * 25)
+    expect(v).toBeGreaterThan(256 * 25)
+  })
+
   test("features without an exact counterpart are never skipped silently", () => {
     const lettered = rebuildExact(plate([{ id: "t", type: "text", plane: "XY", offset: 6, at: [5, 5], text: "A", height: 5, depth: 1, operation: "union" }]))
     expect(lettered.bodies[0]!.reason).toContain("text")

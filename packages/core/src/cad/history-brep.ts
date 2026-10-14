@@ -33,6 +33,10 @@ import {
   makeSphere,
   makeTorus,
   draftPlanarFace,
+  loftBrep,
+  loftSection,
+  loopArea,
+  type LoftSegment,
   mateTransform,
   nearestFace,
   normalizeProfile,
@@ -998,7 +1002,35 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           apply(f.id, ok(solid), f.operation, f.targets, f.id)
           break
         }
-        case "loft":
+        case "loft": {
+          // Each section's largest loop (as the mesh rebuild lofts), started where the mesh's ring starts.
+          const sections: LoftSegment[][] = [], starts: Vec3[] = []
+          let reason: string | undefined
+          for (const id of f.sections) {
+            const sk = sketchOf(id)
+            if (sk === undefined) { reason = `section '${id}' is not available`; break }
+            const { loops } = exactSketchLoops(sk.solve.sketch)
+            const polys = sketchProfiles(sk.solve.sketch).loops
+            if (loops.length === 0 || polys.length === 0) { reason = `section '${id}' has no closed loop`; break }
+            const F = sk.frame
+            const placed = { origin: F.origin, x: F.u, y: F.v, z: F.n }
+            const outer = loops.reduce((a, b) => (Math.abs(loopArea(b)) > Math.abs(loopArea(a)) ? b : a))
+            const first = polys.reduce((a, b) => (Math.abs(polygonArea(b)) > Math.abs(polygonArea(a)) ? b : a))[0]!
+            try { sections.push(loftSection(outer, placed)) } catch (e) { reason = e instanceof Error ? e.message : String(e); break }
+            starts.push({ x: F.origin.x + F.u.x * first.x + F.v.x * first.y, y: F.origin.y + F.u.y * first.x + F.v.y * first.y, z: F.origin.z + F.u.z * first.x + F.v.z * first.y })
+          }
+          if (reason !== undefined) { unsupported(f, reason); break }
+          let solid: Brep
+          try {
+            solid = loftBrep(sections, { smooth: f.smooth === true, starts, name: f.id })
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
+          tools.set(f.id, { exact: [ok(solid)], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, ok(solid), f.operation, f.targets, f.id)
+          break
+        }
         case "coil":
         case "rib":
         case "sheet":
