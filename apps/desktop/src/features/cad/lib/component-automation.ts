@@ -12,12 +12,16 @@ import {
   billOfMaterials,
   brep,
   cam,
+  brepBox,
   elementBrep,
   fastenerSolids,
+  gizmoTransform,
+  jointsFromHoles,
   planFasteners,
   type AssemblyPart,
   type BomRow,
   type FastenerPlan,
+  type InferredJoint,
   type InterferenceReport,
   type UnfastenedStack
 } from "@cadcamfun/core"
@@ -67,39 +71,46 @@ const rotatedOrScaled = (e: Element): boolean => {
 
 /**
  * The exact solids of the scene, in world coordinates: visible solids not consumed as Boolean operands, and the solids
- * inside components (a component moved without rotation or scale; a rotated one is listed with the reason).
+ * inside components, placed, turned and uniformly scaled with them (a non-uniform scale is listed with the reason).
  */
 export const sceneParts = (elements: ReadonlyArray<Element>): SceneParts => {
   const byId = new Map<string, Element>()
   for (const e of elements) if (typeof e.id === "string") byId.set(e.id, e)
   const consumed = new Set<string>()
   for (const e of elements) if (String(e.type).startsWith("boolean-") && Array.isArray(e["operands"])) for (const o of e["operands"] as unknown[]) consumed.add(String(o))
-  const parts: ScenePart[] = []
   const skipped: Array<{ id: string; name: string; reason: string }> = []
-  const visit = (e: Element, offset: { x: number; y: number; z: number }) => {
+  // Parts of one element in its parent's frame: a container places its children at its own x / y / z, then turns, scales and
+  // moves all of them together about the centre of their box, as the viewport turns the component's group.
+  const visit = (e: Element): ScenePart[] => {
     const id = String(e.id ?? "")
-    if (e["visible"] === false || consumed.has(id)) return
+    if (e["visible"] === false || consumed.has(id)) return []
     const type = String(e.type ?? "")
     if (CONTAINERS.has(type)) {
-      if (rotatedOrScaled(e)) { skipped.push({ id, name: nameOf(e), reason: "a rotated or scaled component is not placed exactly yet" }); return }
-      const at = { x: offset.x + num(e["x"]), y: offset.y + num(e["y"]), z: offset.z + num(e["z"]) }
-      for (const child of componentChildren(e as never) as unknown as Element[]) visit(child, at)
-      return
+      const at = { x: num(e["x"]), y: num(e["y"]), z: num(e["z"]) }
+      const moved = (componentChildren(e as never) as unknown as Element[]).flatMap(visit).map((p) =>
+        at.x === 0 && at.y === 0 && at.z === 0 ? p : { ...p, brep: brep.transformBrep(p.brep, brep.translation(at)) })
+      if (moved.length === 0 || !rotatedOrScaled(e) && num(e["translateX"]) === 0 && num(e["translateY"]) === 0 && num(e["translateZ"]) === 0) return moved
+      const boxes = moved.map((p) => brepBox(p.brep))
+      const box = {
+        lo: { x: Math.min(...boxes.map((b) => b.lo.x)), y: Math.min(...boxes.map((b) => b.lo.y)), z: Math.min(...boxes.map((b) => b.lo.z)) },
+        hi: { x: Math.max(...boxes.map((b) => b.hi.x)), y: Math.max(...boxes.map((b) => b.hi.y)), z: Math.max(...boxes.map((b) => b.hi.z)) }
+      }
+      const tr = gizmoTransform(e as never, box)
+      if (typeof tr === "string") { skipped.push({ id, name: nameOf(e), reason: tr }); return [] }
+      return tr === undefined ? moved : moved.map((p) => ({ ...p, brep: brep.transformBrep(p.brep, tr) }))
     }
-    if (!SOLID_TYPES.has(type)) return
+    if (!SOLID_TYPES.has(type)) return []
     let placed: ReturnType<typeof elementBrep>
     try {
       placed = elementBrep(e as never, byId as never)
     } catch (err) {
-      skipped.push({ id, name: nameOf(e), reason: err instanceof Error ? err.message : String(err) }); return
+      skipped.push({ id, name: nameOf(e), reason: err instanceof Error ? err.message : String(err) }); return []
     }
-    if (placed.brep === undefined) { skipped.push({ id, name: nameOf(e), reason: placed.reason }); return }
-    const b = offset.x === 0 && offset.y === 0 && offset.z === 0 ? placed.brep : brep.transformBrep(placed.brep, brep.translation(offset))
+    if (placed.brep === undefined) { skipped.push({ id, name: nameOf(e), reason: placed.reason }); return [] }
     const fastener = fastenerOf(e)
-    parts.push({ id, name: nameOf(e), brep: b, element: e, ...(fastener !== undefined ? { fastener } : {}) })
+    return [{ id, name: nameOf(e), brep: placed.brep, element: e, ...(fastener !== undefined ? { fastener } : {}) }]
   }
-  for (const e of elements) visit(e, { x: 0, y: 0, z: 0 })
-  return { parts, skipped }
+  return { parts: elements.flatMap(visit), skipped }
 }
 
 const materialOf = (e: Element): string | undefined => {
@@ -201,6 +212,41 @@ export const sceneInterference = (elements: ReadonlyArray<Element>): SceneInterf
 export const sceneBom = (elements: ReadonlyArray<Element>): { readonly rows: ReadonlyArray<BomRow>; readonly skipped: SceneParts["skipped"] } => {
   const scene = sceneParts(elements)
   return { rows: billOfMaterials(assemblyParts(scene)), skipped: scene.skipped }
+}
+
+/** Joints inferred from the coaxial holes of the scene's parts (fasteners left out): revolute about one shared axis, fixed by two. */
+export const sceneJoints = (elements: ReadonlyArray<Element>): { readonly joints: ReadonlyArray<InferredJoint>; readonly names: ReadonlyMap<string, string>; readonly skipped: SceneParts["skipped"] } => {
+  const scene = sceneParts(elements)
+  const bodies = scene.parts.filter((p) => p.fastener === undefined)
+  return { joints: jointsFromHoles(bodies), names: new Map(bodies.map((p) => [p.id, p.name])), skipped: scene.skipped }
+}
+
+/** The part of the assembly store the joints are written through (one history step per joint, as the joint form does). */
+export interface JointTarget {
+  readonly assemblyState: { readonly nodes: Readonly<Record<string, { readonly id: string; readonly componentId?: string }>>; readonly joints: Readonly<Record<string, { readonly parent: string; readonly child: string }>> }
+  addComponent(name: string, position: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number }, parentId?: string | null, componentId?: string, metadata?: Record<string, unknown>): string
+  addJoint(type: "fixed" | "revolute", parentId: string, childId: string, origin: { x: number; y: number; z: number }, primaryAxis: { x: number; y: number; z: number }, secondaryAxis?: undefined, limits?: undefined, name?: string): unknown
+}
+
+/**
+ * Writes inferred joints into the assembly: each part gets the node that already references it (`componentId`) or a new
+ * one; a pair that already has a joint keeps it. Returns how many joints were added and how many were already there.
+ */
+export const applyJoints = (inferred: ReturnType<typeof sceneJoints>, store: () => JointTarget): { readonly added: number; readonly existing: number } => {
+  const nodeOf = (part: string): string => {
+    const found = Object.values(store().assemblyState.nodes).find((n) => n.componentId === part)
+    if (found !== undefined) return found.id
+    return store().addComponent(inferred.names.get(part) ?? part, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, null, part, { automation: "joints-from-holes" })
+  }
+  let added = 0, existing = 0
+  for (const j of inferred.joints) {
+    const parent = nodeOf(j.parent), child = nodeOf(j.child)
+    const joined = Object.values(store().assemblyState.joints).some((x) => (x.parent === parent && x.child === child) || (x.parent === child && x.child === parent))
+    if (joined) { existing++; continue }
+    const name = `${inferred.names.get(j.child) ?? j.child} on ${inferred.names.get(j.parent) ?? j.parent} (${j.kind === "fixed" ? `${j.axes} hole axes` : "hole axis"})`
+    if (store().addJoint(j.kind, parent, child, j.origin, j.axis, undefined, undefined, name) !== null) added++
+  }
+  return { added, existing }
 }
 
 /** The BOM as CSV (RFC 4180), for a spreadsheet or an ERP import. */

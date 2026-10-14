@@ -486,7 +486,53 @@ export const meshIntersectionPolylines = (A: TriSet, B: TriSet, bvhB: TriBvh, sa
     const pts = chain.filter((e, i) => i === 0 || dist3(e.p, chain[i - 1]!.p) > 1e-12 * scale).map((e) => ({ p: e.p, uva: e.uva, uvb: e.uvb }))
     if (pts.length >= 2) out.push({ pts, closed })
   }
-  return out
+  return bridgeGaps(out)
+}
+
+/**
+ * Joins the pieces of one intersection curve that the triangle tests left apart. A crossing that falls on the edge shared
+ * by two triangles of the other mesh can be missed by both (each rounds it outside), which drops a segment and breaks a
+ * closed curve into open pieces whose ends do not meet any vertex; the arrangement then loses them. Open pieces whose ends
+ * are within three polyline steps and continue each other's direction are joined, and a piece whose two ends meet that way
+ * is closed. The refinement that follows puts every point back on the exact curve.
+ */
+const bridgeGaps = <P extends { readonly p: Vec3 }>(chains: Array<{ pts: P[]; closed: boolean }>): Array<{ pts: P[]; closed: boolean }> => {
+  const open = chains.filter((c) => !c.closed && c.pts.length >= 2)
+  if (open.length === 0) return chains
+  let step = 0
+  for (const c of chains) for (let i = 1; i < c.pts.length; i++) step = Math.max(step, dist3(c.pts[i]!.p, c.pts[i - 1]!.p))
+  const gapTol = 3 * step
+  const dirOf = (a: Vec3, b: Vec3) => normalize3(sub3(b, a))
+  const tailDir = (c: { pts: P[] }) => dirOf(c.pts[c.pts.length - 2]!.p, c.pts[c.pts.length - 1]!.p)
+  const headDir = (c: { pts: P[] }) => dirOf(c.pts[0]!.p, c.pts[1]!.p)
+  // Can the end of `a` continue into the start of `b`?
+  const continues = (a: { pts: P[] }, b: { pts: P[] }): boolean => {
+    const e = a.pts[a.pts.length - 1]!.p, s = b.pts[0]!.p
+    const d = dist3(e, s)
+    if (d > gapTol) return false
+    if (d < 1e-12) return true
+    const g = dirOf(e, s)
+    return dot3(tailDir(a), g) > 0.7 && dot3(g, headDir(b)) > 0.7
+  }
+  const reverse = (c: { pts: P[]; closed: boolean }) => ({ pts: [...c.pts].reverse(), closed: c.closed })
+  let pieces = open.map((c) => ({ pts: [...c.pts], closed: false }))
+  for (let merged = true; merged;) {
+    merged = false
+    search: for (let i = 0; i < pieces.length; i++) {
+      for (let j = 0; j < pieces.length; j++) {
+        if (i === j) continue
+        for (const b of [pieces[j]!, reverse(pieces[j]!)]) {
+          if (!continues(pieces[i]!, b)) continue
+          pieces[i] = { pts: [...pieces[i]!.pts, ...b.pts], closed: false }
+          pieces = pieces.filter((_, k) => k !== j)
+          merged = true
+          break search
+        }
+      }
+    }
+  }
+  for (const c of pieces) if (c.pts.length > 3 && continues(c, c)) c.closed = true
+  return [...chains.filter((c) => c.closed || c.pts.length < 2), ...pieces]
 }
 
 /**

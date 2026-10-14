@@ -223,13 +223,23 @@ and material, with exact volumes and masses. The desktop's assembly panel runs a
 (`apps/desktop/src/features/cad/lib/component-automation.ts`: components are flattened, fasteners are
 inserted as `brep` elements in one undo step and are not inserted twice; the BOM exports as CSV).
 
-Fillets of edges between curved faces (variable radius, setbacks), shells of revolutions and sweeps, drafts, persistent naming
+Fillets of edges between curved faces (variable radius, setbacks), shells of sweeps, drafts of curved faces, push-pull and mates on the exact model, persistent naming
 and 2D drafting remain pending, so the professional kernel acceptance gate is not claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-14: drafts and revolution shells are exact, assemblies infer joints, and no feature is skipped silently.
+  `extrudeProfile`'s `inset` leans the walls (tilted planes, cones; holes widen), which `rebuildExact` uses for an
+  extrusion's draft angle; `brep/draft.ts` drafts a planar face about its hinge with exact Booleans (the mesh
+  rebuild's add / remove wedges); `revolveShellLoop` hollows a full revolution. Rib, sheet, text, thread,
+  push-pull and mate were skipped by the exact replay and left the body looking exact: they now mark the bodies
+  they touch with the reason. Boolean: open pieces of one intersection curve broken by the triangle tests are
+  joined (`bridgeGaps`), so 1e-12 of sketch-solver noise no longer loses a curve. Automations: rotated and scaled
+  components are placed with `gizmoTransform` (the viewport's pivot), and `jointsFromHoles` infers revolute (one
+  shared hole axis) or fixed (two or more) joints written into the assembly store.
 
 - 2026-10-14: exact shell of an extrusion: `offsetLoop` (`brep/sweep.ts`) moves a line/arc profile exactly (parallel
   lines, concentric arcs, mitred joints as `moveRing`, tangent joints kept, collapse and self-crossing refused);

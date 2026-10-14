@@ -62,6 +62,41 @@ test("smart fasteners, interference and BOM on the canvas elements", async () =>
   expect(csv[3]!.startsWith("3,ISO 4762 M8x20,ISO 4762 M8x20,steel,2,")).toBe(true)
 })
 
+test("a rotated component: its parts are placed where the viewport draws them and fastened on the turned axes", async () => {
+  const THREE = await import("three")
+  const { sceneParts, fastenScene } = await import("../src/features/cad/lib/component-automation.ts")
+  const { buildElementObject, disposeObject } = await import("../src/features/cad/lib/sceneHelpers.ts")
+  const [base, sub] = scene()
+  // The whole joint in one component, turned 90 degrees about z and moved, around the centre of its box.
+  const turned = { id: "turned", type: "component", name: "Turned joint", x: 100, y: 0, z: 0, layerId: "default", rotation: { z: 90 }, translateY: 5,
+    elements: [base, sub] }
+  const parts = sceneParts([turned])
+  expect(parts.skipped).toEqual([])
+  expect(parts.parts.map((p) => p.id)).toEqual(["base", "plate"])
+  // The viewport's group: the union of the exact parts' boxes is the box of what it draws.
+  const object = buildElementObject(turned as never)!
+  const drawn = new THREE.Box3().setFromObject(object)
+  disposeObject(object)
+  const { brepBox } = await import("@cadcamfun/core")
+  const boxes = parts.parts.map((p) => brepBox(p.brep))
+  const lo = ["x", "y", "z"].map((k) => Math.min(...boxes.map((b) => b.lo[k as "x"])))
+  const hi = ["x", "y", "z"].map((k) => Math.max(...boxes.map((b) => b.hi[k as "x"])))
+  for (let i = 0; i < 3; i++) {
+    expect(Math.abs(lo[i]! - drawn.min.getComponent(i))).toBeLessThan(0.05)
+    expect(Math.abs(hi[i]! - drawn.max.getComponent(i))).toBeLessThan(0.05)
+  }
+  // 60 x 30 turned by 90 degrees: 30 wide in x, 60 in y.
+  expect(hi[0]! - lo[0]!).toBeCloseTo(30, 6)
+  expect(hi[1]! - lo[1]!).toBeCloseTo(60, 6)
+  const fastened = fastenScene([turned])
+  expect(fastened.unfastened).toEqual([])
+  expect(fastened.plans.map((p) => p.designation)).toEqual(["ISO 4762 M8x20", "ISO 4762 M8x20"])
+  // The holes were at x = 15 and 45 along the 60 mm side: after the turn they lie on one line along y, 30 apart.
+  const [a, b] = fastened.plans.map((p) => p.seat)
+  expect(Math.abs(a!.x - b!.x)).toBeLessThan(1e-9)
+  expect(Math.abs(Math.abs(a!.y - b!.y) - 30)).toBeLessThan(1e-9)
+})
+
 test("the assembly panel inserts the fasteners in one undo step and reports interference and the BOM", async () => {
   installDom("http://localhost/cad")
   const { render } = await import("solid-js/web")
@@ -96,6 +131,23 @@ test("the assembly panel inserts the fasteners in one undo step and reports inte
     const bom = await waitFor("bom-result")
     expect(bom.textContent).toContain("ISO 4762 M8x20")
     expect(bom.querySelectorAll("[data-testid='bom-row']").length).toBe(4)
+
+    // Joints from the holes: base and plate get assembly nodes and one fixed joint (two shared axes); a second run adds none.
+    const { useAssemblyStore } = await import("../src/features/cad/store/assemblyStore.ts")
+    useAssemblyStore.getState().reset()
+    click("Joints from holes")
+    expect((await waitFor("joints-result")).textContent).toContain("Joints added: 1")
+    const state = useAssemblyStore.getState().assemblyState
+    const joint = Object.values(state.joints)[0]!
+    expect(joint.type).toBe("fixed")
+    expect(state.nodes[joint.parent]!.componentId).toBe("base")
+    expect(state.nodes[joint.child]!.componentId).toBe("plate")
+    expect(Math.abs(joint.origin.z - 20)).toBeLessThan(1e-9)
+    click("Joints from holes")
+    for (let i = 0; i < 1500 && !(root.querySelector("[data-testid='joints-result']")!.textContent ?? "").includes("already joined: 1"); i++) await new Promise((r) => setTimeout(r, 10))
+    expect(root.querySelector("[data-testid='joints-result']")!.textContent).toContain("Joints added: 0 · already joined: 1")
+    expect(Object.keys(useAssemblyStore.getState().assemblyState.joints).length).toBe(1)
+    useAssemblyStore.getState().reset()
 
     // One undo removes every inserted fastener.
     useElementsStore.getState().undo()
