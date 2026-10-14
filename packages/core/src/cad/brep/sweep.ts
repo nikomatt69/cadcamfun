@@ -81,6 +81,37 @@ export const loopArea = (l: ProfileLoop): number => {
   return area / 2
 }
 
+/**
+ * Signed area and first moments (the integrals of x and y over the area) of a loop, by Green's theorem: exact for lines and
+ * circular arcs, a fine polygon for a NURBS segment. The centre of area of a profile is the sum of the moments over the sum
+ * of the areas (holes, running clockwise, count negative).
+ */
+export const loopMoments = (l: ProfileLoop): { readonly area: number; readonly mx: number; readonly my: number } => {
+  let a2 = 0, mx = 0, my = 0
+  const chord = (p: Vec2, q: Vec2): void => {
+    a2 += p.x * q.y - q.x * p.y
+    mx += ((q.y - p.y) * (p.x * p.x + p.x * q.x + q.x * q.x)) / 6
+    my -= ((q.x - p.x) * (p.y * p.y + p.y * q.y + q.y * q.y)) / 6
+  }
+  for (const s of l) {
+    if (s.kind === "line") { chord(s.a, s.b); continue }
+    if (s.kind === "arc") {
+      const { center: c, radius: r, start: t0, end: t1 } = s
+      const S = (t: number) => Math.sin(t), C = (t: number) => Math.cos(t)
+      a2 += r * c.x * (S(t1) - S(t0)) - r * c.y * (C(t1) - C(t0)) + r * r * (t1 - t0)
+      // x^2 dy / 2 and -y^2 dx / 2 along x = cx + r cos t, y = cy + r sin t.
+      const cos2 = (t: number) => t / 2 + Math.sin(2 * t) / 4, sin2 = (t: number) => t / 2 - Math.sin(2 * t) / 4
+      const cos3 = (t: number) => S(t) - S(t) ** 3 / 3, sin3 = (t: number) => -C(t) + C(t) ** 3 / 3
+      mx += (c.x * c.x * r * (S(t1) - S(t0)) + 2 * c.x * r * r * (cos2(t1) - cos2(t0)) + r ** 3 * (cos3(t1) - cos3(t0))) / 2
+      my += (c.y * c.y * r * (C(t0) - C(t1)) + 2 * c.y * r * r * (sin2(t1) - sin2(t0)) + r ** 3 * (sin3(t1) - sin3(t0))) / 2
+      continue
+    }
+    let prev = segmentPoint(s, 0)
+    for (let i = 1; i <= 256; i++) { const p = segmentPoint(s, i / 256); chord(prev, p); prev = p }
+  }
+  return { area: a2 / 2, mx, my }
+}
+
 const near2 = (a: Vec2, b: Vec2, tol: number) => Math.hypot(a.x - b.x, a.y - b.y) <= tol
 
 /** Checks closure and returns the loops oriented: outer counter-clockwise first, holes clockwise. */
