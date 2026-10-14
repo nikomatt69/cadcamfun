@@ -145,7 +145,7 @@
         "zod": "^4.1.8",
       },
       "devDependencies": {
-        "@nikoemme/cadcamfun-nikcli-plugin": "workspace:*",
+        "@nikoemme_/cadcamfun-nikcli-plugin": "workspace:*",
         "ai": "7.0.127",
       },
     },
@@ -203,7 +203,7 @@
       },
     },
     "packages/nikcli-plugin": {
-      "name": "@nikoemme/cadcamfun-nikcli-plugin",
+      "name": "@nikoemme_/cadcamfun-nikcli-plugin",
       "version": "0.1.0",
       "dependencies": {
         "zod": "^4.1.8",
@@ -443,7 +443,7 @@
 
     "@cadcamfun/mobile": ["@cadcamfun/mobile@workspace:apps/mobile"],
 
-    "@nikoemme/cadcamfun-nikcli-plugin": ["@nikoemme/cadcamfun-nikcli-plugin@workspace:packages/nikcli-plugin"],
+    "@nikoemme_/cadcamfun-nikcli-plugin": ["@nikoemme_/cadcamfun-nikcli-plugin@workspace:packages/nikcli-plugin"],
 
     "@cadcamfun/plugin-sdk": ["@cadcamfun/plugin-sdk@workspace:packages/plugin-sdk"],
 

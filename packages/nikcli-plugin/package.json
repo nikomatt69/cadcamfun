@@ -1,5 +1,5 @@
 {
-  "name": "@nikoemme/cadcamfun-nikcli-plugin",
+  "name": "@nikoemme_/cadcamfun-nikcli-plugin",
   "version": "0.1.0",
   "description": "Drive a running CADCAMFUN instance from a standalone nikcli: the application's CAD/CAM action catalogue as nikcli tools.",
   "type": "module",

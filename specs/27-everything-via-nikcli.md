@@ -52,7 +52,7 @@ B does **not** touch nikcli sources. nikcli is consumed only as `@nikcli-ai/sdk-
                  │  + app-owned mod         │                            │
                  └──────┬───────────────────┬────────────────────────────┘
                         │                   │
-              assistant chat        @nikoemme/cadcamfun-nikcli-plugin
+              assistant chat        @nikoemme_/cadcamfun-nikcli-plugin
               (desktop, mobile      (standalone `nikcli`: same tool ids,
                companion)            execute() → HTTP + paired token)
 ```
@@ -102,7 +102,7 @@ The prompt budget of spec 26 survives: the model sees the consolidated tool cata
 
 ### 4.4 External agent plugin
 
-A small package `@nikoemme/cadcamfun-nikcli-plugin` (built on `@nikcli-ai/plugin`'s `./tool` export) registers **the same tool ids** into any nikcli, with `execute()` calling the cadcamfun HTTP face (§5) with a paired token. Installed with `nikcli plug install`, it turns a standalone nikcli into a full CAD/CAM agent for a running cadcamfun instance: describe → edit → operations → generate → analyze → verify, the same loop as `16-cadcam-agent-blueprint.md` §3.6.5. This is the "tutto via nikcli" surface outside the app: same ids, same schemas, same confirmations — only the transport differs.
+A small package `@nikoemme_/cadcamfun-nikcli-plugin` (built on `@nikcli-ai/plugin`'s `./tool` export) registers **the same tool ids** into any nikcli, with `execute()` calling the cadcamfun HTTP face (§5) with a paired token. Installed with `nikcli plug install`, it turns a standalone nikcli into a full CAD/CAM agent for a running cadcamfun instance: describe → edit → operations → generate → analyze → verify, the same loop as `16-cadcam-agent-blueprint.md` §3.6.5. This is the "tutto via nikcli" surface outside the app: same ids, same schemas, same confirmations — only the transport differs.
 
 ## 5. Via C — the HttpApi bridge
 
@@ -139,14 +139,14 @@ The agent stays a CAD/CAM colleague, not an HTTP Swiss-army knife. The model-vis
 | 2 | Catalogue→HTTP parity map + missing routes in `packages/api`/`apps/sidecar/src/http`; regenerated clients; parity test catalogue↔routes | WP3, WP4 | 1 |
 | 3 | `contributes.aiTools` in plugin-sdk; first production `extensions` caller in `toolsFor` | WP9, WP8 | 1 |
 | 4 | App-owned mod (audit, destructive escalation, prompt context) — gated on the pinned bundle (§4.3) | WP8 | 0 |
-| 5 | Paired agent tokens + `@nikoemme/cadcamfun-nikcli-plugin`; external round-trip | WP4, WP8 | 2 |
+| 5 | Paired agent tokens + `@nikoemme_/cadcamfun-nikcli-plugin`; external round-trip | WP4, WP8 | 2 |
 
 ## 10. Acceptance criteria
 
 1. A parity test derives host registrations and HTTP route mappings or explicit in-process-only exceptions from the catalogue, failing on drift. Preserve already registered `cad_grep` reachability, parameter/result schemas and read-only authorization through RM-01 consolidation and RM-11 bridge exposure; test any explicit in-process-only exception. This is preservation coverage, not a reproduced current missing-registration failure. Source inspection on 2026-10-12 confirms the `cadGrep` import and inclusion in `BUILT_IN_TOOLS` in `packages/ai/src/tools/registry.ts`.
 2. Every consolidated tool prompt documents every action and every parameter of every action (spec 26 §6.3, restated over catalogue actions); catalogue prompt cost stays under 24 000 characters.
 3. Destructive actions require verifiable native confirmation in-process and over HTTP, alongside authorized project/write scope. Grouped tools use stricter native `ask` until proven action escalation; a model flag/write token alone is not confirmation. Read tokens fail before execute.
-4. External round-trip: with a paired token, a real embedded host plus `@nikoemme/cadcamfun-nikcli-plugin` performs describe → add elements → create operation → generate G-code → verify against a running sidecar, without any provider key (fake model, as in spec 16 acceptance §6).
+4. External round-trip: with a paired token, a real embedded host plus `@nikoemme_/cadcamfun-nikcli-plugin` performs describe → add elements → create operation → generate G-code → verify against a running sidecar, without any provider key (fake model, as in spec 16 acceptance §6).
 5. Isolation unchanged: the sentinel `~/.config/nikcli` test passes; only the app-owned mod loads; user/project mods and plugin auto-install remain disabled.
 6. `bunx tsc -p packages/{ai,api}/tsconfig.json`, the sidecar and desktop typechecks, and `bun test packages apps` are clean; generated clients are regenerated where ids appear.
 

@@ -39,6 +39,6 @@
   },
   "devDependencies": {
     "ai": "7.0.127",
-    "@nikoemme/cadcamfun-nikcli-plugin": "workspace:*"
+    "@nikoemme_/cadcamfun-nikcli-plugin": "workspace:*"
   }
 }

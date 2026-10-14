@@ -289,7 +289,7 @@ jobs:
           files: dist/*
           fail_on_unmatched_files: true
 
-  # Needs the repository secret NPM_TOKEN (an npm automation token that can publish under the @nikoemme scope). Without it
+  # Needs the repository secret NPM_TOKEN (an npm automation token that can publish under the @nikoemme_ scope). Without it
   # the job warns and stays green; a version already on the registry is skipped, so re-running a release is safe.
   publish-npm:
     needs: trusted
@@ -306,7 +306,7 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - name: Publish @nikoemme/cadcamfun-nikcli-plugin
+      - name: Publish @nikoemme_/cadcamfun-nikcli-plugin
         working-directory: packages/nikcli-plugin
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
