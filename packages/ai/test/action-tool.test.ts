@@ -13,8 +13,7 @@ const read = defineAction({ id: "probe.read", kind: "read", parameters: z.object
 const write = defineAction({ id: "probe.write", kind: "write", parameters: z.object({}), run: () => ({ ok: true }) })
 
 describe("defineActionTool", () => {
-  test("rejects a group that mixes read and write effects, an empty group and a redefined discriminator", () => {
-    expect(() => defineActionTool("mixed", { inspect: read, save: write }, "mixed")).toThrow("mixes read and write")
+  test("rejects an empty group and a redefined discriminator", () => {
     expect(() => defineActionTool("empty", {}, "empty")).toThrow("no actions")
     expect(() => defineActionTool("invalid", { inspect: defineAction({ id: "probe.read", kind: "read", parameters: z.object({ action: z.string() }), run: () => ({ ok: true }) }) }, "invalid")).toThrow("discriminator")
   })
@@ -105,12 +104,14 @@ describe("defineActionTool", () => {
     expect(JSON.parse(await toSpec(tool, context).execute({ action: "inspect" }, call()))).toEqual({ ok: true, original: true })
   })
 
-  test("a tool's kind is its effect, and a group that mixes effects is refused", () => {
+  test("a tool's kind is the strongest kind of its actions", () => {
     expect(defineActionTool("probe", { read }, "Probe").kind).toBe("read")
     expect(defineActionTool("probe", { write }, "Probe").kind).toBe("write")
     const destructive = defineAction({ id: "probe.drop", kind: "destructive", parameters: z.object({}), run: () => ({ ok: true }) })
     expect(defineActionTool("probe", { drop: destructive }, "Probe").kind).toBe("destructive")
-    expect(() => defineActionTool("probe", { read, drop: destructive }, "Probe")).toThrow("mixes read and write")
+    // A group with one write is a write tool, so a read-only role never receives it, whatever reads it also carries.
+    expect(defineActionTool("probe", { read, save: write }, "Probe").kind).toBe("write")
+    expect(defineActionTool("probe", { read, drop: destructive }, "Probe").kind).toBe("destructive")
   })
 
   test("a contributed action without an implementation refuses instead of guessing", async () => {

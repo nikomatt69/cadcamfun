@@ -23,8 +23,8 @@ describe("action contracts", () => {
     for (const spec of ACTION_CATALOGUE) {
       if (spec.kind === "read") expect(spec.contract.effects.filter((effect) => effect !== "interface" && effect !== "external")).toEqual([])
     }
-    // Kind `write` only so no read-only role holds the tool: recorded, and the subject of AI-11 Step 3.
-    expect(ACTION_CATALOGUE.filter((spec) => spec.kind !== "read" && spec.contract.effects.length === 0).map((spec) => spec.id)).toEqual(["agent.list", "agent.read"])
+    // Listing and reading delegated tasks are reads; the `agent` tool stays a write tool because it can start and cancel.
+    expect(ACTION_CATALOGUE.filter((spec) => spec.kind !== "read" && spec.contract.effects.length === 0).map((spec) => spec.id)).toEqual([])
   })
 
   test("every catalogue action declares its result", () => {

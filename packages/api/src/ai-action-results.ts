@@ -10,6 +10,7 @@
  */
 import { Schema } from "effect"
 import { cam } from "@cadcamfun/core"
+import type { ActionEffect } from "./ai-actions.ts"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -17,14 +18,6 @@ import { cam } from "@cadcamfun/core"
 export const ActionOutcomeKind = Schema.Literals(["succeeded", "partial", "refused", "conflict", "cancelled", "uncertain"])
 export type ActionOutcomeKind = typeof ActionOutcomeKind.Type
 
-/**
- * What an action changes or reaches beyond reading the open document. Declared, never inferred from the tool's name:
- * `interface` is the editor or viewport on the user's screen, `external` the network, `task` the delegation scheduler.
- */
-export const ActionEffect = Schema.Literals([
-  "drawing", "operation", "program", "report", "stock", "component", "library", "memory", "context", "history", "workflow", "task", "interface", "external"
-])
-export type ActionEffect = typeof ActionEffect.Type
 
 /** The wire form of every non-success: the model and the desktop read the same four fields; anything else the implementation said stays. */
 export const ActionFailureResult = Schema.Struct({
@@ -258,8 +251,8 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.transform": write(["drawing"], transformed),
   "cad_edit.group": write(["drawing"], grouped),
   "cad_edit.delete": write(["drawing"], deleted),
-  // Kind `write` in the catalogue, but it only changes what the editor shows: layers, view, selection.
-  "cad_edit.editor": write(["interface"], editor),
+  // Mostly what the editor shows (view, selection); the layers it creates, renames or deletes belong to the drawing.
+  "cad_edit.editor": write(["interface", "drawing"], editor),
   "cad_edit.import": write(["drawing"], added),
   "cad_edit.parametric_create": write(["drawing"], parametricCreated),
   "cad_edit.parametric_update": write(["drawing"], parametricUpdated),
@@ -286,7 +279,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.update": write(["operation"], operationUpdated),
   "cam_edit.generate": write(["program"], generated),
   // Regenerates and stores the program with its report today; AI-11 Step 8 makes it read the stored program.
-  "cam_edit.verify": write(["program", "report"], verified),
+  "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
 
   "library.component_list": read(componentList),
@@ -324,7 +317,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
 
   "agent.start": write(["task"], task),
   // Kind `write` in the catalogue so no read-only role holds the tool, but listing and reading change nothing.
-  "agent.list": write([], tasks),
-  "agent.read": write([], task),
+  "agent.list": read(tasks),
+  "agent.read": read(task),
   "agent.cancel": write(["task"], task)
 }

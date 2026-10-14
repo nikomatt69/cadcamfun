@@ -26,37 +26,37 @@ const limitsFor = async (name: string | undefined, context: ActionContext): Prom
 
 export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
-    id: "cam.plan_check", kind: "read", effects: [], parameters: CAM_ACTION_INPUTS["cam.plan_check"],
+    id: "cam.plan_check", kind: "read", parameters: CAM_ACTION_INPUTS["cam.plan_check"],
     run: (input, { handlers, projectId }) => handlers.validateMachiningPlan?.(projectId, input) ?? { ok: false, error: "Plan validation is unavailable in this host." }
   }),
   defineWireAction({
-    id: "cam.review", kind: "read", effects: [], parameters: CAM_ACTION_INPUTS["cam.review"],
+    id: "cam.review", kind: "read", parameters: CAM_ACTION_INPUTS["cam.review"],
     run: ({ operationId }, { handlers, projectId }) => handlers.reviewOperation?.(projectId, operationId) ?? { ok: false, error: "Saved review is unavailable in this host." }
   }),
   defineWireAction({
-    id: "cam.machine", kind: "read", effects: [], replaces: "cam_describe_machine",
+    id: "cam.machine", kind: "read", replaces: "cam_describe_machine",
     parameters: CAM_ACTION_INPUTS["cam.machine"],
     // Pure: reads the kinematics table, needs no project data.
     run: async ({ machineType: kind }) => ({ ...cam.kinematicsOf(kind), origins: cam.ORIGINS[kind] })
   }),
   defineWireAction({
-    id: "cam.operations", kind: "read", effects: [], replaces: "cam_list_operations",
+    id: "cam.operations", kind: "read", replaces: "cam_list_operations",
     parameters: CAM_ACTION_INPUTS["cam.operations"],
     run: (_input, { handlers, projectId }) => handlers.listOperations(projectId)
   }),
   defineWireAction({
-    id: "cam.suggest", kind: "read", effects: [], replaces: "cam_suggest_parameters",
+    id: "cam.suggest", kind: "read", replaces: "cam_suggest_parameters",
     parameters: CAM_ACTION_INPUTS["cam.suggest"],
     run: ({ params }, { handlers, projectId }) => handlers.suggestParameters(projectId, params ?? {})
   }),
   defineWireAction({
-    id: "cam.compare_setups", kind: "read", effects: [], replaces: "cam_suggest_parameters",
+    id: "cam.compare_setups", kind: "read", replaces: "cam_suggest_parameters",
     parameters: CAM_ACTION_INPUTS["cam.compare_setups"],
     run: ({ candidates }, { handlers, projectId }) =>
       handlers.compareSetups?.(projectId, candidates) ?? Promise.resolve({ ok: false, error: "Setup comparisons are not available in this runtime." })
   }),
   defineWireAction({
-    id: "cam.analyze", kind: "read", effects: [], replaces: "cam_analyze_gcode",
+    id: "cam.analyze", kind: "read", replaces: "cam_analyze_gcode",
     // The program text, or the operation whose stored program is read: `cam_edit.generate` answers with a preview only, so the
     // whole program the machine would run is reachable only by its operation.
     parameters: CAM_ACTION_INPUTS["cam.analyze"],
@@ -77,7 +77,7 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
-    id: "cam.stock", kind: "read", effects: [], replaces: "cam_stock",
+    id: "cam.stock", kind: "read", replaces: "cam_stock",
     parameters: CAM_ACTION_INPUTS["cam.stock"],
     run: (_input, { handlers, projectId }) =>
       handlers.stock === undefined
@@ -85,18 +85,18 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         : handlers.stock(projectId, { action: "inspect" })
   }),
   defineWireAction({
-    id: "cam.vision", kind: "read", effects: ["ui"], replaces: "cam_vision",
+    id: "cam.vision", kind: "read", replaces: "cam_vision",
     parameters: CAM_VISION_INPUT,
     run: vision("cam", "cam-viewport.png")
   }),
   defineWireAction({
-    id: "cam.chain_suggest", kind: "read", effects: [], replaces: "cam_operations_suggest_chain",
+    id: "cam.chain_suggest", kind: "read", replaces: "cam_operations_suggest_chain",
     parameters: CAM_ACTION_INPUTS["cam.chain_suggest"],
     run: ({ fromOperationId, materialHint, toolHint }, { handlers, projectId }) =>
       handlers.suggestChain({ projectId, ...(fromOperationId !== undefined ? { fromOperationId } : {}), ...(materialHint !== undefined ? { materialHint } : {}), ...(toolHint !== undefined ? { toolHint } : {}) })
   }),
   defineWireAction({
-    id: "cam.materials", kind: "read", effects: [],
+    id: "cam.materials", kind: "read",
     parameters: CAM_ACTION_INPUTS["cam.materials"],
     // Pure: the kernel's material table.
     run: async ({ query }) => {
@@ -109,7 +109,7 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
-    id: "cam.cutting_data", kind: "read", effects: [], parameters: CAM_ACTION_INPUTS["cam.cutting_data"],
+    id: "cam.cutting_data", kind: "read", parameters: CAM_ACTION_INPUTS["cam.cutting_data"],
     run: async (input, context) => {
       const material = cam.kernel.findMaterial(input.material)
       if (material === undefined) return { ok: false, error: `Unknown material '${input.material}': use cam action materials` }
@@ -132,11 +132,11 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
-    id: "cam.manufacture", kind: "read", effects: [], parameters: CAM_ACTION_INPUTS["cam.manufacture"],
+    id: "cam.manufacture", kind: "read", parameters: CAM_ACTION_INPUTS["cam.manufacture"],
     run: (input, { handlers, projectId }) => handlers.manufacture?.(projectId, input) ?? Promise.resolve({ ok: false, error: "The CAM kernel is unavailable in this host." })
   }),
   defineWireAction({
-    id: "cam.chain_status", kind: "read", effects: [], replaces: "cam_chain_status",
+    id: "cam.chain_status", kind: "read", replaces: "cam_chain_status",
     parameters: CAM_ACTION_INPUTS["cam.chain_status"],
     run: ({ operationId }, { handlers, projectId }) => handlers.chainStatus({ projectId, operationId })
   })

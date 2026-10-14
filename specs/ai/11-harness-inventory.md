@@ -12,12 +12,12 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 ## Totals
 
-- Actions: **83** in **13** tools (read 46, write 33, destructive 4).
+- Actions: **83** in **13** tools (read 48, write 31, destructive 4).
 - Actions with an identified execution path: **81/83**.
 - Actions named in their tool prompt: **83/83**.
 - Actions mentioned by at least one test file: **79/83**.
 - Actions with a declared result schema: **83/83**.
-- Prompt files: **39** (base layers 8, modes 5); one-shot workflows: **5**.
+- Prompt files: **40** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **18** (plus user skills from the store); composer commands: **32**.
 
 ## Tools
@@ -27,7 +27,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad` | read | 20 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 3976 |
 | `cad_edit` | destructive | 12 | primary:general, primary:cad, editor, modeler | 3937 |
 | `cam` | read | 14 | primary:general, primary:cad, primary:cam, researcher, machinist, reviewer, planner, diagnostician, verifier, optimizer | 2443 |
-| `cam_edit` | write | 6 | primary:general, primary:cam, machinist, verifier, optimizer | 2589 |
+| `cam_edit` | write | 6 | primary:general, primary:cam, machinist, optimizer | 2845 |
 | `library` | read | 5 | primary:general, primary:cad, primary:cam, researcher, editor, modeler, machinist, reviewer, planner, diagnostician, verifier, optimizer | 1400 |
 | `parts` | destructive | 3 | primary:general, primary:cad, editor, modeler | 1270 |
 | `library_edit` | destructive | 5 | primary:general, primary:cam, machinist | 1807 |
@@ -44,121 +44,121 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cad.describe` (was `cad_describe_drawing`) | read | — | — | handler `describeDrawing` → `apps/sidecar/src/services/ai.ts:598` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agent-persistence.test.ts, agents.test.ts, bridge.test.ts, specialists-host.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-recovery.test.ts, ai-specialists.test.ts |
-| `cad.check` (was `cad_check_design`) | read | — | — | handler `checkDesign` → `apps/sidecar/src/services/ai.ts:602` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, ai-chat-loop.test.ts, ai-lifecycle.test.ts, ai-project-sessions.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
-| `cad.relations` (was `cad_component_relations`) | read | — | firstId*, secondId* | handler `cadComponentRelations` → `apps/sidecar/src/services/ai.ts:406` | yes | declared | action-inputs-cad.test.ts, ai-stock-inspection.test.ts |
-| `cad.grep` (was `cad_grep`) | read | — | query*, layerId, parametricOnly, includeParameters, offset, limit | handler `grep` → `apps/sidecar/src/services/ai.ts:447` | yes | declared | action-inputs-cad.test.ts, bridge.test.ts |
-| `cad.vision` (was `cad_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:432` | yes | declared | action-inputs-cad.test.ts, nikcli-host.test.ts |
-| `cad.inspect_elements` (was `cad_inspect`) | read | — | ids, layerId, offset, limit | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:376` | yes | declared | inspection-wire.test.ts, ai-stock-inspection.test.ts |
-| `cad.inspect_layers` (was `cad_inspect`) | read | — | — | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:376` | yes | declared | inspection-wire.test.ts |
-| `cad.inspect_search` (was `cad_inspect`) | read | — | query*, layerId, limit | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:376` | yes | declared | inspection-wire.test.ts |
-| `cad.inspect_property` (was `cad_inspect`) | read | — | elementId*, path*, offset, maxChars | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:376` | yes | declared | inspection-wire.test.ts, ai-stock-inspection.test.ts |
-| `cad.drawing` | read | — | elementId, history, options | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, ai-drawing.test.ts |
+| `cad.describe` (was `cad_describe_drawing`) | read | — | — | handler `describeDrawing` → `apps/sidecar/src/services/ai.ts:603` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agent-persistence.test.ts, agents.test.ts, bridge.test.ts, specialists-host.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-recovery.test.ts, ai-specialists.test.ts |
+| `cad.check` (was `cad_check_design`) | read | — | — | handler `checkDesign` → `apps/sidecar/src/services/ai.ts:607` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, ai-chat-loop.test.ts, ai-lifecycle.test.ts, ai-project-sessions.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
+| `cad.relations` (was `cad_component_relations`) | read | — | firstId*, secondId* | handler `cadComponentRelations` → `apps/sidecar/src/services/ai.ts:411` | yes | declared | action-inputs-cad.test.ts, ai-stock-inspection.test.ts |
+| `cad.grep` (was `cad_grep`) | read | — | query*, layerId, parametricOnly, includeParameters, offset, limit | handler `grep` → `apps/sidecar/src/services/ai.ts:452` | yes | declared | action-inputs-cad.test.ts, bridge.test.ts |
+| `cad.vision` (was `cad_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:437` | yes | declared | action-inputs-cad.test.ts, nikcli-host.test.ts |
+| `cad.inspect_elements` (was `cad_inspect`) | read | — | ids, layerId, offset, limit | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:381` | yes | declared | inspection-wire.test.ts, ai-stock-inspection.test.ts |
+| `cad.inspect_layers` (was `cad_inspect`) | read | — | — | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:381` | yes | declared | inspection-wire.test.ts |
+| `cad.inspect_search` (was `cad_inspect`) | read | — | query*, layerId, limit | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:381` | yes | declared | inspection-wire.test.ts |
+| `cad.inspect_property` (was `cad_inspect`) | read | — | elementId*, path*, offset, maxChars | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:381` | yes | declared | inspection-wire.test.ts, ai-stock-inspection.test.ts |
+| `cad.drawing` | read | — | elementId, history, options | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, ai-drawing.test.ts |
 | `cad.parametric_validate` (was `cad_parametric`) | read | — | history* | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-fusion-governance.test.ts |
-| `cad.parametric_inspect` (was `cad_parametric`) | read | — | elementId* | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts |
-| `cad.parametric_test` (was `cad_parametric`) | read | — | elementId*, cases* | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts |
-| `cad.parametric_dfm` (was `cad_parametric`) | read | — | elementId, history, process, toolDiameter, material, minWall, envelope | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad.parametric_exact` (was `cad_parametric`) | read | — | elementId, history, includeStep, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts |
-| `cad.exact` | read | — | ids, machining | handler `cadExact` → `apps/sidecar/src/services/ai.ts:417` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
-| `cad.assembly` | read | — | washers | handler `cadAssembly` → `apps/sidecar/src/services/ai.ts:424` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
+| `cad.parametric_inspect` (was `cad_parametric`) | read | — | elementId* | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts |
+| `cad.parametric_test` (was `cad_parametric`) | read | — | elementId*, cases* | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts |
+| `cad.parametric_dfm` (was `cad_parametric`) | read | — | elementId, history, process, toolDiameter, material, minWall, envelope | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
+| `cad.parametric_exact` (was `cad_parametric`) | read | — | elementId, history, includeStep, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts |
+| `cad.exact` | read | — | ids, machining | handler `cadExact` → `apps/sidecar/src/services/ai.ts:422` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
+| `cad.assembly` | read | — | washers | handler `cadAssembly` → `apps/sidecar/src/services/ai.ts:429` | yes | declared | action-inputs-cad.test.ts, ai-exact.test.ts |
 | `cad.parametric_fastener` (was `cad_parametric`) | read | — | size, fit, shaftDiameter | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad.parametric_recipe` (was `cad_parametric`) | read | — | recipe*, params | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad.parametric_from_element` (was `cad_parametric`) | read | — | elementId*, depth | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-fusion-governance.test.ts |
+| `cad.parametric_recipe` (was `cad_parametric`) | read | — | recipe*, params | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
+| `cad.parametric_from_element` (was `cad_parametric`) | read | — | elementId*, depth | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-fusion-governance.test.ts |
 
 ### `cad_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:527` | yes | declared, partial on `skipped` | action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cad_edit.add_entities` (was `cad_add_entities`) | write | drawing | entities* | handler `addEntities` → `apps/sidecar/src/services/ai.ts:521` | yes | declared | action-inputs-cad.test.ts, service.test.ts, ai-cam-tools.test.ts, companion-chat-e2e.test.ts, ai-editor-sync.test.ts, ai-workspace.test.ts, ai.test.ts |
-| `cad_edit.modify` (was `cad_modify_entities`) | write | drawing | changes* | handler `modifyEntities` → `apps/sidecar/src/services/ai.ts:551` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agents.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
-| `cad_edit.transform` (was `cad_transform_entities`) | write | drawing | ids*, dx, dy, dz, rotateAxis, rotateDegrees, scale, about, copies | handler `transformEntities` → `apps/sidecar/src/services/ai.ts:580` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts |
-| `cad_edit.group` (was `cad_group_entities`) | write | drawing | ids*, name, ungroup, layer | handler `groupEntities` → `apps/sidecar/src/services/ai.ts:590` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts |
-| `cad_edit.delete` (was `cad_delete_entities`) | destructive | drawing | ids*, confirm* | handler `deleteEntities` → `apps/sidecar/src/services/ai.ts:574` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, bridge.test.ts, service.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
-| `cad_edit.editor` (was `cad_editor`) | write | interface | actions* | local (in-package implementation) — `packages/ai/src/actions/cad-edit.ts` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts, cad-section.test.ts |
-| `cad_edit.import` (was `cad_import_drawing`) | write | drawing | format, content, attachment, depth, up, scale, gap, tolerance, name, color, layer | handler `addElements` → `apps/sidecar/src/services/ai.ts:527` | yes | declared | action-inputs-cad.test.ts, attachments.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-attachments.test.ts |
-| `cad_edit.parametric_create` (was `cad_parametric`) | write | drawing | history*, name*, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts, ai-fusion-governance.test.ts |
-| `cad_edit.parametric_update` (was `cad_parametric`) | write | drawing | elementId*, parameters*, expectedRevision* | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad_edit.parametric_recipe_create` (was `cad_parametric`) | write | drawing | recipe*, params, name, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-cad-to-gcode-e2e.test.ts |
-| `cad_edit.parametric_convert` (was `cad_parametric`) | write | drawing | elementId*, depth, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:479` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-fusion-governance.test.ts |
+| `cad_edit.add` (was `cad_add_elements`) | write | drawing | elements* | handler `addElements` → `apps/sidecar/src/services/ai.ts:532` | yes | declared, partial on `skipped` | action-contracts.test.ts, action-outcome.test.ts, bridge.test.ts, nikcli-host.test.ts, program-calls.test.ts, ai-actions.test.ts, ai-bridge-policy.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-fusion-governance.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-chat-loop.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-timeline.test.ts, ai-tool-facts.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cad_edit.add_entities` (was `cad_add_entities`) | write | drawing | entities* | handler `addEntities` → `apps/sidecar/src/services/ai.ts:526` | yes | declared | action-inputs-cad.test.ts, service.test.ts, ai-cam-tools.test.ts, companion-chat-e2e.test.ts, ai-editor-sync.test.ts, ai-workspace.test.ts, ai.test.ts |
+| `cad_edit.modify` (was `cad_modify_entities`) | write | drawing | changes* | handler `modifyEntities` → `apps/sidecar/src/services/ai.ts:556` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, agents.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
+| `cad_edit.transform` (was `cad_transform_entities`) | write | drawing | ids*, dx, dy, dz, rotateAxis, rotateDegrees, scale, about, copies | handler `transformEntities` → `apps/sidecar/src/services/ai.ts:585` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts |
+| `cad_edit.group` (was `cad_group_entities`) | write | drawing | ids*, name, ungroup, layer | handler `groupEntities` → `apps/sidecar/src/services/ai.ts:595` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts |
+| `cad_edit.delete` (was `cad_delete_entities`) | destructive | drawing | ids*, confirm* | handler `deleteEntities` → `apps/sidecar/src/services/ai.ts:579` | yes | declared | action-inputs-cad.test.ts, action-outcome.test.ts, bridge.test.ts, service.test.ts, ai-bridge-tokens.test.ts, ai-bridge.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, nikcli-plugin.test.ts, ai-editor-sync.test.ts, ai-tool-views.test.ts |
+| `cad_edit.editor` (was `cad_editor`) | write | interface, drawing | actions* | local (in-package implementation) — `packages/ai/src/actions/cad-edit.ts` | yes | declared | action-inputs-cad.test.ts, ai-workspace.test.ts, cad-section.test.ts |
+| `cad_edit.import` (was `cad_import_drawing`) | write | drawing | format, content, attachment, depth, up, scale, gap, tolerance, name, color, layer | handler `addElements` → `apps/sidecar/src/services/ai.ts:532` | yes | declared | action-inputs-cad.test.ts, attachments.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-attachments.test.ts |
+| `cad_edit.parametric_create` (was `cad_parametric`) | write | drawing | history*, name*, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts, ai-fusion-governance.test.ts |
+| `cad_edit.parametric_update` (was `cad_parametric`) | write | drawing | elementId*, parameters*, expectedRevision* | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-cad-to-gcode-e2e.test.ts |
+| `cad_edit.parametric_recipe_create` (was `cad_parametric`) | write | drawing | recipe*, params, name, x, y, z, layer | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-cad-to-gcode-e2e.test.ts |
+| `cad_edit.parametric_convert` (was `cad_parametric`) | write | drawing | elementId*, depth, name | handler `parametric` → `apps/sidecar/src/services/ai.ts:484` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, ai-fusion-governance.test.ts |
 
 ### `cam`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cam.plan_check` | read | — | operations*, expectedRevision | handler `validateMachiningPlan` → `apps/sidecar/src/services/ai.ts:261` | yes | declared | ai-cad-to-gcode-e2e.test.ts |
-| `cam.review` | read | — | operationId* | handler `reviewOperation` → `apps/sidecar/src/services/ai.ts:300` | yes | declared | ai-cad-to-gcode-e2e.test.ts |
+| `cam.plan_check` | read | — | operations*, expectedRevision | handler `validateMachiningPlan` → `apps/sidecar/src/services/ai.ts:265` | yes | declared | ai-cad-to-gcode-e2e.test.ts |
+| `cam.review` | read | — | operationId* | handler `reviewOperation` → `apps/sidecar/src/services/ai.ts:304` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts |
 | `cam.machine` (was `cam_describe_machine`) | read | — | machineType* | local (core cam.kinematicsOf) — `packages/ai/src/actions/cam.ts` | yes | declared | **none** |
-| `cam.operations` (was `cam_list_operations`) | read | — | — | handler `listOperations` → `apps/sidecar/src/services/ai.ts:638` | yes | declared | cam-wire.test.ts, tool-definitions.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts |
-| `cam.suggest` (was `cam_suggest_parameters`) | read | — | params | handler `suggestParameters` → `apps/sidecar/src/services/ai.ts:679` | yes | declared | ai-cam-tools.test.ts |
-| `cam.compare_setups` (was `cam_suggest_parameters`) | read | — | candidates* | handler `compareSetups` → `apps/sidecar/src/services/ai.ts:685` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
-| `cam.analyze` (was `cam_analyze_gcode`) | read | — | gcode, operationId, machineType | **handler `machine`: implementation not found**<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:723` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
-| `cam.stock` (was `cam_stock`) | read | — | — | handler `stock` → `apps/sidecar/src/services/ai.ts:325`, `apps/sidecar/src/services/ai.ts:776` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
-| `cam.vision` (was `cam_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:432` | yes | declared | **none** |
-| `cam.chain_suggest` (was `cam_operations_suggest_chain`) | read | — | fromOperationId, materialHint, toolHint | handler `suggestChain` → `apps/sidecar/src/services/ai.ts:944` | yes | declared | **none** |
+| `cam.operations` (was `cam_list_operations`) | read | — | — | handler `listOperations` → `apps/sidecar/src/services/ai.ts:643` | yes | declared | cam-wire.test.ts, tool-definitions.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts |
+| `cam.suggest` (was `cam_suggest_parameters`) | read | — | params | handler `suggestParameters` → `apps/sidecar/src/services/ai.ts:684` | yes | declared | ai-cam-tools.test.ts |
+| `cam.compare_setups` (was `cam_suggest_parameters`) | read | — | candidates* | handler `compareSetups` → `apps/sidecar/src/services/ai.ts:690` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
+| `cam.analyze` (was `cam_analyze_gcode`) | read | — | gcode, operationId, machineType | **handler `machine`: implementation not found**<br>handler `operationProgram` → `apps/sidecar/src/services/ai.ts:728` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-timeline.test.ts, ai-tool-views.test.ts |
+| `cam.stock` (was `cam_stock`) | read | — | — | handler `stock` → `apps/sidecar/src/services/ai.ts:330`, `apps/sidecar/src/services/ai.ts:805` | yes | declared | cam-wire.test.ts, ai-stock-inspection.test.ts |
+| `cam.vision` (was `cam_vision`) | read | interface | focus | handler `vision` → `apps/sidecar/src/services/ai.ts:437` | yes | declared | **none** |
+| `cam.chain_suggest` (was `cam_operations_suggest_chain`) | read | — | fromOperationId, materialHint, toolHint | handler `suggestChain` → `apps/sidecar/src/services/ai.ts:973` | yes | declared | **none** |
 | `cam.materials` | read | — | query | local (core cam.kernel.findMaterial) — `packages/ai/src/actions/cam.ts` | yes | declared | cam-kernel-actions.test.ts |
 | `cam.cutting_data` | read | — | material*, cut*, tool*, machine, depth, ae, ap, scallop | **handler `machine`: implementation not found** | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts |
-| `cam.manufacture` | read | — | material*, machine, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, subprograms | handler `manufacture` → `apps/sidecar/src/services/ai.ts:207` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, cam-subprograms.test.ts |
-| `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:958` | yes | declared | **none** |
+| `cam.manufacture` | read | — | material*, machine, origin, finishAllowance, scallop, planOnly, operations, tools, deburr, subprograms | handler `manufacture` → `apps/sidecar/src/services/ai.ts:211` | yes | declared | cam-kernel-actions.test.ts, cam-wire.test.ts, cam-subprograms.test.ts |
+| `cam.chain_status` (was `cam_chain_status`) | read | — | operationId* | handler `chainStatus` → `apps/sidecar/src/services/ai.ts:987` | yes | declared | **none** |
 
 ### `cam_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cam_edit.manufacture` | write | operation, program | material*, machine, origin, finishAllowance, scallop, expectedRevision, operations, tools, deburr, subprograms | handler `manufactureOperation` → `apps/sidecar/src/services/ai.ts:234` | yes | declared | cam-wire.test.ts, cam-kernel.test.ts |
-| `cam_edit.create` (was `cam_create_operation`) | write | operation | type*, params, expectedRevision | handler `createOperation` → `apps/sidecar/src/services/ai.ts:615` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.update` (was `cam_update_operation`) | write | operation | operationId*, params*, expectedRevision | handler `updateOperation` → `apps/sidecar/src/services/ai.ts:654` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-workspace.test.ts |
-| `cam_edit.generate` (was `cam_generate_gcode`) | write | program | operationId, maxLines | handler `generateGcode` → `apps/sidecar/src/services/ai.ts:711` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.verify` (was `cam_verify_toolpath`) | write | program, report | operationId*, tool, fixtures, targetSolids, stock, resolution, tolerance, start | handler `verifyOperation` → `apps/sidecar/src/services/ai.ts:746` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
-| `cam_edit.stock_set` (was `cam_stock`) | write | stock | stock* | handler `stock` → `apps/sidecar/src/services/ai.ts:325`, `apps/sidecar/src/services/ai.ts:776` | yes | declared | cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts |
+| `cam_edit.manufacture` | write | operation, program | material*, machine, origin, finishAllowance, scallop, expectedRevision, operations, tools, deburr, subprograms | handler `manufactureOperation` → `apps/sidecar/src/services/ai.ts:238` | yes | declared | cam-wire.test.ts, cam-kernel.test.ts |
+| `cam_edit.create` (was `cam_create_operation`) | write | operation | type*, params, expectedRevision | handler `createOperation` → `apps/sidecar/src/services/ai.ts:620` | yes | declared | action-outcome.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.update` (was `cam_update_operation`) | write | operation | operationId*, params*, expectedRevision | handler `updateOperation` → `apps/sidecar/src/services/ai.ts:659` | yes | declared | ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-workspace.test.ts |
+| `cam_edit.generate` (was `cam_generate_gcode`) | write | program | operationId, maxLines | handler `generateGcode` → `apps/sidecar/src/services/ai.ts:716` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-editor-sync.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.verify` (was `cam_verify_toolpath`) | write | report | operationId*, tool, fixtures, targetSolids, stock, resolution, tolerance, start | handler `verifyOperation` → `apps/sidecar/src/services/ai.ts:756` | yes | declared | action-contracts.test.ts, action-outcome.test.ts, agents.test.ts, cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-cam-tools.test.ts, ai-stock-inspection.test.ts, ai-program-sync.test.ts, ai-reconciliation-races.test.ts, ai-tool-views.test.ts, ai-workspace.test.ts |
+| `cam_edit.stock_set` (was `cam_stock`) | write | stock | stock* | handler `stock` → `apps/sidecar/src/services/ai.ts:330`, `apps/sidecar/src/services/ai.ts:805` | yes | declared | cam-wire.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-stock-inspection.test.ts |
 
 ### `library`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:985` | yes | declared | action-inputs.test.ts |
-| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:986` | yes | declared | action-inputs.test.ts |
-| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:794` | yes | declared | action-inputs.test.ts |
-| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:795` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
-| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:987` | yes | declared | action-inputs.test.ts |
+| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:1014` | yes | declared | action-inputs.test.ts |
+| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:1015` | yes | declared | action-inputs.test.ts |
+| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:823` | yes | declared | action-inputs.test.ts |
+| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:824` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
+| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:1016` | yes | declared | action-inputs.test.ts |
 
 ### `parts`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `parts.save` (was `cad_component_save`) | write | component | ids*, name* | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:988` | yes | declared | action-inputs.test.ts |
-| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:992` | yes | declared | action-inputs.test.ts |
-| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:997` | yes | declared | action-inputs.test.ts |
+| `parts.save` (was `cad_component_save`) | write | component | ids*, name* | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:1017` | yes | declared | action-inputs.test.ts |
+| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:1021` | yes | declared | action-inputs.test.ts |
+| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:1026` | yes | declared | action-inputs.test.ts |
 
 ### `library_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:998` | yes | declared | action-inputs.test.ts |
-| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:999` | yes | declared | action-inputs.test.ts |
-| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1000` | yes | declared | action-inputs.test.ts |
-| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1001` | yes | declared | action-inputs.test.ts |
-| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1002` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:1027` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:1028` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1029` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1030` | yes | declared | action-inputs.test.ts |
+| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1031` | yes | declared | action-inputs.test.ts |
 
 ### `memory`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `memory.recall` (was `memory_recall`) | read | — | prefix | handler `recall` → `apps/sidecar/src/services/ai.ts:783` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts |
-| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784` | yes | declared | action-inputs.test.ts |
+| `memory.recall` (was `memory_recall`) | read | — | prefix | handler `recall` → `apps/sidecar/src/services/ai.ts:812` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts |
+| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:813` | yes | declared | action-inputs.test.ts |
 
 ### `memory_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `memory_edit.remember` (was `memory_remember`) | write | memory | key*, value* | handler `remember` → `apps/sidecar/src/services/ai.ts:782` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts, ai.test.ts |
-| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:789` | yes | declared | action-inputs.test.ts |
+| `memory_edit.remember` (was `memory_remember`) | write | memory | key*, value* | handler `remember` → `apps/sidecar/src/services/ai.ts:811` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts, ai.test.ts |
+| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:813`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:818` | yes | declared | action-inputs.test.ts |
 
 ### `research`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `research.search` (was `web_search`) | read | external | query*, numResults | handler `webSearch` → `apps/sidecar/src/services/ai.ts:431` | yes | declared | action-inputs.test.ts |
+| `research.search` (was `web_search`) | read | external | query*, numResults | handler `webSearch` → `apps/sidecar/src/services/ai.ts:436` | yes | declared | action-inputs.test.ts |
 | `research.read_attachment` (was `attachment_read`) | read | — | attachment*, offset, maxChars | local (in-package implementation) — `packages/ai/src/actions/research.ts` | yes | declared | action-inputs.test.ts |
 
 ### `vcs`
@@ -184,8 +184,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `agent.start` (was `agent_task`) | write | task | description*, prompt*, agent, subagent_type, background | contribution `agent.start` → `packages/ai/src/nikcli/background-tools.ts:49` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, agents.test.ts, background-tools.test.ts, bridge.test.ts, specialists-host.test.ts, ai-bridge.test.ts, ai-specialists.test.ts, ai-task-card.test.ts, ai-tool-facts.test.ts |
-| `agent.list` (was `agent_tasks`) | write | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:50` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
-| `agent.read` (was `agent_task_read`) | write | — | taskId* | contribution `agent.read` → `packages/ai/src/nikcli/background-tools.ts:51` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
+| `agent.list` (was `agent_tasks`) | read | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:50` | yes | declared | action-contracts.test.ts, action-inputs.test.ts, background-tools.test.ts, ai-task-card.test.ts |
+| `agent.read` (was `agent_task_read`) | read | — | taskId* | contribution `agent.read` → `packages/ai/src/nikcli/background-tools.ts:51` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
 | `agent.cancel` (was `agent_task_cancel`) | write | task | taskId* | contribution `agent.cancel` → `packages/ai/src/nikcli/background-tools.ts:52` | yes | declared | action-inputs.test.ts, background-tools.test.ts |
 
 ## Prompt files
@@ -217,12 +217,13 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `packages/ai/src/nikcli/prompts/report.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 541 | **none** |
 | `packages/ai/src/nikcli/prompts/researcher.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1478 | ai-specialists.test.ts |
 | `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | **none** |
-| `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2762 | **none** |
+| `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2766 | **none** |
 | `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1639 | specialists-host.test.ts, ai-specialists.test.ts |
 | `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3976 | fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompts.test.ts, specialists-host.test.ts, ai-specialists.test.ts |
 | `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3937 | fusion-modelling.test.ts, nikcli-host.test.ts, specialists-host.test.ts |
 | `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 2443 | modes.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2589 | prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2845 | prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1524 | **none** |
 | `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1400 | **none** |
 | `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1807 | **none** |
 | `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 789 | **none** |

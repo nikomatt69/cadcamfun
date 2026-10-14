@@ -188,14 +188,14 @@ const NEEDS_LAYER = new Set(["layer_create", "layer_rename", "layer_color", "lay
 const NEEDS_IDS = new Set(["select", "show", "hide", "isolate"])
 
 export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
-  defineWireAction({ id: "cad_edit.add", kind: "write", effects: ["domain"], replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),
+  defineWireAction({ id: "cad_edit.add", kind: "write", replaces: "cad_add_elements", parameters: addElementsParameters, run: runAddElements }),
   defineWireAction({
-    id: "cad_edit.add_entities", kind: "write", effects: ["domain"], replaces: "cad_add_entities",
+    id: "cad_edit.add_entities", kind: "write", replaces: "cad_add_entities",
     parameters: INPUTS["cad_edit.add_entities"],
     run: ({ entities }, { handlers, projectId }) => handlers.addEntities(projectId, entities.map((e) => validated(EntityInput, e)))
   }),
   defineWireAction({
-    id: "cad_edit.modify", kind: "write", effects: ["domain"], replaces: "cad_modify_entities",
+    id: "cad_edit.modify", kind: "write", replaces: "cad_modify_entities",
     parameters: INPUTS["cad_edit.modify"],
     // EntityChanges checks the fields it knows (sizes > 0, points); the rest (x, y, z, rotation, scale, history, parameters, any other
     // field of the element) passes through untouched and is judged against the element's own type by the handler.
@@ -203,7 +203,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       handlers.modifyEntities(projectId, changes.map((c) => ({ id: c.id, changes: { ...c.changes, ...validated(EntityChanges, c.changes) } })))
   }),
   defineWireAction({
-    id: "cad_edit.transform", kind: "write", effects: ["domain"], replaces: "cad_transform_entities",
+    id: "cad_edit.transform", kind: "write", replaces: "cad_transform_entities",
     parameters: INPUTS["cad_edit.transform"],
     run: async ({ ids, dx, dy, dz, rotateAxis, rotateDegrees, scale, about, copies }, { handlers, projectId }) => {
       const move = dx !== undefined || dy !== undefined || dz !== undefined ? { x: dx ?? 0, y: dy ?? 0, z: dz ?? 0 } : undefined
@@ -217,13 +217,13 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     }
   }),
   defineWireAction({
-    id: "cad_edit.group", kind: "write", effects: ["domain"], replaces: "cad_group_entities",
+    id: "cad_edit.group", kind: "write", replaces: "cad_group_entities",
     parameters: INPUTS["cad_edit.group"],
     run: ({ ids, name, ungroup, layer }, { handlers, projectId }) =>
       handlers.groupEntities(projectId, { ids, ungroup: ungroup === true, ...(name !== undefined ? { name } : {}), ...(layer !== undefined ? { layer } : {}) })
   }),
   defineWireAction({
-    id: "cad_edit.delete", kind: "destructive", effects: ["domain"], replaces: "cad_delete_entities",
+    id: "cad_edit.delete", kind: "destructive", replaces: "cad_delete_entities",
     // `confirm: true` is the model's own acknowledgement that the user asked for this; the native `ask` permission the host
     // registers for `cad_edit` is the human decision. Both are required, and neither one alone is enough.
     parameters: INPUTS["cad_edit.delete"],
@@ -232,7 +232,7 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
   defineWireAction({
     // The layers, the view and the selection live in the open editor, not in the stored drawing: this checks the actions are
     // complete and hands them back; the editor performs them when it reads the result.
-    id: "cad_edit.editor", kind: "write", effects: ["ui", "domain"], replaces: "cad_editor",
+    id: "cad_edit.editor", kind: "write", replaces: "cad_editor",
     parameters: INPUTS["cad_edit.editor"],
     run: ({ actions }) => {
       const problems = actions.flatMap((a, index) => {
@@ -247,24 +247,24 @@ export const CAD_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       return { ok: true, actions, note: "The editor performs these actions as it reads this result." }
     }
   }),
-  defineWireAction({ id: "cad_edit.import", kind: "write", effects: ["domain"], replaces: "cad_import_drawing", parameters: INPUTS["cad_edit.import"], run: runImport }),
+  defineWireAction({ id: "cad_edit.import", kind: "write", replaces: "cad_import_drawing", parameters: INPUTS["cad_edit.import"], run: runImport }),
   defineWireAction({
-    id: "cad_edit.parametric_create", kind: "write", effects: ["domain"], replaces: "cad_parametric",
+    id: "cad_edit.parametric_create", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_create"],
     run: (input, context) => runParametricCreate(input, context)
   }),
   defineWireAction({
-    id: "cad_edit.parametric_update", kind: "write", effects: ["domain"], replaces: "cad_parametric",
+    id: "cad_edit.parametric_update", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_update"],
     run: (input, context) => runParametricUpdate(input, context)
   }),
   defineWireAction({
-    id: "cad_edit.parametric_recipe_create", kind: "write", effects: ["domain"], replaces: "cad_parametric",
+    id: "cad_edit.parametric_recipe_create", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_recipe_create"],
     run: (input, context) => runParametricRecipeCreate(input, context)
   }),
   defineWireAction({
-    id: "cad_edit.parametric_convert", kind: "write", effects: ["domain"], replaces: "cad_parametric",
+    id: "cad_edit.parametric_convert", kind: "write", replaces: "cad_parametric",
     parameters: INPUTS["cad_edit.parametric_convert"],
     run: (input, context) => runParametricConvert(input, context)
   })
