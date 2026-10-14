@@ -7,8 +7,8 @@
  * are different actions even though the same function answers both.
  */
 import { z } from "zod"
-import { analyzeManufacturability, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, recipeNames, requireThread, type History } from "@cadcamfun/core"
-import { exactReport, historySchema, parameterSchema, parametricReport } from "../parametric.ts"
+import { analyzeManufacturability, brep, buildRecipe, drawing, historyToStep, keywayFor, METRIC_THREADS, rebuild, recipeNames, requireThread, type History } from "@cadcamfun/core"
+import { EXACT_ACTION_BUDGET_MS, exactReport, historySchema, parameterSchema, parametricReport } from "../parametric.ts"
 import type { ActionContext } from "./action.ts"
 
 const elementId = z.string().min(1).max(100)
@@ -198,10 +198,10 @@ export const runParametricExact = async (input: z.infer<typeof parametricExactSc
   const got = await historyOf(input, context)
   if ("error" in got) return got.error
   const result = rebuild(got.history)
-  const bodies = exactReport(got.history, result)
+  const bodies = exactReport(got.history, result, EXACT_ACTION_BUDGET_MS)
   const out: Record<string, unknown> = { ok: !result.issues.some((i) => i.severity === "error"), bodies, issues: result.issues.slice(0, 20) }
   if (input.includeStep === true) {
-    const step = historyToStep(got.history, input.name ?? "part")
+    const step = brep.withBudget(EXACT_ACTION_BUDGET_MS, () => historyToStep(got.history, input.name ?? "part"))
     out["exported"] = step.exported
     out["skipped"] = step.skipped
     if (step.step !== undefined) {

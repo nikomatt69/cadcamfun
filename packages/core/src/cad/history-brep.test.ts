@@ -255,6 +255,38 @@ describe("exact replay of a parametric history", () => {
     for (const v of exact.vertices) expect(Math.min(...corners.map((k) => Math.hypot(k.x - v.point.x, k.y - v.point.y)))).toBeLessThan(1e-9)
   })
 
+  test("a loft is exact: square to square a frustum of planes, circle to square rational columns that agree with the mesh", () => {
+    const frustum = rebuildExact(history([rectangle("s1", "XY", 0, 0, 20, 20), rectangle("s2", "XY", 5, 5, 10, 10, 30), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    expect(frustum.bodies[0]!.reason).toBeUndefined()
+    expect(rel(massProperties(frustum.bodies[0]!.brep!).volume, 10 * (400 + 100 + 200))).toBeLessThan(1e-9)
+    expect(frustum.bodies[0]!.brep!.faces.every((f) => f.surface.kind === "plane")).toBe(true)
+    const round = { ...circles("s1", "XY", 10, 10, [10]), offset: 0 }
+    const mixed = rebuildExact(history([round, rectangle("s2", "XY", 2, 2, 16, 16, 25), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    const v = exactVolume(history([round, rectangle("s2", "XY", 2, 2, 16, 16, 25), { id: "lofted", type: "loft", sections: ["s1", "s2"], operation: "new" }]))
+    expect(rel(v, meshVolume(mixed.result.bodies[0]!.mesh))).toBeLessThan(5e-3)
+    expect(v).toBeLessThan(PI * 100 * 25)
+    expect(v).toBeGreaterThan(256 * 25)
+  })
+
+  test("a time budget stops the exact replay quickly and every body says why; within its budget the result is unchanged", () => {
+    const heavy = plate([
+      { id: "h1", type: "hole", plane: "XY", offset: 6, at: [10, 12.5], diameter: 6, depth: 6 },
+      { id: "h2", type: "hole", plane: "XY", offset: 6, at: [30, 12.5], diameter: 6, depth: 6 },
+      { id: "round", type: "fillet", radius: 1 }
+    ])
+    // The mesh rebuild is not under the budget: time the exact part alone.
+    const mesh = rebuildExact(heavy, undefined, { budgetMs: 1 }).result
+    const t = performance.now()
+    const stopped = rebuildExact(heavy, mesh, { budgetMs: 1 })
+    expect(performance.now() - t).toBeLessThan(1_000)
+    expect(stopped.bodies[0]!.brep).toBeUndefined()
+    expect(stopped.bodies[0]!.reason).toContain("time budget")
+    // The mesh rebuild is untouched, and a generous budget gives the same exact model as none.
+    expect(stopped.result.bodies[0]!.mesh.indices.length).toBeGreaterThan(0)
+    const simple = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }])
+    expect(massProperties(rebuildExact(simple, undefined, { budgetMs: 60_000 }).bodies[0]!.brep!).volume).toBe(massProperties(rebuildExact(simple).bodies[0]!.brep!).volume)
+  })
+
   test("features without an exact counterpart are never skipped silently", () => {
     const lettered = rebuildExact(plate([{ id: "t", type: "text", plane: "XY", offset: 6, at: [5, 5], text: "A", height: 5, depth: 1, operation: "union" }]))
     expect(lettered.bodies[0]!.reason).toContain("text")

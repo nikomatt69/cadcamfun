@@ -98,6 +98,13 @@ describe("arguments written the XML way", () => {
     const schema = lenient(z.object({ elements: z.array(z.looseObject({ type: z.string() })).min(1) }))
     expect(schema.safeParse({ elements: { item: { type: "cube", width: "5" } } }).success).toBe(true)
     expect(z.toJSONSchema(schema, { io: "input" })).toBeDefined()
+    // A structure sent as JSON text (seen in real sessions: `"shapes": "[...]"`) is the structure; text and code are left alone.
+    expect(sanitizeArguments({ history: { features: [{ id: "s", sketch: { shapes: '[{"id":"r","kind":"rectangle","at":[0,0],"width":"40"}]' } }] } })).toEqual({
+      history: { features: [{ id: "s", sketch: { shapes: [{ id: "r", kind: "rectangle", at: [0, 0], width: 40 }] } }] }
+    })
+    expect(sanitizeArguments({ history: '{"parameters":{"w":"5"},"features":[]}' })).toEqual({ history: { parameters: { w: 5 }, features: [] } })
+    const text = { text: "[not parsed]", code: "{ return 1 }", sketch: "s1", name: "{x}", shapes: "[broken" }
+    expect(sanitizeArguments(text)).toEqual(text)
   })
 })
 

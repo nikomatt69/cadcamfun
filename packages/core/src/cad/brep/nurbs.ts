@@ -23,6 +23,12 @@ export interface NurbsSurfaceData {
   readonly weights?: ReadonlyArray<ReadonlyArray<number>>
 }
 
+// The evaluators run hundreds of thousands of times per mass integration or tessellation: plain loops, not Array.from /
+// fill / map / slice, whose callbacks and copies dominated the cost.
+const zeros = (n: number): number[] => { const a = new Array<number>(n); for (let i = 0; i < n; i++) a[i] = 0; return a }
+const grid = (r: number, c: number): number[][] => { const a = new Array<number[]>(r); for (let i = 0; i < r; i++) a[i] = zeros(c); return a }
+const head = (a: ReadonlyArray<number>, n: number, divisor = 1): number[] => { const o = new Array<number>(n); for (let i = 0; i < n; i++) o[i] = a[i]! / divisor; return o }
+
 /** A2.1: knot span index of `u` for `n + 1` control points. */
 export const findSpan = (n: number, p: number, u: number, U: ReadonlyArray<number>): number => {
   if (u >= U[n + 1]!) return n
@@ -38,9 +44,9 @@ export const findSpan = (n: number, p: number, u: number, U: ReadonlyArray<numbe
 
 /** A2.2: the `p + 1` non-vanishing basis functions at `u`. */
 export const basisFuns = (i: number, u: number, p: number, U: ReadonlyArray<number>): number[] => {
-  const N = new Array<number>(p + 1).fill(0)
-  const left = new Array<number>(p + 1).fill(0)
-  const right = new Array<number>(p + 1).fill(0)
+  const N = zeros(p + 1)
+  const left = zeros(p + 1)
+  const right = zeros(p + 1)
   N[0] = 1
   for (let j = 1; j <= p; j++) {
     left[j] = u - U[i + 1 - j]!
@@ -59,9 +65,9 @@ export const basisFuns = (i: number, u: number, p: number, U: ReadonlyArray<numb
 
 /** A2.3: basis functions and their derivatives up to order `n`; `ders[k][j]` is the k-th derivative of N_{i-p+j}. */
 export const dersBasisFuns = (i: number, u: number, p: number, n: number, U: ReadonlyArray<number>): number[][] => {
-  const ndu: number[][] = Array.from({ length: p + 1 }, () => new Array<number>(p + 1).fill(0))
-  const left = new Array<number>(p + 1).fill(0)
-  const right = new Array<number>(p + 1).fill(0)
+  const ndu: number[][] = grid(p + 1, p + 1)
+  const left = zeros(p + 1)
+  const right = zeros(p + 1)
   ndu[0]![0] = 1
   for (let j = 1; j <= p; j++) {
     left[j] = u - U[i + 1 - j]!
@@ -75,9 +81,9 @@ export const dersBasisFuns = (i: number, u: number, p: number, n: number, U: Rea
     }
     ndu[j]![j] = saved
   }
-  const ders: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(p + 1).fill(0))
+  const ders: number[][] = grid(n + 1, p + 1)
   for (let j = 0; j <= p; j++) ders[0]![j] = ndu[j]![p]!
-  const a: number[][] = [new Array<number>(p + 1).fill(0), new Array<number>(p + 1).fill(0)]
+  const a: number[][] = [zeros(p + 1), zeros(p + 1)]
   for (let r = 0; r <= p; r++) {
     let s1 = 0, s2 = 1
     a[0]![0] = 1
@@ -132,7 +138,7 @@ export const nurbsCurveDerivs = (c: NurbsCurveData, u: number, d: number): numbe
   const nders = dersBasisFuns(span, u, p, du, c.knots)
   const w = c.weights
   // Homogeneous derivatives Aw (dim coords) and w.
-  const CK: number[][] = Array.from({ length: d + 1 }, () => new Array<number>(dim + 1).fill(0))
+  const CK: number[][] = grid(d + 1, dim + 1)
   for (let k = 0; k <= du; k++) {
     const row = CK[k]!
     for (let j = 0; j <= p; j++) {
@@ -144,17 +150,17 @@ export const nurbsCurveDerivs = (c: NurbsCurveData, u: number, d: number): numbe
       row[dim] = row[dim]! + N * wi
     }
   }
-  if (w === undefined) return CK.map((row) => row.slice(0, dim))
+  if (w === undefined) { const o: number[][] = []; for (const row of CK) o.push(head(row, dim)); return o }
   const out: number[][] = []
   for (let k = 0; k <= d; k++) {
-    const v = CK[k]!.slice(0, dim)
+    const v = head(CK[k]!, dim)
     for (let i = 1; i <= k; i++) {
       const b = binom(k, i) * CK[i]![dim]!
       const prev = out[k - i]!
       for (let q = 0; q < dim; q++) v[q] = v[q]! - b * prev[q]!
     }
     const w0 = CK[0]![dim]!
-    out.push(v.map((x) => x / w0))
+    out.push(head(v, dim, w0))
   }
   return out
 }
@@ -181,10 +187,10 @@ export const nurbsSurfaceDerivs = (s: NurbsSurfaceData, u: number, v: number, d:
   const Nu = dersBasisFuns(uspan, u, p, du, s.knotsU)
   const Nv = dersBasisFuns(vspan, v, q, dv, s.knotsV)
   const W = s.weights
-  const H: number[][][] = Array.from({ length: d + 1 }, () => Array.from({ length: d + 1 }, () => new Array<number>(dim + 1).fill(0)))
+  const H: number[][][] = []; for (let i = 0; i <= d; i++) H.push(grid(d + 1, dim + 1))
   for (let k = 0; k <= du; k++) {
     // temp[sv] = Σ_r Nu[k][r] Pw[uspan-p+r][vspan-q+sv]
-    const temp: number[][] = Array.from({ length: q + 1 }, () => new Array<number>(dim + 1).fill(0))
+    const temp: number[][] = grid(q + 1, dim + 1)
     for (let sv = 0; sv <= q; sv++) {
       const t = temp[sv]!
       for (let r = 0; r <= p; r++) {
@@ -206,11 +212,11 @@ export const nurbsSurfaceDerivs = (s: NurbsSurfaceData, u: number, v: number, d:
       }
     }
   }
-  if (W === undefined) return H.map((row) => row.map((h) => h.slice(0, dim)))
-  const S: number[][][] = Array.from({ length: d + 1 }, () => Array.from({ length: d + 1 }, () => new Array<number>(dim).fill(0)))
+  if (W === undefined) { for (const row of H) for (let l = 0; l < row.length; l++) row[l] = head(row[l]!, dim); return H }
+  const S: number[][][] = []; for (let i = 0; i <= d; i++) S.push(grid(d + 1, dim))
   for (let k = 0; k <= d; k++) {
     for (let l = 0; l <= d - k; l++) {
-      const v2 = H[k]![l]!.slice(0, dim)
+      const v2 = head(H[k]![l]!, dim)
       for (let j = 1; j <= l; j++) {
         const b = binom(l, j) * H[0]![j]![dim]!
         const prev = S[k]![l - j]!
@@ -220,7 +226,7 @@ export const nurbsSurfaceDerivs = (s: NurbsSurfaceData, u: number, v: number, d:
         const b = binom(k, i) * H[i]![0]![dim]!
         const prev = S[k - i]![l]!
         for (let c = 0; c < dim; c++) v2[c] = v2[c]! - b * prev[c]!
-        const v3 = new Array<number>(dim).fill(0)
+        const v3 = zeros(dim)
         for (let j = 1; j <= l; j++) {
           const b2 = binom(l, j) * H[i]![j]![dim]!
           const pr = S[k - i]![l - j]!
@@ -230,7 +236,7 @@ export const nurbsSurfaceDerivs = (s: NurbsSurfaceData, u: number, v: number, d:
         for (let c = 0; c < dim; c++) v2[c] = v2[c]! - bk * v3[c]!
       }
       const w0 = H[0]![0]![dim]!
-      S[k]![l] = v2.map((x) => x / w0)
+      S[k]![l] = head(v2, dim, w0)
     }
   }
   return S

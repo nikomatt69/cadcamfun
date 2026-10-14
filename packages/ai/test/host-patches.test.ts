@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
-import { MEDIA_RULE_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
+import { MEDIA_RULE_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
 
 /** The marker must exist exactly once in the pinned bundle; a bump that moves it fails here, not in a user's chat. */
 describe("host patch: images in tool results", () => {
@@ -19,17 +19,40 @@ describe("host patch: images in tool results", () => {
   test("the patch answers false and changes nothing else", () => {
     const patched = patchHostSource(bundle)!
     expect(patched).toBeDefined()
-    expect(patched.length).toBe(bundle.length - MEDIA_RULE_MARKER.length + "return false;".length)
     expect(patched).not.toContain(MEDIA_RULE_MARKER)
     const at = patched.indexOf("function supportsMediaInToolResults(model)")
     expect(patched.slice(at, at + 520)).toContain("return false;\n}")
-    // Exactly the one substitution, nothing else in 15 MB of host.
-    expect(patched).toBe(bundle.replace(MEDIA_RULE_MARKER, () => "return false;"))
+    // Exactly the two substitutions, nothing else in 15 MB of host.
+    expect(patched).toBe(bundle.replace(MEDIA_RULE_MARKER, () => "return false;").replace(STEP_INSTRUCTIONS_MARKER, () => `        InstructionSync.foldDelivered(sessionID);\n${STEP_INSTRUCTIONS_MARKER}`))
   })
 
-  test("a bundle without the marker, or with it twice, is left alone", () => {
+  test("a bundle without the markers, or with one twice, is left alone there", () => {
     expect(patchHostSource("function other() {}")).toBeUndefined()
     expect(patchHostSource(`${MEDIA_RULE_MARKER}\n${MEDIA_RULE_MARKER}`)).toBeUndefined()
+    expect(patchHostSource(`${MEDIA_RULE_MARKER}\n${STEP_INSTRUCTIONS_MARKER}\n${STEP_INSTRUCTIONS_MARKER}`)).toBe(`return false;\n${STEP_INSTRUCTIONS_MARKER}\n${STEP_INSTRUCTIONS_MARKER}`)
+  })
+})
+
+/** A skill loaded during a long turn was resent in full on every step (the model kept saying the skills were "reloaded"). */
+describe("host patch: instructions folded before every step", () => {
+  const bundle = readFileSync(createRequire(import.meta.url).resolve("@nikcli-ai/sdk-next"), "utf8")
+
+  test("the marker is the instruction assembly of the turn's step loop, once", () => {
+    expect(bundle.split(STEP_INSTRUCTIONS_MARKER)).toHaveLength(2)
+    const at = bundle.indexOf(STEP_INSTRUCTIONS_MARKER)
+    const loop = bundle.lastIndexOf("async function runLoopTurn(sessionID, controller)", at)
+    expect(loop).toBeGreaterThan(-1)
+    // Inside that function's `while (true)` step loop, after the fold the host does once per turn.
+    const between = bundle.slice(loop, at)
+    expect(between).toContain("InstructionSync.foldDelivered(sessionID);")
+    expect(between).toContain("while (true) {")
+    expect(between.slice(1)).not.toContain("async function ")
+  })
+
+  test("the patched loop folds delivered instructions before each step's assembly", () => {
+    const patched = patchHostSource(bundle)!
+    const at = patched.indexOf(STEP_INSTRUCTIONS_MARKER)
+    expect(patched.slice(at - 60, at)).toContain("InstructionSync.foldDelivered(sessionID);\n")
   })
 })
 

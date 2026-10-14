@@ -15,6 +15,7 @@
 import { cross3, dist3, dot3, length3, normalize3, sub3, unwrapNear, type Vec3 } from "./math.ts"
 import { curveDerivs, curvePoint, curve2Point, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Surface, type SurfaceParam } from "./geom.ts"
 import { Cdt } from "./cdt.ts"
+import { checkBudget } from "./budget.ts"
 import type { Brep, Coedge, Edge, Face } from "./topology.ts"
 
 export interface TessellateOptions {
@@ -34,6 +35,8 @@ export interface TessellateOptions {
   readonly paramStep?: number
   /** Tessellate only these faces (the Boolean meshes only the faces near the other operand); default every face. */
   readonly faces?: ReadonlySet<number>
+  /** Reuse the mesh of a face met before with the same surface, side, boundary and options (the Boolean's sequences). */
+  readonly reuse?: boolean
 }
 
 export interface FaceMesh {
@@ -570,6 +573,13 @@ const tessellateFace = (
   // Integration mode: parameter-span limits per direction.
   const stepU = paramStep === undefined ? undefined : per.u !== undefined ? paramStep : (u1 - u0) / 24
   const stepV = paramStep === undefined ? undefined : per.v !== undefined || s.kind === "sphere" ? paramStep : s.kind === "cylinder" || s.kind === "cone" ? undefined : (v1 - v0) / 24
+  // A triangle that passed its tests keeps passing while it exists (the tests read only its corners, and constrained edges
+  // never change), so a later pass skips it: without this every pass re-tested the whole face, and a sphere took seconds.
+  const passed = new Set<string>()
+  const triangleKey = (a: number, b: number, c: number): string => {
+    const m = Math.min(a, b, c)
+    return m === a ? `${a},${b},${c}` : m === b ? `${b},${c},${a}` : `${c},${a},${b}`
+  }
   for (let pass = 0; pass < 40; pass++) {
     const tris = cdt.result().triangles
     if (cdt.pointCount > maxPoints) {
@@ -578,6 +588,8 @@ const tessellateFace = (
     }
     const inserts: Array<readonly [number, number]> = []
     for (const [a, b2, c] of tris) {
+      const key = triangleKey(a, b2, c)
+      if (passed.has(key)) continue
       // Effective parameters: a pole corner takes the undetermined parameter from the other corners, which is where
       // the triangle's 3D edges actually leave the pole (a cone generator, a sphere meridian).
       const ka = indexOf.get(a)!, kb = indexOf.get(b2)!, kc = indexOf.get(c)!
@@ -646,6 +658,7 @@ const tessellateFace = (
           if (dot3(na, nb) < cosTol || dot3(nb, nc) < cosTol || dot3(nc, na) < cosTol) bad = true
         }
       }
+      if (!bad) passed.add(key)
       if (bad) {
         // Effective centroid first (where the 3D triangle is); the raw (u, v) centroid, always strictly inside, if not.
         inserts.push([(ua + ub + uc) / 3, (va + vb + vc) / 3])
@@ -714,6 +727,51 @@ const tessellateFace = (
 /** Display tolerance used when none is given: 1/2000 of the model diagonal, clamped to [0.001, 0.05] mm. */
 export const defaultChordTol = (b: Brep): number => Math.min(0.05, Math.max(0.001, bboxDiagonal(b) / 2000))
 
+// ---------------------------------------------------------------- face reuse
+// A blend or any sequence of Booleans meshes the same faces of the growing body again and again (a fillet tool touches a few
+// faces; the rest come out of each Boolean with the same surface object and the same boundary). A face's mesh depends only on
+// its surface, its side, its boundary curves and ranges, and the options, so it is kept per surface object and reused.
+
+const objectIds = new WeakMap<object, number>()
+let nextObjectId = 1
+const idOf = (o: object): number => {
+  let id = objectIds.get(o)
+  if (id === undefined) { id = nextObjectId++; objectIds.set(o, id) }
+  return id
+}
+const faceMeshes = new WeakMap<object, Map<string, FaceMesh>>()
+const FACE_MESHES_PER_SURFACE = 32
+/** Reuse counters (diagnostics: how many face meshes the Booleans took from the cache). */
+export const faceMeshReuse = { hits: 0, misses: 0 }
+
+const faceKey = (b: Brep, face: Face, settings: string): string =>
+  `${settings}|${face.reversed ? 1 : 0}|${face.loops.map((l) => l.coedges.map((c) => { const e = b.edges[c.edge]!; return `${idOf(e.curve)}:${e.t0}:${e.t1}:${c.reversed ? 1 : 0}` }).join(",")).join(";")}`
+
+/**
+ * A cached face mesh carried into this tessellation: each global id it used maps to one id here. Boundary points are the
+ * samples of this tessellation's own edges (the same positions, bit for bit, since sampling is deterministic), so the face
+ * still shares them with its neighbours; interior points are added.
+ */
+const adoptFaceMesh = (cached: FaceMesh, fi: number, b: Brep, edges: ReadonlyArray<EdgePolyline>, pts: Points): FaceMesh => {
+  const key = (x: number, y: number, z: number) => `${x},${y},${z}`
+  const boundary = new Map<string, number>()
+  for (const l of b.faces[fi]!.loops) for (const c of l.coedges) for (const g of edges[c.edge]!.points) { const p = pts.get(g); boundary.set(key(p.x, p.y, p.z), g) }
+  const remap = new Map<number, number>()
+  const n = cached.global.length
+  const global = new Uint32Array(n)
+  for (let i = 0; i < n; i++) {
+    const old = cached.global[i]!
+    let id = remap.get(old)
+    if (id === undefined) {
+      const x = cached.positions[i * 3]!, y = cached.positions[i * 3 + 1]!, z = cached.positions[i * 3 + 2]!
+      id = boundary.get(key(x, y, z)) ?? pts.add({ x, y, z })
+      remap.set(old, id)
+    }
+    global[i] = id
+  }
+  return { ...cached, face: fi, global }
+}
+
 /** Tessellates every face of the B-rep; the welded mesh is watertight for a valid closed shell. */
 export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTessellation => {
 
@@ -733,9 +791,28 @@ export const tessellateBrep = (b: Brep, options: TessellateOptions = {}): BrepTe
   const faces: FaceMesh[] = []
   const welded: number[] = []
   const triFace: number[] = []
-  b.faces.forEach((_, fi) => {
+  const settings = `${chord}|${angle}|${maxEdge}|${maxPoints}|${options.paramStep ?? ""}`
+  b.faces.forEach((face, fi) => {
     if (options.faces !== undefined && !options.faces.has(fi)) return
-    const fm = tessellateFace(fi, b, edges, pts, chord, angle, maxEdge, maxPoints, options.paramStep, warnings)
+    checkBudget()
+    let fm: FaceMesh | undefined
+    if (options.reuse === true) {
+      const key = faceKey(b, face, settings)
+      let bySurface = faceMeshes.get(face.surface)
+      const cached = bySurface?.get(key)
+      if (cached !== undefined) { faceMeshReuse.hits++; fm = adoptFaceMesh(cached, fi, b, edges, pts) }
+      else {
+        faceMeshReuse.misses++
+        // Warnings of a fresh mesh are this tessellation's; a mesh with warnings is not kept.
+        const before = warnings.length
+        fm = tessellateFace(fi, b, edges, pts, chord, angle, maxEdge, maxPoints, options.paramStep, warnings)
+        if (fm !== undefined && warnings.length === before) {
+          if (bySurface === undefined) { bySurface = new Map(); faceMeshes.set(face.surface, bySurface) }
+          if (bySurface.size >= FACE_MESHES_PER_SURFACE) bySurface.delete(bySurface.keys().next().value!)
+          bySurface.set(key, fm)
+        }
+      }
+    } else fm = tessellateFace(fi, b, edges, pts, chord, angle, maxEdge, maxPoints, options.paramStep, warnings)
     if (fm === undefined) return
     faces.push(fm)
     for (let i = 0; i < fm.indices.length; i += 3) {

@@ -8,7 +8,8 @@
  *   exact surface (S_u × S_v), so the only error is the trimming polygon of curved boundaries in (u, v).
  */
 import { cross3, dot3, gaussLegendre, length3, toFrame, TRIANGLE_RULE, unwrapNear, type Vec3 } from "./math.ts"
-import { curveDerivs, curvePoint, surfaceDerivs, surfacePeriods, surfaceProject } from "./geom.ts"
+import { sub3 } from "../vec.ts"
+import { curveDerivs, curvePoint, surfaceBounds, surfaceDerivs, surfacePeriods, surfacePoint, surfaceProject } from "./geom.ts"
 import type { Brep, Face } from "./topology.ts"
 import { defaultChordTol as displayChord, faceBoundaries, tessellateBrep, type TessellateOptions } from "./tessellate.ts"
 
@@ -86,15 +87,76 @@ const planarFace = (b: Brep, f: Face, acc: Acc): number => {
   return acc.area - before
 }
 
+/**
+ * Whether a NURBS face is its whole parameter rectangle: one loop whose every edge runs along a side of the domain, and
+ * every side reached. Such a face (a loft column, an untrimmed import) is integrated over the rectangle directly.
+ */
+const untrimmedNurbs = (b: Brep, f: Face): boolean => {
+  if (f.surface.kind !== "nurbs" || f.loops.length !== 1) return false
+  const { u0, u1, v0, v1 } = surfaceBounds(f.surface)
+  const tu = 1e-9 * (u1 - u0), tv = 1e-9 * (v1 - v0)
+  const sides = new Set<number>()
+  for (const c of f.loops[0]!.coedges) {
+    const e = b.edges[c.edge]!
+    let side: number | undefined
+    for (let k = 0; k <= 4; k++) {
+      const p = curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 4)
+      const q = surfaceProject(f.surface, p)
+      if (length3(sub3(surfacePoint(f.surface, q.u, q.v), p)) > 1e-7) return false
+      const on = [Math.abs(q.u - u0) <= tu, Math.abs(q.u - u1) <= tu, Math.abs(q.v - v0) <= tv, Math.abs(q.v - v1) <= tv]
+      // A corner sample is on two sides: the edge's side is the one its other samples share.
+      if (k === 0 || k === 4) { if (!on.some(Boolean)) return false; continue }
+      const s = on.indexOf(true)
+      if (s < 0 || (side !== undefined && side !== s)) return false
+      side = s
+    }
+    if (side !== undefined) sides.add(side)
+  }
+  return sides.size === 4
+}
+
+/** ∫∫ over a whole NURBS parameter rectangle: a tensor Gauss rule on every knot span, split in four each way. */
+const rectangleFace = (f: Face, acc: Acc): number => {
+  if (f.surface.kind !== "nurbs") throw new Error("rectangleFace on a non-NURBS face")
+  const d = f.surface.data
+  const sigma = f.reversed ? -1 : 1
+  const before = acc.area
+  const G = gaussLegendre(12)
+  const pieces = (knots: ReadonlyArray<number>): Array<readonly [number, number]> => {
+    const out: Array<readonly [number, number]> = []
+    const distinct = [...new Set(knots)].sort((a, b) => a - b)
+    for (let i = 0; i + 1 < distinct.length; i++) for (let k = 0; k < 4; k++) {
+      const a = distinct[i]!, z = distinct[i + 1]!
+      out.push([a + ((z - a) * k) / 4, a + ((z - a) * (k + 1)) / 4])
+    }
+    return out
+  }
+  const { u0, u1, v0, v1 } = surfaceBounds(f.surface)
+  const inRange = (r: readonly [number, number], lo: number, hi: number) => r[0] >= lo - 1e-15 && r[1] <= hi + 1e-15
+  const us = pieces(d.knotsU).filter((r) => inRange(r, u0, u1)), vs = pieces(d.knotsV).filter((r) => inRange(r, v0, v1))
+  for (const [ua, ub] of us) for (const [va, vb] of vs) {
+    const ju = (ub - ua) / 2, jv = (vb - va) / 2
+    for (let i = 0; i < G.x.length; i++) for (let j = 0; j < G.x.length; j++) {
+      const u = ua + ju * (1 + G.x[i]!), v = va + jv * (1 + G.x[j]!)
+      const dd = surfaceDerivs(f.surface, u, v)
+      const N = cross3(dd.su, dd.sv)
+      acc.add(dd.p, { x: N.x * sigma, y: N.y * sigma, z: N.z * sigma }, length3(N), G.w[i]! * G.w[j]! * ju * jv)
+    }
+  }
+  return acc.area - before
+}
+
 /** Mass properties; `options` tune the triangulation used for curved faces (default: very fine). */
 export const massProperties = (b: Brep, options: TessellateOptions = {}): MassProperties => {
   const acc = new Acc()
   const faceAreas = b.faces.map(() => 0)
-  const curved = b.faces.some((f) => f.surface.kind !== "plane")
-  if (curved) {
+  const rectangles = new Set<number>()
+  b.faces.forEach((f, fi) => { if (untrimmedNurbs(b, f)) { rectangles.add(fi); faceAreas[fi] = rectangleFace(f, acc) } })
+  const others = new Set(b.faces.map((f, fi) => (f.surface.kind !== "plane" && !rectangles.has(fi) ? fi : -1)).filter((fi) => fi >= 0))
+  if (others.size > 0) {
     // The rule integrates the exact surface; only the (u, v) trimming polygon of curved boundaries approximates, so
     // the default boundary sampling is 50× finer than the display tolerance.
-    const opts: TessellateOptions = { angleTolDeg: 4, paramStep: 0.25, ...options, chordTol: options.chordTol ?? displayChord(b) / 50 }
+    const opts: TessellateOptions = { angleTolDeg: 4, paramStep: 0.25, ...options, chordTol: options.chordTol ?? displayChord(b) / 50, faces: options.faces ?? others }
     const fine = tessellateBrep(b, opts)
     // The same boundary rings the triangulation was constrained to: used to add the slivers between each chord in
     // (u, v) and the true trimming curve, so curved trims integrate to second order in the chord height.
@@ -102,7 +164,7 @@ export const massProperties = (b: Brep, options: TessellateOptions = {}): MassPr
     const G = gaussLegendre(6)
     for (const fm of fine.faces) {
       const f = b.faces[fm.face]!
-      if (f.surface.kind === "plane") continue
+      if (f.surface.kind === "plane" || rectangles.has(fm.face)) continue
       const sigma = f.reversed ? -1 : 1
       const before = acc.area
       const per = surfacePeriods(f.surface)

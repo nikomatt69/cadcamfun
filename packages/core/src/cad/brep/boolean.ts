@@ -22,6 +22,7 @@ import { compactBrep, edgeUses, EMPTY_BREP, type Brep, type Coedge, type Edge, t
 import { faceBoundaries, tessellateBrep, type FaceBoundaries, type UvSample } from "./tessellate.ts"
 import { brepLocator, type BrepLocator } from "./classify.ts"
 import { Cdt } from "./cdt.ts"
+import { checkBudget } from "./budget.ts"
 import {
   edgeEdgeHits,
   edgeOnSurface,
@@ -51,6 +52,12 @@ export interface BooleanOptions {
   readonly fitTol?: number
   /** Diagnostics hook: receives each stage's data (intersections, arrangements, classification). */
   readonly debug?: (stage: string, data: unknown) => void
+  /**
+   * Turn of the normal across one triangle of the seed meshes, degrees (default 10). The seeds only find where the surfaces
+   * meet (the curves are then refined on the exact surfaces); a small, simple operand such as a rolling-ball corner can use a
+   * coarser seed.
+   */
+  readonly seedAngleDeg?: number
 }
 
 export interface BooleanStats {
@@ -254,7 +261,9 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   const size = Math.max(1e-3, dist3(allBox.lo, allBox.hi))
   const tol = options.tol ?? Math.max(1e-7, size * 1e-8)
   const fitTol = options.fitTol ?? Math.max(1e-6, size * 1e-6)
-  const seedChord = size / 600
+  // Rounded down to a power of two: never coarser than size / 600, and the same for the Booleans of one sequence (a blend's
+  // tools change the size a little each time), so a face met again reuses its mesh (`tessellateBrep` `reuse`).
+  const seedChord = 2 ** Math.floor(Math.log2(size / 600))
   const reg = new VertexRegistry(Math.max(tol * 10, 1e-7))
 
   // ------------------------------------------------ preparation
@@ -262,7 +271,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   // only the faces near the other operand are meshed: a fillet tool touches a few faces of a large body, and meshing the
   // whole body for every Boolean of a blend sequence was most of its cost. A face away from the other operand has no
   // intersection; it stays one fragment, classified as a whole.
-  const opts = { chordTol: seedChord, angleTolDeg: 10 }
+  const opts = { chordTol: seedChord, angleTolDeg: options.seedAngleDeg ?? 10 }
   const pad = seedChord * 2
   const faceBoxesOf = (b: Brep, fb: FaceBoundaries): Array<{ lo: Vec3; hi: Vec3 }> =>
     b.faces.map((f, fi) => {
@@ -285,7 +294,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     const fb = fbs[s]
     const faceBox = boxes[s]
     const active = new Set(b.faces.map((_, fi) => fi).filter((fi) => boxOverlap(faceBox[fi]!, near[s], 0)))
-    const tess = tessellateBrep(b, { ...opts, faces: active })
+    const tess = tessellateBrep(b, { ...opts, faces: active, reuse: true })
     const tri: Array<TriSet | undefined> = b.faces.map(() => undefined)
     const bvh: Array<TriBvh | undefined> = b.faces.map(() => undefined)
     for (const fm of tess.faces) { tri[fm.face] = triSetOfFace(fm); bvh[fm.face] = new TriBvh(tri[fm.face]!, tol) }
@@ -389,6 +398,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   A.faces.forEach((fa, ia) => {
     B.faces.forEach((fbF, ib) => {
       if (!boxOverlap(S[0].faceBox[ia]!, S[1].faceBox[ib]!, 0)) return
+      checkBudget()
       if (coincidentSurfaces(fa.surface, fbF.surface, S[1], ib)) return
       const ta = S[0].tri[ia], tb = S[1].tri[ib], bvb = S[1].bvh[ib]
       if (ta === undefined || tb === undefined || bvb === undefined) return
@@ -591,6 +601,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   for (const s of [0, 1] as const) {
     const sd = S[s], other = S[1 - s]!
     sd.brep.faces.forEach((face, fi) => {
+      checkBudget()
       if (sd.fb.synthetic[fi]) throw new BooleanError(`face ${fi} of operand ${s === 0 ? "A" : "B"} has a loop wrapping a period without a seam edge (not supported)`)
       const surf = face.surface
       const per = surfacePeriods(surf)
