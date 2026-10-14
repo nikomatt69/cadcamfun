@@ -1,6 +1,6 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { historyVolume, rebuild, type History } from "@cadcamfun/core"
-import { historySchema, parametricReport } from "../src/parametric.ts"
+import { decodeHistory, parseHistory, parametricReport } from "../src/parametric.ts"
 import { CADCAM_SKILLS } from "../src/skills/index.ts"
 
 setDefaultTimeout(60_000)
@@ -14,7 +14,7 @@ const line = (id: string, offset: number, pts: Array<[number, number]>) => ({
     constraints: pts.map(([x, y], k) => ({ type: "fixed", point: `${id}p${k}`, x, y }))
   }
 })
-const parse = (features: unknown[]) => historySchema.safeParse({ parameters: {}, features })
+const parse = (features: unknown[]) => decodeHistory({ parameters: {}, features })
 
 describe("rib, sheet metal, thread, text and press/pull reach the assistant", () => {
   test("each passes the schema and builds the part it describes", () => {

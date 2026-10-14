@@ -5,24 +5,15 @@
  * Verification persists the regenerated program and the report on the operation, so it is a write (`cam_edit.verify`),
  * not a read: a read-only specialist may inspect what a report already says, never regenerate and store NC.
  */
-import { z } from "zod"
 import { cam } from "@cadcamfun/core"
-import { CAM_ACTION_INPUTS, CamSetupCandidate, CamMachiningPlan, CamManufactureInput } from "@cadcamfun/api"
+import { CAM_ACTION_INPUTS, VisionInput as CAM_VISION_INPUT, CamSetupCandidate, CamMachiningPlan, CamManufactureInput } from "@cadcamfun/api"
 import { analyzeGcode } from "../gcode-analysis.ts"
-import { visionInputSchema } from "../vision.ts"
-import { ToolMediaResult } from "../tools/define.ts"
+import { vision } from "./cad.ts"
 import { defineAction, defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
 
 export type SetupCandidate = typeof CamSetupCandidate.Type
 export type MachiningPlanInput = typeof CamMachiningPlan.Type
 export type ManufactureInput = typeof CamManufactureInput.Type
-
-const vision = async (input: z.infer<typeof visionInputSchema>, context: ActionContext) => {
-  if (context.handlers.vision === undefined) return { ok: false, error: "Viewport capture is unavailable in this host." }
-  const result = await context.handlers.vision(context.projectId, "cam", input.focus, context.signal)
-  if (!result.ok) return result
-  return new ToolMediaResult(result.evidence, [{ type: "file", mime: result.capture.mime, filename: "cam-viewport.png", url: `data:${result.capture.mime};base64,${result.capture.data}` }])
-}
 
 /** The machine limits a cutting-data call respects: a named preset, else the project machine's spindle and feed, else a typical VMC. */
 const limitsFor = async (name: string | undefined, context: ActionContext): Promise<cam.kernel.MachineLimits> => {
@@ -93,10 +84,10 @@ export const CAM_ACTIONS: ReadonlyArray<ActionSpec> = [
         ? Promise.resolve({ ok: false, error: "Stock management is unavailable in this host." })
         : handlers.stock(projectId, { action: "inspect" })
   }),
-  defineAction({
+  defineWireAction({
     id: "cam.vision", kind: "read", effects: ["ui"], replaces: "cam_vision",
-    parameters: visionInputSchema,
-    run: vision
+    parameters: CAM_VISION_INPUT,
+    run: vision("cam", "cam-viewport.png")
   }),
   defineWireAction({
     id: "cam.chain_suggest", kind: "read", effects: [], replaces: "cam_operations_suggest_chain",

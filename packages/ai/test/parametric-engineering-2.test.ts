@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
+import { Schema } from "effect"
+import { ParametricHistory } from "@cadcamfun/api"
 import { buildRecipe, type History } from "@cadcamfun/core"
-import { historySchema } from "../src/parametric.ts"
+import { decodeHistory, parseHistory } from "../src/parametric.ts"
 import { toSpec } from "../src/tools/define.ts"
 import { cadTool } from "../src/tools/cad.ts"
 import { parametricInputSchema, parametricHarness } from "./helpers/parametric.ts"
@@ -44,10 +46,10 @@ const box = (extra: unknown[] = [], parameters: Record<string, number | string> 
   features: [rectangle("s", "XY", 0, 0, "w", "d"), { id: "box", type: "extrude", sketch: "s", depth: "h", operation: "new" }, ...extra]
 })
 const issuesOf = (value: unknown): string => {
-  const parsed = historySchema.safeParse(value)
-  return parsed.success ? "" : parsed.error.issues.map((i) => i.message).join(" | ")
+  const parsed = decodeHistory(value)
+  return parsed.success ? "" : parsed.problems.join(" | ")
 }
-const accepted = (value: unknown): boolean => historySchema.safeParse(value).success
+const accepted = (value: unknown): boolean => decodeHistory(value).success
 
 interface Call { readonly projectId: string; readonly input: unknown }
 /** What the project handler answers when it stores a part (the `cad_edit.parametric_create` contract). */
@@ -129,7 +131,7 @@ describe("the history schema takes sweep, loft, shell, fillet and grid patterns"
   })
 
   test("the schema description tells the model the new references", () => {
-    const json = JSON.stringify(z.toJSONSchema(historySchema as never))
+    const json = JSON.stringify(Schema.toJsonSchemaDocument(ParametricHistory))
     for (const word of ["sweep", "loft", "shell", "fillet", "grid", "countB", "stepB", "smooth", "parallel", "minLength"]) expect(json).toContain(word)
   })
 })
@@ -209,7 +211,7 @@ describe("cad_parametric: the new recipes", () => {
     expect(out.ok).toBe(true)
     expect(out.derived).toMatchObject({ innerDiameter: 8 })
     expect(out.history.features.map((f: { type: string }) => f.type)).toEqual(["sketch", "sketch", "sweep"])
-    expect(historySchema.safeParse(out.history).success).toBe(true)
+    expect(decodeHistory(out.history).success).toBe(true)
     expect(out.report).toMatchObject({ ok: true, bodyCount: 1 })
     const turn = (120 * Math.PI) / 180, radius = 15
     const centreline = 40 + 40 - 2 * radius * Math.tan(turn / 2) + radius * turn
@@ -222,7 +224,7 @@ describe("cad_parametric: the new recipes", () => {
     expect(out.ok).toBe(true)
     expect(out.history.features.filter((f: { type: string }) => f.type === "loft").map((f: { operation: string }) => f.operation)).toEqual(["new", "subtract"])
     expect(out.report).toMatchObject({ ok: true, bodyCount: 1 })
-    expect(historySchema.safeParse(out.history).success).toBe(true)
+    expect(decodeHistory(out.history).success).toBe(true)
   }, SLOW)
 
   test("a rule broken in either recipe is an ok:false with the rule, nothing written", async () => {

@@ -1,4 +1,4 @@
-import { historySchema } from "@cadcamfun/ai"
+import { decodeHistory } from "@cadcamfun/ai"
 import { usesOf, resolveParameters } from "@cadcamfun/core"
 
 type Element = Record<string, unknown> & { id: string; type: string }
@@ -27,7 +27,7 @@ export const readProperty = (element: Element, path: ReadonlyArray<string>, offs
 /** Real nominal relationships, with no guessed mating constraints or inferred shared parameter bindings. */
 export const componentParameters = (element: Record<string, unknown>, prefix = "", depth = 0): unknown[] => {
   if (depth > 10) return [{ omitted: true, reason: "Maximum component nesting depth" }]
-  const decoded = historySchema.safeParse(element["history"])
+  const decoded = decodeHistory(element["history"])
   const own = decoded.success ? [{ path: prefix || String(element["id"] ?? "root"), parameters: decoded.data.parameters, resolved: resolveParameters(decoded.data.parameters).values, dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) })) }] : []
   const children = Array.isArray(element["elements"]) ? element["elements"] : []
   return [...own, ...children.slice(0, 100).flatMap((child, index) => child !== null && typeof child === "object" ? componentParameters(child as Record<string, unknown>, `${prefix}/elements/${index}`, depth + 1) : [])]

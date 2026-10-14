@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import {
   AiBackground, AiConfig, AiCredentials, jsonFileCredentials, AiHost, AiService, BackgroundTaskManager, DirectModel, defaultModelFactory,
   ToolHandlers, ToolRegistry, makeToolRegistry, backgroundToolContributionsFor, defaultProviderSpecs, makeAiBackgroundLayer,
-  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, historySchema, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
+  searchWeb, makeNikCliRuntime, readPolicyFile, agentSystemPrompt, decodeHistory, parseHistory, parseProjectContext, projectContextKey, type ActionContribution, type HostToolSpec, type ProviderId, type ToolHandlersShape,
   CONTRIBUTION_KEYS, bridgeAdmission, describeBridge, scopeBridge, bridgeAllowed, pluginToolId, type BridgeMode, type BridgeTool
 } from "@cadcamfun/ai"
 import { DESIGN_SPACE, cad, cam, checkModel, type History } from "@cadcamfun/core"
@@ -278,7 +278,7 @@ const toolHandlers = Effect.gen(function*() {
           if (settings.machineType !== "lathe" && settings.operationType !== "probing" && elements.length === 0) issues.push({ severity: "error", code: "MISSING_GEOMETRY", message: "There is no part to machine." })
           for (const element of elements) {
             if (element.type !== "parametric") continue
-            const history = historySchema.parse(element["history"]) as History
+            const history = parseHistory(element["history"])
             const dfm = cad.analyzeManufacturability(history, { process: settings.machineType === "lathe" ? "turn" : settings.machineType === "3dprinter" ? "print" : "mill", toolDiameter: settings.toolDiameter })
             issues.push(...dfm.issues)
           }
@@ -469,8 +469,8 @@ const toolHandlers = Effect.gen(function*() {
           if (element.type !== "parametric") return base
           // A grep is a text operation: it reports the stored history, it never rebuilds geometry to
           // answer a search. Metrics come from cad_parametric inspect, which can afford the kernel run.
-          const decoded = historySchema.safeParse(element["history"])
-          if (!decoded.success) return { ...base, historyProblems: decoded.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`) }
+          const decoded = decodeHistory(element["history"])
+          if (!decoded.success) return { ...base, historyProblems: decoded.problems.slice(0, 8) }
           return {
             ...base,
             ...(input.includeParameters ? { parameters: decoded.data.parameters } : {}),

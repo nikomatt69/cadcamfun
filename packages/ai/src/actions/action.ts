@@ -13,6 +13,7 @@ import { z } from "zod"
 import { ACTION_CONTRACTS, ActionDenied, ActionInvalidInput, ActionInterrupted, type ActionContract } from "@cadcamfun/api"
 import type { ActionContribution, ToolContext } from "../tools/define.ts"
 import { nikcliWireSchema } from "../tools/wire-schema.ts"
+import { schemaProblems } from "../tool-validation.ts"
 import { classifyOutcome, failure, outcomeWire, type ActionOutcome } from "./outcome.ts"
 
 /** What an action does to domain data. Derived from the implementation, never from the tool's name. */
@@ -101,10 +102,11 @@ export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>
  */
 const wireDecoder = <A>(actionId: string, schema: Schema.Codec<A, unknown>) => {
   const decode = Schema.decodeUnknownEffect(schema)
-  return (input: unknown): Effect.Effect<A, ActionInvalidInput> => decode(input, { errors: "all" }).pipe(
+  // Strict like the derived schema the host validates with: a misspelt optional field is refused, never silently dropped.
+  return (input: unknown): Effect.Effect<A, ActionInvalidInput> => decode(input, { errors: "all", onExcessProperty: "error" }).pipe(
     Effect.mapError((error) => new ActionInvalidInput({
       actionId,
-      message: `The arguments do not match the action's schema. ${error.message.replace(/\s*\n\s*/g, " ").slice(0, 600)}`
+      message: `The arguments do not match the action's schema. ${schemaProblems(error).slice(0, 12).join("; ")}`
     }))
   )
 }

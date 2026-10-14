@@ -1,16 +1,17 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { historyVolume, rebuild, withParameter, type History } from "@cadcamfun/core"
 import { normalizeElement } from "../src/element-catalog.ts"
-import { historySchema, parametricReport } from "../src/parametric.ts"
+import { decodeHistory, parseHistory, parametricReport } from "../src/parametric.ts"
 import { CADCAM_SKILLS, FUSION_EXAMPLE_HISTORY } from "../src/skills/index.ts"
 import { PRIMITIVE_ELEMENTS } from "@cadcamfun/core"
-import { parametricRecipeSchema } from "../src/actions/parametric.ts"
+import { Schema } from "effect"
+import { PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { buildHostConfig } from "../src/nikcli/config.ts"
 import { TOOL_IDS } from "../src/tools/registry.ts"
 
 setDefaultTimeout(60_000)
 
-const parse = (history: unknown) => historySchema.safeParse(history)
+const parse = (history: unknown) => decodeHistory(history)
 
 describe("the history schema offers the Fusion 360 commands to the assistant", () => {
   test("the skill's own example is valid, builds, and a parameter edit resizes it", () => {
@@ -65,7 +66,7 @@ describe("the history schema offers the Fusion 360 commands to the assistant", (
     const history = { parameters: { d: 24 }, features: [{ id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "c", kind: "circle", at: [0, 0], diameter: "d" }] } }, { id: "x", type: "extrude", sketch: "s", depth: 6, operation: "new" }] }
     const made = normalizeElement({ type: "parametric", history })
     expect(made.ok).toBe(true)
-    const report = parametricReport(historySchema.parse(history) as History)
+    const report = parametricReport(parseHistory(history) as History)
     expect(report.ok).toBe(true)
     expect(normalizeElement({ type: "parametric", history: { parameters: {}, features: [{ id: "s", type: "sketch", plane: "XY", sketch: { shapes: [{ id: "sl", kind: "slot", at: [0, 0], length: 4, width: 8 }] } }, { id: "x", type: "extrude", sketch: "s", depth: 6, operation: "new" }] } }))
       .toMatchObject({ ok: false })
@@ -96,7 +97,7 @@ describe("the assistant is told about them", () => {
 
 describe("recipes still behave", () => {
   test("the recipe schema is unchanged for the existing standard parts", () => {
-    expect(parametricRecipeSchema.safeParse({ recipe: "flange" }).success).toBe(true)
+    expect(Schema.is(PARAMETRIC_ACTION_INPUTS["cad.parametric_recipe"])({ recipe: "flange" })).toBe(true)
   })
 })
 
@@ -162,7 +163,7 @@ describe("every catalogue solid can be placed in a history, and the assistant ca
       expect(m, `${element} has measures here`).toBeDefined()
       const history = { parameters: {}, features: [{ id: "p", type: "primitive", element, ...(m!.params ? { params: m!.params } : {}), ...(m!.options ? { options: m!.options } : {}), ...(m!.extra ?? {}), operation: "new" }] }
       const parsed = parse(history)
-      expect(parsed.success, `${element}: ${parsed.success ? "" : JSON.stringify(parsed.error.issues.slice(0, 2))}`).toBe(true)
+      expect(parsed.success, `${element}: ${parsed.success ? "" : JSON.stringify(parsed.problems.slice(0, 2))}`).toBe(true)
       if (!parsed.success) continue
       const built = rebuild(parsed.data as History)
       expect(built.issues.filter((i) => i.severity === "error"), element).toEqual([])

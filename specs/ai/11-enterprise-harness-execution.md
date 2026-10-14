@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 in progress (outcome contract built, CAD and CAM families migrated); Steps 2–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Steps 2–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -83,12 +83,12 @@ D: Step 0. Placement: RM-01. Start: `packages/ai/src/actions/action.ts` (`Action
 no uniform guarantee.
 
 - [x] Add a result schema and effect metadata to `ActionSpec` (`contract`, from `ACTION_CONTRACTS` in `packages/api/src/ai-action-results.ts`).
-- [ ] Extend the authoritative Effect schemas; derive the nikcli representation from them.
+- [x] Extend the authoritative Effect schemas; derive the nikcli representation from them.
 - [x] Distinguish success, partial, refusal, conflict, cancellation and uncertain outcome (`packages/ai/src/actions/outcome.ts`).
-- [ ] Migrate by family: CAD → CAM → libraries/parts → memory/research → VCS/delegation. CAD done (32 actions), CAM done (20 actions).
-- [ ] Move domain handlers to Effect; keep the Promise conversion at the SDK seam only.
-- [ ] Keep the compatible argument normalisation, with no correction that changes units, identifiers or authority.
-- [ ] Update the failing host test to assert the missing fields and that the handler did not run, instead of an obsolete sentence.
+- [x] Migrate by family: CAD → CAM → libraries/parts → memory/research → VCS/delegation. 83/83 actions declare input and result.
+- [ ] Move domain handlers to Effect; keep the Promise conversion at the SDK seam only. Deferred to Step 5 (see below).
+- [x] Keep the compatible argument normalisation, with no correction that changes units, identifiers or authority.
+- [x] Update the failing host test to assert the missing fields and that the handler did not run, instead of an obsolete sentence.
 
 Tests: extend `action-tool.test.ts`, `wire-schema.test.ts`, `tool-definitions.test.ts`, `packages/api/test/ai-actions.test.ts`.
 Gate: every action validated on input and output; no arbitrary public result crosses the adapters as success.
@@ -113,6 +113,24 @@ Progress (2026-10-14):
   (`cam-edit.ts`, `ToolRow.tsx`, regression in `action-outcome.test.ts`).
 - Open (C): the optional `ToolHandlers.machine` is still implemented by no host, so `cam.analyze` and `cam.cutting_data`
   use default limits instead of the project machine (inventory known gap; Step 5 binds the document and its machine).
+- **V** Inputs: every action's parameters are one Effect schema in `@cadcamfun/api` (`ai-action-inputs.ts`, `ai-cad.ts`,
+  `ai-parametric.ts`, `ai-cam.ts`, `ai-inspection.ts`); the nikcli schema is derived from it (`nikcliWireSchema`) and the seam
+  decodes every call with it (`defineWireAction`), so the handler receives the decoded value (defaults, trimming, a flag sent
+  as text). The parametric history has one declaration; the zod copy is gone and the sidecar decodes stored histories with
+  `decodeHistory`. Equivalence: `action-inputs.test.ts` (31 actions) and `action-inputs-cad.test.ts` (27 actions); the
+  Effect history agreed with the replaced zod one on all 562 histories of the ai and sidecar suites (396 accepted, 166 refused).
+- Decision (strictness): action inputs are strict at the host guard and at the seam, so a misspelt optional field is refused
+  with its name instead of being dropped. Actions without parameters still take any object. Stored histories keep Effect's
+  default (excess keys ignored), so an older document still loads.
+- **V** Third defect, found by the equivalence tests: an Effect `Record` drops keys its key schema refuses, so
+  `parametric_update` with a bad parameter name would have answered success without applying it. Parameter, primitive and
+  recipe records now check names on the whole record (`namedRecord`) and refuse them; the JSON schema keeps `propertyNames`.
+- Refusals name the fields: the catalogue pre-parse (`runAction`) and the seam both list each problem; unions report the
+  variant the value meant (`tool-validation.ts`).
+- Deferred (C): moving the domain handlers themselves to Effect belongs with Step 5, which rewrites the sidecar admission
+  (`load`/`save`) the handlers sit on; today the Promise crossing is at the SDK seam and at each handler.
+- Finding (C): `cad_edit.add_entities` and `cad_edit.modify` still pass sketch entities through `validated(EntityInput, ...)`,
+  which drops `name` and `color` on 2D entities; kept as today's behaviour, recorded for Step 10.
 - Effects classification (C): `cad_edit.editor` is kind `write` but touches only the interface; `agent.list` and `agent.read`
   are kind `write` with no effect (pinned in the test; Step 3).
 
@@ -373,3 +391,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   No RM row status changed.
 - 2026-10-14: Step 1 progress: outcome contract and classifier; CAD and CAM families migrated (52/83 results); fixed
   `parametric_convert` missing `mutation` and `cam_edit.generate` reporting a failed generation as success.
+- 2026-10-14: closed Step 1: every action's input declared once in Effect and decoded at the seam; strict inputs; fixed
+  parameter names silently dropped by `Record`; handler migration to Effect deferred to Step 5.

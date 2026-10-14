@@ -1,29 +1,28 @@
 import { z } from "zod"
+import { PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
 import { runAction, actionById } from "../../src/actions/catalogue.ts"
 import type { ToolHandlersShape } from "../../src/tools/handlers.ts"
-import {
-  parametricCreateSchema, parametricDfmSchema, parametricFastenerSchema, parametricInspectSchema, parametricRecipeCreateSchema,
-  parametricRecipeSchema, parametricTestSchema, parametricUpdateSchema, parametricValidateSchema
-} from "../../src/actions/parametric.ts"
+import { nikcliWireSchema } from "../../src/tools/wire-schema.ts"
 
 /**
  * The parametric surface as one union, for the tests that still speak the old `action:` vocabulary. Each leaf is the
- * catalogue action's own schema, so a union that parses still proves the action's schema is satisfied; the run below
- * goes through the catalogue like every other caller. The `parametric_*` spelling is what the tool prompt documents,
- * so it is the one the union is keyed by; the short name is accepted as an alias.
+ * nikcli schema derived from the catalogue action's own Effect input, so a union that parses still proves what the host
+ * would accept; the run below goes through the catalogue like every other caller. The `parametric_*` spelling is what
+ * the tool prompt documents, so it is the one the union is keyed by; the short name is accepted as an alias.
  */
+const wire = (id: keyof typeof PARAMETRIC_ACTION_INPUTS) => nikcliWireSchema(PARAMETRIC_ACTION_INPUTS[id] as never)
 const withAction = (name: string, short: string, schema: z.ZodObject<Record<string, z.ZodType>>) =>
   z.union([schema.safeExtend({ action: z.literal(name) }), schema.safeExtend({ action: z.literal(short) })])
 
 export const parametricInputSchema = z.union([
-  withAction("parametric_validate", "validate", parametricValidateSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_inspect", "inspect", parametricInspectSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_test", "test", parametricTestSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_create", "create", parametricCreateSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_update", "update", parametricUpdateSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_dfm", "dfm", parametricDfmSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_fastener", "fastener", parametricFastenerSchema as z.ZodObject<Record<string, z.ZodType>>),
-  withAction("parametric_recipe", "recipe", (parametricRecipeSchema as z.ZodObject<Record<string, z.ZodType>>).extend({ create: z.boolean().optional(), name: z.string().optional(), x: z.number().optional(), y: z.number().optional(), z: z.number().optional(), layer: z.string().optional() }))
+  withAction("parametric_validate", "validate", wire("cad.parametric_validate")),
+  withAction("parametric_inspect", "inspect", wire("cad.parametric_inspect")),
+  withAction("parametric_test", "test", wire("cad.parametric_test")),
+  withAction("parametric_create", "create", wire("cad_edit.parametric_create")),
+  withAction("parametric_update", "update", wire("cad_edit.parametric_update")),
+  withAction("parametric_dfm", "dfm", wire("cad.parametric_dfm")),
+  withAction("parametric_fastener", "fastener", wire("cad.parametric_fastener")),
+  withAction("parametric_recipe", "recipe", wire("cad_edit.parametric_recipe_create").safeExtend({ create: z.boolean().optional() }))
 ])
 
 /**
@@ -70,14 +69,14 @@ export const parametricHarness = (reply: (input: never) => unknown = () => ({ ok
   } as unknown as ToolHandlersShape
   const run = async (input: unknown) => {
     const value = input as { action: string; create?: boolean }
-    const { action: _action, create, ...payload } = value
-    return await runAction(parametricActionId(value), create === true ? { ...payload, create } : payload, { handlers, projectId: "p1" }) as any
+    const { action: _action, create: _create, ...payload } = value
+    return await runAction(parametricActionId(value), payload, { handlers, projectId: "p1" }) as any
   }
   return { calls, run, handlers, withoutHandler: (input: unknown) => runWith(input, {} as ToolHandlersShape) }
 }
 
 const runWith = async (input: unknown, handlers: ToolHandlersShape): Promise<any> => {
   const value = input as { action: string; create?: boolean }
-  const { action: _action, create, ...payload } = value
-  return await runAction(parametricActionId(value), create === true ? { ...payload, create } : payload, { handlers, projectId: "p1" }) as any
+  const { action: _action, create: _create, ...payload } = value
+  return await runAction(parametricActionId(value), payload, { handlers, projectId: "p1" }) as any
 }
