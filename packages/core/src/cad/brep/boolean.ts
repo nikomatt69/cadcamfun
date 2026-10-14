@@ -52,6 +52,12 @@ export interface BooleanOptions {
   readonly fitTol?: number
   /** Diagnostics hook: receives each stage's data (intersections, arrangements, classification). */
   readonly debug?: (stage: string, data: unknown) => void
+  /**
+   * Turn of the normal across one triangle of the seed meshes, degrees (default 10). The seeds only find where the surfaces
+   * meet (the curves are then refined on the exact surfaces); a small, simple operand such as a rolling-ball corner can use a
+   * coarser seed.
+   */
+  readonly seedAngleDeg?: number
 }
 
 export interface BooleanStats {
@@ -255,7 +261,9 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   const size = Math.max(1e-3, dist3(allBox.lo, allBox.hi))
   const tol = options.tol ?? Math.max(1e-7, size * 1e-8)
   const fitTol = options.fitTol ?? Math.max(1e-6, size * 1e-6)
-  const seedChord = size / 600
+  // Rounded down to a power of two: never coarser than size / 600, and the same for the Booleans of one sequence (a blend's
+  // tools change the size a little each time), so a face met again reuses its mesh (`tessellateBrep` `reuse`).
+  const seedChord = 2 ** Math.floor(Math.log2(size / 600))
   const reg = new VertexRegistry(Math.max(tol * 10, 1e-7))
 
   // ------------------------------------------------ preparation
@@ -263,7 +271,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   // only the faces near the other operand are meshed: a fillet tool touches a few faces of a large body, and meshing the
   // whole body for every Boolean of a blend sequence was most of its cost. A face away from the other operand has no
   // intersection; it stays one fragment, classified as a whole.
-  const opts = { chordTol: seedChord, angleTolDeg: 10 }
+  const opts = { chordTol: seedChord, angleTolDeg: options.seedAngleDeg ?? 10 }
   const pad = seedChord * 2
   const faceBoxesOf = (b: Brep, fb: FaceBoundaries): Array<{ lo: Vec3; hi: Vec3 }> =>
     b.faces.map((f, fi) => {
@@ -286,7 +294,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
     const fb = fbs[s]
     const faceBox = boxes[s]
     const active = new Set(b.faces.map((_, fi) => fi).filter((fi) => boxOverlap(faceBox[fi]!, near[s], 0)))
-    const tess = tessellateBrep(b, { ...opts, faces: active })
+    const tess = tessellateBrep(b, { ...opts, faces: active, reuse: true })
     const tri: Array<TriSet | undefined> = b.faces.map(() => undefined)
     const bvh: Array<TriBvh | undefined> = b.faces.map(() => undefined)
     for (const fm of tess.faces) { tri[fm.face] = triSetOfFace(fm); bvh[fm.face] = new TriBvh(tri[fm.face]!, tol) }

@@ -28,7 +28,27 @@ import { curveDerivs, curvePoint, surfaceNormal, surfaceProject, type Surface } 
 import { BooleanError, booleanBrep } from "./boolean.ts"
 import { makeSphere, polyhedron } from "./primitives.ts"
 import { extrudeProfile, revolveProfile, type ProfileLoop, type ProfileSegment } from "./sweep.ts"
-import { edgeUses, type Brep } from "./topology.ts"
+import { edgeUses, mergeBreps, type Brep } from "./topology.ts"
+import { BudgetExceeded } from "./budget.ts"
+
+interface Box { readonly lo: Vec3; readonly hi: Vec3 }
+
+/** A tool's box from its vertices and edge samples, grown by `pad` (a curved edge bulges between samples by far less). */
+const toolBox = (tool: Brep, pad: number): Box => {
+  const lo = { x: Infinity, y: Infinity, z: Infinity }, hi = { x: -Infinity, y: -Infinity, z: -Infinity }
+  const add = (p: Vec3): void => {
+    lo.x = Math.min(lo.x, p.x); lo.y = Math.min(lo.y, p.y); lo.z = Math.min(lo.z, p.z)
+    hi.x = Math.max(hi.x, p.x); hi.y = Math.max(hi.y, p.y); hi.z = Math.max(hi.z, p.z)
+  }
+  for (const v of tool.vertices) add(v.point)
+  for (const e of tool.edges) for (let k = 0; k <= 16; k++) add(curvePoint(e.curve, e.t0 + ((e.t1 - e.t0) * k) / 16))
+  // A sphere or torus face can bulge past its edges: a pad of a tenth of the box keeps such tools apart conservatively.
+  const grow = pad + 0.1 * Math.max(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z)
+  return { lo: { x: lo.x - grow, y: lo.y - grow, z: lo.z - grow }, hi: { x: hi.x + grow, y: hi.y + grow, z: hi.z + grow } }
+}
+
+const boxesTouch = (a: Box, b: Box): boolean =>
+  a.lo.x <= b.hi.x && b.lo.x <= a.hi.x && a.lo.y <= b.hi.y && b.lo.y <= a.hi.y && a.lo.z <= b.hi.z && b.lo.z <= a.hi.z
 
 // ================================================================ candidate edges
 
@@ -410,7 +430,7 @@ const cornerTools = (b: Brep, done: ReadonlyArray<BlendCandidate>, r: number, g:
     const poles = normalize3(add3(sub3(m[0], m[1]), scale3(m[2], 0.3)))
     const away = neg3(add3(add3(m[0], m[1]), m[2]))
     try {
-      tools.push(booleanBrep(cell, makeSphere(r, frame(C, poles, away)), "subtract").brep)
+      tools.push(booleanBrep(cell, makeSphere(r, frame(C, poles, away)), "subtract", { seedAngleDeg: 20 }).brep)
     } catch (err) {
       tools.push(`the corner tool at ${V.x.toFixed(2)},${V.y.toFixed(2)},${V.z.toFixed(2)} failed: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -431,29 +451,82 @@ export const blendBrep = (b: Brep, edges: ReadonlyArray<BlendCandidate>, size: n
   const rejected: string[] = []
   const failures: string[] = []
   const done: BlendCandidate[] = []
+  const describeFailure = (err: unknown): string => err instanceof BooleanError ? `exact Boolean failed: ${err.message}` : err instanceof Error ? err.message : String(err)
+  // Every edge's tool comes from the original body, so they are all built first.
+  const built: Array<{ readonly edge: BlendCandidate; readonly tool: Brep; readonly box: Box }> = []
   for (const e of edges) {
     try {
       const tool = edgeTool(b, uses, e, size, style, g, endCuts(b, e, edges, size, style))
       if (typeof tool === "string") { rejected.push(`${describeBlendEdge(e)}: ${tool}`); continue }
-      const debug = options.debug
-      current = booleanBrep(current, tool, e.convex ? "subtract" : "union", debug === undefined ? {} : { debug: (stage, data) => debug(describeBlendEdge(e), stage, data) }).brep
-      blended++
-      done.push(e)
+      built.push({ edge: e, tool, box: toolBox(tool, g) })
     } catch (err) {
-      failures.push(`${describeBlendEdge(e)}: ${err instanceof BooleanError ? `exact Boolean failed: ${err.message}` : err instanceof Error ? err.message : String(err)}`)
+      if (err instanceof BudgetExceeded) throw err
+      failures.push(`${describeBlendEdge(e)}: ${describeFailure(err)}`)
     }
+  }
+  // Tools whose boxes are apart go into one Boolean (an operand of several disjoint solids): a plate's dozens of edges take a
+  // few Booleans instead of one each, and every Boolean re-cuts the faces the others leave. Batches form only within runs of
+  // the same operation, so the order of material added and removed is the edges' order.
+  const apply = (batch: ReadonlyArray<(typeof built)[number]>, op: "subtract" | "union", label: string): boolean => {
+    const debug = options.debug
+    try {
+      const operand = batch.length === 1 ? batch[0]!.tool : mergeBreps(batch.map((x) => x.tool))
+      current = booleanBrep(current, operand, op, debug === undefined ? {} : { debug: (stage, data) => debug(label, stage, data) }).brep
+      return true
+    } catch (err) {
+      if (err instanceof BudgetExceeded) throw err
+      if (batch.length === 1) failures.push(`${label}: ${describeFailure(err)}`)
+      return false
+    }
+  }
+  for (let start = 0; start < built.length;) {
+    const op = built[start]!.edge.convex ? "subtract" : "union"
+    let end = start
+    while (end < built.length && (built[end]!.edge.convex ? "subtract" : "union") === op) end++
+    const batches: Array<Array<(typeof built)[number]>> = []
+    for (const item of built.slice(start, end)) {
+      const batch = batches.find((x) => x.every((other) => !boxesTouch(other.box, item.box)))
+      if (batch === undefined) batches.push([item])
+      else batch.push(item)
+    }
+    for (const batch of batches) {
+      if (apply(batch, op, batch.length === 1 ? describeBlendEdge(batch[0]!.edge) : `${batch.length} edges`)) {
+        blended += batch.length
+        done.push(...batch.map((x) => x.edge))
+        continue
+      }
+      // The batch failed: each edge alone, so the failure names its edge and the others still blend.
+      for (const item of batch) if (apply([item], op, describeBlendEdge(item.edge))) { blended++; done.push(item.edge) }
+    }
+    start = end
   }
   let vertices = 0
   if (style === "fillet") {
+    const corners: Array<{ readonly tool: Brep; readonly box: Box }> = []
     for (const tool of cornerTools(b, done, size, g)) {
-      if (typeof tool === "string") { failures.push(`rolling-ball corner: ${tool}`); continue }
+      if (typeof tool === "string") failures.push(`rolling-ball corner: ${tool}`)
+      else corners.push({ tool, box: toolBox(tool, g) })
+    }
+    const batches: Array<Array<(typeof corners)[number]>> = []
+    for (const item of corners) {
+      const batch = batches.find((x) => x.every((other) => !boxesTouch(other.box, item.box)))
+      if (batch === undefined) batches.push([item])
+      else batch.push(item)
+    }
+    const subtract = (batch: ReadonlyArray<(typeof corners)[number]>, label: string): boolean => {
+      const debug = options.debug
       try {
-        const debug = options.debug
-        current = booleanBrep(current, tool, "subtract", debug === undefined ? {} : { debug: (stage, data) => debug(`corner ${vertices}`, stage, data) }).brep
-        vertices++
+        current = booleanBrep(current, batch.length === 1 ? batch[0]!.tool : mergeBreps(batch.map((x) => x.tool)), "subtract", debug === undefined ? {} : { debug: (stage, data) => debug(label, stage, data) }).brep
+        return true
       } catch (err) {
-        failures.push(`rolling-ball corner: ${err instanceof Error ? err.message : String(err)}`)
+        if (err instanceof BudgetExceeded) throw err
+        if (batch.length === 1) failures.push(`rolling-ball corner: ${err instanceof Error ? err.message : String(err)}`)
+        return false
       }
+    }
+    for (const batch of batches) {
+      if (subtract(batch, `${batch.length} corners`)) { vertices += batch.length; continue }
+      for (const item of batch) if (subtract([item], `corner ${vertices}`)) vertices++
     }
   }
   return { brep: current, blended, vertices, rejected, failures }
