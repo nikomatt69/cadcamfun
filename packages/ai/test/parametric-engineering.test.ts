@@ -90,7 +90,8 @@ describe("the history schema takes the engineering features", () => {
     expect(report.volumeMm3!).toBeLessThan(plain.volumeMm3! - 2 * Math.PI * 4 * 8 * 0.9)
     expect(report.bounds!.max.x).toBeCloseTo(plain.bounds!.max.x, 5)
     expect(report.issues).toEqual([])
-  })
+    // The report's exact model blends the chamfered rims with exact Booleans (about a second each on a loaded machine).
+  }, 60_000)
 })
 
 describe("cad_parametric input schema", () => {

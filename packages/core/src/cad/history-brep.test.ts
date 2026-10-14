@@ -165,6 +165,47 @@ describe("exact replay of a parametric history", () => {
     expect(rebuildExact(both).bodies[0]!.reason).toContain("straight edges and full circles only")
   }, 180_000)
 
+  test("a drafted extrusion leans its walls exactly: planes tilt, arcs become cones, holes widen towards the top", () => {
+    const k = Math.tan((5 * PI) / 180), h = 6
+    const drafted = (base: History) => ({ ...base, features: base.features.map((f) => (f.id === "plate" ? { ...f, taper: 5 } : f)) })
+    // The area at height z is a quadratic in z; Simpson's rule integrates it exactly.
+    const simpson = (area: (z: number) => number) => (h / 6) * (area(0) + 4 * area(h / 2) + area(h))
+    const rect = (z: number) => (40 - 2 * k * z) * (25 - 2 * k * z)
+    expect(rel(exactVolume(drafted(plate())), simpson(rect))).toBeLessThan(1e-9)
+    // A bore of radius 4 in the profile widens by k per mm of height.
+    const [s1, extrude] = plate().features as [SketchFeature, Extract<Feature, { type: "extrude" }>]
+    const bored = history([{ ...s1, sketch: { entities: [...s1.sketch.entities, pt("c", 20, 12.5), { id: "k", kind: "circle", center: "c", radius: 4 }], constraints: [...s1.sketch.constraints, { type: "fixed", point: "c" }] } }, { ...extrude, taper: 5 }], plate().parameters)
+    expect(rel(exactVolume(bored), simpson((z) => rect(z) - PI * (4 + k * z) ** 2))).toBeLessThan(1e-9)
+    // Rounded corners (r = 5) shrink to concentric arcs: cones at the corners.
+    const rounded = drafted({ ...plate(), features: plate().features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 } } : f)) })
+    const r = rebuildExact(rounded)
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(rel(v, simpson((z) => rect(z) - (4 - PI) * (5 - k * z) ** 2))).toBeLessThan(1e-9)
+    expect(r.bodies[0]!.brep!.faces.filter((f) => f.surface.kind === "cone").length).toBe(4)
+    expect(rel(v, meshVolume(r.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+  })
+
+  test("a face draft leans a planar face about its hinge: material removed above the neutral plane, added below", () => {
+    const k = Math.tan((5 * PI) / 180)
+    const draft = (neutral: number, angle = 5): Feature => ({ id: "lean", type: "draft", near: [40, 12.5, 3], normal: [1, 0, 0], angle, neutral })
+    // Hinge on the bottom edge: a wedge 6 high and 6 tan(5) deep leaves the 25 mm wide face.
+    const removed = rebuildExact(plate([draft(0)]))
+    expect(rel(massProperties(removed.bodies[0]!.brep!).volume, 6000 - 25 * (36 * k) / 2)).toBeLessThan(1e-9)
+    expect(rel(massProperties(removed.bodies[0]!.brep!).volume, meshVolume(removed.result.bodies[0]!.mesh))).toBeLessThan(1e-6)
+    // Hinge on the top edge: the face leans out below it, the wedge is added.
+    expect(rel(exactVolume(plate([draft(6)])), 6000 + 25 * (36 * k) / 2)).toBeLessThan(1e-9)
+    // Hinge half way up: both, and they cancel.
+    expect(rel(exactVolume(plate([draft(3)])), 6000)).toBeLessThan(1e-9)
+  })
+
+  test("features without an exact counterpart are never skipped silently", () => {
+    const pushed = rebuildExact(plate([{ id: "pp", type: "pushpull", near: [40, 12.5, 3], distance: 2 }]))
+    expect(pushed.bodies[0]!.reason).toContain("push-pull")
+    // A hole wall is curved: its draft says so instead of leaving the body as it was.
+    const bored = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle: 3 }])
+    expect(rebuildExact(bored).bodies[0]!.reason).toContain("curved face")
+  })
+
   test("a shell hollows the extrusion exactly: closed, open at the top, a tube around a bore, a rounded box", () => {
     const shell = (open: "none" | "top" | "bottom" | "both", base = plate()): History =>
       history([...base.features, { id: "hollow", type: "shell", feature: "plate", thickness: 1, open }], base.parameters)

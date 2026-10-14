@@ -20,6 +20,7 @@ import {
   blendCandidates,
   booleanBrep,
   BooleanError,
+  brepLocator,
   compose,
   edgePointAt,
   extrudeProfile,
@@ -28,8 +29,10 @@ import {
   makeCone,
   makeSphere,
   makeTorus,
+  draftPlanarFace,
   normalizeProfile,
   offsetLoop,
+  pickPlanarFace,
   polyhedron,
   revolveProfile,
   rotation,
@@ -451,11 +454,9 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         case "extrude": {
           const sk = sketchOf(f.sketch)
           if (sk === undefined) break
-          if (f.taper !== undefined && dim(f.taper) !== 0) {
-            unsupported(f, "a drafted extrusion has no exact model yet")
-            break
-          }
           const depth = dim(f.depth)
+          // A draft angle leans the walls: the top profile is inset by depth * tan(angle), as the mesh's tapered prism.
+          const inset = f.taper === undefined ? 0 : depth * Math.tan((dim(f.taper) * Math.PI) / 180)
           const dir = f.direction ?? "up"
           const from = dir === "up" ? 0 : dir === "down" ? -depth : -depth / 2
           let { loops } = exactSketchLoops(sk.solve.sketch)
@@ -472,7 +473,13 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           // The rebuild already resolved the sketch's plane (base or work plane, offset applied).
           const F = sk.frame
           const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
-          const solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id }))
+          let solids: Brep[]
+          try {
+            solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id, ...(inset !== 0 ? { inset } : {}) }))
+          } catch (e) {
+            unsupported(f, e instanceof Error ? e.message : String(e))
+            break
+          }
           if (solids.length === 0) break
           extrusions.set(f.id, { loops, frame: F, from, to: from + depth })
           let united = unionAll(solids)
@@ -742,11 +749,54 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           apply(f.id, ok(cavity), "subtract", f.targets, f.id)
           break
         }
+        case "draft": {
+          // The face nearest `near` among the candidate bodies (the mesh rebuild's choice); a curved one leans by moving its
+          // vertices in the mesh rebuild, which has no exact counterpart yet.
+          const near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
+          const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
+          const raw = f.pull === undefined ? { x: 0, y: 0, z: 1 } : { x: dim(f.pull[0]), y: dim(f.pull[1]), z: dim(f.pull[2]) }
+          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          let chosen: { body: (typeof bodies)[number]; distance: number; planar: boolean } | undefined
+          for (const b of candidates) {
+            if (b.exact.brep === undefined) continue
+            const closest = brepLocator(b.exact.brep).closest(near)
+            const planar = closest.face !== undefined && b.exact.brep.faces[closest.face]!.surface.kind === "plane"
+            const pick = hint === undefined ? undefined : pickPlanarFace(b.exact.brep, near, hint)
+            const distance = pick?.distance ?? closest.distance
+            if (chosen === undefined || distance < chosen.distance) chosen = { body: b, distance, planar: hint !== undefined ? pick !== undefined : planar }
+          }
+          if (chosen === undefined) {
+            for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the drafted face could not be found on the exact model") }
+            break
+          }
+          const target = chosen.body
+          if (!chosen.planar) { bodies[bodies.indexOf(target)] = { ...target, exact: no("a draft of a curved face has no exact model yet") }; break }
+          const len = Math.hypot(raw.x, raw.y, raw.z)
+          const drafted = draftPlanarFace(target.exact.brep!, { near, ...(hint !== undefined ? { normal: hint } : {}), pull: { x: raw.x / len, y: raw.y / len, z: raw.z / len }, neutral: f.neutral === undefined ? 0 : dim(f.neutral), angle: dim(f.angle) })
+          bodies[bodies.indexOf(target)] = { ...target, exact: typeof drafted === "string" ? no(drafted) : ok(drafted) }
+          break
+        }
+        case "plane":
+          // Construction geometry only: no body changes.
+          break
         case "sweep":
         case "loft":
         case "coil":
+        case "rib":
+        case "sheet":
+        case "text":
           unsupported(f, `a ${f.type} has no exact model yet`)
           break
+        case "thread":
+          unsupported({ ...f, operation: f.cut === true ? "subtract" : f.operation ?? "new" }, "a modelled (helical) thread has no exact model yet")
+          break
+        case "pushpull":
+        case "mate": {
+          // These move faces or whole bodies in the mesh rebuild; until they are replayed exactly, the bodies they touch say so.
+          const id = f.body
+          for (const b of bodies.filter((x) => id === undefined || x.id === id)) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`a ${f.type === "mate" ? "joint (mate)" : "push-pull"} has no exact model yet`) }
+          break
+        }
       }
     } catch (e) {
       warnings.push(`${f.id}: ${e instanceof Error ? e.message : String(e)}`)
