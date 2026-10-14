@@ -7,6 +7,8 @@
  *   inverse   the candidate table angles that bring a direction to machine +Z, each with its residual, its branch, its
  *             singularity and C unwrapped to the nearest turn of the previous one (C is never normalised block by block: a
  *             position equal modulo 360 degrees can need a full turn);
+ *   interpolation  the controller's joint interpolation error of a move (how far the tip arc strays from its chords) and
+ *             the block count that keeps it within a tolerance
  *   plan      the path through the candidates of every direction that minimises the rotary travel (A/B and C, in degrees),
  *             subject to the limits: a dynamic programme over the candidate graph, so a branch change that is cheap now but
  *             costly later is not taken greedily.
@@ -174,4 +176,39 @@ export const planTable = (directions: ReadonlyArray<Vec3>, kin: TableKinematic, 
     idx = layer.from[idx]!
   }
   return { positions, travel: total }
+}
+
+/**
+ * Controller interpolation error of a joint move from `from` to `to` for a tool-tip point `point` of the part, when the table
+ * joints are interpolated linearly in `steps` equal blocks (the controller's non-TCP interpolation). With the part point fixed the
+ * tip describes an arc about the pivot; each block is a chord of it, and the error is the largest distance of the arc from its
+ * chord, sampled inside every block. More blocks shorten the chords, so the error falls.
+ */
+export const interpolationDeviation = (point: Vec3, from: RotaryAngles, to: RotaryAngles, kin: TableKinematic, steps: number): number => {
+  const tf = tiltOf(from), tt = tiltOf(to)
+  const poseAt = (t: number): RotaryAngles => kin.layout === "table-AC"
+    ? { a: tf + (tt - tf) * t, c: from.c + (to.c - from.c) * t }
+    : { b: tf + (tt - tf) * t, c: from.c + (to.c - from.c) * t }
+  const SAMPLES = 16
+  let worst = 0
+  for (let k = 0; k < steps; k++) {
+    const a = forward(point, poseAt(k / steps), kin), b = forward(point, poseAt((k + 1) / steps), kin)
+    const ab = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }
+    const len2 = ab.x * ab.x + ab.y * ab.y + ab.z * ab.z
+    for (let j = 1; j < SAMPLES; j++) {
+      const t = (k + j / SAMPLES) / steps
+      const p = forward(point, poseAt(t), kin)
+      const ap = { x: p.x - a.x, y: p.y - a.y, z: p.z - a.z }
+      const u = len2 > 0 ? Math.min(1, Math.max(0, (ap.x * ab.x + ap.y * ab.y + ap.z * ab.z) / len2)) : 0
+      const foot = { x: a.x + ab.x * u, y: a.y + ab.y * u, z: a.z + ab.z * u }
+      worst = Math.max(worst, Math.hypot(p.x - foot.x, p.y - foot.y, p.z - foot.z))
+    }
+  }
+  return worst
+}
+
+/** The fewest equal joint blocks that keep the controller interpolation error within `tolerance` (mm); `undefined` past `maxSteps`. */
+export const stepsForTolerance = (point: Vec3, from: RotaryAngles, to: RotaryAngles, kin: TableKinematic, tolerance: number, maxSteps = 4096): number | undefined => {
+  for (let n = 1; n <= maxSteps; n *= 2) if (interpolationDeviation(point, from, to, kin, n) <= tolerance) return n
+  return undefined
 }

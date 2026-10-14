@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { anglesFor, partToMachine, type RotaryLayout } from "../indexing.ts"
-import { candidatesFor, forward, planTable, toolAxisInMachine, travel, unwrapC, type TableKinematic } from "./kinematics.ts"
+import { candidatesFor, forward, interpolationDeviation, planTable, stepsForTolerance, toolAxisInMachine, travel, unwrapC, type TableKinematic } from "./kinematics.ts"
 
 const kin = (layout: RotaryLayout, limits: TableKinematic["limits"] = { tiltMin: -120, tiltMax: 120 }): TableKinematic => ({ layout, limits, pivot: { x: 0, y: 0, z: 0 } })
 const unit = (x: number, y: number, z: number) => { const l = Math.hypot(x, y, z); return { x: x / l, y: y / l, z: z / l } }
@@ -121,5 +121,31 @@ describe("the table plan", () => {
       prev = { tilt: best.tilt, c: best.c }
     }
     expect(plan.travel).toBeLessThanOrEqual(greedy + 1e-9)
+  })
+})
+
+describe("controller interpolation of a joint move", () => {
+  const far = { x: 60, y: 0, z: 0 }
+  test("one joint block strays from the chord of the arc the tip describes; two blocks stray less", () => {
+    const k = kin("table-AC")
+    const from = { a: 0, c: 0 }, to = { a: 60, c: 90 }
+    const one = interpolationDeviation(far, from, to, k, 1)
+    expect(one).toBeGreaterThan(0.1)
+    expect(interpolationDeviation(far, from, to, k, 2)).toBeLessThan(one)
+  })
+
+  test("the error falls as the joint move is split, and the block count meets the tolerance", () => {
+    const k = kin("table-AC")
+    const from = { a: 0, c: 0 }, to = { a: 60, c: 90 }
+    expect(interpolationDeviation(far, from, to, k, 64)).toBeLessThan(interpolationDeviation(far, from, to, k, 4))
+    const n = stepsForTolerance(far, from, to, k, 0.01)
+    expect(n).toBeDefined()
+    expect(interpolationDeviation(far, from, to, k, n!)).toBeLessThanOrEqual(0.01)
+    if (n! > 1) expect(interpolationDeviation(far, from, to, k, n! / 2)).toBeGreaterThan(0.01)
+  })
+
+  test("a tip on the tilt axis does not stray when only the tilt moves", () => {
+    const k = kin("table-BC")
+    expect(interpolationDeviation({ x: 0, y: 5, z: 0 }, { b: 0, c: 0 }, { b: 40, c: 0 }, k, 1)).toBeLessThan(1e-9)
   })
 })
