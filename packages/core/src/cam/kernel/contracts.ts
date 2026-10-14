@@ -34,6 +34,11 @@ export interface KernelMachine {
   readonly toolChangeSeconds?: number
   /** Axis travel in work coordinates; when present every move is checked against it. */
   readonly travel?: { readonly minX: number; readonly maxX: number; readonly minY: number; readonly maxY: number; readonly minZ: number; readonly maxZ: number }
+  /**
+   * The table the spindle must clear: its footprint (mm) and the gap between the bottom of the stock and the table top, the
+   * parallels' height. When present, every NC move is checked for the holder and shank against the table (`machine-clearance`).
+   */
+  readonly table?: { readonly length: number; readonly width: number; readonly gap: number }
 }
 
 /** Process overrides an operation may carry; anything absent comes from the cutting data. */
@@ -141,7 +146,7 @@ export interface CamIssue {
 export type ClaimStatus = "passed" | "failed" | "unsupported" | "unresolved"
 
 export interface Claim {
-  readonly id: "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel"
+  readonly id: "cutting-data" | "machine-limits" | "operations-complete" | "no-rapid-in-stock" | "holder-clearance" | "no-gouge" | "material-removed" | "nc-replay" | "machine-travel" | "machine-clearance"
   readonly status: ClaimStatus
   readonly detail: string
 }

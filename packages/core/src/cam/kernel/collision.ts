@@ -33,13 +33,16 @@ const SAMPLES = 9
 export interface Capsule { readonly a: Vec3; readonly b: Vec3; readonly radius: number }
 export interface Solid { readonly sdf: (p: Vec3) => number }
 
-/** The moving joint values of a motion: the tilt (A or B) and C, degrees. A head has no C. */
-export interface Pose { readonly tilt: number; readonly c: number }
+/**
+ * The moving joint values of a motion: the tilt (A or B) and C, degrees, and, for a machine whose linear axes move the spindle,
+ * the spindle nose in machine coordinates, mm. A head has no C; a fixed spindle has no nose.
+ */
+export interface Pose { readonly tilt: number; readonly c: number; readonly nose?: Vec3 }
 
 export interface Scene {
   readonly probesAt: (pose: Pose) => ReadonlyArray<Capsule>
   readonly obstaclesAt: (pose: Pose) => ReadonlyArray<Solid>
-  /** Largest distance of a probe sample from its rotation centre, mm. */
+  /** Largest distance of a probe sample from its rotation centre, mm (rotary joints only; the nose is a translation). */
   readonly reachProbes: number
   /** Largest distance of an obstacle point from its rotation centre, mm. */
   readonly reachObstacles: number
@@ -157,6 +160,24 @@ export const trunnionScene = (cutter: Cutter, layout: RotaryLayout, nose: Vec3, 
   }
 }
 
+/**
+ * A fixed tool moved by the linear axes over fixed obstacles (the 3-axis machine): the spindle nose is the pose's `nose`, and the
+ * flutes, shank and holder hang from it along the tool axis (down into the part, so the holder rises above the nose).
+ */
+export const linearScene = (cutter: Cutter, obstacles: ReadonlyArray<Solid>): Scene => ({
+  probesAt: (pose) => {
+    if (pose.nose === undefined) throw new RangeError("A linear scene needs the spindle nose of the pose")
+    return toolCapsules(cutter, pose.nose, { x: 0, y: 0, z: -1 }, cutter.stickout)
+  },
+  obstaclesAt: () => obstacles,
+  reachProbes: 0,
+  reachObstacles: 0
+})
+
+/** The table of a machine as an obstacle: a box of `length` x `width` centred on (`cx`, `cy`), its top at `top`, `depth` mm deep. */
+export const tableBox = (cx: number, cy: number, top: number, length: number, width: number, depth: number): Solid =>
+  boxSolid({ x: cx, y: cy, z: top - depth / 2 }, { x: length / 2, y: width / 2, z: depth / 2 }, (p) => p)
+
 /** Evaluate the clearance of a pose: the least signed distance over probe samples, and the half sample spacing it may hide. */
 export interface Clearance {
   /** Smallest sampled value of (distance - radius), mm; an upper bound on the true clearance. */
@@ -180,8 +201,12 @@ const evaluate = (scene: Scene, pose: Pose): Clearance => {
 }
 
 /** The largest change of clearance over a joint move, mm: Σ reach · |Δθ| in radians, over both moving bodies. */
-const motionBound = (scene: Scene, from: Pose, to: Pose): number =>
-  (scene.reachProbes + scene.reachObstacles) * (Math.abs(to.tilt - from.tilt) + Math.abs(to.c - from.c)) * DEG
+const motionBound = (scene: Scene, from: Pose, to: Pose): number => {
+  const rotary = (scene.reachProbes + scene.reachObstacles) * (Math.abs(to.tilt - from.tilt) + Math.abs(to.c - from.c)) * DEG
+  // A translation of the spindle moves every probe point by the same vector, so the clearance changes by at most its length.
+  const linear = from.nose !== undefined && to.nose !== undefined ? length3(sub(to.nose, from.nose)) : 0
+  return rotary + linear
+}
 
 export interface MotionCheck {
   readonly verdict: "clear" | "collision" | "unresolved"
@@ -200,7 +225,11 @@ export interface MotionCheck {
 export const checkMotion = (scene: Scene, from: Pose, to: Pose, options: { readonly margin?: number; readonly maxDepth?: number } = {}): MotionCheck => {
   const margin = options.margin ?? 0
   const maxDepth = options.maxDepth ?? 12
-  const poseAt = (t: number): Pose => ({ tilt: from.tilt + (to.tilt - from.tilt) * t, c: from.c + (to.c - from.c) * t })
+  const poseAt = (t: number): Pose => ({
+    tilt: from.tilt + (to.tilt - from.tilt) * t,
+    c: from.c + (to.c - from.c) * t,
+    ...(from.nose !== undefined && to.nose !== undefined ? { nose: add(from.nose, scale(sub(to.nose, from.nose), t)) } : {})
+  })
   let evaluations = 0
   const evalAt = (t: number): Clearance => {
     evaluations++

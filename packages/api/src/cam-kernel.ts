@@ -64,7 +64,7 @@ export const CamKernelArtifact: Schema.Codec<cam.kernel.CamArtifact> = Schema.St
   })),
   program: cam.ProgramSchema, tools: Schema.Array(cutter), nc: Schema.String,
   claims: Schema.Array(Schema.Struct({
-    id: Schema.Literals(["cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel"]),
+    id: Schema.Literals(["cutting-data", "machine-limits", "operations-complete", "no-rapid-in-stock", "holder-clearance", "no-gouge", "material-removed", "nc-replay", "machine-travel", "machine-clearance"]),
     status: Schema.Literals(["passed", "failed", "unsupported", "unresolved"]), detail: Schema.String
   })),
   issues: Schema.Array(CamKernelIssue), release: Schema.Literals(["blocked", "preview", "verified-program"]),

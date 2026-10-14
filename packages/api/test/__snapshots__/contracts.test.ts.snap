@@ -45582,6 +45582,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "string",
                       },
+                      "steepAngle": {
+                        "maximum": 85,
+                        "minimum": 5,
+                        "type": "number",
+                      },
                       "stepdown": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -45611,6 +45616,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "roughing",
                           "parallel",
                           "waterline",
+                          "steep-shallow",
                         ],
                         "type": "string",
                       },
@@ -47818,6 +47824,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                 "roughing",
                                 "parallel",
                                 "waterline",
+                                "steep-shallow",
                               ],
                               "type": "string",
                             },
@@ -47844,6 +47851,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                             },
                             "scallop": {
                               "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "slopeAngle": {
+                              "maximum": 85,
+                              "minimum": 5,
                               "type": "number",
                             },
                             "stepdown": {
@@ -48148,6 +48160,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                                       "material-removed",
                                       "nc-replay",
                                       "machine-travel",
+                                      "machine-clearance",
                                     ],
                                     "type": "string",
                                   },
@@ -50384,6 +50397,11 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                         ],
                         "type": "string",
                       },
+                      "steepAngle": {
+                        "maximum": 85,
+                        "minimum": 5,
+                        "type": "number",
+                      },
                       "stepdown": {
                         "exclusiveMinimum": 0,
                         "type": "number",
@@ -50413,6 +50431,7 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           "roughing",
                           "parallel",
                           "waterline",
+                          "steep-shallow",
                         ],
                         "type": "string",
                       },

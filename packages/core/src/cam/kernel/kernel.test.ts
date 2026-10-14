@@ -2,6 +2,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { buildRecipe } from "../../cad/recipes.ts"
 import type { History } from "../../cad/history.ts"
 import { interpretGcode } from "../testing/gcode-interpreter.ts"
+import { DEFAULT_MACHINE } from "./machines.ts"
 import {
   DEFAULT_CUTTERS,
   MATERIALS,
@@ -331,3 +332,21 @@ describe("running a job: NC plus evidence about that NC", () => {
     expect(missingTool.status === "failed" && missingTool.issues[0]!.tag).toBe("UnknownTool")
   })
 })
+
+describe("machine clearance on the release gate", () => {
+  test("the claim is computed on the real program, not skipped: every move checked and clear", () => {
+    const a = ok(runJob(job("6061")))
+    const c = a.claims.find((x) => x.id === "machine-clearance")!
+    expect(c.status).toBe("passed")
+    expect(c.detail).toMatch(/moves checked/)
+  })
+
+  test("a table set higher than the stock's bottom is a holder collision, and the program is not verified", () => {
+    // The table top at 40 mm above the stock bottom: the shank of every cut that goes deep reaches it.
+    const high = ok(runJob(job("6061", { machine: { ...DEFAULT_MACHINE, table: { length: 1000, width: 500, gap: -40 } } })))
+    expect(high.release).not.toBe("verified-program")
+    expect(claim(high, "machine-clearance")).toBe("failed")
+    expect(high.issues.some((i) => i.tag === "HolderCollision" && /table/.test(i.message))).toBe(true)
+  })
+})
+

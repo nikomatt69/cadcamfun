@@ -54,6 +54,7 @@ import { DEFAULT_CUTTERS, cutterIssues, legacyTool, verifyTool, type Cutter } fr
 import { cuttingData, type CutClass, type CuttingData } from "./cutting-data.ts"
 import { digestOf, sha256 } from "./identity.ts"
 import { DEFAULT_MACHINE } from "./machines.ts"
+import { checkNcClearance, type TableGeometry } from "./machine-clearance.ts"
 import { findMaterial, type WorkpieceMaterial } from "./materials.ts"
 import { offsetRing, planJob, type Plan } from "./planner.ts"
 
@@ -664,6 +665,23 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     }
   }
 
+  // Holder and shank against the table over every NC move (linear axes; the table itself does not rotate).
+  const table: TableGeometry | undefined = machine.table === undefined ? undefined : {
+    cx: (stock.min.x + stock.max.x) / 2 - origin.x,
+    cy: (stock.min.y + stock.max.y) / 2 - origin.y,
+    top: stock.min.z - origin.z - machine.table.gap,
+    length: machine.table.length,
+    width: machine.table.width
+  }
+  const clearance = interpreted !== undefined && table !== undefined
+    ? checkNcClearance(interpreted.segments, (line) => { const n = toolAtLine[line]; return n === undefined ? undefined : cutterByNumber.get(n) }, table)
+    : undefined
+  if (clearance?.first !== undefined) {
+    const f = clearance.first
+    const cutter = cutterByNumber.get(toolAtLine[f.line] ?? -1)
+    issues.push(issue("HolderCollision", "replay", `${cutter?.name ?? "The tool"} holder or shank touches the machine table at NC line ${f.line} (clearance ${f.clearance.toFixed(3)} mm)`, { line: f.line, point: f.point }))
+  }
+
   // ------------------------------------------------------------ evidence
   const failedOps = finalOutcomes.filter((x) => x.status === "failed")
   const unmachined = prepared.plan?.unmachined ?? []
@@ -700,7 +718,12 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       id: "nc-replay", status: interpreted === undefined ? "unresolved" : interpreted.errors.length > 0 || noTool > 0 || !extentAgrees ? "failed" : "passed",
       detail: interpreted === undefined ? "No NC was emitted" : `Interpreted ${interpreted.segments.length} NC motions independently of the post; extents agree within ${rounding.toExponential(1)} mm`
     },
-    { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" }
+    { id: "machine-travel", status: machine.travel === undefined ? "unsupported" : travelHits > 0 ? "failed" : "passed", detail: machine.travel === undefined ? "The machine has no travel limits configured" : travelHits > 0 ? `${travelHits} moves outside the travel` : "Every move within the machine travel" },
+    {
+      id: "machine-clearance",
+      status: interpreted === undefined ? "unresolved" : table === undefined ? "unsupported" : clearance === undefined ? "unresolved" : clearance.rotaryMoves > 0 ? "unsupported" : clearance.first !== undefined ? "failed" : clearance.unresolved > 0 ? "unresolved" : "passed",
+      detail: table === undefined ? "The machine has no table geometry configured" : clearance === undefined ? "No NC to check" : clearance.rotaryMoves > 0 ? `${clearance.rotaryMoves} moves with A/B/C words: the rotary table is not modelled here` : clearance.first !== undefined ? `Holder or shank reaches the table at NC line ${clearance.first.line}` : clearance.unresolved > 0 ? `${clearance.unresolved} of ${clearance.checked} moves not proven clear within the subdivision depth` : `${clearance.checked} moves checked; the holder and shank stay ${clearance.minClearance !== undefined ? `at least ${clearance.minClearance.toFixed(3)} mm` : "clear"} from the table`
+    }
   ]
   const hardFailure = issues.some((i) => i.severity === "error")
   const release: ReleaseLevel = hardFailure || nc === "" ? "blocked" : claims.every((c) => c.status === "passed" || (c.status === "unsupported" && c.id === "machine-travel")) ? "verified-program" : "preview"

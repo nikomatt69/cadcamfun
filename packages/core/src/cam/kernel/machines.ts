@@ -9,27 +9,27 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
   {
     id: "vmc-standard", name: "Vertical machining centre (BT40, 12 000 rpm, 11 kW)", post: "fanuc",
     limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
-    rapidFeed: 30000, toolChangeSeconds: 6
+    table: { length: 1000, width: 500, gap: 30 }, rapidFeed: 30000, toolChangeSeconds: 6
   },
   {
     id: "haas-vf2", name: "Haas VF-2 class (8 100 rpm, 22 kW)", post: "haas",
     limits: { maxRpm: 8100, minRpm: 50, maxFeed: 16500, powerKw: 22.4, torqueNm: 122, rigidity: "standard" },
-    rapidFeed: 25400, toolChangeSeconds: 4
+    table: { length: 762, width: 406, gap: 30 }, rapidFeed: 25400, toolChangeSeconds: 4
   },
   {
     id: "hsc-mill", name: "High-speed mill (HSK-E40, 30 000 rpm, 7 kW)", post: "generic",
     limits: { maxRpm: 30000, minRpm: 3000, maxFeed: 20000, powerKw: 7, torqueNm: 8, rigidity: "standard" },
-    rapidFeed: 40000, toolChangeSeconds: 5
+    table: { length: 600, width: 400, gap: 30 }, rapidFeed: 40000, toolChangeSeconds: 5
   },
   {
     id: "desktop-mill", name: "Benchtop mill (10 000 rpm, 0.75 kW)", post: "generic",
     limits: { maxRpm: 10000, minRpm: 300, maxFeed: 3000, powerKw: 0.75, torqueNm: 3, rigidity: "light" },
-    rapidFeed: 3000, toolChangeSeconds: 30
+    table: { length: 300, width: 200, gap: 15 }, rapidFeed: 3000, toolChangeSeconds: 30
   },
   {
     id: "cnc-router", name: "CNC router (24 000 rpm spindle, 2.2 kW)", post: "grbl",
     limits: { maxRpm: 24000, minRpm: 6000, maxFeed: 6000, powerKw: 2.2, torqueNm: 1.2, rigidity: "hobby" },
-    rapidFeed: 8000, toolChangeSeconds: 30
+    table: { length: 1200, width: 900, gap: 20 }, rapidFeed: 8000, toolChangeSeconds: 30
   }
 ]
 
