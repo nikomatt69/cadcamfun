@@ -43,4 +43,11 @@ describe("machine clearance over the NC", () => {
     expect(r.checked).toBe(0)
     expect(r.first).toBeUndefined()
   })
+
+  test("a move that turns the table is counted and not checked, so the claim cannot read clear", () => {
+    const turn = (line: number, a: number): GSegment => ({ kind: "linear", from: { x: 0, y: 0, z: 0 }, to: { x: 0, y: 0, z: 0 }, feed: 100, line, rotary: { a, c: 0 } })
+    const r = checkNcClearance([turn(1, 0), turn(2, 135)], cutterOf, table)
+    expect(r.rotaryMoves).toBe(1)
+    expect(r.first).toBeUndefined()
+  })
 })

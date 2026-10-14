@@ -1,18 +1,20 @@
 /**
  * Continuous clearance of the tool assembly from the machine table over the NC (spec 29 §12 "check swept machine motion"). Each
- * linear or arc move of the replayed NC moves the spindle nose; the flutes, shank and holder hang from it and are checked against
- * the table by `checkMotion`, between the start and the end of the move, not only at its end points.
+ * linear or arc move of the replayed NC is checked between its start and its end, not only at the end points: the spindle nose
+ * moves on the linear axes and the flutes, shank and holder hang from it (`linearScene`).
  *
  *   linear / rapid  one move from the previous point to this one
  *   arc             chords whose sagitta is at most `ARC_SAGITTA` mm; the clearance is then required to exceed that sagitta
- *   rotary          moves with A/B/C words are not modelled (the table is fixed here): reported, never passed as clear
+ *   rotary          moves that change the A/B/C words are counted and not checked: the rotating part body is not modelled here
+ *                   (a turning box needs an exact cylinder-to-box distance; the capsules of the probes over-approximate a flat
+ *                   end too much to decide it), so the claim stays unsupported rather than passed
  *
- * The stock is not an obstacle here: the height-field replay already checks the cutter against the material, and the stock box
- * would flag every normal cut of a flute. The table is the fixture the tool can reach past the stock's bottom.
+ * The stock is not an obstacle: the height-field replay already checks the cutter against the material with the exact tool
+ * profile, and a stock box would flag every normal cut of a flute. The table is the fixture the tool can reach past the stock's bottom.
  */
 import type { Vec3 } from "../../cad/vec.ts"
 import type { GSegment } from "../testing/gcode-interpreter.ts"
-import { checkMotion, linearScene, tableBox } from "./collision.ts"
+import { checkMotion, linearScene, tableBox, type Pose } from "./collision.ts"
 import type { Cutter } from "./cutters.ts"
 
 /** The table as the machine has it: its footprint centred on (`cx`, `cy`) in work coordinates, its top at `top`. */
@@ -35,9 +37,9 @@ export interface ClearanceFinding {
 }
 
 export interface ClearanceResult {
-  /** Moves checked (chords for arcs). */
+  /** Linear and arc moves checked (chords for arcs). */
   readonly checked: number
-  /** Moves with A/B/C words, which the fixed table does not model. */
+  /** Moves that change the A/B/C words. They are not checked (see the module note). */
   readonly rotaryMoves: number
   /** Moves that could not be proven clear within the subdivision depth. */
   readonly unresolved: number
@@ -67,7 +69,18 @@ const arcChords = (s: Extract<GSegment, { kind: "arc" }>): Vec3[] => {
   return out
 }
 
-/** Check every motion of the replayed NC against the table. `cutterOf` gives the cutter active at an NC line (undefined: skipped). */
+/** The table angles a segment carries: linear and rapid moves only (an arc and a dwell carry none). */
+const rotaryOf = (s: GSegment): { readonly a?: number; readonly b?: number; readonly c?: number } | undefined =>
+  s.kind === "linear" || s.kind === "rapid" ? s.rotary : undefined
+
+/** Whether a segment changes the table angles it carries (a segment without rotary words keeps the angles in force). */
+const turnsTable = (s: GSegment, angles: { readonly a?: number; readonly b?: number; readonly c?: number }): boolean => {
+  const r = rotaryOf(s)
+  if (r === undefined) return false
+  return (r.a ?? 0) !== (angles.a ?? 0) || (r.b ?? 0) !== (angles.b ?? 0) || (r.c ?? 0) !== (angles.c ?? 0)
+}
+
+/** Check every linear and arc move of the replayed NC against the table. `cutterOf` gives the cutter active at an NC line. */
 export const checkNcClearance = (
   segments: ReadonlyArray<GSegment>,
   cutterOf: (line: number) => Cutter | undefined,
@@ -75,22 +88,27 @@ export const checkNcClearance = (
   options: { readonly maxDepth?: number } = {}
 ): ClearanceResult => {
   const obstacles = [tableBox(table.cx, table.cy, table.top, table.length, table.width, 200)]
+  const depth = options.maxDepth !== undefined ? { maxDepth: options.maxDepth } : {}
   let checked = 0, rotaryMoves = 0, unresolved = 0
   let minClearance: number | undefined
   let first: ClearanceFinding | undefined
+  let angles: { a?: number; b?: number; c?: number } = {}
   for (const s of segments) {
     if (s.kind === "dwell") continue
-    if (s.kind !== "arc" && s.rotary !== undefined && Object.keys(s.rotary).length > 0) rotaryMoves++
+    const turns = turnsTable(s, angles)
+    const r = rotaryOf(s)
+    if (r !== undefined) angles = { ...(r.a !== undefined ? { a: r.a } : {}), ...(r.b !== undefined ? { b: r.b } : {}), ...(r.c !== undefined ? { c: r.c } : {}) }
+    if (turns) { rotaryMoves++; continue }
     const cutter = cutterOf(s.line)
     if (cutter === undefined) continue
     const scene = linearScene(cutter, obstacles)
+    const nose = (p: Vec3): Pose => ({ tilt: 0, c: 0, nose: { x: p.x, y: p.y, z: p.z + cutter.stickout } })
     // A chord is checked with the spindle nose at the stick-out above its tip; the arc's sagitta is the margin it must keep.
     const margin = s.kind === "arc" ? ARC_SAGITTA : 0
     const points: Vec3[] = s.kind === "arc" ? arcChords(s) : [s.from, s.to]
-    const nose = (p: Vec3): Vec3 => ({ x: p.x, y: p.y, z: p.z + cutter.stickout })
     for (let k = 1; k < points.length; k++) {
       const from = points[k - 1]!, to = points[k]!
-      const r = checkMotion(scene, { tilt: 0, c: 0, nose: nose(from) }, { tilt: 0, c: 0, nose: nose(to) }, { margin, ...(options.maxDepth !== undefined ? { maxDepth: options.maxDepth } : {}) })
+      const r = checkMotion(scene, nose(from), nose(to), { margin, ...depth })
       checked++
       if (r.verdict === "collision") {
         const at = r.at ?? 0

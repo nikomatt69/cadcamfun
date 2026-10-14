@@ -349,4 +349,3 @@ describe("machine clearance on the release gate", () => {
     expect(high.issues.some((i) => i.tag === "HolderCollision" && /table/.test(i.message))).toBe(true)
   })
 })
-
