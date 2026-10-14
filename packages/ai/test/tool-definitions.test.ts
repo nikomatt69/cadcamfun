@@ -17,7 +17,7 @@ describe("one action tool per capability boundary (nikcli style)", () => {
       expect(existsSync(`${dir}prompts/${id}.txt`), `${id}.txt`).toBe(true)
     }
     const files = readdirSync(dir)
-      .filter((f) => /^(cad|cam|lib|memory|vcs|research|agent|parts)_?[a-z_]*\.ts$/.test(f) && f !== "catalogue.ts" && f !== "action.ts" && f !== "define.ts" && f !== "handlers.ts" && f !== "lenient-arguments.ts" && f !== "project-tools.ts" && f !== "registry.ts" && f !== "wire-schema.ts" && f !== "web_search.ts")
+      .filter((f) => /^(cad|cam|lib|memory|vcs|research|agent|parts)_?[a-z_]*\.ts$/.test(f) && f !== "catalogue.ts" && f !== "action.ts" && f !== "define.ts" && f !== "handlers.ts" && f !== "lenient-arguments.ts" && f !== "project-tools.ts" && f !== "registry.ts" && f !== "wire-schema.ts")
       .map((f) => f.slice(0, -3)).sort()
     expect(files).toEqual([...TOOL_IDS].sort())
   })

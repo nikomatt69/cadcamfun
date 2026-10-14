@@ -5,7 +5,8 @@
 import { describe, expect, test } from "bun:test"
 import { ACTION_CONTRACTS } from "@cadcamfun/api"
 import { ACTION_CATALOGUE, actionById, runAction } from "../src/actions/catalogue.ts"
-import { executeActionOutcome } from "../src/actions/action.ts"
+import { z } from "zod"
+import { defineAction, executeActionOutcome } from "../src/actions/action.ts"
 import type { ToolHandlersShape } from "../src/tools/handlers.ts"
 
 const drawing = { drawingId: "d", projectId: "p" }
@@ -26,10 +27,8 @@ describe("action contracts", () => {
     expect(ACTION_CATALOGUE.filter((spec) => spec.kind !== "read" && spec.contract.effects.length === 0).map((spec) => spec.id)).toEqual(["agent.list", "agent.read"])
   })
 
-  test("the CAD and CAM families are migrated: every cad, cad_edit, cam and cam_edit action declares its result", () => {
-    const families = ["cad.", "cad_edit.", "cam.", "cam_edit."]
-    const migrated = ACTION_CATALOGUE.filter((spec) => families.some((family) => spec.id.startsWith(family)))
-    expect(migrated.filter((spec) => spec.contract.result === undefined).map((spec) => spec.id)).toEqual([])
+  test("every catalogue action declares its result", () => {
+    expect(ACTION_CATALOGUE.filter((spec) => spec.contract.result === undefined).map((spec) => spec.id)).toEqual([])
   })
 })
 
@@ -115,8 +114,21 @@ describe("outcome classification", () => {
     expect(made).toMatchObject({ kind: "succeeded", validated: true, value: { ok: true, preview: "G0 Z5" } })
   })
 
-  test("an action whose family is not migrated passes unvalidated, and says so", async () => {
-    const result = await outcome("library.lookup_material", { query: "steel" }, { lookupMaterial: async () => ({ anything: true }) })
+  test("a delegated task that stopped in error is an answer about the task; an unknown agent is a refusal", async () => {
+    const failedTask = { id: "6f1c2b9e-3d4a-4c5b-8e7f-0a1b2c3d4e5f", description: "Check", prompt: "p", status: "error", error: "Model unavailable", projectId: "p", parentSessionId: "s" }
+    const read = await executeActionOutcome(actionById("agent.read")!, { taskId: "6f1c2b9e-3d4a-4c5b-8e7f-0a1b2c3d4e5f" }, {
+      handlers: handlers({}), projectId: "p", contributions: { "agent.read": async () => failedTask }
+    })
+    expect(read).toMatchObject({ kind: "succeeded", validated: true, value: { status: "error" } })
+    const unknown = await executeActionOutcome(actionById("agent.start")!, { agent: "nobody", description: "d", prompt: "p" }, {
+      handlers: handlers({}), projectId: "p", contributions: { "agent.start": async () => ({ ok: false, error: "Unknown agent \"nobody\"." }) }
+    })
+    expect(unknown).toMatchObject({ kind: "refused", value: { _tag: "ActionRefused", actionId: "agent.start" } })
+  })
+
+  test("an action with no declared result (a test probe outside the catalogue) passes unvalidated, and says so", async () => {
+    const probe = defineAction({ id: "probe.read", kind: "read", parameters: z.object({}), run: async () => ({ anything: true }) })
+    const result = await executeActionOutcome(probe, {}, { handlers: handlers({}), projectId: "p" })
     expect(result).toMatchObject({ kind: "succeeded", validated: false })
   })
 })

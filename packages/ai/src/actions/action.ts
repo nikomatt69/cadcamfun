@@ -94,6 +94,21 @@ export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>
   })
 })
 
+/**
+ * The seam's decoder for an Effect-owned input. The host validates the derived schema first; this decode applies what the
+ * JSON schema cannot say (trimming, defaults, a flag sent as text) and names each field it refuses, so the model can fix
+ * the call instead of guessing.
+ */
+const wireDecoder = <A>(actionId: string, schema: Schema.Codec<A, unknown>) => {
+  const decode = Schema.decodeUnknownEffect(schema)
+  return (input: unknown): Effect.Effect<A, ActionInvalidInput> => decode(input, { errors: "all" }).pipe(
+    Effect.mapError((error) => new ActionInvalidInput({
+      actionId,
+      message: `The arguments do not match the action's schema. ${error.message.replace(/\s*\n\s*/g, " ").slice(0, 600)}`
+    }))
+  )
+}
+
 /** Effect owns a wire action's input; nikcli only gets its derived, model-visible representation. */
 export const defineWireAction = <A>(config: {
   readonly id: string
@@ -102,12 +117,11 @@ export const defineWireAction = <A>(config: {
   readonly replaces?: string
   readonly run: (input: A, context: ActionContext) => Promise<unknown> | unknown
 }): ActionSpec => {
-  const decode = Schema.decodeUnknownEffect(config.parameters)
+  const decode = wireDecoder(config.id, config.parameters)
   return defineAction({
     ...config,
     parameters: nikcliWireSchema(config.parameters),
     run: (input, context) => decode(input).pipe(
-      Effect.mapError(() => new ActionInvalidInput({ actionId: config.id, message: "The arguments do not match the action's schema." })),
       Effect.flatMap((decoded) => Effect.try({
         try: () => config.run(decoded, context),
         catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) })
@@ -165,23 +179,26 @@ export const executeAction = async (action: ActionSpec, input: unknown, context:
  * catalogue still owns the identity, the effect and the validation; a host that has not contributed one refuses
  * the call instead of guessing.
  */
-export const contributedAction = <S extends ActionParameters>(config: Omit<ActionConfig<S>, "run"> & { readonly contribution: string }): ActionSpec<S> => ({
-  ...defineAction({
+export const contributedAction = <A>(config: {
+  readonly id: string
+  readonly kind: ActionKind
+  readonly parameters: Schema.Codec<A, unknown>
+  readonly replaces?: string
+  readonly contribution: string
+}): ActionSpec => ({
+  ...defineWireAction({
     id: config.id,
     kind: config.kind,
     parameters: config.parameters,
     ...(config.replaces !== undefined ? { replaces: config.replaces } : {}),
+    // The action's schema is the seam's decoder: a contribution reached directly (a test, or the next adapter) gets the
+    // decoded value too, so a flag sent as `"true"` never reads as false and quietly changes what the action does.
     run: (input, context) => {
       const contribution = context.contributions?.[config.contribution]
       if (contribution === undefined) {
         return { ok: false, _tag: "ActionUnavailable", actionId: config.id, error: `${config.id} is not available in this host.` }
       }
-      // The action's schema is the seam's decoder. The host already validates before it calls, but a contribution
-      // reached directly (a test, or the next adapter) must not get raw arguments: a flag sent as `"true"` would
-      // otherwise read as false and quietly change what the action does.
-      const parsed = (config.parameters as z.ZodType).safeParse(input)
-      if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: config.id, error: "The arguments do not match the action's schema." }
-      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(parsed.data, context)
+      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(input, context)
     }
   }),
   contributed: config.contribution

@@ -174,12 +174,51 @@ const generated = Schema.Struct({ ok: Schema.Literal(true), stats: record, previ
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
 const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
 
+// ---------------------------------------------------------------- `library`, `parts`, `library_edit`
+
+/** A library listing: rows with an id and a name; the rest is the row as the repository stores it. */
+const rows = (fields: Schema.Struct.Fields = {}) => Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, name: str, ...fields }), [record]))
+const componentList = Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, name: nullable(str), children: int }), [record]))
+const partSaved = Schema.Struct({ ok: Schema.Literal(true), componentId: str, name: str, children: int, ...drawingRef })
+const partInserted = Schema.Struct({ ok: Schema.Literal(true), ids: strings, component: Schema.Struct({ id: str, name: str }), elements, ...drawingRef })
+const partDeleted = Schema.Struct({ ok: Schema.Literal(true), deleted: str })
+const upserted = Schema.Struct({ ok: Schema.Literal(true), id: str, created: Schema.Boolean })
+const defaultsSet = Schema.Struct({ ok: Schema.Literal(true), projectId: str, defaults: record })
+const libraryDeleted = Schema.Struct({ ok: Schema.Literal(true), kind: Schema.Literals(["material", "tool", "machine_config"]), id: str })
+
+// ---------------------------------------------------------------- `memory`, `memory_edit`, `research`
+
+const recalled = Schema.Array(Schema.StructWithRest(Schema.Struct({ key: str }), [record]))
+const contextDocument = Schema.Struct({ text: str, updatedAt: Schema.optionalKey(str) })
+const remembered = Schema.Struct({ ok: Schema.Literal(true), key: str })
+const contextUpdated = Schema.Struct({ ok: Schema.Literal(true), text: str, updatedAt: Schema.optionalKey(str), changed: Schema.Boolean })
+/** Excerpts are untrusted text: the result says where they came from, never what to do with them. */
+const searched = Schema.Struct({ ok: Schema.Literal(true), query: str, source: str, results: Schema.Array(record) })
+const attachmentRead = Schema.Struct({ ok: Schema.Literal(true), attachment: str, offset: int, content: str, totalChars: int, nextOffset: nullable(int) })
+
+// ---------------------------------------------------------------- `vcs`, `vcs_edit`, `agent`
+
+const pullRequestRef = { number: int, title: str, head: str } as const
+const vcsStatus = Schema.Struct({ branch: str, branches: strings, openPullRequests: Schema.Array(Schema.Struct(pullRequestRef)) })
+const vcsDiff = Schema.Array(Schema.StructWithRest(Schema.Struct({ path: str, status: str }), [record]))
+const pullRequests = Schema.Array(Schema.StructWithRest(Schema.Struct(pullRequestRef), [record]))
+const changeStarted = Schema.Struct({ branch: str })
+const committed = Schema.Struct({ commit: str })
+const restored = Schema.Struct({ commit: str, branch: str, paths: strings })
+const pullRequestOpened = Schema.Struct({ number: int, head: str, base: str })
+const workflowsRun = Schema.Array(Schema.Struct({ workflow: str, status: str }))
+/** A delegated task as the scheduler holds it. A task that stopped in `error` is an answer about the task, not a refusal. */
+const task = Schema.StructWithRest(Schema.Struct({
+  id: str, description: str, status: Schema.Literals(["queued", "running", "completed", "error", "cancelled"])
+}), [record])
+const tasks = Schema.Array(task)
+
 // ---------------------------------------------------------------- the table
 
 export interface ActionContract {
   /** What the action changes or reaches; empty for a read of the open document. */
   readonly effects: ReadonlyArray<ActionEffect>
-  /** The success value; absent while the action's family has not been migrated (AI-11 Step 1). */
+  /** The success value. Every catalogue action declares one (AI-11 Step 1); a test-only probe may not. */
   readonly result?: Schema.Top
   /** A success that left something out; the field that names what (`skipped`). */
   readonly partialWhen?: string
@@ -250,42 +289,42 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.verify": write(["program", "report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
 
-  "library.component_list": read(),
-  "library.lookup_component": read(),
-  "library.lookup_material": read(),
-  "library.lookup_tool": read(),
-  "library.lookup_machine_config": read(),
+  "library.component_list": read(componentList),
+  "library.lookup_component": read(rows()),
+  "library.lookup_material": read(rows()),
+  "library.lookup_tool": read(rows({ diameter: num, type: str })),
+  "library.lookup_machine_config": read(rows({ type: str })),
 
-  "parts.save": write(["component"]),
-  "parts.insert": write(["drawing"]),
-  "parts.delete": write(["component"]),
+  "parts.save": write(["component"], partSaved),
+  "parts.insert": write(["drawing"], partInserted),
+  "parts.delete": write(["component"], partDeleted),
 
-  "library_edit.upsert_material": write(["library"]),
-  "library_edit.upsert_tool": write(["library"]),
-  "library_edit.upsert_machine_config": write(["library"]),
-  "library_edit.set_default": write(["library"]),
-  "library_edit.delete": write(["library"]),
+  "library_edit.upsert_material": write(["library"], upserted),
+  "library_edit.upsert_tool": write(["library"], upserted),
+  "library_edit.upsert_machine_config": write(["library"], upserted),
+  "library_edit.set_default": write(["library"], defaultsSet),
+  "library_edit.delete": write(["library"], libraryDeleted),
 
-  "memory.recall": read(),
-  "memory.context_read": read(),
-  "memory_edit.remember": write(["memory"]),
-  "memory_edit.context_update": write(["context"]),
+  "memory.recall": read(recalled),
+  "memory.context_read": read(contextDocument),
+  "memory_edit.remember": write(["memory"], remembered),
+  "memory_edit.context_update": write(["context"], contextUpdated),
 
-  "research.search": read(undefined, ["external"]),
-  "research.read_attachment": read(),
+  "research.search": read(searched, ["external"]),
+  "research.read_attachment": read(attachmentRead),
 
-  "vcs.status": read(),
-  "vcs.diff": read(),
-  "vcs.list_pull_requests": read(),
-  "vcs_edit.start_change": write(["history"]),
-  "vcs_edit.commit": write(["history"]),
-  "vcs_edit.restore": write(["history", "drawing"]),
-  "vcs_edit.open_pull_request": write(["history"]),
-  "vcs_edit.run_workflows": write(["workflow"]),
+  "vcs.status": read(vcsStatus),
+  "vcs.diff": read(vcsDiff),
+  "vcs.list_pull_requests": read(pullRequests),
+  "vcs_edit.start_change": write(["history"], changeStarted),
+  "vcs_edit.commit": write(["history"], committed),
+  "vcs_edit.restore": write(["history", "drawing"], restored),
+  "vcs_edit.open_pull_request": write(["history"], pullRequestOpened),
+  "vcs_edit.run_workflows": write(["workflow"], workflowsRun),
 
-  "agent.start": write(["task"]),
+  "agent.start": write(["task"], task),
   // Kind `write` in the catalogue so no read-only role holds the tool, but listing and reading change nothing.
-  "agent.list": write([]),
-  "agent.read": write([]),
-  "agent.cancel": write(["task"])
+  "agent.list": write([], tasks),
+  "agent.read": write([], task),
+  "agent.cancel": write(["task"], task)
 }

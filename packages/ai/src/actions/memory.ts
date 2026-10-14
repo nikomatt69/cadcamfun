@@ -6,14 +6,14 @@
 import { z } from "zod"
 import { projectMemoryPrefix } from "../project-memory.ts"
 import { applyProjectContextSection, MAX_PROJECT_CONTEXT_CHARS, projectContextKey } from "../project-context.ts"
-import { defineAction, type ActionSpec } from "./action.ts"
+import { MEMORY_ACTION_INPUTS as INPUTS } from "@cadcamfun/api"
+import { defineWireAction, type ActionSpec } from "./action.ts"
 
 const document = z.object({ text: z.string(), updatedAt: z.string().optional() })
 
 export const MEMORY_ACTIONS: ReadonlyArray<ActionSpec> = [
-  defineAction({
-    id: "memory.recall", kind: "read", replaces: "memory_recall",
-    parameters: z.object({ prefix: z.string().optional() }),
+  defineWireAction({
+    id: "memory.recall", kind: "read", replaces: "memory_recall", parameters: INPUTS["memory.recall"],
     run: async ({ prefix }, { handlers, projectId }) => {
       const namespace = projectMemoryPrefix(projectId)
       const result = z.array(z.object({ key: z.string(), value: z.unknown() })).safeParse(await handlers.recall(`${namespace}${prefix ?? ""}`))
@@ -21,9 +21,8 @@ export const MEMORY_ACTIONS: ReadonlyArray<ActionSpec> = [
       return result.data.filter((note) => note.key.startsWith(namespace)).map((note) => ({ ...note, key: note.key.slice(namespace.length) }))
     }
   }),
-  defineAction({
-    id: "memory.context_read", kind: "read", replaces: "project_context",
-    parameters: z.object({}),
+  defineWireAction({
+    id: "memory.context_read", kind: "read", replaces: "project_context", parameters: INPUTS["memory.context_read"],
     run: async (_input, { handlers, projectId }) => {
       const entry = await handlers.projectContext(projectId)
       // An absent row is an empty document, not a failure: a project that never had rules reads as blank.
@@ -33,14 +32,12 @@ export const MEMORY_ACTIONS: ReadonlyArray<ActionSpec> = [
 ]
 
 export const MEMORY_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
-  defineAction({
-    id: "memory_edit.remember", kind: "write", replaces: "memory_remember",
-    parameters: z.object({ key: z.string().regex(/^[A-Za-z0-9_.-]{1,80}$/), value: z.string().min(1).max(2000) }),
+  defineWireAction({
+    id: "memory_edit.remember", kind: "write", replaces: "memory_remember", parameters: INPUTS["memory_edit.remember"],
     run: ({ key, value }, { handlers, projectId }) => handlers.remember(`${projectMemoryPrefix(projectId)}${key}`, value)
   }),
-  defineAction({
-    id: "memory_edit.context_update", kind: "write", replaces: "project_context",
-    parameters: z.object({ heading: z.string().trim().min(1).max(80), content: z.string().min(1).max(2_000) }),
+  defineWireAction({
+    id: "memory_edit.context_update", kind: "write", replaces: "project_context", parameters: INPUTS["memory_edit.context_update"],
     run: async ({ heading, content }, { handlers, projectId }) => {
       const current = document.safeParse(await handlers.projectContext(projectId))
       const next = applyProjectContextSection(current.success ? current.data.text : "", heading, content)

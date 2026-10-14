@@ -15,8 +15,8 @@ action a result schema its answers are validated against, `unknown (N)` while it
 - Actions: **83** in **13** tools (read 46, write 33, destructive 4).
 - Actions with an identified execution path: **81/83**.
 - Actions named in their tool prompt: **83/83**.
-- Actions mentioned by at least one test file: **63/83**.
-- Actions with a declared result schema: **52/83**.
+- Actions mentioned by at least one test file: **78/83**.
+- Actions with a declared result schema: **83/83**.
 - Prompt files: **39** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **18** (plus user skills from the store); composer commands: **32**.
 
@@ -116,77 +116,77 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:985` | yes | unknown (N) | **none** |
-| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:986` | yes | unknown (N) | **none** |
-| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:794` | yes | unknown (N) | action-outcome.test.ts |
-| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:795` | yes | unknown (N) | action-tool.test.ts |
-| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:987` | yes | unknown (N) | **none** |
+| `library.component_list` (was `cad_component_list`) | read | — | — | contribution `library.component_list` → `apps/sidecar/src/services/ai.ts:985` | yes | declared | action-inputs.test.ts |
+| `library.lookup_component` (was `lib_lookup_component`) | read | — | query | contribution `library.lookup_component` → `apps/sidecar/src/services/ai.ts:986` | yes | declared | action-inputs.test.ts |
+| `library.lookup_material` (was `lib_lookup_material`) | read | — | query* | handler `lookupMaterial` → `apps/sidecar/src/services/ai.ts:794` | yes | declared | action-inputs.test.ts |
+| `library.lookup_tool` (was `lib_lookup_tool`) | read | — | query* | handler `lookupTool` → `apps/sidecar/src/services/ai.ts:795` | yes | declared | action-inputs.test.ts, action-tool.test.ts |
+| `library.lookup_machine_config` (was `lib_lookup_machine_config`) | read | — | query | contribution `library.lookup_machine_config` → `apps/sidecar/src/services/ai.ts:987` | yes | declared | action-inputs.test.ts |
 
 ### `parts`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `parts.save` (was `cad_component_save`) | write | component | ids*, name* | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:988` | yes | unknown (N) | **none** |
-| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:992` | yes | unknown (N) | **none** |
-| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:997` | yes | unknown (N) | **none** |
+| `parts.save` (was `cad_component_save`) | write | component | ids*, name* | contribution `parts.save` → `apps/sidecar/src/services/ai.ts:988` | yes | declared | action-inputs.test.ts |
+| `parts.insert` (was `cad_component_insert`) | write | drawing | componentId*, transform | contribution `parts.insert` → `apps/sidecar/src/services/ai.ts:992` | yes | declared | action-inputs.test.ts |
+| `parts.delete` (was `cad_component_delete`) | destructive | component | componentId*, confirm* | contribution `parts.delete` → `apps/sidecar/src/services/ai.ts:997` | yes | declared | action-inputs.test.ts |
 
 ### `library_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:998` | yes | unknown (N) | **none** |
-| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:999` | yes | unknown (N) | **none** |
-| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1000` | yes | unknown (N) | **none** |
-| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1001` | yes | unknown (N) | **none** |
-| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1002` | yes | unknown (N) | **none** |
+| `library_edit.upsert_material` (was `lib_upsert_material`) | write | library | id, name*, description, properties, isPublic | contribution `library_edit.upsert_material` → `apps/sidecar/src/services/ai.ts:998` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_tool` (was `lib_upsert_tool`) | write | library | id, name*, type*, diameter*, material*, numberOfFlutes, maxRPM, coolantType, cuttingLength, totalLength, shankDiameter, notes, isPublic | contribution `library_edit.upsert_tool` → `apps/sidecar/src/services/ai.ts:999` | yes | declared | action-inputs.test.ts |
+| `library_edit.upsert_machine_config` (was `lib_upsert_machine_config`) | write | library | id, name*, kind*, kinematics, postProcessor*, workOffsets, probing, maxRPM, maxFeed, isPublic | contribution `library_edit.upsert_machine_config` → `apps/sidecar/src/services/ai.ts:1000` | yes | declared | action-inputs.test.ts |
+| `library_edit.set_default` (was `lib_set_default`) | write | library | materialId, toolId, machineConfigId | contribution `library_edit.set_default` → `apps/sidecar/src/services/ai.ts:1001` | yes | declared | action-inputs.test.ts |
+| `library_edit.delete` (was `lib_delete`) | destructive | library | kind*, id*, confirm* | contribution `library_edit.delete` → `apps/sidecar/src/services/ai.ts:1002` | yes | declared | action-inputs.test.ts |
 
 ### `memory`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `memory.recall` (was `memory_recall`) | read | — | prefix | handler `recall` → `apps/sidecar/src/services/ai.ts:783` | yes | unknown (N) | assistant-controls.test.ts |
-| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784` | yes | unknown (N) | **none** |
+| `memory.recall` (was `memory_recall`) | read | — | prefix | handler `recall` → `apps/sidecar/src/services/ai.ts:783` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts |
+| `memory.context_read` (was `project_context`) | read | — | — | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784` | yes | declared | action-inputs.test.ts |
 
 ### `memory_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `memory_edit.remember` (was `memory_remember`) | write | memory | key*, value* | handler `remember` → `apps/sidecar/src/services/ai.ts:782` | yes | unknown (N) | assistant-controls.test.ts, ai.test.ts |
-| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:789` | yes | unknown (N) | **none** |
+| `memory_edit.remember` (was `memory_remember`) | write | memory | key*, value* | handler `remember` → `apps/sidecar/src/services/ai.ts:782` | yes | declared | action-inputs.test.ts, assistant-controls.test.ts, ai.test.ts |
+| `memory_edit.context_update` (was `project_context`) | write | context | heading*, content* | handler `projectContext` → `apps/sidecar/src/services/ai.ts:784`<br>handler `saveProjectContext` → `apps/sidecar/src/services/ai.ts:789` | yes | declared | action-inputs.test.ts |
 
 ### `research`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `research.search` (was `web_search`) | read | external | query*, numResults | handler `webSearch` → `apps/sidecar/src/services/ai.ts:431` | yes | unknown (N) | **none** |
-| `research.read_attachment` (was `attachment_read`) | read | — | attachment*, offset, maxChars | local (in-package implementation) — `packages/ai/src/actions/research.ts` | yes | unknown (N) | **none** |
+| `research.search` (was `web_search`) | read | external | query*, numResults | handler `webSearch` → `apps/sidecar/src/services/ai.ts:431` | yes | declared | action-inputs.test.ts |
+| `research.read_attachment` (was `attachment_read`) | read | — | attachment*, offset, maxChars | local (in-package implementation) — `packages/ai/src/actions/research.ts` | yes | declared | action-inputs.test.ts |
 
 ### `vcs`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `vcs.status` (was `vcs_status`) | read | — | — | contribution `vcs.status` → `apps/sidecar/src/services/ai-vcs-tools.ts:51` | yes | unknown (N) | ai-vcs-tools.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
-| `vcs.diff` (was `vcs_diff`) | read | — | from, to | contribution `vcs.diff` → `apps/sidecar/src/services/ai-vcs-tools.ts:56` | yes | unknown (N) | project-vcs.test.ts |
-| `vcs.list_pull_requests` (was `vcs_list_pull_requests`) | read | — | state | contribution `vcs.list_pull_requests` → `apps/sidecar/src/services/ai-vcs-tools.ts:58` | yes | unknown (N) | project-vcs.test.ts |
+| `vcs.status` (was `vcs_status`) | read | — | — | contribution `vcs.status` → `apps/sidecar/src/services/ai-vcs-tools.ts:51` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
+| `vcs.diff` (was `vcs_diff`) | read | — | from, to | contribution `vcs.diff` → `apps/sidecar/src/services/ai-vcs-tools.ts:56` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
+| `vcs.list_pull_requests` (was `vcs_list_pull_requests`) | read | — | state | contribution `vcs.list_pull_requests` → `apps/sidecar/src/services/ai-vcs-tools.ts:58` | yes | declared | action-inputs.test.ts, project-vcs.test.ts |
 
 ### `vcs_edit`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `vcs_edit.start_change` (was `vcs_start_change`) | write | history | topic* | contribution `vcs_edit.start_change` → `apps/sidecar/src/services/ai-vcs-tools.ts:63` | yes | unknown (N) | ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:70` | yes | unknown (N) | bridge.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.restore` (was `vcs_restore_paths`) | destructive | history, drawing | paths*, from*, confirm* | contribution `vcs_edit.restore` → `apps/sidecar/src/services/ai-vcs-tools.ts:72` | yes | unknown (N) | ai-vcs-tools.test.ts |
-| `vcs_edit.open_pull_request` (was `vcs_open_pull_request`) | write | history | title*, body | contribution `vcs_edit.open_pull_request` → `apps/sidecar/src/services/ai-vcs-tools.ts:78` | yes | unknown (N) | ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
-| `vcs_edit.run_workflows` (was `actions_run`) | write | workflow | trigger | contribution `vcs_edit.run_workflows` → `apps/sidecar/src/services/ai-vcs-tools.ts:85` | yes | unknown (N) | ai-vcs-tools.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.start_change` (was `vcs_start_change`) | write | history | topic* | contribution `vcs_edit.start_change` → `apps/sidecar/src/services/ai-vcs-tools.ts:63` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.commit` (was `vcs_commit`) | write | history | message* | contribution `vcs_edit.commit` → `apps/sidecar/src/services/ai-vcs-tools.ts:70` | yes | declared | action-inputs.test.ts, bridge.test.ts, ai-bridge-policy.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.restore` (was `vcs_restore_paths`) | destructive | history, drawing | paths*, from*, confirm* | contribution `vcs_edit.restore` → `apps/sidecar/src/services/ai-vcs-tools.ts:72` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts |
+| `vcs_edit.open_pull_request` (was `vcs_open_pull_request`) | write | history | title*, body | contribution `vcs_edit.open_pull_request` → `apps/sidecar/src/services/ai-vcs-tools.ts:78` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, companion-chat-e2e.test.ts, project-vcs.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
+| `vcs_edit.run_workflows` (was `actions_run`) | write | workflow | trigger | contribution `vcs_edit.run_workflows` → `apps/sidecar/src/services/ai-vcs-tools.ts:85` | yes | declared | action-inputs.test.ts, ai-vcs-tools.test.ts, ai-specialists.test.ts, ai-tool-facts.test.ts |
 
 ### `agent`
 
 | Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `agent.start` (was `agent_task`) | write | task | description*, prompt*, agent, subagent_type, background | contribution `agent.start` → `packages/ai/src/nikcli/background-tools.ts:49` | yes | unknown (N) | agents.test.ts, background-tools.test.ts, bridge.test.ts, specialists-host.test.ts, ai-bridge.test.ts, ai-specialists.test.ts, ai-task-card.test.ts, ai-tool-facts.test.ts |
-| `agent.list` (was `agent_tasks`) | write | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:50` | yes | unknown (N) | action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
-| `agent.read` (was `agent_task_read`) | write | — | taskId* | contribution `agent.read` → `packages/ai/src/nikcli/background-tools.ts:51` | yes | unknown (N) | action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
-| `agent.cancel` (was `agent_task_cancel`) | write | task | taskId* | contribution `agent.cancel` → `packages/ai/src/nikcli/background-tools.ts:52` | yes | unknown (N) | background-tools.test.ts |
+| `agent.start` (was `agent_task`) | write | task | description*, prompt*, agent, subagent_type, background | contribution `agent.start` → `packages/ai/src/nikcli/background-tools.ts:49` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, agents.test.ts, background-tools.test.ts, bridge.test.ts, specialists-host.test.ts, ai-bridge.test.ts, ai-specialists.test.ts, ai-task-card.test.ts, ai-tool-facts.test.ts |
+| `agent.list` (was `agent_tasks`) | write | — | — | contribution `agent.list` → `packages/ai/src/nikcli/background-tools.ts:50` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
+| `agent.read` (was `agent_task_read`) | write | — | taskId* | contribution `agent.read` → `packages/ai/src/nikcli/background-tools.ts:51` | yes | declared | action-inputs.test.ts, action-outcome.test.ts, background-tools.test.ts, ai-task-card.test.ts |
+| `agent.cancel` (was `agent_task_cancel`) | write | task | taskId* | contribution `agent.cancel` → `packages/ai/src/nikcli/background-tools.ts:52` | yes | declared | action-inputs.test.ts, background-tools.test.ts |
 
 ## Prompt files
 
