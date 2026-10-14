@@ -18,6 +18,7 @@ import { signedArea } from "../../cad/shapes.ts"
 import type { Vec2 } from "../../cad/vec.ts"
 import { distanceToChain, pointInRing } from "../geometry.ts"
 import { threadMinorDiameter } from "../operations/thread.ts"
+import { exactFeatures } from "../brep-part.ts"
 import { historyFeatures, type HistoryFeatures, type MachiningHole } from "../generator/history-features.ts"
 import type { CadElement } from "../generator/schema.ts"
 import type { OperationSpec, StockBox } from "./contracts.ts"
@@ -131,9 +132,16 @@ export const planJob = (input: PlanInput): Plan => {
   // ------------------------------------------------------------ features
   const features: HistoryFeatures[] = []
   const freeform: CadElement[] = []
+  const byId = new Map((input.elements ?? []).map((e) => [String(e["id"] ?? ""), e] as const))
   for (const e of input.elements ?? []) {
     if (e["type"] === "workpiece") continue
-    const f = historyFeatures(e)
+    let f = historyFeatures(e)
+    if (f === undefined) {
+      // No walkable history (a STEP solid, a part the editor rotated): the features come from the exact B-rep, or the reason it is a surface job.
+      const exact = exactFeatures(e, byId)
+      if (exact?.features !== undefined) f = exact.features
+      else if (exact !== undefined) notes.push(`${exact.reason}; machined with the 3D surface strategies`)
+    }
     if (f !== undefined && (f.outlines.length > 0 || f.pockets.length > 0 || f.holes.length > 0)) {
       features.push(f)
       for (const n of f.notes) (/not reachable|requires|not a turned|only a revolution/.test(n) ? unmachined : notes).push(n)
