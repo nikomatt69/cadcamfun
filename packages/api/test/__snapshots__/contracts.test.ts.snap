@@ -11928,6 +11928,1301 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/cad/exact/analyze": {
+      "post": {
+        "operationId": "cadExact.analyze",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "drawingId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "elements": {
+                    "items": {
+                      "type": "object",
+                    },
+                    "maxItems": 2000,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "maxItems": 200,
+                    "type": "array",
+                  },
+                  "machining": {
+                    "type": "boolean",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "parts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "area": {
+                            "type": "number",
+                          },
+                          "bounds": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "max": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "min": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                            },
+                            "required": [
+                              "min",
+                              "max",
+                            ],
+                            "type": "object",
+                          },
+                          "centroid": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                          "edges": {
+                            "type": "integer",
+                          },
+                          "faces": {
+                            "type": "integer",
+                          },
+                          "holes": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "bottom": {
+                                  "enum": [
+                                    "through",
+                                    "flat",
+                                    "drill-point",
+                                  ],
+                                  "type": "string",
+                                },
+                                "depth": {
+                                  "type": "number",
+                                },
+                                "diameter": {
+                                  "type": "number",
+                                },
+                                "direction": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "entry": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                    },
+                                    "z": {
+                                      "type": "number",
+                                    },
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "z",
+                                  ],
+                                  "type": "object",
+                                },
+                                "form": {
+                                  "enum": [
+                                    "simple",
+                                    "counterbore",
+                                    "countersink",
+                                  ],
+                                  "type": "string",
+                                },
+                                "headDepth": {
+                                  "type": "number",
+                                },
+                                "headDiameter": {
+                                  "type": "number",
+                                },
+                              },
+                              "required": [
+                                "entry",
+                                "direction",
+                                "diameter",
+                                "depth",
+                                "form",
+                                "bottom",
+                              ],
+                              "type": "object",
+                            },
+                            "type": "array",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "issues": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "machining": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "bottom": {
+                                    "type": "number",
+                                  },
+                                  "holes": {
+                                    "type": "integer",
+                                  },
+                                  "outlines": {
+                                    "type": "integer",
+                                  },
+                                  "pockets": {
+                                    "type": "integer",
+                                  },
+                                  "prismatic": {
+                                    "enum": [
+                                      true,
+                                    ],
+                                    "type": "boolean",
+                                  },
+                                  "top": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "prismatic",
+                                  "holes",
+                                  "pockets",
+                                  "outlines",
+                                  "top",
+                                  "bottom",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "prismatic": {
+                                    "enum": [
+                                      false,
+                                    ],
+                                    "type": "boolean",
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "prismatic",
+                                  "reason",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "surfaces": {
+                            "additionalProperties": {
+                              "type": "integer",
+                            },
+                            "type": "object",
+                          },
+                          "throughHoles": {
+                            "type": "integer",
+                          },
+                          "valid": {
+                            "type": "boolean",
+                          },
+                          "vertices": {
+                            "type": "integer",
+                          },
+                          "volume": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "valid",
+                          "issues",
+                          "volume",
+                          "area",
+                          "centroid",
+                          "bounds",
+                          "faces",
+                          "edges",
+                          "vertices",
+                          "surfaces",
+                          "holes",
+                          "machining",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "reason": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "reason",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "totals": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "area": {
+                          "type": "number",
+                        },
+                        "parts": {
+                          "type": "integer",
+                        },
+                        "volume": {
+                          "type": "number",
+                        },
+                      },
+                      "required": [
+                        "parts",
+                        "volume",
+                        "area",
+                      ],
+                      "type": "object",
+                    },
+                  },
+                  "required": [
+                    "parts",
+                    "skipped",
+                    "totals",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
+    "/api/cad/exact/assembly": {
+      "post": {
+        "operationId": "cadExact.assembly",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "drawingId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "elements": {
+                    "items": {
+                      "type": "object",
+                    },
+                    "maxItems": 2000,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "washers": {
+                    "type": "boolean",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bom": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "designation": {
+                            "type": "string",
+                          },
+                          "item": {
+                            "type": "integer",
+                          },
+                          "mass": {
+                            "type": "number",
+                          },
+                          "material": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "parts": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "quantity": {
+                            "type": "integer",
+                          },
+                          "volume": {
+                            "type": "number",
+                          },
+                        },
+                        "required": [
+                          "item",
+                          "name",
+                          "quantity",
+                          "volume",
+                          "parts",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "fasteners": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "existing": {
+                          "type": "integer",
+                        },
+                        "plans": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "bodies": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "designation": {
+                                "type": "string",
+                              },
+                              "direction": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "engagement": {
+                                "type": "number",
+                              },
+                              "grip": {
+                                "type": "number",
+                              },
+                              "headWasher": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "designation": {
+                                    "type": "string",
+                                  },
+                                  "inner": {
+                                    "type": "number",
+                                  },
+                                  "outer": {
+                                    "type": "number",
+                                  },
+                                  "thickness": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "designation",
+                                  "inner",
+                                  "outer",
+                                  "thickness",
+                                ],
+                                "type": "object",
+                              },
+                              "id": {
+                                "type": "string",
+                              },
+                              "length": {
+                                "type": "number",
+                              },
+                              "nut": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "across": {
+                                    "type": "number",
+                                  },
+                                  "at": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                      },
+                                      "z": {
+                                        "type": "number",
+                                      },
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "z",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  "designation": {
+                                    "type": "string",
+                                  },
+                                  "height": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "designation",
+                                  "across",
+                                  "height",
+                                  "at",
+                                ],
+                                "type": "object",
+                              },
+                              "nutWasher": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "designation": {
+                                    "type": "string",
+                                  },
+                                  "inner": {
+                                    "type": "number",
+                                  },
+                                  "outer": {
+                                    "type": "number",
+                                  },
+                                  "thickness": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "designation",
+                                  "inner",
+                                  "outer",
+                                  "thickness",
+                                ],
+                                "type": "object",
+                              },
+                              "nutWasherAt": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "seat": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "size": {
+                                "type": "string",
+                              },
+                              "tapped": {
+                                "type": "string",
+                              },
+                              "threadName": {
+                                "type": "string",
+                              },
+                              "warnings": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                            },
+                            "required": [
+                              "id",
+                              "size",
+                              "threadName",
+                              "designation",
+                              "length",
+                              "seat",
+                              "direction",
+                              "bodies",
+                              "grip",
+                              "warnings",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "unfastened": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "at": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "bodies": {
+                                "items": {
+                                  "type": "string",
+                                },
+                                "type": "array",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "bodies",
+                              "at",
+                              "reason",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "plans",
+                        "unfastened",
+                        "existing",
+                      ],
+                      "type": "object",
+                    },
+                    "interference": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "checked": {
+                          "type": "integer",
+                        },
+                        "clashes": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "a": {
+                                "type": "string",
+                              },
+                              "aName": {
+                                "type": "string",
+                              },
+                              "b": {
+                                "type": "string",
+                              },
+                              "bName": {
+                                "type": "string",
+                              },
+                              "centroid": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "x": {
+                                    "type": "number",
+                                  },
+                                  "y": {
+                                    "type": "number",
+                                  },
+                                  "z": {
+                                    "type": "number",
+                                  },
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "z",
+                                ],
+                                "type": "object",
+                              },
+                              "volume": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "a",
+                              "b",
+                              "aName",
+                              "bName",
+                              "volume",
+                              "centroid",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "expected": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "a": {
+                                "type": "string",
+                              },
+                              "aName": {
+                                "type": "string",
+                              },
+                              "b": {
+                                "type": "string",
+                              },
+                              "bName": {
+                                "type": "string",
+                              },
+                              "note": {
+                                "type": "string",
+                              },
+                              "volume": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "a",
+                              "b",
+                              "aName",
+                              "bName",
+                              "volume",
+                              "note",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "touching": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "a": {
+                                "type": "string",
+                              },
+                              "b": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "a",
+                              "b",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                        "undetermined": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "a": {
+                                "type": "string",
+                              },
+                              "b": {
+                                "type": "string",
+                              },
+                              "reason": {
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "a",
+                              "b",
+                              "reason",
+                            ],
+                            "type": "object",
+                          },
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "clashes",
+                        "expected",
+                        "touching",
+                        "undetermined",
+                        "checked",
+                      ],
+                      "type": "object",
+                    },
+                    "joints": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "axes": {
+                            "type": "integer",
+                          },
+                          "axis": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                          "child": {
+                            "type": "string",
+                          },
+                          "childName": {
+                            "type": "string",
+                          },
+                          "kind": {
+                            "enum": [
+                              "revolute",
+                              "fixed",
+                            ],
+                            "type": "string",
+                          },
+                          "origin": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                              },
+                              "y": {
+                                "type": "number",
+                              },
+                              "z": {
+                                "type": "number",
+                              },
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "z",
+                            ],
+                            "type": "object",
+                          },
+                          "parent": {
+                            "type": "string",
+                          },
+                          "parentName": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "parent",
+                          "child",
+                          "parentName",
+                          "childName",
+                          "kind",
+                          "origin",
+                          "axis",
+                          "axes",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "parts": {
+                      "type": "integer",
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "reason": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "reason",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "parts",
+                    "interference",
+                    "bom",
+                    "joints",
+                    "fasteners",
+                    "skipped",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
+    "/api/cad/exact/step": {
+      "post": {
+        "operationId": "cadExact.step",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "author": {
+                    "type": "string",
+                  },
+                  "drawingId": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "elements": {
+                    "items": {
+                      "type": "object",
+                    },
+                    "maxItems": 2000,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                  "faceted": {
+                    "type": "boolean",
+                  },
+                  "ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "maxItems": 200,
+                    "type": "array",
+                  },
+                },
+                "type": "object",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "parts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "exact": {
+                            "type": "boolean",
+                          },
+                          "faces": {
+                            "type": "integer",
+                          },
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "note": {
+                            "type": "string",
+                          },
+                          "valid": {
+                            "type": "boolean",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "exact",
+                          "faces",
+                          "valid",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "skipped": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "reason": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "reason",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "step": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "parts",
+                    "skipped",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenEncoded",
+                },
+              },
+            },
+            "description": "Forbidden",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "cadExact",
+        ],
+      },
+    },
     "/api/companion": {
       "get": {
         "operationId": "companion.status",
@@ -59352,6 +60647,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
     },
     {
       "name": "toolpathGenerator",
+    },
+    {
+      "name": "cadExact",
     },
     {
       "name": "library",

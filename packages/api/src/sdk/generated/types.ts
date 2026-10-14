@@ -1118,6 +1118,216 @@ export type ToolpathGeneratorManufacturePayload = {
   readonly tolerance?: number
   readonly resolution?: number
   readonly workOffset?: "G54" | "G55" | "G56" | "G57" | "G58" | "G59"
+  readonly operations?: ReadonlyArray<
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "face"
+        readonly bottom: number
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "adaptive"
+        readonly region: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "pocket"
+        readonly region: {
+          readonly boundary: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly islands?: ReadonlyArray<ReadonlyArray<{ readonly x: number; readonly y: number }>>
+        }
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+        readonly finish?: boolean
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "profile"
+        readonly loop: ReadonlyArray<{ readonly x: number; readonly y: number }>
+        readonly side: "outside" | "inside"
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+        readonly finish?: boolean
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "bore"
+        readonly center: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly top: number
+        readonly bottom: number
+        readonly allowance?: number
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "drill"
+        readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+        readonly top: number
+        readonly bottom: number
+        readonly cut?: "drill" | "spot"
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "thread"
+        readonly center: { readonly x: number; readonly y: number }
+        readonly diameter: number
+        readonly pitch: number
+        readonly internal: boolean
+        readonly top: number
+        readonly length: number
+        readonly rightHand?: boolean
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "engrave"
+        readonly paths: ReadonlyArray<{
+          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly closed: boolean
+        }>
+        readonly top: number
+        readonly depth: number
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "chamfer"
+        readonly loops: ReadonlyArray<{
+          readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>
+          readonly side: "outside" | "inside"
+        }>
+        readonly top: number
+        readonly width: number
+        readonly tipOffset?: number
+      }
+    | {
+        readonly id: string
+        readonly name?: string
+        readonly tool: string
+        readonly rpm?: number
+        readonly feed?: number
+        readonly plungeFeed?: number
+        readonly stepdown?: number
+        readonly stepover?: number
+        readonly coolant?: "off" | "flood" | "mist"
+        readonly radialEngagement?: number
+        readonly strategy: "surface"
+        readonly mode: "roughing" | "parallel" | "waterline" | "steep-shallow"
+        readonly slopeAngle?: number
+        readonly allowance?: number
+        readonly scallop?: number
+        readonly clearing?: "contour" | "adaptive"
+        readonly angle?: number
+        readonly restFrom?: string
+      }
+  >
+  readonly tools?: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly kind: "flat" | "ball" | "bull" | "chamfer" | "spot" | "drill" | "facemill" | "threadmill" | "engraver"
+    readonly diameter: number
+    readonly flutes: number
+    readonly material: "hss" | "hss-co" | "carbide" | "pcd"
+    readonly coating: "none" | "tin" | "ticn" | "altin" | "alcrn" | "zrn" | "dlc" | "diamond"
+    readonly cornerRadius?: number
+    readonly angle?: number
+    readonly tipDiameter?: number
+    readonly pitch?: number
+    readonly fluteLength: number
+    readonly shankDiameter: number
+    readonly stickout: number
+    readonly holder?: { readonly diameter: number; readonly length: number }
+    readonly maxRpm?: number
+    readonly number?: number
+  }>
+  readonly deburr?: number
 }
 
 export type ToolpathGeneratorParsePayload = { readonly gcode: string; readonly name?: string }
@@ -1252,10 +1462,42 @@ export type ToolpathGeneratorVerifyPayload = {
           readonly segments?: number
         }
     >
+    readonly meshes?: ReadonlyArray<{
+      readonly positions: ReadonlyArray<number>
+      readonly indices: ReadonlyArray<number>
+    }>
+    readonly reliefs?: ReadonlyArray<{
+      readonly x: number
+      readonly y: number
+      readonly radius: number
+      readonly bottom: number
+      readonly reason: string
+    }>
   }
   readonly resolution?: number
   readonly tolerance?: number
   readonly start?: { readonly x: number; readonly y: number; readonly z: number }
+}
+
+export type CadExactAnalyzePayload = {
+  readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly drawingId?: string
+  readonly ids?: ReadonlyArray<string>
+  readonly machining?: boolean
+}
+
+export type CadExactStepPayload = {
+  readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly drawingId?: string
+  readonly ids?: ReadonlyArray<string>
+  readonly faceted?: boolean
+  readonly author?: string
+}
+
+export type CadExactAssemblyPayload = {
+  readonly elements?: ReadonlyArray<{ readonly [x: string]: JsonValue }>
+  readonly drawingId?: string
+  readonly washers?: boolean
 }
 
 export type LibraryCreatePayload = {
@@ -5069,6 +5311,9 @@ export type ToolpathGeneratorManufactureInput = {
   readonly tolerance?: ToolpathGeneratorManufacturePayload["tolerance"]
   readonly resolution?: ToolpathGeneratorManufacturePayload["resolution"]
   readonly workOffset?: ToolpathGeneratorManufacturePayload["workOffset"]
+  readonly operations?: ToolpathGeneratorManufacturePayload["operations"]
+  readonly tools?: ToolpathGeneratorManufacturePayload["tools"]
+  readonly deburr?: ToolpathGeneratorManufacturePayload["deburr"]
 }
 
 export type ToolpathGeneratorManufactureOutput =
@@ -5084,7 +5329,17 @@ export type ToolpathGeneratorManufactureOutput =
         operations: Array<{
           id: string
           name: string
-          strategy: "face" | "adaptive" | "pocket" | "profile" | "bore" | "drill" | "thread" | "engrave" | "surface"
+          strategy:
+            | "face"
+            | "adaptive"
+            | "pocket"
+            | "profile"
+            | "bore"
+            | "drill"
+            | "thread"
+            | "engrave"
+            | "chamfer"
+            | "surface"
           toolId: string
           cut:
             | "face"
@@ -5141,6 +5396,14 @@ export type ToolpathGeneratorManufactureOutput =
             warnings: Array<string>
             exceeded: Array<string>
             source: string
+            reference: {
+              table: "MATERIALS"
+              row: string
+              rowName: string
+              columns: { [x: string]: number }
+              factors: { [x: string]: number }
+              basis: string
+            }
           }
           parameters: { [x: string]: any }
           overridden: Array<string>
@@ -5411,6 +5674,127 @@ export type ToolpathGeneratorVerifyOutput = {
     heights: Array<number>
     gouge: Array<number>
   }
+}
+
+export type CadExactAnalyzeInput = {
+  readonly elements?: CadExactAnalyzePayload["elements"]
+  readonly drawingId?: CadExactAnalyzePayload["drawingId"]
+  readonly ids?: CadExactAnalyzePayload["ids"]
+  readonly machining?: CadExactAnalyzePayload["machining"]
+}
+
+export type CadExactAnalyzeOutput = {
+  parts: Array<{
+    id: string
+    name: string
+    valid: boolean
+    issues: Array<string>
+    volume: number
+    area: number
+    centroid: { x: number; y: number; z: number }
+    bounds: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }
+    faces: number
+    edges: number
+    vertices: number
+    surfaces: { [x: string]: number }
+    throughHoles?: number
+    holes: Array<{
+      entry: { x: number; y: number; z: number }
+      direction: { x: number; y: number; z: number }
+      diameter: number
+      depth: number
+      form: "simple" | "counterbore" | "countersink"
+      bottom: "through" | "flat" | "drill-point"
+      headDiameter?: number
+      headDepth?: number
+    }>
+    machining:
+      | { prismatic: true; holes: number; pockets: number; outlines: number; top: number; bottom: number }
+      | { prismatic: false; reason: string }
+  }>
+  skipped: Array<{ id: string; name: string; reason: string }>
+  totals: { parts: number; volume: number; area: number }
+}
+
+export type CadExactStepInput = {
+  readonly elements?: CadExactStepPayload["elements"]
+  readonly drawingId?: CadExactStepPayload["drawingId"]
+  readonly ids?: CadExactStepPayload["ids"]
+  readonly faceted?: CadExactStepPayload["faceted"]
+  readonly author?: CadExactStepPayload["author"]
+}
+
+export type CadExactStepOutput = {
+  step?: string
+  parts: Array<{ id: string; name: string; exact: boolean; faces: number; valid: boolean; note?: string }>
+  skipped: Array<{ id: string; name: string; reason: string }>
+}
+
+export type CadExactAssemblyInput = {
+  readonly elements?: CadExactAssemblyPayload["elements"]
+  readonly drawingId?: CadExactAssemblyPayload["drawingId"]
+  readonly washers?: CadExactAssemblyPayload["washers"]
+}
+
+export type CadExactAssemblyOutput = {
+  parts: number
+  interference: {
+    clashes: Array<{
+      a: string
+      b: string
+      aName: string
+      bName: string
+      volume: number
+      centroid: { x: number; y: number; z: number }
+    }>
+    expected: Array<{ a: string; b: string; aName: string; bName: string; volume: number; note: string }>
+    touching: Array<{ a: string; b: string }>
+    undetermined: Array<{ a: string; b: string; reason: string }>
+    checked: number
+  }
+  bom: Array<{
+    item: number
+    name: string
+    designation?: string
+    material?: string
+    quantity: number
+    volume: number
+    mass?: number
+    parts: Array<string>
+  }>
+  joints: Array<{
+    parent: string
+    child: string
+    parentName: string
+    childName: string
+    kind: "revolute" | "fixed"
+    origin: { x: number; y: number; z: number }
+    axis: { x: number; y: number; z: number }
+    axes: number
+  }>
+  fasteners: {
+    plans: Array<{
+      id: string
+      size: string
+      threadName: string
+      designation: string
+      length: number
+      seat: { x: number; y: number; z: number }
+      direction: { x: number; y: number; z: number }
+      bodies: Array<string>
+      tapped?: string
+      grip: number
+      engagement?: number
+      headWasher?: { designation: string; inner: number; outer: number; thickness: number }
+      nutWasher?: { designation: string; inner: number; outer: number; thickness: number }
+      nutWasherAt?: { x: number; y: number; z: number }
+      nut?: { designation: string; across: number; height: number; at: { x: number; y: number; z: number } }
+      warnings: Array<string>
+    }>
+    unfastened: Array<{ bodies: Array<string>; at: { x: number; y: number; z: number }; reason: string }>
+    existing: number
+  }
+  skipped: Array<{ id: string; name: string; reason: string }>
 }
 
 export type LibraryListInput = {

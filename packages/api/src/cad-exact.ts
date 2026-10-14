@@ -1,0 +1,111 @@
+import { Schema } from "effect"
+import { cad } from "@cadcamfun/core"
+
+const vec3 = cad.Vec3Schema
+const num = Schema.Finite
+const int = Schema.Int
+const id = Schema.NonEmptyString
+
+/**
+ * Where the exact kernel reads the solids from: the elements in the body (an explicit snapshot, nothing stored is touched), or a
+ * stored drawing the caller can open (the sidecar reads its elements; the scene never travels over HTTP).
+ */
+const source = {
+  elements: Schema.optionalKey(Schema.Array(Schema.Record(Schema.String, Schema.Json)).check(Schema.isMinLength(1), Schema.isMaxLength(2000))),
+  drawingId: Schema.optionalKey(id)
+}
+
+export const CadExactRequest = Schema.Struct({
+  ...source,
+  /** Only these solids (ids as in the drawing, component children included). */
+  ids: Schema.optionalKey(Schema.Array(id).check(Schema.isMaxLength(200))),
+  /** Also tell how the CAM planner will machine each solid (default true). */
+  machining: Schema.optionalKey(Schema.Boolean)
+})
+export type CadExactRequest = typeof CadExactRequest.Type
+
+export const CadExactStepRequest = Schema.Struct({
+  ...source,
+  ids: Schema.optionalKey(Schema.Array(id).check(Schema.isMaxLength(200))),
+  /** Write mesh-only solids as faceted solids (default true). */
+  faceted: Schema.optionalKey(Schema.Boolean),
+  author: Schema.optionalKey(Schema.String)
+})
+export type CadExactStepRequest = typeof CadExactStepRequest.Type
+
+export const CadAssemblyRequest = Schema.Struct({
+  ...source,
+  /** Washers under heads and nuts in the fastener plans (default true). */
+  washers: Schema.optionalKey(Schema.Boolean)
+})
+export type CadAssemblyRequest = typeof CadAssemblyRequest.Type
+
+const skipped = Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, reason: Schema.String }))
+
+export const CadExactHole = Schema.Struct({
+  entry: vec3, direction: vec3, diameter: num, depth: num,
+  form: Schema.Literals(["simple", "counterbore", "countersink"]),
+  bottom: Schema.Literals(["through", "flat", "drill-point"]),
+  headDiameter: Schema.optionalKey(num), headDepth: Schema.optionalKey(num)
+})
+
+export const CadExactMachining = Schema.Union([
+  Schema.Struct({ prismatic: Schema.Literal(true), holes: int, pockets: int, outlines: int, top: num, bottom: num }),
+  Schema.Struct({ prismatic: Schema.Literal(false), reason: Schema.String })
+])
+
+export const CadExactPart = Schema.Struct({
+  id: Schema.String, name: Schema.String, valid: Schema.Boolean, issues: Schema.Array(Schema.String),
+  volume: num, area: num, centroid: vec3, bounds: Schema.Struct({ min: vec3, max: vec3 }),
+  faces: int, edges: int, vertices: int, surfaces: Schema.Record(Schema.String, int),
+  throughHoles: Schema.optionalKey(int),
+  holes: Schema.Array(CadExactHole), machining: CadExactMachining
+})
+
+export const CadExactAnalysis = Schema.Struct({
+  parts: Schema.Array(CadExactPart), skipped,
+  totals: Schema.Struct({ parts: int, volume: num, area: num })
+})
+export type CadExactAnalysis = typeof CadExactAnalysis.Type
+
+export const CadExactStep = Schema.Struct({
+  /** STEP AP214 text; absent when the selection holds no solid. */
+  step: Schema.optionalKey(Schema.String),
+  parts: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String, exact: Schema.Boolean, faces: int, valid: Schema.Boolean, note: Schema.optionalKey(Schema.String) })),
+  skipped
+})
+export type CadExactStep = typeof CadExactStep.Type
+
+const washer = Schema.Struct({ designation: Schema.String, inner: num, outer: num, thickness: num })
+
+export const CadAssemblyReport = Schema.Struct({
+  parts: int,
+  interference: Schema.Struct({
+    clashes: Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String, aName: Schema.String, bName: Schema.String, volume: num, centroid: vec3 })),
+    expected: Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String, aName: Schema.String, bName: Schema.String, volume: num, note: Schema.String })),
+    touching: Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String })),
+    undetermined: Schema.Array(Schema.Struct({ a: Schema.String, b: Schema.String, reason: Schema.String })),
+    checked: int
+  }),
+  bom: Schema.Array(Schema.Struct({
+    item: int, name: Schema.String, designation: Schema.optionalKey(Schema.String), material: Schema.optionalKey(Schema.String),
+    quantity: int, volume: num, mass: Schema.optionalKey(num), parts: Schema.Array(Schema.String)
+  })),
+  joints: Schema.Array(Schema.Struct({
+    parent: Schema.String, child: Schema.String, parentName: Schema.String, childName: Schema.String,
+    kind: Schema.Literals(["revolute", "fixed"]), origin: vec3, axis: vec3, axes: int
+  })),
+  fasteners: Schema.Struct({
+    plans: Schema.Array(Schema.Struct({
+      id: Schema.String, size: Schema.String, threadName: Schema.String, designation: Schema.String, length: num, seat: vec3, direction: vec3,
+      bodies: Schema.Array(Schema.String), tapped: Schema.optionalKey(Schema.String), grip: num, engagement: Schema.optionalKey(num),
+      headWasher: Schema.optionalKey(washer), nutWasher: Schema.optionalKey(washer), nutWasherAt: Schema.optionalKey(vec3),
+      nut: Schema.optionalKey(Schema.Struct({ designation: Schema.String, across: num, height: num, at: vec3 })),
+      warnings: Schema.Array(Schema.String)
+    })),
+    unfastened: Schema.Array(Schema.Struct({ bodies: Schema.Array(Schema.String), at: vec3, reason: Schema.String })),
+    existing: int
+  }),
+  skipped
+})
+export type CadAssemblyReport = typeof CadAssemblyReport.Type
