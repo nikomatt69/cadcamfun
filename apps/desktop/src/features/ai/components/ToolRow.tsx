@@ -289,7 +289,7 @@ const VIEWS: Readonly<Record<string, ViewFn>> = {
     const d = rec(data)
     const stats = rec(d?.["stats"])
     const preview = Array.isArray(d?.["preview"]) ? arr(d?.["preview"]).map(String).join("\n") : str(d?.["preview"]) ?? str(d?.["gcode"]) ?? ""
-    const error = str(stats?.["error"])
+    const error = str(stats?.["error"]) ?? (d?.["ok"] === false ? str(d?.["error"]) ?? "Generation failed" : undefined)
     return { icon: "⌘", pending: "Generating G-code...", title: error ? "G-code not generated" : `G-code: ${plural(num(stats?.["lines"]) ?? 0, "line")} · ${mm(stats?.["cutLength"])} mm of cut · ${Math.round((num(stats?.["estimatedSeconds"]) ?? 0) / 60 * 10) / 10} min`, tone: error ? "error" : "ok",
       detail: () => <div class="space-y-1"><Show when={error}><p class="text-red-600">{error}</p></Show><Pair rows={[["Rapid", num(stats?.["rapidLength"]) !== undefined ? `${mm(stats?.["rapidLength"])} mm` : undefined], ["Z", num(stats?.["minZ"]) !== undefined ? `${mm(stats?.["minZ"])} … ${mm(stats?.["maxZ"])} mm` : undefined]]} /><Show when={preview !== ""}><Code text={preview} numbered /></Show></div> }
   },

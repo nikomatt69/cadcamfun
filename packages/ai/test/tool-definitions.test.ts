@@ -7,7 +7,7 @@ import { ACTION_CATALOGUE, REPLACED_TOOL_IDS, actionsOf, toolOf } from "../src/a
 const dir = new URL("../src/tools/", import.meta.url).pathname
 const calls: Array<{ method: string; args: unknown[] }> = []
 const handlers = new Proxy({} as never, {
-  get: (_t, method: string) => async (...args: unknown[]) => { calls.push({ method, args }); return { ok: true, method } }
+  get: (_t, method: string) => async (...args: unknown[]) => { calls.push({ method, args }); return method === "listOperations" ? [{ id: "op-1", name: "Pocket", generated: false }] : { ok: true, method } }
 })
 
 describe("one action tool per capability boundary (nikcli style)", () => {
@@ -40,7 +40,7 @@ describe("one action tool per capability boundary (nikcli style)", () => {
     calls.length = 0
     const tool = buildTools(handlers, "project-1").find((t) => t.id === "cam")!
     const out = await tool.execute({ action: "operations" }, { sessionId: "s", projectId: "project-1", signal: new AbortController().signal })
-    expect(JSON.parse(out)).toEqual({ ok: true, method: "listOperations" })
+    expect(JSON.parse(out)).toEqual([{ id: "op-1", name: "Pocket", generated: false }])
     expect(calls).toEqual([{ method: "listOperations", args: ["project-1"] }])
   })
 

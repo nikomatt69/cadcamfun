@@ -4,9 +4,12 @@
  * crosses an adapter as success, and the desktop decodes the same shapes when it mirrors a change into the editor.
  *
  * A result schema states what consumers rely on, not every field: a value may carry more (the model reads it), never less.
- * Refusals (`ok: false`) are not described per action; their shape is the shared failure below.
+ * A verdict is a result: a check or a review whose `ok` is false because the part or the program failed matches its schema
+ * and is an answer. Refusals (`ok: false` that match no result) are not described per action; their shape is the shared
+ * failure below.
  */
 import { Schema } from "effect"
+import { cam } from "@cadcamfun/core"
 
 // ---------------------------------------------------------------- shared shapes
 
@@ -93,7 +96,7 @@ const parametricReport = {
 const parametricValidate = Schema.Struct(parametricReport)
 const parametricInspect = Schema.Struct({ ...parametricReport, elementId: str, revision: str, history: record, ...drawingRef })
 const parametricTest = Schema.Struct({ ok: Schema.Boolean, revision: str, mutated: Schema.Literal(false), cases: Schema.Array(record), elementId: str, ...drawingRef })
-const parametricDfm = Schema.Struct({ ok: Schema.Boolean })
+const parametricDfm = Schema.Struct({ ok: Schema.Boolean, process: str, toolDiameter: num, issues: Schema.Array(record), metrics: Schema.Struct({ bodies: int, volumeMm3: num }) })
 const parametricExact = Schema.Struct({ ok: Schema.Boolean, bodies: Schema.Array(record), issues: Schema.Array(record) })
 const exact = Schema.Struct({
   ok: Schema.Literal(true),
@@ -134,6 +137,42 @@ const parametricCreated = Schema.Struct({ ok: Schema.Literal(true), mutation: Sc
 const parametricUpdated = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("update"), ids: strings, elements, revision: str, report: record, ...drawingRef })
 const recipeCreated = Schema.Struct({ ok: Schema.Literal(true), recipe: str, history: record, report: Schema.Struct(parametricReport), created: parametricCreated })
 const converted = Schema.Struct({ ok: Schema.Literal(true), mutation: Schema.Literal("add"), ids: strings, elements, source: Schema.Struct({ id: str, type: str }), notes: strings, ...drawingRef })
+
+// ---------------------------------------------------------------- `cam` (reads)
+
+/** A plan check is a verdict: `ok` is false when an operation fails its checks. Validated against `revision`. */
+const planCheck = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, mutated: Schema.Literal(false), operations: Schema.Array(record) })
+/** A saved review is a verdict on one operation; `stale` and `unverified` are answers, not refusals. */
+const review = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed", "stale", "unverified"]), operationId: str })
+const machine = Schema.Struct({ kind: str, title: str, plane: str, axes: Schema.Array(record), xIsDiameter: Schema.Boolean, origins: Schema.Unknown })
+const operations = Schema.Array(Schema.StructWithRest(Schema.Struct({ id: str, name: str, generated: Schema.Boolean }), [record]))
+const compared = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), candidates: Schema.Array(record), ...drawingRef })
+const gcodePoint = vec3
+const analysis = Schema.Struct({
+  issues: Schema.Array(Schema.Struct({ severity: Schema.Literals(["error", "warning", "info"]), code: str, line: int, message: str })),
+  stats: Schema.Struct({ lines: int, rapidMoves: int, cutMoves: int, toolChanges: int, bounds: nullable(Schema.Struct({ min: gcodePoint, max: gcodePoint })) })
+})
+const stockRead = Schema.Struct({ ok: Schema.Literal(true), stock: record, volumeMm3: num, workpieceMatchesStock: Schema.Boolean, ...drawingRef })
+const chainSuggest = Schema.Struct({
+  ok: Schema.Literal(true), after: nullable(str),
+  recommendation: Schema.Struct({ type: Schema.Literal("operation"), operationType: str, params: record, reason: str })
+})
+const materials = Schema.Struct({ ok: Schema.Literal(true), materials: Schema.Array(record), machines: Schema.Array(record) })
+const cuttingData = Schema.Struct({ ok: Schema.Literal(true), material: Schema.Struct({ id: str, name: str, iso: str }), machine: record, cuttingData: record })
+/** A read-only kernel run (or plan): nothing is stored. A blocked or failed run is a refusal carrying its issues. */
+const manufactured = Schema.Struct({ ok: Schema.Literal(true), mutated: Schema.Literal(false), ...drawingRef })
+const chainStatus = Schema.Struct({ ok: Schema.Literal(true), operationId: str, restFrom: nullable(str), generated: Schema.Boolean, warnings: strings })
+
+// ---------------------------------------------------------------- `cam_edit` (writes)
+
+const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str, release: str, identity: record, ...drawingRef })
+const operationCreated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, name: str, drawing: str, elements: int })
+const operationUpdated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, settings: record, note: str })
+/** A generated program: its statistics and the first lines. A failed generation is a refusal, never an empty preview. */
+const generated = Schema.Struct({ ok: Schema.Literal(true), stats: record, preview: str })
+/** A verification is a verdict: `ok` is false when the replay finds a collision or gouge. */
+const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
+const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
 
 // ---------------------------------------------------------------- the table
 
@@ -188,28 +227,28 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cad_edit.parametric_recipe_create": write(["drawing"], recipeCreated),
   "cad_edit.parametric_convert": write(["drawing"], converted),
 
-  "cam.plan_check": read(),
-  "cam.review": read(),
-  "cam.machine": read(),
-  "cam.operations": read(),
-  "cam.suggest": read(),
-  "cam.compare_setups": read(),
-  "cam.analyze": read(),
-  "cam.stock": read(),
-  "cam.vision": read(undefined, ["interface"]),
-  "cam.chain_suggest": read(),
-  "cam.materials": read(),
-  "cam.cutting_data": read(),
-  "cam.manufacture": read(),
-  "cam.chain_status": read(),
+  "cam.plan_check": read(planCheck),
+  "cam.review": read(review),
+  "cam.machine": read(machine),
+  "cam.operations": read(operations),
+  "cam.suggest": read(cam.generator.SuggestResponseSchema),
+  "cam.compare_setups": read(compared),
+  "cam.analyze": read(analysis),
+  "cam.stock": read(stockRead),
+  "cam.vision": read(vision, ["interface"]),
+  "cam.chain_suggest": read(chainSuggest),
+  "cam.materials": read(materials),
+  "cam.cutting_data": read(cuttingData),
+  "cam.manufacture": read(manufactured),
+  "cam.chain_status": read(chainStatus),
 
-  "cam_edit.manufacture": write(["operation", "program"]),
-  "cam_edit.create": write(["operation"]),
-  "cam_edit.update": write(["operation"]),
-  "cam_edit.generate": write(["program"]),
+  "cam_edit.manufacture": write(["operation", "program"], programStored),
+  "cam_edit.create": write(["operation"], operationCreated),
+  "cam_edit.update": write(["operation"], operationUpdated),
+  "cam_edit.generate": write(["program"], generated),
   // Regenerates and stores the program with its report today; AI-11 Step 8 makes it read the stored program.
-  "cam_edit.verify": write(["program", "report"]),
-  "cam_edit.stock_set": write(["stock"]),
+  "cam_edit.verify": write(["program", "report"], verified),
+  "cam_edit.stock_set": write(["stock"], stockSet),
 
   "library.component_list": read(),
   "library.lookup_component": read(),

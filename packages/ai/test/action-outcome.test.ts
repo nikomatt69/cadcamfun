@@ -26,9 +26,10 @@ describe("action contracts", () => {
     expect(ACTION_CATALOGUE.filter((spec) => spec.kind !== "read" && spec.contract.effects.length === 0).map((spec) => spec.id)).toEqual(["agent.list", "agent.read"])
   })
 
-  test("the CAD family is migrated: every cad and cad_edit action declares its result", () => {
-    const cad = ACTION_CATALOGUE.filter((spec) => spec.id.startsWith("cad.") || spec.id.startsWith("cad_edit."))
-    expect(cad.filter((spec) => spec.contract.result === undefined).map((spec) => spec.id)).toEqual([])
+  test("the CAD and CAM families are migrated: every cad, cad_edit, cam and cam_edit action declares its result", () => {
+    const families = ["cad.", "cad_edit.", "cam.", "cam_edit."]
+    const migrated = ACTION_CATALOGUE.filter((spec) => families.some((family) => spec.id.startsWith(family)))
+    expect(migrated.filter((spec) => spec.contract.result === undefined).map((spec) => spec.id)).toEqual([])
   })
 })
 
@@ -98,8 +99,24 @@ describe("outcome classification", () => {
     expect(result).toMatchObject({ kind: "uncertain", value: { _tag: "ActionUncertain" } })
   })
 
+  test("a failed verdict is an answer, not a refusal", async () => {
+    const check = await outcome("cad.check", {}, { checkDesign: async () => ({ ok: false, issues: [{ severity: "error", code: "open-shell" }], omitted: 0, stats: {}, ...drawing }) })
+    expect(check).toMatchObject({ kind: "succeeded", validated: true, value: { ok: false, issues: [{ code: "open-shell" }] } })
+    const verify = await outcome("cam_edit.verify", { operationId: "o" }, {
+      verifyOperation: async () => ({ ok: false, status: "failed", revision: "r1", issues: [{ kind: "gouge" }], stats: {} })
+    })
+    expect(verify).toMatchObject({ kind: "succeeded", value: { ok: false, status: "failed" } })
+  })
+
+  test("a failed generation is a refusal, never an empty program presented as success", async () => {
+    const failed = await outcome("cam_edit.generate", { operationId: "o" }, { generateGcode: async () => ({ gcode: "", stats: { error: "Tool larger than the pocket." } }) })
+    expect(failed).toMatchObject({ kind: "refused", value: { ok: false, _tag: "ActionRefused", actionId: "cam_edit.generate", error: "Tool larger than the pocket." } })
+    const made = await outcome("cam_edit.generate", { operationId: "o", maxLines: 1 }, { generateGcode: async () => ({ gcode: "G0 Z5\nG1 Z-1", stats: { lines: 2 } }) })
+    expect(made).toMatchObject({ kind: "succeeded", validated: true, value: { ok: true, preview: "G0 Z5" } })
+  })
+
   test("an action whose family is not migrated passes unvalidated, and says so", async () => {
-    const result = await outcome("cam.operations", {}, { listOperations: async () => ({ anything: true }) })
+    const result = await outcome("library.lookup_material", { query: "steel" }, { lookupMaterial: async () => ({ anything: true }) })
     expect(result).toMatchObject({ kind: "succeeded", validated: false })
   })
 })

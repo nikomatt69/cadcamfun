@@ -71,7 +71,7 @@ test("a cancelled direct catalogue invocation returns a typed interruption and n
 
 test("numeric material grades stay textual through the host's lenient argument adapter", async () => {
   let received: unknown
-  const host = buildTools({ ...handlers, manufactureOperation: async (_project, input) => { received = input; return { ok: true } } }, "p").find((spec) => spec.id === "cam_edit")!
+  const host = buildTools({ ...handlers, manufactureOperation: async (_project, input) => { received = input; return { ok: true, operationId: "o", release: "verified-program", identity: {}, drawingId: "d", projectId: "p" } } }, "p").find((spec) => spec.id === "cam_edit")!
   expect(JSON.parse(await host.execute({ action: "manufacture", material: "6061" }, { projectId: "p", sessionId: "s", signal: new AbortController().signal })).ok).toBe(true)
   expect(received).toEqual({ material: "6061" })
 })

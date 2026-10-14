@@ -3,9 +3,9 @@
  * adapter (the host tool, `runAction`, the bridge): a success is checked against the action's declared result, a refusal
  * is given the shared failure shape, and anything the contract does not describe is never passed on as success.
  *
- * - `succeeded`: the value matches the declared result.
+ * - `succeeded`: the value matches the declared result (a verdict whose `ok` is false, such as a failed check, included).
  * - `partial`: it matches, and names what it left out (the contract's `partialWhen` field is non-empty).
- * - `refused`: the action declined (`ok: false`), or it failed before it could change anything.
+ * - `refused`: the action declined (`ok: false` that matches no result), or a read failed in its own code.
  * - `conflict`: the document changed under it (`ActionConflict`, or a stale-revision answer).
  * - `cancelled`: it was stopped before it ran.
  * - `uncertain`: a write that may or may not have committed (thrown or aborted mid-way), or an answer outside the contract.
@@ -64,12 +64,17 @@ export const classifyOutcome = (spec: Classified, raw: unknown): ActionOutcome =
   const files = raw instanceof ToolMediaResult ? raw.files : undefined
   const value = raw instanceof ToolMediaResult ? raw.value : raw
   const object = asRecord(value)
-  if (object?.["ok"] === false) return classifyRefusal(spec, object)
   // A committed receipt (RM-03) is a success whatever the action's own result is.
   if (object?.["_tag"] === "ActionCommitted" && object["ok"] === true) return { kind: "succeeded", value, ...(files ? { files } : {}), validated: true }
   const schema = spec.contract.result
-  if (schema === undefined) return { kind: "succeeded", value, ...(files ? { files } : {}), validated: false }
+  if (schema === undefined) {
+    if (object?.["ok"] === false) return classifyRefusal(spec, object)
+    return { kind: "succeeded", value, ...(files ? { files } : {}), validated: false }
+  }
   const checked = Schema.decodeUnknownExit(schema as Schema.Codec<unknown, unknown>)(value)
+  // A verdict (`ok: false` because the part or program failed) matches the result and is an answer; anything else that says
+  // `ok: false` is the action declining.
+  if (Exit.isFailure(checked) && object?.["ok"] === false) return classifyRefusal(spec, object)
   if (Exit.isFailure(checked)) {
     const changed = spec.kind !== "read"
     return {
