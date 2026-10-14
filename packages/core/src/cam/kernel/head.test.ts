@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { headAxis, headFor, headTip, type HeadKinematic } from "./head.ts"
+import { headABFor, headAxis, headFor, headTip, type HeadKinematic } from "./head.ts"
 
 const head = (over: Partial<HeadKinematic> = {}): HeadKinematic => ({ pivot: { x: 0, y: 0, z: 200 }, gauge: 120, tilt: [-90, 90], ...over })
 const unit = (x: number, y: number, z: number) => { const l = Math.hypot(x, y, z); return { x: x / l, y: y / l, z: z / l } }
@@ -38,5 +38,49 @@ describe("tilting head", () => {
   test("a tilt outside the head's range is refused", () => {
     expect(headFor(unit(1, 0, -0.05), head({ tilt: [-30, 30] }))).toBeUndefined()
     expect(headFor(unit(0.3, 0, -1), head({ tilt: [-30, 30] }))).toBeDefined()
+  })
+})
+
+describe("tilting head with two tilts (AB)", () => {
+  const ab = { pivot: { x: 0, y: 0, z: 200 }, gauge: 120, tiltA: [-110, 110] as const, tiltB: [-180, 180] as const }
+  const sphere = (n: number) => Array.from({ length: n }, (_, k) => {
+    const z = 1 - 2 * ((k + 0.5) / n)
+    const r = Math.sqrt(1 - z * z), phi = k * 2.399963
+    return { x: r * Math.cos(phi), y: r * Math.sin(phi), z }
+  })
+  test("every reachable direction is reached by the (A, B) solutions: the tool axis equals it", () => {
+    for (const d of sphere(300)) {
+      const sols = headABFor(d, ab)
+      if (sols.length === 0) continue
+      for (const s of sols) {
+        expect(s.residual).toBeLessThan(1e-9)
+      }
+    }
+    // Most directions with dz < 0 (tool into the part) are reachable with these ranges.
+    const reachable = sphere(300).filter((d) => headABFor(d, ab).length > 0).length
+    expect(reachable).toBeGreaterThan(150)
+  })
+
+  test("the second branch reaches the same direction: A to 180 - A, B to B + 180", () => {
+    const d = { x: 0.3, y: 0.4, z: -Math.sqrt(1 - 0.25) }
+    // A = 156 degrees on the second branch: the range must allow it for both branches to exist.
+    const sols = headABFor(d, { ...ab, tiltA: [-180, 180] })
+    expect(sols.length).toBe(2)
+    expect(sols[0]!.residual).toBeLessThan(1e-9)
+    expect(sols[1]!.residual).toBeLessThan(1e-9)
+    expect(sols[0]!.branch).toBe(0)
+    expect(sols[1]!.branch).toBe(1)
+  })
+
+  test("a tool straight along Y is the singular case: A at 90 degrees, B undetermined", () => {
+    const s = headABFor({ x: 0, y: 1, z: 0 }, ab)
+    expect(s.length).toBeGreaterThan(0)
+    expect(s[0]!.singularity).toBe(1)
+    expect(s[0]!.residual).toBeLessThan(1e-9)
+  })
+
+  test("the A range refuses a direction that needs a larger tilt", () => {
+    const d = { x: 0, y: 0.95, z: -Math.sqrt(1 - 0.95 * 0.95) }
+    expect(headABFor(d, { ...ab, tiltA: [-30, 30] })).toEqual([])
   })
 })
