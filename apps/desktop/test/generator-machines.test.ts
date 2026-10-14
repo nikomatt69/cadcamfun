@@ -92,7 +92,7 @@ describe("generator panel by machine", () => {
       surfaceCell.click()
       await settle()
       const strategy = await find<HTMLSelectElement>('[data-testid="surface-settings"] select[aria-label="Surface strategy"]')
-      expect([...strategy.options].map((o) => o.value)).toEqual(["roughing", "parallel", "waterline"])
+      expect([...strategy.options].map((o) => o.value)).toEqual(["roughing", "parallel", "waterline", "steep-shallow"])
       expect(document.querySelector('[data-testid="surface-settings"]')!.textContent).not.toContain("Raster angle")
       await choose(strategy, "parallel")
       expect(useGeneratorStore.getState().settings.surfaceStrategy).toBe("parallel")

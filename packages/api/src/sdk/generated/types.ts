@@ -5226,6 +5226,7 @@ export type ToolpathGeneratorManufactureOutput =
             | "material-removed"
             | "nc-replay"
             | "machine-travel"
+            | "machine-clearance"
           status: "passed" | "failed" | "unsupported" | "unresolved"
           detail: string
         }>

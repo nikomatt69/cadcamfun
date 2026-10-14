@@ -102,7 +102,7 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
   // Rest machining continues the tool before it. On a roughing that is the `rest` strategy; on a finishing strategy it restricts the
   // path to where the previous (larger) tool did not reach as low: pencil machining when that tool was a ball.
   const rest = s.useRestMachining && s.surfaceStrategy === "roughing"
-  const restFinish = s.useRestMachining && (s.surfaceStrategy === "parallel" || s.surfaceStrategy === "waterline")
+  const restFinish = s.useRestMachining && (s.surfaceStrategy === "parallel" || s.surfaceStrategy === "waterline" || s.surfaceStrategy === "steep-shallow")
   const strategy: SurfaceStrategy = rest ? "rest" : s.surfaceStrategy
   const previousKind = s.toolType === "ballnose" ? "ballnose" : "endmill"
   const first = modelFor(strategy)
@@ -140,7 +140,7 @@ export const surfaceProgram = (placed: ReadonlyArray<CadElement>, s: ToolpathSet
   if (s.surfaceClearing === "adaptive" && (strategy === "roughing" || strategy === "rest")) gcode += `; Adaptive clearing: radial depth of cut held at ${f3(s.adaptiveEngagement)} % of the tool diameter\n`
   if (restFinish) gcode += `; Rest finishing: only where a ${f3(s.restToolDiameter)} mm tool did not reach as low\n`
   const primary = run(finishes ? (rest ? "Rest roughing" : "Roughing") : strategy, strategy, {
-    allowance, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay,
+    allowance, scallop: s.scallop, angle: s.rasterAngle, oneWay: s.rasterOneWay, slopeAngle: s.steepAngle,
     clearing: s.surfaceClearing, engagement: s.adaptiveEngagement,
     ...(rest ? { restFrom: { diameter: s.restToolDiameter, kind: "endmill", allowance } } : {}),
     ...(restFinish ? { restFrom: { diameter: s.restToolDiameter, kind: previousKind, allowance: 0 } } : {})

@@ -200,7 +200,7 @@ const PROBE_CYCLES: ReadonlyArray<{ readonly value: typeof cam.generator.DEFAULT
 function SurfaceSettings(): JSX.Element {
   const gen = useGeneratorStore()
   const s = () => gen.settings
-  const raster = () => s().surfaceStrategy === "parallel" || (s().surfaceStrategy === "roughing" && s().finishingPass && s().finishingStrategy !== "contour")
+  const raster = () => s().surfaceStrategy === "parallel" || s().surfaceStrategy === "steep-shallow" || (s().surfaceStrategy === "roughing" && s().finishingPass && s().finishingStrategy !== "contour")
   return (
     <div class="space-y-3 p-3 border border-gray-200 rounded-md" data-testid="surface-settings">
       <div>
@@ -209,8 +209,12 @@ function SurfaceSettings(): JSX.Element {
           <option value="roughing">Roughing (Z levels around the part)</option>
           <option value="parallel">Parallel finishing (raster on the surface)</option>
           <option value="waterline">Waterline finishing (constant Z contours)</option>
+          <option value="steep-shallow">Steep and shallow (waterline on walls, raster on flats)</option>
         </select>
       </div>
+      <Show when={s().surfaceStrategy === "steep-shallow"}>
+        <div><label class={LABEL}>Steep above (° from horizontal)</label><NumberField min="5" max="85" step="1" value={s().steepAngle} onValue={(value) => gen.updateSettings("steepAngle", value)} /></div>
+      </Show>
       <Show when={s().surfaceStrategy === "roughing"}>
         <div>
           <label class={LABEL}>Clearing</label>

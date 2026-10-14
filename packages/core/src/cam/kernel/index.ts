@@ -8,7 +8,13 @@
  *   execute       prepare / run: strategies, post, independent NC replay, stock lineage, claims and release level
  *   compat        the legacy generator settings in and out of the kernel's cutting data
  *   schema        Effect Schemas of the caller-supplied cutters and operations (HTTP, assistant)
+ *   kinematics    the trunnion table (AC / BC): forward, inverse candidates with branch and C unwrapped, and the cheapest path
+ *   head          the tilting head (B about Y): the tool axis and tip for a tilt, and the tilt that reaches a direction
  *   assembly      the 3D tool assembly (cutting zone, shank, holder) as a profile and its solid of revolution
+ *   collision     the continuous check of a joint move: tool probes against the table and the part, certified clear / collision
+ *   motion        simultaneous five-axis: locations -> table poses, each move split into blocks and checked for collision
+ *   stock         volumetric stock as voxels: sure / possible removal by the cutter's sampled sweep, remaining-volume bracket
+ *   machine-clearance  holder and shank against the table over every NC move (certified; rotary moves reported, not passed)
  */
 export * from "./materials.ts"
 export * from "./cutters.ts"
@@ -22,3 +28,9 @@ export * from "./compat.ts"
 export * from "./assembly.ts"
 export { CutterSchema, OperationSpecSchema } from "./schema.ts"
 export { jobOfSnapshot, type KernelSnapshot } from "./snapshot.ts"
+export { headAxis, headFor, headTip, type HeadKinematic, type HeadSolution } from "./head.ts"
+export { candidatesFor, planTable, forward, toolAxisInMachine, unwrapC, travel, type Candidate, type PlannedPosition, type TableKinematic, type TablePlan } from "./kinematics.ts"
+export { checkMotion, cylinderSolid, boxSolid, headScene, trunnionScene, tableBox, linearScene, type Capsule, type Clearance, type MotionCheck, type Pose, type Scene, type Solid, type TableEnvelope } from "./collision.ts"
+export { planSimultaneous, type CutterLocation, type MotionSegment, type PartEnvelope, type SimultaneousInput, type SimultaneousPlan } from "./motion.ts"
+export { voxelStock, removeTipPath, remainingVolume, type VoxelStock } from "./stock.ts"
+export { checkNcClearance, ARC_SAGITTA, type ClearanceFinding, type ClearanceResult, type TableGeometry } from "./machine-clearance.ts"
