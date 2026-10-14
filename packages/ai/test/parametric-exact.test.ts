@@ -42,11 +42,17 @@ describe("the assistant's view of the exact model", () => {
   })
 
   test("a body built with a mesh-only feature says why it has no exact model", async () => {
+    const squashed = { ...(plate as object), features: [...(plate as { features: unknown[] }).features, { id: "s", type: "scale", factor: [1, 2, 1] }] } as never
+    const out = (await runParametricExact({ history: squashed } as never, context)) as { bodies: Array<Record<string, unknown>> }
+    expect(out.bodies[0]!["exact"]).toBe(false)
+    expect(String(out.bodies[0]!["reason"])).toContain("non-uniform scale")
+  })
+
+  test("a filleted body keeps its exact model (rolling-ball fillets of the exact solid)", async () => {
     const filleted = { ...(plate as object), features: [...(plate as { features: unknown[] }).features, { id: "f", type: "fillet", radius: 1 }] } as never
     const out = (await runParametricExact({ history: filleted } as never, context)) as { bodies: Array<Record<string, unknown>> }
-    expect(out.bodies[0]!["exact"]).toBe(false)
-    expect(String(out.bodies[0]!["reason"])).toContain("fillet")
-  })
+    expect(out.bodies[0]!["exact"]).toBe(true)
+  }, 120_000)
 
   test("exactly one of elementId and history is required", async () => {
     const out = (await runParametricExact({} as never, context)) as Record<string, unknown>

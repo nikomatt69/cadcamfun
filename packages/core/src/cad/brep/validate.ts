@@ -8,6 +8,19 @@ import { dist3 } from "./math.ts"
 import { curvePoint, surfaceDistance } from "./geom.ts"
 import { coedgeEndVertex, coedgeStartVertex, type Brep } from "./topology.ts"
 import { massProperties } from "./mass.ts"
+import { tessellateBrep } from "./tessellate.ts"
+
+/** Signed volume of a coarse watertight tessellation (divergence theorem over its triangles). */
+const coarseVolume = (b: Brep): number => {
+  const t = tessellateBrep(b, { chordTol: 0.05, angleTolDeg: 30 })
+  const p = t.positions, ix = t.indices
+  let v = 0
+  for (let i = 0; i < ix.length; i += 3) {
+    const a = ix[i]! * 3, c = ix[i + 1]! * 3, d = ix[i + 2]! * 3
+    v += p[a]! * (p[c + 1]! * p[d + 2]! - p[c + 2]! * p[d + 1]!) - p[a + 1]! * (p[c]! * p[d + 2]! - p[c + 2]! * p[d]!) + p[a + 2]! * (p[c]! * p[d + 1]! - p[c + 1]! * p[d]!)
+  }
+  return v / 6
+}
 
 export interface BrepIssue {
   readonly kind:
@@ -41,6 +54,11 @@ export interface ValidateOptions {
   readonly tol?: number
   /** Skip the (more expensive) volume/orientation check. */
   readonly skipVolume?: boolean
+  /**
+   * Check the orientation on a coarse tessellation's volume instead of the exact one: the sign is all the check needs, and
+   * the Boolean validates every result it returns (exact quadrature there was a large share of a blend sequence's time).
+   */
+  readonly coarseVolume?: boolean
 }
 
 export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport => {
@@ -124,7 +142,7 @@ export const validateBrep = (b: Brep, options: ValidateOptions = {}): BrepReport
   }
   let volume: number | undefined
   if (manifold && options.skipVolume !== true && issues.length === 0) {
-    volume = massProperties(b).volume
+    volume = options.coarseVolume === true ? coarseVolume(b) : massProperties(b).volume
     if (!(volume > 0)) issues.push({ kind: "orientation", message: `closed shell encloses a non-positive volume (${volume}); faces point inwards` })
   }
   return { valid: issues.length === 0, issues, manifoldSolid: manifold && issues.length === 0, genus, volume }

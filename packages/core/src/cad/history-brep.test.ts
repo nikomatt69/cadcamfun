@@ -114,11 +114,35 @@ describe("exact replay of a parametric history", () => {
   })
 
   test("a feature without an exact counterpart is reported per body, the mesh stays", () => {
-    const r = rebuildExact(plate([{ id: "round", type: "fillet", radius: 1 }]))
+    const r = rebuildExact(plate([{ id: "squash", type: "scale", factor: [1, 2, 1] }]))
     expect(r.bodies[0]!.brep).toBeUndefined()
-    expect(r.bodies[0]!.reason).toContain("fillet")
+    expect(r.bodies[0]!.reason).toContain("non-uniform scale")
     expect(r.result.bodies[0]!.mesh.indices.length).toBeGreaterThan(0)
   })
+
+  test("a fillet of every edge is the exact rolling-ball solid (inner box plus ball)", () => {
+    const r = 1
+    const v = exactVolume(plate([{ id: "round", type: "fillet", radius: r }]))
+    const a = 40 - 2 * r, b = 25 - 2 * r, c = 6 - 2 * r
+    expect(rel(v, a * b * c + 2 * r * (a * b + b * c + a * c) + PI * r * r * (a + b + c) + (4 / 3) * PI * r ** 3)).toBeLessThan(1e-8)
+    const faces = rebuildExact(plate([{ id: "round", type: "fillet", radius: r }])).bodies[0]!.brep!.faces
+    expect(faces.filter((f) => f.surface.kind === "sphere").length).toBe(8)
+  }, 180_000)
+
+  test("a chamfer of the vertical edges, and of every edge", () => {
+    const c = 2
+    // The four vertical edges: four 45-degree flats.
+    expect(rel(exactVolume(plate([{ id: "bevel", type: "fillet", style: "chamfer", radius: c, edges: { parallel: "z" } }])), 6000 - 4 * (c * c / 2) * 6)).toBeLessThan(1e-10)
+    // Every edge: the twelve chamfer planes, inclusion-exclusion at the eight corners.
+    expect(rel(exactVolume(plate([{ id: "bevel", type: "fillet", style: "chamfer", radius: c }])), 6000 - 2 * c * c * (40 + 25 + 6) + 6 * c ** 3)).toBeLessThan(1e-9)
+  }, 180_000)
+
+  test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
+    const r = 1
+    const holed = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "round", type: "fillet", radius: r, edges: { curved: true, within: { min: [10, 5, -1], max: [30, 20, 7] } } }])
+    const s = { area: r * r * (1 - PI / 4), centroid: ((10 - 3 * PI) / (12 - 3 * PI)) * r }
+    expect(rel(exactVolume(holed), 6000 - PI * 16 * 6 - 2 * (2 * PI * (4 + s.centroid) * s.area))).toBeLessThan(1e-8)
+  }, 180_000)
 
   test("recipes: the exact solid agrees with the mesh within the meshing error", () => {
     for (const [name, input] of [["mounting_plate", {}], ["flange", {}], ["l_bracket", {}], ["stepped_shaft", { sections: [{ diameter: 20, length: 30 }, { diameter: 14, length: 40 }] }]] as const) {

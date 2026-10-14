@@ -10,7 +10,7 @@
  *   fit tolerance.
  */
 import { cross3, dist3, dot3, length3, normalize3, solve2, solveDense, sub3, unwrapNear as unwrapNearCheck, type Vec2, type Vec3 } from "./math.ts"
-import { curveDerivs, curvePoint, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface, type SurfaceParam } from "./geom.ts"
+import { curveDerivs, curvePoint, curveProject, surfaceDerivs, surfaceNormal, surfacePeriods, surfacePoint, surfaceProject, type Curve3, type Surface, type SurfaceParam } from "./geom.ts"
 import type { Edge } from "./topology.ts"
 import type { FaceMesh } from "./tessellate.ts"
 
@@ -244,13 +244,45 @@ export const edgeEdgeHits = (
   tol: number
 ): CurveCurveHit[] => {
   const hits: CurveCurveHit[] = []
-  const add = (h: CurveCurveHit | undefined) => {
-    if (h === undefined) return
+  // Where the curves touch (tangent at the hit, e.g. a fillet's tangent line meeting the arc that ends it) Newton converges
+  // slowly and stops short; when such a hit is near an end point of either edge that lies exactly on the other curve, that
+  // end point is the intersection.
+  const ends: Array<{ readonly p: Vec3; readonly onFirst: boolean; readonly param: number }> = [
+    { p: curvePoint(e1.curve, e1.t0), onFirst: true, param: e1.t0 }, { p: curvePoint(e1.curve, e1.t1), onFirst: true, param: e1.t1 },
+    { p: curvePoint(e2.curve, e2.t0), onFirst: false, param: e2.t0 }, { p: curvePoint(e2.curve, e2.t1), onFirst: false, param: e2.t1 }
+  ]
+  const snap = Math.max(seedDist * 0.25, tol * 100)
+  const snapped = (h: CurveCurveHit): CurveCurveHit => {
+    for (const end of ends) {
+      if (dist3(end.p, h.point) > snap) continue
+      const other = end.onFirst ? e2 : e1
+      const q = curveProject(other.curve, end.p, other.t0, other.t1)
+      if (dist3(curvePoint(other.curve, q), end.p) > tol) continue
+      return end.onFirst ? { t: end.param, s: q, point: end.p } : { t: q, s: end.param, point: end.p }
+    }
+    return h
+  }
+  const add = (raw: CurveCurveHit | undefined) => {
+    if (raw === undefined) return
+    const h = snapped(raw)
     const s1 = e1.t1 - e1.t0, s2 = e2.t1 - e2.t0
     if (h.t < e1.t0 - 1e-9 * s1 || h.t > e1.t1 + 1e-9 * s1 || h.s < e2.t0 - 1e-9 * s2 || h.s > e2.t1 + 1e-9 * s2) return
     const t = Math.min(e1.t1, Math.max(e1.t0, h.t)), s = Math.min(e2.t1, Math.max(e2.t0, h.s))
     if (hits.some((x) => dist3(x.point, h.point) < tol)) return
     hits.push({ t, s, point: curvePoint(e1.curve, t) })
+  }
+  // Edges on one curve (a stretch both solids use, e.g. two blends meeting on their mitre ellipse): every sample would
+  // "cross"; only the ends of the overlap are vertices, i.e. each edge's end points that lie on the other edge.
+  const paramOn = (p: Vec3, e: Edge): number | undefined => {
+    const t = curveProject(e.curve, p, e.t0, e.t1)
+    return dist3(curvePoint(e.curve, t), p) <= tol ? t : undefined
+  }
+  let run = 0
+  for (let i = 0; i < x1.length && run < 3; i++) run = paramOn(x1[i]!, e2) === undefined ? 0 : run + 1
+  if (run >= 3) {
+    for (const t of [e1.t0, e1.t1]) { const s = paramOn(curvePoint(e1.curve, t), e2); if (s !== undefined) add({ t, s, point: curvePoint(e1.curve, t) }) }
+    for (const s of [e2.t0, e2.t1]) { const t = paramOn(curvePoint(e2.curve, s), e1); if (t !== undefined) add({ t, s, point: curvePoint(e2.curve, s) }) }
+    return hits.sort((a, b) => a.t - b.t)
   }
   for (let i = 0; i + 1 < x1.length; i++) {
     for (let j = 0; j + 1 < x2.length; j++) {

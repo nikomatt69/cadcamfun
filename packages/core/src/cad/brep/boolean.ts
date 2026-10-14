@@ -145,8 +145,25 @@ interface FittedCurve {
   readonly params: ReadonlyArray<number>
 }
 
-/** Line, circle, or interpolating cubic B-spline through exact points of a curve. */
-const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number): FittedCurve => {
+/**
+ * The exact conic two surfaces meet in, when there is one the line and circle tests do not cover: a plane cutting a
+ * cylinder obliquely meets it in an ellipse centred where the axis crosses the plane, of minor radius R across the axis and
+ * major radius R / |cos θ| along the axis's projection (θ between the axis and the plane's normal).
+ */
+const conicOf = (sa: Surface, sb: Surface): { readonly frame: Frame; readonly a: number; readonly b: number } | undefined => {
+  const plane = sa.kind === "plane" ? sa : sb.kind === "plane" ? sb : undefined
+  const cyl = sa.kind === "cylinder" ? sa : sb.kind === "cylinder" ? sb : undefined
+  if (plane === undefined || cyl === undefined || plane.kind !== "plane" || cyl.kind !== "cylinder") return undefined
+  const n = plane.frame.z, ax = cyl.frame.z
+  const c = dot3(n, ax)
+  if (Math.abs(c) < 1e-9 || Math.abs(Math.abs(c) - 1) < 1e-12) return undefined
+  const centre = add3(cyl.frame.origin, scale3(ax, dot3(sub3(plane.frame.origin, cyl.frame.origin), n) / c))
+  const major = normalize3(sub3(ax, scale3(n, c)))
+  return { frame: { origin: centre, x: major, y: cross3(n, major), z: n }, a: cyl.radius / Math.abs(c), b: cyl.radius }
+}
+
+/** Line, circle, the surfaces' exact conic, or an interpolating cubic B-spline through exact points of a curve. */
+const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number, conic?: { readonly frame: Frame; readonly a: number; readonly b: number }): FittedCurve => {
   const n = pts.length
   const P0 = pts[0]!, Pn = closed ? pts[0]! : pts[n - 1]!
   // Line.
@@ -194,6 +211,35 @@ const fitCurve = (pts: ReadonlyArray<Vec3>, closed: boolean, tol: number): Fitte
       }
     }
   }
+  // The exact ellipse of the two surfaces, when every point lies on it.
+  if (conic !== undefined && n >= 2) {
+    const { a, b } = conic
+    const local = (p: Vec3) => { const d = sub3(p, conic.frame.origin); return { x: dot3(d, conic.frame.x), y: dot3(d, conic.frame.y), z: dot3(d, conic.frame.z) } }
+    let ok = true
+    for (const p of pts) {
+      const q = local(p)
+      if (Math.abs(q.z) > tol || Math.abs(Math.hypot(q.x / a, q.y / b) - 1) * Math.min(a, b) > tol) { ok = false; break }
+    }
+    if (ok) {
+      // Orient the frame so the points run with increasing parameter.
+      const ang = (f: Frame, p: Vec3) => { const d = sub3(p, f.origin); return Math.atan2(dot3(d, f.y) / b, dot3(d, f.x) / a) }
+      let d0 = ang(conic.frame, pts[1] ?? Pn) - ang(conic.frame, P0)
+      while (d0 > Math.PI) d0 -= TAU
+      while (d0 < -Math.PI) d0 += TAU
+      const fr: Frame = d0 < 0 ? { origin: conic.frame.origin, x: conic.frame.x, y: scale3(conic.frame.y, -1), z: scale3(conic.frame.z, -1) } : conic.frame
+      const t0 = ang(fr, P0)
+      const params: number[] = [t0]
+      let acc = t0
+      for (let i = 1; i < n; i++) {
+        let d = ang(fr, pts[i]!) - ang(fr, pts[i - 1]!)
+        while (d < 0) d += TAU
+        while (d >= TAU) d -= TAU
+        acc += d
+        params.push(acc)
+      }
+      return { curve: { kind: "ellipse", frame: fr, a, b }, t0, t1: closed ? t0 + TAU : acc, params }
+    }
+  }
   // Cubic B-spline interpolation (closed curves repeat the first point).
   const data = closed ? [...pts, pts[0]!] : pts
   const { curve, params } = interpolateCurve(data.map((p) => [p.x, p.y, p.z]), 3)
@@ -212,25 +258,39 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   const reg = new VertexRegistry(Math.max(tol * 10, 1e-7))
 
   // ------------------------------------------------ preparation
-  const prepare = (b: Brep): SolidData => {
-    const opts = { chordTol: seedChord, angleTolDeg: 10 }
-    const fb = faceBoundaries(b, opts)
-    const tess = tessellateBrep(b, opts)
+  // Face boxes come from the boundary samples (and, for a curved face, its surface sampled over its parameter range), so
+  // only the faces near the other operand are meshed: a fillet tool touches a few faces of a large body, and meshing the
+  // whole body for every Boolean of a blend sequence was most of its cost. A face away from the other operand has no
+  // intersection; it stays one fragment, classified as a whole.
+  const opts = { chordTol: seedChord, angleTolDeg: 10 }
+  const pad = seedChord * 2
+  const faceBoxesOf = (b: Brep, fb: FaceBoundaries): Array<{ lo: Vec3; hi: Vec3 }> =>
+    b.faces.map((f, fi) => {
+      const ps: Vec3[] = []
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity
+      for (const r of fb.rings[fi] ?? []) for (const s of r) { ps.push(fb.point(s.g)); u0 = Math.min(u0, s.u); u1 = Math.max(u1, s.u); v0 = Math.min(v0, s.v); v1 = Math.max(v1, s.v) }
+      if (f.surface.kind !== "plane" && Number.isFinite(u0)) for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) ps.push(surfacePoint(f.surface, u0 + ((u1 - u0) * i) / 8, v0 + ((v1 - v0) * j) / 8))
+      if (ps.length === 0) return { lo: allBox.lo, hi: allBox.hi }
+      const bx = boxOf(ps)
+      // A curved face can bulge between the samples.
+      const bulge = f.surface.kind === "plane" ? 0 : 0.05 * dist3(bx.lo, bx.hi)
+      const p = pad + bulge
+      return { lo: { x: bx.lo.x - p, y: bx.lo.y - p, z: bx.lo.z - p }, hi: { x: bx.hi.x + p, y: bx.hi.y + p, z: bx.hi.z + p } }
+    })
+  const fbs = [faceBoundaries(A, opts), faceBoundaries(B, opts)] as const
+  const boxes = [faceBoxesOf(A, fbs[0]), faceBoxesOf(B, fbs[1])] as const
+  const solidBox = (bs: ReadonlyArray<{ lo: Vec3; hi: Vec3 }>) => boxOf(bs.flatMap((x) => [x.lo, x.hi]))
+  const near = [solidBox(boxes[1]), solidBox(boxes[0])] as const
+  const prepare = (b: Brep, s: 0 | 1): SolidData => {
+    const fb = fbs[s]
+    const faceBox = boxes[s]
+    const active = new Set(b.faces.map((_, fi) => fi).filter((fi) => boxOverlap(faceBox[fi]!, near[s], 0)))
+    const tess = tessellateBrep(b, { ...opts, faces: active })
     const tri: Array<TriSet | undefined> = b.faces.map(() => undefined)
     const bvh: Array<TriBvh | undefined> = b.faces.map(() => undefined)
     for (const fm of tess.faces) { tri[fm.face] = triSetOfFace(fm); bvh[fm.face] = new TriBvh(tri[fm.face]!, tol) }
-    const faceBox = b.faces.map((_, fi) => {
-      const t = tri[fi]
-      if (t === undefined) return { lo: allBox.lo, hi: allBox.hi }
-      const ps: Vec3[] = []
-      for (const [a, c, d] of t.tris) ps.push(t.pos(a), t.pos(c), t.pos(d))
-      const bx = boxOf(ps)
-      const pad = seedChord * 2
-      return { lo: { x: bx.lo.x - pad, y: bx.lo.y - pad, z: bx.lo.z - pad }, hi: { x: bx.hi.x + pad, y: bx.hi.y + pad, z: bx.hi.z + pad } }
-    })
     const edgeBox = b.edges.map((e, ei) => {
       const bx = boxOf(fb.edges[ei]!.points.map((g) => fb.point(g)))
-      const pad = seedChord * 2
       void e
       return { lo: { x: bx.lo.x - pad, y: bx.lo.y - pad, z: bx.lo.z - pad }, hi: { x: bx.hi.x + pad, y: bx.hi.y + pad, z: bx.hi.z + pad } }
     })
@@ -247,7 +307,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
       edgeBox
     }
   }
-  const S = [prepare(A), prepare(B)] as const
+  const S = [prepare(A, 0), prepare(B, 1)] as const
 
   const coincidentSurfaces = (sa: Surface, sb: Surface, sdB: SolidData, fbi: number): boolean => {
     // Every sampled point of face fb lies on surface sa.
@@ -427,7 +487,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
       const pieceClosed = v0 === v1
       const ptsP = seg.map((m) => m.q)
       if (ptsP.length >= 2 && !(ptsP.length === 2 && v0 === v1)) {
-        const fit = fitCurve(pieceClosed ? ptsP.slice(0, -1).map((q) => q.p) : ptsP.map((q) => q.p), pieceClosed, Math.max(tol * 10, fitTol / 10))
+        const fit = fitCurve(pieceClosed ? ptsP.slice(0, -1).map((q) => q.p) : ptsP.map((q) => q.p), pieceClosed, Math.max(tol * 10, fitTol / 10), conicOf(sa, sb))
         const params = pieceClosed ? [...fit.params, fit.t1] : [...fit.params]
         ssiPieces.push({
           key: `C${ci}.${ssiPieces.length}`,
@@ -797,7 +857,7 @@ export const booleanBrep = (A: Brep, B: Brep, op: BooleanOp, options: BooleanOpt
   let result: Brep = shellsByConnectivity({ vertices, edges, faces, shells: [] })
   result = mergeCoplanarFaces(result)
   result = compactBrep(result)
-  const report = validateBrep(result)
+  const report = validateBrep(result, { coarseVolume: true })
   if (!report.valid) throw new BooleanError(`Boolean ${op} produced an invalid solid: ${report.issues.slice(0, 3).map((i) => i.message).join("; ")}`, report.issues)
   return {
     brep: result,
@@ -855,11 +915,49 @@ const interiorSample = (polys: ReadonlyArray<ReadonlyArray<Vec2>>, su: number, s
       const A = Math.abs((r.xs[b]! - r.xs[a]!) * (r.ys[c]! - r.ys[a]!) - (r.ys[b]! - r.ys[a]!) * (r.xs[c]! - r.xs[a]!))
       if (A > bestA) { bestA = A; best = { x: (r.xs[a]! + r.xs[b]! + r.xs[c]!) / 3 / su, y: (r.ys[a]! + r.ys[b]! + r.ys[c]!) / 3 / sv } }
     }
-    if (best !== undefined) return best
+    if (best !== undefined && insidePolys(polys, best.x, best.y)) return best
   } catch {
-    // Degenerate fragment: fall back to the vertex average.
+    // Degenerate fragment (duplicate or touching points): the scanline below always finds an inside point.
   }
+  return scanlineSample(polys, su, sv)
+}
+
+/** Even-odd inside test of a point against a polygon with holes. */
+const insidePolys = (polys: ReadonlyArray<ReadonlyArray<Vec2>>, x: number, y: number): boolean => {
+  let crossings = 0
+  for (const p of polys) for (let i = 0; i < p.length; i++) {
+    const a = p[i]!, b = p[(i + 1) % p.length]!
+    if ((a.y > y) !== (b.y > y) && x < a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y)) crossings++
+  }
+  return crossings % 2 === 1
+}
+
+/**
+ * A point inside a polygon with holes, by scanlines: on lines across its height (between vertex heights), the middle of the
+ * widest inside run (even-odd). Unlike a vertex average it cannot fall outside a fragment bounded by a densely sampled arc.
+ */
+const scanlineSample = (polys: ReadonlyArray<ReadonlyArray<Vec2>>, su: number, sv: number): Vec2 => {
+  let minY = Infinity, maxY = -Infinity
+  for (const p of polys) for (const q of p) { minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y) }
+  let best: Vec2 | undefined, bestW = -1
+  const lines = 37
+  for (let k = 1; k < lines; k++) {
+    // Off the regular grid so a line does not run through vertices on round coordinates.
+    const y = minY + ((maxY - minY) * (k + 0.123456)) / (lines + 0.25)
+    const xs: number[] = []
+    for (const p of polys) for (let i = 0; i < p.length; i++) {
+      const a = p[i]!, b = p[(i + 1) % p.length]!
+      if ((a.y > y) !== (b.y > y)) xs.push(a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y))
+    }
+    xs.sort((a, b) => a - b)
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const w = (xs[i + 1]! - xs[i]!) * su
+      if (w > bestW) { bestW = w; best = { x: (xs[i]! + xs[i + 1]!) / 2, y } }
+    }
+  }
+  if (best !== undefined) return best
   const all = polys[0]!
+  void sv
   return { x: all.reduce((s, q) => s + q.x, 0) / all.length, y: all.reduce((s, q) => s + q.y, 0) / all.length }
 }
 

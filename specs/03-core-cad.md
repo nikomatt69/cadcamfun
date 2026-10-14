@@ -138,8 +138,12 @@ constructors, `extrudeProfile` / `revolveProfile`, `transformBrep`, `tessellateB
 `massProperties`, `validateBrep`, `readStepBreps` / `writeStepBreps`, and `booleanBrep`.
 
 `booleanBrep(A, B, "union" | "subtract" | "intersect", options)` intersects, imprints, classifies and
-sews trimmed surfaces. Analytic intersection curves are recognized; other intersection curves are fitted
-as cubic B-splines using `fitTol`. This is a numerical tolerance contract, not a claim of symbolic exactness
+sews trimmed surfaces. Analytic intersection curves are recognized (lines, circles, and the exact ellipse
+of a plane cutting a cylinder obliquely); other intersection curves are fitted as cubic B-splines using
+`fitTol`. Only the faces whose boxes overlap the other operand are meshed for the intersections (a fillet
+tool touches a few faces of a large body); edges running on one curve meet only at the ends of their
+overlap; a tangential crossing near an edge end snaps to that end when it lies exactly on the other curve;
+every result is validated (orientation by the sign of a coarse tessellation's volume). This is a numerical tolerance contract, not a claim of symbolic exactness
 for arbitrary surface intersections. Invalid sewn topology raises `BooleanError` with validator issues.
 `options.debug(stage, data)` exposes diagnostics without changing result validation.
 
@@ -155,8 +159,11 @@ cavity walls; the chained-Boolean regression covers this case.
   `brep` or the `reason` it has none. Exact: plain extrude (sketch lines, arcs and circles kept exact), revolve,
   hole (simple, counterbore, countersink), the analytic catalogue solids (cube, cylinder, cone, sphere,
   hemisphere, torus, prism, pyramid, extrusion, revolution) with their rotation, move, uniform scale, mirror,
-  pattern, split, combine and every union / subtract / intersect. Fillet, shell, sweep, loft, coil, edge and
-  corner treatments, drafts, non-uniform scale and the other catalogue solids keep their mesh and say so.
+  pattern, split, combine, every union / subtract / intersect, the profile corner treatments of an extrude
+  (exact tangent arcs or flats) and the `fillet` feature (fillet or chamfer, the mesh rebuild's edge selection:
+  edges between faces meeting at 25 degrees or more, convex by default, rims only with `curved`). Shell, sweep,
+  loft, coil, extrude edge treatments, drafts, non-uniform scale and the other catalogue solids keep their mesh
+  and say so; a fillet whose exact Boolean fails leaves the body without an exact model, with the reason.
   `exactSummary`, `historyToStep(history, name)`, `catalogueBrep`, `exactSketchLoops`, `brepBox`. Sketches on named
   or tilted work planes use the frame `rebuild` resolved; a hole on a non-base work plane keeps its mesh and says so.
 - `scene-step.ts` — `elementBrep(element, byId)` is the exact solid of a drawing element placed exactly as
@@ -176,13 +183,38 @@ cavity walls; the chained-Boolean regression covers this case.
   (`userData.brepEdge`); the property panel edits their placement and shows an "Exact model" section for every
   solid with an exact model (volume, area, centre of mass, topology, surfaces, validity, its own STEP).
 
-General B-rep fillets/chamfers, shell/draft on B-reps, persistent naming and 2D drafting remain pending, so the
-professional kernel acceptance gate is not claimed complete.
+**Blends (`brep/blend.ts`).** `blendCandidates(brep, minAngle)` lists the straight edges between two planes
+and the rims where a plane meets a cylinder square to it, each convex or concave; `selectBlendEdges` applies
+the mesh blend's selector; `blendBrep(brep, edges, size, "fillet" | "chamfer")` blends them with exact
+Booleans of rolling-ball tools: a straight edge becomes a cylinder (chamfer: a plane), a rim a torus (chamfer:
+a cone). Two blended edges meeting at a corner are mitred on their bisector plane; three convex fillets of
+one radius meeting at a corner get the rolling ball's spherical patch (the cell of the corner between its
+faces and the planes through the ball centre square to the edges, minus the ball). An edge that ends against
+a wall square to it stops on the wall. Edges refused for their geometry are in `rejected`, Boolean failures in
+`failures`; nothing is approximated. Reference parts with analytic volumes: one edge, a mitre, one spherical
+corner, the fully rounded box (6 planes, 12 cylinders, 8 spheres, the Minkowski volume), the fully chamfered
+box, a torus and a cone on a hole's mouth.
+
+**Drawings (`brep/drawing-edges.ts`).** `drawingEdges(brep)` is the seam `drawing/project.ts` named: every
+B-rep edge sampled on its exact curve with its faces' outward normals (crease, or smooth for tangent edges
+and seams), the inner edges of curved faces as silhouette candidates, and the watertight tessellation as the
+occluder. `generateSheet` draws from it when every body of the history has an exact model (option `exact`,
+reported as `edgeSource`); a smooth edge whose two faces are both seen edge-on is drawn as outline.
+
+Fillets of edges between curved faces (variable radius, setbacks), shell/draft on B-reps, persistent naming
+and 2D drafting remain pending, so the professional kernel acceptance gate is not claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-14: exact fillets and chamfers (`brep/blend.ts`) wired into `rebuildExact`'s `fillet` feature;
+  exact drawing edges (`brep/drawing-edges.ts`) in `generateSheet`. Boolean: exact plane x cylinder
+  ellipses, face-local meshing, overlapping edges, tangential end hits, robust fragment samples (scanline
+  fallback), coarse orientation check. Tessellation: cylinders and cones triangulated in strips (the Delaunay
+  metric compressed along the straight direction). A two-edge fillet went from 27 s to 0.7 s, the flange's
+  exact rebuild from 13-52 s to 2.3 s on a loaded machine.
 
 - 2026-10-13: merged the `exact-brep` worktree checkpoint on main: `history-brep.ts` (`rebuildExact`,
   `exactSummary`, `historyToStep`), `scene-step.ts` (`elementBrep`, `sceneToStep`), the barrel exports and the

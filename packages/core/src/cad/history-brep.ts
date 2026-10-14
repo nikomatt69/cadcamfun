@@ -14,6 +14,8 @@ import { dimensionValue, type Dimension } from "./expr.ts"
 import type { Sketch } from "./sketch.ts"
 import { rebuild, type Feature, type History, type PlaneName, type RebuildResult } from "./history.ts"
 import {
+  blendBrep,
+  blendCandidates,
   booleanBrep,
   BooleanError,
   compose,
@@ -28,6 +30,7 @@ import {
   revolveProfile,
   rotation,
   segmentPoint,
+  selectBlendEdges,
   treatLoopCorners,
   tessellateBrep,
   massProperties,
@@ -564,9 +567,27 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           else for (const c of copies) apply(f.id, c.exact, source.operation, source.targets, c.label)
           break
         }
-        case "fillet":
-          for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) bodies[bodies.indexOf(b)] = { ...b, exact: no("fillets and chamfers have no exact model yet") }
+        case "fillet": {
+          // The mesh rebuild's selection (edges between faces meeting at 25 degrees or more, convex by default, rims only when
+          // `curved`) on the exact solid; an edge the exact blend fails on leaves the body without an exact model.
+          const style = f.style ?? "fillet"
+          const size = dim(f.radius)
+          const sel = f.edges
+          const selector = {
+            ...(sel?.parallel !== undefined ? { parallel: sel.parallel } : {}), ...(sel?.kind !== undefined ? { kind: sel.kind } : {}),
+            ...(sel?.minLength !== undefined ? { minLength: dim(sel.minLength) } : {}), ...(sel?.curved === true ? { curved: true } : {}),
+            ...(sel?.within !== undefined ? { within: { min: sel.within.min.map(dim) as [number, number, number], max: sel.within.max.map(dim) as [number, number, number] } } : {})
+          }
+          for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) {
+            if (b.exact.brep === undefined) continue
+            const picked = selectBlendEdges(blendCandidates(b.exact.brep, 25), selector)
+            if (picked.length === 0) continue
+            const res = blendBrep(b.exact.brep, picked, size, style)
+            for (const why of res.rejected.slice(0, 4)) warnings.push(`${f.id}: not blended: ${why}`)
+            bodies[bodies.indexOf(b)] = { ...b, exact: res.failures.length > 0 ? no(`exact ${style} failed: ${res.failures[0]}`) : ok(res.brep) }
+          }
           break
+        }
         case "shell":
           for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) bodies[bodies.indexOf(b)] = { ...b, exact: no("a shell has no exact model yet") }
           break
