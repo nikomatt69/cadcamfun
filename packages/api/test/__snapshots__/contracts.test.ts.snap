@@ -55790,6 +55790,94 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                           ],
                           "type": "object",
                         },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "angle": {
+                              "type": "number",
+                            },
+                            "coolant": {
+                              "enum": [
+                                "off",
+                                "flood",
+                                "mist",
+                              ],
+                              "type": "string",
+                            },
+                            "feed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "id": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "lead": {
+                              "maximum": 85,
+                              "minimum": -85,
+                              "type": "number",
+                            },
+                            "name": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "plungeFeed": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "radialEngagement": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "rpm": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepdown": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "stepover": {
+                              "exclusiveMinimum": 0,
+                              "type": "number",
+                            },
+                            "strategy": {
+                              "enum": [
+                                "multiaxis",
+                              ],
+                              "type": "string",
+                            },
+                            "tilt": {
+                              "maximum": 85,
+                              "minimum": -85,
+                              "type": "number",
+                            },
+                            "tool": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "type": "string",
+                            },
+                            "toolAxis": {
+                              "enum": [
+                                "normal",
+                                "lead",
+                              ],
+                              "type": "string",
+                            },
+                            "top": {
+                              "type": "number",
+                            },
+                          },
+                          "required": [
+                            "id",
+                            "tool",
+                            "stepover",
+                            "strategy",
+                            "top",
+                          ],
+                          "type": "object",
+                        },
                       ],
                     },
                     "maxItems": 500,

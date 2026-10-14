@@ -1,0 +1,59 @@
+import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { buildRecipe } from "../../cad/recipes.ts"
+import { DEFAULT_CUTTERS, findCutter, runJob, type CamArtifact, type ManufacturingJob, type OperationSpec } from "./index.ts"
+import { findMachine } from "./machines.ts"
+
+setDefaultTimeout(100_000)
+
+// A dome on a base, cut by a five-axis finish on the trunnion machine. The part is the one the freeform test roughs.
+const base = { id: "base", type: "cube", x: 0, y: 0, z: 4, width: 40, height: 40, depth: 8 }
+const dome = { id: "dome", type: "sphere", x: 0, y: 0, z: 8, radius: 8 }
+const ball = findCutter(DEFAULT_CUTTERS, "ball-10")!
+const stock = { min: { x: -22, y: -22, z: 0 }, max: { x: 22, y: 22, z: 17 } }
+
+const job = (machine: string, operations: ReadonlyArray<OperationSpec>): ManufacturingJob => ({
+  schemaVersion: 1, id: "five", name: "Five-axis dome", material: "6061", part: { kind: "elements", elements: [base, dome] },
+  stock, tools: [ball], operations, machine: findMachine(machine)!, quality: { resolution: 0.4 }
+})
+const multiaxis = (tool: string): OperationSpec => ({ id: "five-finish", strategy: "multiaxis", tool, top: 17, stepover: 20, toolAxis: "normal" })
+
+describe("five-axis operations in the kernel", () => {
+  test("a five-axis finish on the trunnion writes simultaneous A/C words and the run completes", () => {
+    const r = runJob(job("trunnion-5ax", [multiaxis(ball.id)]))
+    if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
+    const a: CamArtifact = r.value
+    expect(a.operations.map((o) => o.strategy)).toEqual(["multiaxis"])
+    expect(a.operations[0]!.cut).toBe("finish-3d")
+    // The table turns while the axes move: the NC has rotary words on the cutting blocks.
+    expect(a.nc).toMatch(/\bA-?\d/)
+    expect(a.nc).toMatch(/\bC-?\d/)
+    // The replay reads the NC the post wrote, so it must not fail on the G-words of the five-axis program.
+    expect(a.claims.find((c) => c.id === "nc-replay")!.status).not.toBe("failed")
+    // Moves that turn the table are not checked against the height field, so the stock and gouge claims cannot pass.
+    expect(a.claims.find((c) => c.id === "no-gouge")!.status).toBe("unresolved")
+    expect(a.claims.find((c) => c.id === "material-removed")!.status).not.toBe("passed")
+    expect(a.claims.find((c) => c.id === "machine-clearance")!.status).toBe("unsupported")
+  })
+
+  test("a five-axis operation on a machine without a rotary table fails that operation with a typed issue", () => {
+    const r = runJob(job("vmc-standard", [multiaxis(ball.id)]))
+    if (r.status !== "ok") throw new Error(r.issues.map((i) => i.message).join("; "))
+    expect(r.value.operations[0]!.status).toBe("failed")
+    expect(r.value.issues.some((i) => /5-axis machine|rotary table/.test(i.message))).toBe(true)
+  })
+
+  test("the trunnion pivot is a machine property: the preset carries it and the 3-axis presets do not", () => {
+    expect(findMachine("trunnion-5ax")!.fiveAxis!.pivot).toEqual({ x: 0, y: 0, z: -100 })
+    expect(findMachine("vmc-standard")!.fiveAxis).toBeUndefined()
+  })
+
+  test("the same job on the same machine gives byte-identical NC", () => {
+    const a = runJob(job("trunnion-5ax", [multiaxis(ball.id)]))
+    const b = runJob(job("trunnion-5ax", [multiaxis(ball.id)]))
+    if (a.status !== "ok" || b.status !== "ok") throw new Error("the five-axis job must run")
+    expect(a.value.nc).toBe(b.value.nc)
+  })
+})
+
+// Keep the plate recipe import used by the other suites' fixtures out of this file's scope.
+void buildRecipe

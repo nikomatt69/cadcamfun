@@ -51,6 +51,12 @@ export const OperationSpecSchema = Schema.Union([
     slopeAngle: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: 5, maximum: 85 }))),
     allowance: Schema.optionalKey(nonNegative), scallop: Schema.optionalKey(positive), clearing: Schema.optionalKey(Schema.Literals(["contour", "adaptive"])),
     angle: Schema.optionalKey(Schema.Finite), restFrom: Schema.optionalKey(id)
+  }),
+  Schema.Struct({
+    ...overrides, strategy: Schema.Literal("multiaxis"), top: Schema.Finite, stepover: positive,
+    angle: Schema.optionalKey(Schema.Finite), toolAxis: Schema.optionalKey(Schema.Literals(["normal", "lead"])),
+    lead: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 }))),
+    tilt: Schema.optionalKey(Schema.Finite.check(Schema.isBetween({ minimum: -85, maximum: 85 })))
   })
 ])
 

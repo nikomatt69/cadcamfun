@@ -98,7 +98,8 @@ export const checkNcClearance = (
     const turns = turnsTable(s, angles)
     const r = rotaryOf(s)
     if (r !== undefined) angles = { ...(r.a !== undefined ? { a: r.a } : {}), ...(r.b !== undefined ? { b: r.b } : {}), ...(r.c !== undefined ? { c: r.c } : {}) }
-    if (turns) { rotaryMoves++; continue }
+    // A move that turns the table, or runs with the table already turned, is not checked: the table box is fixed in the machine.
+    if (turns || (angles.a ?? 0) !== 0 || (angles.b ?? 0) !== 0 || (angles.c ?? 0) !== 0) { rotaryMoves++; continue }
     const cutter = cutterOf(s.line)
     if (cutter === undefined) continue
     const scene = linearScene(cutter, obstacles)

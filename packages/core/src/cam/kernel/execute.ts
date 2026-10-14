@@ -24,6 +24,9 @@ import { AdaptiveParams, generateAdaptive } from "../operations/adaptive.ts"
 import { DrillParams, generateDrill } from "../operations/drill.ts"
 import { EngraveParams, generateEngrave } from "../operations/engrave.ts"
 import { FaceParams, generateFace } from "../operations/face.ts"
+import { MultiaxisParams, generateMultiaxis } from "../operations/multiaxis.ts"
+import { fiveAxisKinematic } from "../five-axis.ts"
+import { TriangleSoup } from "../model/mesh-queries.ts"
 import { PocketParams, generatePocket } from "../operations/pocket.ts"
 import { ProfileParams, generateProfile } from "../operations/profile.ts"
 import { SurfaceParams, generateSurface } from "../operations/surface.ts"
@@ -164,6 +167,7 @@ const cutOf = (op: OperationSpec, tool: Cutter): CutClass => {
     case "engrave": return "engrave"
     case "chamfer": return "chamfer"
     case "surface": return op.mode === "roughing" ? (op.clearing === "contour" ? "rough-side" : "adaptive") : "finish-3d"
+    case "multiaxis": return "finish-3d"
   }
 }
 
@@ -214,6 +218,7 @@ const sweptRegion = (op: OperationSpec, o: Vec3, radius: number): { readonly box
     }
     case "face":
     case "surface":
+    case "multiaxis":
       return undefined
   }
 }
@@ -308,9 +313,9 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     const radius = tool.diameter / 2
     const region = sweptRegion(op, o, radius)
     const materialTop = Math.min(sMax.z, grid.topOver(region))
-    const opTop = op.strategy === "face" || op.strategy === "surface" ? sMax.z : op.top - o.z
+    const opTop = op.strategy === "face" || op.strategy === "surface" || op.strategy === "multiaxis" ? sMax.z : op.top - o.z
     const opBottom = op.strategy === "face" ? op.bottom - o.z
-      : op.strategy === "surface" ? partBottom
+      : op.strategy === "surface" || op.strategy === "multiaxis" ? partBottom
       : op.strategy === "thread" ? op.top - o.z - op.length
       : op.strategy === "engrave" ? op.top - o.z - op.depth
       : op.strategy === "chamfer" ? op.top - o.z - chamferGeometry(coneOf(tool), op.width, op.tipOffset ?? 0.2).tipDepth
@@ -433,6 +438,22 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
           generated = { toolpath: r.toolpath, warnings: [...r.warnings, ...r.skipped] }
           break
         }
+        case "multiaxis": {
+          const five = machine.fiveAxis
+          if (five === undefined) { fail("InvalidInput", `${op.id}: the machine has no rotary table: choose a 5-axis machine`, data); return }
+          const soup = new TriangleSoup(workMeshes, Math.max(0.5, cell))
+          const params = decode(MultiaxisParams, {
+            ...common, strategy: "parallel", stepover: Math.max(1, Math.min(100, op.stepover)), angle: op.angle ?? 0,
+            toolAxis: op.toolAxis ?? "normal", lead: op.lead ?? 10, tilt: op.tilt ?? 0, tolerance: prepared.tolerance
+          })
+          const kin = fiveAxisKinematic({
+            layout: five.layout, limits: { tilt: five.tilt, ...(five.rotation !== undefined ? { rotation: five.rotation } : {}) },
+            pivot: five.pivot, tcp: "program"
+          })
+          const r = generateMultiaxis(params, soup, legacyTool(tool), kin)
+          generated = { toolpath: r.toolpath, warnings: [...r.warnings, ...(r.stats.skipped > 0 ? [`${op.id}: ${r.stats.skipped} points skipped (no lean clears the part, or the table cannot reach it)`] : [])] }
+          break
+        }
         case "surface": {
           const model = part()
           if (model === undefined) { fail("InvalidInput", `${op.id}: the part has no surface model`, data); return }
@@ -459,7 +480,11 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     const marked: Toolpath = { ...tp, moves: [{ _tag: "Comment", text: `OP${toolpaths.length + 1} ${op.id}` } as Move, ...tp.moves] }
     // Provisional stock: what this operation removes, so the next one enters from the right height.
     const replay = pathFromProgram(makeProgram("provisional", [marked]), { x: 0, y: 0, z: CLEARANCE })
-    carve(provisional, replay.segments, toolModel(verifyTool(tool)), Math.max(cell, Math.min(radius / 4, 3)))
+    if (marked.moves.some((m) => (m._tag === "Rapid" || m._tag === "Linear") && m.rotary !== undefined)) {
+      warnings.push(`${op.id}: five-axis moves are not carved into the height field; the stock after this operation is not tracked`)
+    } else {
+      carve(provisional, replay.segments, toolModel(verifyTool(tool)), Math.max(cell, Math.min(radius / 4, 3)))
+    }
     toolpaths.push(marked)
     opOfToolpath.push(outcomes.length)
     warnings.push(...generated.warnings, ...data.warnings)
@@ -556,6 +581,8 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
   const removedByOp = new Map<number, number>()
   const cutLengthByOp = new Map<number, number>()
   let rapidHits = 0, shankHits = 0, holderHits = 0, noTool = 0
+  // Moves with A/B/C words: their XYZ is in the machine frame, not the work frame the height field is in, so they are not carved or checked here.
+  let turnedMoves = 0
   const firstFinding = new Map<string, CamIssue>()
   const finding = (key: string, make: () => CamIssue): void => { if (!firstFinding.has(key)) firstFinding.set(key, make()) }
   let gougeColumns = 0, gougeDepth = 0
@@ -578,6 +605,7 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
     const cellSize = Math.min(hf.cellX, hf.cellY)
     for (const s of interpreted.segments as ReadonlyArray<GSegment>) {
       if (s.kind === "dwell") continue
+      if (s.kind !== "arc" && s.rotary !== undefined) { turnedMoves++; continue }
       const op = opAtLine[s.line]
       if (op !== lastOp) { checkGouges(lastOp); lastOp = op }
       const n = toolAtLine[s.line]
@@ -704,14 +732,14 @@ export const executeJob = (prepared: PreparedJob): CamResult<CamArtifact> => {
       status: failedOps.length > 0 || unmachined.length > 0 ? "failed" : "passed",
       detail: failedOps.length > 0 || unmachined.length > 0 ? [...failedOps.map((x) => `${x.id} failed`), ...unmachined].join("; ") : `${finalOutcomes.length} operations generated; every planned feature has an operation`
     },
-    { id: "no-rapid-in-stock", status: interpreted === undefined ? "unresolved" : rapidHits > 0 ? "failed" : "passed", detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material` : "No rapid move touches the stock as replayed" },
+    { id: "no-rapid-in-stock", status: interpreted === undefined ? "unresolved" : rapidHits > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: rapidHits > 0 ? `${rapidHits} rapid samples inside material` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their rapids are not checked against the height field` : "No rapid move touches the stock as replayed" },
     {
       id: "holder-clearance", status: interpreted === undefined ? "unresolved" : shankHits + holderHits > 0 ? "failed" : "passed",
       detail: shankHits + holderHits > 0 ? `${shankHits} shank and ${holderHits} holder contacts with the stock` : "Shank and holder stay clear of the stock (3-axis height-field replay)"
     },
-    { id: "no-gouge", status: interpreted === undefined ? "unresolved" : gougeColumns > 0 ? "failed" : "passed", detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm` : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)` },
+    { id: "no-gouge", status: interpreted === undefined ? "unresolved" : gougeColumns > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed", detail: gougeColumns > 0 ? `${gougeColumns} cells cut below the part, up to ${gougeDepth.toFixed(3)} mm` : turnedMoves > 0 ? `${turnedMoves} moves turn the table: their cuts are not checked against the part` : `No cut below the part beyond ${(0.02 + prepared.tolerance).toFixed(3)} mm (one cell of lateral slack)` },
     {
-      id: "material-removed", status: interpreted === undefined ? "unresolved" : maxRemaining > 0 ? "failed" : "passed",
+      id: "material-removed", status: interpreted === undefined ? "unresolved" : maxRemaining > 0 ? "failed" : turnedMoves > 0 ? "unresolved" : "passed",
       detail: maxRemaining > 0 ? `${remainingVolume.toFixed(1)} mm³ left, up to ${maxRemaining.toFixed(3)} mm` : `The replayed stock matches the part within ${allowed.toFixed(3)} mm`
     },
     {

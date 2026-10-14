@@ -27,6 +27,13 @@ export const MACHINES: ReadonlyArray<KernelMachine> = [
     table: { length: 300, width: 200, gap: 15 }, rapidFeed: 3000, toolChangeSeconds: 30
   },
   {
+    // The kernel writes machine coordinates (tool centre point in the program), so the post must not add the controller's TCP command.
+    id: "trunnion-5ax", name: "5-axis trunnion (BT40, 12 000 rpm, A/C table, 11 kW)", post: "fanuc",
+    limits: { maxRpm: 12000, minRpm: 100, maxFeed: 12000, powerKw: 11, torqueNm: 70, rigidity: "standard" },
+    // Typical trunnion: the rotation centre sits about 100 mm below the work origin on the table top (a shop enters its own).
+    table: { length: 600, width: 400, gap: 30 }, fiveAxis: { layout: "table-AC", pivot: { x: 0, y: 0, z: -100 }, tilt: [-120, 120] }, rapidFeed: 30000, toolChangeSeconds: 6
+  },
+  {
     id: "cnc-router", name: "CNC router (24 000 rpm spindle, 2.2 kW)", post: "grbl",
     limits: { maxRpm: 24000, minRpm: 6000, maxFeed: 6000, powerKw: 2.2, torqueNm: 1.2, rigidity: "hobby" },
     table: { length: 1200, width: 900, gap: 20 }, rapidFeed: 8000, toolChangeSeconds: 30

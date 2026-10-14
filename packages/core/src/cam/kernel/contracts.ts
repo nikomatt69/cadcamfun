@@ -39,6 +39,17 @@ export interface KernelMachine {
    * parallels' height. When present, every NC move is checked for the holder and shank against the table (`machine-clearance`).
    */
   readonly table?: { readonly length: number; readonly width: number; readonly gap: number }
+  /**
+   * The trunnion table that turns the part for five-axis operations. `pivot` is the centre of rotation of the table in the work
+   * frame, mm: a property of the machine's trunnion (its height over the table and its position), so it is given here and not
+   * derived from the stock. `layout` is C about Z with tilt A about X or B about Y; `tilt` and `rotation` are the ranges in degrees.
+   */
+  readonly fiveAxis?: {
+    readonly layout: "table-AC" | "table-BC"
+    readonly pivot: { readonly x: number; readonly y: number; readonly z: number }
+    readonly tilt: readonly [number, number]
+    readonly rotation?: readonly [number, number]
+  }
 }
 
 /** Process overrides an operation may carry; anything absent comes from the cutting data. */
@@ -79,6 +90,11 @@ export type OperationSpec =
   | (OperationBase & { readonly strategy: "engrave"; readonly paths: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly closed: boolean }>; readonly top: number; readonly depth: number })
   | (OperationBase & { readonly strategy: "chamfer"; readonly loops: ReadonlyArray<{ readonly points: ReadonlyArray<Vec2>; readonly side: "outside" | "inside" }>; readonly top: number; readonly width: number; readonly tipOffset?: number })
   | (OperationBase & { readonly strategy: "surface"; readonly mode: "roughing" | "parallel" | "waterline" | "steep-shallow"; readonly slopeAngle?: number; readonly allowance?: number; readonly scallop?: number; readonly clearing?: "contour" | "adaptive"; readonly angle?: number; readonly restFrom?: string })
+  /**
+   * Simultaneous five-axis finishing on a trunnion table: the tool leans off the surface normal (`lead` towards the travel, `tilt`
+   * sideways) and the table turns with the linear axes. The moves carry A/B/C words; `top` is the highest the tool may be.
+   */
+  | (OperationBase & { readonly strategy: "multiaxis"; readonly top: number; readonly stepover: number; readonly angle?: number; readonly toolAxis?: "normal" | "lead"; readonly lead?: number; readonly tilt?: number })
 
 export type Strategy = OperationSpec["strategy"]
 
