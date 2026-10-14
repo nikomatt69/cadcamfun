@@ -26,6 +26,7 @@ import {
 } from "../ir.ts"
 import { type ArcMode, type Dialect, type PostOptions, defaultPostOptions } from "./types.ts"
 import { assertCycleSafe } from "../cycle-safety.ts"
+import { bodyOf, planSubprograms } from "./subprograms.ts"
 
 const MM_PER_INCH = 25.4
 
@@ -88,6 +89,28 @@ export const toolNumbers = (program: Program, override?: Readonly<Record<string,
   return map
 }
 
+/** The state a subprogram body leaves the control in. */
+interface SubprogramExit {
+  readonly motion: string | undefined
+  readonly feed: string | undefined
+  /** Rounded displacement of the tool over the body, output units. */
+  readonly dx: number
+  readonly dy: number
+  readonly dz: number
+}
+
+const shifted = (move: Move, by: Vec3): Move => {
+  switch (move._tag) {
+    case "Rapid":
+    case "Linear":
+      return { ...move, to: { x: move.to.x - by.x, y: move.to.y - by.y, z: move.to.z - by.z } }
+    case "Arc":
+      return { ...move, to: { x: move.to.x - by.x, y: move.to.y - by.y, z: move.to.z - by.z }, center: { x: move.center.x - by.x, y: move.center.y - by.y } }
+    default:
+      return move
+  }
+}
+
 class Writer {
   readonly lines: string[] = []
   private blockNumber: number
@@ -105,6 +128,11 @@ class Writer {
   /** Tool-centre-point control (`G234` on Haas) active over a simultaneous 5-axis section. */
   private tcpOn = false
   private cycle: { code: string; z?: string; r?: string; q?: string; p?: string } | undefined
+  /**
+   * Incremental output (`G91`) for the body of a subprogram: the axis words are the change of the rounded position, which
+   * starts at the origin of the body's own frame, so the control adds up exactly the positions the absolute text would give.
+   */
+  incremental = false
   // True IR position (mm), for arc geometry and cycle expansion.
   ir: Vec3 | undefined
   spindleRpm = 0
@@ -116,10 +144,11 @@ class Writer {
     private readonly options: PostOptions,
     private readonly dialect: Dialect,
     private readonly arcMode: ArcMode,
-    units: "mm" | "inch"
+    units: "mm" | "inch",
+    blockStart?: number
   ) {
     this.numbered = options.lineNumbers !== undefined
-    this.blockNumber = options.lineNumbers?.start ?? 0
+    this.blockNumber = blockStart ?? options.lineNumbers?.start ?? 0
     this.step = options.lineNumbers?.step ?? 0
     this.scale = units === "inch" ? 1 / MM_PER_INCH : 1
   }
@@ -165,9 +194,11 @@ class Writer {
     const y = Number(ys)
     const z = Number(zs)
     const words: string[] = []
-    if (forceXY || this.px !== x) words.push(`X${xs}`)
-    if (forceXY || this.py !== y) words.push(`Y${ys}`)
-    if (this.pz !== z) words.push(`Z${zs}`)
+    const word = (letter: string, text: string, value: number, current: number | undefined): string =>
+      this.incremental ? `${letter}${formatNumber(value - (current ?? 0), this.options.decimals)}` : `${letter}${text}`
+    if (forceXY || this.px !== x) words.push(word("X", xs, x, this.px))
+    if (forceXY || this.py !== y) words.push(word("Y", ys, y, this.py))
+    if (this.pz !== z) words.push(word("Z", zs, z, this.pz))
     return { words, x, y, z }
   }
 
@@ -436,6 +467,42 @@ class Writer {
     this.endCycle()
   }
 
+  /** The number the next numbered block gets. */
+  nextBlock(): number {
+    return this.blockNumber
+  }
+
+  /** Starts a subprogram body: the tool is at the origin of the body's frame, with no motion mode or feed set yet. */
+  startBody(): void {
+    this.px = 0
+    this.py = 0
+    this.pz = 0
+    this.ir = { x: 0, y: 0, z: 0 }
+    this.motion = undefined
+    this.feed = undefined
+  }
+
+  /** What a body leaves behind: the modal motion code and feed, and the total rounded displacement. */
+  bodyExit(): SubprogramExit {
+    return { motion: this.motion, feed: this.feed, dx: this.px ?? 0, dy: this.py ?? 0, dz: this.pz ?? 0 }
+  }
+
+  /**
+   * Calls a subprogram right after the positioning move. The control ends up where the body's increments add up to from here,
+   * with the modal motion code and feed the body left; `end` is the true end point of the toolpath the call replaces.
+   */
+  call(text: string, exit: SubprogramExit, end: Vec3 | undefined): void {
+    this.endCycle()
+    this.block(text)
+    const d = this.options.decimals
+    this.px = Number(((this.px ?? 0) + exit.dx).toFixed(d))
+    this.py = Number(((this.py ?? 0) + exit.dy).toFixed(d))
+    this.pz = Number(((this.pz ?? 0) + exit.dz).toFixed(d))
+    this.motion = exit.motion
+    this.feed = exit.feed
+    if (end !== undefined) this.ir = { ...end }
+  }
+
   /**
    * Closes a simultaneous 5-axis section at the end of the program: the control must not be left with
    * tool-centre-point control active (it is cancelled at `M30` on Haas, but a reader expects to see it).
@@ -492,6 +559,9 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   const options: PostOptions = { ...defaultPostOptions, ...userOptions }
   const w = new Writer(options, dialect, resolveArcMode(options.arcMode, dialect), program.units)
   const numbers = toolNumbers(program, options.toolNumbers)
+  const spec = options.subprograms === true ? dialect.subprograms : undefined
+  const unit = Math.pow(10, -options.decimals) * (program.units === "inch" ? MM_PER_INCH : 1)
+  const plan = spec === undefined ? undefined : planSubprograms(program, spec.first(program), spec.last, unit)
 
   for (const line of dialect.begin(program)) w.raw(line)
   if (options.header) {
@@ -505,13 +575,36 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
     program.toolpaths.forEach((tp, i) => {
       w.comment(`OP ${i + 1}: ${tp.name} | T${numbers.get(tp.toolId)} [${tp.toolId}] | S${Math.round(tp.spindleRpm)} | F${feedRange(tp)}`)
     })
+    for (const g of plan?.groups ?? []) w.comment(`SUBPROGRAM O${g.number}: ${program.toolpaths[g.leader]!.name} X${g.members.length}`)
   }
   w.block(program.units === "inch" ? "G20" : "G21", ...dialect.setup)
   w.block(program.workOffset)
 
   let zMax = -Infinity
   let first = true
-  for (const tp of program.toolpaths) {
+  // A subprogram body is written once, in its own incremental frame, from the motion of the toolpath that leads its group.
+  // The first call needs only what it leaves the control in; the text is written after the main program, numbered on from it.
+  const buildBody = (gi: number, blockStart: number): { readonly lines: ReadonlyArray<string>; readonly exit: SubprogramExit; readonly next: number } => {
+    const group = plan!.groups[gi]!
+    const source = bodyOf(program.toolpaths[group.leader]!)!
+    const b = new Writer(options, dialect, resolveArcMode(options.arcMode, dialect), program.units, blockStart)
+    b.incremental = true
+    b.raw(spec!.begin(group.number))
+    b.block("G91")
+    b.startBody()
+    // The body is written about the rounded positioning point, the position the control is really at: rounding then commutes
+    // with the translation of a copy, so a copy at a whole number of output steps is exactly its own text.
+    const snap = (v: number): number => Number((v * b.scale).toFixed(options.decimals)) / b.scale
+    const origin = { x: snap(source.origin.x), y: snap(source.origin.y), z: snap(source.origin.z) }
+    for (const move of source.body) b.move(shifted(move, origin))
+    b.finishMotion()
+    const exit = b.bodyExit()
+    b.block("G90")
+    b.block(spec!.end)
+    return { lines: b.lines, exit, next: b.nextBlock() }
+  }
+  const exits = new Map<number, SubprogramExit>()
+  for (const [ti, tp] of program.toolpaths.entries()) {
     w.comment(`OPERATION: ${tp.name}`)
     const n = numbers.get(tp.toolId) ?? 1
     if (n !== w.tool) {
@@ -543,10 +636,27 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
       if (tp.coolant !== "off") w.block(tp.coolant === "flood" ? "M8" : "M7")
       w.coolant = tp.coolant
     }
-    for (const move of tp.moves) {
-      w.move(move)
-      const to = moveTarget(move)
-      if (to !== undefined && to.z > zMax) zMax = to.z
+    const call = plan?.callOf.get(ti)
+    if (call === undefined) {
+      for (const move of tp.moves) {
+        w.move(move)
+        const to = moveTarget(move)
+        if (to !== undefined && to.z > zMax) zMax = to.z
+      }
+    } else {
+      // The positioning move as usual, then one block in place of the rest of the toolpath.
+      tp.moves.forEach((move, mi) => {
+        if (mi <= call.head) w.move(move)
+        const to = moveTarget(move)
+        if (to !== undefined && to.z > zMax) zMax = to.z
+      })
+      let exit = exits.get(call.group)
+      if (exit === undefined) {
+        exit = buildBody(call.group, 0).exit
+        exits.set(call.group, exit)
+      }
+      const last = [...tp.moves].reverse().map(moveTarget).find((p) => p !== undefined)
+      w.call(spec!.call(plan!.groups[call.group]!.number), exit, last)
     }
     w.finishMotion()
   }
@@ -559,6 +669,13 @@ export const emitProgram = (program: Program, userOptions: Partial<PostOptions>,
   w.block("M5")
   if (w.coolant !== "off") w.block("M9")
   w.block(dialect.end)
+  // Subprograms follow the end of the main program and precede the closing delimiter.
+  let next = w.nextBlock()
+  for (const gi of [...exits.keys()].sort((a, b) => a - b)) {
+    const built = buildBody(gi, next)
+    w.lines.push(...built.lines)
+    next = built.next
+  }
   for (const line of dialect.finish) w.raw(line)
   return `${w.lines.join("\n")}\n`
 }

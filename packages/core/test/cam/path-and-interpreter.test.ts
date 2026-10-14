@@ -92,7 +92,7 @@ describe("reference interpreter", () => {
   })
 
   test("unsupported motion words are reported instead of ignored", () => {
-    expect(interpretGcode("G91\nG1 X1 F10").errors.length).toBe(1)
+    expect(interpretGcode("G18\nG1 X1 F10").errors.length).toBe(1)
     expect(interpretGcode("G18").errors.length).toBe(1)
   })
 })

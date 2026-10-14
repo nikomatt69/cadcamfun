@@ -36,6 +36,13 @@ export interface PostOptions {
   readonly retractBeforeToolChange?: boolean
   /** Injected into the header when given; absent by default so output is deterministic. */
   readonly stamp?: string
+  /**
+   * Write the toolpaths that repeat another one translated (the same motion at another place: the holes of a pattern, the
+   * copies of a pocket) as one subprogram, called once per copy, when the dialect has them (`Dialect.subprograms`). The
+   * subprogram is incremental (`G91`) and starts where the tool stands, so a copy is the same text. Off by default so
+   * existing output stays byte-identical.
+   */
+  readonly subprograms?: boolean
 }
 
 export const defaultPostOptions: PostOptions = {
@@ -80,6 +87,22 @@ export interface Dialect {
   readonly setup: ReadonlyArray<string>
   /** Blocks of a tool change to tool number `n`; `first` is true for the first tool of the program. */
   readonly toolChange: (n: number, first: boolean) => ReadonlyArray<string>
+  /**
+   * Subprograms the control runs (`M98 P<n>` … `M99`), written after the end of the main program. Absent on controls
+   * without them: the `subprograms` option is then ignored.
+   */
+  readonly subprograms?: {
+    /** Number of the first subprogram: the main program's number plus one. */
+    readonly first: (program: Program) => number
+    /** Highest program number the control accepts. */
+    readonly last: number
+    /** Block that calls subprogram `n`. */
+    readonly call: (n: number) => string
+    /** Line that opens subprogram `n` (`O1001`). */
+    readonly begin: (n: number) => string
+    /** Block that returns to the caller (`M99`). */
+    readonly end: string
+  }
   /** Final program-end block (`M30`, `M2`). */
   readonly end: string
   /** Lines after the end block, unnumbered (e.g. `%`). */
