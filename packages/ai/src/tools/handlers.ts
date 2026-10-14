@@ -1,5 +1,5 @@
 import type { SetupCandidate, MachiningPlanInput, ManufactureInput } from "../actions/cam.ts"
-import type { CadGrepInput } from "../actions/cad.ts"
+import type { CadAssemblyInput, CadExactInput, CadGrepInput } from "../actions/cad.ts"
 import type { CadComponentRelationsInput, CadInspectionInput } from "../actions/cad.ts"
 import type { ParametricHandlerInput } from "../actions/parametric.ts"
 export type { ParametricHandlerInput } from "../actions/parametric.ts"
@@ -40,6 +40,10 @@ export interface ToolHandlersShape {
   stock?(projectId: string, input: CamStockInput): Promise<unknown>
   cadInspect?(projectId: string, input: CadInspectionInput): Promise<unknown>
   cadComponentRelations?(projectId: string, input: CadComponentRelationsInput): Promise<unknown>
+  /** The exact B-rep kernel over the open drawing: per solid validity, mass properties, holes and how the CAM planner will machine it. */
+  cadExact?(projectId: string, input: CadExactInput): Promise<unknown>
+  /** Exact interference, bill of materials, joints and the fasteners still missing of the open drawing. */
+  cadAssembly?(projectId: string, input: CadAssemblyInput): Promise<unknown>
   webSearch?(input: WebSearchInput, signal?: AbortSignal): Promise<unknown>
   vision?(projectId: string, mode: "cad" | "cam", focus?: string, signal?: AbortSignal): Promise<{ ok: false; error: string } | { ok: true; capture: VisionCapture; evidence: unknown }>
   parametric?(projectId: string, input: ParametricHandlerInput): Promise<unknown>

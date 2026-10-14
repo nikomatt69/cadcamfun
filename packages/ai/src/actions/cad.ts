@@ -48,6 +48,15 @@ export const cadGrepParameters = z.object({
 })
 export type CadGrepInput = z.infer<typeof cadGrepParameters>
 
+/** The exact kernel over the whole drawing: `ids` narrows it to some elements, `machining` skips the CAM feature evaluation. */
+export const cadExactParameters = z.object({
+  ids: z.array(z.string().min(1).max(100)).min(1).max(40).optional(),
+  machining: z.boolean().optional()
+})
+export type CadExactInput = z.infer<typeof cadExactParameters>
+export const cadAssemblyParameters = z.object({ washers: z.boolean().optional() })
+export type CadAssemblyInput = z.infer<typeof cadAssemblyParameters>
+
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
     ? { ok: false, error: "Inspection is unavailable in this host." }
@@ -139,6 +148,18 @@ export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
     id: "cad.parametric_exact", kind: "read", replaces: "cad_parametric",
     parameters: parametricExactSchema,
     run: (input, context) => runParametricExact(input, context)
+  }),
+  defineAction({
+    id: "cad.exact", kind: "read",
+    parameters: cadExactParameters,
+    run: (input, { handlers, projectId }) =>
+      handlers.cadExact === undefined ? { ok: false, error: "Exact analysis is unavailable in this host." } : handlers.cadExact(projectId, input)
+  }),
+  defineAction({
+    id: "cad.assembly", kind: "read",
+    parameters: cadAssemblyParameters,
+    run: (input, { handlers, projectId }) =>
+      handlers.cadAssembly === undefined ? { ok: false, error: "Assembly analysis is unavailable in this host." } : handlers.cadAssembly(projectId, input)
   }),
   defineAction({
     id: "cad.parametric_fastener", kind: "read", replaces: "cad_parametric",
