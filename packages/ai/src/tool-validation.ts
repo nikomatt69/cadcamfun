@@ -8,7 +8,9 @@ export const toolValidationFailure = (tool: string, error: z.ZodError) => {
     if (issue.path.at(-1) === "cases" && issue.code === "invalid_type" && issue.expected === "array") {
       hints.add('Send cases as a JSON array of 1..12 objects, e.g. [{"name":"wider","parameters":{"width":80}}], never as a JSON-encoded string.')
     }
-    if (issue.path.includes("history") && issue.code === "invalid_type" && issue.expected === "object") {
+    // A history sent as text is parsed by the lenient layer; an empty or partial one then lacks its parameters or features.
+    const historyPart = issue.path.at(-1) === "history" || (issue.path.at(-2) === "history" && (issue.path.at(-1) === "parameters" || issue.path.at(-1) === "features"))
+    if (issue.path.includes("history") && issue.code === "invalid_type" && (issue.expected === "object" || historyPart)) {
       hints.add('Send history as a JSON object {"parameters":{},"features":[...]}, never as a string containing JSON.')
     }
     if (issue.path.includes("entities") && issue.path.at(-1) === "kind") {
