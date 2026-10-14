@@ -33,6 +33,6 @@ export const makeParametricRunner = (handlers: () => ToolHandlersShape, projectI
     const { create: _create, ...rest } = input
     const definition = buildTools(handlers(), projectId()).find((t) => t.id === tool)
     if (definition === undefined) throw new Error(`Tool ${tool} is not registered`)
-    return JSON.parse(await definition.execute({ ...(input["action"] === "recipe" && tool === "cad" ? rest : input), action }, ctx)) as any
+    return JSON.parse(await definition.execute({ ...rest, action }, ctx)) as any
   }
 }

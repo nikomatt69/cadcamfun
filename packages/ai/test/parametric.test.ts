@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { plateTemplate } from "@cadcamfun/core"
-import { historySchema, parametricReport } from "../src/parametric.ts"
+import { decodeHistory, parseHistory, parametricReport } from "../src/parametric.ts"
 import { normalizeElement } from "../src/element-catalog.ts"
 
 describe("parametric boundary and geometry", () => {
@@ -19,7 +19,7 @@ describe("parametric boundary and geometry", () => {
   })
   test("existing plate rebuilds and dependent dimensions follow variants", () => {
     const base = plateTemplate()
-    expect(historySchema.safeParse(base).success).toBe(true)
+    expect(decodeHistory(base).success).toBe(true)
     const original = parametricReport(base)
     expect(original.ok).toBe(true)
     for (const width of [30, 60, 90]) {
@@ -40,7 +40,7 @@ describe("parametric boundary and geometry", () => {
       { ...base, parameters: { ...base.parameters, width: Infinity } },
       { ...base, features: [...base.features, { id: "p", type: "pattern", feature: "plate", kind: "linear", count: 3 }] }
     ]) {
-      expect(historySchema.safeParse(history).success).toBe(false)
+      expect(decodeHistory(history).success).toBe(false)
       expect(normalizeElement({ type: "parametric", history }).ok).toBe(false)
     }
   })

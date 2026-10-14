@@ -3,20 +3,24 @@
  * libraries: inspection never provisions a project, a drawing or a default (the sidecar's handlers enforce that too),
  * which is what lets the read-only specialists have the whole tool.
  */
-import { z } from "zod"
-import { CadInspectionElements, CadInspectionLayers, CadInspectionProperty, CadInspectionSearch } from "@cadcamfun/api"
-import { visionInputSchema } from "../vision.ts"
-import { nikcliWireSchema } from "../tools/wire-schema.ts"
+import { CAD_ACTION_INPUTS, EmptyActionInput, CadInspectionElements, CadInspectionLayers, CadInspectionProperty, CadInspectionSearch, PARAMETRIC_ACTION_INPUTS } from "@cadcamfun/api"
+import { Schema } from "effect"
 import { ToolMediaResult } from "../tools/define.ts"
-import { defineAction, type ActionContext, type ActionParameters, type ActionSpec } from "./action.ts"
-import type { CadInspectionInput as CadInspectionInputWire } from "@cadcamfun/api"
+import { defineWireAction, type ActionContext, type ActionSpec } from "./action.ts"
+import type { CadInspectionInput as CadInspectionInputWire, VisionInput } from "@cadcamfun/api"
 import {
-  parametricDfmSchema, parametricDrawingSchema, parametricExactSchema, parametricFastenerSchema, parametricFromElementSchema, parametricInspectSchema, parametricRecipeSchema, parametricTestSchema, parametricValidateSchema,
   runParametricDfm, runParametricDrawing, runParametricExact, runParametricFastener, runParametricFromElement, runParametricInspect, runParametricRecipe, runParametricTest, runParametricValidate
 } from "./parametric.ts"
 
-/** A leaf's own parameters: the wire schema without its `action` literal, which the tool adds as the discriminator. */
-const leaf = (schema: { omit: (mask: Record<string, true>) => unknown }) => schema.omit({ action: true }) as ActionParameters
+const INPUTS = { ...CAD_ACTION_INPUTS, ...PARAMETRIC_ACTION_INPUTS }
+
+/** A leaf's own parameters: the shared inspection schema without its `action` literal, which the tool adds as the discriminator. */
+const leaf = <F extends { readonly action: unknown }>(schema: { readonly fields: F }) => {
+  const { action: _action, ...fields } = schema.fields
+  // An empty Struct derives to "object or array"; the shared empty input says "object".
+  const leafSchema = Object.keys(fields).length === 0 ? EmptyActionInput : Schema.Struct(fields as unknown as Schema.Struct.Fields)
+  return leafSchema as unknown as Schema.Codec<Record<string, unknown>, unknown>
+}
 
 /** What `cadInspect` receives: the shared contract with the host's own defaults filled in. */
 export type CadInspectionInput =
@@ -36,33 +40,15 @@ const withDefaults = (value: Record<string, unknown>): Record<string, unknown> =
   }
 }
 
-export const cadGrepParameters = z.object({
-  query: z.string().min(1).max(200),
-  layerId: z.string().min(1).max(100).optional(),
-  /** Restrict to parametric parts. Off by default so one search also finds the plain geometry of a big project. */
-  parametricOnly: z.boolean().default(false),
-  /** Inline each parametric hit's full parameter set, so finding a part and reading its parameters is one call. */
-  includeParameters: z.boolean().default(true),
-  offset: z.number().int().nonnegative().default(0),
-  limit: z.number().int().min(1).max(50).default(20)
-})
-export type CadGrepInput = z.infer<typeof cadGrepParameters>
-
-/** The exact kernel over the whole drawing: `ids` narrows it to some elements, `machining` skips the CAM feature evaluation. */
-export const cadExactParameters = z.object({
-  ids: z.array(z.string().min(1).max(100)).min(1).max(40).optional().describe("Element ids to analyse (default: every solid of the drawing)."),
-  machining: z.boolean().optional().describe("Include how the CAM planner machines each solid (features or 3D surface job); default true.")
-})
-export type CadExactInput = z.infer<typeof cadExactParameters>
-export const cadAssemblyParameters = z.object({ washers: z.boolean().optional().describe("Count missing washers as missing fasteners; default true.") })
-export type CadAssemblyInput = z.infer<typeof cadAssemblyParameters>
+export type { CadAssemblyInput, CadExactInput, CadGrepInput } from "@cadcamfun/api"
 
 const inspect = (action: string) => (input: unknown, context: ActionContext) =>
   context.handlers.cadInspect === undefined
     ? { ok: false, error: "Inspection is unavailable in this host." }
     : context.handlers.cadInspect(context.projectId, withDefaults({ ...(input as Record<string, unknown>), action }) as never)
 
-const vision = (mode: "cad" | "cam", filename: string) => async (input: z.infer<typeof visionInputSchema>, context: ActionContext) => {
+/** A capture of the viewport the user sees, with its evidence; shared by `cad.vision` and `cam.vision`. */
+export const vision = (mode: "cad" | "cam", filename: string) => async (input: typeof VisionInput.Type, context: ActionContext) => {
   if (context.handlers.vision === undefined) return { ok: false, error: "Viewport capture is unavailable in this host." }
   const result = await context.handlers.vision(context.projectId, mode, input.focus, context.signal)
   if (!result.ok) return result
@@ -70,110 +56,110 @@ const vision = (mode: "cad" | "cam", filename: string) => async (input: z.infer<
 }
 
 export const CAD_ACTIONS: ReadonlyArray<ActionSpec> = [
-  defineAction({
+  defineWireAction({
     id: "cad.describe", kind: "read", replaces: "cad_describe_drawing",
-    parameters: z.object({}),
+    parameters: INPUTS["cad.describe"],
     run: (_input, { handlers, projectId }) => handlers.describeDrawing(projectId)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.check", kind: "read", replaces: "cad_check_design",
-    parameters: z.object({}),
+    parameters: INPUTS["cad.check"],
     run: (_input, { handlers, projectId }) => handlers.checkDesign(projectId)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.relations", kind: "read", replaces: "cad_component_relations",
-    parameters: z.object({ firstId: z.string().min(1), secondId: z.string().min(1) }),
+    parameters: INPUTS["cad.relations"],
     run: (input, { handlers, projectId }) =>
       handlers.cadComponentRelations === undefined
         ? { ok: false, error: "Inspection is unavailable in this host." }
         : handlers.cadComponentRelations(projectId, input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.grep", kind: "read", replaces: "cad_grep",
-    parameters: cadGrepParameters,
+    parameters: INPUTS["cad.grep"],
     run: (input, { handlers, projectId }) =>
       handlers.grep === undefined ? { ok: false, error: "Drawing search is unavailable in this host." } : handlers.grep(projectId, input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.vision", kind: "read", replaces: "cad_vision",
-    parameters: visionInputSchema,
+    parameters: INPUTS["cad.vision"],
     run: vision("cad", "cad-viewport.png")
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.inspect_elements", kind: "read", replaces: "cad_inspect",
-    parameters: leaf(nikcliWireSchema(CadInspectionElements)),
+    parameters: leaf(CadInspectionElements),
     run: inspect("elements")
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.inspect_layers", kind: "read", replaces: "cad_inspect",
-    parameters: leaf(nikcliWireSchema(CadInspectionLayers)),
+    parameters: leaf(CadInspectionLayers),
     run: inspect("layers")
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.inspect_search", kind: "read", replaces: "cad_inspect",
-    parameters: leaf(nikcliWireSchema(CadInspectionSearch)),
+    parameters: leaf(CadInspectionSearch),
     run: inspect("search")
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.inspect_property", kind: "read", replaces: "cad_inspect",
-    parameters: leaf(nikcliWireSchema(CadInspectionProperty)),
+    parameters: leaf(CadInspectionProperty),
     run: inspect("property")
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.drawing", kind: "read",
-    parameters: parametricDrawingSchema,
+    parameters: INPUTS["cad.drawing"],
     run: (input, context) => runParametricDrawing(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_validate", kind: "read", replaces: "cad_parametric",
-    parameters: parametricValidateSchema,
+    parameters: INPUTS["cad.parametric_validate"],
     run: (input) => runParametricValidate(input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_inspect", kind: "read", replaces: "cad_parametric",
-    parameters: parametricInspectSchema,
+    parameters: INPUTS["cad.parametric_inspect"],
     run: (input, context) => runParametricInspect(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_test", kind: "read", replaces: "cad_parametric",
-    parameters: parametricTestSchema,
+    parameters: INPUTS["cad.parametric_test"],
     run: (input, context) => runParametricTest(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_dfm", kind: "read", replaces: "cad_parametric",
-    parameters: parametricDfmSchema,
+    parameters: INPUTS["cad.parametric_dfm"],
     run: (input, context) => runParametricDfm(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_exact", kind: "read", replaces: "cad_parametric",
-    parameters: parametricExactSchema,
+    parameters: INPUTS["cad.parametric_exact"],
     run: (input, context) => runParametricExact(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.exact", kind: "read",
-    parameters: cadExactParameters,
+    parameters: INPUTS["cad.exact"],
     run: (input, { handlers, projectId }) =>
       handlers.cadExact === undefined ? { ok: false, error: "Exact analysis is unavailable in this host." } : handlers.cadExact(projectId, input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.assembly", kind: "read",
-    parameters: cadAssemblyParameters,
+    parameters: INPUTS["cad.assembly"],
     run: (input, { handlers, projectId }) =>
       handlers.cadAssembly === undefined ? { ok: false, error: "Assembly analysis is unavailable in this host." } : handlers.cadAssembly(projectId, input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_fastener", kind: "read", replaces: "cad_parametric",
-    parameters: parametricFastenerSchema,
+    parameters: INPUTS["cad.parametric_fastener"],
     run: (input) => runParametricFastener(input)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_recipe", kind: "read", replaces: "cad_parametric",
-    parameters: parametricRecipeSchema,
+    parameters: INPUTS["cad.parametric_recipe"],
     run: (input, context) => runParametricRecipe(input, context)
   }),
-  defineAction({
+  defineWireAction({
     id: "cad.parametric_from_element", kind: "read", replaces: "cad_parametric",
-    parameters: parametricFromElementSchema,
+    parameters: INPUTS["cad.parametric_from_element"],
     run: (input, context) => runParametricFromElement(input, context)
   })
 ]

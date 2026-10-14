@@ -7,8 +7,8 @@
  * Lengths are millimetres, angles radians. `x`, `y`, `z` place the element (its centre for solids).
  * The tool schema, the sidecar handler and the tests all read this one table; the tolerance maths is core's.
  */
-import { historySchema } from "./parametric.ts"
-import { formatToolValidationError } from "./tool-validation.ts"
+import { decodeHistory } from "./parametric.ts"
+import { formatToolProblems } from "./tool-validation.ts"
 import { MAX_CURVE_SEGMENTS, MIN_GEAR_TEETH, chordError, rebuild, segmentsFor, type History } from "@cadcamfun/core"
 
 type Fields = Readonly<Record<string, unknown>>
@@ -215,8 +215,8 @@ export const normalizeElement = (input: Record<string, unknown>): Normalized => 
     if (!faces.every((f) => Array.isArray(f) && f.length === 3 && new Set(f).size === 3 && f.every((i) => Number.isInteger(i) && i >= 0 && i < vertices.length))) return { ok: false, error: "mesh faces require three distinct valid vertex indexes" }
   }
   if (type === "parametric") {
-    const decoded = historySchema.safeParse(element["history"])
-    if (!decoded.success) return { ok: false, error: `parametric.history: ${formatToolValidationError("cad_edit action add", decoded.error)}` }
+    const decoded = decodeHistory(element["history"])
+    if (!decoded.success) return { ok: false, error: `parametric.history: ${formatToolProblems("cad_edit action add", decoded.problems)}` }
     const history: History = decoded.data
     element["history"] = history
     // Build it now: a history that makes nothing is the model's mistake to hear about, not the user's to find on screen.

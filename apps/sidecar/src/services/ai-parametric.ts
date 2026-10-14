@@ -1,18 +1,18 @@
 /** Project adaptation of the existing parametric kernel. Tests never persist a variant. */
 import { createHash } from "node:crypto"
 import { usesOf } from "@cadcamfun/core"
-import { historySchema, parametricReport, type ParametricHandlerInput } from "@cadcamfun/ai"
+import { decodeHistory, parametricReport, type ParametricHandlerInput } from "@cadcamfun/ai"
 
 export const historyRevision = (history: unknown): string => createHash("sha256").update(JSON.stringify(history)).digest("hex")
 
 export const inspectParametric = (history: unknown) => {
-  const decoded = historySchema.safeParse(history)
-  if (!decoded.success) return { ok: false, error: "Stored parametric history is invalid.", problems: decoded.error.issues.slice(0, 8).map((i) => `${i.path.join(".")}: ${i.message}`) }
+  const decoded = decodeHistory(history)
+  if (!decoded.success) return { ok: false, error: "Stored parametric history is invalid.", problems: decoded.problems.slice(0, 8) }
   return { ...parametricReport(decoded.data), history: decoded.data, revision: historyRevision(history), dependencies: Object.keys(decoded.data.parameters).map((name) => ({ name, ...usesOf(decoded.data, name) })) }
 }
 
 export const changeParameters = (history: unknown, parameters: Readonly<Record<string, number | string>>) => {
-  const decoded = historySchema.safeParse(history)
+  const decoded = decodeHistory(history)
   if (!decoded.success) return { ok: false as const, error: "Stored parametric history is invalid." }
   const unknown = Object.keys(parameters).filter((name) => !Object.hasOwn(decoded.data.parameters, name))
   if (unknown.length > 0) return { ok: false as const, error: `Unknown parameters: ${unknown.join(", ")}. Inspect the part first.` }

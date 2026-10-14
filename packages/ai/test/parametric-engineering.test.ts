@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { buildRecipe, plateTemplate, recipeNames, RECIPES, type History } from "@cadcamfun/core"
-import { historySchema, parametricReport } from "../src/parametric.ts"
+import { decodeHistory, parseHistory, parametricReport } from "../src/parametric.ts"
 import { toSpec } from "../src/tools/define.ts"
 import { BUILT_IN_TOOLS } from "../src/tools/registry.ts"
 import { parametricInputSchema, parametricHarness } from "./helpers/parametric.ts"
@@ -27,13 +27,13 @@ describe("the history schema takes the engineering features", () => {
       { id: "profile", type: "sketch", plane: "XY", sketch: { entities: [{ id: "origin", kind: "point", x: 0, y: 0 }, { id: "outline", kind: "circle", center: "origin", radius: 10 }], constraints: [{ type: "fixed", point: "origin", x: 0, y: 0 }, { type: "radius", circle: "outline", value: "radius" }] } },
       { id: "body", type: "extrude", sketch: "profile", depth: "height", operation: "new" }
     ] }
-    expect(historySchema.safeParse(cylinder).success).toBe(true)
-    expect(historySchema.safeParse(base).success).toBe(true)
+    expect(decodeHistory(cylinder).success).toBe(true)
+    expect(decodeHistory(base).success).toBe(true)
   })
 
   test("extrude accepts an edge and a corner treatment, with numbers or expressions", () => {
-    expect(historySchema.safeParse(plateEdited({ edge: { style: "chamfer", size: 1 }, corner: { style: "fillet", size: "thick / 4" } })).success).toBe(true)
-    expect(historySchema.safeParse(plateEdited({ edge: { style: "fillet", size: "hole / 10", ends: "top", holes: true } })).success).toBe(true)
+    expect(decodeHistory(plateEdited({ edge: { style: "chamfer", size: 1 }, corner: { style: "fillet", size: "thick / 4" } })).success).toBe(true)
+    expect(decodeHistory(plateEdited({ edge: { style: "fillet", size: "hole / 10", ends: "top", holes: true } })).success).toBe(true)
   })
 
   test.each([
@@ -43,47 +43,47 @@ describe("the history schema takes the engineering features", () => {
     ["a corner without a style", { corner: { size: 2 } }],
     ["a non-finite size", { edge: { style: "chamfer", size: Infinity } }]
   ])("%s is refused", (_name, patch) => {
-    expect(historySchema.safeParse(plateEdited(patch)).success).toBe(false)
+    expect(decodeHistory(plateEdited(patch)).success).toBe(false)
   })
 
   test("a counterbore needs headDiameter and headDepth; a countersink needs headDiameter", () => {
     const hole = { id: "cb", type: "hole", plane: "XY", offset: "thick", at: [10, 10], diameter: 4, depth: "thick" }
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "counterbore", headDiameter: 8, headDepth: 3 })).success).toBe(true)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "counterbore", headDiameter: 8 })).success).toBe(false)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "counterbore", headDepth: 3 })).success).toBe(false)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "countersink", headDiameter: 8, angle: 90 })).success).toBe(true)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "countersink", angle: 90 })).success).toBe(false)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "simple" })).success).toBe(true)
-    expect(historySchema.safeParse(plateWith({ ...hole, kind: "tapered" })).success).toBe(false)
-    const refused = historySchema.safeParse(plateWith({ ...hole, kind: "counterbore", headDiameter: 8 }))
-    expect(refused.success ? "" : refused.error.issues.map((i) => i.message).join(" ")).toMatch(/headDiameter and headDepth/)
+    expect(decodeHistory(plateWith({ ...hole, kind: "counterbore", headDiameter: 8, headDepth: 3 })).success).toBe(true)
+    expect(decodeHistory(plateWith({ ...hole, kind: "counterbore", headDiameter: 8 })).success).toBe(false)
+    expect(decodeHistory(plateWith({ ...hole, kind: "counterbore", headDepth: 3 })).success).toBe(false)
+    expect(decodeHistory(plateWith({ ...hole, kind: "countersink", headDiameter: 8, angle: 90 })).success).toBe(true)
+    expect(decodeHistory(plateWith({ ...hole, kind: "countersink", angle: 90 })).success).toBe(false)
+    expect(decodeHistory(plateWith({ ...hole, kind: "simple" })).success).toBe(true)
+    expect(decodeHistory(plateWith({ ...hole, kind: "tapered" })).success).toBe(false)
+    const refused = decodeHistory(plateWith({ ...hole, kind: "counterbore", headDiameter: 8 }))
+    expect(refused.success ? "" : refused.problems.join(" ")).toMatch(/headDiameter and headDepth/)
   })
 
   test("a mirror needs an earlier extrude, revolve, hole or mirror; a pattern may copy a mirror", () => {
     const mirror = { id: "m", type: "mirror", feature: "hole1", plane: "YZ", offset: "width / 2" }
-    expect(historySchema.safeParse(plateWith(mirror)).success).toBe(true)
-    expect(historySchema.safeParse(plateWith(mirror, { id: "m2", type: "mirror", feature: "m", plane: "ZX" })).success).toBe(true)
-    expect(historySchema.safeParse(plateWith(mirror, { id: "p", type: "pattern", feature: "m", kind: "linear", count: 2, step: [0, 5, 0] })).success).toBe(true)
-    const unknown = historySchema.safeParse(plateWith({ ...mirror, feature: "ghost" }))
+    expect(decodeHistory(plateWith(mirror)).success).toBe(true)
+    expect(decodeHistory(plateWith(mirror, { id: "m2", type: "mirror", feature: "m", plane: "ZX" })).success).toBe(true)
+    expect(decodeHistory(plateWith(mirror, { id: "p", type: "pattern", feature: "m", kind: "linear", count: 2, step: [0, 5, 0] })).success).toBe(true)
+    const unknown = decodeHistory(plateWith({ ...mirror, feature: "ghost" }))
     expect(unknown.success).toBe(false)
-    expect(unknown.success ? "" : unknown.error.issues.map((i) => i.message).join(" ")).toContain("Mirror source 'ghost'")
-    expect(historySchema.safeParse(plateWith({ ...mirror, feature: "sketch1" })).success).toBe(false) // a sketch has no tool
-    expect(historySchema.safeParse({ ...base, features: [{ id: "m", type: "mirror", feature: "hole1", plane: "XY" }, ...base.features] }).success).toBe(false) // forward reference
-    expect(historySchema.safeParse(plateWith({ ...mirror, plane: "XZ" })).success).toBe(false)
+    expect(unknown.success ? "" : unknown.problems.join(" ")).toContain("Mirror source 'ghost'")
+    expect(decodeHistory(plateWith({ ...mirror, feature: "sketch1" })).success).toBe(false) // a sketch has no tool
+    expect(decodeHistory({ ...base, features: [{ id: "m", type: "mirror", feature: "hole1", plane: "XY" }, ...base.features] }).success).toBe(false) // forward reference
+    expect(decodeHistory(plateWith({ ...mirror, plane: "XZ" })).success).toBe(false)
   })
 
   test("a pattern still refuses a source that is a sketch or does not exist", () => {
-    expect(historySchema.safeParse(plateWith({ id: "p", type: "pattern", feature: "sketch1", kind: "linear", count: 2, step: [1, 0, 0] })).success).toBe(false)
-    expect(historySchema.safeParse(plateWith({ id: "p", type: "pattern", feature: "nowhere", kind: "linear", count: 2, step: [1, 0, 0] })).success).toBe(false)
+    expect(decodeHistory(plateWith({ id: "p", type: "pattern", feature: "sketch1", kind: "linear", count: 2, step: [1, 0, 0] })).success).toBe(false)
+    expect(decodeHistory(plateWith({ id: "p", type: "pattern", feature: "nowhere", kind: "linear", count: 2, step: [1, 0, 0] })).success).toBe(false)
   })
 
   test("the report of a part with the new features: bodies, volume smaller than the plain plate, bounds unchanged", () => {
     const plain = parametricReport(base as History)
-    const treated = historySchema.parse(plateWith(
+    const treated = parseHistory(plateWith(
       { id: "cb", type: "hole", plane: "XY", offset: "thick", at: [10, 10], diameter: 4, depth: "thick", kind: "counterbore", headDiameter: 8, headDepth: 3 },
       { id: "m", type: "mirror", feature: "cb", plane: "YZ", offset: "width / 2" }
     ))
-    const edged = historySchema.parse({ ...treated, features: treated.features.map((f) => (f.id === "plate" ? { ...f, edge: { style: "chamfer", size: 1 } } : f)) })
+    const edged = parseHistory({ ...treated, features: treated.features.map((f) => (f.id === "plate" ? { ...f, edge: { style: "chamfer", size: 1 } } : f)) })
     const report = parametricReport(edged)
     expect(report.ok).toBe(true)
     expect(report.bodyCount).toBe(1)
@@ -138,7 +138,7 @@ describe("cad_parametric: recipe", () => {
     expect(result.rules.length).toBeGreaterThan(0)
     expect(result.report).toMatchObject({ ok: true, bodyCount: 1 })
     expect(result.report.volumeMm3).toBeGreaterThan(0)
-    expect(historySchema.safeParse(result.history).success).toBe(true)
+    expect(decodeHistory(result.history).success).toBe(true)
     expect(result.history).toEqual(buildRecipe(name, params).history)
     expect(calls).toEqual([])
     expect(JSON.stringify(result)).not.toContain("NaN")
@@ -291,7 +291,7 @@ describe("cad_parametric: fastener", () => {
 describe("cad_parametric: the existing actions are untouched", () => {
   test("validate answers by itself and sees the new features", async () => {
     const { calls, run } = harness()
-    const history = historySchema.parse(plateEdited({ edge: { style: "chamfer", size: 1 }, corner: { style: "fillet", size: 3 } }))
+    const history = parseHistory(plateEdited({ edge: { style: "chamfer", size: 1 }, corner: { style: "fillet", size: 3 } }))
     const result = await run({ action: "validate", history })
     expect(result.ok).toBe(true)
     expect(calls).toEqual([])
@@ -300,7 +300,7 @@ describe("cad_parametric: the existing actions are untouched", () => {
 
   test("inspect, create, update and test go to the project handler unchanged", async () => {
     const { calls, run } = harness(() => ({ ok: true }))
-    const history = historySchema.parse(base)
+    const history = parseHistory(base)
     const inputs = [
       { action: "inspect", elementId: "e1" },
       { action: "create", history, name: "Plate", x: 1, y: 2, z: 3 },
