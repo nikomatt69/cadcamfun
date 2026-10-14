@@ -1,6 +1,6 @@
 # 25 — Project AI context, memory rendering and session lifecycle
 
-Status: specified, then implemented across WP8 (`packages/ai`), WP3 (`packages/api`), WP4 (`apps/sidecar`) and WP6 (`apps/desktop`). Extends `08-ai.md` §"Workspace integration", `19-context-awareness.md` and `24-assistant-control-flow.md`; no database migration, no new dependency, no change to the host isolation contract.
+Status: specified; §2.1–§2.2 implemented across WP8 (`packages/ai`), WP3 (`packages/api`), WP4 (`apps/sidecar`) and WP6 (`apps/desktop`). **§2.3 (`start_session` / `settle_session`) is not implemented**: the `POST /api/ai/sessions/control` contract (`packages/api/src/groups/ai.ts`, `action` literals `status`, `compact`, `cancel_task`, `answer_question`, `reject_question`, `reply_permission`, `consolidate_memory`, `context`) has neither action, and no sidecar handler, desktop caller or test exists; only `PROJECT_NOTE_TTL_DAYS` (`packages/ai/src/project-context.ts`) was added. §2.3 and acceptance criteria 5–7 stay pending and are owned by [AI-11 Step 9](ai/11-enterprise-harness-execution.md) under [RM-07](roadmap/07-ai-lifecycle.md). Extends `08-ai.md` §"Workspace integration", `19-context-awareness.md` and `24-assistant-control-flow.md`; no database migration, no new dependency, no change to the host isolation contract.
 
 ## 1. Why
 
@@ -63,7 +63,7 @@ The two host files are read by `packages/ai/src/nikcli/project-files.ts`: `Bun.f
 
 ### 2.3 Session lifecycle
 
-Two new actions on `POST /api/ai/sessions/control`.
+Two new actions on `POST /api/ai/sessions/control` (**pending**: not in the contract as of 2026-10-14, see Status).
 
 **`start_session`** — `{ sessionId?, projectId, model? }`. Resolves the project host, verifies project ownership, binds the client session id to a fresh host session (reusing an existing binding that is still alive), and returns the composition of the briefing it just primed:
 
@@ -113,4 +113,5 @@ The desktop calls `settle_session` when the user starts a new conversation or cl
 
 ## 6. Change log
 
+- 2026-10-14: corrected Status: source search shows `start_session` / `settle_session` absent from the API contract, the sidecar and the desktop; §2.3 and criteria 5–7 are pending (AI-11 Step 0). Documentation only.
 - v1 (2026-10-11): contract for the per-project context document, the bounded rendering of the Brain-owned files, and the `start_session` / `settle_session` lifecycle actions. Evidence read from the pinned `sdk-next@1.428.0` bundle; no host API is re-implemented here.

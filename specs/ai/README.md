@@ -20,6 +20,7 @@ Read [the ordered roadmap](../roadmap/README.md), [its process](../roadmap/00-ho
 | AI-08 | [Precision modelling and CAM](08-precision-modelling-and-cam.md) | [RM-09](../roadmap/09-cad-cam-depth.md) | RM-02 for core; RM-03/RM-06 and core acceptance before precision integration |
 | AI-09 | [Evaluation and observability](09-evaluation-and-observability.md) | [RM-10](../roadmap/10-observability.md) | RM-07; fixtures ship with each earlier increment |
 | AI-10 | [nikcli and plugin adapters](10-nikcli-and-plugin-adapters.md) | [RM-11](../roadmap/11-nikcli-bridge.md) | RM-01 catalogue, RM-03 routes and pinned SDK compatibility |
+| AI-11 | [Enterprise harness execution guide](11-enterprise-harness-execution.md) ([inventory](11-harness-inventory.md)) | Steps mapped onto RM-01, RM-02/03, RM-06, RM-07, RM-09–RM-11 | Step 0 done; each later step waits for its RM dependencies |
 
 ## Delivery discipline
 
@@ -32,4 +33,5 @@ Read [the ordered roadmap](../roadmap/README.md), [its process](../roadmap/00-ho
 
 ## Change log
 
+- 2026-10-14: added AI-11, the execution guide for the CADCAMFUN-specialised nikcli harness, and its generated inventory. Sequence and RM statuses unchanged.
 - 2026-10-12: published ten design increments mapped to the existing RM sequence; no RM implementation status changed.
