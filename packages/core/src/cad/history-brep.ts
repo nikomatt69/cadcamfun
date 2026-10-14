@@ -130,12 +130,16 @@ const insideLoop = (p: Vec2, loop: ProfileLoop): boolean => {
 
 /** Loops grouped into profiles by even-odd nesting: each solid loop with the holes directly inside it. */
 export const profilesOfLoops = (loops: ReadonlyArray<ProfileLoop>): Array<{ readonly loops: ProfileLoop[] }> => {
-  const probe = loops.map((l) => segmentPoint(l[0]!, 0.5))
-  const depth = loops.map((_, i) => loops.filter((o, j) => j !== i && insideLoop(probe[i]!, o)).length)
+  // A loop is nested in another only when all of it is inside: loops whose boundaries cross (two overlapping circles, the
+  // mixer's figure-eight boss) are separate regions, extruded apart and united, as the mesh rebuild unites them. One probe
+  // point per loop took the second circle for a hole of the first.
+  const probes = loops.map((l) => l.flatMap((s) => [0.25, 0.5, 0.75].map((f) => segmentPoint(s, f))))
+  const within = (i: number, j: number): boolean => probes[i]!.every((p) => insideLoop(p, loops[j]!))
+  const depth = loops.map((_, i) => loops.filter((_, j) => j !== i && within(i, j)).length)
   const out: Array<{ loops: ProfileLoop[] }> = []
   loops.forEach((l, i) => {
     if (depth[i]! % 2 !== 0) return
-    const holes = loops.filter((h, j) => depth[j] === depth[i]! + 1 && insideLoop(probe[j]!, l))
+    const holes = loops.filter((_, j) => depth[j] === depth[i]! + 1 && within(j, i))
     out.push({ loops: [l, ...holes] })
   })
   return out
