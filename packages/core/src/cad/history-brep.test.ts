@@ -199,9 +199,65 @@ describe("exact replay of a parametric history", () => {
     expect(rel(exactVolume(plate([draft(3)])), 6000)).toBeLessThan(1e-9)
   })
 
+  test("a push/pull moves a planar face exactly: out (sewn on), in (a pocket of the whole face), sideways, around a bore", () => {
+    const pp = (near: [number, number, number], distance: number, normal?: [number, number, number]): Feature => ({ id: "pp", type: "pushpull", near, distance, ...(normal !== undefined ? { normal } : {}) })
+    const up = rebuildExact(plate([pp([20, 12.5, 6], 4)]))
+    expect(rel(massProperties(up.bodies[0]!.brep!).volume, 40 * 25 * 10)).toBeLessThan(1e-9)
+    expect(rel(massProperties(up.bodies[0]!.brep!).volume, meshVolume(up.result.bodies[0]!.mesh))).toBeLessThan(1e-9)
+    expect(rel(exactVolume(plate([pp([20, 12.5, 6], -2)])), 40 * 25 * 4)).toBeLessThan(1e-9)
+    // The +X face, chosen by the hint from a point on the corner edge.
+    expect(rel(exactVolume(plate([pp([40, 12.5, 6], 5, [1, 0, 0])])), 45 * 25 * 6)).toBeLessThan(1e-9)
+    // The top face of a bored plate is a ring: pulled up, the bore goes on through the new material.
+    const bored = (extra: Feature[]) => plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, ...extra])
+    expect(rel(exactVolume(bored([pp([5, 5, 6], 3)])), (1000 - 16 * PI) * 9)).toBeLessThan(1e-9)
+    // The bore's wall is curved: said, not approximated.
+    expect(rebuildExact(bored([pp([24, 12.5, 3], 1)])).bodies[0]!.reason).toContain("curved face")
+  })
+
+  test("a mate lays one body's face on another's exactly: opposed normals, centres of area together, offset, slide and spin", () => {
+    const pose = (spin: number): History => history([
+      ...plate().features,
+      circles("s2", "XY", 100, 0, [5]), { id: "pin", type: "extrude", sketch: "s2", depth: 8, operation: "new" },
+      { id: "seat", type: "mate", body: "pin", face: { near: [100, 0, 0], normal: [0, 0, -1] }, to: { body: "plate", near: [20, 12.5, 6], normal: [0, 0, 1] }, offset: 1, spin, slide: [3, -2] }
+    ], plate().parameters)
+    const r = rebuildExact(pose(30))
+    expect(r.result.issues.filter((i) => i.severity === "error")).toEqual([])
+    const pin = r.bodies.find((b) => b.id === "pin")!
+    expect(pin.reason).toBeUndefined()
+    // The pin's base centre lands on the plate's top centre, 1 above, slid by (3, -2) along the face's X and Y.
+    const props = massProperties(pin.brep!)
+    expect(rel(props.volume, PI * 25 * 8)).toBeLessThan(1e-9)
+    expect(Math.hypot(props.centroid.x - 23, props.centroid.y - 10.5, props.centroid.z - 11)).toBeLessThan(1e-9)
+    // Agrees with the mesh pose: its rim vertices lie on the exact cylinder, within the shift of the inscribed polygon's own
+    // centre of area (the mesh's centring) from the circle's.
+    const m = r.result.bodies.find((b) => b.id === "pin")!.mesh.positions
+    for (let i = 0; i < m.length; i += 3) {
+      expect(Math.abs(Math.hypot(m[i]! - 23, m[i + 1]! - 10.5) - 5)).toBeLessThan(1e-5)
+      expect(Math.min(Math.abs(m[i + 2]! - 7), Math.abs(m[i + 2]! - 15))).toBeLessThan(1e-9)
+    }
+    // A box spun about the target normal: its corners follow the mesh's (stored in single precision).
+    const box = history([
+      ...plate().features,
+      rectangle("s3", "XY", 100, 0, 10, 4), { id: "block", type: "extrude", sketch: "s3", depth: 2, operation: "new" },
+      { id: "seat", type: "mate", body: "block", face: { near: [105, 2, 0], normal: [0, 0, -1] }, to: { body: "plate", near: [20, 12.5, 6], normal: [0, 0, 1] }, spin: 30 }
+    ], plate().parameters)
+    const rb = rebuildExact(box)
+    const exact = rb.bodies.find((b) => b.id === "block")!.brep!
+    const mesh = rb.result.bodies.find((b) => b.id === "block")!.mesh.positions
+    for (const v of exact.vertices) {
+      let best = Infinity
+      for (let i = 0; i < mesh.length; i += 3) best = Math.min(best, Math.hypot(mesh[i]! - v.point.x, mesh[i + 1]! - v.point.y, mesh[i + 2]! - v.point.z))
+      expect(best).toBeLessThan(1e-5)
+    }
+    // The exact corners are where the rotation puts them: the 10 x 4 block centred on (20, 12.5), turned by 30 degrees.
+    const c = Math.cos(PI / 6), s = Math.sin(PI / 6)
+    const corners = [[-5, -2], [5, -2], [5, 2], [-5, 2]].map(([x, y]) => ({ x: 20 + c * x! - s * y!, y: 12.5 + s * x! + c * y! }))
+    for (const v of exact.vertices) expect(Math.min(...corners.map((k) => Math.hypot(k.x - v.point.x, k.y - v.point.y)))).toBeLessThan(1e-9)
+  })
+
   test("features without an exact counterpart are never skipped silently", () => {
-    const pushed = rebuildExact(plate([{ id: "pp", type: "pushpull", near: [40, 12.5, 3], distance: 2 }]))
-    expect(pushed.bodies[0]!.reason).toContain("push-pull")
+    const lettered = rebuildExact(plate([{ id: "t", type: "text", plane: "XY", offset: 6, at: [5, 5], text: "A", height: 5, depth: 1, operation: "union" }]))
+    expect(lettered.bodies[0]!.reason).toContain("text")
     // A hole wall is curved: its draft says so instead of leaving the body as it was.
     const bored = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "lean", type: "draft", near: [24, 12.5, 3], angle: 3 }])
     expect(rebuildExact(bored).bodies[0]!.reason).toContain("curved face")

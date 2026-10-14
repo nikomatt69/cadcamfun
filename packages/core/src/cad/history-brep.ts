@@ -4,13 +4,15 @@
  * the mesh for the viewport and the CAM's dexels, the B-rep for measuring, STEP exchange and the operations a mesh cannot
  * carry (exact Booleans, face and edge selection).
  *
- * Exact today: extrude (with rounded or bevelled profile corners, and its end rims filleted or chamfered), revolve, hole
- * (simple, counterbore, countersink), fillet and chamfer of straight edges and plane-cylinder rims, the shell of an
- * extrusion (its profile offset exactly by `offsetLoop`), the analytic catalogue primitives (cube, cylinder, cone, sphere,
- * hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine, and the
- * union / subtract / intersect of every tool. A body that went through anything else (the shell of a revolution or a
- * sweep, sweep, loft, coil, drafts, blends of curved edges, a non-uniform scale, another catalogue element) keeps its mesh
- * and says why it has no exact model; nothing is approximated behind the caller's back.
+ * Exact today: extrude (with rounded or bevelled profile corners, a draft angle, and its end rims filleted or chamfered),
+ * revolve, sweep along lines and arcs, hole (simple, counterbore, countersink), fillet and chamfer of straight edges and of
+ * coaxial rims (plane, cylinder, cone), shells of extrusions, full revolutions and sweeps, the draft and the push/pull of a
+ * planar face, mates (the rigid motion from the exact faces), the analytic catalogue primitives (cube, cylinder, cone,
+ * sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine,
+ * and the union / subtract / intersect of every tool. A body that went through anything else (loft, coil, rib, sheet,
+ * text, a modelled thread, drafts and push/pulls of curved faces, blends of non-coaxial curved edges, a non-uniform scale,
+ * another catalogue element) keeps its mesh and says why it has no exact model; nothing is approximated behind the
+ * caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import { polygonArea, sketchProfiles, type Sketch } from "./sketch.ts"
@@ -31,7 +33,11 @@ import {
   makeSphere,
   makeTorus,
   draftPlanarFace,
+  mateTransform,
+  nearestFace,
   normalizeProfile,
+  planarFaceFrame,
+  pushPullFace,
   offsetLoop,
   pickPlanarFace,
   pieceEnd,
@@ -1002,11 +1008,48 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
         case "thread":
           unsupported({ ...f, operation: f.cut === true ? "subtract" : f.operation ?? "new" }, "a modelled (helical) thread has no exact model yet")
           break
-        case "pushpull":
+        case "pushpull": {
+          const distance = dim(f.distance)
+          if (distance === 0) break
+          const near = { x: dim(f.near[0]), y: dim(f.near[1]), z: dim(f.near[2]) }
+          const hint = f.normal === undefined ? undefined : { x: dim(f.normal[0]), y: dim(f.normal[1]), z: dim(f.normal[2]) }
+          const query = { near, ...(hint !== undefined ? { normal: hint } : {}) }
+          const candidates = bodies.filter((b) => f.body === undefined || b.id === f.body)
+          // The body whose face is nearest (the mesh rebuild's choice); a body without an exact model could have been it.
+          if (candidates.length > 1 && candidates.some((b) => b.exact.brep === undefined)) {
+            for (const b of candidates) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no("the pushed face may lie on a body without an exact model") }
+            break
+          }
+          let chosen: { body: (typeof bodies)[number]; distance: number } | undefined
+          for (const b of candidates) {
+            if (b.exact.brep === undefined) continue
+            const found = nearestFace(b.exact.brep, query)
+            if (found === undefined) continue
+            const d = "pick" in found ? found.pick.distance : found.distance
+            if (chosen === undefined || d < chosen.distance) chosen = { body: b, distance: d }
+          }
+          if (chosen === undefined) break
+          const pushed = pushPullFace(chosen.body.exact.brep!, { ...query, distance })
+          bodies[bodies.indexOf(chosen.body)] = { ...chosen.body, exact: typeof pushed === "string" ? no(pushed) : ok(pushed) }
+          break
+        }
         case "mate": {
-          // These move faces or whole bodies in the mesh rebuild; until they are replayed exactly, the bodies they touch say so.
-          const id = f.body
-          for (const b of bodies.filter((x) => id === undefined || x.id === id)) bodies[bodies.indexOf(b)] = { ...b, exact: b.exact.brep === undefined ? b.exact : no(`a ${f.type === "mate" ? "joint (mate)" : "push-pull"} has no exact model yet`) }
+          // The moving body is laid on the fixed one by the rigid motion of the mesh rebuild, built from the exact faces.
+          const moving = bodies.find((b) => b.id === f.body), fixed = bodies.find((b) => b.id === f.to.body)
+          if (moving === undefined || fixed === undefined || moving.exact.brep === undefined) break
+          const at = (p: readonly [Dimension, Dimension, Dimension]) => ({ x: dim(p[0]), y: dim(p[1]), z: dim(p[2]) })
+          const faceOf = (b: Brep, near: readonly [Dimension, Dimension, Dimension], normal: readonly [Dimension, Dimension, Dimension] | undefined) => {
+            const found = nearestFace(b, { near: at(near), ...(normal !== undefined ? { normal: at(normal) } : {}) })
+            if (found === undefined) return "the mated face could not be found on the exact model"
+            if (!("pick" in found)) return "a joint on a curved face has no exact model yet"
+            return planarFaceFrame(b, found.pick)
+          }
+          if (fixed.exact.brep === undefined) { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(`the body it is mated to ('${fixed.id}') has no exact model`) }; break }
+          const mine = faceOf(moving.exact.brep, f.face.near, f.face.normal), theirs = faceOf(fixed.exact.brep, f.to.near, f.to.normal)
+          if (typeof mine === "string" || typeof theirs === "string") { bodies[bodies.indexOf(moving)] = { ...moving, exact: no(typeof mine === "string" ? mine : theirs as string) }; break }
+          const slide = (f.slide ?? [0, 0]).map(dim)
+          const tr = mateTransform(mine, theirs, { offset: f.offset === undefined ? 0 : dim(f.offset), spin: f.spin === undefined ? 0 : (dim(f.spin) * Math.PI) / 180, slideU: slide[0]!, slideV: slide[1]! })
+          bodies[bodies.indexOf(moving)] = { ...moving, exact: ok(transformBrep(moving.exact.brep, tr)) }
           break
         }
       }

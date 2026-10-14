@@ -223,13 +223,27 @@ and material, with exact volumes and masses. The desktop's assembly panel runs a
 (`apps/desktop/src/features/cad/lib/component-automation.ts`: components are flattened, fasteners are
 inserted as `brep` elements in one undo step and are not inserted twice; the BOM exports as CSV).
 
-Fillets of edges between curved faces (variable radius, setbacks), shells of sweeps, drafts of curved faces, push-pull and mates on the exact model, persistent naming
-and 2D drafting remain pending, so the professional kernel acceptance gate is not claimed complete.
+**Face edits (`brep/face-edit.ts`).** `pushPullFace` pushes a planar face's own outline out (sewn on with
+`sewSolids` when the prism shares the face exactly, else united with the mesh rebuild's 0.01 mm overlap) or
+pulls it in (subtracted); `mateTransform` is the mesh rebuild's mate motion (normals opposed, centres of area
+together, offset, slide along the target face's u/v, spin), built from `planarFaceFrame`, whose centre of area
+is exact (`loopMoments`: Green's theorem over lines and arcs). `nearestFace` selects as the mesh rebuild does
+(60-degree normal hint; a nearer curved face is reported, not approximated).
+
+Fillets of non-coaxial curved edges (variable radius, setbacks), loft and coil, drafts and push-pulls of curved
+faces, persistent naming and 2D drafting remain pending, so the professional kernel acceptance gate is not
+claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-14: push-pull and mate are replayed exactly (`brep/face-edit.ts`). A pushed face's prism is sewn on
+  without a Boolean when it shares the face; a pulled one is subtracted; a bored face carries its bore through.
+  A mated body is moved by the rigid motion of the mesh rebuild, from exact centres of area (`loopMoments`), so
+  a pin lands on the analytic centre and a spun block's corners are exact to 1e-9 (the mesh agrees to its single
+  precision). Push-pulls of curved faces and mates on curved faces say so.
 
 - 2026-10-14: drafts and revolution shells are exact, assemblies infer joints, and no feature is skipped silently.
   `extrudeProfile`'s `inset` leans the walls (tilted planes, cones; holes widen), which `rebuildExact` uses for an

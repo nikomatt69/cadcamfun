@@ -25,9 +25,9 @@ export interface PlanarFacePick {
 
 /**
  * The planar face nearest `near` (its plane distance when the point projects inside it, else the distance to its outline);
- * with `normal`, only faces whose outward normal is within 1 degree of it.
+ * with `normal`, only faces whose outward normal is within 1 degree of it (or whose cosine to it is at least `minCos`).
  */
-export const pickPlanarFace = (b: Brep, near: Vec3, normal?: Vec3): PlanarFacePick | undefined => {
+export const pickPlanarFace = (b: Brep, near: Vec3, normal?: Vec3, minCos = Math.cos(Math.PI / 180)): PlanarFacePick | undefined => {
   const loc = brepLocator(b)
   const hint = normal === undefined ? undefined : normalize3(normal)
   let best: PlanarFacePick | undefined
@@ -35,7 +35,7 @@ export const pickPlanarFace = (b: Brep, near: Vec3, normal?: Vec3): PlanarFacePi
     if (f.surface.kind !== "plane") return
     const F = f.surface.frame
     const n = f.reversed ? scale3(F.z, -1) : F.z
-    if (hint !== undefined && dot3(n, hint) < Math.cos(Math.PI / 180)) return
+    if (hint !== undefined && dot3(n, hint) < minCos) return
     const q = surfaceProject(f.surface, near)
     let distance = Math.abs(dot3(sub3(near, F.origin), F.z))
     if (!loc.insideFace(fi, q.u, q.v)) {
