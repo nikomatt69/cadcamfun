@@ -5,11 +5,12 @@
  * carry (exact Booleans, face and edge selection).
  *
  * Exact today: extrude (with rounded or bevelled profile corners, and its end rims filleted or chamfered), revolve, hole
- * (simple, counterbore, countersink), fillet and chamfer of straight edges and plane-cylinder rims, the analytic catalogue
- * primitives (cube, cylinder, cone, sphere, hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale,
- * mirror, pattern, split and combine, and the union / subtract / intersect of every tool. A body that went through anything
- * else (shell, sweep, loft, coil, drafts, blends of curved edges, a non-uniform scale, another catalogue element) keeps its
- * mesh and says why it has no exact model; nothing is approximated behind the caller's back.
+ * (simple, counterbore, countersink), fillet and chamfer of straight edges and plane-cylinder rims, the shell of an
+ * extrusion (its profile offset exactly by `offsetLoop`), the analytic catalogue primitives (cube, cylinder, cone, sphere,
+ * hemisphere, torus, prism, pyramid) with their rotation, move, uniform scale, mirror, pattern, split and combine, and the
+ * union / subtract / intersect of every tool. A body that went through anything else (the shell of a revolution or a
+ * sweep, sweep, loft, coil, drafts, blends of curved edges, a non-uniform scale, another catalogue element) keeps its mesh
+ * and says why it has no exact model; nothing is approximated behind the caller's back.
  */
 import { dimensionValue, type Dimension } from "./expr.ts"
 import type { Sketch } from "./sketch.ts"
@@ -28,6 +29,7 @@ import {
   makeSphere,
   makeTorus,
   normalizeProfile,
+  offsetLoop,
   polyhedron,
   revolveProfile,
   rotation,
@@ -329,6 +331,8 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   const dim = (d: Dimension): number => dimensionValue(d, values)
   const bodies: Array<{ id: string; feature: string; exact: Exact }> = []
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
+  // What a shell needs of an extrusion: its exact (corner-treated) loops, sketch frame and extent along the normal.
+  const extrusions = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly frame: { readonly origin: Vec3; readonly n: Vec3; readonly u: Vec3 }; readonly from: number; readonly to: number }>()
 
   const boolean = (a: Exact, b: Exact, op: "union" | "subtract" | "intersect"): Exact => {
     if (a.brep === undefined) return a
@@ -403,6 +407,7 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           const placement = frame({ x: F.origin.x + F.n.x * from, y: F.origin.y + F.n.y * from, z: F.origin.z + F.n.z * from }, F.n, F.u)
           const solids = profilesOfLoops(loops).map((p) => extrudeProfile(p, depth, { placement, name: f.id }))
           if (solids.length === 0) break
+          extrusions.set(f.id, { loops, frame: F, from, to: from + depth })
           let united = unionAll(solids)
           if (f.edge !== undefined) {
             const treated = treatEndRims(united, f.id, f.edge.ends ?? "both", f.edge.holes === true, dim(f.edge.size), f.edge.style)
@@ -628,9 +633,33 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           }
           break
         }
-        case "shell":
-          for (const b of bodies.filter((x) => f.targets === undefined || f.targets.includes(x.id))) bodies[bodies.indexOf(b)] = { ...b, exact: no("a shell has no exact model yet") }
+        case "shell": {
+          // The mesh rebuild's cavity, exact: each region of the extrusion's profile moved inwards by the wall (its holes
+          // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
+          const ex = extrusions.get(f.feature)
+          if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (only extrusions are shelled exactly)`); break }
+          const t = dim(f.thickness)
+          const open = f.open ?? "none"
+          const z0 = ex.from + (open === "bottom" || open === "both" ? -1 : t)
+          const z1 = ex.to + (open === "top" || open === "both" ? 1 : -t)
+          let cavity: Brep
+          try {
+            const at = (z: number) => frame({ x: ex.frame.origin.x + ex.frame.n.x * z, y: ex.frame.origin.y + ex.frame.n.y * z, z: ex.frame.origin.z + ex.frame.n.z * z }, ex.frame.n, ex.frame.u)
+            const pieces = profilesOfLoops(ex.loops).map((p) => {
+              const [outer, ...holes] = p.loops
+              let piece = extrudeProfile({ loops: [offsetLoop(outer!, t)] }, z1 - z0, { placement: at(z0), name: `${f.id}.cavity` })
+              for (const h of holes) piece = booleanBrep(piece, extrudeProfile({ loops: [offsetLoop(h, -t)] }, z1 - z0 + 2, { placement: at(z0 - 1), name: `${f.id}.wall` }), "subtract").brep
+              return piece
+            })
+            cavity = unionAll(pieces)
+          } catch (e) {
+            unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+            break
+          }
+          tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+          apply(f.id, ok(cavity), "subtract", f.targets, f.id)
           break
+        }
         case "sweep":
         case "loft":
         case "coil":

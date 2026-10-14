@@ -223,13 +223,19 @@ and material, with exact volumes and masses. The desktop's assembly panel runs a
 (`apps/desktop/src/features/cad/lib/component-automation.ts`: components are flattened, fasteners are
 inserted as `brep` elements in one undo step and are not inserted twice; the BOM exports as CSV).
 
-Fillets of edges between curved faces (variable radius, setbacks), shell/draft on B-reps, persistent naming
+Fillets of edges between curved faces (variable radius, setbacks), shells of revolutions and sweeps, drafts, persistent naming
 and 2D drafting remain pending, so the professional kernel acceptance gate is not claimed complete.
 
 Verification: `bun --no-env-file test packages/core/src/cad/brep`,
 `bun --no-env-file test packages/core`, and `bun --no-env-file x tsc -p packages/core/tsconfig.json`.
 
 ## 8. Change log
+
+- 2026-10-14: exact shell of an extrusion: `offsetLoop` (`brep/sweep.ts`) moves a line/arc profile exactly (parallel
+  lines, concentric arcs, mitred joints as `moveRing`, tangent joints kept, collapse and self-crossing refused);
+  `rebuildExact`'s `shell` subtracts the mesh rebuild's cavity built from it (closed, open top / bottom / both,
+  holes grown by the wall). A shell of a revolution or a sweep still says it has no exact model. Tests:
+  `brep/offset.test.ts` (exact Green areas to 1e-9), `history-brep.test.ts` (analytic volumes to 1e-9).
 
 - 2026-10-14: an extrusion's edge treatment (`edge`: fillet or chamfer of the end rims, `ends`, `holes`) is exact:
   `rebuildExact` blends the rims of `<id>.top` / `<id>.bottom` with `blendBrep`; a rim it cannot blend (the arc

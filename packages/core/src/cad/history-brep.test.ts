@@ -165,6 +165,30 @@ describe("exact replay of a parametric history", () => {
     expect(rebuildExact(both).bodies[0]!.reason).toContain("straight edges and full circles only")
   }, 180_000)
 
+  test("a shell hollows the extrusion exactly: closed, open at the top, a tube around a bore, a rounded box", () => {
+    const shell = (open: "none" | "top" | "bottom" | "both", base = plate()): History =>
+      history([...base.features, { id: "hollow", type: "shell", feature: "plate", thickness: 1, open }], base.parameters)
+    // 40 x 25 x 6 with a 1 mm wall: the cavity is 38 x 23 by 4 closed, by 5 open at the top.
+    expect(rel(exactVolume(shell("none")), 6000 - 38 * 23 * 4)).toBeLessThan(1e-9)
+    expect(rel(exactVolume(shell("top")), 6000 - 38 * 23 * 5)).toBeLessThan(1e-9)
+    // A bore of radius 4 in the profile: open at both ends the part is a tube with a 1 mm wall round the bore and outside.
+    const [s1, extrude] = plate().features as [SketchFeature, Extract<Feature, { type: "extrude" }>]
+    const bored = history([{ ...s1, sketch: { entities: [...s1.sketch.entities, pt("c", 20, 12.5), { id: "k", kind: "circle", center: "c", radius: 4 }], constraints: [...s1.sketch.constraints, { type: "fixed", point: "c" }] } }, extrude], plate().parameters)
+    expect(rel(exactVolume(shell("both", bored)), 6 * ((1000 - 16 * PI) - (38 * 23 - 25 * PI)))).toBeLessThan(1e-9)
+    // Rounded profile corners (r = 5): the cavity's corners are concentric arcs of radius 4.
+    const rounded = { ...plate(), features: plate().features.map((f) => (f.id === "plate" ? { ...f, corner: { style: "fillet" as const, size: 5 } } : f)) }
+    const r = rebuildExact(shell("top", rounded))
+    const v = massProperties(r.bodies[0]!.brep!).volume
+    expect(rel(v, (1000 - (4 - PI) * 25) * 6 - (38 * 23 - (4 - PI) * 16) * 5)).toBeLessThan(1e-9)
+    expect(rel(v, meshVolume(r.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+  }, 180_000)
+
+  test("a shell of something other than an extrusion says why it has no exact model", () => {
+    const ring = history([rectangle("s1", "XY", 5, 0, 3, 10), { id: "ring", type: "revolve", sketch: "s1", axis: "y", operation: "new" }, { id: "hollow", type: "shell", feature: "ring", thickness: 0.5 }])
+    const r = rebuildExact(ring)
+    expect(r.bodies[0]!.reason).toContain("only extrusions are shelled exactly")
+  })
+
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
     const r = 1
     const holed = plate([{ id: "h1", type: "hole", plane: "XY", offset: 6, at: [20, 12.5], diameter: 8, depth: 6 }, { id: "round", type: "fillet", radius: r, edges: { curved: true, within: { min: [10, 5, -1], max: [30, 20, 7] } } }])
