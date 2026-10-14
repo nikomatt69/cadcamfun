@@ -33,7 +33,9 @@ import {
   polyhedron,
   revolveProfile,
   rotation,
+  segmentEnd,
   segmentPoint,
+  segmentStart,
   selectBlendEdges,
   treatLoopCorners,
   tessellateBrep,
@@ -173,6 +175,69 @@ const ok = (brep: Brep): Exact => ({ brep })
 const no = (reason: string): Exact => ({ reason })
 
 const unionAll = (parts: ReadonlyArray<Brep>): Brep => parts.slice(1).reduce((acc, b) => booleanBrep(acc, b, "union").brep, parts[0]!)
+
+/**
+ * The cavity profile of a shelled revolution, exactly as the mesh rebuild's `shellRevolveProfile` builds it from a polygon:
+ * a profile that touches the axis is mirrored across it into a closed section, moved inwards by the wall (`offsetLoop`),
+ * cut back to the half-plane x >= 0 (by symmetry the joints between the chain and its mirror lie on the axis, so the cut is
+ * the chain's own pieces plus a line along the axis), and an open end (`top`: largest axial position) is pushed out by
+ * the wall plus 1 mm. Profile x is the distance from the axis, y the position along it.
+ */
+export const revolveShellLoop = (loop: ProfileLoop, t: number, open: "none" | "top" | "bottom" | "both"): ProfileLoop => {
+  const tol = 1e-7
+  const onAxis = (s: ProfileSegment) => s.kind === "line" && Math.abs(s.a.x) <= tol && Math.abs(s.b.x) <= tol
+  const n = loop.length
+  let inner: ProfileSegment[]
+  if (!loop.some(onAxis)) {
+    inner = [...offsetLoop(loop, t)]
+  } else {
+    // The open chain off the axis, from the end of the axis run round to its start.
+    const startAt = loop.findIndex((s, i) => onAxis(s) && !onAxis(loop[(i + 1) % n]!))
+    const chain: ProfileSegment[] = []
+    for (let k = 1; k < n; k++) {
+      const s = loop[(startAt + k) % n]!
+      if (onAxis(s)) break
+      chain.push(s)
+    }
+    if (chain.length + loop.filter(onAxis).length !== n) throw new RangeError("the profile of a revolution to shell touches its axis more than once")
+    const mirror = (s: ProfileSegment): ProfileSegment => {
+      if (s.kind === "line") return { kind: "line", a: { x: -s.b.x, y: s.b.y }, b: { x: -s.a.x, y: s.a.y } }
+      if (s.kind === "arc") return { kind: "arc", center: { x: -s.center.x, y: s.center.y }, radius: s.radius, start: Math.PI - s.end, end: Math.PI - s.start }
+      throw new RangeError("a spline in the profile of a revolution has no exact shell")
+    }
+    const full = [...chain, ...[...chain].reverse().map(mirror)]
+    const moved = offsetLoop(full, t)
+    // The chain's pieces (the first half) run from the axis back to the axis.
+    inner = moved.slice(0, chain.length)
+    const first = segmentStart(inner[0]!), last = segmentEnd(inner[inner.length - 1]!)
+    if (Math.abs(first.x) > 1e-6 || Math.abs(last.x) > 1e-6) throw new RangeError(`A ${t} mm wall leaves no cavity in this revolution`)
+    inner.push({ kind: "line", a: { x: 0, y: last.y }, b: { x: 0, y: first.y } })
+  }
+  for (const s of inner) for (let k = 0; k <= 8; k++) if (segmentPoint(s, k / 8).x < -1e-9) throw new RangeError(`A ${t} mm wall leaves no cavity in this revolution`)
+  // Open ends: the flat inner face at the end is pushed out, its straight walls lengthened with it.
+  const push = (which: "top" | "bottom") => {
+    const ys = inner.flatMap((s) => [segmentStart(s).y, segmentEnd(s).y])
+    const y0 = which === "top" ? Math.max(...ys) : Math.min(...ys)
+    const y1 = y0 + (which === "top" ? 1 : -1) * (t + 1)
+    const at = (p: Vec2) => Math.abs(p.y - y0) <= 1e-9
+    const flat = inner.map((s) => s.kind === "line" && at(s.a) && at(s.b))
+    if (!flat.some(Boolean)) throw new RangeError(`the open ${which} of a revolution shell has no exact model unless its inner face is flat`)
+    const m = inner.length
+    inner = inner.map((s, i) => {
+      const touches = (p: Vec2) => at(p) && (flat[i] || flat[(i + m - 1) % m] || flat[(i + 1) % m])
+      if (s.kind !== "line") {
+        if (touches(segmentStart(s)) || touches(segmentEnd(s))) throw new RangeError(`the open ${which} of a revolution shell has no exact model next to an arc`)
+        return s
+      }
+      const a = touches(s.a) ? { x: s.a.x, y: y1 } : s.a, b = touches(s.b) ? { x: s.b.x, y: y1 } : s.b
+      if (!flat[i] && (a !== s.a || b !== s.b) && Math.abs(s.a.x - s.b.x) > 1e-9) throw new RangeError(`the open ${which} of a revolution shell has no exact model next to a slanted wall`)
+      return { kind: "line", a, b }
+    })
+  }
+  if (open === "top" || open === "both") push("top")
+  if (open === "bottom" || open === "both") push("bottom")
+  return inner
+}
 
 /**
  * An extrusion's edge treatment on the exact solid: the rims of its end faces (`<id>.top`, `<id>.bottom`), the outer boundary
@@ -333,6 +398,8 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
   const tools = new Map<string, { readonly exact: ReadonlyArray<Exact>; readonly operation: "new" | "union" | "subtract" | "intersect"; readonly targets?: ReadonlyArray<string> }>()
   // What a shell needs of an extrusion: its exact (corner-treated) loops, sketch frame and extent along the normal.
   const extrusions = new Map<string, { readonly loops: ReadonlyArray<ProfileLoop>; readonly frame: { readonly origin: Vec3; readonly n: Vec3; readonly u: Vec3 }; readonly from: number; readonly to: number }>()
+  // And of a revolution: its (radial, axial) profile and axis.
+  const revolutions = new Map<string, { readonly loop: ProfileLoop; readonly full: boolean; readonly origin: Vec3; readonly axis: Vec3; readonly radial: Vec3 }>()
 
   const boolean = (a: Exact, b: Exact, op: "union" | "subtract" | "intersect"): Exact => {
     if (a.brep === undefined) return a
@@ -463,6 +530,7 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           const r3 = { x: P.u.x * n2.x + P.v.x * n2.y, y: P.u.y * n2.x + P.v.y * n2.y, z: P.u.z * n2.x + P.v.z * n2.y }
           normalizeProfile({ loops: [mapped] })
           const brep = revolveProfile({ loops: [mapped] }, (degrees * Math.PI) / 180, { origin: o3, axis: d3, radial: r3, name: f.id })
+          revolutions.set(f.id, { loop: mapped, full: degrees >= 360 - 1e-9, origin: o3, axis: d3, radial: r3 })
           const tool = ok(brep)
           tools.set(f.id, { exact: [tool], operation: f.operation, ...(f.targets !== undefined ? { targets: f.targets } : {}) })
           apply(f.id, tool, f.operation, f.targets, f.id)
@@ -637,9 +705,23 @@ export const rebuildExact = (history: History, given?: RebuildResult): ExactRebu
           // The mesh rebuild's cavity, exact: each region of the extrusion's profile moved inwards by the wall (its holes
           // outwards), from a wall above the bottom to a wall below the top, or through an open end; then subtracted.
           const ex = extrusions.get(f.feature)
-          if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (only extrusions are shelled exactly)`); break }
           const t = dim(f.thickness)
           const open = f.open ?? "none"
+          const rev = revolutions.get(f.feature)
+          if (ex === undefined && rev !== undefined) {
+            if (!rev.full) { unsupported({ ...f, operation: "subtract" }, "only a full revolution (360 degrees) can be shelled"); break }
+            let cavity: Brep
+            try {
+              cavity = revolveProfile({ loops: [revolveShellLoop(rev.loop, t, open)] }, 2 * Math.PI, { origin: rev.origin, axis: rev.axis, radial: rev.radial, name: `${f.id}.cavity` })
+            } catch (e) {
+              unsupported({ ...f, operation: "subtract" }, e instanceof Error ? e.message : String(e))
+              break
+            }
+            tools.set(f.id, { exact: [ok(cavity)], operation: "subtract", ...(f.targets !== undefined ? { targets: f.targets } : {}) })
+            apply(f.id, ok(cavity), "subtract", f.targets, f.id)
+            break
+          }
+          if (ex === undefined) { unsupported({ ...f, operation: "subtract" }, `a shell of '${f.feature}' has no exact model yet (extrusions and full revolutions are shelled exactly)`); break }
           const z0 = ex.from + (open === "bottom" || open === "both" ? -1 : t)
           const z1 = ex.to + (open === "top" || open === "both" ? 1 : -t)
           let cavity: Brep

@@ -183,10 +183,23 @@ describe("exact replay of a parametric history", () => {
     expect(rel(v, meshVolume(r.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
   }, 180_000)
 
-  test("a shell of something other than an extrusion says why it has no exact model", () => {
-    const ring = history([rectangle("s1", "XY", 5, 0, 3, 10), { id: "ring", type: "revolve", sketch: "s1", axis: "y", operation: "new" }, { id: "hollow", type: "shell", feature: "ring", thickness: 0.5 }])
-    const r = rebuildExact(ring)
-    expect(r.bodies[0]!.reason).toContain("only extrusions are shelled exactly")
+  test("a shell of a full revolution: a hollow ring, an open ring, a cup and a closed can, exactly", () => {
+    const turned = (x: number, w: number, h: number, open: "none" | "top" | "bottom" | "both", t: number, degrees?: number) =>
+      history([rectangle("s1", "XY", x, 0, w, h), { id: "ring", type: "revolve", sketch: "s1", axis: "y", ...(degrees !== undefined ? { angle: degrees } : {}), operation: "new" }, { id: "hollow", type: "shell", feature: "ring", thickness: t, open }])
+    // A ring of section 5..8 x 0..10: the cavity is 5.5..7.5 x 0.5..9.5, or through the top.
+    expect(rel(exactVolume(turned(5, 3, 10, "none", 0.5)), PI * (64 - 25) * 10 - PI * (7.5 ** 2 - 5.5 ** 2) * 9)).toBeLessThan(1e-9)
+    expect(rel(exactVolume(turned(5, 3, 10, "top", 0.5)), PI * (64 - 25) * 10 - PI * (7.5 ** 2 - 5.5 ** 2) * 9.5)).toBeLessThan(1e-9)
+    // A solid cylinder r 10 x 20 (its profile on the axis): a cup with a 1 mm wall and floor, and a closed can.
+    const cup = rebuildExact(turned(0, 10, 20, "top", 1))
+    expect(cup.bodies[0]!.reason).toBeUndefined()
+    const v = massProperties(cup.bodies[0]!.brep!).volume
+    expect(rel(v, PI * 100 * 20 - PI * 81 * 19)).toBeLessThan(1e-9)
+    expect(rel(v, meshVolume(cup.result.bodies[0]!.mesh))).toBeLessThan(2e-3)
+    expect(rel(exactVolume(turned(0, 10, 20, "none", 1)), PI * 100 * 20 - PI * 81 * 18)).toBeLessThan(1e-9)
+    // A partial revolution cannot be shelled: the rebuild reports it on the feature, and both views keep the half ring.
+    const part = rebuildExact(turned(5, 3, 10, "none", 0.5, 180))
+    expect(part.result.issues.some((i) => i.feature === "hollow" && i.severity === "error")).toBe(true)
+    expect(rel(massProperties(part.bodies[0]!.brep!).volume, (PI * (64 - 25) * 10) / 2)).toBeLessThan(1e-9)
   })
 
   test("hole mouths are rounded with exact tori when curved edges are asked for", () => {
