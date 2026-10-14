@@ -11,10 +11,12 @@
  */
 import { emptyDrawing, type Drawing, type Entity } from "../cad/entities.ts"
 import { rebuild, type History, type RebuildResult } from "../cad/history.ts"
+import { rebuildExact } from "../cad/history-brep.ts"
+import { drawingEdges } from "../cad/brep/drawing-edges.ts"
 import { meshBounds, type Mesh } from "../cad/solid.ts"
 import type { Vec2 } from "../cad/vec.ts"
 import { fmt, planDimensions, type CircleNote, type DimensionPlan, type HoleGroup } from "./dimensions.ts"
-import { edgesOf, projectView, viewFrame, type ProjectedView, type Seg2, type V3, type ViewName } from "./project.ts"
+import { edgesOf, projectView, viewFrame, type Edge3, type ProjectedView, type Seg2, type V3, type ViewName } from "./project.ts"
 import { detailView, sectionView, type Axis, type SectionView } from "./section.ts"
 import { drawingToSvg } from "./svg.ts"
 
@@ -44,6 +46,8 @@ export interface SheetOptions {
   readonly section?: { readonly axis: Axis; readonly at: number; readonly from?: "+" | "-"; readonly letter?: string; readonly parent?: "front" | "top" | "right" }
   readonly detail?: { readonly view?: "front" | "top" | "right"; readonly centre: V3; readonly radius: number; readonly factor: number; readonly letter?: string }
   readonly flatness?: { readonly value: number; readonly view?: "front" | "top" | "right" }
+  /** Draw the views from the exact B-rep edges when every body has an exact model (default true); otherwise from the mesh. */
+  readonly exact?: boolean
 }
 
 export interface DimensionReport {
@@ -66,6 +70,8 @@ export interface DrawingSheet {
   readonly callouts: ReadonlyArray<string>
   readonly section: { readonly loops: number; readonly hatchLines: number } | undefined
   readonly warnings: ReadonlyArray<string>
+  /** Where the view edges came from: the exact B-rep (true curves, tangent edges hidden) or the mesh's dihedral angles. */
+  readonly edgeSource: "exact" | "mesh"
 }
 
 export const scaleText = (s: number): string => (s >= 1 ? `${Number(s.toFixed(3))}:1` : `1:${Number((1 / s).toFixed(3))}`)
@@ -179,11 +185,25 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   warnings.push(...plan.notes)
   const [W, H] = SIZES[options.size ?? "A3"]
   const projection = options.projection ?? "first"
-  const edges = edgesOf(mesh)
+  // The views: from the exact solid when every body has one (its edges are the true feature edges, a fillet's tangent
+  // boundaries are not drawn), else from the mesh. The exact tessellation is also the occluder, so edges and faces agree.
+  let viewMesh = mesh
+  let edges: ReadonlyArray<Edge3> | undefined
+  if (result !== undefined && options.exact !== false) {
+    const ex = rebuildExact(source as History, result)
+    const missing = ex.bodies.find((b) => b.brep === undefined)
+    if (missing === undefined) {
+      const parts = ex.bodies.map((b) => drawingEdges(b.brep!))
+      viewMesh = parts.length === 1 ? parts[0]!.mesh : mergeBodies(parts.map((p) => p.mesh))
+      edges = parts.flatMap((p) => p.edges)
+    } else warnings.push(`Views drawn from the mesh: body '${missing.id}' has no exact model (${missing.reason ?? "unknown"})`)
+  }
+  const edgeSource = edges === undefined ? "mesh" : "exact"
+  edges ??= edgesOf(mesh)
   const names = options.views ?? ["front", "top", "right"]
   const principal = new Map<PrincipalName, ProjectedView>()
-  for (const n of names) principal.set(n, projectView(mesh, n, { edges }))
-  const iso = options.iso === false ? undefined : projectView(mesh, "iso", { edges, hidden: false })
+  for (const n of names) principal.set(n, projectView(viewMesh, n, { edges }))
+  const iso = options.iso === false ? undefined : projectView(viewMesh, "iso", { edges, hidden: false })
 
   // The area the views may use: inside the frame, above the title block and notes.
   const area = { x0: 20, y0: 58, x1: W - 20, y1: H - 20 }
@@ -337,7 +357,7 @@ export const generateSheet = (source: History | { readonly mesh: Mesh }, options
   const drawing: Drawing = { ...base, layers: LAYERS.map((l) => ({ id: l.id, name: l.name, visible: true, locked: false, color: l.color })), entities: cv.entities }
   return {
     drawing, svg: drawingToSvg(drawing, { width: W, height: H }), size: { width: W, height: H }, scale, views: reports, dimensions, callouts,
-    section: arranged.section === undefined ? undefined : { loops: arranged.section.loops.length, hatchLines: arranged.section.hatch.length }, warnings
+    section: arranged.section === undefined ? undefined : { loops: arranged.section.loops.length, hatchLines: arranged.section.hatch.length }, warnings, edgeSource
   }
 }
 

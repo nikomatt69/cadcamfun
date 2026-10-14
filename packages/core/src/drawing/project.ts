@@ -211,9 +211,11 @@ export const projectView = (mesh: Mesh, view: ViewName | ViewFrame, options: Pro
   const t = frame.toViewer
   for (const e of edges) {
     if (e.kind === "smooth") {
-      // Only a silhouette: the two faces look different ways at the viewer.
+      // Only a silhouette: the two faces look different ways at the viewer, or both are seen edge-on (a flat wall tangent
+      // to a fillet, seen along the wall: the edge is on the outline; exact normals make this test exact).
       const d1 = dot(e.n1, t), d2 = e.n2 === undefined ? 0 : dot(e.n2, t)
-      if (!((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9))) continue
+      const edgeOn = e.n2 !== undefined && Math.abs(d1) <= 1e-9 && Math.abs(d2) <= 1e-9
+      if (!(edgeOn || (d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9))) continue
     }
     const pa = toView(e.a), pb = toView(e.b)
     const len = Math.hypot(pb.x - pa.x, pb.y - pa.y)
