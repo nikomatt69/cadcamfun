@@ -8,6 +8,7 @@
  *   execute       prepare / run: strategies, post, independent NC replay, stock lineage, claims and release level
  *   compat        the legacy generator settings in and out of the kernel's cutting data
  *   schema        Effect Schemas of the caller-supplied cutters and operations (HTTP, assistant)
+ *   kinematics    the trunnion table (AC / BC): forward, inverse candidates with branch and C unwrapped, and the cheapest path
  *   assembly      the 3D tool assembly (cutting zone, shank, holder) as a profile and its solid of revolution
  */
 export * from "./materials.ts"
@@ -22,3 +23,4 @@ export * from "./compat.ts"
 export * from "./assembly.ts"
 export { CutterSchema, OperationSpecSchema } from "./schema.ts"
 export { jobOfSnapshot, type KernelSnapshot } from "./snapshot.ts"
+export { candidatesFor, planTable, forward, toolAxisInMachine, unwrapC, travel, type Candidate, type PlannedPosition, type TableKinematic, type TablePlan } from "./kinematics.ts"
