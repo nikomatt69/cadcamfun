@@ -11,6 +11,9 @@
  *   kinematics    the trunnion table (AC / BC): forward, inverse candidates with branch and C unwrapped, and the cheapest path
  *   head          the tilting head (B about Y): the tool axis and tip for a tilt, and the tilt that reaches a direction
  *   assembly      the 3D tool assembly (cutting zone, shank, holder) as a profile and its solid of revolution
+ *   collision     the continuous check of a joint move: tool probes against the table and the part, certified clear / collision
+ *   motion        simultaneous five-axis: locations -> table poses, each move split into blocks and checked for collision
+ *   stock         volumetric stock as voxels: sure / possible removal by the cutter's sampled sweep, remaining-volume bracket
  */
 export * from "./materials.ts"
 export * from "./cutters.ts"
@@ -26,3 +29,6 @@ export { CutterSchema, OperationSpecSchema } from "./schema.ts"
 export { jobOfSnapshot, type KernelSnapshot } from "./snapshot.ts"
 export { headAxis, headFor, headTip, type HeadKinematic, type HeadSolution } from "./head.ts"
 export { candidatesFor, planTable, forward, toolAxisInMachine, unwrapC, travel, type Candidate, type PlannedPosition, type TableKinematic, type TablePlan } from "./kinematics.ts"
+export { checkMotion, cylinderSolid, boxSolid, headScene, trunnionScene, type Capsule, type Clearance, type MotionCheck, type Pose, type Scene, type Solid, type TableEnvelope } from "./collision.ts"
+export { planSimultaneous, type CutterLocation, type MotionSegment, type PartEnvelope, type SimultaneousInput, type SimultaneousPlan } from "./motion.ts"
+export { voxelStock, removeTipPath, remainingVolume, type VoxelStock } from "./stock.ts"
