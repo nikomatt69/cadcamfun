@@ -1,4 +1,4 @@
-import { For, Show, type JSX } from "solid-js"
+import { For, Show, createSignal, type JSX } from "solid-js"
 import { Package } from "lucide-solid"
 import { cam } from "@cadcamfun/core"
 import { predefinedMaterials } from "../../../cad/lib/predefinedLibraries.ts"
@@ -26,16 +26,29 @@ export function MaterialSection(): JSX.Element {
   const properties = () => cam.generator.materialProperties[gen.settings.material]
   const userMaterials = () => (materials.data() ?? []) as ReadonlyArray<{ id: string; name: string }>
 
+  // The CAM kernel's grade within the panel's family, the cutter's material and the machine whose limits apply.
+  const [grade, setGrade] = createSignal<string | undefined>(undefined)
+  const [toolMaterial, setToolMaterial] = createSignal<"carbide" | "hss">("carbide")
+  const [machineId, setMachineId] = createSignal(cam.kernel.DEFAULT_MACHINE.id)
+  const familyGrade = () => cam.kernel.findMaterial(cam.kernel.LEGACY_MATERIAL_GRADE[gen.settings.material] ?? gen.settings.material)
+  const currentGrade = () => (grade() !== undefined ? cam.kernel.findMaterial(grade()!) : undefined) ?? familyGrade()
+  /** Grades of the same ISO group as the panel's family (all grades for "other"). */
+  const grades = () => {
+    const family = familyGrade()
+    return gen.settings.material === "other" || family === undefined ? cam.kernel.MATERIALS : cam.kernel.MATERIALS.filter((m) => m.iso === family.iso || m.family === family.family)
+  }
+  const recommendation = () => {
+    const machine = cam.kernel.findMachine(machineId()) ?? cam.kernel.DEFAULT_MACHINE
+    return cam.kernel.recommendForSettings(gen.settings, { ...(currentGrade() !== undefined ? { grade: currentGrade()!.id } : {}), toolMaterial: toolMaterial(), machine: machine.limits })
+  }
+
   const applyRecommended = (): void => {
-    const property = properties()
-    if (!property?.feedrateModifier || !property.speedModifier) return
-    gen.patchSettings({
-      feedrate: Math.round(1000 * property.feedrateModifier),
-      plungerate: Math.round(1000 * property.feedrateModifier * 0.4),
-      rpm: Math.round(10000 * property.speedModifier),
-      coolant: ["Necessario", "Raccomandato", "Necessario ad alta pressione"].includes(property.coolant)
-    })
-    gen.flash(`Parameters optimized for ${gen.settings.material}`)
+    const r = recommendation()
+    if (r === undefined) { gen.flash("Cutting data is computed for milling operations"); return }
+    gen.patchSettings(r.patch)
+    const d = r.data
+    const notes = [...d.warnings, ...d.exceeded].slice(0, 2).join(" · ")
+    gen.flash(`${r.material.name}: ${d.rpm} rpm, F${d.feed}, ap ${d.ap} mm, ae ${d.ae} mm (Vc ${Math.round(d.vc)} m/min, fz ${d.fz} mm)${notes ? ` — ${notes}` : ""}`, 6000)
   }
 
   const fromLibrary = (value: string): void => {
@@ -45,6 +58,8 @@ export function MaterialSection(): JSX.Element {
     const found = predefined ?? user
     if (!found) return
     gen.patchSettings({ material: materialTypeOf(found.name) })
+    const known = cam.kernel.findMaterial(found.name)
+    if (known !== undefined) setGrade(known.id)
     gen.flash(`Material "${found.name}" loaded from library`)
   }
 
@@ -62,6 +77,40 @@ export function MaterialSection(): JSX.Element {
           <option value="composite">Composite</option>
           <option value="other">Other</option>
         </select>
+      </div>
+
+      <div class="grid grid-cols-1 gap-2" data-testid="cutting-data-panel">
+        <div>
+          <label class={LABEL}>Grade</label>
+          <select class={INPUT} data-testid="material-grade" value={currentGrade()?.id ?? ""} onChange={(event) => setGrade(event.currentTarget.value || undefined)}>
+            <For each={grades()}>{(m) => <option value={m.id}>{m.name} (ISO {m.iso})</option>}</For>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class={LABEL}>Tool material</label>
+            <select class={INPUT} value={toolMaterial()} onChange={(event) => setToolMaterial(event.currentTarget.value as "carbide" | "hss")}>
+              <option value="carbide">Carbide</option>
+              <option value="hss">HSS</option>
+            </select>
+          </div>
+          <div>
+            <label class={LABEL}>Machine limits</label>
+            <select class={INPUT} value={machineId()} onChange={(event) => setMachineId(event.currentTarget.value)}>
+              <For each={cam.kernel.MACHINES}>{(m) => <option value={m.id}>{m.name}</option>}</For>
+            </select>
+          </div>
+        </div>
+        <Show when={recommendation()}>
+          {(r) => (
+            <div class="p-2 rounded-md bg-emerald-50 text-xs text-emerald-900 space-y-0.5" data-testid="cutting-data-preview">
+              <div class="font-medium">Cutting data for {r().material.name} · Ø{gen.settings.toolDiameter} {gen.settings.flutes}F {toolMaterial() === "hss" ? "HSS" : "carbide"}</div>
+              <div>{r().data.rpm} rpm · F {r().data.feed} mm/min · plunge {r().data.plungeFeed} · Vc {Math.round(r().data.vc)} m/min · fz {r().data.fz} mm</div>
+              <div>ap {r().data.ap} mm · ae {r().data.ae} mm · {r().data.coolant} · {r().data.powerKw} kW · deflection {r().data.deflectionMm} mm</div>
+              <For each={[...r().data.exceeded, ...r().data.warnings].slice(0, 3)}>{(w) => <div class="text-amber-700">⚠ {w}</div>}</For>
+            </div>
+          )}
+        </Show>
       </div>
 
       <Show when={gen.settings.material && properties()}>
