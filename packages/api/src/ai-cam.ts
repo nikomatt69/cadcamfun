@@ -6,9 +6,11 @@ const revision = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1
 const positive = Schema.Finite.check(Schema.isGreaterThan(0))
 const params = Schema.Record(Schema.String, Schema.Unknown)
 // Effect's empty Struct also accepts arrays; action parameters always use an object, including no-argument calls.
-const empty = Schema.Struct({}).check(Schema.makeFilter((input) => !Array.isArray(input), {
+/** An action that takes no arguments: an object (never an array), shown to the model as one with no properties. */
+export const EmptyActionInput = Schema.Struct({}).check(Schema.makeFilter((input) => !Array.isArray(input), {
   expected: "an action parameter object", toJsonSchema: () => ({ type: "object", properties: {} })
 }))
+const empty = EmptyActionInput
 
 /** Shared inputs of the CAM action catalogue. Lengths are millimetres; these schemas never carry trusted authority. */
 export const CamSetupCandidate = Schema.Struct({

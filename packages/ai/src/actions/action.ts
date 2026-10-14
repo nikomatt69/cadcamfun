@@ -10,9 +10,10 @@
  */
 import { Effect, Schema } from "effect"
 import { z } from "zod"
-import { ActionDenied, ActionInvalidInput, ActionInterrupted } from "@cadcamfun/api"
+import { ACTION_CONTRACTS, ActionDenied, ActionInvalidInput, ActionInterrupted, type ActionContract } from "@cadcamfun/api"
 import type { ActionContribution, ToolContext } from "../tools/define.ts"
 import { nikcliWireSchema } from "../tools/wire-schema.ts"
+import { classifyOutcome, failure, outcomeWire, type ActionOutcome } from "./outcome.ts"
 
 /** What an action does to domain data. Derived from the implementation, never from the tool's name. */
 export type ActionKind = "read" | "write" | "destructive"
@@ -38,6 +39,8 @@ export interface ActionSpec<S extends ActionParameters = ActionParameters> {
   readonly id: string
   readonly kind: ActionKind
   readonly parameters: S
+  /** What the action touches and the result it must answer with (`ACTION_CONTRACTS` in `@cadcamfun/api`). */
+  readonly contract: ActionContract
   readonly run: (input: z.infer<S>, context: ActionContext) => Effect.Effect<unknown, ActionFailure>
   /** The per-verb tool id this action replaced; the parity test maps every retired id here. */
   readonly replaces?: string
@@ -64,10 +67,17 @@ export interface ActionConfig<S extends ActionParameters> {
  * Declares one action. The implementation's Promise is crossed exactly once, here, so every caller sees an Effect:
  * a foreign exception becomes a tagged failure instead of escaping into the host's tool bridge.
  */
+/** An action outside the catalogue (an extension, a test probe) declares nothing: no effects known, no result checked. */
+const UNDECLARED: ActionContract = { effects: [] }
+
+/** The catalogue's contract of `id`; `harness-inventory.test.ts` asserts every catalogue action has one. */
+const contractOf = (id: string): ActionContract => ACTION_CONTRACTS[id] ?? UNDECLARED
+
 export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>): ActionSpec<S> => ({
   id: config.id,
   kind: config.kind,
   parameters: config.parameters,
+  contract: contractOf(config.id),
   ...(config.replaces !== undefined ? { replaces: config.replaces } : {}),
   run: Effect.fn(`actions.${config.id}`)(function*(input: z.infer<S>, context: ActionContext) {
     // Constructing an Effect must not start a Promise handler: cancellation and admission happen before execution.
@@ -84,6 +94,21 @@ export const defineAction = <S extends ActionParameters>(config: ActionConfig<S>
   })
 })
 
+/**
+ * The seam's decoder for an Effect-owned input. The host validates the derived schema first; this decode applies what the
+ * JSON schema cannot say (trimming, defaults, a flag sent as text) and names each field it refuses, so the model can fix
+ * the call instead of guessing.
+ */
+const wireDecoder = <A>(actionId: string, schema: Schema.Codec<A, unknown>) => {
+  const decode = Schema.decodeUnknownEffect(schema)
+  return (input: unknown): Effect.Effect<A, ActionInvalidInput> => decode(input, { errors: "all" }).pipe(
+    Effect.mapError((error) => new ActionInvalidInput({
+      actionId,
+      message: `The arguments do not match the action's schema. ${error.message.replace(/\s*\n\s*/g, " ").slice(0, 600)}`
+    }))
+  )
+}
+
 /** Effect owns a wire action's input; nikcli only gets its derived, model-visible representation. */
 export const defineWireAction = <A>(config: {
   readonly id: string
@@ -92,12 +117,11 @@ export const defineWireAction = <A>(config: {
   readonly replaces?: string
   readonly run: (input: A, context: ActionContext) => Promise<unknown> | unknown
 }): ActionSpec => {
-  const decode = Schema.decodeUnknownEffect(config.parameters)
+  const decode = wireDecoder(config.id, config.parameters)
   return defineAction({
     ...config,
     parameters: nikcliWireSchema(config.parameters),
     run: (input, context) => decode(input).pipe(
-      Effect.mapError(() => new ActionInvalidInput({ actionId: config.id, message: "The arguments do not match the action's schema." })),
       Effect.flatMap((decoded) => Effect.try({
         try: () => config.run(decoded, context),
         catch: (cause) => new ActionFailed({ actionId: config.id, message: message(cause) })
@@ -109,41 +133,72 @@ export const defineWireAction = <A>(config: {
   })
 }
 
-/** The shared Promise seam for the host and direct catalogue callers. Interruption has the same wire result on both. */
-export const executeAction = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<unknown> => {
+/** A typed failure as an outcome. A write that failed inside its own code may have committed part of its work. */
+const failureOutcome = (action: ActionSpec, error: ActionFailure): ActionOutcome => {
+  const result = actionFailureResult(error)
+  switch (error._tag) {
+    case "ActionInterrupted": return { kind: "cancelled", value: result, validated: true }
+    case "ActionFailed": return action.kind === "read"
+      ? { kind: "refused", value: result, validated: true }
+      : { kind: "uncertain", value: failure(action.id, "ActionUncertain", `${error.message} The action failed while running and may have changed the document: inspect before retrying.`), validated: true }
+    default: return { kind: "refused", value: result, validated: true }
+  }
+}
+
+/**
+ * The shared Promise seam for the host and direct catalogue callers: runs the action and classifies what it answered
+ * (`outcome.ts`). Interruption has the same wire result on both; an abort that lands while a write runs is `uncertain`.
+ */
+export const executeActionOutcome = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<ActionOutcome> => {
+  let started = false
   try {
     return await Effect.runPromise(
-      action.run(input as never, context).pipe(Effect.catch((error: ActionFailure) => Effect.succeed(actionFailureResult(error)))),
+      Effect.sync(() => { started = !context.signal?.aborted }).pipe(
+        Effect.andThen(action.run(input as never, context)),
+        Effect.map((raw) => classifyOutcome(action, raw)),
+        Effect.catch((error: ActionFailure) => Effect.succeed(failureOutcome(action, error)))
+      ),
       { signal: context.signal }
     )
   } catch (cause) {
-    if (context.signal?.aborted) return actionFailureResult(new ActionInterrupted({ actionId: action.id, message: "Tool execution cancelled." }))
+    if (context.signal?.aborted) {
+      return started && action.kind !== "read"
+        ? { kind: "uncertain", value: failure(action.id, "ActionUncertain", "Tool execution was cancelled while the action ran; it may have changed the document: inspect before retrying."), validated: true }
+        : failureOutcome(action, new ActionInterrupted({ actionId: action.id, message: "Tool execution cancelled." }))
+    }
     throw cause
   }
 }
+
+/** The wire answer of `executeActionOutcome`: what the host adapter returns to the model. */
+export const executeAction = async (action: ActionSpec, input: unknown, context: ActionContext): Promise<unknown> =>
+  outcomeWire(await executeActionOutcome(action, input, context))
 
 /**
  * An action whose implementation the application contributes (libraries, version control, delegation). The
  * catalogue still owns the identity, the effect and the validation; a host that has not contributed one refuses
  * the call instead of guessing.
  */
-export const contributedAction = <S extends ActionParameters>(config: Omit<ActionConfig<S>, "run"> & { readonly contribution: string }): ActionSpec<S> => ({
-  ...defineAction({
+export const contributedAction = <A>(config: {
+  readonly id: string
+  readonly kind: ActionKind
+  readonly parameters: Schema.Codec<A, unknown>
+  readonly replaces?: string
+  readonly contribution: string
+}): ActionSpec => ({
+  ...defineWireAction({
     id: config.id,
     kind: config.kind,
     parameters: config.parameters,
     ...(config.replaces !== undefined ? { replaces: config.replaces } : {}),
+    // The action's schema is the seam's decoder: a contribution reached directly (a test, or the next adapter) gets the
+    // decoded value too, so a flag sent as `"true"` never reads as false and quietly changes what the action does.
     run: (input, context) => {
       const contribution = context.contributions?.[config.contribution]
       if (contribution === undefined) {
         return { ok: false, _tag: "ActionUnavailable", actionId: config.id, error: `${config.id} is not available in this host.` }
       }
-      // The action's schema is the seam's decoder. The host already validates before it calls, but a contribution
-      // reached directly (a test, or the next adapter) must not get raw arguments: a flag sent as `"true"` would
-      // otherwise read as false and quietly change what the action does.
-      const parsed = (config.parameters as z.ZodType).safeParse(input)
-      if (!parsed.success) return { ok: false, _tag: "ActionInvalidInput", actionId: config.id, error: "The arguments do not match the action's schema." }
-      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(parsed.data, context)
+      return (contribution as (value: unknown, ctx: ToolContext) => Promise<unknown>)(input, context)
     }
   }),
   contributed: config.contribution

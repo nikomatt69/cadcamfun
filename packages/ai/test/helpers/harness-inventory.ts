@@ -211,6 +211,7 @@ export interface ActionEntry {
   readonly roles: ReadonlyArray<string>
   readonly prompt: boolean
   readonly result: string
+  readonly effects: ReadonlyArray<string>
   readonly tests: ReadonlyArray<string>
 }
 
@@ -227,8 +228,9 @@ export const actionInventory = (): ReadonlyArray<ActionEntry> => {
     routes: routesOf(spec.id, blocks, decls),
     roles: holders(toolOf(spec)),
     prompt: promptMentions(toolOf(spec), nameOf(spec)),
-    // No action declares a result schema yet (ActionSpec.run returns `unknown`): Step 1 adds it.
-    result: "unknown (N)",
+    // Step 1 migrates the families one by one; an action without a declared result still passes unvalidated.
+    result: spec.contract.result !== undefined ? (spec.contract.partialWhen !== undefined ? `declared, partial on \`${spec.contract.partialWhen}\`` : "declared") : "unknown (N)",
+    effects: spec.contract.effects,
     tests: testsFor(toolOf(spec), nameOf(spec), tests)
   }))
 }
@@ -309,7 +311,9 @@ export const renderInventory = (): string => {
     "",
     "Evidence class (legend of [AI-11](11-enterprise-harness-execution.md)): every route below is **C** — found by reading the",
     "caller → adapter → implementation path. A test file listed under *Tests* mentions the action; it is not a dedicated",
-    "regression and does not make the action **V**. *Result* is `unknown (N)` for every action until Step 1 adds result schemas.",
+    "regression and does not make the action **V**. *Result* is `declared` when `ACTION_CONTRACTS` (`@cadcamfun/api`) gives the",
+    "action a result schema its answers are validated against, `unknown (N)` while its family is not migrated (AI-11 Step 1).",
+    "*Effects* is what the action changes or reaches beyond reading the open document.",
     "",
     "## Totals",
     "",
@@ -317,7 +321,7 @@ export const renderInventory = (): string => {
     `- Actions with an identified execution path: **${actions.filter(hasExecutionPath).length}/${actions.length}**.`,
     `- Actions named in their tool prompt: **${actions.filter((entry) => entry.prompt).length}/${actions.length}**.`,
     `- Actions mentioned by at least one test file: **${actions.filter((entry) => entry.tests.length > 0).length}/${actions.length}**.`,
-    `- Actions with a declared result schema: **0/${actions.length}**.`,
+    `- Actions with a declared result schema: **${actions.filter((entry) => entry.result !== "unknown (N)").length}/${actions.length}**.`,
     `- Prompt files: **${prompts.length}** (base layers ${BASE_LAYERS.length}, modes ${Object.keys(MODE_PROMPTS).length}); one-shot workflows: **${workflows.length}**.`,
     `- Built-in skills: **${CADCAM_SKILLS.length}** (plus user skills from the store); composer commands: **${commands.length}**.`,
     "",
@@ -332,9 +336,9 @@ export const renderInventory = (): string => {
   }
   push("", "## Actions", "")
   for (const tool of ACTION_TOOL_IDS) {
-    push(`### \`${tool}\``, "", "| Action | Effect | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |", "| --- | --- | --- | --- | --- | --- | --- |")
+    push(`### \`${tool}\``, "", "| Action | Kind | Effects | Parameters (* required) | Execution path | In prompt | Result | Tests (mentions) |", "| --- | --- | --- | --- | --- | --- | --- | --- |")
     for (const entry of actions.filter((candidate) => candidate.tool === tool)) {
-      push(`| \`${entry.id}\`${entry.replaces !== undefined ? ` (was \`${entry.replaces}\`)` : ""} | ${entry.kind} | ${cell(entry.parameters)} | ${entry.routes.map(routeText).map(cell).join("<br>")} | ${entry.prompt ? "yes" : "**no**"} | ${entry.result} | ${entry.tests.length === 0 ? "**none**" : entry.tests.join(", ")} |`)
+      push(`| \`${entry.id}\`${entry.replaces !== undefined ? ` (was \`${entry.replaces}\`)` : ""} | ${entry.kind} | ${entry.effects.length === 0 ? "—" : entry.effects.join(", ")} | ${cell(entry.parameters)} | ${entry.routes.map(routeText).map(cell).join("<br>")} | ${entry.prompt ? "yes" : "**no**"} | ${entry.result} | ${entry.tests.length === 0 ? "**none**" : entry.tests.join(", ")} |`)
     }
     push("")
   }

@@ -163,13 +163,13 @@ describe("cad_parametric: recipe", () => {
   })
 
   test("create: true calls the project handler exactly once with the generated history, the name and the placement", async () => {
-    const { calls, run } = harness(() => ({ ok: true, elementId: "el-9", revision: "r1" }))
+    const { calls, run } = harness(() => ({ ok: true, mutation: "add", ids: ["el-9"], elements: [{ id: "el-9", type: "parametric" }], drawingId: "d1", projectId: "p1" }))
     const result = await run({ action: "recipe", recipe: "l_bracket", params: { holesPerLeg: 2 }, create: true, name: "Bracket A", x: 10, y: 20, z: 5, layer: "Parts" })
     expect(calls).toHaveLength(1)
     expect(calls[0]!.projectId).toBe("p1")
     expect(calls[0]!.input).toEqual({ action: "create", history: buildRecipe("l_bracket", { holesPerLeg: 2 }).history, name: "Bracket A", x: 10, y: 20, z: 5, layer: "Parts" })
     expect(result.ok).toBe(true)
-    expect(result.created).toEqual({ ok: true, elementId: "el-9", revision: "r1" })
+    expect(result.created).toMatchObject({ ok: true, mutation: "add", ids: ["el-9"] })
     expect(result.history).toEqual((calls[0]!.input as { history: unknown }).history)
   }, SLOW)
 
@@ -239,7 +239,7 @@ describe("cad_parametric: dfm", () => {
   })
 
   test("a part that cannot be read comes back as the handler's own failure or a clear message", async () => {
-    expect(await harness(() => ({ ok: false, error: "No such element." })).run({ action: "dfm", elementId: "ghost" })).toEqual({ ok: false, error: "No such element." })
+    expect(await harness(() => ({ ok: false, error: "No such element." })).run({ action: "dfm", elementId: "ghost" })).toEqual({ ok: false, _tag: "ActionRefused", actionId: "cad.parametric_dfm", error: "No such element." })
     const noHistory = await harness(() => ({ ok: true })).run({ action: "dfm", elementId: "e" })
     expect(noHistory).toMatchObject({ ok: false })
     expect(noHistory.error).toMatch(/no readable parametric history/)

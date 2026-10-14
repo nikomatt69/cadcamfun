@@ -19,7 +19,7 @@ setDefaultTimeout(90000)
 let failing = false
 let slow = 0
 let handlerCalls: string[] = []
-const handlers = new Proxy({} as ToolHandlersShape, { get: (_t, name: string) => async () => (handlerCalls.push(name), slow > 0 && (await new Promise((r) => setTimeout(r, slow))), failing ? { ok: false, error: "The drawing is locked." } : { ok: true, count: 1 }) })
+const handlers = new Proxy({} as ToolHandlersShape, { get: (_t, name: string) => async () => (handlerCalls.push(name), slow > 0 && (await new Promise((r) => setTimeout(r, slow))), failing ? { ok: false, error: "The drawing is locked." } : name === "describeDrawing" ? { total: 1, counts: { cube: 1 }, drawingId: "d", projectId: "p" } : { ok: true, count: 1 }) })
 let script: (request: ChatRequestBody, index: number) => Completion = () => ({ text: "hi" })
 const fake = startFakeOpenAi((request, index) => script(request, index))
 const fakeProvider: HostProviderSpec = {

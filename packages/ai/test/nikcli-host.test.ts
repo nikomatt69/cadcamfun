@@ -32,8 +32,10 @@ const probeTool: HostToolSpec = {
 const viewportPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg=="
 
 const added: Array<{ projectId: string; elements: ReadonlyArray<Record<string, unknown>> }> = []
+const handlerCalls: string[] = []
 const stubHandlers = new Proxy({} as ToolHandlersShape, {
   get: (_target, name: string) => async (projectId: string, elements: ReadonlyArray<Record<string, unknown>>) => {
+    handlerCalls.push(name)
     if (name === "vision") return { ok: true, capture: { data: viewportPng, mime: "image/png", width: 1, height: 1 }, evidence: { ok: true, sceneRevision: "fixture-revision", image: { width: 1, height: 1 } } }
     if (name === "addElements") { added.push({ projectId, elements }); return { ok: true, ids: elements.map((_, i) => `id-${i}`), elements } }
     return { ok: true }
@@ -250,11 +252,16 @@ describe("embedded nikcli host", () => {
     const host = await Effect.runPromise(runtime.host("project-invalid-history"))
     script = (_index, _turn, lastRole) => lastRole === "tool" ? { text: "Payload requires correction." } : { toolCalls: [{ name: "cad", args: { action: "parametric_validate", history: "{}" } }] }
     const sessionId = await Effect.runPromise(createHostSession(host, "invalid history"))
+    handlerCalls.length = 0
     const events = await collect(hostChatStream({ host, sessionId, message: "validate", model, autoContinues: 0 }))
     const result = events.find((event) => event.type === "tool_result" && event.tool === "cad")
     expect(result?.type === "tool_result" && result.ok).toBe(false)
-    expect(result?.type === "tool_result" && result.output).toContain("history as a JSON object")
-    expect(result?.type === "tool_result" && result.output).toContain("No mutation")
+    const output = result?.type === "tool_result" ? result.output : ""
+    // The refusal names each missing field, not only a sentence of advice, and nothing behind the action ran.
+    expect(output).toContain("history.parameters")
+    expect(output).toContain("history.features")
+    expect(output).toContain("No mutation")
+    expect(handlerCalls).toEqual([])
   })
 
   test("Ask waits for native approval before executing and Reject prevents mutation", async () => {

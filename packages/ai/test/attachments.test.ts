@@ -39,7 +39,7 @@ describe("chat attachments", () => {
 
   test("cad_edit import reads an attached DXF by name and says what is attached when it is not found", async () => {
     const added: unknown[] = []
-    const handlers = new Proxy({} as never, { get: () => async (_p: string, e: unknown) => { added.push(e); return { ok: true, ids: [] } } })
+    const handlers = new Proxy({} as never, { get: () => async (_p: string, e: unknown) => { added.push(e); return { ok: true, ids: [], elements: [], drawingId: "d", projectId: "p" } } })
     const tool = buildTools(handlers, "p").find((t) => t.id === "cad_edit")!
     const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
     const square = (s: number) => [[0, 0, s, 0], [s, 0, s, s], [s, s, 0, s], [0, s, 0, 0]].map(([a, b, c, d]) => `0\nLINE\n8\n0\n10\n${a}\n20\n${b}\n11\n${c}\n21\n${d}\n`).join("")
@@ -56,7 +56,7 @@ describe("chat attachments", () => {
 
   test("cad_edit import reads a STEP attachment with its own height and reports what a prism cannot say", async () => {
     const added: Array<Array<Record<string, unknown>>> = []
-    const handlers = new Proxy({} as never, { get: () => async (_p: string, e: Array<Record<string, unknown>>) => { added.push(e); return { ok: true, ids: [] } } })
+    const handlers = new Proxy({} as never, { get: () => async (_p: string, e: Array<Record<string, unknown>>) => { added.push(e); return { ok: true, ids: [], elements: [], drawingId: "d", projectId: "p" } } })
     const tool = buildTools(handlers, "p").find((t) => t.id === "cad_edit")!
     const ctx = { sessionId: "s", projectId: "p", signal: new AbortController().signal }
     const pt = (id: number, x: number, y: number, z: number) => `#${id}=CARTESIAN_POINT('',(${x}.,${y}.,${z}.));\n`

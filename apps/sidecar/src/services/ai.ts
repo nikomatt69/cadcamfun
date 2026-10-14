@@ -501,7 +501,8 @@ const toolHandlers = Effect.gen(function*() {
           ...carried, x: converted.placement.x, y: converted.placement.y, z: converted.placement.z
         }
         const created = await handlers.addElements(projectId, [twin])
-        return { ...(created as Record<string, unknown>), source: origin, notes: [...converted.notes, "The original is still in the drawing: check the parametric part, then remove the original with cad_edit delete."], report: { ok: report.ok, bodyCount: "bodyCount" in report ? report.bodyCount : undefined, volumeMm3: "volumeMm3" in report ? report.volumeMm3 : undefined } }
+        // `mutation` tells the desktop the twin is new (`opsFor` adds it); without it the editor treats it as an update of an unknown id.
+        return { ...(created as Record<string, unknown>), mutation: "add", source: origin, notes: [...converted.notes, "The original is still in the drawing: check the parametric part, then remove the original with cad_edit delete."], report: { ok: report.ok, bodyCount: "bodyCount" in report ? report.bodyCount : undefined, volumeMm3: "volumeMm3" in report ? report.volumeMm3 : undefined } }
       }
       const loaded = await load(projectId)
       const element = loaded.elements.find((e) => e.id === input.elementId && e.type === "parametric")

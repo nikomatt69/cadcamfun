@@ -1,7 +1,8 @@
 /** Bounded Exa MCP adapter, using the same public search endpoint as the pinned nikcli host. */
 import { z } from "zod"
-export const webSearchInputSchema = z.object({ query: z.string().trim().min(1).max(500), numResults: z.number().int().min(1).max(8).default(5) })
-export type WebSearchInput = z.infer<typeof webSearchInputSchema>
+import type { ResearchSearchInput } from "@cadcamfun/api"
+/** The decoded `research.search` input (`ResearchSearchInput` in `@cadcamfun/api`). */
+export type WebSearchInput = ResearchSearchInput
 const responseSchema = z.object({ error: z.object({ message: z.string() }).optional(), result: z.object({ isError: z.boolean().optional(), content: z.array(z.object({ type: z.string(), text: z.string().optional() })).max(100) }).optional() })
 const MAX_BYTES = 256 * 1024
 export type WebSearchTransport = (url: string, init: RequestInit) => Promise<Response>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { z } from "zod"
 import { ActionInvalidInput, ActionInterrupted } from "@cadcamfun/api"
 import { defineAction, defineActionTool } from "../src/tools/action.ts"
@@ -114,13 +114,13 @@ describe("defineActionTool", () => {
   })
 
   test("a contributed action without an implementation refuses instead of guessing", async () => {
-    const action = contributedAction({ id: "library.lookup_tool", kind: "read", contribution: "library.lookup_tool", parameters: z.object({ query: z.string() }) })
+    const action = contributedAction({ id: "library.lookup_tool", kind: "read", contribution: "library.lookup_tool", parameters: Schema.Struct({ query: Schema.String }) })
     expect(action.contributed).toBe("library.lookup_tool")
     const tool = defineActionTool("library", { lookup_tool: action as never }, "Library")
     const refused = JSON.parse(await toSpec(tool, context).execute({ action: "lookup_tool", query: "6mm" }, call()))
     expect(refused).toMatchObject({ ok: false, _tag: "ActionUnavailable" })
-    const served = JSON.parse(await toSpec(tool, { ...context, contributions: { "library.lookup_tool": async () => ({ ok: true, rows: [] }) } }).execute({ action: "lookup_tool", query: "6mm" }, call()))
-    expect(served).toEqual({ ok: true, rows: [] })
+    const served = JSON.parse(await toSpec(tool, { ...context, contributions: { "library.lookup_tool": async () => [] } }).execute({ action: "lookup_tool", query: "6mm" }, call()))
+    expect(served).toEqual([])
   })
 
   test("the shared failure contracts carry every tag the adapter can answer with", () => {

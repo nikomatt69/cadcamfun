@@ -50,6 +50,9 @@ const issuesOf = (value: unknown): string => {
 const accepted = (value: unknown): boolean => historySchema.safeParse(value).success
 
 interface Call { readonly projectId: string; readonly input: unknown }
+/** What the project handler answers when it stores a part (the `cad_edit.parametric_create` contract). */
+const created = { ok: true, mutation: "add", ids: ["e-1"], elements: [{ id: "e-1", type: "parametric" }], drawingId: "d1", projectId: "p1" }
+
 const harness = (reply: (input: never) => unknown = () => ({ ok: true })) => {
   const built = parametricHarness(reply)
   return { calls: built.calls as Call[], run: built.run as (input: unknown) => Promise<any> }
@@ -233,14 +236,14 @@ describe("cad_parametric: the new recipes", () => {
   })
 
   test("create: true sends the generated sweep history to the project once", async () => {
-    const { calls, run } = harness(() => ({ ok: true, elementId: "e-1" }))
+    const { calls, run } = harness(() => created)
     // Creating only happens after the part rebuilds cleanly, so this test pays for a rebuild: the mitred Ø10 elbow
     // keeps that check honest without the minutes the default Ø30 R45 bend costs.
     const out = await run({ action: "recipe", recipe: "pipe_bend", params: { outerDiameter: 10, wall: 1, bendRadius: 0 }, create: true, name: "Elbow" })
     expect(calls).toHaveLength(1)
     expect(calls[0]!.input).toMatchObject({ action: "create", name: "Elbow" })
     expect(((calls[0]!.input as { history: History }).history.features.map((f) => f.type))).toContain("sweep")
-    expect(out.created).toEqual({ ok: true, elementId: "e-1" })
+    expect(out.created).toEqual(created)
   }, SLOW)
 
   test("both recipes pass the manufacturability check they were designed for (no error on a mill)", async () => {

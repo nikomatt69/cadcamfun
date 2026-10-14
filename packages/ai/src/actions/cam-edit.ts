@@ -27,7 +27,10 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
     run: async ({ operationId, maxLines = 40 }, { handlers, projectId }) => {
       const result = await handlers.generateGcode(projectId, operationId)
       if ("_tag" in result) return result
-      return { stats: result.stats, preview: result.gcode.split("\n").slice(0, maxLines).join("\n") }
+      // A failed generation answers with an empty program and the reason in its statistics: that is a refusal, not a program.
+      const error = (result.stats as { error?: unknown } | undefined)?.error
+      if (typeof error === "string" && error !== "") return { ok: false, error }
+      return { ok: true, stats: result.stats, preview: result.gcode.split("\n").slice(0, maxLines).join("\n") }
     }
   }),
   defineWireAction({
