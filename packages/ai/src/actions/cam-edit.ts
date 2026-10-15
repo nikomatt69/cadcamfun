@@ -4,6 +4,7 @@
  * read-only roles have `cam` and never this tool, even though verifying is mostly computation.
  */
 import { CAM_ACTION_INPUTS } from "@cadcamfun/api"
+import { cam } from "@cadcamfun/core"
 import { defineWireAction, type ActionSpec } from "./action.ts"
 
 export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
@@ -30,7 +31,14 @@ export const CAM_EDIT_ACTIONS: ReadonlyArray<ActionSpec> = [
       // A failed generation answers with an empty program and the reason in its statistics: that is a refusal, not a program.
       const error = (result.stats as { error?: unknown } | undefined)?.error
       if (typeof error === "string" && error !== "") return { ok: false, error }
-      return { ok: true, stats: result.stats, preview: result.gcode.split("\n").slice(0, maxLines).join("\n") }
+      // The answer previews the program; the whole of it stays stored on the operation (`cam.analyze` with operationId reads it),
+      // named by its hash, so the preview says exactly how much it leaves out.
+      const lines = result.gcode.split("\n")
+      const shown = lines.slice(0, maxLines)
+      return {
+        ok: true, ...(operationId !== undefined ? { operationId } : {}), stats: result.stats, programHash: cam.kernel.sha256(result.gcode),
+        lines: lines.length, previewLines: shown.length, omittedLines: lines.length - shown.length, preview: shown.join("\n")
+      }
     }
   }),
   defineWireAction({

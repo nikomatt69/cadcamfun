@@ -51,7 +51,7 @@ describe("action result contracts", () => {
     expect(accepts(ACTION_CONTRACTS["cad_edit.add"]!.result, untargeted)).toBe(false)
     expect(accepts(ACTION_CONTRACTS["cad_edit.add"]!.result, { ...change, ids: "e1" })).toBe(false)
     // A generated program is answered by its statistics and a preview; an empty program is not a success.
-    expect(accepts(ACTION_CONTRACTS["cam_edit.generate"]!.result, { ok: true, stats: { lines: 900 }, preview: "G0" })).toBe(true)
+    expect(accepts(ACTION_CONTRACTS["cam_edit.generate"]!.result, { ok: true, operationId: "o", stats: { lines: 900 }, programHash: "h", lines: 900, previewLines: 40, omittedLines: 860, preview: "G0" })).toBe(true)
     expect(accepts(ACTION_CONTRACTS["cam_edit.generate"]!.result, { stats: { error: "no geometry" }, preview: "" })).toBe(false)
   })
 })

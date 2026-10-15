@@ -162,7 +162,11 @@ const programStored = Schema.Struct({ ok: Schema.Literal(true), operationId: str
 const operationCreated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, name: str, drawing: str, elements: int })
 const operationUpdated = Schema.Struct({ ok: Schema.Literal(true), operationId: str, settings: record, note: str })
 /** A generated program: its statistics and the first lines. A failed generation is a refusal, never an empty preview. */
-const generated = Schema.Struct({ ok: Schema.Literal(true), stats: record, preview: str })
+/** A preview of the stored program: how many lines it has, how many the preview shows, and the program's identity. */
+const generated = Schema.Struct({
+  ok: Schema.Literal(true), operationId: Schema.optionalKey(str), stats: record, programHash: str,
+  lines: int, previewLines: int, omittedLines: int, preview: str
+})
 /** A verification is a verdict: `ok` is false when the replay finds a collision or gouge. */
 const verified = Schema.Struct({ ok: Schema.Boolean, status: Schema.Literals(["pass", "failed"]), revision: str, issues: Schema.Array(record), stats: record })
 const stockSet = Schema.Struct({ ok: Schema.Literal(true), action: Schema.Literal("set"), stock: record, volumeMm3: num, invalidatedOperations: Schema.Array(Schema.Unknown), ...drawingRef })
