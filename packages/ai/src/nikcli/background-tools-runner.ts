@@ -76,6 +76,7 @@ class WorkerRunner {
 
       // The parent's stream carries this session's tool calls, so what the specialist edits shows up in the editor live.
       const release = adoptChildSession(this.parentSessionId, session.id, spec.id)
+      let report: string | undefined
       try {
         const controller = new AbortController()
         let aborting: Promise<unknown> | undefined
@@ -102,7 +103,8 @@ class WorkerRunner {
               )
               if (result.info?.error?.name !== undefined) throw new Error(result.info.error.data?.message ?? result.info.error.name)
               if (result.name !== undefined) throw new Error(describePromptFailure(result))
-              return extractWorkerText(result.parts)
+              report = extractWorkerText(result.parts)
+              return report
             } catch (cause) {
               const message = cause instanceof Error ? cause.message : String(cause)
               if (attempt >= WORKER_RESUMES || controller.signal.aborted || !isTransientFailure(message)) throw cause
@@ -124,6 +126,8 @@ class WorkerRunner {
         }
       } finally {
         release()
+        // The report is in the journal before the session that holds it goes away.
+        if (report !== undefined) await input.report?.(report).catch(() => undefined)
         await host.client.session.remove({ sessionID: session.id }).catch(() => undefined)
       }
     })() as Promise<string>

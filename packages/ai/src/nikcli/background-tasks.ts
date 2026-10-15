@@ -19,6 +19,11 @@ export interface BackgroundTaskInput extends BackgroundTaskOwner {
 
 export interface BackgroundTaskRunnerInput extends BackgroundTaskInput {
   readonly signal: AbortSignal;
+  /**
+   * Records the specialist's report before its native session is removed, so a crash between the two does not lose it.
+   * Resolves once the journal holds it (immediately without a journal).
+   */
+  readonly report?: (text: string) => Promise<void>;
 }
 
 export type BackgroundTaskStatus = "queued" | "running" | "completed" | "error" | "cancelled";
@@ -32,11 +37,45 @@ export interface BackgroundTask extends BackgroundTaskInput {
   readonly createdAt?: number;
   readonly startedAt?: number;
   readonly finishedAt?: number;
+  /** 1 for the first run; a reader re-run after an interruption counts up to `MAX_TASK_ATTEMPTS`. */
+  readonly attempt?: number;
+  /** The parent has been handed the outcome (or the outcome is not for the parent). */
+  readonly delivered?: boolean;
+}
+
+/** A reader interrupted by a crash or a restart runs again at most this many times in total. */
+export const MAX_TASK_ATTEMPTS = 2;
+/** Settled tasks kept in the journal: delivered ones older than this are dropped when the journal is recovered. */
+export const TASK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Where tasks outlive the process. The manager writes a task before its runner starts, the specialist's report before its
+ * session is removed, and the outcome before it is delivered; `recover` reads it back after a restart.
+ */
+export interface BackgroundTaskJournal {
+  write(task: BackgroundTask): Promise<void>;
+  list(): Promise<ReadonlyArray<BackgroundTask>>;
+  remove(id: string): Promise<void>;
+}
+
+/** What `recover` did with the tasks a previous process left behind. */
+export interface BackgroundTaskRecovery {
+  /** Readers queued again for another attempt. */
+  readonly resumed: ReadonlyArray<string>;
+  /** Editors (or readers out of attempts) that stopped mid-run: their effect on the document is uncertain, nothing is replayed. */
+  readonly uncertain: ReadonlyArray<string>;
+  /** Settled outcomes handed to the parent again because their delivery was not recorded. */
+  readonly redelivered: ReadonlyArray<string>;
+  /** Delivered records past the retention window, removed. */
+  readonly pruned: number;
 }
 
 export interface BackgroundTaskManagerOptions {
   readonly runner?: (input: BackgroundTaskRunnerInput) => Promise<string>;
   readonly onCompletion?: (task: BackgroundTask) => void | Promise<void>;
+  readonly journal?: BackgroundTaskJournal;
+  /** Clock for tests. */
+  readonly now?: () => number;
 }
 
 export interface BackgroundTaskManagerInterface {
@@ -61,6 +100,8 @@ export class BackgroundTaskManagerError extends Error {
 interface Entry {
   task: BackgroundTask;
   readonly controller: AbortController;
+  /** The journal write of the enqueue; the runner starts only after it. */
+  persisted: Promise<void>;
 }
 
 const owns = (owner: BackgroundTaskOwner, task: BackgroundTaskOwner): boolean =>
@@ -115,14 +156,93 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         ...(input.edits === true ? { edits: true } : {}),
         background: input.background !== false,
         status: "queued",
-        createdAt: Date.now(),
+        createdAt: this.now(),
+        attempt: 1,
       },
       controller: new AbortController(),
+      persisted: Promise.resolve(),
     };
+    this.admit(entry);
+    return { ...entry.task };
+  }
+
+  /**
+   * Reads back what a previous process left in the journal. A reader that was queued or running runs again (bounded by
+   * `MAX_TASK_ATTEMPTS`); an editor is never replayed: the document may hold part of its work, so it is marked uncertain
+   * for the parent to reconcile against the current revision. A settled outcome whose delivery was not recorded is
+   * delivered again, and old delivered records are pruned. Call it once, after the runner and the completion hook are set.
+   */
+  async recover(): Promise<BackgroundTaskRecovery> {
+    const journal = this.options.journal;
+    if (journal === undefined || this.disposed) return { resumed: [], uncertain: [], redelivered: [], pruned: 0 };
+    const resumed: string[] = [];
+    const uncertain: string[] = [];
+    const redelivered: string[] = [];
+    let pruned = 0;
+    const now = this.now();
+    for (const stored of await journal.list()) {
+      if (this.entries.has(stored.id)) continue;
+      const attempt = stored.attempt ?? 1;
+      if (stored.status === "queued" || stored.status === "running") {
+        if (stored.edits !== true && attempt < MAX_TASK_ATTEMPTS) {
+          const { startedAt: _startedAt, text: _text, ...rest } = stored;
+          const entry: Entry = { task: { ...rest, status: "queued", attempt: attempt + 1 }, controller: new AbortController(), persisted: Promise.resolve() };
+          this.admit(entry);
+          resumed.push(stored.id);
+          continue;
+        }
+        const error = stored.edits === true
+          ? "Interrupted while changing the document: its effect is uncertain. Inspect the document and its revision before running it again; it was not replayed."
+          : `Interrupted ${attempt} times; not run again.`;
+        const entry: Entry = { task: { ...stored, status: "error", error, finishedAt: now, delivered: false }, controller: new AbortController(), persisted: Promise.resolve() };
+        entry.controller.abort();
+        this.entries.set(stored.id, entry);
+        await this.record(entry.task);
+        this.notify(entry);
+        uncertain.push(stored.id);
+        continue;
+      }
+      if (stored.delivered === true || stored.background === false || stored.status === "cancelled") {
+        if (stored.delivered === true && now - (stored.finishedAt ?? 0) > TASK_RETENTION_MS) {
+          await journal.remove(stored.id).catch(() => undefined);
+          pruned++;
+          continue;
+        }
+        const entry: Entry = { task: stored, controller: new AbortController(), persisted: Promise.resolve() };
+        entry.controller.abort();
+        this.entries.set(stored.id, entry);
+        this.settled.add(stored.id);
+        continue;
+      }
+      const entry: Entry = { task: stored, controller: new AbortController(), persisted: Promise.resolve() };
+      entry.controller.abort();
+      this.entries.set(stored.id, entry);
+      this.notify(entry);
+      redelivered.push(stored.id);
+    }
+    return { resumed, uncertain, redelivered, pruned };
+  }
+
+  private admit(entry: Entry): void {
     this.entries.set(entry.task.id, entry);
+    entry.persisted = this.record(entry.task, true);
     this.queue.push(entry);
     this.drain();
-    return { ...entry.task };
+  }
+
+  private now(): number {
+    return (this.options.now ?? Date.now)();
+  }
+
+  /** Writes a snapshot to the journal. With `strict` a failure rejects (the enqueue must be durable before the run). */
+  private async record(task: BackgroundTask, strict = false): Promise<void> {
+    const journal = this.options.journal;
+    if (journal === undefined) return;
+    try {
+      await journal.write({ ...task });
+    } catch (cause) {
+      if (strict) throw cause;
+    }
   }
 
   list(owner: BackgroundTaskOwner): readonly BackgroundTask[] {
@@ -205,13 +325,13 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
   private cancelEntry(entry: Entry): boolean {
     const status = entry.task.status;
     if (status !== "queued" && status !== "running") return false;
-    entry.task = { ...entry.task, status: "cancelled", finishedAt: Date.now() };
+    entry.task = { ...entry.task, status: "cancelled", finishedAt: this.now() };
     if (status === "queued") {
       const index = this.queue.indexOf(entry);
       if (index >= 0) this.queue.splice(index, 1);
     }
     entry.controller.abort();
-    if (status === "queued") this.notify(entry);
+    if (status === "queued") void this.record(entry.task).then(() => this.notify(entry));
     return true;
   }
 
@@ -226,10 +346,11 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         this.queue.unshift(entry);
         break;
       }
-      entry.task = { ...entry.task, status: "running", startedAt: Date.now() };
+      entry.task = { ...entry.task, status: "running", startedAt: this.now() };
       this.occupied.add(entry);
-      // Cancelled before the runner got to start: there is nothing to run, and the abort event has already fired.
-      const work = Promise.resolve().then(() => entry.controller.signal.aborted ? "" : runner({
+      // The task is in the journal before anything runs; a failed write means it never starts. Cancelled before the
+      // runner got to start: there is nothing to run, and the abort event has already fired.
+      const work = entry.persisted.then(() => this.record(entry.task)).then(() => entry.controller.signal.aborted ? "" : runner({
         projectId: entry.task.projectId,
         parentSessionId: entry.task.parentSessionId,
         prompt: entry.task.prompt,
@@ -238,18 +359,23 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
         ...(entry.task.edits === true ? { edits: true } : {}),
         background: entry.task.background !== false,
         signal: entry.controller.signal,
+        report: (text) => this.record({ ...entry.task, text }),
       })).then(
         (text) => {
           if (entry.task.status !== "cancelled") {
-            entry.task = { ...entry.task, status: "completed", text, finishedAt: Date.now() };
+            entry.task = { ...entry.task, status: "completed", text, finishedAt: this.now() };
           }
         },
         (error: unknown) => {
           if (entry.task.status !== "cancelled") {
-            entry.task = { ...entry.task, status: "error", error: error instanceof Error ? error.message : String(error), finishedAt: Date.now() };
+            entry.task = { ...entry.task, status: "error", error: error instanceof Error ? error.message : String(error), finishedAt: this.now() };
           }
         },
-      ).finally(() => {
+      ).then(() => {
+        // The outcome is durable before anyone is told about it.
+        if (entry.task.background === false || entry.task.status === "cancelled") entry.task = { ...entry.task, delivered: true };
+        return this.record(entry.task);
+      }).finally(() => {
         // Abort is only a request: release capacity after the actual runner settles.
         this.active.delete(work);
         this.occupied.delete(entry);
@@ -279,9 +405,16 @@ export class BackgroundTaskManager implements BackgroundTaskManagerInterface {
     const callback = this.options.onCompletion;
     if (!callback || this.disposed) return;
     const snapshot = { ...entry.task };
-    // Host wake failures must not strand scheduler slots or reject runner cleanup.
-    const delivery = Promise.resolve().then(() => this.disposed ? undefined : callback(snapshot))
-      .catch(() => undefined).finally(() => this.deliveries.delete(delivery));
+    // Host wake failures must not strand scheduler slots or reject runner cleanup. A delivery that went through is
+    // recorded, so a restart hands over only what never reached the parent.
+    const delivery = Promise.resolve().then(async () => {
+      if (this.disposed) return;
+      await callback(snapshot);
+      if (entry.task.delivered !== true && snapshot.status !== "queued" && snapshot.status !== "running") {
+        entry.task = { ...entry.task, delivered: true };
+        await this.record(entry.task);
+      }
+    }).catch(() => undefined).finally(() => this.deliveries.delete(delivery));
     this.deliveries.add(delivery);
   }
 }

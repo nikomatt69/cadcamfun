@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Steps 9–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Step 9 partial (task journal: durable enqueue, report and outcome, bounded recovery, editors never replayed; event sequences, leases and session lifecycle open); Steps 10–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -389,18 +389,35 @@ Progress (2026-10-15):
 D: RM-01 and RM-03 receipts; execution in RM-07. Code: `background-tasks.ts`, `background-tools-runner.ts`, `chat.ts`,
 `service.ts`, `events.ts`, desktop `stream.ts`.
 
-- [ ] Persist the enqueue before execution and the outcome before delivery.
-- [ ] Keep owner, attempt, lease, heartbeat and receipt references.
+- [x] Persist the enqueue before execution and the outcome before delivery.
+- [ ] Keep owner, attempt, lease, heartbeat and receipt references. (owner and attempt done; lease, heartbeat and receipts wait for RM-03/RM-07)
 - [ ] Add event sequences and an explicit resync answer.
-- [ ] Recover readers with a bounded policy; reconcile uncertain editors.
-- [ ] Keep children's reports before the native session is removed.
+- [x] Recover readers with a bounded policy; reconcile uncertain editors.
+- [x] Keep children's reports before the native session is removed.
 - [ ] Stop depending on the last 40 message entries to rebuild a long turn.
 - [ ] Really implement `start_session`/`settle_session` (spec 25 §2.3, absent today), with budget, consolidation and retention policies.
-- [ ] Cancellation and removal wait for effects to stop before declaring completion.
+- [x] Cancellation and removal wait for effects to stop before declaring completion.
 
 Tests: `runtime-lifecycle.test.ts`, `background-tasks.test.ts`, `background-parent-link.test.ts`, `ai-recovery.test.ts`,
 `ai-project-sessions.test.ts`. Gate: crash and reconnect do not duplicate changes; lost events require reconciliation, not blind
 replay.
+
+Progress (2026-10-15):
+
+- **V** `BackgroundTaskManager` takes a `BackgroundTaskJournal` (sidecar: `kvTaskJournal`, one key-value row per task under
+  `ai.tasks.<id>`). The enqueue is written before the runner starts (a failed write means the task never runs), the
+  specialist's report is written through `report` before its native session is removed, and the outcome is written before
+  the completion hook delivers it; a delivery that went through is recorded (`delivered`).
+- **V** `recover()` (called once by `makeAiBackgroundLayer` after the runner and hook are installed): an interrupted reader runs
+  again up to `MAX_TASK_ATTEMPTS`; an interrupted editor is never replayed and is reported to its parent as uncertain, to be
+  reconciled against the current revision; a settled outcome not yet delivered is delivered once; delivered records older
+  than `TASK_RETENTION_MS` are pruned. A crash therefore does not duplicate a document change.
+- **V** Tests: `background-journal.test.ts` (order of writes, failed journal, cancellation settles after the runner stops,
+  recovery matrix and idempotence), `apps/sidecar/test/ai-task-journal.test.ts` (round trip through the key-value store,
+  undecodable rows skipped, an interrupted edit reported and not replayed).
+- Open: event sequence numbers and a resync answer for the desktop stream; leases and heartbeats (one process owns the
+  journal today); receipt references (RM-03); rebuilding a long turn without the last-40-messages window; real
+  `start_session`/`settle_session` (spec 25 §2.3) with budget, consolidation and retention.
 
 ### Step 10 — Geometric acceptance and heavy work
 
@@ -533,3 +550,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   budgets; retired nested actions removed; skills, workflows and family styles moved to text files; standards editions.
 - 2026-10-15: closed Step 8: gate test for a report bound to the stored program and its inputs (setup change with identical
   NC, NC change with identical inputs, verification never writes NC); machine configuration recorded as the open input.
+- 2026-10-15: Step 9 progress: background-task journal (enqueue before run, report before session removal, outcome before
+  delivery), bounded recovery of readers, uncertain editors reported instead of replayed, retention.

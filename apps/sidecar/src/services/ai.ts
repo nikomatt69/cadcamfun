@@ -25,6 +25,7 @@ import { ProjectRepo } from "../repos/project-repo.ts"
 import { ToolRepo } from "../repos/tool-repo.ts"
 import { ToolpathRepo } from "../repos/toolpath-repo.ts"
 import { KvStore } from "./kv.ts"
+import { kvTaskJournal } from "./ai-task-journal.ts"
 import { normalizeElement, withDefaultTolerance } from "@cadcamfun/ai"
 import { groupElements, transformElements } from "./ai-transform.ts"
 import { applyChanges, describeElements, elementsOf, newElements, type Element } from "./ai-elements.ts"
@@ -1165,7 +1166,8 @@ const AiHostLive = Layer.effect(AiHost, Effect.gen(function*() {
   // hand its four `agent_task*` tool specs to every project's host. The same
   // instance is passed to `AiBackgroundLive` below so the worker runner owns
   // it (no second scheduler, no second scheduler across projects).
-  const scheduler = new BackgroundTaskManager({})
+  // Tasks are journalled in the key-value store, so a restart neither loses an outcome nor replays a document change.
+  const scheduler = new BackgroundTaskManager({ journal: kvTaskJournal(yield* KvStore) })
   // Delegation is the host's to implement, for as long as the host lives; with it the registry holds every implementation
   // the catalogue names, and the guard keeps the two sides in step.
   yield* registry.contributeScoped(backgroundToolContributionsFor(scheduler))
