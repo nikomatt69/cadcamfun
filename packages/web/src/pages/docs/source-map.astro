@@ -74,6 +74,7 @@ const toc = [
       <li><code>packages/vcs/src/index.ts</code>, <code>apps/sidecar/src/services/project-vcs.ts</code>, and <code>repos/project-vcs-repo.ts</code>: history library, orchestration, and persistence.</li>
       <li><code>packages/workflow/src/index.ts</code>, <code>apps/sidecar/src/services/workflow-runner.ts</code>, and <code>workflow-service-steps-live.ts</code>: workflow contract, execution, and service step registration.</li>
     </ul>
+    <p>Version control lives in <code>packages/vcs/src</code>: <code>object.ts</code> (git object format), <code>repository.ts</code> (refs and commits), <code>snapshot.ts</code>, <code>diff.ts</code>, <code>store.ts</code>, <code>transport.ts</code>, and <code>github.ts</code>. Workflows live in <code>packages/workflow/src</code>: <code>schema.ts</code>, <code>trigger.ts</code> (glob and trigger matching), and <code>run.ts</code>. Workflow files are read from <code>.cadcamfun/workflows/</code> in the project tree.</p>
   </section>
 
   <section id="web" class="doc-section">

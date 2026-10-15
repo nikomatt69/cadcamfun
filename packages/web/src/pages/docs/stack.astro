@@ -45,6 +45,7 @@ const toc = [
     <p>The mobile manifest uses Expo <code>~57.0.27</code>, React <code>19.2.3</code>, React Native <code>0.86.3</code>, and Expo Router <code>~57.0.25</code>. Its custom companion transport is a native module. NativeWind, Reanimated, Gesture Handler, SecureStore, and local authentication support the mobile application.</p>
     <p>This site uses Astro <code>^5.14.1</code> with the Cloudflare adapter, MDX and Tailwind integrations. Documentation pages are prerendered; assistant, Markdown, Studio fallback, and artifact routes run on the server. The local Studio API runs in Bun because it uses <code>bun:sqlite</code>.</p>
     <p>TypeScript tooling includes TypeScript 5.9 and the native preview compiler. Most application workspaces use <code>tsgo</code>; web and mobile use <code>tsc</code>. The manifest ranges describe allowed dependency versions; the lockfile records the installed resolution.</p>
+    <p>The documentation site uses Astro 5 with the Cloudflare adapter, MDX, and Tailwind (<code>packages/web/package.json</code>). The desktop webview reaches native code through <code>@tauri-apps/api</code> v2.</p>
   </section>
 
 

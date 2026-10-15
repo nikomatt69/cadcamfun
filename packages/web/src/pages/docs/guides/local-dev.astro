@@ -101,6 +101,7 @@ bun run --cwd packages/web build`}
     <h2>Documentation and companion development</h2>
     <p><code>bun run --cwd packages/web start</code> runs Astro alone. <code>bun run --cwd packages/web dev</code> starts Astro plus the local Studio API. The documentation check validates the route index; the build validates Astro compilation and prerendering.</p>
     <p>For iOS, <code>bun run --cwd apps/mobile start</code> starts Metro for a custom development client. <code>bun run --cwd apps/mobile ios</code> builds/runs the native app; <code>build</code> exports JavaScript only. Native pinning requires the local Swift module and cannot run in Expo Go.</p>
+    <p><code>bun scripts/build.ts --help</code> lists the release pipeline's options. <code>--only=resources</code> restages migrations without rebuilding, and <code>--dry-run</code> prints the plan without writing anything.</p>
   </section>
 
   <section id="config-reference" class="doc-section">

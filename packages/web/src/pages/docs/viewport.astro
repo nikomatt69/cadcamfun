@@ -75,6 +75,7 @@ const [tool, setTool] = createSignal<ToolId>("select")
     <h2>Coordinates and units</h2>
     <p>Core drawing coordinates and stock sizes use millimetres. Drawing angles and Three.js rotation components use radians; do not apply that convention to CAM rotary-axis values or feature inputs that explicitly use degrees. <code>viewport/units.ts</code> contains conversion helpers for displayed millimetres and inches. Convert at input/output boundaries so snapping, geometry, and toolpath motion retain a consistent unit system.</p>
     <p>The 2D camera maps world coordinates to CSS pixels; backing canvas dimensions incorporate device pixel ratio. Resizing updates the camera and backing buffer through <code>ResizeObserver</code>. Camera scale determines grid spacing and screen-space hit tolerances.</p>
+    <p>Inch display converts with exactly 25.4 mm per inch, and lengths default to 3 decimals (<code>apps/desktop/src/viewport/units.ts</code>). In the 2D editor, each wheel step zooms by a factor of 1.15, the scale is clamped between 0.001 and 100,000, and fit-to-view leaves a 10% margin (<code>editor2d/camera.ts</code>).</p>
   </section>
 
   <section id="boundaries" class="doc-section">

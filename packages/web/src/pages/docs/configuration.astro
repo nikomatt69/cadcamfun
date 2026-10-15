@@ -46,6 +46,7 @@ bun --no-env-file apps/sidecar/src/main.ts`}</DocCode>
     </tbody></table>
     <p>The data directory is a storage root, not an HTTP bind address. The main server's listener is fixed to <code>127.0.0.1</code> with an ephemeral port. Companion networking uses its own explicitly enabled HTTPS gateway; changing a URL setting does not make the loopback listener public.</p>
     <p>Keep the configured migration directory aligned with the binary. Startup can fail before readiness when a migration cannot be planned, backed up, or applied. The database reference explains transaction and backup behavior; a missing table after omitting migrations is a configuration issue rather than proof that the project was deleted.</p>
+    <p>The application token is read as a redacted value and never appears in configuration logs. Every setting on this page is read once, in <code>apps/sidecar/src/config.ts</code>; a changed value takes effect only after the sidecar restarts.</p>
   </section>
   <section id="ai" class="doc-section">
     <h2>AI host and connectivity</h2>
@@ -69,6 +70,7 @@ bun --no-env-file apps/sidecar/src/main.ts`}</DocCode>
     </tbody></table>
     <p>These settings configure integrations; they do not establish that a remote account, price, subscription, or webhook delivery exists. Check the operation's actual failure and running service status. Do not infer that a table's presence means the related hosted feature is fully configured.</p>
     <p>The AppConfig interface also contains test-injection hooks such as a replacement model factory and Stripe API base. They are not environment variables read by this production configuration layer. Keep test hooks out of deployment instructions unless the running host explicitly exposes them.</p>
+    <p>The billing trial route starts a 14-day <code>PRO</code> trial (<code>TRIAL_DAYS</code> in <code>apps/sidecar/src/repos/billing-repo.ts</code>, used by <code>http/billing.ts</code>). The available plans are <code>FREE</code>, <code>BASIC</code>, <code>PRO</code>, and <code>ENTERPRISE</code>; only the three paid plans take a <code>STRIPE_PRICE_*</code> setting.</p>
   </section>
   <section id="telemetry" class="doc-section">
     <h2>Logs and telemetry</h2>

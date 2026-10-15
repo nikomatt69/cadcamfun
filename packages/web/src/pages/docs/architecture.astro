@@ -46,6 +46,7 @@ const toc = [
     <p>Effect layers acquire the database and shared services within the application scope. The database layer creates its parent directory, enables WAL and foreign keys, optionally applies migrations, and wraps query failures with an operation name. Finalization attempts a truncating WAL checkpoint and closes the SQLite handle.</p>
     <p>The <code>DatabaseLive</code> layer selects <code>dataDir/cadcamfun.db</code>. A migration folder must be supplied to apply migrations at startup. AI credentials, plugin state, VCS objects, workflow execution, and file storage are handled through their respective service interfaces; storage details are described on their module pages.</p>
     <p>The local Studio in <code>packages/web/script/studio-server.ts</code> is an additional Bun process. It opens a configured existing application database directly and serves authenticated overview data on loopback port 4396. Its development proxy and cookie sessions are independent of the Tauri sidecar connection.</p>
+    <p>Live project events (pull requests, commits, workflow runs, and assistant session phases) are published through an in-process event service. A new subscriber first receives up to the 20 most recent matching events and then live ones, optionally filtered by project and event type (<code>apps/sidecar/src/services/live-events.ts</code>).</p>
   </section>
 
   <section id="extensions" class="doc-section">

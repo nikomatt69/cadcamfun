@@ -150,6 +150,7 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
       </tbody>
     </table>
     <p>Native CI builds an unsigned simulator app and checks real gateway pairing/project listing. Separate CI checks typecheck, logic tests, and JavaScript export. These do not prove physical-device signing, TestFlight distribution, remote-network routing, or a real model provider.</p>
+    <p>Repeated bad tokens are throttled: ten failed attempts from one IP address within 60 seconds make further requests from it return HTTP 429 until the window expires. A 429 after re-pairing usually means an old device token is still being retried.</p>
   </section>
 
   <section id="sources" class="doc-section">

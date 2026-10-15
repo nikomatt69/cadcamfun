@@ -134,6 +134,7 @@ bun run generate:check
 bun run --filter @cadcamfun/web generate:api-reference
 bun run --filter @cadcamfun/web check:api-reference`}</DocCode>
     <p>Client regeneration and documentation regeneration are separate outputs from the same contract. Keep both current after endpoint changes. Do not edit generated method bodies to change the server's input requirements.</p>
+    <p>Generated code is written to <code>packages/api/src/client/generated</code> and <code>packages/api/src/sdk/generated</code>. Do not edit those files by hand; change the contract and regenerate.</p>
   </section>
   <section id="verification" class="doc-section">
     <h2>Integration verification</h2>

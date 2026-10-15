@@ -39,7 +39,7 @@ const toc = [
     <p><strong>{entry.method}</strong> <code>{entry.path}</code></p>
     {entry.operation.summary && <p>{entry.operation.summary}</p>}
     {entry.operation.description && <p>{entry.operation.description}</p>}
-    <p><strong>Authentication:</strong> {entry.operation.security?.length ? "Bearer token required." : "No bearer middleware declared."} {entry.operation.deprecated && "This operation is marked deprecated."}</p>
+    <p><strong>Authentication:</strong> {entry.operation.security?.length ? "Bearer token required." : "No bearer middleware is declared for this operation."} {entry.operation.deprecated && "This operation is marked deprecated."}</p>
     <h3>Parameters</h3>
     {(entry.operation.parameters?.length ?? 0) > 0 ? <div class="overflow-x-auto"><table>
       <thead><tr><th>Name</th><th>Location</th><th>Presence</th><th>Type and constraints</th></tr></thead>
@@ -66,7 +66,7 @@ const toc = [
       </>) : <p>No response body schema is declared.</p>}
     </>)}
     <h3>Request template</h3>
-    {entry.operation.requestBody?.content["multipart/form-data"] ? <p>This operation uses multipart form data. Construct form parts according to its schema using the client upload API or <code>curl --form</code>; do not set a multipart boundary manually.</p> : <DocCode language="bash" title="Connection and payload placeholders">{requestExample(entry)}</DocCode>}
+    {entry.operation.requestBody?.content["multipart/form-data"] ? <p>This operation uses multipart form data. Build form parts according to its schema using the client upload API or <code>curl --form</code>; do not set a multipart boundary manually.</p> : <DocCode language="bash" title="Connection and payload placeholders">{requestExample(entry)}</DocCode>}
   </section>)}
   {schemas.length > 0 && <section id="schemas" class="doc-section">
     <h2>Referenced schemas</h2>

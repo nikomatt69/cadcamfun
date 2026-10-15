@@ -149,6 +149,7 @@ curl --fail-with-body -X PUT "$CADCAM_URL/api/components/$CADCAM_COMPONENT_ID" \
     </table>
     <p>Updating through the CAM save modal records the previous program first. Manual save on the toolpath detail screen records the updated state as a version. Version restore records the current state before replacing it, so a restore can be reversed through another version operation. These are distinct flows; a generic PUT is not automatically a project commit.</p>
     <p>Open <code>/toolpaths/:id</code> for Details, G-code, Versions, and Comments. Open <code>/projects/:id/history</code> for project history; per-item buttons filter by paths such as <code>drawings/&lt;id&gt;.json</code>. The <a href="/docs/api/toolpath-history">toolpath history API</a> accepts <code>versionId</code> for restoration.</p>
+    <p>History changes are also published as live events (<code>commit</code>, <code>pr.*</code>, <code>workflow.started</code>/<code>workflow.finished</code>, <code>ai.session</code>). A new subscriber first receives up to 20 recent matching events.</p>
   </section>
 
   <section id="verify" class="doc-section">

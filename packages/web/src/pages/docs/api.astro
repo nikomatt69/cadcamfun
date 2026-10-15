@@ -90,6 +90,7 @@ const projects = Effect.gen(function* () {
     <h2>Streaming and recovery</h2>
 <p>The AI stream carries typed events for text, reasoning, tool calls and results, permission and question requests, retries, turn state, context, and completion. Clients must consume events incrementally and retain the session identifier. An HTTP connection ending is not sufficient evidence that a model turn finished: session state can be read again after reconnecting.</p>
     <p>AI event schemas live in <code>packages/api/src/ai-events.ts</code> and <code>packages/ai/src/events.ts</code>. General live events use the events group. Binary downloads, JavaScript plugin bootstrap responses, and signed raw webhook bodies require their own transport handling.</p>
+    <p>List routes that page their results use <code>page</code> and <code>limit</code> query parameters. For machine configurations, <code>page</code> defaults to 1, <code>limit</code> defaults to 20 and is clamped to 1–100, and the response carries <code>pagination</code> with <code>page</code>, <code>limit</code>, <code>total</code>, and <code>totalPages</code> (<code>apps/sidecar/src/http/machine-configs.ts</code>). Check each group's reference page for the parameters it actually declares.</p>
   </section>
 
   <section id="codegen" class="doc-section">

@@ -105,6 +105,7 @@ const toc = [
     <DocCallout title="Evidence has a model boundary">
       <p>The native stock/holder replay is a three-axis height-field check. The public native snapshot has no fixture-envelope field. Standalone verification accepts fixture envelopes, but they are not added to native evidence by implication. A verified-program label is evidence about its captured model and checks, not a machine certification.</p>
     </DocCallout>
+    <p>Kernel results identify their producer: the algorithm identifier is <code>cadcamfun-cam-kernel@1</code> and the contract schema version is <code>1</code> (<code>packages/core/src/cam/kernel/execute.ts</code>, <code>contracts.ts</code>). Compare both when deciding whether stored evidence came from the same kernel.</p>
   </section>
 
   <section id="portable" class="doc-section">

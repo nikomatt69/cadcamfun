@@ -71,6 +71,7 @@ const toc = [
 <p>An update can replace NC while sending the unchanged prior portable document. The service recognizes that case, rebuilds the parsed program from the new text, and removes operations and native source evidence that no longer match. An inconsistent new document is rejected instead of silently combining unrelated programs.</p>
     <p>Ordinary free-form toolpath data remains supported. A change to NC removes stale native artifact metadata where it no longer matches. Client-supplied <code>verification</code> and <code>response</code> fields do not become trusted native evidence.</p>
     <p>The validation implementation is <code>apps/sidecar/src/services/cam-program.ts</code>; <code>runKernelRequest</code>, <code>prepareCamProgramData</code>, and <code>drawingRevision</code> share the same request adapter and identity logic used by generation and saves.</p>
+    <p>A saved program can contain subprograms generated from repeated toolpaths. The rules for which toolpaths may share a subprogram are described on the <a href="/docs/cam">CAM page</a>.</p>
   </section>
 
   <section id="frames" class="doc-section">

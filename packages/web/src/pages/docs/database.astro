@@ -37,6 +37,7 @@ const toc = [
   <section id="files" class="doc-section">
     <h2>Schema and entry points</h2>
 <p><code>packages/db/src/schema.ts</code> defines tables, indexes, relationships, defaults, and inferred select/insert types. <code>src/index.ts</code> exports <code>Database</code>, <code>DatabaseError</code>, the Drizzle <code>Db</code> type, and the schema namespace. <code>src/upgrade.ts</code> owns migration planning, backups, and transactional application; <code>src/migrate.ts</code> is the command-line entry point. Generated SQL and the migration journal live in <code>packages/db/drizzle</code>.</p>
+    <p>Every connection opened by <code>packages/db/src/index.ts</code> switches SQLite to <code>journal_mode = WAL</code> and turns on <code>foreign_keys</code>. Closing the database runs <code>wal_checkpoint(TRUNCATE)</code> so the main file is complete when the process exits. If the checkpoint is busy or fails, a warning is logged and shutdown continues.</p>
   </section>
 
   <section id="mapping" class="doc-section">

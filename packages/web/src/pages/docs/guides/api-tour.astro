@@ -76,6 +76,7 @@ curl --silent --show-error "$CADCAMFUN_URL/api/projects/$PROJECT_ID" \
     <DocCode language="json" title="Captured HTTP 200">{JSON.stringify(capture("Read project").body, null, 2)}</DocCode>
     <p>Detail includes the owner, nullable organization, and drawing/component counts. Creation and retrieval have related but different response schemas. A missing or inaccessible project returns 404 with <code>Project not found or access denied</code>; callers should not infer a private project's existence from that result.</p>
     <p><a href="/docs/api/projects">Projects API</a> also documents update and deletion. Updating requires a non-empty name; deleting requires the owner or an organization administrator. Do not implement update as an arbitrary JSON patch without following its payload contract.</p>
+    <p>Paged lists such as machine configurations accept <code>page</code> (default 1) and <code>limit</code> (default 20, maximum 100) and return a <code>pagination</code> object with <code>total</code> and <code>totalPages</code>. Request the next page instead of raising <code>limit</code> past the cap; larger values are clamped to 100.</p>
   </section>
   <section id="preferences" class="doc-section">
     <h2>Persist a preference</h2>

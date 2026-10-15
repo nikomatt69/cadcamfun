@@ -75,6 +75,7 @@ const toc = [
 <p>The sidecar publishes <code>/api/openapi.json</code> for its served contract and uses bearer middleware on protected groups. A second optional session header chooses the acting account. The local profile is created or reused under <code>local@cadcamfun.local</code>, keeping the installation usable without account sign-in.</p>
     <p>CORS admits <code>tauri://localhost</code>, HTTP/HTTPS <code>tauri.localhost</code>, and HTTP localhost or 127.0.0.1 origins with an optional port. Other origins receive no allowed-origin response header. CORS is a browser policy; the bearer middleware remains the access control for protected routes.</p>
     <p>The served groups cover design resources, manufacturing generation and verification, exact CAD, libraries, costs, AI, VCS/workflows, events, companion controls, identity, organizations, notifications, files, plugins, billing, analytics, waitlist, MCP, and local state. Consult the running OpenAPI document for method and payload details.</p>
+    <p>The acting-account header is <code>x-session-token</code>. Without it, or with a token that does not verify as a session token for an existing user, requests act as the local profile (<code>src/http/authorization.ts</code>).</p>
   </section>
 
   <section id="layout" class="doc-section">

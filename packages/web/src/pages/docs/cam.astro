@@ -57,6 +57,7 @@ const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
 <p>The built-in registry implements <code>generic</code>, <code>fanuc</code>, <code>grbl</code>, and <code>haas</code>. <code>linuxcnc</code> is a recognized post identifier without an implementation in this registry; <code>getPost</code> can return undefined. Resolve and check the post before calling it.</p>
     <p>Posts share an emitter with fixed-decimal formatting, comment sanitization, tool changes, arc handling, optional line numbering, and cycle expansion. Defaults are three decimal places, canned cycles enabled, IJK arcs, header enabled, and 0.01 mm tolerance. Unsupported arc formats fall back through the dialect's supported forms and linearization.</p>
     <p><code>toolNumbers</code> maps tool identifiers to explicit positive integer pockets. Unmapped tools use first-use numbering while avoiding occupied numbers. <code>retractBeforeToolChange</code> is opt-in; it raises Z to the program's highest reached position before a tool change. Subprogram emission is also opt-in and depends on dialect support. Review the selected controller's output and machine configuration before production use.</p>
+    <p>Repeated toolpaths can be emitted as subprograms. A toolpath qualifies when, after its positioning move, its motion is another toolpath's motion translated within 5 × 10⁻⁶ mm, with the same move kinds, feeds, and arc senses. Each group needs at least six body moves and must save at least twelve moves in total. Toolpaths with canned cycles or rotary words are never candidates (<code>packages/core/src/cam/post/subprograms.ts</code>).</p>
   </section>
 
   <section id="kernel" class="doc-section">
@@ -96,6 +97,7 @@ const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
     <p>Heights must satisfy clearance ≥ safe ≥ retract. Profile defaults are outside compensation, climb direction, zero finishing allowance, direct lead-in, arc fitting off, and 0.01 mm tolerance. Ramp angle defaults to 3° and accepts 0.1–45°; helix pitch defaults to 1 mm per revolution. A declared side and allowance move the tool-center path, rather than changing the source contour.</p>
     <p>These are pure operation defaults. The application generator's settings and native kernel's material-derived process data are separate parameter layers; do not assume the same field names or defaults across them.</p>
     <p>Source: <code>packages/core/src/cam/params.ts</code> and <code>operations/profile.ts</code>.</p>
+    <p>Thread milling uses the ISO 68-1 basic profile heights: 0.54127 × pitch for internal threads and 0.61343 × pitch for external threads (<code>packages/core/src/cam/operations/thread.ts</code>). The toolpath viewer assumes 500 mm/min for cutting moves without a feed and 1,000 mm/min for rapids when timing an animation; these are playback assumptions, not machine estimates.</p>
   </section>
 
   <section id="replay-example" class="doc-section">
@@ -117,6 +119,7 @@ console.log(report.issues)`}
     <p>Changing the plunge to <code>G0 Z-3</code> produces a <code>RapidInMaterial</code> finding. Adding a short cutting length or holder dimensions can introduce shank/holder findings that the original request could not test. Supplying target geometry adds finished-part comparison; this example makes no claim about a target or fixtures.</p>
     <p>The verifier budgets at most 2,500,000 grid cells and 3,000,000 path samples, with an 80,000,000 work budget. Requests can be coarsened to meet those limits. Preview stock is downsampled for display, so its pixels are not a second, finer verification result.</p>
     <p>Source: <code>packages/core/src/cam/verify/verify.ts</code> and <code>verify/verify.test.ts</code>.</p>
+    <p>When replaying text that calls subprograms, the interpreter follows <code>M98</code> nesting up to eight levels deep and stops unrolling at 2,000,000 lines, so a large repeat count cannot exhaust memory (<code>packages/core/src/cam/subprogram-text.ts</code>).</p>
   </section>
 
   <section id="diagnostics" class="doc-section">

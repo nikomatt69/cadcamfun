@@ -42,6 +42,7 @@ const toc = [
     <p>The SDK's <code>src/index.ts</code> is the public application plugin entry point. It defines manifest and capability contracts and plugin authoring helpers. The runtime host lives in <code>apps/sidecar/src/plugins</code>; the SDK itself is not the host process.</p>
     <h3><code>@nikoemme_/cadcamfun-nikcli-plugin</code></h3>
     <p><code>packages/nikcli-plugin/src/index.ts</code> exports the standalone nikcli bridge. Unlike most workspaces, it is configured for public npm publication, currently at version <code>0.1.0</code>. It discovers actions from a running CADCAMFUN application and invokes them over authenticated HTTP. It does not embed the CAD kernel or an independent action catalogue.</p>
+    <p><code>@cadcamfun/plugin-sdk</code> implements plugin API major version <code>1</code>. Plugin identifiers are reverse-DNS names of 3–128 characters, such as <code>com.example.gear-generator</code>, and versions follow <code>major.minor.patch</code> with an optional pre-release suffix (<code>packages/plugin-sdk/src/manifest.ts</code>).</p>
   </section>
 
   <section id="codegen" class="doc-section">
@@ -50,6 +51,7 @@ const toc = [
     <p>Other exports include compatibility emitters, transport error mapping, <code>write</code>, and <code>generate</code>. Unsupported contract shapes raise <code>GenerationError</code>. The application generation script records endpoint exclusions explicitly for shared and Promise-only limitations.</p>
     <p><code>packages/api/scripts/generate-clients.ts</code> writes <code>src/sdk/generated</code> and <code>src/client/generated</code>. Its drift check generates into a temporary directory and compares file names and contents with committed output.</p>    <DocCode language="bash" title="Repository root">{`bun run generate
 bun run generate:check`}</DocCode>
+    <p>The generated output lives in <code>packages/api/src/client/generated</code> and <code>packages/api/src/sdk/generated</code>. Run <code>bun run generate</code> after changing a contract, and <code>bun run generate:check</code> to confirm the committed output is current.</p>
   </section>
 
   <section id="apps" class="doc-section">

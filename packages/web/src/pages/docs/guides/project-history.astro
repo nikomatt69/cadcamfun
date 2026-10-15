@@ -25,6 +25,7 @@ const toc = [
 <p>Saving a project, drawing, or toolpath updates the SQLite working copy. Creating a project commit snapshots the working resources into Git-compatible objects and moves the current branch ref. Those are separate operations: a saved drawing can be uncommitted, and a committed program can remain local without any remote mirror.</p>
     <p>The sidecar's history service builds one canonical JSON file per resource. The tree includes project.json, drawings, components, toolpaths, referenced materials/tools/machine configurations, and production costs. Workflow YAML and other carried non-entity text live in the repository tree, rather than ordinary drawing records. A change to one entity does not require treating the entire database as an opaque binary diff.</p>
     <p>Choose a disposable or intended project before following the mutating examples. Set <code>PROJECT_ID</code> to its real identifier and use a current connection URL/application bearer. Project history and workflow endpoints are documented in the <a href="/docs/api/history">history API reference</a>; project metadata writes use the <a href="/docs/api/projects">projects API</a>.</p>
+    <p>Objects use git's byte-exact loose-object format, so commit and tree IDs match what <code>git</code> computes for the same content. Branch references live under <code>refs/heads/</code>, and the default branch is <code>main</code>.</p>
   </section>
 
   <section id="access" class="doc-section">

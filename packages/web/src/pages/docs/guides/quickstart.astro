@@ -72,6 +72,7 @@ bun run db:migrate`}
     </DocCode>
     <p>Open <code>http://localhost:1420</code>. With no <code>VITE_SIDECAR_URL</code>, this uses the in-memory fake API. It supports a subset of requests and does not provide persistent projects, provider sessions, or native dialogs. Connect to a live sidecar by setting both Vite sidecar URL and token process variables.</p>
     <p>The desktop package's <code>tauri:dev</code> script creates a stub sidecar when the binary is missing. The stub supports shell isolation. Prefer the root <code>desktop:dev</code> command when exercising application services.</p>
+    <p><code>bun run desktop:dev</code> first runs <code>build:sidecar</code>, which compiles the sidecar and stages migrations (pipeline steps <code>compile</code> and <code>resources</code>). It then starts <code>tauri dev</code> in the desktop package.</p>
   </section>
 
   <section id="after" class="doc-section">

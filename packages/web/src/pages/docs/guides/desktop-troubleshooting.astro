@@ -118,6 +118,7 @@ bun run --filter @cadcamfun/desktop dev`}
     </DocCode>
     <p>Protected calls can use account session context in addition to the application token. Companion and standalone bridge tokens have narrower scopes and are not substitutes for a launch token. A 401 needs credential diagnosis; a 403 needs operation/access diagnosis; an absent or inaccessible project can be reported as 404.</p>
     <p>Some screens, including project child-resource tabs, currently turn individual list errors into empty arrays. A blank tab is not sufficient evidence that records were deleted. Read the corresponding <a href="/docs/api/projects">project</a>, <a href="/docs/api/drawings">drawing</a>, or <a href="/docs/api/toolpaths">toolpath</a> endpoint before recreating work.</p>
+    <p>A valid launch token is 64 hexadecimal characters (32 random bytes) and changes on every launch. A token of a different shape was not issued by the desktop shell.</p>
   </section>
 
   <section id="preview" class="doc-section">

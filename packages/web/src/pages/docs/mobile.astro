@@ -58,6 +58,7 @@ const toc = [
     <DocCallout type="note" title="Device access includes write operations">
       <p>The gateway currently permits version-control commit, branch, checkout, and restore requests as well as pull-request review and merge. Device tokens are scoped to the gateway route policy; they are not a read-only role or a per-project restriction. Revoke a lost or untrusted phone in desktop companion settings.</p>
     </DocCallout>
+    <p>The gateway limits failed authentication attempts: after ten failed bearer attempts from one IP address within 60 seconds, further requests from that address receive HTTP 429 until the window expires (<code>apps/sidecar/src/services/companion-gateway.ts</code>).</p>
   </section>
 
   <section id="assistant" class="doc-section">

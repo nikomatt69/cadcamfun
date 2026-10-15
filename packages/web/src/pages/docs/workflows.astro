@@ -68,6 +68,7 @@ jobs:
     <p><code>vcs/commit</code> requires a message and accepts a <code>files</code> record of text under <code>.cadcamfun/</code> with YAML, Markdown, JSON, or text extensions. It acts as the run's account and obeys protected-branch policy. The extra-file argument cannot directly replace CAD entity paths. The current implementation delegates to project commit without checking for a clean working copy: it also snapshots current database edits on the checked-out branch, which can differ from the ref being checked. Run this writing step only when that current branch and working state are intended to be committed.</p>
     <p><code>notify/push</code> creates an application notification for the run's actor, with optional title, body, and success/failure outcome. It is a persisted notification step; it does not by itself establish delivery through an external push provider.</p>
     <p><code>ai/prompt</code> requires a prompt and optionally accepts system text and a model. It can substitute committed file content and returns answer text and model identity. Missing credentials or a provider error fail this step; a model answer is advisory output, separate from deterministic geometry checks.</p>
+    <p>The pure built-in steps are registered in <code>builtinSteps</code> (<code>apps/sidecar/src/services/workflow-steps.ts</code>): <code>project/validate</code>, <code>project/require-gcode</code>, <code>cam/verify</code>, <code>cam/gcode</code>, and <code>cam/sequence</code>. They need only the committed files and <code>@cadcamfun/core</code>, so they are available even when the assistant is not running.</p>
   </section>
 
   <section id="running" class="doc-section">
@@ -131,6 +132,7 @@ console.log(result) // { status: "success", jobs: { inspect: "success" } }`}
     <p>Output substitution traverses nested arrays and records. An exact missing output expression evaluates to undefined; an absent output embedded in a longer string becomes empty text. Do not rely on a skipped or failed step to have produced an output. Declare <code>needs</code> for cross-job consumers so dependency scheduling establishes the data order.</p>
     <p>Step <code>if</code> is one of three literal modes, not a general expression language. Workflow variables, shell interpolation, matrix builds, arbitrary JavaScript conditions, and third-party action loading are not implemented by this engine. The separate <code>ai/prompt</code> handler substitutes committed <code>files.&lt;path&gt;</code> references in its prompt; ordinary steps do not receive that extra substitution.</p>
     <p>Source: <code>packages/workflow/src/trigger.ts</code>, <code>run.ts</code>, and <code>apps/sidecar/src/services/workflow-service-steps.ts</code>.</p>
+    <p>An omitted branch or path filter matches every value. A manual dispatch matches only workflows that declare <code>on.manual</code>, and a pull-request event matches the workflow's <code>branches</code> globs against the pull request's base branch (<code>packages/workflow/src/trigger.ts</code>).</p>
   </section>
 
   <section id="troubleshooting" class="doc-section">

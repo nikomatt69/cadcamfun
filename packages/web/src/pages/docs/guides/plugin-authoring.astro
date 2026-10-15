@@ -186,6 +186,7 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
 <p>The production loader supplies a 10-second host budget for ordinary lifecycle/command RPC. AI tool calls have a separate 30-second deadline. The host limits a plugin to 2,000 calls per minute and 64 pending calls. It passes a 256 MB resource-limit setting to Bun when creating the worker. These are runtime controls, not a separate process or operating-system containment policy.</p>
     <p>The bootstrap starts with an empty environment and attempts to delete selected process/network globals. Deletion is best-effort and some Bun globals remain reachable. Capability checking is therefore meaningful for the APIs the host supplies, but cannot be presented as complete isolation of arbitrary JavaScript.</p>
     <p>Optional signature and dev fields exist in the manifest schema. The current worker installation path records signature text without cryptographic verification. Do not label a publisher verified because that field is present. A self-contained source review and installation policy remain separate decisions from schema acceptance.</p>
+    <p>Plugins that crash three times within ten minutes are disabled automatically, and an assistant tool call is stopped after 30 seconds. Both values are constants in <code>apps/sidecar/src/plugins/host.ts</code>.</p>
   </section>
 
   <section id="maintenance" class="doc-section">

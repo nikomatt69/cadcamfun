@@ -138,6 +138,7 @@ const toc = [
 <p>When the reader ends without a final event, treat completion as unknown. Call <code>POST /api/ai/sessions/state</code> with the same sessionId and projectId. The response contains busy and text, with optional recovered tool/todo/diagnostic events, usage, and tasks. Reconstruct the UI from this snapshot; replaying recovered tool events does not execute them again.</p>
     <p>Then request <code>/api/ai/sessions/control</code> with action status to inspect pending permissions/questions, worker tasks, goal, and context policy. A busy turn waiting for an unanswered question needs a reply, not a second copy of the original prompt. A session reported idle with accumulated text can be displayed as recovered output even though the original TCP connection vanished.</p>
     <p>Keep a distinction between network failure, a typed provider/config error event, explicit abort, and session removal. Retry the model request only after checking what the first turn actually did. In particular, read the current drawing after a partial mutation diagnostic or interrupted editing worker.</p>
+    <p>Inside the server, a dropped model connection is resumed up to five times with a 2-second backoff that doubles up to 30 seconds. A client reconnecting to the stream should still read the session state, because those resumes can finish work that the client did not see stream.</p>
   </section>
 
   <section id="context" class="doc-section">

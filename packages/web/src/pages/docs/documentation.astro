@@ -68,6 +68,7 @@ curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
     <p>Retrieval first scores the current question and earlier user questions against titles, routes, keywords, and summaries. The current known page is retained. When a Workers AI binding is available, an optional tool-call planner can select relevant documentation routes; invalid selections or planner failures fall back to lexical retrieval.</p>
     <p>Up to three pages are loaded. Each is condensed to a 5,000-character budget by retaining its introduction and matching sections. A long API resource page is therefore not automatically supplied in full to the model. Link the user to the relevant operation when the excerpt does not contain enough detail.</p>
     <p>Loaded Markdown is cached separately for 30 minutes when the Worker cache is available. A source edit can require cache refresh in an already-running deployment. If no selected page can be loaded, the route returns 502. If no Workers AI binding or complete nikcli backend configuration exists, it returns 503 before generation.</p>
+    <p>A single assistant request may carry at most 12 conversation messages, and a question is limited to 1,200 characters (<code>MAX_MESSAGES</code> and <code>MAX_QUESTION_CHARS</code> in <code>src/lib/docsAssistant.ts</code>).</p>
   </section>
   <section id="bindings" class="doc-section">
     <h2>Models and rate limits</h2>

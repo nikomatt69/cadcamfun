@@ -61,6 +61,7 @@ costs/<id>.json
     </DocCode>
     <p>One JSON file per entity keeps unrelated changes separate. The snapshot includes library items referenced by toolpaths and production cost estimates so restored manufacturing data can retain its dependencies. Entity identifiers used as file names are restricted to safe letters, digits, underscores, and hyphens, with a maximum of 128 characters.</p>
     <p>JSON keys are sorted recursively and files use stable pretty-printing with a final newline. Arrays retain their order. Extra text files can travel with a package-level snapshot; the public commit endpoint accepts extra files only under <code>.cadcamfun/workflows/</code> with a safe YAML file name.</p>
+    <p>Objects use git's loose-object format byte for byte, so object IDs match those computed by <code>git</code>. Tree entries are either files (mode <code>100644</code>) or directories (mode <code>40000</code>). A commit signature records name, email, Unix-seconds time, and a <code>+hhmm</code>/<code>-hhmm</code> offset. Branches are stored under <code>refs/heads/</code>, and a project's default branch is <code>main</code> (<code>packages/vcs/src/object.ts</code>, <code>repository.ts</code>).</p>
   </section>
 
   <section id="package" class="doc-section">

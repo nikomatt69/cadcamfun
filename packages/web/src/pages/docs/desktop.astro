@@ -136,6 +136,7 @@ bun test apps/desktop/src
 bun run build:desktop`}
     </DocCode>
     <p>The first command runs a browser preview. <code>desktop:dev</code> compiles the real sidecar and stages migrations before starting Tauri. The desktop package's <code>tauri:dev</code> script instead creates a stub binary only when no binary exists; use it for isolated shell work and check which binary is present before interpreting its API responses.</p>
+    <p>The desktop <code>build</code> script runs <code>vite build</code> only; it does not compile the sidecar or package a Tauri bundle. Use <code>bun scripts/build.ts</code> for the full release pipeline (see <a href="/docs/release">Release</a>).</p>
   </section>
 
   <section id="preferences" class="doc-section">

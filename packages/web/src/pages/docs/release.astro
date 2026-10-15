@@ -50,6 +50,7 @@ bun scripts/build.ts --no-updater`}
     </DocCode>
     <p><code>--only</code> and <code>--skip</code> accept stage names; <code>--target</code>, <code>--bundles</code>, and <code>--out-dir</code> select outputs. The default target is the host reported by <code>rustc -vV</code>. Sidecar binaries are written to <code>apps/desktop/src-tauri/binaries/sidecar-&lt;triple&gt;</code>, with <code>.exe</code> on Windows. Identical binaries and migration trees are kept unchanged to avoid unnecessary development restarts.</p>
     <p>Use <code>compile-sidecar.ts</code> through the pipeline: it applies the embedded-host bundling adaptations. A direct generic compile command does not represent the same build procedure. The default artifact directory is <code>apps/desktop/src-tauri/target/release-artifacts</code>.</p>
+    <p>The <code>resources</code> step copies <code>packages/db/drizzle/</code> into <code>apps/desktop/src-tauri/resources/migrations/</code> and is safe to repeat. The <code>artifacts</code> step writes <code>SHA256SUMS</code> and <code>RELEASE_NOTES.md</code>, built from the commits since the last tag. Step aliases are accepted by <code>--only</code> and <code>--skip</code>: <code>deps</code>, <code>checks</code>/<code>test</code>, <code>sidecar</code>, <code>migrations</code>, and <code>notes</code>/<code>checksums</code>/<code>release</code>. The script never reads <code>.env*</code> files or prints secret values.</p>
   </section>
 
   <section id="ci" class="doc-section">

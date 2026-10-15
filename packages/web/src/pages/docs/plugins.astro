@@ -84,6 +84,7 @@ const toc = [
     <h2>Runtime limits</h2>
 <p>The host defines a 256 MB worker memory setting, a 2,000-call-per-minute rate limit, and at most 64 pending calls per plugin. Command timeout behavior is supplied by the embedding host; the assistant loader uses 10 seconds. AI tool calls have a separate 30-second deadline. Timeouts, absent tools, worker crashes, capability failures, and queue exhaustion return typed host failures or readable tool results.</p>
     <p>Crash tracking faults a plugin after three crashes within ten minutes. These host controls bound cooperative RPC and lifecycle behavior; the memory setting passed to Bun is not a substitute for a separately isolated executable.</p>
+    <p>The limits are defined in <code>apps/sidecar/src/plugins/host.ts</code>: <code>CALL_TIMEOUT_MS</code> (5,000 ms per ordinary call), <code>AI_TOOL_TIMEOUT_MS</code> (30,000 ms per assistant tool call), <code>MEMORY_LIMIT_MB</code> (256), <code>CALL_RATE_LIMIT</code> (2,000 calls per plugin per minute), <code>MAX_PENDING_CALLS</code> (64), and <code>CRASH_LIMIT</code> (3 crashes within a 10-minute <code>CRASH_WINDOW_MS</code>, after which the plugin is disabled automatically).</p>
   </section>
 
   <section id="http" class="doc-section">
