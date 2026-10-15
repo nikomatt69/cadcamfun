@@ -1,0 +1,334 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Packages", href: "#packages" },
+  { title: "Apps", href: "#apps" },
+  { title: "Direction", href: "#direction" },
+  { title: "Commands", href: "#commands" },
+  { title: "What not to import", href: "#avoid" },
+]
+---
+
+<DocsLayout
+  title="Packages and apps"
+  subtitle="Npm names, directories, and the workspace dependencies each package.json actually declares."
+  description="CADCAMFUN workspace packages and apps: paths, ownership, dependency direction, and the commands that typecheck them."
+  toc={toc}
+>
+  <section id="packages" class="doc-section">
+    <h2>Packages</h2>
+    <p>
+      Libraries live under <code>packages/</code>. The root <code>package.json</code> workspace
+      glob is <code>packages/*</code>, so every directory here is a workspace, including this docs
+      site. Effect is <code>4.0.0-rc.112</code> wherever it appears, because
+      <code>@nikcli-ai/sdk-next</code> requires that release. Do not bump it in one package.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Package</th><th>Path</th><th>Declares a dependency on</th><th>Owns</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>@cadcamfun/db</code></td>
+          <td><code>packages/db</code></td>
+          <td><code>effect</code>, <code>drizzle-orm@1.0.0-beta.22</code>. No other workspace package.</td>
+          <td>Drizzle schema (<code>src/schema.ts</code>), migrations (<code>drizzle/</code>), <code>Database</code> service (<code>src/index.ts</code>), CLI migrate (<code>src/migrate.ts</code>). SQLite via <code>bun:sqlite</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/core</code></td>
+          <td><code>packages/core</code></td>
+          <td><code>effect</code> only. Hot loops stay plain functions.</td>
+          <td>CAD in <code>src/cad</code>, CAM and G-code in <code>src/cam</code>, drawing in <code>src/drawing</code>. No database, network, or filesystem.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/api</code></td>
+          <td><code>packages/api</code></td>
+          <td><code>effect</code>, <code>@cadcamfun/core</code>, <code>zod</code>.</td>
+          <td>Schema-first HttpApi groups in <code>src/groups</code>, shared domain schemas, generated clients in <code>src/sdk</code> and <code>src/client</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/ai</code></td>
+          <td><code>packages/ai</code></td>
+          <td><code>@cadcamfun/api</code>, <code>@cadcamfun/core</code>, <code>effect</code>, <code>ai</code> 7.x, <code>@nikcli-ai/sdk-next</code>, <code>@ai-sdk/*</code>.</td>
+          <td>nikcli embedded host and AI SDK v7, as Effect services. Source under <code>src/nikcli</code>, <code>src/tools</code>, <code>src/skills</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/plugin-sdk</code></td>
+          <td><code>packages/plugin-sdk</code></td>
+          <td><code>effect</code>, <code>@cadcamfun/core</code>.</td>
+          <td>Public plugin types: <code>manifest.ts</code>, <code>plugin.ts</code>, <code>capability.ts</code>, <code>context.ts</code>, <code>test-host.ts</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/vcs</code></td>
+          <td><code>packages/vcs</code></td>
+          <td>None.</td>
+          <td>Git-compatible history: <code>object.ts</code>, <code>repository.ts</code>, <code>snapshot.ts</code>, <code>diff.ts</code>, <code>github.ts</code>, <code>store.ts</code>, <code>transport.ts</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/workflow</code></td>
+          <td><code>packages/workflow</code></td>
+          <td><code>effect</code> only.</td>
+          <td>Actions-style schema (<code>schema.ts</code>), triggers (<code>trigger.ts</code>), runner (<code>run.ts</code>).</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/httpapi-codegen</code></td>
+          <td><code>packages/httpapi-codegen</code></td>
+          <td><code>effect</code>, <code>prettier</code>. Dev: <code>@effect/platform-bun</code>.</td>
+          <td>Generates clients. <code>@cadcamfun/api</code>’s <code>generate</code> script writes <code>packages/api/src/sdk</code> and <code>packages/api/src/client</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@nikoemme_/cadcamfun-nikcli-plugin</code></td>
+          <td><code>packages/nikcli-plugin</code></td>
+          <td><code>zod</code> only.</td>
+          <td>Tools a standalone nikcli uses against a running app. The catalogue is the app’s. The plugin does not keep a second copy.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/web</code></td>
+          <td><code>packages/web</code></td>
+          <td>Astro 5, Tailwind 3. No <code>@cadcamfun/*</code> runtime dependency.</td>
+          <td>This documentation site. It does not import the sidecar or the database.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <code>packages/nikcli-plugin</code> is the bridge for a nikcli process outside the desktop
+      (a terminal, another machine, CI). It presents the same action catalogue the embedded host
+      registers, and it calls the running sidecar to invoke those actions. It is not the embedded
+      host. The embedded host is <code>packages/ai</code>, loaded by <code>apps/sidecar</code>.
+    </p>
+    <p>
+      Public entry points are the <code>exports</code> map in each <code>package.json</code>.
+      <code>@cadcamfun/db</code> exports <code>.</code> and <code>./schema</code>.
+      <code>@cadcamfun/api</code> exports <code>.</code> and <code>./sdk</code>
+      (<code>src/sdk/generated/index.ts</code>). The others export <code>.</code> as
+      <code>src/index.ts</code>. Import those paths. Do not deep-import a file that is not exported,
+      from another package.
+    </p>
+  </section>
+
+  <section id="apps" class="doc-section">
+    <h2>Apps</h2>
+    <table>
+      <thead>
+        <tr><th>Package</th><th>Path</th><th>Workspace dependencies</th><th>Owns</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>@cadcamfun/sidecar</code></td>
+          <td><code>apps/sidecar</code></td>
+          <td><code>ai</code>, <code>api</code>, <code>core</code>, <code>db</code>, <code>plugin-sdk</code>, <code>vcs</code>, <code>workflow</code></td>
+          <td>Bun Effect server. Entry <code>src/main.ts</code>. HTTP handlers in <code>src/http</code>, services in <code>src/services</code>, repositories in <code>src/repos</code>, plugin host in <code>src/plugins</code>, wiring in <code>src/layers.ts</code>.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/desktop</code></td>
+          <td><code>apps/desktop</code></td>
+          <td><code>api</code>, <code>core</code></td>
+          <td>SolidJS + Vite UI in <code>src/</code>, Tauri v2 shell in <code>src-tauri/</code>. Three.js is a direct dependency (<code>three</code> ^0.180).</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/mobile</code></td>
+          <td><code>apps/mobile</code></td>
+          <td><code>api</code> only</td>
+          <td>Expo iOS companion (package version 6.0.0). Thin client of a paired desktop. Native pairing socket in <code>modules/companion-net</code>. Scripts: <code>expo start --dev-client</code>, <code>expo run:ios</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      The README rule is that the desktop imports API types only. The desktop manifest also depends
+      on <code>@cadcamfun/core</code>, and the viewport plus the CAD and CAM features import
+      geometry and toolpath helpers from it. Mobile does not. Neither app depends on
+      <code>@cadcamfun/db</code>. The sidecar is the process that opens
+      <code>cadcamfun.db</code>.
+    </p>
+    <p>
+      Desktop source layout, from <code>apps/desktop/src/README.md</code> and the README at the
+      repo root:
+    </p>
+    <ul>
+      <li><code>src/app/</code> — shell, route table (<code>routes.tsx</code>), API client. No product logic in the shell.</li>
+      <li><code>src/pages/</code> — one-line route adapters. No logic.</li>
+      <li><code>src/features/&lt;name&gt;/</code> — one folder per product area. Inside, only the folders that area needs: <code>screens/</code>, <code>components/</code>, <code>hooks/</code>, <code>lib/</code>, <code>store/</code>, <code>types/</code>, <code>api/</code>, <code>styles/</code>.</li>
+      <li><code>src/shared/</code> — <code>ui/</code>, <code>components/</code>, <code>state/</code>. Move code here when a second feature needs it.</li>
+      <li><code>src/styles/</code> — global CSS. Feature CSS stays in the feature.</li>
+      <li><code>src/viewport/</code> — 2D/3D engine (<code>editor2d</code>, <code>view3d</code>, <code>spatial</code>, <code>units.ts</code>).</li>
+      <li><code>src/i18n/</code> — translation tables. Default locale <code>en</code>.</li>
+      <li><code>src/testing/</code> — fake API and core-flow tests.</li>
+    </ul>
+    <p>
+      Feature directories present under <code>apps/desktop/src/features</code>:
+      <code>admin</code>, <code>ai</code>, <code>analytics</code>, <code>auth</code>,
+      <code>billing</code>, <code>cad</code>, <code>cam</code>, <code>chat</code>,
+      <code>companion</code>, <code>costs</code>, <code>dashboard</code>, <code>legal</code>,
+      <code>library</code>, <code>marketplace</code>, <code>mcp</code>, <code>organizations</code>,
+      <code>plugins</code>, <code>profile</code>, <code>projects</code>, <code>settings</code>,
+      <code>toolpaths</code>. Imports between features go through each feature’s public files.
+    </p>
+  </section>
+
+  <section id="direction" class="doc-section">
+    <h2>Direction</h2>
+    <p>
+      The README writes the allowed arrows with no cycles:
+      <code>core</code> ← <code>api</code> ← sidecar;
+      <code>db</code> ← sidecar;
+      <code>ai</code> and <code>plugin-sdk</code> ← sidecar.
+      The desktop imports API types only. <code>core</code> and <code>api</code> must not import
+      <code>db</code>. The manifests add two arrows the one-line summary does not draw:
+      <code>core</code> ← <code>ai</code>, <code>core</code> ← <code>plugin-sdk</code>, and
+      <code>core</code> ← desktop. <code>vcs</code> and <code>workflow</code> are sidecar
+      dependencies. <code>workflow</code> does not depend on <code>vcs</code> in its
+      <code>package.json</code>; the sidecar composes them.
+    </p>
+    <DocCode language="text" title="Who may import whom">
+{`packages/core        no @cadcamfun/db, no I/O in hot loops
+packages/api         @cadcamfun/core only
+packages/ai          @cadcamfun/api, @cadcamfun/core
+packages/plugin-sdk  @cadcamfun/core
+packages/vcs         no workspace dependencies
+packages/workflow    effect only
+apps/sidecar         ai, api, core, db, plugin-sdk, vcs, workflow
+apps/desktop         api, core
+apps/mobile          api
+packages/web         none of the above`}
+    </DocCode>
+    <p>
+      <code>specs/</code> is the contract for scope and APIs. It is not a package. Sequence of
+      remaining work is <code>specs/roadmap/README.md</code>. The current step is RM-01, the action
+      catalogue (<code>specs/roadmap/01-action-catalogue.md</code>). Units inside
+      <code>packages/core</code> are millimetres and radians. Degrees and G-code decimal formatting
+      stay at the UI and post boundary.
+    </p>
+    <DocCallout title="Legacy code stays out" type="warn">
+      <p>
+        <code>.reference/</code> is the old Next.js and Prisma app. It is git-ignored and read-only.
+        v6 does not import it. A type you remember from Prisma is re-declared in
+        <code>packages/db/src/schema.ts</code> or in <code>packages/api</code>, with the same table
+        and column names, not with a path back into <code>.reference/</code>.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="commands" class="doc-section">
+    <h2>Commands</h2>
+    <p>
+      From the repository root. <code>bunx tsc -p</code> is the README check for one project.
+      <code>bun run --filter &lt;pkg&gt; typecheck</code> runs that package’s own script, which is
+      <code>tsgo</code> for every package except <code>@cadcamfun/mobile</code> and
+      <code>@cadcamfun/web</code> (those use <code>tsc</code>).
+    </p>
+    <DocCode language="bash" title="From the repo root">
+{`bun test packages/core
+bunx tsc -p packages/core/tsconfig.json
+bun test apps/sidecar
+bunx tsc -p apps/sidecar/tsconfig.json
+bun run --filter @cadcamfun/api coverage
+bun run generate
+bun run generate:check
+bun run --filter @cadcamfun/web dev`}
+    </DocCode>
+    <table>
+      <thead>
+        <tr><th>Root script</th><th>Resolves to</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>bun run db:generate</code></td>
+          <td><code>drizzle-kit generate</code> in <code>packages/db</code> (<code>drizzle.config.ts</code>).</td>
+        </tr>
+        <tr>
+          <td><code>bun run db:migrate</code></td>
+          <td><code>bun src/migrate.ts</code> in <code>packages/db</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun run generate</code></td>
+          <td><code>packages/api/scripts/generate-clients.ts</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun run generate:check</code></td>
+          <td>The same script with <code>--check</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun test packages apps</code></td>
+          <td>README suite. Does not include <code>scripts/</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun run test</code></td>
+          <td><code>bun test packages apps scripts</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun run typecheck</code></td>
+          <td><code>turbo run typecheck</code>, then <code>tsgo -p tsconfig.json --noEmit</code> at the root.</td>
+        </tr>
+        <tr>
+          <td><code>bun run desktop:dev</code></td>
+          <td><code>build:sidecar</code>, then <code>tauri dev</code> in <code>@cadcamfun/desktop</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <code>@cadcamfun/mobile</code>’s own test script is <code>bun test test</code>, which only
+      makes sense with the working directory <code>apps/mobile</code>. From the root, use
+      <code>bun test apps/mobile</code> or <code>bun run --filter @cadcamfun/mobile test</code>.
+      iOS run scripts (<code>ios</code>, <code>ios:release</code>, <code>native:generate</code>)
+      need Xcode. They are not part of <code>bun test packages apps</code>. WP13’s overview status
+      says the Expo migration, gateway, pairing, and JS export are in place, and that native
+      Release/device validation is in progress with TestFlight still pending. Do not describe
+      TestFlight as shipped.
+    </p>
+  </section>
+
+  <section id="avoid" class="doc-section">
+    <h2>What not to import</h2>
+    <table>
+      <thead>
+        <tr><th>Import</th><th>Why it is rejected</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>@cadcamfun/db</code> from <code>packages/core</code> or <code>packages/api</code></td>
+          <td>README rule. Those packages stay free of SQLite so they can run in tests and in the UI without a file.</td>
+        </tr>
+        <tr>
+          <td><code>@cadcamfun/db</code> from <code>apps/desktop</code> or <code>apps/mobile</code></td>
+          <td>The window and the phone are HTTP clients. The sidecar owns the file.</td>
+        </tr>
+        <tr>
+          <td>Anything from <code>.reference/</code></td>
+          <td>Git-ignored legacy tree. Domain knowledge only.</td>
+        </tr>
+        <tr>
+          <td><code>effect</code> at a version other than <code>4.0.0-rc.112</code></td>
+          <td>Service tags would split. nikcli’s SDK is built against this rc.</td>
+        </tr>
+        <tr>
+          <td>A deep file under another package that is not in <code>exports</code></td>
+          <td>The public surface is the package entry. Cross-package reach-ins break when the file moves.</td>
+        </tr>
+        <tr>
+          <td><code>apps/sidecar</code> from <code>packages/core</code></td>
+          <td>The arrow points the other way. Core has no I/O.</td>
+        </tr>
+        <tr>
+          <td>Degrees, or <code>Number.prototype.toString</code>, inside <code>packages/core</code></td>
+          <td>Internal units are millimetres and radians. G-code uses a fixed decimal count (default 3).</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      The other direction is also a bug: a pass-through package that only re-exports the sidecar.
+      Callers in the desktop import <code>@cadcamfun/api</code> types and talk HTTP. Callers in the
+      sidecar import <code>@cadcamfun/db</code> and use <code>Database.query</code>.
+    </p>
+  </section>
+  <DocRelated
+    items={[
+      { title: "Source map", href: "/docs/source-map" },
+      { title: "Architecture", href: "/docs/architecture" },
+    ]}
+  />
+</DocsLayout>

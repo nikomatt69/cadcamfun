@@ -1,0 +1,211 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Package", href: "#package" },
+  { title: "Steps", href: "#steps" },
+  { title: "Running", href: "#running" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Schema exports", href: "#schema-exports" },
+  { title: "On disk", href: "#on-disk" },
+  { title: "Registered step ids", href: "#step-ids" },
+]
+---
+
+<DocsLayout
+  title="Workflows"
+  subtitle="Actions-style YAML. Steps are registered functions. There is no shell and no Docker."
+  description="CADCAMFUN workflows: schema, triggers, the step registry, and which steps the sidecar actually registers."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP12 on the task board is <strong>done</strong> for the engine and the runner. The board
+      says only <code>project/*</code> steps are registered. Owner directory:
+      <code>packages/workflow</code> (<code>@cadcamfun/workflow</code>). Spec:
+      <code>specs/13-vcs-actions-mobile.md</code> §3. The runner that executes steps against a
+      project lives in the sidecar, not in this package.
+    </p>
+    <DocCallout type="note" title="The source registers more than the board sentence">
+      <p>
+        <code>apps/sidecar/src/services/workflow-steps.ts</code> defines
+        <code>project/validate</code>, <code>project/require-gcode</code>,
+        <code>cam/verify</code>, <code>cam/gcode</code>, and <code>cam/sequence</code>.
+        <code>workflow-service-steps-live.ts</code> registers <code>vcs/commit</code> and
+        <code>notify/push</code> on the live runner. <code>ai/prompt</code> is implemented as a
+        service-backed step and stays unregistered until the AI layer attaches it. Spec 13 says
+        a workflow that names an unregistered step fails before any step runs, and that the
+        registry test asserts <code>ai/prompt</code> is absent until that layer is up. Quote the
+        board for the milestone. Read <code>WorkflowRunner.steps()</code> at runtime for the
+        list a file may use.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="package" class="doc-section">
+    <h2>Package</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>packages/workflow/src/schema.ts</code></td><td>YAML to a <code>Workflow</code> via Effect Schema.</td></tr>
+        <tr><td><code>packages/workflow/src/trigger.ts</code></td><td><code>push</code> (branch and path globs), <code>pullRequest</code>, <code>manual</code>.</td></tr>
+        <tr><td><code>packages/workflow/src/run.ts</code></td><td>Job DAG (<code>needs</code>, levels, cycle check), interpolation, <code>if</code>, event stream.</td></tr>
+        <tr><td><code>packages/workflow/src/index.ts</code></td><td>Re-exports those three modules.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      A step is a pure function of the commit being checked (<code>ctx.files</code>) and its
+      <code>with:</code> parameters. It does not read the live database, so a run reports on the
+      tree that was pushed. <code>ctx.actor</code> is the account that dispatched the run. Writes
+      are attributed to that account, not to the local profile.
+    </p>
+    <p>
+      Jobs form a DAG. <code>needs</code> orders them. A cycle fails the workflow before steps
+      run. <code>if</code> accepts <code>success</code>, <code>failure</code>, or
+      <code>always</code>. <code>continueOnError</code> keeps later steps going. Step outputs
+      are shared for the whole run, keyed by step id. Spec 13 §8 says <code>needs</code>-scoped
+      outputs are a later limit. Interpolation uses the host expression syntax
+      <code>steps.&lt;id&gt;.outputs.&lt;key&gt;</code>. An <code>ai/prompt</code> body may also
+      embed <code>files.&lt;path&gt;</code>.
+    </p>
+    <DocCode language="yaml" title="A workflow that only uses project steps">
+{`name: Validate
+on:
+  push:
+    branches: [main, "ai/**"]
+    paths: ["toolpaths/**"]
+  pullRequest:
+    branches: [main]
+  manual: {}
+jobs:
+  check:
+    steps:
+      - id: v
+        uses: project/validate
+      - uses: project/require-gcode`}
+    </DocCode>
+    <p>
+      Workflow files are committed at <code>.cadcamfun/workflows/&lt;name&gt;.yml</code>. The API
+      accepts those paths and rejects other non-model files on commit.
+    </p>
+  </section>
+
+  <section id="steps" class="doc-section">
+    <h2>Steps</h2>
+    <p>
+      Pure steps ship in <code>workflow-steps.ts</code> so any layer that builds the runner can
+      use them. Service-backed steps are added with <code>WorkflowRunner.register</code> because
+      the runner cannot depend on a service constructed above it.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Step</th><th><code>with</code></th><th>Fails when</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>project/validate</code></td><td>—</td><td>An entity file is not JSON, an <code>id</code> does not match the file name, or <code>name</code> is missing.</td></tr>
+        <tr><td><code>project/require-gcode</code></td><td>—</td><td>A toolpath in the commit has no G-code.</td></tr>
+        <tr><td><code>cam/verify</code></td><td><code>toolpath?</code>, <code>tolerance?</code>, <code>severity?</code> (<code>error</code> or <code>warning</code>)</td><td>Replay reports a rapid in material, a gouge, uncut stock, a shank, holder, or fixture collision, or a cut below stock. Warnings count when severity is <code>warning</code>.</td></tr>
+        <tr><td><code>cam/gcode</code></td><td><code>toolpath?</code></td><td>Committed G-code differs from what the stored generation request produces.</td></tr>
+        <tr><td><code>cam/sequence</code></td><td><code>toolpath?</code></td><td>One tool number names two diameters or types, or a rest pass names a previous tool that is not larger. Defined in <code>workflow-steps.ts</code>. Spec 13’s step table does not list it.</td></tr>
+        <tr><td><code>vcs/commit</code></td><td><code>message</code>, optional <code>files</code> under <code>.cadcamfun/**</code></td><td>Dirty working copy, a path outside <code>.cadcamfun/</code>, or an AI actor on <code>main</code>.</td></tr>
+        <tr><td><code>notify/push</code></td><td><code>title?</code>, <code>body?</code>, <code>outcome?</code></td><td>Does not fail the run. Writes a <code>WORKFLOW_PASSED</code> or <code>WORKFLOW_FAILED</code> notification.</td></tr>
+        <tr><td><code>ai/prompt</code></td><td><code>prompt</code>, optional <code>system</code>, <code>model</code></td><td>The model errors. The answer is <code>outputs.text</code>. Unregistered until <code>AiLive</code> registers it.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>cam/verify</code> and <code>cam/gcode</code> read the generator request stored on
+      each toolpath. A toolpath that cannot be verified (a lathe job, or no stored request) is
+      listed in <code>skipped</code>. It is not counted as verified. Spec 13 is explicit: an
+      unverifiable toolpath is not a verified one.
+    </p>
+  </section>
+
+  <section id="running" class="doc-section">
+    <h2>Running</h2>
+    <p>
+      <code>WorkflowRunner.trigger(projectId, ref, event, &#123; onEvent?, actor? &#125;)</code>
+      starts a run. The actor is an options field. <code>WorkflowRunner.steps()</code> lists
+      names for the editor and for error messages. Every run is persisted as a
+      <code>WorkflowRun</code> row with its event stream. HTTP:
+      <code>GET /api/projects/:id/actions/runs</code> and
+      <code>POST /api/projects/:id/actions/dispatch</code>.
+    </p>
+    <p>
+      The desktop history screen is where a person sees run status. The phone can read the same
+      routes through the companion gateway. Dispatch from the phone is not in the gateway
+      allow-list in spec 13 §6 (the list is GET on <code>actions</code>, plus the AI chat
+      posts). Confirm the allow-list in <code>companion-gateway.ts</code> before a mobile
+      button calls dispatch.
+    </p>
+    <p>
+      There is no <code>run:</code> key and no Docker image. <code>uses:</code> must name a
+      registered CADCAMFUN step. That is the whole sandbox: the step function is the code that
+      runs.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>A workflow must not start a shell, a container, or arbitrary JavaScript from the YAML file.</li>
+      <li>Pure steps must not read the live database. They see <code>ctx.files</code> from the commit.</li>
+      <li>An unregistered <code>uses</code> fails the run before the first step.</li>
+      <li><code>ai/prompt</code> must not be documented as available until the AI layer has registered it.</li>
+      <li><code>vcs/commit</code> from a workflow must refuse an AI actor on <code>main</code>, the same guard as the assistant tools.</li>
+      <li>Trigger failures must not fail the commit or merge that caused them.</li>
+    </ul>
+  </section>
+  <section id="schema-exports" class="doc-section">
+    <h2>Schema exports</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Names</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>packages/workflow/src/schema.ts</code></td><td><code>WorkflowSchema</code>, <code>JobSchema</code>, <code>StepSchema</code>, <code>TriggersSchema</code> (<code>push</code>, <code>manual</code>, <code>pullRequest</code>), <code>parseWorkflow</code>, <code>WorkflowError</code></td></tr>
+        <tr><td><code>packages/workflow/src/trigger.ts</code></td><td><code>TriggerEvent</code>, <code>matchesTrigger</code>, <code>globToRegExp</code></td></tr>
+        <tr><td><code>packages/workflow/src/run.ts</code></td><td><code>runWorkflow</code>, <code>StepHandler</code>, <code>StepRegistry</code>, <code>RunEvent</code>, <code>RunResult</code>, <code>interpolate</code>, <code>missingSteps</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="on-disk" class="doc-section">
+    <h2>On disk</h2>
+    <p>
+      A workflow file is <code>.cadcamfun/workflows/&lt;name&gt;.yml</code>.
+    </p>
+  </section>
+
+  <section id="step-ids" class="doc-section">
+    <h2>Registered step ids</h2>
+    <p>
+      <code>builtinSteps</code> in <code>apps/sidecar/src/services/workflow-steps.ts</code>.
+      Service steps in <code>apps/sidecar/src/services/workflow-service-steps.ts</code> are
+      <code>vcsCommitStep</code>, <code>notifyPushStep</code>, and <code>aiPromptStep</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Kind</th><th>Step id</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Builtin</td><td><code>project/validate</code></td></tr>
+        <tr><td>Builtin</td><td><code>project/require-gcode</code></td></tr>
+        <tr><td>Builtin</td><td><code>cam/verify</code></td></tr>
+        <tr><td>Builtin</td><td><code>cam/gcode</code></td></tr>
+        <tr><td>Builtin</td><td><code>cam/sequence</code></td></tr>
+        <tr><td>Service</td><td><code>vcs/commit</code></td></tr>
+        <tr><td>Service</td><td><code>notify/push</code></td></tr>
+        <tr><td>Service</td><td><code>ai/prompt</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "History", href: "/docs/history" }, { title: "Mobile", href: "/docs/mobile" }, { title: "CAM and G-code", href: "/docs/cam" }]} />
+</DocsLayout>

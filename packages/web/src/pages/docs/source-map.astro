@@ -1,0 +1,369 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Directories", href: "#directories" },
+  { title: "Desktop tree", href: "#desktop" },
+  { title: "Sidecar and API", href: "#sidecar" },
+  { title: "Spec files", href: "#specs" },
+  { title: "Paths the specs name", href: "#missing" },
+  { title: "Contracts", href: "#contracts" },
+]
+---
+
+<DocsLayout
+  title="Source map"
+  subtitle="Paths that are in the tree, the spec that owns each area, and the spec paths that are not files yet."
+  description="Directory map of CADCAMFUN CAD, CAM, API, sidecar, desktop, viewport, history, workflows, mobile, and specs."
+  toc={toc}
+>
+  <section id="directories" class="doc-section">
+    <h2>Directories</h2>
+    <p>
+      Paths below are in the tree. Internal geometry and toolpaths use millimetres and radians.
+      Degrees stay at the UI or G-code boundary. G-code numbers use a fixed decimal count
+      (default 3) inside the post, not <code>toString</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Path</th><th>Doc</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CAD geometry</td>
+          <td><code>packages/core/src/cad</code> (sketch, solids, brep, imports, history)</td>
+          <td><a href="/docs/cad">CAD geometry</a></td>
+        </tr>
+        <tr>
+          <td>Drawing model</td>
+          <td><code>packages/core/src/drawing</code></td>
+          <td><a href="/docs/cad">CAD geometry</a></td>
+        </tr>
+        <tr>
+          <td>CAM kernel and operations</td>
+          <td><code>packages/core/src/cam/kernel</code>, <code>packages/core/src/cam/operations</code></td>
+          <td><a href="/docs/cam">CAM and G-code</a></td>
+        </tr>
+        <tr>
+          <td>CAM posts</td>
+          <td><code>packages/core/src/cam/post/fanuc.ts</code>, <code>haas.ts</code>, <code>grbl.ts</code>, <code>generic.ts</code>, plus <code>emitter.ts</code> and <code>post/advanced/</code></td>
+          <td><a href="/docs/cam">CAM and G-code</a></td>
+        </tr>
+        <tr>
+          <td>CAM public exports</td>
+          <td><code>packages/core/src/cam/index.ts</code> (setup, operations, post, kernel, verify, generator, cycles)</td>
+          <td><a href="/docs/cam">CAM and G-code</a></td>
+        </tr>
+        <tr>
+          <td>Setups</td>
+          <td><code>packages/core/src/cam/setup.ts</code></td>
+          <td><a href="/docs/setups">Setups</a></td>
+        </tr>
+        <tr>
+          <td>Database</td>
+          <td><code>packages/db/src/schema.ts</code>, <code>src/index.ts</code>, <code>src/migrate.ts</code>, <code>drizzle/</code></td>
+          <td><a href="/docs/database">Database</a></td>
+        </tr>
+        <tr>
+          <td>API groups</td>
+          <td><code>packages/api/src/groups</code></td>
+          <td><a href="/docs/api">API contract</a></td>
+        </tr>
+        <tr>
+          <td>API clients</td>
+          <td><code>packages/api/src/sdk</code>, <code>packages/api/src/client</code></td>
+          <td><a href="/docs/api">API contract</a></td>
+        </tr>
+        <tr>
+          <td>Client generator</td>
+          <td><code>packages/httpapi-codegen</code>, invoked by <code>packages/api/scripts/generate-clients.ts</code></td>
+          <td><a href="/docs/api">API contract</a></td>
+        </tr>
+        <tr>
+          <td>Sidecar HTTP and services</td>
+          <td><code>apps/sidecar/src/http</code>, <code>services</code>, <code>repos</code></td>
+          <td><a href="/docs/sidecar">Sidecar</a></td>
+        </tr>
+        <tr>
+          <td>Sidecar lifecycle</td>
+          <td><code>apps/sidecar/src/main.ts</code>, <code>config.ts</code>, <code>layers.ts</code>, <code>startup.ts</code>, <code>shutdown.ts</code></td>
+          <td><a href="/docs/sidecar">Sidecar</a></td>
+        </tr>
+        <tr>
+          <td>Plugin host</td>
+          <td><code>apps/sidecar/src/plugins</code>, <code>packages/plugin-sdk/src</code></td>
+          <td><a href="/docs/plugins">Plugins</a></td>
+        </tr>
+        <tr>
+          <td>AI</td>
+          <td><code>packages/ai/src</code> (<code>nikcli/</code>, <code>tools/</code>, <code>skills/</code>), <code>packages/nikcli-plugin</code></td>
+          <td><a href="/docs/ai">AI</a></td>
+        </tr>
+        <tr>
+          <td>History</td>
+          <td><code>packages/vcs/src/object.ts</code>, <code>repository.ts</code>, <code>snapshot.ts</code>, <code>github.ts</code>, <code>diff.ts</code></td>
+          <td><a href="/docs/history">History</a></td>
+        </tr>
+        <tr>
+          <td>Workflows</td>
+          <td><code>packages/workflow/src/schema.ts</code>, <code>trigger.ts</code>, <code>run.ts</code></td>
+          <td><a href="/docs/workflows">Workflows</a></td>
+        </tr>
+        <tr>
+          <td>Desktop shell</td>
+          <td><code>apps/desktop/src/app</code>, <code>pages</code>, <code>shared</code>, <code>styles</code>, <code>i18n</code></td>
+          <td><a href="/docs/desktop">Desktop</a></td>
+        </tr>
+        <tr>
+          <td>Viewport</td>
+          <td><code>apps/desktop/src/viewport/editor2d</code>, <code>view3d</code>, <code>spatial</code>, <code>units.ts</code></td>
+          <td><a href="/docs/viewport">Viewport</a></td>
+        </tr>
+        <tr>
+          <td>Tauri shell</td>
+          <td><code>apps/desktop/src-tauri/src/lib.rs</code>, <code>sidecar.rs</code>, <code>tauri.conf.json</code></td>
+          <td><a href="/docs/desktop">Desktop</a></td>
+        </tr>
+        <tr>
+          <td>Mobile</td>
+          <td><code>apps/mobile</code>, <code>apps/mobile/modules/companion-net</code></td>
+          <td><a href="/docs/mobile">Mobile</a></td>
+        </tr>
+        <tr>
+          <td>Release pipeline</td>
+          <td><code>scripts/build.ts</code>, <code>.github/workflows/ci.yml</code>, <code>build-platforms.yml</code>, <code>release.yml</code>, <code>ios.yml</code></td>
+          <td><a href="/docs/release">Release</a></td>
+        </tr>
+        <tr>
+          <td>Docs site</td>
+          <td><code>packages/web</code></td>
+          <td><a href="/docs/guides">Guides</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      CAM operations present as files under <code>packages/core/src/cam/operations</code> include
+      <code>pocket.ts</code>, <code>profile.ts</code>, <code>face.ts</code>, <code>drill.ts</code>,
+      <code>adaptive.ts</code>, <code>chamfer.ts</code>, <code>engrave.ts</code>,
+      <code>surface.ts</code>, <code>thread.ts</code>, <code>rest.ts</code>, and
+      <code>multiaxis.ts</code>. Kernel files live beside <code>planner.ts</code>,
+      <code>execute.ts</code>, and <code>contracts.ts</code> in
+      <code>packages/core/src/cam/kernel</code>. The §4 status for WP2 says “3 posts”. The post
+      directory also contains <code>generic.ts</code> and <code>advanced/</code>. List the files
+      you are editing; do not renumber the spec from this table.
+    </p>
+  </section>
+
+  <section id="desktop" class="doc-section">
+    <h2>Desktop tree</h2>
+    <p>
+      Rules are in <code>apps/desktop/src/README.md</code> and <code>specs/06-desktop-ui.md</code>.
+      A feature folder contains only the subfolders it uses. Shared code moves to
+      <code>src/shared</code> when a second feature needs it. <code>src/pages</code> stays a
+      one-line adapter.
+    </p>
+    <DocCode language="text" title="apps/desktop/src">
+{`app/          Shell.tsx, routes.tsx, client.ts, sidecar.ts, PageStub.tsx
+pages/        route adapters
+features/     admin, ai, analytics, auth, billing, cad, cam, chat,
+              companion, costs, dashboard, legal, library, marketplace,
+              mcp, organizations, plugins, profile, projects, settings,
+              toolpaths
+shared/       ui, components, state
+styles/       global CSS
+viewport/     editor2d, view3d, spatial, units.ts
+i18n/         tables, default locale en
+testing/      fake API and core-flow tests
+main.tsx`}
+    </DocCode>
+    <p>
+      Inside a feature, the allowed folder names are <code>screens/</code>,
+      <code>components/</code>, <code>hooks/</code>, <code>lib/</code>, <code>store/</code>,
+      <code>types/</code>, <code>api/</code>, and <code>styles/</code>. CAD currently has
+      <code>components</code>, <code>hooks</code>, <code>lib</code>, <code>screens</code>,
+      <code>store</code>, and <code>types</code>. Add a folder only when that feature needs it.
+    </p>
+    <p>
+      The webview dev server is Vite at <code>http://localhost:1420</code>
+      (<code>apps/desktop/src-tauri/tauri.conf.json</code>). The Rust shell’s identifier is
+      <code>com.cadcamfun.app</code>. Sidecar binaries are
+      <code>apps/desktop/src-tauri/binaries/sidecar-&lt;host-triple&gt;</code>. Bundled migration
+      SQL is <code>apps/desktop/src-tauri/resources/migrations/</code>, copied from
+      <code>packages/db/drizzle</code> by <code>bun run build:sidecar</code>. The stub compiler is
+      <code>apps/desktop/scripts/build-stub-sidecar.ts</code> and the stub source is
+      <code>apps/desktop/src-tauri/stub/stub-sidecar.ts</code>.
+    </p>
+    <DocCallout title="PageStub.tsx is still in the tree" type="note">
+      <p>
+        <code>apps/desktop/src/app/PageStub.tsx</code> exists. <code>specs/00-overview.md</code> §4
+        says the rest of the 65 pages are still stubs. The roadmap snapshot says pages are no
+        longer <code>PageStub</code>. Read <code>apps/desktop/src/app/routes.tsx</code> before
+        you delete or rename the component. Do not pick a status from this paragraph.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="sidecar" class="doc-section">
+    <h2>Sidecar and API</h2>
+    <p>
+      HTTP handler files under <code>apps/sidecar/src/http</code> include
+      <code>health.ts</code>, <code>projects.ts</code>, <code>drawings.ts</code>,
+      <code>toolpaths.ts</code>, <code>toolpath-generator.ts</code>, <code>tools.ts</code>,
+      <code>materials.ts</code>, <code>machine-configs.ts</code>, <code>library.ts</code>,
+      <code>ai.ts</code>, <code>plugins.ts</code>, <code>auth.ts</code>, <code>vcs.ts</code>,
+      <code>companion.ts</code>, <code>billing.ts</code>, <code>organizations.ts</code>,
+      <code>files.ts</code>, <code>kv.ts</code>, and <code>waitlist.ts</code> (the directory has
+      more; list it before assuming a route is missing). Matching contract groups live in
+      <code>packages/api/src/groups</code>. A handler without a group, or a group without a
+      handler, is the parity gap <code>specs/11-api-parity-brief.md</code> tracks. WP4’s §4 status
+      says every contract group is served and families without a contract are still missing.
+    </p>
+    <p>
+      Service modules under <code>apps/sidecar/src/services</code> include <code>ai.ts</code>,
+      <code>cam-program.ts</code>, <code>project-vcs.ts</code>, <code>workflow-runner.ts</code>,
+      <code>companion-gateway.ts</code>, <code>payments.ts</code>, <code>kv.ts</code>, and
+      <code>local-profile.ts</code>. Repositories under <code>src/repos</code> are the Drizzle
+      calls. Other packages do not open SQLite. They call these services or, inside
+      <code>packages/db</code> tests, <code>Database.query</code>.
+    </p>
+    <DocCode language="bash" title="Contract commands, from the repo root">
+{`bun run --filter @cadcamfun/api coverage
+bun run generate
+bun run generate:check
+bunx tsc -p packages/api/tsconfig.json
+bunx tsc -p apps/sidecar/tsconfig.json`}
+    </DocCode>
+    <p>
+      <code>coverage</code> is <code>packages/api/scripts/api-coverage.ts</code>. The task board
+      records its result as 67/195. The roadmap snapshot records 121/195. Run the command and read
+      the output. <code>generate</code> rewrites <code>packages/api/src/sdk</code> and
+      <code>packages/api/src/client</code> from the HttpApi contract via
+      <code>@cadcamfun/httpapi-codegen</code>. Commit generated clients only when you were asked
+      to commit.
+    </p>
+  </section>
+
+  <section id="specs" class="doc-section">
+    <h2>Spec files</h2>
+    <p>
+      <code>specs/</code> is the contract. Topic pages on this site follow those files. When they
+      disagree, the spec wins on the contract and <code>specs/roadmap/README.md</code> wins on
+      order. The current step is RM-01.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Use it for</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>specs/00-overview.md</code></td><td>Task board WP0–WP14, definition of done, parity rule (195 routes).</td></tr>
+        <tr><td><code>specs/01-conventions.md</code></td><td>Effect v4, database, units, agent workflow.</td></tr>
+        <tr><td><code>specs/02-database.md</code></td><td>WP0 schema, <code>Database.layer</code>, migrate CLI.</td></tr>
+        <tr><td><code>specs/03-core-cad.md</code></td><td>WP1 geometry.</td></tr>
+        <tr><td><code>specs/04-core-cam.md</code></td><td>WP2 toolpaths, posts, legacy bugs not to copy.</td></tr>
+        <tr><td><code>specs/05-api-sidecar.md</code></td><td>WP3 contract and WP4 server.</td></tr>
+        <tr><td><code>specs/06-desktop-ui.md</code></td><td>WP6 screens and WP7 viewport.</td></tr>
+        <tr><td><code>specs/07-tauri-shell.md</code></td><td>WP5 sidecar lifecycle, token, app data dir.</td></tr>
+        <tr><td><code>specs/08-ai.md</code></td><td>WP8 nikcli host and AI SDK v7.</td></tr>
+        <tr><td><code>specs/09-plugins.md</code></td><td>WP9 SDK and host.</td></tr>
+        <tr><td><code>specs/10-release-sync.md</code></td><td>WP10 pipeline. <code>scripts/build.ts</code> implements the six steps.</td></tr>
+        <tr><td><code>specs/11-api-parity-brief.md</code></td><td>Route families still missing a contract.</td></tr>
+        <tr><td><code>specs/13-vcs-actions-mobile.md</code></td><td>WP11 history, WP12 workflows, WP13 iOS.</td></tr>
+        <tr><td><code>specs/14-multi-op-setup.md</code></td><td>WP14 one setup, many operations, many programs.</td></tr>
+        <tr><td><code>specs/api-inventory.md</code></td><td>The 195 legacy route files parity is measured against.</td></tr>
+        <tr><td><code>specs/roadmap/README.md</code></td><td>Order RM-00–RM-11. Current step RM-01.</td></tr>
+        <tr><td><code>specs/roadmap/00-how-to-follow.md</code></td><td>How an agent picks the row and when to stop.</td></tr>
+        <tr><td><code>specs/ai/</code></td><td>Native AI design contracts. They do not replace the roadmap statuses.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Later design specs (<code>15</code> through <code>29</code>, including
+      <code>26-tool-consolidation.md</code> and <code>28-native-ai-architecture.md</code>) own
+      contracts the roadmap sequences. The roadmap’s snapshot says spec 26 has not landed and
+      that <code>tools/action.ts</code> is absent. The file is present at
+      <code>packages/ai/src/tools/action.ts</code>. That does not change the snapshot’s status
+      sentence, and it does not make spec 26 the current step. Do not start that work as RM-01
+      unless <code>specs/roadmap/01-action-catalogue.md</code> tells you to edit that file.
+      <code>specs/20-integral-roadmap.md</code> and <code>specs/21-integration-master-plan.md</code>
+      are not the sequence.
+    </p>
+  </section>
+
+  <section id="missing" class="doc-section">
+    <h2>Paths the specs name</h2>
+    <p>
+      These paths are written in <code>specs/00-overview.md</code> §4 or in the roadmap snapshot.
+      They are not directories or files in the tree. Looking for them and then creating them is
+      how a later RM step gets started early. RM-02 (multi-op setup) is <code>pending</code>.
+      RM-01 is the current step.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Named path</th><th>In the tree</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>packages/core/src/cam/program/</code></td>
+          <td>Absent. <code>packages/core/src/cam/index.ts</code> does not export a <code>program</code> namespace. <code>setup.ts</code> and <code>program-evidence.ts</code> do exist.</td>
+        </tr>
+        <tr>
+          <td><code>packages/api/src/groups/cam-setup.ts</code></td>
+          <td>Absent. <code>packages/api/src/cam-program.ts</code> exists and is not under <code>groups/</code>.</td>
+        </tr>
+        <tr>
+          <td><code>apps/sidecar/src/http/cam-setup.ts</code></td>
+          <td>Absent. <code>apps/sidecar/src/services/cam-program.ts</code> exists.</td>
+        </tr>
+        <tr>
+          <td>Desktop <code>setupStore</code></td>
+          <td>No matches in the repo. CAM UI is under <code>apps/desktop/src/features/cam</code>.</td>
+        </tr>
+        <tr>
+          <td><code>packages/ai/src/tools/action.ts</code></td>
+          <td>The roadmap snapshot says this file is absent and that spec 26 has not landed. The file is in the tree, and it imports <code>packages/ai/src/actions/action.ts</code>. File presence is not a status for spec 26 or for RM-01. Read <code>specs/26-tool-consolidation.md</code> and <code>specs/roadmap/01-action-catalogue.md</code> before editing it.</td>
+        </tr>
+        <tr>
+          <td><code>.reference/</code></td>
+          <td>Present on disk for people who have the legacy tree, git-ignored. Never an import path.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="contracts" class="doc-section">
+    <h2>Contracts</h2>
+    <p>
+      Dependency direction: <code>core</code> ← <code>api</code> ← sidecar;
+      <code>db</code> ← sidecar; <code>ai</code> and <code>plugin-sdk</code> ← sidecar. The desktop
+      imports API types only, and its <code>package.json</code> also depends on
+      <code>@cadcamfun/core</code>. <code>core</code> and <code>api</code> must not import
+      <code>db</code>. Only <code>packages/db</code> talks to SQLite. Everyone else uses a sidecar
+      repository service or the <code>Database</code> service.
+    </p>
+    <p>
+      <code>.reference/</code> is the legacy Next.js and Prisma tree. It is read-only. v6 does not
+      import it. Do not read <code>.env*</code> files. Do not hand-edit SQL in
+      <code>packages/db/drizzle/</code>. Effect stays at <code>4.0.0-rc.112</code>, with docs in
+      <code>packages/db/node_modules/effect/ai-docs/src/</code>.
+    </p>
+    <DocCode language="bash" title="Open the area you are about to edit">
+{`bunx tsc -p packages/core/tsconfig.json
+bun test packages/core
+bun run desktop:dev`}
+    </DocCode>
+    <p>
+      <code>desktop:dev</code> builds the sidecar first. The window’s database is
+      <code>$CADCAMFUN_DATA_DIR/cadcamfun.db</code> (Tauri <code>app_data_dir</code>), not the CLI
+      file <code>bun run db:migrate</code> writes. See <a href="/docs/guides/local-dev">Local development</a>.
+    </p>
+  </section>
+  <DocRelated
+    items={[
+      { title: "Packages", href: "/docs/packages" },
+      { title: "Desktop", href: "/docs/desktop" },
+    ]}
+  />
+</DocsLayout>

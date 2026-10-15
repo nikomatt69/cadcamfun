@@ -1,0 +1,44 @@
+---
+import { activeDocsSection } from "../../data/docsSidebar"
+
+const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
+const section = activeDocsSection(pathname)
+const showGroupTitles = section.groups.length > 1
+---
+
+<div
+  id="docs-sidebar"
+  class="docs-rail hidden w-full shrink-0 xl:sticky xl:top-[var(--chrome-top)] xl:block xl:w-[260px] xl:self-start"
+>
+  <div class="custom-scrollbar xl:max-h-[var(--rail-max)] xl:overflow-y-auto">
+  <nav class="flex flex-col gap-7 py-8 pl-3 pr-4" aria-label="Documentation">
+    {section.groups.map((group) => (
+      <div>
+        {showGroupTitles && (
+          <h2 class="mb-2 px-3 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-terminal-muted">{group.title}</h2>
+        )}
+        <ul class="flex flex-col">
+          {group.items.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <li>
+                <a
+                  href={item.href}
+                  data-mobile-docs-link
+                  aria-current={isActive ? "page" : undefined}
+                  class:list={[
+                    "block rounded-[4px] px-3 py-2 text-[13.5px]",
+                    isActive ? "docs-nav-active" : "text-terminal-muted",
+                  ]}
+                >
+                  {item.title}
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    ))}
+  </nav>
+  </div>
+</div>

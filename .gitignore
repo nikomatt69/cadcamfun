@@ -115,3 +115,7 @@ apps/mobile/dist/
 /out/
 /.nikcli/
 apps/desktop/tmpprobe/
+.opencode/
+.tmp-probe/
+release-local/
+.docs/

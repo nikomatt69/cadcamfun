@@ -1,0 +1,1282 @@
+---
+import { docsIndex } from "../../data/docsIndex"
+
+interface Props {
+  pathname: string
+}
+
+const { pathname } = Astro.props
+const currentPage = docsIndex.find((entry) => entry.href === pathname)
+
+const suggestions = [
+  "How do I install and run CADCAMFUN locally?",
+  "How does a toolpath become G-code for my machine?",
+  currentPage ? `Explain ${currentPage.title} in simple terms` : "What is CADCAMFUN?",
+  "Build me a checklist for generating and verifying G-code",
+]
+---
+
+<div data-doc-assistant data-llm-exclude data-path={pathname} data-state="closed" class="da-root print:hidden">
+  <!-- Launcher (visible only when the panel is closed) -->
+  <button
+    type="button"
+    data-assistant-launcher
+    aria-expanded="false"
+    aria-controls="doc-assistant-panel"
+    class="da-launcher pressable glass-chip"
+  >
+    <span class="da-dot" aria-hidden="true"></span>
+    <span>Ask the docs</span>
+    <span data-assistant-unread class="da-unread" hidden>New</span>
+  </button>
+
+  <!-- Mobile scrim: only under an expanded panel, never on desktop -->
+  <div data-assistant-backdrop hidden class="da-backdrop"></div>
+
+  <section id="doc-assistant-panel" data-assistant-panel role="dialog" aria-label="CADCAMFUN documentation assistant" class="da-panel">
+    <header data-assistant-header class="da-header">
+      <span aria-hidden="true" class="da-grabber"></span>
+
+      <button type="button" data-assistant-title aria-label="Expand the documentation assistant" class="da-title">
+        <span class="da-eyebrow">
+          <img src="/brand/icon.png" alt="" width="14" height="14" />
+          Docs assistant
+          <span data-assistant-badge hidden title="Engine answering your questions" class="da-badge"></span>
+        </span>
+        <span class="da-heading">Ask the docs</span>
+        <span class="da-sub">
+          {currentPage ? `Grounded in the docs · reading ${currentPage.title}` : "Grounded in the CADCAMFUN documentation"}
+        </span>
+      </button>
+
+      <div class="da-actions">
+        <button type="button" data-assistant-reset title="Clear conversation" aria-label="Clear conversation" class="da-icon pressable">
+          <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+          </svg>
+        </button>
+        <button type="button" data-assistant-minimize title="Minimize" aria-label="Minimize the documentation assistant" class="da-icon pressable">
+          <svg class="da-chevron" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"></path>
+          </svg>
+        </button>
+        <button type="button" data-assistant-close title="Close" aria-label="Close the documentation assistant" class="da-icon pressable">
+          <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div data-assistant-log class="da-log custom-scrollbar">
+      <div data-assistant-empty class="da-empty">
+        <p>
+          Ask anything about CADCAMFUN: the geometry kernel, CAM operations and posts, the sidecar API, the desktop
+          app, the database, or the repository workflow. Answers come from these docs and cite the pages they used.
+          It can also publish a checklist, setup sheet or cheatsheet as a shareable guide. No account needed.
+        </p>
+        <div class="da-suggestions">
+          {suggestions.map((suggestion) => (
+            <button type="button" data-assistant-suggestion={suggestion} class="da-chip pressable">
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <form data-assistant-form class="da-form">
+      <div class="da-compose">
+        <label class="sr-only" for="doc-assistant-input">Your question</label>
+        <textarea
+          id="doc-assistant-input"
+          data-assistant-input
+          rows="1"
+          maxlength="1200"
+          placeholder="Ask about CADCAMFUN…"
+          class="da-input"></textarea>
+        <button type="submit" data-assistant-send aria-label="Send question" class="da-send pressable plate-face">
+          <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 12 14-7-5.5 7L19 19 5 12Z"></path>
+          </svg>
+        </button>
+      </div>
+      <p class="da-disclaimer">AI-generated from the docs. It can be wrong. Verify commands and simulate G-code before running it on a machine.</p>
+    </form>
+  </section>
+</div>
+
+<style is:global>
+  .da-root {
+    --da-panel-fill: rgb(var(--terminal-panel) / 0.86);
+  }
+
+  [data-theme="dark"] .da-root {
+    --da-panel-fill: rgb(14 14 14 / 0.9);
+  }
+
+  /* Launcher */
+  .da-launcher {
+    position: fixed;
+    right: var(--nav-inset);
+    bottom: max(var(--nav-inset), env(safe-area-inset-bottom));
+    z-index: 60;
+    display: none;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.95rem;
+    border: none;
+    cursor: pointer;
+    color: rgb(var(--terminal-text));
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: var(--shadow-strong);
+  }
+
+  .da-root[data-state="closed"] .da-launcher {
+    display: inline-flex;
+  }
+
+  .da-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 2px;
+    background: rgb(var(--terminal-accent));
+    flex: none;
+  }
+
+  .da-unread {
+    margin-left: 0.15rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    background: rgb(var(--terminal-accent) / 0.14);
+    color: rgb(var(--terminal-text));
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .da-unread[hidden] {
+    display: none;
+  }
+
+  .da-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgb(var(--terminal-bg) / 0.6);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  .da-backdrop[hidden] {
+    display: none;
+  }
+
+  /* Panel: a heavier plate than the page chrome, so text over it stays legible. */
+  .da-panel {
+    position: fixed;
+    left: var(--nav-inset);
+    right: var(--nav-inset);
+    bottom: max(var(--nav-inset), env(safe-area-inset-bottom));
+    z-index: 70;
+    display: none;
+    flex-direction: column;
+    max-height: min(85dvh, 36rem);
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background-color: var(--da-panel-fill);
+    background-image: var(--glass-sheen);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(var(--glass-saturate));
+    box-shadow: var(--shadow-strong);
+    transform-origin: bottom right;
+    transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out);
+  }
+
+  .da-root[data-state="open"] .da-panel,
+  .da-root[data-state="minimized"] .da-panel {
+    display: flex;
+  }
+
+  /* Grows out of the launcher it replaces. Closing is instant. */
+  @starting-style {
+    .da-root[data-state="open"] .da-panel {
+      opacity: 0;
+      transform: translateY(12px) scale(0.97);
+    }
+  }
+
+  @media (min-width: 640px) {
+    .da-panel {
+      left: auto;
+      width: 25rem;
+    }
+
+    .da-root[data-state="minimized"] .da-panel {
+      width: 20rem;
+    }
+
+    @starting-style {
+      .da-root[data-state="open"] .da-panel {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+      }
+    }
+  }
+
+  .da-header {
+    position: relative;
+    display: flex;
+    flex-shrink: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 0.75rem 0.75rem 1rem;
+    user-select: none;
+    box-shadow: 0 var(--hairline) 0 rgb(var(--terminal-text) / 0.08);
+  }
+
+  .da-root[data-state="minimized"] .da-header {
+    box-shadow: none;
+  }
+
+  .da-grabber {
+    position: absolute;
+    inset-inline: 0;
+    top: 0.35rem;
+    margin-inline: auto;
+    width: 2.25rem;
+    height: 0.25rem;
+    border-radius: 2px;
+    background: rgb(var(--terminal-text) / 0.18);
+  }
+
+  @media (min-width: 640px) {
+    .da-grabber {
+      display: none;
+    }
+  }
+
+  .da-title {
+    min-width: 0;
+    flex: 1;
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    color: inherit;
+    cursor: default;
+  }
+
+  .da-root[data-state="minimized"] .da-title {
+    cursor: pointer;
+  }
+
+  .da-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--terminal-accent));
+  }
+
+  .da-eyebrow img {
+    width: 14px;
+    height: 14px;
+  }
+
+  .da-badge {
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    background: var(--surface-hover);
+    color: rgb(var(--terminal-muted));
+    letter-spacing: 0.08em;
+  }
+
+  .da-badge[hidden] {
+    display: none;
+  }
+
+  .da-heading {
+    display: block;
+    margin-top: 0.3rem;
+    font-family: "CADCAM Rounded", "Sofia Pro Soft", sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: rgb(var(--terminal-text));
+  }
+
+  .da-sub {
+    display: block;
+    margin-top: 0.1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-root[data-state="minimized"] .da-sub {
+    display: none;
+  }
+
+  .da-actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.125rem;
+  }
+
+  .da-icon {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: rgb(var(--terminal-muted));
+    cursor: pointer;
+  }
+
+  .da-icon svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .da-chevron {
+    transition: transform 200ms var(--ease-out);
+  }
+
+  .da-root[data-state="minimized"] .da-chevron {
+    transform: rotate(180deg);
+  }
+
+  .da-root[data-state="minimized"] [data-assistant-reset],
+  .da-root[data-state="minimized"] .da-log,
+  .da-root[data-state="minimized"] .da-form {
+    display: none;
+  }
+
+  /* Transcript */
+  .da-log {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1rem;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .da-log > * + * {
+    margin-top: 0.85rem;
+  }
+
+  .da-empty p {
+    margin: 0;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-empty[hidden] {
+    display: none;
+  }
+
+  .da-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+  }
+
+  .da-chip {
+    min-height: 2.25rem;
+    padding: 0.4rem 0.7rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-hover);
+    color: rgb(var(--terminal-text));
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .da-msg-user {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .da-msg-user > div {
+    max-width: 85%;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    background: rgb(var(--terminal-accent) / 0.12);
+    color: rgb(var(--terminal-text));
+    white-space: pre-wrap;
+  }
+
+  [data-theme="dark"] .da-msg-user > div {
+    background: rgb(255 255 255 / 0.08);
+  }
+
+  .da-msg-assistant > * + * {
+    margin-top: 0.5rem;
+  }
+
+  .da-body {
+    color: rgb(var(--terminal-text));
+  }
+
+  .da-body > :first-child {
+    margin-top: 0;
+  }
+
+  .da-body p {
+    margin: 0.4rem 0;
+  }
+
+  .da-body h4 {
+    margin: 0.7rem 0 0.2rem;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .da-body ul,
+  .da-body ol {
+    margin: 0.4rem 0;
+    padding-left: 1.2rem;
+  }
+
+  .da-body ul {
+    list-style: disc;
+  }
+
+  .da-body ol {
+    list-style: decimal;
+  }
+
+  .da-body li + li {
+    margin-top: 0.2rem;
+  }
+
+  .da-body a {
+    color: rgb(var(--terminal-text));
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(var(--terminal-accent) / 0.55);
+    text-underline-offset: 3px;
+  }
+
+  .da-body :not(pre) > code {
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    background: var(--surface-hover);
+    font-size: 0.86em;
+  }
+
+  .da-body pre {
+    margin: 0.5rem 0;
+    padding: 0.6rem 0.75rem;
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: rgb(var(--terminal-code));
+    box-shadow: var(--shadow-soft);
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .da-body table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  .da-body th,
+  .da-body td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: var(--hairline) solid rgb(var(--terminal-border));
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .da-scroll {
+    margin: 0.5rem 0;
+    overflow-x: auto;
+  }
+
+  .da-thinking {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: rgb(var(--terminal-muted));
+    font-size: 13px;
+  }
+
+  .da-thinking::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 2px;
+    background: rgb(var(--terminal-accent));
+    animation: da-pulse 900ms var(--ease-in-out) infinite alternate;
+  }
+
+  @keyframes da-pulse {
+    from {
+      opacity: 0.25;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .da-tools,
+  .da-sources {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .da-tool,
+  .da-source {
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    background: var(--surface-hover);
+    color: rgb(var(--terminal-muted));
+    font-size: 11px;
+    text-decoration: none;
+  }
+
+  .da-tool {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  .da-source {
+    font-weight: 600;
+    transition: color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+  }
+
+  .da-sources-label {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-reasoning {
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--radius-md);
+    background: var(--surface-hover);
+  }
+
+  .da-reasoning summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-reasoning p {
+    margin: 0.4rem 0 0;
+    white-space: pre-wrap;
+    font-size: 12px;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-artifact {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-md);
+    background: rgb(var(--terminal-accent) / 0.1);
+    box-shadow: var(--shadow-soft);
+    color: rgb(var(--terminal-text));
+    text-decoration: none;
+  }
+
+  .da-artifact svg {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    color: rgb(var(--terminal-accent));
+  }
+
+  .da-artifact-text {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .da-artifact-text span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .da-artifact-title {
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+
+  .da-artifact-file {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 11px;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-artifact-open {
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .da-notice {
+    margin: 0;
+    font-size: 12px;
+    color: rgb(var(--terminal-muted));
+  }
+
+  .da-error {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    background: rgb(var(--terminal-error) / 0.1);
+    color: rgb(var(--terminal-error));
+    font-size: 12.5px;
+  }
+
+  /* Composer */
+  .da-form {
+    flex-shrink: 0;
+    padding: 0.75rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+    box-shadow: 0 calc(var(--hairline) * -1) 0 rgb(var(--terminal-text) / 0.08);
+  }
+
+  .da-compose {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .da-input {
+    min-height: 2.75rem;
+    max-height: 8rem;
+    flex: 1;
+    resize: none;
+    padding: 0.65rem 0.75rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: rgb(var(--terminal-bg) / 0.7);
+    box-shadow: inset 0 0 0 var(--hairline) rgb(var(--terminal-text) / 0.12);
+    color: rgb(var(--terminal-text));
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.4;
+    transition: box-shadow 160ms var(--ease-out);
+  }
+
+  @media (min-width: 640px) {
+    .da-input {
+      font-size: 14px;
+    }
+  }
+
+  .da-input::placeholder {
+    color: rgb(var(--terminal-muted) / 0.8);
+  }
+
+  .da-input:focus {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 var(--hairline) rgb(var(--terminal-accent) / 0.6),
+      0 0 0 3px rgb(var(--terminal-accent) / 0.16);
+  }
+
+  .da-send {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+  }
+
+  .da-send svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .da-send:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .da-disclaimer {
+    margin: 0.5rem 0.125rem 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: rgb(var(--terminal-muted));
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .da-icon:hover,
+    .da-chip:hover {
+      background: var(--surface-active);
+      color: rgb(var(--terminal-text));
+    }
+
+    .da-source:hover {
+      background: var(--surface-active);
+      color: rgb(var(--terminal-text));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .da-panel {
+      transform: none !important;
+      transition: opacity 160ms ease;
+    }
+
+    .da-thinking::before {
+      animation: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .da-panel {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background-image: none;
+      background-color: rgb(var(--terminal-panel));
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    .da-panel {
+      background-color: rgb(var(--terminal-panel));
+      border: 2px solid rgb(var(--terminal-text));
+    }
+  }
+</style>
+
+<script>
+  type Role = "user" | "assistant"
+  type Source = { title: string; href: string }
+  type Artifact = { id: string; url: string; title: string; filename: string }
+  type ToolCall = { name: string; arguments: Record<string, unknown>; result: string }
+  type Message = {
+    role: Role
+    content: string
+    reasoning?: string
+    tools?: ToolCall[]
+    sources?: Source[]
+    artifact?: Artifact
+    notice?: string
+    error?: string
+  }
+  type PanelState = "closed" | "open" | "minimized"
+
+  const STORE_KEY = "cadcamfun:docs-assistant"
+  const STATE_KEY = "cadcamfun:docs-assistant:state"
+  const SESSION_KEY = "cadcamfun:docs-assistant:session"
+  const MAX_STORED = 12
+  const MOBILE = "(max-width: 639px)"
+
+  const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+  const renderInline = (value: string) =>
+    escapeHtml(value)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|\s)_([^_]+)_/g, "$1<em>$2</em>")
+      .replace(/\[([^\]]+)\]\((\/[^)\s]*|https?:\/\/[^)\s]+)\)/g, (_match, text: string, href: string) => {
+        const attrs = href.startsWith("http") ? ' target="_blank" rel="noreferrer"' : ""
+        return `<a href="${href}"${attrs}>${text}</a>`
+      })
+
+  /** Minimal Markdown renderer: fenced code, headings, lists, tables, paragraphs. */
+  const renderMarkdown = (source: string) =>
+    source
+      .split(/```/)
+      .map((block, index) => {
+        if (index % 2 === 1) {
+          const body = block.replace(/^[a-zA-Z0-9+#-]*\n/, "").replace(/\n$/, "")
+          return `<pre class="custom-scrollbar"><code>${escapeHtml(body)}</code></pre>`
+        }
+
+        const html: string[] = []
+        let list: { type: "ul" | "ol"; items: string[] } | null = null
+        let table: string[][] | null = null
+
+        const cells = (line: string) =>
+          line
+            .replace(/^\s*\|/, "")
+            .replace(/\|\s*$/, "")
+            .split("|")
+            .map((cell) => cell.trim())
+
+        const flushTable = () => {
+          if (!table) return
+          const [head, ...rows] = table
+          const row = (values: string[], tag: "th" | "td") =>
+            `<tr>${values.map((value) => `<${tag}>${renderInline(value)}</${tag}>`).join("")}</tr>`
+          html.push(
+            `<div class="da-scroll custom-scrollbar"><table><thead>${row(head, "th")}</thead><tbody>${rows
+              .map((values) => row(values, "td"))
+              .join("")}</tbody></table></div>`,
+          )
+          table = null
+        }
+
+        const flush = () => {
+          flushTable()
+          if (!list) return
+          html.push(`<${list.type}>${list.items.map((item) => `<li>${item}</li>`).join("")}</${list.type}>`)
+          list = null
+        }
+
+        for (const rawLine of block.split("\n")) {
+          const line = rawLine.trimEnd()
+          if (!line.trim()) {
+            flush()
+            continue
+          }
+
+          if (/^\s*\|.*\|\s*$/.test(line)) {
+            const values = cells(line)
+            // The |---|---| separator only marks the header, it is not a row.
+            if (values.every((value) => /^:?-{2,}:?$/.test(value))) continue
+            ;(table ??= []).push(values)
+            continue
+          }
+          flushTable()
+
+          const heading = line.match(/^#{1,6}\s+(.*)$/)
+          if (heading) {
+            flush()
+            html.push(`<h4>${renderInline(heading[1])}</h4>`)
+            continue
+          }
+
+          const bullet = line.match(/^\s*[-*]\s+(.*)$/)
+          if (bullet) {
+            if (list?.type !== "ul") flush()
+            list ??= { type: "ul", items: [] }
+            list.items.push(renderInline(bullet[1]))
+            continue
+          }
+
+          const ordered = line.match(/^\s*\d+[.)]\s+(.*)$/)
+          if (ordered) {
+            if (list?.type !== "ol") flush()
+            list ??= { type: "ol", items: [] }
+            list.items.push(renderInline(ordered[1]))
+            continue
+          }
+
+          flush()
+          html.push(`<p>${renderInline(line)}</p>`)
+        }
+
+        flush()
+        return html.join("")
+      })
+      .join("")
+
+  const loadHistory = (): Message[] => {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(STORE_KEY) ?? "[]")
+      return Array.isArray(parsed) ? (parsed as Message[]).slice(-MAX_STORED) : []
+    } catch {
+      return []
+    }
+  }
+
+  const loadState = (): PanelState => {
+    try {
+      const value = sessionStorage.getItem(STATE_KEY)
+      return value === "open" || value === "minimized" ? value : "closed"
+    } catch {
+      return "closed"
+    }
+  }
+
+  const readSession = () => {
+    try {
+      return sessionStorage.getItem(SESSION_KEY) || undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  const save = (key: string, value: unknown) => {
+    try {
+      sessionStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value))
+    } catch {
+      // Private mode / quota — persistence is best-effort.
+    }
+  }
+
+  const initDocAssistant = () => {
+    const root = document.querySelector<HTMLElement>("[data-doc-assistant]")
+    if (!root) return
+    if (root.dataset.assistantReady === "true") return
+    root.dataset.assistantReady = "true"
+
+    const launcher = root.querySelector<HTMLButtonElement>("[data-assistant-launcher]")
+    const panel = root.querySelector<HTMLElement>("[data-assistant-panel]")
+    const header = root.querySelector<HTMLElement>("[data-assistant-header]")
+    const log = root.querySelector<HTMLElement>("[data-assistant-log]")
+    const empty = root.querySelector<HTMLElement>("[data-assistant-empty]")
+    const backdrop = root.querySelector<HTMLElement>("[data-assistant-backdrop]")
+    const form = root.querySelector<HTMLFormElement>("[data-assistant-form]")
+    const input = root.querySelector<HTMLTextAreaElement>("[data-assistant-input]")
+    const send = root.querySelector<HTMLButtonElement>("[data-assistant-send]")
+    const title = root.querySelector<HTMLButtonElement>("[data-assistant-title]")
+    const minimize = root.querySelector<HTMLButtonElement>("[data-assistant-minimize]")
+    const close = root.querySelector<HTMLButtonElement>("[data-assistant-close]")
+    const reset = root.querySelector<HTMLButtonElement>("[data-assistant-reset]")
+    const badge = root.querySelector<HTMLElement>("[data-assistant-badge]")
+    const unread = root.querySelectorAll<HTMLElement>("[data-assistant-unread]")
+    if (!launcher || !panel || !log || !form || !input || !send) return
+
+    const path = root.dataset.path ?? window.location.pathname
+    const mobile = window.matchMedia(MOBILE)
+    let messages = loadHistory()
+    let state = loadState()
+    let streaming = false
+    let controller: AbortController | null = null
+
+    const element = (tag: string, className: string, text?: string) => {
+      const node = document.createElement(tag)
+      node.className = className
+      if (text !== undefined) node.textContent = text
+      return node
+    }
+
+    const bubble = (message: Message, index: number) => {
+      const wrapper = document.createElement("div")
+      wrapper.dataset.messageIndex = String(index)
+
+      if (message.role === "user") {
+        wrapper.className = "da-msg-user"
+        wrapper.append(element("div", "", message.content))
+        return wrapper
+      }
+
+      wrapper.className = "da-msg-assistant"
+
+      if (message.tools?.length) {
+        const chips = element("div", "da-tools")
+        for (const tool of message.tools) chips.append(element("span", "da-tool", `${tool.name} · ${tool.result}`))
+        wrapper.append(chips)
+      }
+
+      if (message.reasoning?.trim()) {
+        const details = element("details", "da-reasoning")
+        details.append(element("summary", "", "Thinking"), element("p", "", message.reasoning.trim()))
+        wrapper.append(details)
+      }
+
+      const body = element("div", "da-body")
+      body.dataset.assistantBody = ""
+      body.innerHTML = message.content ? renderMarkdown(message.content) : '<span class="da-thinking">Reading the docs…</span>'
+      wrapper.append(body)
+
+      if (message.artifact) {
+        const card = document.createElement("a")
+        card.href = message.artifact.url
+        card.target = "_blank"
+        card.rel = "noreferrer"
+        card.className = "da-artifact pressable"
+        card.innerHTML = `<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M14 3v4a1 1 0 0 0 1 1h4M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/></svg>`
+        const text = element("span", "da-artifact-text")
+        text.append(
+          element("span", "da-artifact-title", message.artifact.title),
+          element("span", "da-artifact-file", `${message.artifact.filename} · shareable guide`),
+        )
+        card.append(text, element("span", "da-artifact-open", "Open"))
+        wrapper.append(card)
+      }
+
+      if (message.notice) wrapper.append(element("p", "da-notice", message.notice))
+      if (message.error) wrapper.append(element("p", "da-error", message.error))
+
+      if (message.sources?.length) {
+        const sources = element("div", "da-sources")
+        sources.append(element("span", "da-sources-label", "Sources"))
+        for (const source of message.sources) {
+          const link = element("a", "da-source", source.title) as HTMLAnchorElement
+          link.href = source.href
+          sources.append(link)
+        }
+        wrapper.append(sources)
+      }
+
+      return wrapper
+    }
+
+    const render = () => {
+      log.querySelectorAll("[data-message-index]").forEach((node) => node.remove())
+      if (empty) empty.hidden = messages.length > 0
+      messages.forEach((message, index) => log.append(bubble(message, index)))
+      log.scrollTop = log.scrollHeight
+    }
+
+    const markUnread = (value: boolean) => {
+      unread.forEach((node) => {
+        node.hidden = !value
+      })
+    }
+
+    /** Keeps the panel above the on-screen keyboard on mobile. */
+    const syncViewport = () => {
+      const viewport = window.visualViewport
+      if (!viewport || !mobile.matches || state !== "open") {
+        panel.style.translate = ""
+        return
+      }
+      const overlap = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      panel.style.translate = overlap > 80 ? `0 -${overlap}px` : ""
+    }
+
+    const setState = (next: PanelState, options: { focus?: boolean } = {}) => {
+      state = next
+      root.dataset.state = next
+      save(STATE_KEY, next)
+
+      launcher.setAttribute("aria-expanded", next === "closed" ? "false" : "true")
+      minimize?.setAttribute("aria-label", next === "minimized" ? "Expand the documentation assistant" : "Minimize the documentation assistant")
+      minimize?.setAttribute("title", next === "minimized" ? "Expand" : "Minimize")
+
+      const scrim = next === "open" && mobile.matches
+      if (backdrop) backdrop.hidden = !scrim
+      document.body.style.overflow = scrim ? "hidden" : ""
+
+      if (next === "open") {
+        markUnread(false)
+        render()
+        if (options.focus !== false && !mobile.matches) window.setTimeout(() => input.focus(), 60)
+      }
+      if (next === "closed" && options.focus !== false) launcher.focus({ preventScroll: true })
+      syncViewport()
+    }
+
+    const setBusy = (busy: boolean) => {
+      streaming = busy
+      send.disabled = busy
+      input.disabled = busy
+    }
+
+    const streamAnswer = async () => {
+      const target = messages[messages.length - 1]
+      controller = new AbortController()
+      setBusy(true)
+
+      try {
+        const response = await fetch("/api/docs-assistant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            path,
+            sessionID: readSession(),
+            messages: messages.slice(0, -1).map(({ role, content }) => ({ role, content })),
+          }),
+        })
+
+        if (!response.ok || !response.body) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null
+          target.error = payload?.error ?? `The assistant is unavailable (HTTP ${response.status}).`
+          render()
+          return
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let building = ""
+
+        const handleEvent = (raw: string) => {
+          const lines = raw.split("\n")
+          const name = lines.find((line) => line.startsWith("event:"))?.slice(6).trim()
+          const data = lines
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trim())
+            .join("")
+          if (!name || !data) return
+
+          try {
+            const payload = JSON.parse(data)
+            if (name === "sources") target.sources = payload as Source[]
+            else if (name === "tool") {
+              target.tools = [...(target.tools ?? []), payload as ToolCall]
+              render()
+            } else if (name === "reasoning") {
+              target.reasoning = (target.reasoning ?? "") + (payload as { text: string }).text
+            }
+            // `delta` appends (Workers AI tokens), `text` replaces (nikcli
+            // message updates, and the final normalized answer).
+            else if (name === "delta") target.content += (payload as { text: string }).text
+            else if (name === "text") target.content = (payload as { text: string }).text
+            else if (name === "artifact") {
+              target.artifact = payload as Artifact
+              building = ""
+            } else if (name === "status") {
+              building = (payload as { message: string }).message
+            } else if (name === "notice") target.notice = (payload as { message: string }).message
+            else if (name === "error") target.error = (payload as { message: string }).message
+            else if (name === "meta") {
+              const meta = payload as { backend?: string; sessionID?: string }
+              if (meta.sessionID) save(SESSION_KEY, meta.sessionID)
+              if (badge && meta.backend) {
+                badge.textContent = meta.backend === "nikcli" ? "nikcli" : "cf ai"
+                badge.hidden = false
+              }
+            }
+          } catch {
+            // Ignore malformed frames.
+          }
+        }
+
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const events = buffer.split("\n\n")
+          buffer = events.pop() ?? ""
+          for (const event of events) handleEvent(event)
+
+          const body = log.querySelector<HTMLElement>(`[data-message-index="${messages.length - 1}"] [data-assistant-body]`)
+          const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60
+          if (body && (target.content || building)) {
+            const progress = building ? `<span class="da-thinking">${escapeHtml(building)}</span>` : ""
+            body.innerHTML = renderMarkdown(target.content) + progress
+          }
+          if (atBottom) log.scrollTop = log.scrollHeight
+        }
+        if (buffer.trim()) handleEvent(buffer)
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          target.error = "The connection to the assistant was interrupted."
+        }
+      } finally {
+        controller = null
+        setBusy(false)
+        if (!target.content && !target.error) target.error = "No answer was returned. Try rephrasing your question."
+        render()
+        save(STORE_KEY, messages.slice(-MAX_STORED))
+        if (state === "minimized") markUnread(true)
+        else if (!mobile.matches) input.focus()
+      }
+    }
+
+    const ask = (question: string) => {
+      const trimmed = question.trim()
+      if (!trimmed || streaming) return
+      if (state !== "open") setState("open", { focus: false })
+      messages = [...messages.slice(-MAX_STORED + 2), { role: "user", content: trimmed }, { role: "assistant", content: "" }]
+      input.value = ""
+      input.style.height = ""
+      render()
+      void streamAnswer()
+    }
+
+    launcher.addEventListener("click", () => setState("open"))
+    close?.addEventListener("click", () => setState("closed"))
+    backdrop?.addEventListener("click", () => setState("closed"))
+    minimize?.addEventListener("click", () => setState(state === "minimized" ? "open" : "minimized"))
+    title?.addEventListener("click", () => {
+      if (state === "minimized") setState("open")
+    })
+
+    reset?.addEventListener("click", () => {
+      controller?.abort()
+      messages = []
+      save(STORE_KEY, messages)
+      save(SESSION_KEY, "")
+      markUnread(false)
+      render()
+      if (!mobile.matches) input.focus()
+    })
+
+    root.querySelectorAll<HTMLButtonElement>("[data-assistant-suggestion]").forEach((button) => {
+      button.addEventListener("click", () => ask(button.dataset.assistantSuggestion ?? ""))
+    })
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault()
+      ask(input.value)
+    })
+
+    input.addEventListener("keydown", (event) => {
+      // Enter sends on pointer devices; on touch keyboards it inserts a newline.
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !mobile.matches) {
+        event.preventDefault()
+        ask(input.value)
+      }
+    })
+
+    input.addEventListener("input", () => {
+      input.style.height = "auto"
+      input.style.height = `${Math.min(input.scrollHeight, 128)}px`
+    })
+
+    input.addEventListener("focus", () => window.setTimeout(syncViewport, 250))
+    input.addEventListener("blur", () => window.setTimeout(syncViewport, 250))
+
+    // Swipe the header down to minimize on touch devices: a flick counts too.
+    let dragFrom: { y: number; t: number } | null = null
+    header?.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch" || state !== "open") return
+      if ((event.target as HTMLElement).closest("button[data-assistant-close]")) return
+      dragFrom = { y: event.clientY, t: performance.now() }
+    })
+    header?.addEventListener("pointerup", (event) => {
+      if (dragFrom) {
+        const distance = event.clientY - dragFrom.y
+        const velocity = distance / Math.max(1, performance.now() - dragFrom.t)
+        if (distance > 48 || (distance > 8 && velocity > 0.11)) setState("minimized")
+      }
+      dragFrom = null
+    })
+    header?.addEventListener("pointercancel", () => {
+      dragFrom = null
+    })
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || state === "closed") return
+      setState(state === "open" ? "minimized" : "closed")
+    })
+
+    window.visualViewport?.addEventListener("resize", syncViewport)
+    window.visualViewport?.addEventListener("scroll", syncViewport)
+    mobile.addEventListener("change", () => setState(state, { focus: false }))
+
+    setState(state, { focus: false })
+    render()
+  }
+
+  initDocAssistant()
+</script>

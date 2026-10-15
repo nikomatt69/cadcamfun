@@ -1,0 +1,196 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Pipeline", href: "#pipeline" },
+  { title: "Toolpath IR", href: "#ir" },
+  { title: "Operations", href: "#operations" },
+  { title: "Posts", href: "#posts" },
+  { title: "Kernel", href: "#kernel" },
+  { title: "Part model", href: "#model" },
+  { title: "Modules", href: "#modules" },
+]
+---
+
+<DocsLayout
+  title="CAM and G-code"
+  subtitle="Operations emit a machine-neutral toolpath. A post turns that toolpath into dialect text. Nothing in between writes G-code words."
+  description="How CAM works: toolpath IR, operations, posts, the manufacturing kernel, and the dexel part model."
+  toc={toc}
+>
+  <section id="pipeline" class="doc-section">
+    <h2>Pipeline</h2>
+    <p>
+      <code>packages/core/src/cam/index.ts</code> states the order: drawing entities, then an
+      operation, then the toolpath intermediate representation, then a post, then G-code text.
+      An operation does not know Fanuc from GRBL. A post does not recompute a pocket. The public
+      surface is the <code>cam</code> namespace, plus nested namespaces
+      <code>testing</code>, <code>generator</code>, <code>cycles</code>, <code>viewer</code>,
+      <code>verify</code>, <code>model</code>, and <code>kernel</code>.
+    </p>
+    <DocCode language="ts" title="From a program to text">
+{`import { cam } from "@cadcamfun/core"
+
+const post = cam.getPost("grbl")
+const text = post && cam.emitProgram(program, post)`}
+    </DocCode>
+  </section>
+
+  <section id="ir" class="doc-section">
+    <h2>Toolpath IR</h2>
+    <p>
+      <code>ir.ts</code> is the contract shared by operations, posts, the 3D playback, and the
+      simulator. Coordinates are millimetres, feeds are millimetres per minute, times are
+      seconds. Cut depth is negative Z, with the stock top at zero. The operation applies that
+      sign once. A post never flips it.
+    </p>
+    <p>
+      Moves are tagged. <code>Rapid</code> and <code>Linear</code> go to a point, and a linear
+      move carries a feed. <code>Arc</code> stores the true centre in absolute coordinates. The
+      post turns that centre into the relative I and J the dialect wants. An arc whose end has
+      the same XY as its start is a full circle. <code>Dwell</code> waits a number of seconds.
+      <code>Comment</code> is text. <code>Orient</code> indexes a rotary axis between cuts.
+      <code>Cycle</code> is drill, peck, or dwell intent, expanded before some posts emit it.
+    </p>
+    <p>
+      A move may also carry A, B, and C angles that change during the move. That is simultaneous
+      motion, distinct from <code>Orient</code>, which happens between moves. Indexed 3+2 work
+      is <code>indexing.ts</code>: it tilts the work plane onto a trunnion (AC or BC) and
+      transforms the toolpath so ordinary G17 arcs stay valid in machine coordinates.
+    </p>
+    <p>
+      <code>tool.ts</code> is the cutter: diameter, flute length, taper, and the rule that only
+      a drill plunges straight down. <code>params.ts</code> is the shared height stack
+      (clearance, safe, retract), a positive total depth and stepdown, feeds, and coolant. The
+      heights are checked in order. <code>path.ts</code> is the planar path (lines and arcs)
+      kept separate from Z so offsets, ramps, helices, and tabs share one representation.
+    </p>
+  </section>
+
+  <section id="operations" class="doc-section">
+    <h2>Operations</h2>
+    <p>
+      Each file in <code>cam/operations</code> is a parameter schema plus a pure
+      <code>generate</code> function. <code>common.ts</code> builds the moves. Rapids are not
+      emitted below the stock top. Descent is a ramp or a helix limited by an angle. A closed
+      profile steps down along the path instead of rapiding at depth. An open profile lifts,
+      repositions, and re-enters.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Operation</th><th>What it cuts</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>generateProfile</code></td><td>A contour at a constant offset, in depth passes, with a lead-in and optional tabs. Closed contours: outside, inside, or on the line. Climb milling assumes a clockwise spindle, so an outside contour is travelled counter-clockwise.</td></tr>
+        <tr><td><code>generatePocket</code></td><td>The interior of a closed contour, offset inward until the tool no longer fits.</td></tr>
+        <tr><td><code>generateDrill</code></td><td>Points: a drill cycle or an expanded peck, at the tool diameter.</td></tr>
+        <tr><td><code>generateFace</code></td><td>A raster across the stock top to clean a face.</td></tr>
+        <tr><td><code>generateEngrave</code></td><td>A path followed on the surface at a shallow depth, including text outlines.</td></tr>
+        <tr><td><code>generateSurface</code></td><td>A 3D finish over a height field (raster or similar), not a 2D offset.</td></tr>
+        <tr><td><code>rest</code></td><td>Material the previous cutter could not reach, from a distance field.</td></tr>
+        <tr><td><code>generateThread</code></td><td>A helical thread path from thread parameters.</td></tr>
+        <tr><td><code>generateChamfer</code></td><td>An edge break along a contour with a chamfer tool.</td></tr>
+        <tr><td><code>generateAdaptive</code></td><td>A constant-engagement roughing path.</td></tr>
+        <tr><td><code>generateMultiaxis</code></td><td>Moves that carry rotary angles with the tip motion.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>geometry.ts</code> normalises whatever the caller passed (entities, contours, point
+      rings) into contours, and keeps circular sources so a circle can stay an arc in the IR.
+      Polylines become arcs only when arc fitting is asked for.
+    </p>
+  </section>
+
+  <section id="posts" class="doc-section">
+    <h2>Posts</h2>
+    <p>
+      One emitter, <code>emitProgram</code> in <code>post/emitter.ts</code>, walks the IR and
+      tracks modal state (motion mode, feed, plane, tool). A dialect is a small table of how
+      that emitter should spell words. Registered dialects are <code>generic</code>,
+      <code>fanuc</code>, <code>grbl</code>, and <code>haas</code>. <code>getPost</code> looks
+      them up. <code>linuxcnc</code> is a reserved id and is not implemented.
+    </p>
+    <p>
+      Post options set the decimal count, whether canned cycles are emitted or expanded, arc
+      mode, tool numbers, and subprograms. <code>formatNumber</code> uses a fixed number of
+      decimals. Numbers are not produced with default string conversion.
+      <code>post/advanced</code> is a second pass over text that already exists: Fanuc cleanup
+      and a Heidenhain conversion. That pass returns an invalid result instead of throwing.
+    </p>
+  </section>
+
+  <section id="kernel" class="doc-section">
+    <h2>Kernel</h2>
+    <p>
+      <code>cam.kernel</code> is the job that sits above a single operation.
+      <code>planJob</code> reads features (from the parametric history, or from hole recognition
+      on an exact solid) and returns an ordered list: face, rough, drill or thread, finish,
+      deburr, and 3D surface when the part is not 2.5D. The plan assigns cutters. It does not
+      cut yet.
+    </p>
+    <p>
+      <code>prepareJob</code> fills speeds and feeds from the material and the cutter.
+      <code>executeJob</code> runs each operation against a provisional stock, posts the whole
+      program once, then replays the G-code independently onto a voxel stock so the evidence is
+      not the same code that generated the path. <code>runJob</code> is prepare plus execute.
+      The result carries claims and a release level. The functions are pure.
+    </p>
+    <p>
+      Around that pipeline: <code>kinematics.ts</code> solves a trunnion table (forward, inverse
+      candidates, unwrapped C, cheapest travel). <code>head.ts</code> is a tilting head about Y.
+      <code>collision.ts</code> checks a joint move of the tool against the table and the part.
+      <code>motion.ts</code> splits simultaneous five-axis motion into checked blocks.
+      <code>stock.ts</code> is a voxel stock: sure removal, possible removal, and a remaining
+      volume bracket. <code>machine-clearance.ts</code> checks holder and shank against the table
+      on every NC move. <code>convex.ts</code> is the exact distance between convex hulls.
+    </p>
+  </section>
+
+  <section id="model" class="doc-section">
+    <h2>Part model</h2>
+    <p>
+      <code>cam/model</code> builds the solid the 3-axis strategies see.
+      <code>element-mesh.ts</code> makes a closed mesh per scene element, matching the editor’s
+      axis conventions. Parametric histories are united. Booleans go through mesh CSG. A 2D
+      entity or text does not become a mesh.
+    </p>
+    <p>
+      <code>dexel.ts</code> turns those meshes into columns of Z intervals. Boolean elements
+      record which operands they consumed. Strategies read the top height of each column.
+      <code>generator/index.ts</code> is the older panel entry, <code>generateToolpath</code>,
+      which still drives mill, lathe, and printer paths and then runs the same post. The kernel
+      is the path that also plans, verifies, and records evidence.
+      <code>brep-part.ts</code> is the fallback when there is no feature history: it recognises
+      holes and slabs on the exact solid, or it says the job has to be a full 3D surface.
+    </p>
+    <p>
+      <code>verify</code> interprets G-code back into motion and compares it with a height field.
+      <code>viewer</code> turns words and lines into a toolpath the 3D view can play.
+      <code>cycles</code> is the canned-cycle templates the CAM screen offers.
+    </p>
+  </section>
+
+  <section id="modules" class="doc-section">
+    <h2>Modules</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ir.ts</code></td><td>Tagged moves, programs, time estimate, cycle expansion. Millimetres, negative Z.</td></tr>
+        <tr><td><code>operations/</code></td><td>Pure generators from parameters and geometry to IR.</td></tr>
+        <tr><td><code>post/</code></td><td>Shared emitter and the generic, Fanuc, GRBL, and Haas dialects.</td></tr>
+        <tr><td><code>kernel/</code></td><td>Plan, execute, kinematics, collision, voxel stock, clearance.</td></tr>
+        <tr><td><code>setup.ts</code></td><td>Work frame, stock, fixtures, and tool assemblies. See Setups.</td></tr>
+        <tr><td><code>model/</code></td><td>Element meshes and the dexel grid.</td></tr>
+        <tr><td><code>generator/</code></td><td>Panel-facing <code>generateToolpath</code> and suggestions.</td></tr>
+        <tr><td><code>verify/</code>, <code>viewer/</code></td><td>Replay of posted code, and playback geometry.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "CAD geometry", href: "/docs/cad" }, { title: "Setups", href: "/docs/setups" }, { title: "Viewport", href: "/docs/viewport" }]} />
+</DocsLayout>

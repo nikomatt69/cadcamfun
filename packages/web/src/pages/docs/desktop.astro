@@ -1,0 +1,387 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Boot", href: "#boot" },
+  { title: "Routes", href: "#routes" },
+  { title: "Folders", href: "#folders" },
+  { title: "Shell", href: "#shell" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Feature folders", href: "#feature-folders" },
+  { title: "Route paths", href: "#route-paths" },
+  { title: "Tauri commands", href: "#tauri-commands" },
+  { title: "Webview events", href: "#webview-events" },
+  { title: "Activities", href: "#activities" },
+]
+---
+
+<DocsLayout
+  title="Desktop UI"
+  subtitle="SolidJS in the webview. Projects, CAD, CAM, Library, and Settings work end to end. The long tail is still stubs."
+  description="CADCAMFUN desktop UI: routes, feature folders, the Tauri shell, and which screens are real."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP6 on the task board is <strong>in progress</strong>. The board says the Solid and
+      Tailwind v3 foundation is in place, with core screens plus plugins, costs, organizations,
+      waitlist, auth, and analytics, and that the rest of the legacy pages are still stubs.
+      Spec 06 is more specific about what is proven: the Projects, CAD, CAM, Library, and
+      Settings screens work end to end against the contract. The 3D viewport plays back
+      toolpaths. The 2D editor drives the tool state machines. Owner paths:
+      <code>apps/desktop/src/app</code>, <code>features/*/screens</code>,
+      <code>shared/components</code>, <code>shared/state</code>, and <code>src/i18n</code>.
+      Spec: <code>specs/06-desktop-ui.md</code>.
+    </p>
+    <DocCallout type="warn" title="Do not treat a registered route as a finished screen">
+      <p>
+        <code>apps/desktop/src/app/routes.tsx</code> lists the legacy URL table, including
+        marketplace, chat, billing, and MCP. <code>src/pages</code> holds one adapter per path.
+        Many of those adapters still render a stub. Spec 06 says the long tail of legacy pages
+        are generated stubs rather than implemented screens.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="boot" class="doc-section">
+    <h2>Boot</h2>
+    <p>
+      The webview asks the shell for <code>get_sidecar_endpoint</code>, receives
+      <code>&#123; baseUrl, token &#125;</code>, builds <code>ApiClient.layer</code>, and calls
+      <code>GET /health</code>. Effects run on one app <code>ManagedRuntime</code>. Server data
+      stays in the API, with a lightweight query cache keyed by endpoint and params. The editor
+      undo stack is client state: a command pattern over drawing patches, capped at 200 steps
+      (<code>shared/state/history.ts</code>).
+    </p>
+    <p>
+      The splash shows Retry and View logs only after the sidecar has stayed unreachable for
+      150 seconds. Until then it keeps resolving the endpoint. The shell waits up to 60 seconds
+      for each start. The splash shows the seconds waited and a readable reason.
+    </p>
+    <DocCode language="bash" title="Browser with the fake API, or the Tauri window">
+{`bun run --filter @cadcamfun/desktop dev
+bun run desktop:dev`}
+    </DocCode>
+    <p>
+      The fake client is <code>apps/desktop/src/testing/fake-api.ts</code>. Spec 06’s change log
+      says that fake still answers 501 for groups added after the first core screens, so plugins,
+      costs, organizations, auth, and analytics screens need a live sidecar. There is no DOM
+      component test for those screens yet.
+    </p>
+  </section>
+
+  <section id="routes" class="doc-section">
+    <h2>Routes</h2>
+    <p>
+      Paths below exist in <code>routes.tsx</code>. Spec 06 names Projects, CAD, CAM, Library,
+      and Settings as the working end-to-end screens. The activity bar also links Costs, AI,
+      and Plugins. Materials, tools, machine, and toolpaths are in the route table. Treat
+      anything past that working set as a stub until you open the screen module and see a real
+      feature page.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>What to expect</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>/projects</code>, <code>/projects/:id</code>, <code>/projects/create</code></td><td>Working project list and open flow (spec 06).</td></tr>
+        <tr><td><code>/projects/:id/history</code></td><td>Version-control route. Spec 13 says the screen and per-item History buttons are built. A commit graph and in-editor history panels are not.</td></tr>
+        <tr><td><code>/cad</code></td><td>Working CAD editor. Page file re-exports <code>features/cad</code>.</td></tr>
+        <tr><td><code>/cam</code></td><td>Working CAM workspace: operations, generator, G-code, verify tab, toolpath preview.</td></tr>
+        <tr><td><code>/library</code></td><td>Working library screen.</td></tr>
+        <tr><td><code>/settings</code>, <code>/settings/companion</code></td><td>Working settings. Companion pairing UI lives on the companion route.</td></tr>
+        <tr><td><code>/materials</code>, <code>/tools</code>, <code>/machine</code></td><td>Registered. Detail routes exist (<code>/materials/:id</code> and the same shape for tools and machine).</td></tr>
+        <tr><td><code>/toolpaths</code>, <code>/toolpaths/:id</code></td><td>Registered. Spec 06 notes both still mount the CAM workspace screen.</td></tr>
+        <tr><td><code>/costs</code></td><td>Registered. Estimate screen exists and needs a live sidecar for the groups the fake rejects.</td></tr>
+        <tr><td><code>/ai</code></td><td>Registered assistant page. Docked chat also exists inside CAD and CAM.</td></tr>
+        <tr><td><code>/plugins</code>, <code>/plugins/:id</code></td><td>Registered. List, enable, and zip install go through the legacy plugin HTTP group.</td></tr>
+        <tr><td><code>/auth/*</code>, <code>/organizations</code>, <code>/analytics</code>, <code>/waitlist</code></td><td>Screens added in the integration pass. Still part of the unfinished parity tail relative to the full legacy app.</td></tr>
+        <tr><td><code>/marketplace</code>, <code>/mcp</code>, chat under organizations</td><td>Routes exist. Spec 06 calls the long tail stubs.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Layout: title bar (native menus, in-window fallback on Windows and Linux), left activity
+      bar, main area, bottom status bar (units, snap, cursor, sidecar status). Command palette
+      is <code>Cmd/Ctrl+K</code>. Theme is light, dark, or system through CSS variables. Locale
+      file for v6.0 is <code>src/i18n/en.json</code> plus feature files such as
+      <code>en.cad.json</code>. Interactive controls are keyboard reachable.
+    </p>
+  </section>
+
+  <section id="folders" class="doc-section">
+    <h2>Folders</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Put this here</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>src/app/</code></td><td><code>App.tsx</code>, <code>Shell.tsx</code>, <code>routes.tsx</code>, <code>client.ts</code>, <code>sidecar.ts</code>, <code>queries.ts</code>. Nothing feature-specific.</td></tr>
+        <tr><td><code>src/pages/</code></td><td>One-line adapters. A page re-exports a screen. No product logic. <code>PageStub</code> is the placeholder.</td></tr>
+        <tr><td><code>src/features/&lt;name&gt;/</code></td><td><code>screens/</code>, <code>components/</code>, <code>hooks/</code>, <code>lib/</code>, <code>store/</code>, <code>types/</code>. Present areas: admin, ai, analytics, auth, billing, cad, cam, chat, companion, costs, dashboard, legal, library, marketplace, mcp, organizations, plugins, profile, projects, settings, toolpaths.</td></tr>
+        <tr><td><code>src/shared/ui/</code></td><td>Button, modal, card.</td></tr>
+        <tr><td><code>src/shared/components/</code></td><td>Title bar, status bar, workspace navigation.</td></tr>
+        <tr><td><code>src/shared/state/</code></td><td>Session, settings, query cache, editor commands and history.</td></tr>
+        <tr><td><code>src/styles/</code></td><td>Global stylesheets. Feature CSS stays in <code>features/&lt;name&gt;/styles/</code>.</td></tr>
+        <tr><td><code>src/viewport/</code></td><td>WP7. See <a href="/docs/viewport">Viewport</a>.</td></tr>
+        <tr><td><code>src/i18n/</code></td><td>Translation tables.</td></tr>
+        <tr><td><code>src/testing/</code></td><td>Fake API and core-flow tests.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      New logic goes in a feature folder, or in <code>shared/</code> when two features use it.
+      It does not go in <code>pages/</code>. Forms that mirror CAM parameters should derive from
+      the Effect schema (<code>shared/components/schema-form.ts</code>) so the UI cannot drift
+      from <code>packages/core</code>. <code>Schema.optional(X)</code> is a union of <code>X</code>
+      and <code>undefined</code>. The form description unwraps that.
+    </p>
+    <p>
+      CAD and CAM share a browser (<code>features/cad/lib/browser.ts</code> and
+      <code>features/cad/components/browser/</code>). Document units and tolerance change in one
+      place, <code>state/document-settings.ts</code>. Request bodies go through
+      <code>state/json-safe.ts</code> so <code>undefined</code>, NaN, and typed arrays do not
+      break JSON encoding. Session tokens live in <code>shared/state/session.ts</code> (a ref
+      mirrored to <code>localStorage</code>). Sign-out drops the query cache.
+    </p>
+    <p>
+      CAM Save opens one dialog from the toolbar and from the generator. It can export G-code
+      and a portable JSON toolpath. Reopening a saved program uses the toolpath version API.
+      Editing NC drops obsolete kernel and verification evidence. Undo and redo for CAM are a
+      session snapshot (NC, IR, settings, stock), separate from database versions.
+    </p>
+  </section>
+
+  <section id="shell" class="doc-section">
+    <h2>Shell</h2>
+    <p>
+      WP5 owns <code>apps/desktop/src-tauri</code>. The task board marks M1 done: clippy and 32
+      Rust tests, verified with a stub sidecar. Spec 07 §7 records menus, tray, secrets, and
+      lifecycle code beyond that milestone, and a later run of 60 tests with 2 ignored (OS
+      keychain and the real-binary parent contract). A signed <code>.app</code> is WP10 and is
+      not verified.
+    </p>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>src/sidecar.rs</code></td><td>Spawn, token, ready-line decoder, restart once, stdin shutdown.</td></tr>
+        <tr><td><code>src/commands.rs</code></td><td><code>get_sidecar_endpoint</code>, <code>get_logs_dir</code>, <code>open_path</code>, <code>pick_file</code>, <code>save_file</code>, secret get/set/delete.</td></tr>
+        <tr><td><code>src/secrets.rs</code></td><td>OS keychain, service <code>com.cadcamfun.app</code>. <code>keyring</code> 3.6.</td></tr>
+        <tr><td><code>src/menu.rs</code>, <code>src/tray.rs</code></td><td>Menu ids such as <code>file.new</code>, <code>view.preset_top</code>. Tray recent projects emit <code>tray.recent.&lt;projectId&gt;</code>.</td></tr>
+        <tr><td><code>src/updater.rs</code></td><td>WP10 updater plugin. Packaged verification is outstanding.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Commands the webview can call are listed in spec 07 §1. New commands need an
+      <code>allow-&lt;name&gt;</code> entry in <code>capabilities/main.json</code>. The CSP has
+      no <code>unsafe-eval</code> and no remote hosts in the production policy.
+      <code>open_path</code> refuses executables and only opens files under app data, logs,
+      documents, downloads, and desktop. File associations mentioned in the spec are
+      <code>.cadcam</code>, <code>.nc</code>, and <code>.gcode</code>. The single-instance plugin
+      focuses the existing window.
+    </p>
+    <p>
+      macOS glass uses <code>tauri-plugin-liquid-glass</code> and a transparent window. The UI
+      sets <code>data-glass</code> from <code>app/glass.ts</code> after the plugin accepts the
+      effect. An App Store build turns private API off via <code>tauri.appstore.conf.json</code>.
+      Direct distribution is the current release channel.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>The webview must not import Drizzle or open SQLite. Data access goes through <code>ApiClient</code>.</li>
+      <li><code>src/pages</code> must not grow logic. Put it in <code>features/</code> or <code>shared/</code>.</li>
+      <li>The Rust shell must not contain toolpath math, solid kernels, or repository queries.</li>
+      <li>Secrets must not be stored in SQLite or in plain files. The keychain and the sidecar credentials file are the two stores, and they are different keys.</li>
+      <li>The per-launch token must not be written to disk or to logs.</li>
+      <li>A stub route must not be documented as a working end-to-end screen. Spec 06 names five: Projects, CAD, CAM, Library, Settings.</li>
+    </ul>
+  </section>
+  <section id="feature-folders" class="doc-section">
+    <h2>Feature folders</h2>
+    <p>Directories under <code>apps/desktop/src/features</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Folder</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>admin</code></td></tr>
+        <tr><td><code>ai</code></td></tr>
+        <tr><td><code>analytics</code></td></tr>
+        <tr><td><code>auth</code></td></tr>
+        <tr><td><code>billing</code></td></tr>
+        <tr><td><code>cad</code></td></tr>
+        <tr><td><code>cam</code></td></tr>
+        <tr><td><code>chat</code></td></tr>
+        <tr><td><code>companion</code></td></tr>
+        <tr><td><code>costs</code></td></tr>
+        <tr><td><code>dashboard</code></td></tr>
+        <tr><td><code>legal</code></td></tr>
+        <tr><td><code>library</code></td></tr>
+        <tr><td><code>marketplace</code></td></tr>
+        <tr><td><code>mcp</code></td></tr>
+        <tr><td><code>organizations</code></td></tr>
+        <tr><td><code>plugins</code></td></tr>
+        <tr><td><code>profile</code></td></tr>
+        <tr><td><code>projects</code></td></tr>
+        <tr><td><code>settings</code></td></tr>
+        <tr><td><code>toolpaths</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Workspace dependencies of <code>@cadcamfun/desktop</code> include
+      <code>@cadcamfun/api</code> and <code>@cadcamfun/core</code>.
+    </p>
+  </section>
+
+  <section id="route-paths" class="doc-section">
+    <h2>Route paths</h2>
+    <p>
+      Every <code>path</code> string in <code>apps/desktop/src/app/routes.tsx</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Path</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>*</code></td></tr>
+        <tr><td><code>/500</code></td></tr>
+        <tr><td><code>/admin/analytics</code></td></tr>
+        <tr><td><code>/admin/feature-flags</code></td></tr>
+        <tr><td><code>/ai</code></td></tr>
+        <tr><td><code>/analytics/history</code></td></tr>
+        <tr><td><code>/analytics</code></td></tr>
+        <tr><td><code>/auth/forgot-password</code></td></tr>
+        <tr><td><code>/auth/magic-link</code></td></tr>
+        <tr><td><code>/auth/magic-link/verify</code></td></tr>
+        <tr><td><code>/auth/reset-password</code></td></tr>
+        <tr><td><code>/auth/signin</code></td></tr>
+        <tr><td><code>/auth/signup</code></td></tr>
+        <tr><td><code>/auth/two-factor</code></td></tr>
+        <tr><td><code>/auth/verify-email</code></td></tr>
+        <tr><td><code>/auth/verify</code></td></tr>
+        <tr><td><code>/cad</code></td></tr>
+        <tr><td><code>/cam</code></td></tr>
+        <tr><td><code>/costs</code></td></tr>
+        <tr><td><code>/components/:id</code></td></tr>
+        <tr><td><code>/components</code></td></tr>
+        <tr><td><code>/drawings/:id</code></td></tr>
+        <tr><td><code>/</code></td></tr>
+        <tr><td><code>/invitations/:token</code></td></tr>
+        <tr><td><code>/legal/privacy</code></td></tr>
+        <tr><td><code>/legal/terms</code></td></tr>
+        <tr><td><code>/legal/third-party-licenses</code></td></tr>
+        <tr><td><code>/library</code></td></tr>
+        <tr><td><code>/machine/:id</code></td></tr>
+        <tr><td><code>/machine</code></td></tr>
+        <tr><td><code>/marketplace</code></td></tr>
+        <tr><td><code>/marketplace/items/:id</code></td></tr>
+        <tr><td><code>/marketplace/purchase/success</code></td></tr>
+        <tr><td><code>/marketplace/purchases</code></td></tr>
+        <tr><td><code>/marketplace/seller/dashboard</code></td></tr>
+        <tr><td><code>/materials/:id</code></td></tr>
+        <tr><td><code>/materials</code></td></tr>
+        <tr><td><code>/mcp/directory</code></td></tr>
+        <tr><td><code>/mcp/servers/:id</code></td></tr>
+        <tr><td><code>/offline</code></td></tr>
+        <tr><td><code>/organizations/:id</code></td></tr>
+        <tr><td><code>/organizations/:id/chat/:conversationId</code></td></tr>
+        <tr><td><code>/organizations/:id/chat</code></td></tr>
+        <tr><td><code>/organizations/:id/chat/new-group</code></td></tr>
+        <tr><td><code>/organizations/:id/chat/new</code></td></tr>
+        <tr><td><code>/organizations/create</code></td></tr>
+        <tr><td><code>/organizations</code></td></tr>
+        <tr><td><code>/plugins/:id</code></td></tr>
+        <tr><td><code>/plugins</code></td></tr>
+        <tr><td><code>/pricing</code></td></tr>
+        <tr><td><code>/profile</code></td></tr>
+        <tr><td><code>/profile/settings</code></td></tr>
+        <tr><td><code>/projects/:id/history</code></td></tr>
+        <tr><td><code>/projects/:id</code></td></tr>
+        <tr><td><code>/projects/create</code></td></tr>
+        <tr><td><code>/projects</code></td></tr>
+        <tr><td><code>/settings</code></td></tr>
+        <tr><td><code>/settings/companion</code></td></tr>
+        <tr><td><code>/settings/mcp/config-editor</code></td></tr>
+        <tr><td><code>/settings/mcp/edit/:id</code></td></tr>
+        <tr><td><code>/settings/mcp</code></td></tr>
+        <tr><td><code>/settings/subscription</code></td></tr>
+        <tr><td><code>/third-party-licenses</code></td></tr>
+        <tr><td><code>/toolpaths/:id</code></td></tr>
+        <tr><td><code>/toolpaths</code></td></tr>
+        <tr><td><code>/tools/:id</code></td></tr>
+        <tr><td><code>/tools</code></td></tr>
+        <tr><td><code>/waitlist</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="tauri-commands" class="doc-section">
+    <h2>Tauri commands</h2>
+    <p>Commands the webview can invoke:</p>
+    <table>
+      <thead>
+        <tr><th>Command</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>get_sidecar_endpoint</code></td></tr>
+        <tr><td><code>get_logs_dir</code></td></tr>
+        <tr><td><code>open_path</code></td></tr>
+        <tr><td><code>secret_get</code></td></tr>
+        <tr><td><code>secret_set</code></td></tr>
+        <tr><td><code>secret_delete</code></td></tr>
+        <tr><td><code>pick_file</code></td></tr>
+        <tr><td><code>save_file</code></td></tr>
+        <tr><td><code>set_recent_projects</code></td></tr>
+        <tr><td><code>check_for_updates</code></td></tr>
+        <tr><td><code>install_update</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="webview-events" class="doc-section">
+    <h2>Webview events</h2>
+    <table>
+      <thead>
+        <tr><th>Event</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>menu</code></td><td><code>menu.rs</code> <code>MENU_EVENT</code>. <code>tray.rs</code> emits the same channel.</td></tr>
+        <tr><td><code>sidecar-status</code></td><td><code>sidecar.rs</code> <code>STATUS_EVENT</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="activities" class="doc-section">
+    <h2>Activities</h2>
+    <p>
+      <code>apps/desktop/src/app/layout.ts</code> exports <code>ActivityId</code>,
+      <code>ACTIVITIES</code>, <code>routeOf</code>, <code>activeActivity</code>, and
+      <code>isPanelRoute</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th><code>ActivityId</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>projects</code></td></tr>
+        <tr><td><code>cad</code></td></tr>
+        <tr><td><code>cam</code></td></tr>
+        <tr><td><code>library</code></td></tr>
+        <tr><td><code>costs</code></td></tr>
+        <tr><td><code>ai</code></td></tr>
+        <tr><td><code>plugins</code></td></tr>
+        <tr><td><code>settings</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "Viewport", href: "/docs/viewport" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "Release", href: "/docs/release" }]} />
+</DocsLayout>

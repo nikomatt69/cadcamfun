@@ -1,0 +1,112 @@
+---
+import Mark from "./Mark.astro"
+
+const navItems = [
+  { href: "/docs", label: "Docs" },
+  { href: "/docs/architecture", label: "Architecture" },
+  { href: "/docs/guides/quickstart", label: "Quickstart" },
+  { href: "/studio", label: "Studio" },
+]
+
+const pathname = Astro.url.pathname.replace(/\/$/, "") || "/"
+
+function active(href: string) {
+  if (href === "/docs") return pathname === "/docs" || (pathname.startsWith("/docs") && !pathname.startsWith("/docs/guides") && pathname !== "/docs/architecture")
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+---
+
+<header class="sticky top-0 z-50 w-full" aria-label="Primary navigation">
+  <div class="field-mask h-[var(--nav-inset)]"></div>
+  <div class="px-[var(--nav-inset)]">
+  <div class="glass-bar mx-auto w-full max-w-[var(--content-max)]">
+    <div class="page-shell flex h-[var(--topbar-height)] items-center justify-between gap-4">
+      <a href="/" class="pressable flex items-center" aria-label="CADCAMFUN home">
+        <Mark class="h-8 w-auto sm:h-9" />
+      </a>
+
+      <nav class="hidden items-center gap-2 md:flex" aria-label="Main">
+        <div class="glass-chip flex items-center gap-1 p-1">
+          {navItems.map((item) => (
+            <a
+              href={item.href}
+              aria-current={active(item.href) ? "page" : undefined}
+              class:list={[
+                "pressable relative rounded-[4px] px-3.5 py-[6px] text-[13px] font-semibold",
+                active(item.href) ? "nav-current" : "text-terminal-muted",
+              ]}
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+        <button
+          id="theme-toggle"
+          type="button"
+          class="pressable glass-chip flex h-9 w-9 items-center justify-center text-terminal-muted"
+          aria-label="Toggle color theme"
+        >
+          <svg class="h-4 w-4 dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
+          </svg>
+        </button>
+      </nav>
+
+      <div class="flex items-center gap-2 md:hidden">
+        <button id="theme-toggle-mobile" type="button" class="pressable glass-chip flex h-9 w-9 items-center justify-center" aria-label="Toggle color theme">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
+          </svg>
+        </button>
+        <button id="nav-toggle" type="button" class="pressable glass-chip flex h-9 items-center px-3 text-[13px] font-semibold" aria-expanded="false" aria-controls="mobile-nav">
+          Menu
+        </button>
+      </div>
+    </div>
+    <div id="mobile-nav" class="mobile-nav hidden md:hidden" hidden>
+      <nav class="page-shell flex flex-col gap-1 py-3" aria-label="Mobile">
+        {navItems.map((item) => (
+          <a href={item.href} class="rounded-[4px] px-3 py-2.5 text-[15px] font-semibold text-terminal-text">{item.label}</a>
+        ))}
+      </nav>
+    </div>
+  </div>
+  </div>
+  <div class="field-mask h-[var(--plate-gap)]"></div>
+</header>
+
+<script>
+  const apply = (theme: string) => {
+    document.documentElement.setAttribute("data-theme", theme)
+    localStorage.setItem("theme", theme)
+  }
+
+  // One crossfade for the whole page. Per-surface colour transitions are
+  // frozen during the swap so nothing changes theme at its own pace.
+  const toggle = () => {
+    const root = document.documentElement
+    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark"
+    root.classList.add("theme-switching")
+    const release = () => requestAnimationFrame(() => root.classList.remove("theme-switching"))
+    const doc = document as Document & { startViewTransition?: (update: () => void) => { finished: Promise<void> } }
+    if (doc.startViewTransition) {
+      doc.startViewTransition(() => apply(next)).finished.finally(release)
+    } else {
+      apply(next)
+      release()
+    }
+  }
+
+  document.getElementById("theme-toggle")?.addEventListener("click", toggle)
+  document.getElementById("theme-toggle-mobile")?.addEventListener("click", toggle)
+
+  const menu = document.getElementById("mobile-nav")
+  const menuBtn = document.getElementById("nav-toggle")
+  menuBtn?.addEventListener("click", () => {
+    const open = menu?.hasAttribute("hidden")
+    if (open) menu?.removeAttribute("hidden")
+    else menu?.setAttribute("hidden", "")
+    menu?.classList.toggle("hidden", !open)
+    menuBtn.setAttribute("aria-expanded", open ? "true" : "false")
+  })
+</script>

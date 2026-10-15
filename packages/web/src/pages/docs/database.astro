@@ -1,0 +1,260 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Files", href: "#files" },
+  { title: "Type mapping", href: "#mapping" },
+  { title: "Querying", href: "#querying" },
+  { title: "Upgrades", href: "#upgrades" },
+  { title: "Tables", href: "#tables" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Service exports", href: "#service-exports" },
+  { title: "Upgrade and migrate", href: "#upgrade-migrate" },
+  { title: "Table exports", href: "#table-exports" },
+]
+---
+
+<DocsLayout
+  title="Database"
+  subtitle="packages/db is the only package that opens SQLite. Drizzle, WAL, and a scoped Database layer."
+  description="CADCAMFUN database: Drizzle schema, migrations, Database service, upgrades, and LocalKeyValue."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP0 on the task board is <strong>in progress</strong> (adding <code>LocalKeyValue</code> for
+      persistent AI context and preferences). Owner directory: <code>packages/db</code>. Spec:
+      <code>specs/02-database.md</code>. Package name: <code>@cadcamfun/db</code>.
+    </p>
+    <DocCallout type="note" title="LocalKeyValue is the open increment">
+      <p>
+        Spec 02 §4 describes <code>LocalKeyValue</code> for JSON-compatible local state
+        (<code>ai.context.*</code>, <code>ai.memory.*</code>, UI preferences). The sidecar
+        <code>KvStore</code> is the only repository that writes it, through the shared
+        <code>Database</code> service. AI provider credentials stay in the owner-only credentials
+        file and must never be stored in this table.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="files" class="doc-section">
+    <h2>Files</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>packages/db/src/schema.ts</code></td><td>Legacy tables plus native tables. Names match the old Prisma SQLite database.</td></tr>
+        <tr><td><code>packages/db/src/index.ts</code></td><td><code>Database</code> service, <code>Database.layer</code>, <code>DatabaseError</code>, schema re-export.</td></tr>
+        <tr><td><code>packages/db/src/migrate.ts</code></td><td>CLI behind <code>bun run db:migrate</code>.</td></tr>
+        <tr><td><code>packages/db/src/upgrade.ts</code></td><td>Atomic upgrade runner: snapshot, migrate, roll back the logical schema on failure.</td></tr>
+        <tr><td><code>packages/db/src/database.test.ts</code></td><td>Migrates <code>:memory:</code>, round-trips rows, checks foreign keys.</td></tr>
+        <tr><td><code>packages/db/src/upgrade.test.ts</code></td><td>WAL snapshot, last-five retention, journal rollback, scoped cleanup.</td></tr>
+        <tr><td><code>packages/db/drizzle/</code></td><td>Generated SQL. Do not edit by hand.</td></tr>
+        <tr><td><code>packages/db/drizzle.config.ts</code></td><td>drizzle-kit config.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Generated folders currently under <code>packages/db/drizzle/</code> include
+      <code>20261004223029_careful_monster_badoon</code>,
+      <code>20261008030518_redundant_dagger</code>,
+      <code>20261009012351_moaning_loki</code>, and
+      <code>20261009171602_brown_mad_thinker</code>. A new change adds another folder via
+      <code>bun run db:generate</code>.
+    </p>
+  </section>
+
+  <section id="mapping" class="doc-section">
+    <h2>Type mapping</h2>
+    <p>
+      Spec 02 §1 maps Prisma types onto <code>drizzle-orm/sqlite-core</code>. Each table exports
+      <code>xTable</code>, <code>type X</code> (select), and <code>type NewX</code> (insert).
+      Relation objects are not generated up front. Add <code>relations()</code> on a table only
+      when a query needs the relational API.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Prisma</th><th>Drizzle</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>String</code></td><td><code>text</code></td></tr>
+        <tr><td><code>Int</code></td><td><code>integer</code></td></tr>
+        <tr><td><code>Float</code></td><td><code>real</code></td></tr>
+        <tr><td><code>Boolean</code></td><td><code>integer(&#123; mode: "boolean" &#125;)</code></td></tr>
+        <tr><td><code>DateTime</code></td><td><code>integer(&#123; mode: "timestamp_ms" &#125;)</code> (JS <code>Date</code> in and out)</td></tr>
+        <tr><td><code>Json</code></td><td><code>text(&#123; mode: "json" &#125;)</code></td></tr>
+        <tr><td><code>Bytes</code></td><td><code>blob(&#123; mode: "buffer" &#125;)</code></td></tr>
+        <tr><td>enum</td><td><code>text(&#123; enum &#125;)</code> plus an exported <code>XValues</code> const and <code>X</code> union</td></tr>
+        <tr><td><code>@default(cuid())</code></td><td><code>$defaultFn(newId)</code> using <code>crypto.randomUUID()</code></td></tr>
+        <tr><td><code>@updatedAt</code></td><td><code>$defaultFn</code> and <code>$onUpdateFn</code> set to <code>new Date()</code></td></tr>
+        <tr><td><code>onDelete</code></td><td><code>.references(() =&gt; table.col, &#123; onDelete &#125;)</code>. Missing <code>onDelete</code> means restrict.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      JSON columns are <code>unknown</code> until a repository decodes them with a Schema from
+      <code>@cadcamfun/api</code>. Spec 02 lists that as an open follow-up, along with indexes on
+      hot foreign keys (<code>Project.ownerId</code>, <code>Toolpath.projectId</code>,
+      <code>Drawing.projectId</code>).
+    </p>
+  </section>
+
+  <section id="querying" class="doc-section">
+    <h2>Querying</h2>
+    <p>
+      <code>Database.layer(&#123; path, migrationsFolder? &#125;)</code> is the only way to obtain a
+      connection. It opens <code>bun:sqlite</code>, sets <code>PRAGMA journal_mode = WAL</code> and
+      <code>PRAGMA foreign_keys = ON</code>, creates the parent directory, runs migrations when a
+      folder is given, and closes the handle when the layer scope ends. Optional
+      <code>backupsDirectory</code> defaults to <code>backups</code> beside the database.
+    </p>
+    <DocCode language="ts" title="The contract other packages use">
+{`import { Database, schema } from "@cadcamfun/db"
+
+const { query } = yield* Database
+const projects = yield* query("projects.list", (db) =>
+  db.select().from(schema.projectTable)
+)`}
+    </DocCode>
+    <p>
+      The sidecar builds the layer once. The database file is
+      <code>&lt;appData&gt;/cadcamfun/cadcamfun.db</code> (spec 02) from
+      <code>CADCAMFUN_DATA_DIR</code>, at <code>&lt;dir&gt;/cadcamfun.db</code> (spec 05).
+      Migrations run before the HTTP server listens. The migrations folder ships beside the
+      compiled sidecar; WP5 and WP10 map <code>packages/db/drizzle/</code> to runtime
+      <code>migrations/</code>.
+    </p>
+    <p>
+      The CLI <code>bun run db:migrate</code> reads a path from <code>DATABASE_URL</code> and
+      otherwise uses <code>./data/cadcamfun.db</code>. Spec 02 §3 says the untracked
+      <code>.env*</code> files at the repo root are legacy and must not be used by v6. Do not
+      read them. The local path for the app comes from sidecar config.
+    </p>
+  </section>
+
+  <section id="upgrades" class="doc-section">
+    <h2>Upgrades</h2>
+    <p>
+      Upgrade safety belongs to WP0. Before pending migrations on an existing file, SQLite
+      <code>VACUUM INTO</code> writes a standalone WAL-consistent snapshot. New files and
+      <code>:memory:</code> skip that backup. Names include a UTC timestamp. Only the last five
+      snapshots for that database are kept. A backup or retention failure aborts startup as
+      <code>DatabaseError</code> with operation <code>backup</code>. Migration failures use
+      operation <code>migrate</code>.
+    </p>
+    <p>
+      Pending SQL and journal updates run in one SQLite transaction. Failure preserves the
+      original logical schema, data, and journal. Migration SQL must not contain transaction
+      control or non-transactional statements such as <code>VACUUM</code>. Connection acquisition
+      is scoped before initialization, so a failed start releases the handle. Shutdown attempts
+      <code>wal_checkpoint(TRUNCATE)</code> and always closes SQLite. Other packages must not
+      close the handle. Concurrent upgrades from two sidecars are unsupported.
+    </p>
+  </section>
+
+  <section id="tables" class="doc-section">
+    <h2>Tables</h2>
+    <p>
+      <code>schema.ts</code> exports one <code>*Table</code> constant per SQLite table. Group them
+      by what a caller is looking for. Better Auth tables (<code>Session</code>,
+      <code>Account</code>, <code>Passkey</code>, <code>TwoFactor</code>,
+      <code>Authenticator</code>, <code>VerificationToken</code>) are retained for a later cloud
+      phase and unused by the v6.0 local profile.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Group</th><th>Tables</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Identity</td><td><code>User</code>, <code>Account</code>, <code>Session</code>, <code>Authenticator</code>, <code>VerificationToken</code>, <code>Passkey</code>, <code>TwoFactor</code>, <code>Subscription</code>, <code>ApiKey</code>, <code>Token</code></td></tr>
+        <tr><td>Org and chat</td><td><code>Organization</code>, <code>OrganizationInvitation</code>, <code>UserOrganization</code>, <code>Conversation</code>, <code>ConversationParticipant</code>, <code>Message</code>, <code>Notification</code>, <code>PushSubscription</code></td></tr>
+        <tr><td>Project model</td><td><code>Project</code>, <code>Drawing</code>, <code>DrawingVersion</code>, <code>Component</code>, <code>ComponentVersion</code>, <code>ComponentComment</code>, <code>Toolpath</code>, <code>ToolpathVersion</code>, <code>ToolpathComment</code>, <code>Material</code>, <code>Tool</code>, <code>MachineConfig</code>, <code>LibraryItem</code>, <code>FileUpload</code>, <code>ActivityLog</code>, <code>AIAnalysisLog</code>, <code>MeshAsset</code>, <code>CadOperationLog</code></td></tr>
+        <tr><td>Costs and plugins</td><td><code>CostSettings</code>, <code>ProductionCostEstimate</code>, <code>ToolWearCost</code>, <code>MaterialCost</code>, <code>OperationCost</code>, <code>PluginRegistryEntry</code>, <code>PluginConfiguration</code>, <code>MCPServerConfig</code></td></tr>
+        <tr><td>Marketplace</td><td><code>MarketplaceItem</code>, <code>MarketplaceSeller</code>, <code>MarketplaceOrder</code>, <code>MarketplaceReview</code>, <code>MarketplaceCategory</code>, <code>MarketplaceCollection</code>, <code>MarketplaceCollectionItem</code>, <code>MarketplaceWishlist</code>, <code>MarketplacePayout</code></td></tr>
+        <tr><td>History</td><td><code>GitRepo</code>, <code>GitObject</code>, <code>GitRef</code>, <code>PullRequest</code>, <code>PullRequestReview</code>, <code>WorkflowRun</code></td></tr>
+        <tr><td>Native KV</td><td><code>LocalKeyValue</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      On first launch the sidecar <code>LocalProfile</code> service creates the single local
+      <code>User</code> row (spec 02 gap, owned by WP4). Native CAM saves reuse
+      <code>Toolpath</code> and <code>ToolpathVersion</code> JSON columns. Spec 02’s change log
+      says that path needs no extra columns.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>No package other than <code>packages/db</code> may import <code>bun:sqlite</code> or construct a Drizzle client.</li>
+      <li>Callers must not close the SQLite handle. They retain the layer scope through shutdown.</li>
+      <li>Generated SQL under <code>packages/db/drizzle/</code> must not be hand-edited.</li>
+      <li>Credentials, GitHub tokens, and the per-launch bearer token must not be written into <code>LocalKeyValue</code> or any other table.</li>
+      <li>v6 must not follow <code>DATABASE_URL</code> values from the legacy <code>.env*</code> files.</li>
+    </ul>
+  </section>
+  <section id="service-exports" class="doc-section">
+    <h2>Service exports</h2>
+    <p><code>packages/db/src/index.ts</code> exports:</p>
+    <table>
+      <thead>
+        <tr><th>Export</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>schema</code></td><td>Namespace of table constants from <code>schema.ts</code>.</td></tr>
+        <tr><td><code>DatabaseError</code></td><td>Tagged failure for open, backup, and migrate.</td></tr>
+        <tr><td><code>Db</code></td><td>Drizzle client type.</td></tr>
+        <tr><td><code>DatabaseConfig</code></td><td>Path and migrations folder for the layer.</td></tr>
+        <tr><td><code>Database</code></td><td>Effect service. Members are <code>db</code> and <code>query</code>.</td></tr>
+        <tr><td><code>Database.layer</code></td><td>Opens SQLite, runs migrations, and closes the handle with the scope.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="upgrade-migrate" class="doc-section">
+    <h2>Upgrade and migrate</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Names</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>packages/db/src/upgrade.ts</code></td><td><code>planUpgrade</code>, <code>backupDatabase</code>, <code>applyUpgrade</code></td></tr>
+        <tr><td><code>packages/db/src/migrate.ts</code></td><td>CLI. Run <code>bun src/migrate.ts</code> from <code>packages/db</code>. Path is <code>DATABASE_URL</code> or <code>./data/cadcamfun.db</code>. Migrations folder is <code>../drizzle</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="table-exports" class="doc-section">
+    <h2>Table exports</h2>
+    <p>
+      Every <code>*Table</code> constant exported from <code>packages/db/src/schema.ts</code>.
+      The PascalCase model names in Tables are the SQLite names. These are the TypeScript exports.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Group</th><th>Exports</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Auth</td><td><code>userTable</code>, <code>authenticatorTable</code>, <code>verificationTokenTable</code>, <code>accountTable</code>, <code>sessionTable</code>, <code>passkeyTable</code>, <code>twoFactorTable</code>, <code>tokenTable</code>, <code>apiKeyTable</code></td></tr>
+        <tr><td>Billing</td><td><code>subscriptionTable</code></td></tr>
+        <tr><td>Orgs</td><td><code>organizationTable</code>, <code>organizationInvitationTable</code>, <code>userOrganizationTable</code></td></tr>
+        <tr><td>Projects and CAD-CAM</td><td><code>projectTable</code>, <code>drawingTable</code>, <code>drawingVersionTable</code>, <code>componentTable</code>, <code>componentVersionTable</code>, <code>componentCommentTable</code>, <code>toolpathTable</code>, <code>toolpathVersionTable</code>, <code>toolpathCommentTable</code>, <code>materialTable</code>, <code>toolTable</code>, <code>machineConfigTable</code>, <code>meshAssetTable</code>, <code>cadOperationLogTable</code>, <code>fileUploadTable</code>, <code>libraryItemTable</code></td></tr>
+        <tr><td>Marketplace</td><td><code>marketplaceItemTable</code>, <code>marketplaceSellerTable</code>, <code>marketplaceOrderTable</code>, <code>marketplaceReviewTable</code>, <code>marketplaceCategoryTable</code>, <code>marketplaceCollectionTable</code>, <code>marketplaceCollectionItemTable</code>, <code>marketplaceWishlistTable</code>, <code>marketplacePayoutTable</code></td></tr>
+        <tr><td>VCS</td><td><code>gitRepoTable</code>, <code>gitObjectTable</code>, <code>gitRefTable</code>, <code>pullRequestTable</code>, <code>pullRequestReviewTable</code></td></tr>
+        <tr><td>Workflows</td><td><code>workflowRunTable</code></td></tr>
+        <tr><td>Plugins</td><td><code>pluginRegistryEntryTable</code>, <code>pluginConfigurationTable</code></td></tr>
+        <tr><td>Costs</td><td><code>toolWearCostTable</code>, <code>materialCostTable</code>, <code>operationCostTable</code>, <code>productionCostEstimateTable</code>, <code>costSettingsTable</code></td></tr>
+        <tr><td>AI and chat</td><td><code>aIAnalysisLogTable</code>, <code>conversationTable</code>, <code>conversationParticipantTable</code>, <code>messageTable</code></td></tr>
+        <tr><td>Notifications</td><td><code>notificationTable</code>, <code>pushSubscriptionTable</code>, <code>activityLogTable</code></td></tr>
+        <tr><td>MCP</td><td><code>mCPServerConfigTable</code></td></tr>
+        <tr><td>Other</td><td><code>localKeyValueTable</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }, { title: "Conventions", href: "/docs/conventions" }]} />
+</DocsLayout>

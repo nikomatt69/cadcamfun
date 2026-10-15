@@ -1,0 +1,21 @@
+---
+import { activeDocsSection, docsNav } from "../../data/docsSidebar"
+
+const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
+const active = activeDocsSection(pathname)
+---
+
+<div class="sticky top-[var(--subnav-top)] z-40 w-full">
+  <div class="px-[var(--nav-inset)]">
+    <div class="docs-subnav glass-bar mx-auto w-full max-w-[var(--content-max)]">
+      <nav class="page-shell custom-scrollbar flex h-[var(--docs-subnav-height)] items-center gap-1 overflow-x-auto" aria-label="Documentation areas">
+        {docsNav.map((section) => (
+          <a href={section.href} class="docs-subnav-link shrink-0" aria-current={section.id === active.id ? "page" : undefined}>
+            {section.title}
+          </a>
+        ))}
+      </nav>
+    </div>
+  </div>
+  <div class="field-mask h-[var(--plate-gap)]"></div>
+</div>

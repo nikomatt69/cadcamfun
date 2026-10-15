@@ -1,0 +1,30 @@
+---
+interface Props {
+  variant?: "logo" | "icon"
+  class?: string
+}
+const { variant = "logo", class: className = "" } = Astro.props
+const src = variant === "icon" ? "/brand/icon.png" : "/brand/logo.png"
+const width = variant === "icon" ? 1024 : 730
+const height = variant === "icon" ? 1024 : 270
+---
+
+<img
+  src={src}
+  alt={variant === "logo" ? "CADCAMFUN" : ""}
+  width={width}
+  height={height}
+  class:list={["brand-img", variant === "logo" && "brand-img-light", className]}
+  decoding="async"
+/>
+{variant === "logo" && (
+  <img
+    src="/brand/logo-on-dark.png"
+    alt=""
+    width={width}
+    height={height}
+    class:list={["brand-img", "brand-img-dark", className]}
+    decoding="async"
+    aria-hidden="true"
+  />
+)}

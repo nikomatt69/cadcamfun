@@ -1,0 +1,434 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCard from "../../components/docs/DocCard.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Product", href: "#product" },
+  { title: "Stack", href: "#stack" },
+  { title: "Task board", href: "#task-board" },
+  { title: "Layout", href: "#layout" },
+  { title: "Commands", href: "#commands" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "What to do next", href: "#next" },
+]
+---
+
+<DocsLayout
+  title="Overview"
+  subtitle="Local-first CAD/CAM desktop app. Work-package status is the Status column of specs/00-overview.md §4. Sequence of remaining work is specs/roadmap/README.md."
+  description="CADCAMFUN v6 overview: product, stack, work-package status, repository layout, commands, and the current roadmap step."
+  toc={toc}
+>
+  <section id="product" class="doc-section">
+    <h2>Product</h2>
+    <p>
+      CADCAMFUN v6 is a native desktop application: 2D drawing, a 3D viewport, toolpath generation,
+      G-code export, a materials / tools / machine library, cost estimates, an AI assistant, a plugin
+      host, and auto-update. It is local-first and works offline. The window is Tauri v2. Application
+      logic runs in a Bun sidecar. Geometry and CAM live in <code>packages/core</code> and do not
+      open a database or a socket.
+    </p>
+    <p>
+      Read these three files before changing code. They are the record this site follows.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Question</th><th>File</th><th>What it decides</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>What is in scope, and who owns which directory?</td>
+          <td><code>specs/00-overview.md</code></td>
+          <td>Goal, stack, task board WP0–WP14, definition of done.</td>
+        </tr>
+        <tr>
+          <td>How is Effect, SQLite, and a module written?</td>
+          <td><code>specs/01-conventions.md</code></td>
+          <td>Effect v4 shape, database rules, units, agent workflow.</td>
+        </tr>
+        <tr>
+          <td>What is the next implementation step?</td>
+          <td><code>specs/roadmap/README.md</code></td>
+          <td>Order RM-00–RM-11. The current step is RM-01.</td>
+        </tr>
+      </tbody>
+    </table>
+    <DocCallout title="Contracts and sequence">
+      <p>
+        Design specs (<code>specs/00</code> through <code>specs/28</code>, plus <code>specs/ai/</code>)
+        own contracts. <code>specs/roadmap/</code> owns sequence. When a paragraph on this site and a
+        spec disagree, follow the spec. When the roadmap is cited, follow
+        <code>specs/roadmap/README.md</code> and <code>specs/roadmap/00-how-to-follow.md</code> for
+        order. Do not use <code>specs/20-integral-roadmap.md</code> or
+        <code>specs/21-integration-master-plan.md</code> as the work queue.
+      </p>
+    </DocCallout>
+    <p>
+      <code>specs/00-overview.md</code> §6 requires HTTP parity with all 195 legacy route files listed
+      in <code>specs/api-inventory.md</code>, and a SolidJS UI that matches the legacy app. That
+      parity is still open: WP3, WP4, WP6, and WP7 are <code>in progress</code> on the task board.
+      Cloud services (Stripe, email, OAuth) stay behind an Effect service with a local default. The
+      HTTP contract stays the same. v6.0 local identity is one <code>User</code> row. There is no
+      login screen in that local profile.
+    </p>
+  </section>
+
+  <section id="stack" class="doc-section">
+    <h2>Stack</h2>
+    <p>
+      Pins below are the ones in <code>README.md</code>, <code>specs/00-overview.md</code> §1, and
+      the workspace <code>package.json</code> files. The layout table in
+      <code>specs/00-overview.md</code> §3 still says “Vite + React” for <code>apps/desktop</code>.
+      The stack table in §1, the README, and <code>apps/desktop/package.json</code>
+      (<code>solid-js</code>, <code>vite-plugin-solid</code>) are SolidJS. Build and edit the UI as
+      SolidJS.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Concern</th><th>Choice</th><th>Where it is pinned</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Runtime, package manager, tests</td>
+          <td>Bun</td>
+          <td>Root <code>packageManager</code> is <code>bun@1.4.2</code>. Tests are <code>bun:test</code>.</td>
+        </tr>
+        <tr>
+          <td>Application logic</td>
+          <td>Effect <code>4.0.0-rc.112</code></td>
+          <td>Every package that depends on <code>effect</code>. Required by <code>@nikcli-ai/sdk-next</code>. One copy, so <code>Context</code> tags match.</td>
+        </tr>
+        <tr>
+          <td>Persistence</td>
+          <td>Drizzle <code>1.0.0-beta.22</code> + SQLite (<code>bun:sqlite</code>)</td>
+          <td><code>packages/db</code>. <code>drizzle-kit</code> is the same beta.</td>
+        </tr>
+        <tr>
+          <td>Desktop shell</td>
+          <td>Tauri v2</td>
+          <td><code>apps/desktop/src-tauri</code>. CLI is <code>@tauri-apps/cli</code> in the desktop devDependencies. Rust 1.96 is the toolchain named in the overview. Do not <code>cargo install</code> the Tauri CLI.</td>
+        </tr>
+        <tr>
+          <td>UI</td>
+          <td>SolidJS + Vite + TypeScript, Three.js viewport</td>
+          <td><code>apps/desktop</code>. <code>solid-js</code> ^1.9, <code>three</code> ^0.180, Vite 7, Tailwind v3.</td>
+        </tr>
+        <tr>
+          <td>AI</td>
+          <td>nikcli host (<code>@nikcli-ai/sdk-next</code>) and AI SDK v7 (<code>ai</code>)</td>
+          <td><code>packages/ai</code>. Direct calls use <code>@ai-sdk/*</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Effect’s version-matched docs are on disk at
+      <code>packages/db/node_modules/effect/ai-docs/src/</code> (Bun does not hoist; any workspace
+      <code>node_modules/effect/ai-docs/src/</code> is the same pin). Read the folder for the API you
+      are calling. Do not write Effect v3 from memory, and do not bump <code>effect</code> in a
+      single package. Root <code>overrides</code> also pin
+      <code>@effect/platform-node</code> and <code>@effect/platform-node-shared</code> to
+      <code>4.0.0-rc.112</code>.
+    </p>
+  </section>
+
+  <section id="task-board" class="doc-section">
+    <h2>Task board</h2>
+    <p>
+      Status text is copied from the Status column of <code>specs/00-overview.md</code> §4. A row
+      marked in progress is unfinished. This page does not re-measure tests, route coverage, or
+      screens.
+    </p>
+    <table>
+      <thead>
+        <tr><th>WP</th><th>Owns</th><th>Spec</th><th>Status in specs/00 §4</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>WP0</td>
+          <td><code>packages/db</code></td>
+          <td><code>02-database.md</code></td>
+          <td>in progress (adding <code>LocalKeyValue</code> for persistent AI context and preferences)</td>
+        </tr>
+        <tr>
+          <td>WP1</td>
+          <td><code>packages/core/src/cad</code></td>
+          <td><code>03-core-cad.md</code></td>
+          <td>done (288 core tests incl. WP2)</td>
+        </tr>
+        <tr>
+          <td>WP2</td>
+          <td><code>packages/core/src/cam</code></td>
+          <td><code>04-core-cam.md</code></td>
+          <td>done (3 posts, goldens, regression tests for all legacy bugs)</td>
+        </tr>
+        <tr>
+          <td>WP3</td>
+          <td><code>packages/api</code></td>
+          <td><code>05-api-sidecar.md</code></td>
+          <td>in progress — 67/195 legacy route files in the contract (<code>bun run --filter @cadcamfun/api coverage</code>)</td>
+        </tr>
+        <tr>
+          <td>WP4</td>
+          <td><code>apps/sidecar</code></td>
+          <td><code>05-api-sidecar.md</code></td>
+          <td>in progress — every contract group is now served; families without a contract are still missing, see <code>11-api-parity-brief.md</code></td>
+        </tr>
+        <tr>
+          <td>WP5</td>
+          <td><code>apps/desktop/src-tauri</code></td>
+          <td><code>07-tauri-shell.md</code></td>
+          <td>M1 done (clippy + 32 Rust tests; verified with stub sidecar)</td>
+        </tr>
+        <tr>
+          <td>WP6</td>
+          <td><code>apps/desktop/src/app</code>, screens</td>
+          <td><code>06-desktop-ui.md</code></td>
+          <td>in progress — Solid + Tailwind v3 foundation; the rest of the 65 pages are still stubs</td>
+        </tr>
+        <tr>
+          <td>WP7</td>
+          <td><code>apps/desktop/src/viewport</code></td>
+          <td><code>06-desktop-ui.md</code></td>
+          <td>in progress — separate session owns <code>src/viewport</code>, <code>src/state</code></td>
+        </tr>
+        <tr>
+          <td>WP8</td>
+          <td><code>packages/ai</code></td>
+          <td><code>08-ai.md</code></td>
+          <td>done</td>
+        </tr>
+        <tr>
+          <td>WP9</td>
+          <td><code>packages/plugin-sdk</code>, <code>apps/sidecar/src/plugins</code></td>
+          <td><code>09-plugins.md</code></td>
+          <td>done (SDK + host; legacy <code>/api/plugins/*</code> HTTP group served, SDK host not exposed over HTTP yet)</td>
+        </tr>
+        <tr>
+          <td>WP10</td>
+          <td><code>.github/workflows</code>, <code>scripts/</code>, updater in <code>src-tauri</code></td>
+          <td><code>10-release-sync.md</code></td>
+          <td>done (pipeline + CI + updater; release secrets unset)</td>
+        </tr>
+        <tr>
+          <td>WP11</td>
+          <td><code>packages/vcs</code></td>
+          <td><code>13-vcs-actions-mobile.md</code></td>
+          <td>done core + sidecar + API; desktop panels and GitHub routes pending</td>
+        </tr>
+        <tr>
+          <td>WP12</td>
+          <td><code>packages/workflow</code></td>
+          <td><code>13-vcs-actions-mobile.md</code></td>
+          <td>done engine + runner; only <code>project/*</code> steps registered</td>
+        </tr>
+        <tr>
+          <td>WP13</td>
+          <td><code>apps/mobile</code></td>
+          <td><code>13-vcs-actions-mobile.md</code></td>
+          <td>Expo migration integrated; native Release/device validation in progress; TestFlight pending</td>
+        </tr>
+        <tr>
+          <td>WP14</td>
+          <td>multi-operation setups (see <a href="/docs/guides/work-packages">Work packages</a>)</td>
+          <td><code>14-multi-op-setup.md</code></td>
+          <td>in progress — <code>cam.program</code> contracts, plan/generate, post tool-number override, multi-tool parsing done; desktop setup store and persistence pending</td>
+        </tr>
+      </tbody>
+    </table>
+    <DocCallout title="The roadmap snapshot uses different words" type="warn">
+      <p>
+        <code>specs/roadmap/README.md</code> has an “Already shipped” snapshot that does not match
+        §4 on several rows. Examples written in that snapshot: API coverage <strong>121/195</strong>
+        (the task board says 67/195), WP6 “pages are no longer PageStub”, and WP0 “LocalKeyValue +
+        KvStore exist”. Do not average the two texts into a third status. For ownership and the
+        task-board sentence, use §4. For what to implement next, use the roadmap table. To see the
+        live route-file count, run <code>bun run --filter @cadcamfun/api coverage</code> and read
+        its output. Do not paste a new fraction into a spec unless you just ran that command and
+        you are editing the spec.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="layout" class="doc-section">
+    <h2>Layout</h2>
+    <p>
+      Workspaces are <code>packages/*</code> and <code>apps/*</code> (root <code>package.json</code>).
+      <code>packages/web</code> is this Astro site. <code>packages/httpapi-codegen</code> and
+      <code>packages/nikcli-plugin</code> are in the tree and are not in the overview’s layout
+      diagram; they are real packages.
+    </p>
+    <DocCode language="text" title="Repository (paths that exist)">
+{`packages/
+  db/               @cadcamfun/db
+  core/             @cadcamfun/core
+  api/              @cadcamfun/api
+  ai/               @cadcamfun/ai
+  plugin-sdk/       @cadcamfun/plugin-sdk
+  vcs/              @cadcamfun/vcs
+  workflow/         @cadcamfun/workflow
+  httpapi-codegen/  @cadcamfun/httpapi-codegen
+  nikcli-plugin/    @nikoemme_/cadcamfun-nikcli-plugin
+  web/              @cadcamfun/web          this docs site
+apps/
+  sidecar/          @cadcamfun/sidecar
+  desktop/          @cadcamfun/desktop
+  mobile/           @cadcamfun/mobile
+specs/              contracts (00–29, roadmap/, ai/, api-inventory.md)
+scripts/            build.ts and release helpers
+.github/workflows/  ci.yml, build-platforms.yml, release.yml, ios.yml
+.reference/         legacy Next.js + Prisma, git-ignored, read-only`}
+    </DocCode>
+    <div class="doc-grid not-prose">
+      <DocCard title="Quickstart" eyebrow="Run" href="/docs/guides/quickstart">
+        <p>Install, test, migrate, and open the desktop from the repo root.</p>
+      </DocCard>
+      <DocCard title="Architecture" eyebrow="Map" href="/docs/architecture">
+        <p>Dependency direction and why the window is a client of the sidecar.</p>
+      </DocCard>
+      <DocCard title="Conventions" eyebrow="Rules" href="/docs/conventions">
+        <p>Units, Effect services, and who may open SQLite.</p>
+      </DocCard>
+      <DocCard title="Source map" eyebrow="Paths" href="/docs/source-map">
+        <p>Directories for CAD, CAM, HTTP, the window, and the specs.</p>
+      </DocCard>
+    </div>
+  </section>
+
+  <section id="commands" class="doc-section">
+    <h2>Commands</h2>
+    <p>
+      Run these from the repository root. The root <code>test</code> script is wider than the
+      README line: <code>bun run test</code> executes <code>bun test packages apps scripts</code>.
+      The README command stops at packages and apps.
+    </p>
+    <DocCode language="bash" title="Repo root">
+{`bun install
+bun test packages apps
+bunx tsc -p packages/core/tsconfig.json
+bun run db:generate
+bun run db:migrate
+bun run desktop:dev
+bun run build
+bun run build:sidecar
+bun run build:desktop`}
+    </DocCode>
+    <table>
+      <thead>
+        <tr><th>Script</th><th>Root package.json</th><th>What you get</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>db:generate</code></td>
+          <td><code>bun run --filter @cadcamfun/db generate</code></td>
+          <td><code>drizzle-kit generate</code> from <code>packages/db/src/schema.ts</code> into <code>packages/db/drizzle/</code>.</td>
+        </tr>
+        <tr>
+          <td><code>db:migrate</code></td>
+          <td><code>bun run --filter @cadcamfun/db migrate</code></td>
+          <td><code>bun src/migrate.ts</code>. Default file string is <code>./data/cadcamfun.db</code>. See <a href="/docs/guides/quickstart">Quickstart</a> for which directory that is relative to.</td>
+        </tr>
+        <tr>
+          <td><code>desktop:dev</code></td>
+          <td><code>bun run build:sidecar &amp;&amp; bun run --filter @cadcamfun/desktop tauri dev</code></td>
+          <td>Compiles the real sidecar, copies migrations, then opens the Tauri dev window. Vite is <code>http://localhost:1420</code>.</td>
+        </tr>
+        <tr>
+          <td><code>build:sidecar</code></td>
+          <td><code>bun scripts/build.ts --only=compile,resources</code></td>
+          <td>Sidecar binary plus <code>packages/db/drizzle</code> copied to <code>apps/desktop/src-tauri/resources/migrations/</code>.</td>
+        </tr>
+        <tr>
+          <td><code>build:desktop</code></td>
+          <td><code>bun run --filter @cadcamfun/desktop build</code></td>
+          <td>Vite build of the webview only. It does not run <code>tauri build</code>.</td>
+        </tr>
+        <tr>
+          <td><code>build</code></td>
+          <td><code>bun scripts/build.ts</code></td>
+          <td>Full pipeline in <code>scripts/build.ts</code>: install, typecheck, compile, resources, bundle, artifacts.</td>
+        </tr>
+        <tr>
+          <td><code>typecheck</code></td>
+          <td><code>turbo run typecheck &amp;&amp; tsgo -p tsconfig.json --noEmit</code></td>
+          <td>Every package <code>typecheck</code> script, then the root project.</td>
+        </tr>
+        <tr>
+          <td><code>generate</code></td>
+          <td><code>bun run --filter @cadcamfun/api generate</code></td>
+          <td>Regenerate HTTP clients into <code>packages/api/src/sdk</code> and <code>packages/api/src/client</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <p>
+      Dependency direction, from the README, with no cycles:
+      <code>core</code> ← <code>api</code> ← sidecar;
+      <code>db</code> ← sidecar;
+      <code>ai</code> and <code>plugin-sdk</code> ← sidecar.
+      The desktop imports API types only. <code>core</code> and <code>api</code> must not import
+      <code>db</code>.
+    </p>
+    <p>
+      <code>apps/desktop/package.json</code> also depends on <code>@cadcamfun/core</code>, and
+      <code>apps/desktop/src</code> imports it from the viewport and the CAD/CAM features (geometry,
+      toolpaths, sketches). <code>apps/mobile/package.json</code> depends on
+      <code>@cadcamfun/api</code> only. Do not add <code>@cadcamfun/db</code> to
+      <code>packages/core</code>, <code>packages/api</code>, <code>apps/desktop</code>, or
+      <code>apps/mobile</code>.
+    </p>
+    <p>
+      Internal units are millimetres and radians. Convert to degrees only at the UI or G-code
+      boundary. G-code numbers use a fixed decimal count (default 3). Do not format them with
+      implicit <code>toString</code>.
+    </p>
+    <p>
+      <code>.reference/</code> is the previous Next.js, Prisma, and Stripe/Better Auth tree. It is
+      git-ignored and read-only. Use it as domain knowledge. Do not import it, and do not copy a
+      module in verbatim: <code>specs/00-overview.md</code> says several legacy modules contain bugs
+      (see <code>specs/04-core-cam.md</code>).
+    </p>
+    <DocCallout title="Leave .env files closed" type="warn">
+      <p>
+        Do not read, print, or copy values from <code>.env*</code> files. They are legacy and unused.
+        The sidecar reads configuration once, in <code>apps/sidecar/src/config.ts</code>, through
+        Effect <code>Config</code>. The shell passes <code>CADCAMFUN_TOKEN</code>,
+        <code>CADCAMFUN_DATA_DIR</code>, and <code>CADCAMFUN_MIGRATIONS_DIR</code> when it spawns the
+        binary. Do not invent a dotenv loader in another package.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="next" class="doc-section">
+    <h2>What to do next</h2>
+    <p>
+      The current roadmap step is the first row whose status is <code>in progress</code>, otherwise
+      the first <code>pending</code> row. That row is <strong>RM-01</strong>,
+      <code>specs/roadmap/01-action-catalogue.md</code>. Its owners, as written on the roadmap, are
+      WP8 <code>packages/ai</code>, WP4 AI handler adapters, WP3 shared action schemas, and WP6 AI
+      tool consumers (scopes are in the step spec).
+    </p>
+    <p>
+      RM-11 is also marked <code>in progress</code> (HTTP face + plugin built). It is not the
+      current step. It depends on RM-01 and RM-03. Do not start it as the next task because the
+      status cell contains “in progress”.
+    </p>
+    <p>
+      An agent edits only the directories that step owns. A contract change is an edit to the design
+      spec first, with a change-log line, and then the code. Do not commit unless asked. Code,
+      comments, docs, and commit messages are English.
+    </p>
+  </section>
+  <DocRelated
+    items={[
+      { title: "Quickstart", href: "/docs/guides/quickstart" },
+      { title: "Architecture", href: "/docs/architecture" },
+    ]}
+  />
+</DocsLayout>

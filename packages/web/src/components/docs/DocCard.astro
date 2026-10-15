@@ -1,0 +1,25 @@
+---
+interface Props {
+  title?: string
+  eyebrow?: string
+  href?: string
+}
+const { title, eyebrow, href } = Astro.props
+const Element = href ? "a" : "div"
+---
+
+<Element
+  href={href}
+  class:list={[
+    "material relative block rounded-[var(--radius-card)] p-5",
+    href ? "lift pressable" : "",
+  ]}
+>
+  {eyebrow && (
+    <p class="mb-3 font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-terminal-accent">{eyebrow}</p>
+  )}
+  {title && <h3 class="font-display text-card-title text-terminal-text">{title}</h3>}
+  <div class="mt-2 text-[14px] leading-relaxed text-terminal-muted [&_code]:rounded-[4px] [&_code]:bg-terminal-code [&_code]:px-1 [&_code]:text-[0.86em] [&_p]:m-0">
+    <slot />
+  </div>
+</Element>

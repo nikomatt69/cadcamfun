@@ -26,12 +26,15 @@ packages/
   plugin-sdk/  public plugin API types + host contract
   vcs/         git-compatible history: objects, branches, merge, GitHub sync
   workflow/    Actions-style workflow schema, triggers, runner
+  web/         Astro docs site
 apps/
   sidecar/     Bun Effect server (HttpApi handlers, services, wiring)
   desktop/     SolidJS UI + src-tauri/ (Rust shell)
   mobile/      iOS companion (Expo), thin client of a paired desktop
 specs/         source of truth for scope and contracts
 ```
+
+`packages/web` is the Astro docs site.
 
 Dependency direction (no cycles): `core` ← `api` ← `sidecar`; `db` ← `sidecar`;
 `ai`, `plugin-sdk` ← `sidecar`; `api` (types only) ← `desktop`.

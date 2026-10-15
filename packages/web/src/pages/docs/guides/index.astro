@@ -1,0 +1,269 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCard from "../../../components/docs/DocCard.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "The guides", href: "#guides" },
+  { title: "Read first", href: "#read-first" },
+  { title: "Which command", href: "#commands" },
+  { title: "Open one", href: "#open" },
+  { title: "Leave these alone", href: "#leave-alone" },
+]
+---
+
+<DocsLayout
+  title="Guides"
+  subtitle="Install the workspace, run the window, and stay inside the directory a work package owns."
+  description="CADCAMFUN guides: what to read first, which command to run, quickstart, local development, and work packages."
+  toc={toc}
+>
+  <section id="guides" class="doc-section">
+    <h2>The guides</h2>
+    <p>
+      Three procedures plus this index. Each one is written so you can work from that page without
+      opening the others, but the specs still win. <code>specs/</code> is the contract.
+      <code>specs/roadmap/</code> is the sequence. The current step is RM-01, the action catalogue
+      (<code>specs/roadmap/01-action-catalogue.md</code>).
+    </p>
+    <table>
+      <thead>
+        <tr><th>Page</th><th>Use it when</th><th>You will run</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="/docs/guides/quickstart">Quickstart</a></td>
+          <td>A clean checkout should install, test, migrate, and open a window.</td>
+          <td><code>bun install</code>, <code>bun test packages apps</code>, <code>bun run db:migrate</code>, <code>bun run desktop:dev</code></td>
+        </tr>
+        <tr>
+          <td><a href="/docs/guides/local-dev">Local development</a></td>
+          <td>You need the sidecar, the Vite webview, and the SQLite file as three different processes.</td>
+          <td><code>bun test packages/&lt;name&gt;</code>, <code>bunx tsc -p …</code>, sidecar on <code>127.0.0.1</code></td>
+        </tr>
+        <tr>
+          <td><a href="/docs/guides/work-packages">Work packages</a></td>
+          <td>You are about to edit, and you need the directory you are allowed to touch.</td>
+          <td>None until the owner directory and the current RM step are clear.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Topic pages (CAD, CAM, database, sidecar, desktop) describe subsystems. These guides describe
+      the loop you use every day. If a guide and a spec disagree on a contract, follow the spec. If
+      they disagree on what to do next, follow <code>specs/roadmap/README.md</code>.
+    </p>
+  </section>
+
+  <section id="read-first" class="doc-section">
+    <h2>Read first</h2>
+    <p>
+      Order from <code>README.md</code> and <code>AGENTS.md</code>. Stop at the file that answers
+      the question you actually have.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Order</th><th>Path</th><th>Stop here if</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><code>README.md</code></td>
+          <td>You only need the stack, the layout, and the root commands.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><code>specs/00-overview.md</code></td>
+          <td>You need the task board (WP0–WP14), the definition of done, or the parity rule.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><code>specs/01-conventions.md</code></td>
+          <td>You are about to write Effect, a migration, or a public function.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><code>specs/roadmap/README.md</code></td>
+          <td>Someone cited the roadmap, an <code>RM-NN</code> id, or “what’s next”.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>The current step spec</td>
+          <td>Today that is <code>specs/roadmap/01-action-catalogue.md</code>. Edit only its owner directories.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>The design spec for the area</td>
+          <td><code>specs/02</code> through <code>specs/14</code> (and later design specs) own the contract you must not break.</td>
+        </tr>
+      </tbody>
+    </table>
+    <DocCallout title="Effect docs are in the repo" type="note">
+      <p>
+        Effect is pinned to <code>4.0.0-rc.112</code>. Before writing Effect code, open
+        <code>packages/db/node_modules/effect/ai-docs/src/</code>. That tree matches the pin. Stable
+        4.0.0 pages and v3 snippets are the wrong API.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="commands" class="doc-section">
+    <h2>Which command</h2>
+    <p>
+      Every command is from the repository root unless the page says otherwise. Replace the package
+      name with the directory you are changing. There is no <code>&lt;name&gt;</code> package.
+    </p>
+    <DocCode language="bash" title="First hour, from the repo root">
+{`bun install
+bun test packages apps
+bunx tsc -p packages/db/tsconfig.json
+bun run db:generate
+bun run db:migrate
+bun run desktop:dev`}
+    </DocCode>
+    <table>
+      <thead>
+        <tr><th>You want</th><th>Command</th><th>Guide</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>All package and app tests</td>
+          <td><code>bun test packages apps</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>Tests plus <code>scripts/</code></td>
+          <td><code>bun run test</code></td>
+          <td>Local development</td>
+        </tr>
+        <tr>
+          <td>One package, the README typecheck</td>
+          <td><code>bunx tsc -p packages/core/tsconfig.json</code></td>
+          <td>Local development</td>
+        </tr>
+        <tr>
+          <td>The turbo typecheck the CI script uses</td>
+          <td><code>bun run typecheck</code></td>
+          <td>Local development</td>
+        </tr>
+        <tr>
+          <td>A new migration</td>
+          <td><code>bun run db:generate</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>Apply migrations to the CLI database file</td>
+          <td><code>bun run db:migrate</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>Real sidecar, then the window</td>
+          <td><code>bun run desktop:dev</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>Sidecar binary and bundled migrations only</td>
+          <td><code>bun run build:sidecar</code></td>
+          <td>Local development</td>
+        </tr>
+        <tr>
+          <td>Vite production assets only</td>
+          <td><code>bun run build:desktop</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>Install, check, compile, bundle, checksums</td>
+          <td><code>bun run build</code></td>
+          <td>Quickstart</td>
+        </tr>
+        <tr>
+          <td>This docs site</td>
+          <td><code>bun run --filter @cadcamfun/web dev</code></td>
+          <td>Local development</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="open" class="doc-section">
+    <h2>Open one</h2>
+    <div class="doc-grid not-prose">
+      <DocCard title="Quickstart" eyebrow="Run" href="/docs/guides/quickstart">
+        <p>From a clean checkout to the Tauri window, including the two different SQLite files.</p>
+      </DocCard>
+      <DocCard title="Local development" eyebrow="Processes" href="/docs/guides/local-dev">
+        <p>Sidecar on loopback, Vite on port 1420, and how to test one package.</p>
+      </DocCard>
+      <DocCard title="Work packages" eyebrow="Ownership" href="/docs/guides/work-packages">
+        <p>WP0–WP14 directories, RM-00–RM-11, and the definition of done.</p>
+      </DocCard>
+      <DocCard title="Packages" eyebrow="Workspace" href="/docs/packages">
+        <p>Npm names, paths, and the dependency arrows from each package.json.</p>
+      </DocCard>
+    </div>
+  </section>
+
+  <section id="leave-alone" class="doc-section">
+    <h2>Leave these alone</h2>
+    <p>
+      These rules are in <code>specs/01-conventions.md</code> and the README. They apply on every
+      guide below.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Do not</th><th>Do this instead</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Import from <code>.reference/</code>.</td>
+          <td>Read it for domain behaviour, then write new code in the owning package.</td>
+        </tr>
+        <tr>
+          <td>Open, print, or copy <code>.env*</code> files.</td>
+          <td>Configuration for the running app is Effect <code>Config</code> in <code>apps/sidecar/src/config.ts</code>, filled by the Tauri shell.</td>
+        </tr>
+        <tr>
+          <td>Edit generated SQL under <code>packages/db/drizzle/</code> by hand.</td>
+          <td>Change <code>packages/db/src/schema.ts</code>, then <code>bun run db:generate</code>.</td>
+        </tr>
+        <tr>
+          <td>Bump <code>effect</code> in one package, or write v3 services.</td>
+          <td>Stay on <code>4.0.0-rc.112</code> and the <code>ai-docs</code> tree next to that install.</td>
+        </tr>
+        <tr>
+          <td>Import <code>@cadcamfun/db</code> from <code>packages/core</code> or <code>packages/api</code>.</td>
+          <td>Keep those packages pure. The sidecar is the package that opens SQLite.</td>
+        </tr>
+        <tr>
+          <td>Pass degrees across a module boundary, or <code>toString()</code> a G-code number.</td>
+          <td>Millimetres and radians inside. Fixed decimals (default 3) at the post.</td>
+        </tr>
+        <tr>
+          <td>Start RM-02 or a later step because it looks related.</td>
+          <td>RM-01 is the current step. A later row waits until every <code>depends on</code> row is <code>done</code>.</td>
+        </tr>
+        <tr>
+          <td>Edit a directory your WP or RM step does not own.</td>
+          <td>Change the spec first, note it in that spec’s change log, then edit.</td>
+        </tr>
+        <tr>
+          <td>Commit, or amend, unless you were asked.</td>
+          <td>Leave the working tree for the person who asked for the change.</td>
+        </tr>
+        <tr>
+          <td><code>cargo install tauri-cli</code>.</td>
+          <td>The CLI is <code>@tauri-apps/cli</code> on <code>@cadcamfun/desktop</code>. <code>bun run desktop:dev</code> uses it.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated
+    items={[
+      { title: "Quickstart", href: "/docs/guides/quickstart" },
+      { title: "Local development", href: "/docs/guides/local-dev" },
+    ]}
+  />
+</DocsLayout>

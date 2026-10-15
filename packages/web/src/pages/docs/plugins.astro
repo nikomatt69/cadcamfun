@@ -1,0 +1,255 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "SDK", href: "#sdk" },
+  { title: "Capabilities", href: "#capabilities" },
+  { title: "Host", href: "#host" },
+  { title: "HTTP", href: "#http" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Capability symbols", href: "#capability-symbols" },
+  { title: "Manifest fields", href: "#manifest-fields" },
+  { title: "definePlugin", href: "#define-plugin" },
+  { title: "Host limits", href: "#host-limits" },
+]
+---
+
+<DocsLayout
+  title="Plugins"
+  subtitle="Untrusted code, a closed capability list, and a legacy HTTP installer that is not the SDK host."
+  description="CADCAMFUN plugins: manifest, capabilities, worker host, and the legacy /api/plugins routes."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP9 on the task board is <strong>done</strong> for the SDK and the host, with this limit:
+      the legacy <code>/api/plugins/*</code> group is served, and the SDK host is not exposed
+      over HTTP yet. Owner directories: <code>packages/plugin-sdk</code>
+      (<code>@cadcamfun/plugin-sdk</code>) and <code>apps/sidecar/src/plugins</code>. Spec:
+      <code>specs/09-plugins.md</code>.
+    </p>
+    <DocCallout type="warn" title="Two plugin systems share one table">
+      <p>
+        Spec 09’s opening status line still says the host was not started. The tree has
+        <code>host.ts</code>, and the task board counts the host as done. The HTTP handlers in
+        <code>apps/sidecar/src/http/plugins.ts</code> serve the legacy browser plugin (manifest
+        fields <code>main</code> and <code>permissions</code>, zip install, <code>bootstrap.js</code>).
+        That group is independent of the worker host. Both skip registry rows whose manifest
+        they cannot decode. <code>examples/hello-gear</code> is not proven end to end through
+        the sidecar HTTP API. Spec 09 §6 still lists that acceptance item as open.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="sdk" class="doc-section">
+    <h2>SDK</h2>
+    <p>
+      Plugin authors import <code>@cadcamfun/plugin-sdk</code>. It stays dependency-light. A
+      plugin is a folder or archive with <code>plugin.json</code> and an ES module entry.
+    </p>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Export</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>src/manifest.ts</code></td><td><code>PluginManifestSchema</code>, <code>parseManifest</code>, <code>decodeManifest</code>. Reverse-DNS id, semver, <code>apiVersion: "1"</code>.</td></tr>
+        <tr><td><code>src/capability.ts</code></td><td><code>CAPABILITIES</code>, <code>effectiveCapabilities</code>, <code>hasCapability</code>.</td></tr>
+        <tr><td><code>src/context.ts</code></td><td><code>PluginContext</code>, <code>requireCapability</code>. Missing surfaces throw <code>CapabilityError</code>.</td></tr>
+        <tr><td><code>src/plugin.ts</code></td><td><code>definePlugin(&#123; activate(ctx) &#125;)</code>.</td></tr>
+        <tr><td><code>src/test-host.ts</code></td><td><code>createTestHost</code>. Enforces capabilities the way the real host does.</td></tr>
+        <tr><td><code>examples/hello-gear/</code></td><td>Sample manifest, command, storage write, and a post-processor. Exercised by SDK tests, not by the HTTP installer.</td></tr>
+      </tbody>
+    </table>
+    <DocCode language="json" title="plugin.json">
+{`{
+  "id": "com.example.gear-generator",
+  "name": "Gear Generator",
+  "version": "1.2.0",
+  "apiVersion": "1",
+  "entry": "dist/index.js",
+  "capabilities": ["drawing:write", "ui:panel"],
+  "contributes": { "commands": [], "panels": [], "postProcessors": [], "operations": [] }
+}`}
+    </DocCode>
+    <p>
+      <code>drawing:write</code> implies <code>drawing:read</code>. The manifest schema does not
+      repeat that implication. <code>effectiveCapabilities</code> adds it when the host
+      activates the plugin. Contributions are declarative: commands, panels, post-processors
+      (<code>(program, options) =&gt; string</code> using WP2 types), and operations
+      (<code>&#123; schema, generate &#125;</code>). <code>ctx.ui</code> registers descriptors.
+      It does not receive a DOM. A post-processor contribution is how a third party adds a
+      dialect without editing <code>packages/core</code>.
+    </p>
+    <p>
+      <code>createTestHost</code> grants only what the test asks for. A mock that grants
+      everything would let a plugin pass locally and fail at install. Storage keys are
+      namespaced per plugin. Drawing patches go through the same command shape as the editor.
+    </p>
+  </section>
+
+  <section id="capabilities" class="doc-section">
+    <h2>Capabilities</h2>
+    <p>
+      The list in <code>capability.ts</code> is closed. Anything else is a manifest error.
+      Enforcement is in the host, not in the plugin.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Capability</th><th>Allows</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>drawing:read</code></td><td>Read geometry through command patches.</td></tr>
+        <tr><td><code>drawing:write</code></td><td>Patch geometry. Implies read.</td></tr>
+        <tr><td><code>toolpath:read</code></td><td>Read toolpaths and programs.</td></tr>
+        <tr><td><code>storage</code></td><td>Namespaced key-value, private to the plugin.</td></tr>
+        <tr><td><code>ui:panel</code></td><td>Register command and panel descriptors.</td></tr>
+        <tr><td><code>ai:tool</code></td><td>Offer a tool to the assistant. A write tool is confirmed before each call.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The user approves capabilities at install and can revoke them later. The context object
+      only materialises granted surfaces. <code>ctx.drawing</code>, <code>ctx.toolpath</code>,
+      <code>ctx.storage</code>, and <code>ctx.ui</code> are optional. Call
+      <code>requireCapability</code> before use.
+    </p>
+  </section>
+
+  <section id="host" class="doc-section">
+    <h2>Host</h2>
+    <p>
+      Spec 09 §3 isolates each enabled plugin in its own Bun <code>Worker</code>. The worker
+      receives a restricted context over <code>postMessage</code>. No <code>fs</code>, no
+      network, no <code>process</code>, no dynamic import outside the bundle. Default wall-clock
+      timeout is 5 seconds per call, with a worker memory cap and a call-rate limit. The
+      changelog adds a cap of 64 in-flight RPC requests per plugin. Host disposal settles every
+      outstanding request, including a worker that does not emit a crash on termination.
+    </p>
+    <p>
+      Lifecycle is an Effect layer: install, verify, enable, activate, calls, deactivate,
+      disable, uninstall. A crashing plugin is marked <code>faulted</code> and auto-disabled
+      after 3 crashes in 10 minutes. Real worker bootstrap must announce readiness before the
+      host sends activation, because a top-level async plugin can otherwise drop the first
+      message. A post failure is a typed error. The <code>reason</code> is also
+      <code>Error.message</code> so a rejected promise is not empty in the UI.
+    </p>
+    <p>
+      Files in <code>apps/sidecar/src/plugins/</code>: <code>host.ts</code>, <code>repo.ts</code>,
+      <code>bootstrap-script.ts</code>. Registry rows are <code>PluginRegistryEntry</code> and
+      <code>PluginConfiguration</code>. <code>PluginRepo</code> owns them. Local development
+      plugins (<code>dev: true</code>) skip signature checks and show a dev badge. Packaged
+      plugins are specified to carry an Ed25519 signature. Unsigned installs need an explicit
+      confirmation. Marketplace distribution is deferred.
+    </p>
+  </section>
+
+  <section id="http" class="doc-section">
+    <h2>HTTP</h2>
+    <p>
+      <code>apps/sidecar/src/http/plugins.ts</code> implements list, zip install, enable,
+      disable, uninstall, config, and <code>serve</code> for the legacy manifest. Files land in
+      <code>&lt;dataDir&gt;/storage/plugins/&lt;id&gt;/</code>. The registry folder is
+      <code>&lt;dataDir&gt;/plugins-registry</code>. Deviations from the legacy app, recorded in
+      spec 09: unknown plugin is 404, duplicate install is 409, invalid manifest is 400.
+      <code>PUT</code> or <code>PATCH /update</code> applies <code>&#123; manifest, config &#125;</code>.
+    </p>
+    <p>
+      The desktop screens are <code>/plugins</code> and <code>/plugins/:id</code>
+      (<code>features/plugins</code>). Install posts multipart <code>FormData</code>. Those
+      screens talk to this legacy group. They do not activate <code>hello-gear</code> through
+      <code>PluginHost</code>. Hidden CAD plugin panels must not fetch the registry (spec 06).
+    </p>
+    <p>
+      A separate package, <code>packages/nikcli-plugin</code>
+      (<code>@nikoemme_/cadcamfun-nikcli-plugin</code>), exposes the running app’s action
+      catalogue to a standalone nikcli process. It reads the list from the app. It does not keep
+      a second copy, and it is not a CADCAMFUN worker plugin.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>A plugin must not receive <code>fs</code>, network, or <code>process</code>. Capabilities are the only actions.</li>
+      <li>The SDK must not import the sidecar or the database. Authors test with <code>createTestHost</code>.</li>
+      <li>Capability checks belong in the host. A plugin that calls a missing surface gets <code>CapabilityError</code>.</li>
+      <li>The legacy HTTP group must not be described as the SDK worker API. Spec 09 §6’s end-to-end install of <code>hello-gear</code> is still open.</li>
+      <li>Signatures and the trusted key list are specified for packaged plugins. Do not treat a local folder install as a signed marketplace item.</li>
+    </ul>
+  </section>
+  <section id="capability-symbols" class="doc-section">
+    <h2>Capability symbols</h2>
+    <p>
+      The six capability strings are listed under Capabilities.
+      <code>packages/plugin-sdk/src/capability.ts</code> also exports
+      <code>CAPABILITIES</code>, <code>CapabilitySchema</code>, <code>ALL_CAPABILITIES</code>,
+      <code>effectiveCapabilities</code>, <code>hasCapability</code>,
+      <code>missingCapabilities</code>, and <code>storageNamespace</code>.
+    </p>
+  </section>
+
+  <section id="manifest-fields" class="doc-section">
+    <h2>Manifest fields</h2>
+    <p>
+      <code>packages/plugin-sdk/src/manifest.ts</code> exports <code>parseManifest</code> and
+      <code>decodeManifest</code>. Contribution schemas are
+      <code>CommandContributionSchema</code>, <code>PanelContributionSchema</code>, and
+      <code>PostProcessorContributionSchema</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Field</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td></tr>
+        <tr><td><code>name</code></td></tr>
+        <tr><td><code>version</code></td></tr>
+        <tr><td><code>apiVersion</code></td></tr>
+        <tr><td><code>entry</code></td></tr>
+        <tr><td><code>capabilities</code></td></tr>
+        <tr><td><code>contributes</code></td></tr>
+        <tr><td><code>signature</code></td></tr>
+        <tr><td><code>dev</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="define-plugin" class="doc-section">
+    <h2>definePlugin</h2>
+    <p>
+      <code>packages/plugin-sdk/src/plugin.ts</code> exports <code>definePlugin</code>,
+      <code>PluginModule</code>, <code>PluginOperation</code>, and <code>PluginPostProcessor</code>.
+      <code>packages/plugin-sdk/src/context.ts</code> exports <code>PluginContext</code>,
+      <code>DrawingApi</code>, <code>ToolpathApi</code>, <code>PluginStorage</code>, and
+      <code>PluginLogger</code>. The test host is
+      <code>packages/plugin-sdk/src/test-host.ts</code>.
+    </p>
+  </section>
+
+  <section id="host-limits" class="doc-section">
+    <h2>Host limits</h2>
+    <p>Constants and errors in <code>apps/sidecar/src/plugins/host.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Name</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PluginHost</code></td></tr>
+        <tr><td><code>CALL_TIMEOUT_MS</code></td></tr>
+        <tr><td><code>AI_TOOL_TIMEOUT_MS</code></td></tr>
+        <tr><td><code>MEMORY_LIMIT_MB</code></td></tr>
+        <tr><td><code>CALL_RATE_LIMIT</code></td></tr>
+        <tr><td><code>CRASH_LIMIT</code></td></tr>
+        <tr><td><code>PluginCapabilityError</code></td></tr>
+        <tr><td><code>PluginTimeoutError</code></td></tr>
+        <tr><td><code>PluginCrashedError</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "AI assistant", href: "/docs/ai" }, { title: "API contract", href: "/docs/api" }]} />
+</DocsLayout>

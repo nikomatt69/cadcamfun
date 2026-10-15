@@ -1,0 +1,68 @@
+---
+import Layout from "../layouts/Layout.astro"
+import Navbar from "../components/Navbar.astro"
+import Hero from "../components/Hero.astro"
+import Features from "../components/Features.astro"
+import InstallBlock from "../components/InstallBlock.astro"
+import { dependencyNote } from "../data/architecture"
+
+const description = "CADCAMFUN is a local-first native CAD/CAM desktop app for 2D drawing, 3D modelling, toolpaths, and G-code."
+
+const chain = [
+  { name: "core", detail: "CAD geometry and G-code. No I/O." },
+  { name: "api", detail: "HttpApi contract shared by both sides." },
+  { name: "sidecar", detail: "Effect services, SQLite, and HTTP." },
+  { name: "desktop", detail: "SolidJS window. API types only." },
+]
+
+const sidecarImports = ["db", "ai", "plugin-sdk", "vcs", "workflow"]
+
+const docLinks = [
+  { href: "/docs", label: "Docs" },
+  { href: "/docs/architecture", label: "Architecture" },
+  { href: "/docs/stack", label: "Stack" },
+  { href: "/docs/guides", label: "Guides" },
+  { href: "/docs/packages", label: "Reference" },
+  { href: "/docs/source-map", label: "Source map" },
+]
+---
+
+<Layout title="CADCAMFUN — native CAD/CAM" description={description}>
+  <Navbar />
+  <main id="main-content" class="flex-1">
+    <Hero />
+    <Features />
+    <section class="page-section border-t border-terminal-border/50" aria-labelledby="boundary-heading">
+      <div class="page-shell">
+        <p class="font-mono text-eyebrow uppercase text-terminal-accent">Boundaries</p>
+        <h2 id="boundary-heading" class="font-display mt-3 max-w-2xl text-[clamp(1.8rem,3vw,2.6rem)] font-bold tracking-[-0.035em]">
+          Imports point inward, from geometry to the window.
+        </h2>
+        <div class="material mt-10 rounded-[var(--radius-card)] p-5 sm:p-8">
+          <ol class="grid gap-6 md:grid-cols-4 md:gap-0">
+            {chain.map((layer, index) => (
+              <li class="border-t border-terminal-border pt-4 first:border-t-0 first:pt-0 md:border-l md:border-t-0 md:pl-5 md:pt-0 md:first:border-l-0 md:first:pl-0">
+                <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-accent">0{index + 1}</p>
+                <h3 class="font-display mt-2 text-[1.05rem] font-bold tracking-tight">{layer.name}</h3>
+                <p class="mt-2 text-[13.5px] leading-relaxed text-terminal-muted">{layer.detail}</p>
+              </li>
+            ))}
+          </ol>
+          <p class="mt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">Also imported by the sidecar</p>
+          <ul class="mt-3 flex flex-wrap gap-2">
+            {sidecarImports.map((name) => (
+              <li class="rounded-[var(--radius-sm)] border border-terminal-border px-3 py-1 font-mono text-[12px] text-terminal-muted">{name}</li>
+            ))}
+          </ul>
+          <p class="mt-6 border-t border-terminal-border pt-5 text-[14px] leading-relaxed text-terminal-muted">{dependencyNote}</p>
+        </div>
+        <nav class="mt-8 flex flex-wrap gap-2" aria-label="Documentation">
+          {docLinks.map((link) => (
+            <a href={link.href} class="pressable material rounded-[var(--radius-sm)] px-4 py-2 text-[13px] font-semibold">{link.label}</a>
+          ))}
+        </nav>
+      </div>
+    </section>
+    <InstallBlock />
+  </main>
+</Layout>

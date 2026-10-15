@@ -1,0 +1,54 @@
+---
+import Layout from "../../layouts/Layout.astro"
+import Navbar from "../../components/Navbar.astro"
+
+export const prerender = false
+---
+
+<Layout title="Sign in — CADCAMFUN Studio" description="Sign in to CADCAMFUN Studio against the local Drizzle database.">
+  <Navbar />
+  <main id="main-content" class="page-section">
+    <div class="page-shell grid items-start gap-10 lg:grid-cols-2">
+      <div>
+        <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">Studio</p>
+        <h1 class="font-display mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.03em]">
+          Sign in to the local database.
+        </h1>
+        <p class="mt-4 max-w-md text-[15px] leading-relaxed text-terminal-muted">
+          The form checks the <code>User</code> table in the SQLite file Drizzle migrates, and stores the session in <code>Session</code>.
+        </p>
+      </div>
+      <form id="studio-login" class="material rounded-[var(--radius-card)] p-6 sm:p-8">
+        <label class="block text-[13px] font-semibold" for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px]" />
+        <label class="mt-4 block text-[13px] font-semibold" for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required class="glass-chip mt-2 w-full bg-transparent px-3 py-2 text-[15px]" />
+        <p id="studio-error" class="mt-4 hidden text-[13px] text-terminal-text" role="alert"></p>
+        <button type="submit" class="pressable btn-fill mt-6 rounded-[var(--radius-sm)] px-4 py-2.5 text-[14px] font-semibold">Sign in</button>
+      </form>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const form = document.querySelector("#studio-login")
+  const error = document.querySelector("#studio-error")
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault()
+    const data = new FormData(form as HTMLFormElement)
+    const response = await fetch("/studio/api/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
+    })
+    if (response.ok) {
+      location.href = "/studio"
+      return
+    }
+    const body = (await response.json().catch(() => null)) as { error?: string } | null
+    if (error) {
+      error.textContent = body?.error ?? "Sign in failed"
+      error.classList.remove("hidden")
+    }
+  })
+</script>

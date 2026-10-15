@@ -1,0 +1,284 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Layout", href: "#layout" },
+  { title: "Transport", href: "#transport" },
+  { title: "Assistant", href: "#assistant" },
+  { title: "Commands", href: "#commands" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Expo routes", href: "#expo-routes" },
+  { title: "Companion client", href: "#companion-client" },
+  { title: "Pairing fields", href: "#pairing" },
+  { title: "Native module", href: "#native-module" },
+  { title: "Lib files", href: "#lib-files" },
+]
+---
+
+<DocsLayout
+  title="Mobile"
+  subtitle="An Expo client of a paired desktop. The phone does not own the database."
+  description="CADCAMFUN iOS companion: pairing, pinned TLS, routes, and what is still unverified on device."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP13 on the task board is <strong>Expo migration integrated</strong>: gateway, pairing,
+      the pinned local native module, and assistant resources. The board records 48 tests, a
+      passing typecheck, and a passing JavaScript export. Native Release and device validation
+      are in progress. TestFlight is pending. Spec 13’s later changelog line records 56 mobile
+      unit tests with device Release verification still in progress. Quote the board for the
+      milestone, and do not treat either count as a finished device release. Owner directory:
+      <code>apps/mobile</code> (<code>@cadcamfun/mobile</code>). Spec:
+      <code>specs/13-vcs-actions-mobile.md</code>.
+    </p>
+    <DocCallout type="warn" title="Expo Go cannot connect">
+      <p>
+        The local <code>CompanionNet</code> module needs a native development build. Expo Go can
+        show a setup screen. It cannot fall back to ordinary <code>fetch</code> without the pin.
+        Unsupported platforms and web do not silently replace pinning.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="layout" class="doc-section">
+    <h2>Layout</h2>
+    <p>
+      React Native and Expo Router. The old Tauri mobile shell is gone. Do not restore it.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>apps/mobile/app/</code></td><td><code>_layout.tsx</code>, <code>index.tsx</code>, <code>connect.tsx</code>, <code>pair.tsx</code>, and <code>(app)/projects</code>.</td></tr>
+        <tr><td><code>apps/mobile/lib/pairing.ts</code></td><td>QR, paste, deep link, manual address. Races private IPv4s from the QR.</td></tr>
+        <tr><td><code>apps/mobile/lib/client.ts</code>, <code>native.ts</code>, <code>sse.ts</code></td><td>HTTP client, optional native-module load, SSE parsing.</td></tr>
+        <tr><td><code>apps/mobile/lib/storage.ts</code>, <code>store.ts</code>, <code>offline-queue.ts</code></td><td>SecureStore for pairing credentials. Offline assistant queue.</td></tr>
+        <tr><td><code>apps/mobile/modules/companion-net/</code></td><td>Local Expo module. iOS implementation pins the leaf certificate.</td></tr>
+        <tr><td><code>apps/mobile/components/</code></td><td><code>chat</code>, <code>layout</code>, <code>project</code>, <code>ui</code>.</td></tr>
+        <tr><td><code>apps/mobile/hooks/</code></td><td><code>use-host-resource.ts</code>, <code>use-copied-feedback.ts</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Routes cover pairing, projects, history, pull requests, Actions, the assistant, activity,
+      and settings. <code>cadcamfun://pair</code> opens the pairing route and does not put the
+      device token in the UI or in logs. Reconnect keeps credentials when the desktop is offline,
+      checks health without overlapping probes, and cancels stale resource and chat requests
+      when the client, project, or screen changes.
+    </p>
+  </section>
+
+  <section id="transport" class="doc-section">
+    <h2>Transport</h2>
+    <p>
+      The sidecar API listens on <code>127.0.0.1</code>. The phone reaches it through the
+      companion gateway in <code>apps/sidecar/src/services/companion-gateway.ts</code> (and
+      <code>companion.ts</code>). The desktop turns it on at Settings, Mobile companion
+      (<code>/settings/companion</code>). It is off by default and comes back after a restart
+      only if it was on.
+    </p>
+    <p>
+      The gateway is a separate HTTPS listener on <code>0.0.0.0</code>, default port 8443, with
+      a per-install self-signed P-256 certificate under <code>&lt;dataDir&gt;/companion/</code>
+      (key mode 0600). The QR carries the certificate SHA-256 fingerprint. The phone pins that
+      fingerprint. There is no trust-on-first-use and no cleartext HTTP. Device tokens are 32
+      random bytes. Only their SHA-256 is stored, compared in constant time, and shown once
+      inside the QR. The gateway swaps in the sidecar’s real bearer token when it forwards, so
+      the phone never holds that token. Revoking a device on the desktop cuts it off on the next
+      request. Ten failed authentications per minute from one address return 429.
+    </p>
+    <p>
+      iOS code is <code>modules/companion-net/ios/CompanionNetModule.swift</code>: ephemeral
+      URLSession, pinned leaf certificate, HTTPS only, incremental UTF-8 and SSE. Redirects and
+      cross-origin paths are refused. Cancellation closes the task.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Allowed</th><th>Refused (403)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GET /api/health</code>, <code>GET /api/projects</code>, project vcs / pulls / actions reads</td><td>Credentials, plugins, files, billing, <code>/api/companion</code> admin</td></tr>
+        <tr><td><code>GET /api/ai/status</code>, <code>/models</code>, <code>/agents</code></td><td>Provider mutation, skills mutation, host configuration</td></tr>
+        <tr><td><code>POST /api/ai/chat/stream</code>, abort, queue, permission reply, session control and state</td><td><code>POST /vcs/push</code> and <code>/vcs/pull</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      The pairing QR lists every private IPv4 (Wi-Fi, personal hotspot, Tailscale). The phone
+      races them and warms local-network permission so a scan on cellular is not dropped. A
+      private overlay network works when the phone can route to the desktop: the pin and the
+      device token stay the same. A hosted relay is not built. If one is added later it has to
+      carry the TLS stream end to end.
+    </p>
+  </section>
+
+  <section id="assistant" class="doc-section">
+    <h2>Assistant</h2>
+    <p>
+      The phone uses the same server-owned CAD/CAM assistant as the desktop. It can propose.
+      It commits on <code>ai/*</code> and opens a pull request. A person merges.
+      <code>companion-chat-e2e.test.ts</code> boots a real sidecar, points MiniMax at a scripted
+      OpenAI-compatible server, pairs over pinned TLS, and checks that <code>main</code> still
+      holds only the human commit. That test proves the plumbing and the guards. It does not
+      prove the quality of a real model.
+    </p>
+    <p>
+      The transcript is full width, with inspectable CAD, CAM, VCS, and Actions tool cards.
+      The composer can steer during a run. Specialist selection is read-only through
+      <code>GET /api/ai/agents</code>. Offline, the assistant queues and drains in the
+      foreground. Settings shows a connection pill and the queued count. Biometrics live in
+      <code>lib/biometrics.ts</code>.
+    </p>
+  </section>
+
+  <section id="commands" class="doc-section">
+    <h2>Commands</h2>
+    <DocCode language="bash" title="From apps/mobile">
+{`bun run ios          # native app + Metro
+bun run ios:build     # build without Metro
+bun run ios:dev       # Metro for an installed dev build
+bun dev               # Metro for the development client`}
+    </DocCode>
+    <p>
+      <code>expo dev</code> is not an Expo CLI command. iOS simulator verification and a signed
+      device or TestFlight build are separate outcomes. <code>.github/workflows/ios.yml</code>
+      generates the Expo iOS project and builds an unsigned Release simulator app. The workflow
+      file is not proof that CI has gone green. Device signing needs the owner’s Apple team and
+      certificates. Push notifications (APNs) and a hosted relay remain separate work.
+    </p>
+    <p>
+      Local checks recorded in the spec: unit tests, TypeScript, and the iOS JavaScript export.
+      Record a device Release only after that build actually runs.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>The phone must not ship a second copy of the project database or spawn the Bun sidecar.</li>
+      <li>Transport must stay certificate-pinned HTTPS. Do not add an unpinned fetch fallback.</li>
+      <li>The device token and the desktop bearer token must not appear in UI or logs.</li>
+      <li>The gateway must keep the route allow-list. Credentials, plugins, billing, and GitHub push stay on the desktop.</li>
+      <li>The assistant on the phone must not merge to <code>main</code>.</li>
+      <li>TestFlight and a passing device Release are still outstanding. Do not describe the companion as shipped.</li>
+    </ul>
+  </section>
+  <section id="expo-routes" class="doc-section">
+    <h2>Expo routes</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Route</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>app/index.tsx</code></td><td><code>/</code></td></tr>
+        <tr><td><code>app/connect.tsx</code></td><td><code>/connect</code></td></tr>
+        <tr><td><code>app/pair.tsx</code></td><td><code>/pair</code></td></tr>
+        <tr><td><code>app/(app)/assistant.tsx</code></td><td><code>/assistant</code></td></tr>
+        <tr><td><code>app/(app)/activity.tsx</code></td><td><code>/activity</code></td></tr>
+        <tr><td><code>app/(app)/settings.tsx</code></td><td><code>/settings</code></td></tr>
+        <tr><td><code>app/(app)/projects/index.tsx</code></td><td><code>/projects</code></td></tr>
+        <tr><td><code>app/(app)/projects/[id].tsx</code></td><td><code>/projects/[id]</code></td></tr>
+        <tr><td><code>commit/[oid].tsx</code></td><td><code>commit/[oid]</code></td></tr>
+        <tr><td><code>pulls/[number].tsx</code></td><td><code>pulls/[number]</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="companion-client" class="doc-section">
+    <h2>Companion client</h2>
+    <p>Methods on <code>CompanionClient</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Method</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>health</code></td></tr>
+        <tr><td><code>projects</code></td></tr>
+        <tr><td><code>project</code></td></tr>
+        <tr><td><code>status</code></td></tr>
+        <tr><td><code>log</code></td></tr>
+        <tr><td><code>branches</code></td></tr>
+        <tr><td><code>diff</code></td></tr>
+        <tr><td><code>commit</code></td></tr>
+        <tr><td><code>createBranch</code></td></tr>
+        <tr><td><code>checkout</code></td></tr>
+        <tr><td><code>restore</code></td></tr>
+        <tr><td><code>pullRequests</code></td></tr>
+        <tr><td><code>pullRequest</code></td></tr>
+        <tr><td><code>review</code></td></tr>
+        <tr><td><code>merge</code></td></tr>
+        <tr><td><code>close</code></td></tr>
+        <tr><td><code>runs</code></td></tr>
+        <tr><td><code>dispatch</code></td></tr>
+        <tr><td><code>aiStatus</code></td></tr>
+        <tr><td><code>agents</code></td></tr>
+        <tr><td><code>sessionState</code></td></tr>
+        <tr><td><code>questionReply</code></td></tr>
+        <tr><td><code>questionReject</code></td></tr>
+        <tr><td><code>aiModels</code></td></tr>
+        <tr><td><code>abortChat</code></td></tr>
+        <tr><td><code>permissionReply</code></td></tr>
+        <tr><td><code>chat</code></td></tr>
+        <tr><td><code>queueChat</code></td></tr>
+        <tr><td><code>notifications</code></td></tr>
+        <tr><td><code>markNotificationRead</code></td></tr>
+        <tr><td><code>markAllNotificationsRead</code></td></tr>
+        <tr><td><code>removeNotification</code></td></tr>
+        <tr><td><code>events</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="pairing" class="doc-section">
+    <h2>Pairing fields</h2>
+    <p>
+      A pairing record has <code>baseUrl</code>, <code>token</code>, <code>fingerprint</code>,
+      <code>name</code>, and optional <code>hosts</code>.
+      <code>apps/mobile/lib/pairing.ts</code> exports <code>extractPairingLink</code>,
+      <code>parsePairingLink</code>, and <code>PairingError</code>.
+    </p>
+  </section>
+
+  <section id="native-module" class="doc-section">
+    <h2>Native module</h2>
+    <p>
+      <code>apps/mobile/modules/companion-net/index.ts</code> exports
+      <code>CompanionNetNative</code>. Methods are <code>request</code>, <code>streamStart</code>,
+      <code>launchPairLink</code>, and <code>warmLocalNetwork</code>. The iOS implementation is
+      <code>apps/mobile/modules/companion-net/ios/CompanionNetModule.swift</code>.
+    </p>
+  </section>
+
+  <section id="lib-files" class="doc-section">
+    <h2>Lib files</h2>
+    <p>Files under <code>apps/mobile/lib</code>:</p>
+    <table>
+      <thead>
+        <tr><th>File</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>client.ts</code></td></tr>
+        <tr><td><code>pairing.ts</code></td></tr>
+        <tr><td><code>sse.ts</code></td></tr>
+        <tr><td><code>live-events.ts</code></td></tr>
+        <tr><td><code>store.ts</code></td></tr>
+        <tr><td><code>storage.ts</code></td></tr>
+        <tr><td><code>offline-queue.ts</code></td></tr>
+        <tr><td><code>biometrics.ts</code></td></tr>
+        <tr><td><code>server.tsx</code></td></tr>
+        <tr><td><code>server-context.ts</code></td></tr>
+        <tr><td><code>chat-log.ts</code></td></tr>
+        <tr><td><code>native.ts</code></td></tr>
+        <tr><td><code>format.ts</code></td></tr>
+        <tr><td><code>theme.tsx</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "History", href: "/docs/history" }, { title: "Workflows", href: "/docs/workflows" }, { title: "Sidecar", href: "/docs/sidecar" }]} />
+</DocsLayout>

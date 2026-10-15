@@ -1,0 +1,256 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Drawing document", href: "#drawing" },
+  { title: "Sketch and parameters", href: "#sketch" },
+  { title: "Feature history", href: "#history" },
+  { title: "Mesh solids", href: "#mesh" },
+  { title: "Exact B-rep", href: "#brep" },
+  { title: "Import and export", href: "#exchange" },
+  { title: "Technical drawings", href: "#sheets" },
+  { title: "Modules", href: "#modules" },
+]
+---
+
+<DocsLayout
+  title="CAD geometry"
+  subtitle="Drawings, sketches, meshes, and an exact boundary representation. All of it is plain data in @cadcamfun/core."
+  description="How CAD geometry works: the drawing document, parametric history, mesh Booleans, the B-rep kernel, and technical drawings."
+  toc={toc}
+>
+  <section id="drawing" class="doc-section">
+    <h2>Drawing document</h2>
+    <p>
+      A drawing is the 2D document stored on a project. <code>DrawingSchema</code> in
+      <code>packages/core/src/cad/entities.ts</code> holds a schema version, an id, a name, a
+      display unit, layers, entities, and a revision counter. Geometry is always stored in
+      millimetres. Angles on arcs are radians. The <code>units</code> field is only how the
+      editor labels numbers; it does not rescale the stored points.
+    </p>
+    <p>
+      Every entity is a tagged record. The tag is <code>_tag</code>. The kinds are Line, Circle,
+      Arc, Polyline, Rectangle, Ellipse, Spline, Text, Dimension, Hatch, and Block. Shared fields
+      are id, layer, visibility, lock, an optional line style, an optional 2D transform, and
+      optional user data. Selection is not stored on the entity. It lives in the editor.
+    </p>
+    <p>
+      A line style is a colour (0–255 channels, optional alpha), a width, and a type:
+      continuous, dashed, dotted, center, or phantom. A transform is scale, then rotation, then
+      translation. Shear uses the affine form in <code>transform.ts</code> instead.
+    </p>
+    <p>
+      <code>entitySchemaOf(tag)</code> returns the Effect schema for one kind, so a toolbar can
+      decode a line without casting the whole union. <code>emptyDrawing</code> starts a document
+      with one default layer. Older JSON that still uses a <code>type</code> field is upgraded by
+      <code>migrate.ts</code> and then decoded; a failure is <code>DrawingMigrationError</code>.
+    </p>
+    <DocCode language="ts" title="Import">
+{`import { cad, drawing, entitySchemaOf } from "@cadcamfun/core"
+
+const lineSchema = entitySchemaOf("Line")
+const exact = cad.brep`}
+    </DocCode>
+    <p>
+      <code>packages/core/src/index.ts</code> re-exports CAD symbols both flat and as the
+      <code>cad</code> namespace. CAM and technical drawings are namespaces only
+      (<code>cam</code>, <code>drawing</code>), so a name like <code>Path</code> does not collide.
+    </p>
+  </section>
+
+  <section id="sketch" class="doc-section">
+    <h2>Sketch and parameters</h2>
+    <p>
+      A sketch in <code>sketch.ts</code> is points, lines, circles, and arcs that share point ids.
+      A Levenberg–Marquardt solver drives the constraints. The result reports degrees of freedom,
+      redundant constraints, and conflicts. <code>sketchProfiles</code> walks the solved geometry
+      and returns closed loops. Those loops are what an extrude consumes. A loop inside a loop is
+      a hole (even-odd), so a ring is two circles.
+    </p>
+    <p>
+      Dimensions in a history are not always numbers. <code>expr.ts</code> evaluates a parameter
+      table: arithmetic, unit suffixes (<code>mm</code>, <code>in</code>, <code>deg</code>),
+      constants, and functions. <code>resolveParameters</code> orders the table by dependency and
+      rejects cycles. <code>dimensionValue</code> is what a feature reads after that pass. By the
+      time the sketch solver runs, every dimension is a number.
+    </p>
+    <p>
+      Planes are right-handed. XY has normal +Z, YZ has normal +X, ZX has normal +Y. A sketch can
+      also sit on a plane feature created earlier in the history, offset along that plane’s normal.
+    </p>
+  </section>
+
+  <section id="history" class="doc-section">
+    <h2>Feature history</h2>
+    <p>
+      <code>history.ts</code> is a parameter table plus an ordered feature list.
+      <code>rebuild(history)</code> replays the list from the top. Changing <code>width</code>
+      re-solves every sketch that mentions it, rebuilds every solid made from those sketches, and
+      redoes every Boolean after that. The return value is mesh bodies, the resolved parameters,
+      the sketch solve records, sheet-metal flat patterns, and an <code>issues</code> list. A
+      feature that cannot be built is reported and skipped. Features that do not depend on it
+      still build.
+    </p>
+    <p>
+      Feature kinds in that file include sketch, extrude, revolve, hole, pattern, mirror, sweep,
+      loft, shell, fillet, catalogue primitives, coil, move, scale, split, combine, rib, sheet
+      metal, thread, text, push-pull, draft, mate, and plane. An extrude combines with the bodies
+      already built using <code>new</code>, <code>union</code>, <code>subtract</code>, or
+      <code>intersect</code>. A revolve turns a profile about a sketch line or about the plane’s
+      own X or Y axis. A hole is a cylinder subtracted at a point on a plane. A pattern copies an
+      earlier solid along a line or around Z.
+    </p>
+    <p>
+      Corner and edge treatments (chamfer or fillet of a given size) are applied on the profile
+      before the mesh is built. <code>history-edit.ts</code> edits the history immutably: set a
+      dimension by path, rename a parameter, reorder or remove a feature, or start from a
+      template. The editor keeps the previous value for undo.
+    </p>
+    <p>
+      <code>parametric-from-element.ts</code> turns a catalogue element into a history with named
+      parameters. Placement stays on the element, not in the parameter table.
+      <code>script.ts</code> is a fluent <code>model()</code> builder that produces the same
+      <code>History</code> the panel edits. <code>runModelScript</code> evaluates caller-trusted
+      JavaScript into that history.
+    </p>
+    <DocCallout title="Two replays of the same history">
+      <p>
+        <code>rebuild</code> produces triangle meshes. <code>history-brep.ts</code> replays the
+        same features as exact solids where the kernel supports them: plain extrude (including
+        draft and fillets), revolve, holes, sweeps, blends, shells, catalogue primitives, and
+        exact Booleans. A feature the kernel cannot build stays mesh-only and records the reason.
+        It does not silently approximate an exact solid.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="mesh" class="doc-section">
+    <h2>Mesh solids</h2>
+    <p>
+      <code>solid.ts</code> describes catalogue solids (box, cylinder, sphere, cone, torus,
+      extrude, revolve) and turns them into a <code>Mesh</code>: <code>Float32Array</code>
+      positions and <code>Uint32Array</code> indices. <code>meshOf</code>, bounds, and volume read
+      that mesh. The viewport and the mesh Booleans share it.
+    </p>
+    <p>
+      <code>csg.ts</code> unions, subtracts, and intersects triangle soups with a BSP, then
+      <code>cleanPolygonSoup</code> welds the result. The output is correct up to the input mesh
+      tolerance. It is not an exact solid. Inputs must be closed and wound consistently.
+      <code>mesh-clean.ts</code> welds vertices, repairs T-junctions, merges coplanar faces, and
+      re-triangulates. <code>mesh-topology.ts</code> and <code>mesh-normals.ts</code> check and
+      repair the mesh after that.
+    </p>
+    <p>
+      <code>design.ts</code> is the editor’s design space: right-handed, Z up, XY on the ground.
+      Solid rotation in the scene is degrees. Arc and revolution angles stay radians.
+      <code>checkModel</code> reports non-finite sizes, missing Boolean operands, scales under the
+      drawing tolerance, and parts outside an optional stock box.
+    </p>
+  </section>
+
+  <section id="brep" class="doc-section">
+    <h2>Exact B-rep</h2>
+    <p>
+      <code>cad.brep</code> is a boundary-representation kernel: analytic and NURBS geometry, and
+      topology stored as plain tables. A body is vertices, edges (curve segments), coedges (which
+      side of an edge a loop uses, plus an optional p-curve), loops, faces, and shells. Material
+      sits on the left of a loop. The tables serialise to JSON.
+    </p>
+    <p>
+      Curves and surfaces in <code>geom.ts</code> follow STEP parameterisation: line, circle,
+      plane, cylinder, cone, sphere, torus, surface of revolution, extrusion, and NURBS.
+      <code>primitives.ts</code>, <code>sweep.ts</code>, <code>loft.ts</code>, and
+      <code>path-sweep.ts</code> build solids. <code>boolean.ts</code> intersects, imprints,
+      classifies, and sews. An invalid Boolean throws <code>BooleanError</code>. It does not
+      return a partial solid.
+    </p>
+    <p>
+      <code>tessellate.ts</code> turns faces into a watertight welded mesh at a tolerance taken
+      from the model diagonal, and that mesh is the same <code>Mesh</code> the viewport uses.
+      <code>mass.ts</code> computes mass properties. <code>validate.ts</code> checks the body.
+      <code>features.ts</code> recognises holes from coaxial concave cylinders and cones
+      (counterbore, countersink, drill point, through) without reading the feature history.
+      <code>drawing-edges.ts</code> classifies crease edges against smooth tangent edges for
+      hidden-line drawings. <code>budget.ts</code> caps how much work one call may do.
+    </p>
+  </section>
+
+  <section id="exchange" class="doc-section">
+    <h2>Import and export</h2>
+    <p>
+      <code>dxf.ts</code> reads and writes LINE, CIRCLE, ARC, LWPOLYLINE (with bulge), ELLIPSE,
+      TEXT, and MTEXT. It keeps layers and honours <code>$INSUNITS</code>. The drawing is still
+      stored in millimetres. DXF angles are degrees only at that boundary.
+    </p>
+    <p>
+      <code>import-drawing.ts</code> turns a DXF, an SVG, or a <code>Drawing</code> into closed
+      loops and then into extruded scene elements. Nested loops become holes, subtracted from the
+      outer solid. The function is pure and deterministic.
+    </p>
+    <p>
+      <code>import-step.ts</code> reads a prismatic part: the footprint is the bottom faces on XY,
+      the height is the Z extent, and the result is an extrusion. Geometry that is not a prism is
+      counted in warnings, not approximated. An optional up-axis remap runs first.
+    </p>
+    <p>
+      Full solids go through <code>brep/step.ts</code> (AP203, AP214, AP242). Unsupported entities
+      are skipped with a warning. <code>scene-step.ts</code> places each scene element the same way
+      the mesh placer does (gizmo about the bounding-box centre) and <code>sceneToStep</code>
+      writes AP214. A mesh-only solid is faceted and the export says so.
+    </p>
+  </section>
+
+  <section id="sheets" class="doc-section">
+    <h2>Technical drawings</h2>
+    <p>
+      The <code>drawing</code> namespace builds a sheet from the 3D model.
+      <code>project.ts</code> makes orthographic views with hidden-line removal from a mesh or
+      from exact edges. Crease, boundary, and silhouette edges are kept; smooth tangent edges can
+      be dropped. View space is millimetres, Y up.
+    </p>
+    <p>
+      <code>section.ts</code> cuts the mesh with a half-space, caps the cut, projects it, and
+      hatches the section loops. A detail view is a circular zoom of an existing view.
+      <code>dimensions.ts</code> plans callouts from the rebuilt history (hole groups, threads,
+      radii), not by guessing from the mesh. <code>sheet.ts</code> lays views out in first or
+      third angle, adds a title block, and returns both a <code>Drawing</code> the 2D editor can
+      open and a report of dimensions, callouts, warnings, and whether edges came from the exact
+      kernel or the mesh. <code>svg.ts</code> writes that drawing to SVG: millimetre viewBox, Y
+      flipped, layer colours, and line types.
+    </p>
+  </section>
+
+  <section id="modules" class="doc-section">
+    <h2>Modules</h2>
+    <p>Everything below is under <code>packages/core/src/cad</code> unless noted.</p>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>entities.ts</code></td><td>Tagged 2D entities and the drawing document.</td></tr>
+        <tr><td><code>vec.ts</code>, <code>arc-math.ts</code>, <code>bounds.ts</code></td><td>Vectors, arc normalisation, and bounding boxes. Millimetres and radians.</td></tr>
+        <tr><td><code>shapes.ts</code>, <code>offset.ts</code>, <code>intersect.ts</code>, <code>snap.ts</code>, <code>spline.ts</code>, <code>tessellate.ts</code></td><td>2D area, offsets, intersections, snapping, splines, and polyline tessellation. CAM profiles reuse the offset.</td></tr>
+        <tr><td><code>sketch.ts</code>, <code>expr.ts</code>, <code>sketch-shapes.ts</code></td><td>Constraint solver, parameter expressions, and parametric profiles expanded before the solve.</td></tr>
+        <tr><td><code>history.ts</code>, <code>history-edit.ts</code>, <code>history-brep.ts</code></td><td>Mesh replay, immutable edits, and the exact replay of the same feature list.</td></tr>
+        <tr><td><code>solid.ts</code>, <code>csg.ts</code>, <code>mesh-clean.ts</code></td><td>Catalogue meshes, mesh Booleans, and weld after a Boolean.</td></tr>
+        <tr><td><code>brep/</code></td><td>Exact topology, Booleans, STEP, tessellation, mass, validation, hole recognition, drawing edges.</td></tr>
+        <tr><td><code>dxf.ts</code>, <code>import-drawing.ts</code>, <code>import-step.ts</code>, <code>scene-step.ts</code></td><td>DXF round-trip, 2D outline to extrude, prismatic STEP, and scene export to AP214.</td></tr>
+        <tr><td><code>sheet-metal.ts</code>, <code>thread.ts</code>, <code>text-solid.ts</code>, <code>fasteners.ts</code>, <code>dfm.ts</code></td><td>Flat patterns, modelled threads, text solids, ISO fastener sizes, and hole sites for machining.</td></tr>
+        <tr><td><code>packages/core/src/drawing</code></td><td>Projection, sections, dimensions, sheet layout, and SVG.</td></tr>
+      </tbody>
+    </table>
+    <DocCallout title="No I/O in this package">
+      <p>
+        These modules do not open SQLite, the network, or the DOM. The sidecar stores the JSON.
+        The viewport draws it. Hot geometry stays plain functions; Effect schemas sit on the
+        document boundary.
+      </p>
+    </DocCallout>
+  </section>
+  <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "Viewport", href: "/docs/viewport" }, { title: "Setups", href: "/docs/setups" }]} />
+</DocsLayout>

@@ -1,0 +1,278 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Paths", href: "#paths" },
+  { title: "2D tools", href: "#tools" },
+  { title: "3D view", href: "#view3d" },
+  { title: "Units and cursors", href: "#units" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Module tree", href: "#module-tree" },
+  { title: "Tool ids", href: "#tool-ids" },
+  { title: "Module roles", href: "#module-roles" },
+]
+---
+
+<DocsLayout
+  title="Viewport"
+  subtitle="2D tools emit commands. 3D draws meshes and toolpaths. WP7 is still in progress."
+  description="CADCAMFUN viewport: editor2d tools, view3d presets, spatial index, units, and cursors."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP7 on the task board is <strong>in progress</strong>. A separate session owns
+      <code>apps/desktop/src/viewport</code> and <code>src/state</code>. Spec:
+      <code>specs/06-desktop-ui.md</code> §2. Spec 06 also says the 3D viewport plays back
+      toolpaths and the 2D editor drives the tool state machines. That is the working core.
+      It is not the full performance budget (first paint under 1.5 s, no frame over 16 ms on
+      the large-drawing fixture).
+    </p>
+    <DocCallout type="note" title="Read the tool registry and the viewport README together">
+      <p>
+        <code>editor2d/tools/index.ts</code> registers machines for select, line, polyline,
+        rectangle, circle, arc, ellipse, text, dimension, move, rotate, scale, mirror, offset,
+        trim, fillet, and chamfer. <code>apps/desktop/src/viewport/README.md</code> still lists
+        offset, trim, extend, fillet, chamfer, centre-start-end arcs, rulers, four-view, and
+        worker meshing as remaining. Four-view is a <code>ViewPreset</code> in
+        <code>view3d.tsx</code>. Worker construction above 50 000 vertices is still described
+        as main-thread by that README. There is no material-removal simulation.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="paths" class="doc-section">
+    <h2>Paths</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>apps/desktop/src/viewport/index.ts</code></td><td>Import <code>Editor2D</code> and <code>View3D</code> from here.</td></tr>
+        <tr><td><code>viewport/editor2d/editor2d.tsx</code></td><td>Canvas, camera, render loop.</td></tr>
+        <tr><td><code>viewport/editor2d/tools/</code></td><td>One state machine per tool. <code>tool.ts</code> defines <code>ToolId</code>.</td></tr>
+        <tr><td><code>viewport/editor2d/camera.ts</code>, <code>render.ts</code>, <code>snap-pipeline.ts</code></td><td>Pan and zoom, draw, cursor to snap.</td></tr>
+        <tr><td><code>viewport/view3d/view3d.tsx</code></td><td>Three.js scene, orbit, presets, toolpath lines.</td></tr>
+        <tr><td><code>viewport/view3d/playback.ts</code></td><td>Segments with a <code>rapid</code> flag and durations.</td></tr>
+        <tr><td><code>viewport/view3d/toolpath-overlays.ts</code></td><td>Move points, arc helpers, labels. Rapid, cut, arc, and cycle kinds.</td></tr>
+        <tr><td><code>viewport/view3d/mesh-jobs.ts</code>, <code>mesh-worker.ts</code></td><td>Mesh build path. The README says current construction runs on the main thread.</td></tr>
+        <tr><td><code>viewport/view3d/modeling.ts</code>, <code>viewport-controls.tsx</code></td><td>Solids in the scene, preset picker.</td></tr>
+        <tr><td><code>viewport/spatial/grid.ts</code></td><td>Uniform grid index. Items too large for one cell are tracked aside and still returned by every query.</td></tr>
+        <tr><td><code>viewport/units.ts</code></td><td>Display conversion. Internal values stay millimetres.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Both views fill the parent. Give the parent a non-zero height. <code>Editor2D</code>
+      requires <code>drawing</code>, <code>onChange</code>, and <code>selectedTool</code>. Feed
+      emitted drawings back into <code>drawing</code>. External document replacements reset
+      history. Echoes of the canvas’s own documents do not. The canvas owns selection and a
+      bounded undo stack. Wheel and pinch zoom. Space-drag, middle-drag, and right-drag pan.
+      Enter finishes a polyline. Escape cancels a gesture. Delete removes the selection. F fits.
+    </p>
+  </section>
+
+  <section id="tools" class="doc-section">
+    <h2>2D tools</h2>
+    <p>
+      Spec 06 §2 lists the tools. Each machine is
+      <code>&#123; onPointerDown, onPointerMove, onPointerUp, onKey, preview, command, status &#125;</code>.
+      It returns a <code>Command</code>. It does not mutate the document. Shift constrains lines
+      and rectangles. A polyline commits once it has two points. Gesture ids do not collide.
+      Snapping calls <code>findSnap</code> from <code>@cadcamfun/core</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Tool id</th><th>Machine</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>select</code></td><td><code>tools/select.ts</code>. Click, box, add and remove.</td></tr>
+        <tr><td><code>line</code>, <code>rectangle</code>, <code>circle</code>, <code>ellipse</code></td><td><code>tools/two-point.ts</code>.</td></tr>
+        <tr><td><code>polyline</code>, <code>arc</code></td><td><code>tools/chained.ts</code>. Spec 06 asks for 3-point and centre-start-end arcs. The README still lists centre-start-end as remaining.</td></tr>
+        <tr><td><code>text</code>, <code>dimension</code></td><td><code>tools/annotation-transform.ts</code> via <code>gestureTool</code>. Text starts as the word Text. Type before placing it.</td></tr>
+        <tr><td><code>move</code>, <code>rotate</code>, <code>scale</code>, <code>mirror</code></td><td>Same gesture module. First point is the origin. Rotation uses drag direction. Scale uses drag length / 10 mm. Mirror uses the drag axis.</td></tr>
+        <tr><td><code>offset</code></td><td><code>tools/offset.ts</code>.</td></tr>
+        <tr><td><code>trim</code></td><td><code>tools/trim.ts</code>. Spec 06 groups trim and extend. There is no separate <code>extend</code> id in <code>ToolId</code>.</td></tr>
+        <tr><td><code>fillet</code>, <code>chamfer</code></td><td><code>tools/fillet-chamfer.ts</code>. <code>startTool("chamfer")</code> uses the same factory.</td></tr>
+      </tbody>
+    </table>
+    <DocCode language="ts" title="Start a tool">
+{`import { startTool } from "./editor2d/tools"
+
+const tool = startTool("line")
+tool?.onPointerDown(event)
+const command = tool?.command()`}
+    </DocCode>
+    <p>
+      <code>AVAILABLE_TOOLS</code> is the list of ids that have a factory.
+      <code>startTool</code> returns <code>undefined</code> when an id is missing.
+      <code>mirror</code> in core reflects about the line through the origin at an angle in
+      radians, so a vertical axis is <code>π/2</code>.
+    </p>
+  </section>
+
+  <section id="view3d" class="doc-section">
+    <h2>3D view</h2>
+    <p>
+      <code>View3D</code> takes an optional drawing, solids, an extrusion height in millimetres,
+      a <code>cam.Program</code>, a preset, and playback props. The caller owns play, pause, and
+      the scrub time. Playback stops at the end. Set <code>playbackTime</code> to 0 to restart.
+      OrbitControls handles orbit, pan, and zoom. Spec 06’s controls: orbit, pan, zoom, and view
+      presets. The scene draws stock as a core box solid, axes, and a grid.
+    </p>
+    <p>
+      <code>ViewPreset</code> in <code>view3d.tsx</code> is <code>perspective</code>,
+      <code>top</code>, <code>front</code>, <code>right</code>, <code>isometric</code>,
+      <code>bottom</code>, <code>back</code>, <code>left</code>, and <code>four-view</code>.
+      Orthographic cameras serve the axis-aligned presets. Four-view splits top, front, right,
+      and perspective. Orbit is disabled in that preset.
+    </p>
+    <p>
+      Toolpath preview walks the WP2 IR. Rapids are dashed. Cuts are solid. Arcs and helices are
+      tessellated. Drilling cycles expand before playback. <code>playback.ts</code> marks each
+      segment <code>rapid: boolean</code>. Overlay point kinds are <code>rapid</code>,
+      <code>cut</code>, <code>arc</code>, and <code>cycle</code>. The visualizer in
+      <code>toolpath-overlays.ts</code> exposes statistics, filterable points, arc-centre
+      helpers, and workpiece opacity. Spec 06 excludes material-removal simulation from v6.0.
+      The verifier’s height map is a separate CAM panel, not this viewport.
+    </p>
+    <p>
+      Spec 06 asks for mesh buffers off the main thread above 50 000 vertices, using a worker
+      and transferable <code>Float32Array</code>s. <code>mesh-worker.ts</code> is in the tree.
+      The viewport README says current mesh construction still runs on the main thread, and that
+      the large-drawing frame budget is unverified. CADCanvas (owned with WP6) schedules frames
+      only while the scene is active: idle scenes schedule nothing, hidden documents suspend,
+      and orbit damping runs until the camera settles.
+    </p>
+  </section>
+
+  <section id="units" class="doc-section">
+    <h2>Units and cursors</h2>
+    <p>
+      <code>units.ts</code> converts for display. <code>UNIT_TABLE</code> covers millimetres and
+      the other display units the status bar offers. <code>toDisplay</code> and
+      <code>fromDisplay</code> are the boundary. <code>formatAngle</code> prints degrees from
+      radians. <code>programUnitsOf</code> maps inch and thou to G-code <code>inch</code> and
+      everything else to <code>mm</code>. <code>DEFAULT_DECIMALS</code> is 3, matching the post.
+    </p>
+    <p>
+      Cursors are SVG files in the docs site at <code>packages/web/public/cursors/</code> and are
+      the same set the desktop serves from its public cursors (spec 06: kept in the repo). Files
+      present:
+    </p>
+    <DocCode language="text" title="public/cursors">
+{`selected.svg  selected-editable.svg  editable.svg
+draw-line.svg  draw-rectangle.svg  draw-circle.svg  draw-arc.svg  draw-polygon.svg
+dimension.svg  dimension-edit.svg  text.svg
+rotate.svg  rotating.svg  scale.svg  mirror.svg
+fillet.svg  chamfer.svg  erase.svg
+extrude.svg  revolve.svg  face.svg  edge.svg
+drill.svg  mill.svg  cut.svg  toolpath.svg
+measure.svg  measuring.svg`}
+    </DocCode>
+    <p>
+      The spatial index in <code>spatial/grid.ts</code> is what keeps snap and hit tests off a
+      linear scan. Spec 06’s target is 60 fps with 10 000 entities. The grid test builds and
+      queries that count. A stock box that covers many cells is stored beside the grid and
+      included in every query.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>Tools must not mutate the drawing. They emit commands. The editor applies them.</li>
+      <li>The viewport must not call Drizzle or the network. Documents and programs arrive as props.</li>
+      <li>Three.js stays in <code>view3d</code>. Core geometry stays free of Three.js types. Meshes come from <code>meshOf</code> or from tessellation.</li>
+      <li>Display code must not change stored coordinates. Convert with <code>units.ts</code> at the label.</li>
+      <li>Toolpath colours distinguish rapids and cuts. They are not a material-removal simulation.</li>
+      <li>WP7 must not treat the README’s unfinished list as deleted just because a factory file exists. Confirm the gesture in the tool module before calling a tool done.</li>
+    </ul>
+  </section>
+  <section id="module-tree" class="doc-section">
+    <h2>Module tree</h2>
+    <p>Files under <code>apps/desktop/src/viewport</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Path</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>index.ts</code></td></tr>
+        <tr><td><code>units.ts</code></td></tr>
+        <tr><td><code>editor2d/index.ts</code></td></tr>
+        <tr><td><code>editor2d/editor2d.tsx</code></td></tr>
+        <tr><td><code>editor2d/camera.ts</code></td></tr>
+        <tr><td><code>editor2d/render.ts</code></td></tr>
+        <tr><td><code>editor2d/snap-pipeline.ts</code></td></tr>
+        <tr><td><code>editor2d/tools/</code></td></tr>
+        <tr><td><code>view3d/index.ts</code></td></tr>
+        <tr><td><code>view3d/view3d.tsx</code></td></tr>
+        <tr><td><code>view3d/modeling.ts</code></td></tr>
+        <tr><td><code>view3d/mesh-worker.ts</code></td></tr>
+        <tr><td><code>view3d/mesh-jobs.ts</code></td></tr>
+        <tr><td><code>view3d/playback.ts</code></td></tr>
+        <tr><td><code>view3d/toolpath-overlays.ts</code></td></tr>
+        <tr><td><code>view3d/viewport-controls.tsx</code></td></tr>
+        <tr><td><code>spatial/grid.ts</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="tool-ids" class="doc-section">
+    <h2>Tool ids</h2>
+    <p>
+      <code>editor2d/tools/tool.ts</code> defines <code>ToolId</code>.
+      <code>editor2d/tools/index.ts</code> registers <code>TOOL_FACTORIES</code> for those ids.
+    </p>
+    <table>
+      <thead>
+        <tr><th><code>ToolId</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>select</code></td></tr>
+        <tr><td><code>line</code></td></tr>
+        <tr><td><code>polyline</code></td></tr>
+        <tr><td><code>rectangle</code></td></tr>
+        <tr><td><code>circle</code></td></tr>
+        <tr><td><code>arc</code></td></tr>
+        <tr><td><code>ellipse</code></td></tr>
+        <tr><td><code>text</code></td></tr>
+        <tr><td><code>dimension</code></td></tr>
+        <tr><td><code>move</code></td></tr>
+        <tr><td><code>rotate</code></td></tr>
+        <tr><td><code>scale</code></td></tr>
+        <tr><td><code>mirror</code></td></tr>
+        <tr><td><code>offset</code></td></tr>
+        <tr><td><code>trim</code></td></tr>
+        <tr><td><code>fillet</code></td></tr>
+        <tr><td><code>chamfer</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="module-roles" class="doc-section">
+    <h2>Module roles</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>viewport/index.ts</code></td><td>Re-exports <code>Editor2D</code>, <code>View3D</code>, <code>AVAILABLE_TOOLS</code>, and <code>solidsFromProfiles</code>.</td></tr>
+        <tr><td><code>units.ts</code></td><td><code>UNIT_TABLE</code> and <code>MM_PER_INCH</code>.</td></tr>
+        <tr><td><code>spatial/grid.ts</code></td><td>Uniform grid index.</td></tr>
+        <tr><td><code>editor2d/tools/index.ts</code></td><td><code>TOOL_FACTORIES</code> and the <code>ToolId</code> registry.</td></tr>
+        <tr><td><code>view3d/modeling.ts</code></td><td><code>solidsFromProfiles</code>.</td></tr>
+        <tr><td><code>view3d/playback.ts</code></td><td>Toolpath playback segments.</td></tr>
+        <tr><td><code>view3d/toolpath-overlays.ts</code></td><td>Toolpath overlay geometry.</td></tr>
+        <tr><td><code>view3d/mesh-worker.ts</code></td><td>Mesh worker.</td></tr>
+        <tr><td><code>view3d/mesh-jobs.ts</code></td><td>Mesh jobs.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "Desktop UI", href: "/docs/desktop" }, { title: "CAD geometry", href: "/docs/cad" }, { title: "CAM and G-code", href: "/docs/cam" }]} />
+</DocsLayout>

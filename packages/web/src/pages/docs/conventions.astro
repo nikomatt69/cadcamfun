@@ -1,0 +1,162 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Language and files", href: "#language" },
+  { title: "Effect", href: "#effect" },
+  { title: "Errors and schemas", href: "#errors" },
+  { title: "Database", href: "#database" },
+  { title: "Units and G-code", href: "#units" },
+  { title: "Workflow", href: "#workflow" },
+  { title: "Boundaries", href: "#boundaries" },
+]
+---
+
+<DocsLayout
+  title="Conventions"
+  subtitle="Effect 4.0.0-rc.112, millimetres and radians, one SQLite owner, English everywhere."
+  description="CADCAMFUN coding conventions: Effect v4, Drizzle, units, errors, and agent workflow."
+  toc={toc}
+>
+  <section id="language" class="doc-section">
+    <h2>Language and files</h2>
+    <p>
+      Spec <code>01-conventions.md</code> applies to every work package. Identifiers, comments,
+      docs, commit messages, and UI strings are English. UI strings go through the i18n table.
+      The default locale is <code>en</code>. Desktop strings live under
+      <code>apps/desktop/src/i18n</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Rule</th><th>What to do</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>TypeScript</td><td>Strict. No <code>any</code> in exported signatures. Prefer <code>unknown</code> plus Schema at boundaries.</td></tr>
+        <tr><td>Modules</td><td>ES modules. Relative imports include the <code>.ts</code> extension.</td></tr>
+        <tr><td>Files</td><td><code>kebab-case.ts</code>. One concept per file. Tests sit beside source as <code>*.test.ts</code> and use <code>bun:test</code>.</td></tr>
+        <tr><td>Comments</td><td>Explain why. Keep modules small. Keep hot algorithms pure.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="effect" class="doc-section">
+    <h2>Effect</h2>
+    <p>
+      Effect is pinned to <code>4.0.0-rc.112</code>. The authoritative docs for that pin are
+      <code>packages/db/node_modules/effect/ai-docs/src/</code> (any workspace copy works; Bun does
+      not hoist). Do not write v3 idioms from memory. Do not bump <code>effect</code> in one
+      package. Spec 08 §6.3 records the coupling to <code>@nikcli-ai/sdk-next</code>.
+    </p>
+    <DocCode language="ts" title="Service, traced function, decode">
+{`class ProjectRepo extends Context.Service<ProjectRepo, {
+  readonly list: Effect.Effect<ReadonlyArray<Project>, DatabaseError>
+}>()("cadcamfun/ProjectRepo") {}
+
+const load = Effect.fn("ProjectRepo.list")(function* () {
+  const input = yield* Schema.decodeUnknownEffect(Query)(raw)
+  return input
+})`}
+    </DocCode>
+    <ul>
+      <li>Functions that return an Effect and benefit from tracing use <code>Effect.fn("Module.name")</code>. Hot paths use <code>Effect.fnUntraced</code>.</li>
+      <li>Do not write a function whose only job is to wrap <code>Effect.gen</code> and return it.</li>
+      <li>Never throw inside Effect code. Map foreign exceptions with <code>Effect.try</code> or <code>Effect.tryPromise</code> into a tagged error. Handle with <code>Effect.catchTag</code> or <code>Effect.catchTags</code>.</li>
+      <li>Domain models are <code>Schema.Class</code> or <code>Schema.Struct</code>.</li>
+      <li>Resources use <code>Effect.acquireRelease</code> inside a Layer. The Layer owns the lifecycle.</li>
+      <li>Configuration is read once in <code>apps/sidecar/src/config.ts</code> via Effect <code>Config</code>. Everything else receives a service.</li>
+    </ul>
+    <p>
+      Pure geometry and CAM in <code>packages/core</code> have no Effect runtime in hot loops.
+      Algorithms are plain functions over readonly arrays. Effect and Schema wrap them at
+      validation and error edges.
+    </p>
+  </section>
+
+  <section id="errors" class="doc-section">
+    <h2>Errors and schemas</h2>
+    <p>
+      Errors that cross a process boundary are <code>Schema.TaggedError</code> with a stable
+      <code>_tag</code> and an English message. Internal-only errors may use
+      <code>Data.TaggedError</code>. Spec 05 annotates the shared HTTP errors:
+      <code>NotFound</code> (404), <code>Validation</code> (422), <code>Conflict</code> (409),
+      <code>Unauthorized</code> (401), <code>Internal</code> (500).
+    </p>
+    <p>
+      Log with <code>Effect.log*</code> and <code>Effect.annotateLogs</code>.
+      <code>console.*</code> stays in entrypoints. User-facing errors stay typed.
+    </p>
+  </section>
+
+  <section id="database" class="doc-section">
+    <h2>Database</h2>
+    <p>
+      Only <code>packages/db</code> talks to SQLite. Other packages use repository services in
+      <code>apps/sidecar</code> or the <code>Database</code> service. Every query goes through
+      <code>Database.query(operation, run)</code> so a failure becomes <code>DatabaseError</code>.
+    </p>
+    <DocCode language="bash" title="Schema change, from the repo root">
+{`# 1. edit packages/db/src/schema.ts
+bun run db:generate
+# commit the generated SQL under packages/db/drizzle/
+bun run db:migrate`}
+    </DocCode>
+    <p>
+      Leave generated SQL as drizzle-kit wrote it. Table and column names stay identical to the
+      legacy Prisma SQLite database. A schema change ships with a test in
+      <code>packages/db/src/database.test.ts</code> or a new <code>*.test.ts</code>.
+    </p>
+  </section>
+
+  <section id="units" class="doc-section">
+    <h2>Units and G-code</h2>
+    <table>
+      <thead>
+        <tr><th>Quantity</th><th>Inside modules</th><th>Where conversion happens</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Length</td><td>millimetres</td><td>UI display (<code>viewport/units.ts</code>) and the post-processor</td></tr>
+        <tr><td>Angle</td><td>radians</td><td>UI labels and G-code words that the dialect writes in degrees</td></tr>
+        <tr><td>Feed</td><td>mm/min in the toolpath IR</td><td>post converts when the program units are inch</td></tr>
+        <tr><td>Decimals</td><td>fixed count, default 3</td><td><code>formatNumber</code> in <code>cam/post/emitter.ts</code></td></tr>
+      </tbody>
+    </table>
+    <DocCallout type="note" title="Zero is a real value">
+      <p>
+        CAM defaults use <code>??</code>, never <code>||</code>. An explicit feed or height of
+        <code>0</code> must survive. Spec 04 lists the legacy <code>||</code> defaults as a bug
+        with a regression test.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="workflow" class="doc-section">
+    <h2>Workflow</h2>
+    <ul>
+      <li>Do not commit unless asked.</li>
+      <li>Do not edit files outside the work package you own. The task board in spec 00 §4 lists owners.</li>
+      <li>Never read, print, or copy values from <code>.env*</code> files.</li>
+      <li>Before finishing a work package: typecheck, test, and update that spec’s status and change log.</li>
+      <li>Definition of done (spec 00 §5): <code>bun install</code>, <code>bunx tsc -p &lt;package&gt;/tsconfig.json</code>, <code>bun test &lt;package dir&gt;</code>, public surface written in the spec, no <code>.reference/</code> imports, no <code>process.env</code> outside the config module.</li>
+    </ul>
+    <DocCode language="bash" title="Check one package">
+{`bunx tsc -p packages/core/tsconfig.json
+bun test packages/core`}
+    </DocCode>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>Hot loops in <code>packages/core</code> must not depend on the Effect runtime.</li>
+      <li>Handlers outside <code>apps/sidecar/src/config.ts</code> must not read process environment variables.</li>
+      <li>Repositories outside <code>packages/db</code> must not open a SQLite connection of their own.</li>
+      <li>Exported signatures must not use <code>any</code>.</li>
+      <li>Degrees must not cross a module boundary. Pass radians.</li>
+    </ul>
+  </section>
+  <DocRelated items={[{ title: "Stack", href: "/docs/stack" }, { title: "Database", href: "/docs/database" }, { title: "API contract", href: "/docs/api" }]} />
+</DocsLayout>

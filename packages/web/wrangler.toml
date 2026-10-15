@@ -1,0 +1,49 @@
+name = "cadcamfun-web"
+main = "./dist/_worker.js"
+compatibility_date = "2025-01-25"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+html_handling = "drop-trailing-slash"
+
+[vars]
+# Docs assistant (/api/docs-assistant). Any Workers AI text-generation model
+# works. Workers AI includes 10,000 free Neurons/day, so the default is a small
+# "fast" model that keeps a grounded answer (~5k input + ~500 output tokens)
+# cheap enough for hundreds of questions per day.
+#   @cf/meta/llama-3.2-3b-instruct          — cheapest, still coherent
+#   @cf/meta/llama-3.1-8b-instruct-fast     — default: best quality/cost balance
+#   @cf/meta/llama-3.3-70b-instruct-fp8-fast — best answers, ~6x the Neurons
+DOCS_ASSISTANT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
+# Questions that ask for something buildable (a checklist, a setup sheet, a
+# diagram) get a stronger model that writes valid CSS and interactive HTML.
+DOCS_ASSISTANT_ARTIFACT_MODEL = "@cf/openai/gpt-oss-20b"
+DOCS_ASSISTANT_RATE_LIMIT = "20"
+# Optional: canonical origin for guide share links.
+# ARTIFACT_PUBLIC_ORIGIN = "https://cadcamfun.example"
+# Optional: back the assistant with a real nikcli session instead of a one-shot
+# Workers AI call. Set the server here and the token as a secret
+# (`bunx wrangler secret put CADCAMFUN_DOCS_TOKEN`). Unset = Workers AI.
+# CADCAMFUN_DOCS_SERVER = "https://nikcli.example"
+# CADCAMFUN_DOCS_AGENT = "docs-support"
+
+# Workers AI — powers the docs assistant. Always runs against the real
+# Cloudflare service, including under `wrangler dev`, which has no local model.
+[ai]
+binding = "AI"
+remote = true
+
+# Optional per-IP rate limit for the assistant. Create the namespace once with
+# `bunx wrangler kv namespace create cadcamfun-docs-assistant`, then uncomment
+# with the id it prints. Without it the assistant has no rate limit.
+# [[kv_namespaces]]
+# binding = "SESSIONS"
+# id = "<namespace id>"
+
+# Optional shareable guides (/artifact/:id). Create the bucket once with
+# `bunx wrangler r2 bucket create cadcamfun-artifact`, then uncomment.
+# Without it answers stay in the chat and no guide is published.
+# [[r2_buckets]]
+# binding = "ARTIFACTS"
+# bucket_name = "cadcamfun-artifact"

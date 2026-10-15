@@ -1,0 +1,52 @@
+---
+import "../styles/global.css"
+import "../styles/docs.css"
+import "../styles/brand.css"
+import SocialMeta from "../components/SocialMeta.astro"
+import Mark from "../components/Mark.astro"
+
+interface Props {
+  title?: string
+  description?: string
+}
+const {
+  title = "CADCAMFUN",
+  description = "CADCAMFUN is a local-first native CAD/CAM desktop app: drawing, modelling, toolpaths, and G-code.",
+} = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e2eaf4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <SocialMeta title={title} description={description} />
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem("theme")
+        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches
+        document.documentElement.setAttribute("data-theme", stored || (dark ? "dark" : "light"))
+      })()
+    </script>
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">Skip to content</a>
+    <slot />
+    <footer class="mt-auto w-full px-[var(--nav-inset)] pb-[var(--nav-inset)] pt-[var(--plate-gap)]">
+      <div class="glass-bar mx-auto w-full max-w-[var(--content-max)] py-6">
+        <div class="page-shell flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <a href="/" aria-label="CADCAMFUN home"><Mark class="h-7 w-auto" /></a>
+          <nav class="flex gap-5 text-[13px] font-medium text-terminal-muted" aria-label="Footer">
+            <a href="/docs">Docs</a>
+            <a href="/docs/architecture">Architecture</a>
+            <a href="/docs/guides/quickstart">Quickstart</a>
+          </nav>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,78 @@
+---
+import Layout from "../../layouts/Layout.astro"
+import Navbar from "../../components/Navbar.astro"
+
+export const prerender = false
+---
+
+<Layout title="Studio — CADCAMFUN" description="CADCAMFUN Studio: projects and counts from the local Drizzle database.">
+  <Navbar />
+  <main id="main-content" class="page-section">
+    <div class="page-shell">
+      <div class="flex items-end justify-between gap-4">
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-[0.16em] text-terminal-muted">Studio</p>
+          <h1 class="font-display mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold tracking-[-0.03em]">Local workspace</h1>
+        </div>
+        <button id="studio-logout" type="button" class="pressable glass-chip px-4 py-2 text-[13px] font-semibold">Sign out</button>
+      </div>
+      <p id="studio-who" class="mt-4 text-[15px] text-terminal-muted"></p>
+      <div id="studio-counts" class="mt-8 grid gap-3 sm:grid-cols-4"></div>
+      <div class="material mt-8 overflow-hidden rounded-[var(--radius-card)]">
+        <table class="w-full text-left text-[14px]">
+          <thead>
+            <tr>
+              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">Project</th>
+              <th class="px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">Updated</th>
+            </tr>
+          </thead>
+          <tbody id="studio-projects"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const who = document.querySelector("#studio-who")
+  const counts = document.querySelector("#studio-counts")
+  const projects = document.querySelector("#studio-projects")
+
+  const response = await fetch("/studio/api/overview")
+  if (response.status === 401) location.href = "/studio/login"
+  else if (!response.ok) {
+    if (who) who.textContent = "The local Studio API is not running. Start it with bun run dev in packages/web."
+  } else {
+    const body = (await response.json()) as {
+      user: { email: string | null; name: string | null }
+      database: string
+      counts: Record<string, number>
+      projects: { id: string; name: string; updatedAt: string }[]
+    }
+    if (who) who.textContent = `${body.user.name ?? body.user.email ?? "Signed in"} · ${body.database}`
+    if (counts) {
+      counts.innerHTML = Object.entries(body.counts)
+        .map(
+          ([key, value]) =>
+            `<div class="material rounded-[var(--radius-card)] px-4 py-4"><p class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">${key}</p><p class="font-display mt-2 text-[1.6rem] font-bold">${value}</p></div>`,
+        )
+        .join("")
+    }
+    if (projects) {
+      projects.innerHTML =
+        body.projects.length === 0
+          ? `<tr><td class="px-4 py-4 text-terminal-muted" colspan="2">No projects in this database.</td></tr>`
+          : body.projects
+              .map(
+                (project) =>
+                  `<tr><td class="px-4 py-3">${project.name}</td><td class="px-4 py-3 text-terminal-muted">${project.updatedAt.slice(0, 10)}</td></tr>`,
+              )
+              .join("")
+    }
+  }
+
+  document.querySelector("#studio-logout")?.addEventListener("click", async () => {
+    await fetch("/studio/api/logout", { method: "POST" })
+    location.href = "/studio/login"
+  })
+</script>

@@ -1,0 +1,232 @@
+---
+import "../../../styles/global.css"
+import "../../../styles/brand.css"
+import Mark from "../../../components/Mark.astro"
+import { canViewArtifact, publicMeta, readArtifact } from "../../../lib/artifact"
+
+export const prerender = false
+
+// The URL carries a read capability: never cache the shell.
+Astro.response.headers.set("Cache-Control", "private, no-store")
+
+const env = Astro.locals.runtime?.env
+const id = Astro.params.id ?? ""
+const key = Astro.url.searchParams.get("key")
+
+const stored = env?.ARTIFACTS && id ? await readArtifact(env.ARTIFACTS, id) : null
+const authorized = stored ? canViewArtifact(stored, key) : false
+if (!stored) Astro.response.status = env?.ARTIFACTS ? 404 : 503
+else if (!authorized) Astro.response.status = 401
+
+const meta = stored && authorized ? publicMeta(stored) : null
+const rawUrl = meta ? `/artifact/${meta.id}/raw?key=${encodeURIComponent(key ?? "")}` : ""
+const updated = meta ? new Date(meta.time.updated).toUTCString() : ""
+const pageTitle = meta
+  ? `${meta.title} — CADCAMFUN guide`
+  : stored
+    ? "Private guide — CADCAMFUN"
+    : "Guide not found — CADCAMFUN"
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#e2eaf4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>{pageTitle}</title>
+    <link rel="icon" href="/favicon.ico" />
+    <script is:inline>
+      (() => {
+        let stored = null
+        try {
+          stored = localStorage.getItem("theme")
+        } catch {}
+        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches
+        document.documentElement.setAttribute("data-theme", stored || (dark ? "dark" : "light"))
+      })()
+    </script>
+  </head>
+  <body class="artifact-body">
+    <header class="artifact-bar-wrap">
+      <div class="glass-bar artifact-bar">
+        <div class="artifact-bar-left">
+          <a href="/docs" class="pressable" aria-label="CADCAMFUN docs"><Mark class="h-7 w-auto" /></a>
+          {meta && <span class="artifact-kind">Guide</span>}
+          {meta && <span class="artifact-title" title={meta.filename}>{meta.title}</span>}
+        </div>
+        {meta && (
+          <div class="artifact-bar-right">
+            <span class="artifact-meta">v{meta.version} · {updated}</span>
+            <button id="copy-link" type="button" class="pressable glass-chip artifact-copy">Copy link</button>
+          </div>
+        )}
+      </div>
+    </header>
+
+    {
+      !stored ? (
+        <main class="artifact-empty">
+          <div class="material artifact-card">
+            <h1>Guide not found</h1>
+            <p>This guide does not exist, was removed, or guides are not enabled on this deployment.</p>
+            <a href="/docs" class="pressable glass-chip plate-face artifact-cta">Back to the docs</a>
+          </div>
+        </main>
+      ) : !authorized ? (
+        <main class="artifact-empty">
+          <div class="material artifact-card">
+            <h1>Private guide</h1>
+            <p>
+              Open the link exactly as it was shared, including its <code>?key=</code> part.
+            </p>
+            <a href="/docs" class="pressable glass-chip plate-face artifact-cta">Back to the docs</a>
+          </div>
+        </main>
+      ) : (
+        <main class="artifact-frame-wrap">
+          <iframe class="material artifact-frame" src={rawUrl} sandbox="allow-scripts allow-popups" title={meta!.title}></iframe>
+        </main>
+      )
+    }
+
+    <script>
+      const copy = document.getElementById("copy-link")
+      copy?.addEventListener("click", () => {
+        void navigator.clipboard.writeText(window.location.href).then(() => {
+          copy.textContent = "Copied"
+          window.setTimeout(() => {
+            copy.textContent = "Copy link"
+          }, 1500)
+        })
+      })
+    </script>
+
+    <style is:global>
+      html,
+      body.artifact-body {
+        height: 100%;
+      }
+
+      body.artifact-body {
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+      }
+
+      .artifact-bar-wrap {
+        padding: var(--nav-inset) var(--nav-inset) 0;
+      }
+
+      .artifact-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        height: var(--topbar-height);
+        padding-inline: var(--page-gutter);
+      }
+
+      .artifact-bar-left,
+      .artifact-bar-right {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .artifact-kind {
+        flex: none;
+        padding: 0.1rem 0.45rem;
+        border-radius: 3px;
+        background: rgb(var(--terminal-accent) / 0.12);
+        color: rgb(var(--terminal-accent));
+        font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .artifact-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: "CADCAM Rounded", "Sofia Pro Soft", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .artifact-meta {
+        color: rgb(var(--terminal-muted));
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .artifact-copy {
+        border: none;
+        cursor: pointer;
+        padding: 0.4rem 0.8rem;
+        color: rgb(var(--terminal-text));
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .artifact-frame-wrap {
+        display: flex;
+        flex: 1;
+        padding: var(--plate-gap) var(--nav-inset) var(--nav-inset);
+      }
+
+      .artifact-frame {
+        width: 100%;
+        min-height: 70vh;
+        flex: 1;
+        border: 0;
+        border-radius: var(--radius-card);
+        background: rgb(var(--terminal-panel));
+      }
+
+      .artifact-empty {
+        display: grid;
+        flex: 1;
+        place-items: center;
+        padding: var(--nav-inset);
+      }
+
+      .artifact-card {
+        max-width: 28rem;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      .artifact-card h1 {
+        margin: 0;
+        font-family: "CADCAM Rounded", "Sofia Pro Soft", sans-serif;
+        font-size: 1.6rem;
+        letter-spacing: -0.02em;
+      }
+
+      .artifact-card p {
+        margin: 0.75rem 0 1.5rem;
+        color: rgb(var(--terminal-muted));
+      }
+
+      .artifact-cta {
+        display: inline-flex;
+        padding: 0.6rem 1.1rem;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      @media (max-width: 639px) {
+        .artifact-meta {
+          display: none;
+        }
+      }
+    </style>
+  </body>
+</html>

@@ -1,0 +1,266 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "The model", href: "#model" },
+  { title: "What is on disk", href: "#disk" },
+  { title: "Contracts", href: "#contracts" },
+  { title: "API", href: "#api" },
+  { title: "Work frames", href: "#frames" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Setup symbols", href: "#setup-symbols" },
+  { title: "Indexing and IR", href: "#indexing" },
+  { title: "Sidecar program service", href: "#sidecar-program" },
+  { title: "Desktop saved programs", href: "#desktop-programs" },
+]
+---
+
+<DocsLayout
+  title="Setups"
+  subtitle="One setup, many operations, one emit per program. WP14 is in progress."
+  description="Multi-operation CAM setups: plan, tool table, generate, and what is still missing on disk."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP14 on the task board is <strong>in progress</strong>. The board text says
+      <code>cam.program</code> contracts, plan/generate, the post tool-number override, and
+      multi-tool parsing are done, and that the desktop setup store and persistence are pending.
+      Spec: <code>specs/14-multi-op-setup.md</code>. Owner directories named by that spec:
+      <code>packages/core/src/cam/program</code>, post and analysis, 
+      <code>packages/api/src/groups/cam-setup.ts</code>,
+      <code>apps/sidecar/src/http/cam-setup.ts</code>, and
+      <code>apps/desktop/src/features/cam/&#123;lib,store&#125;/setup*</code>.
+    </p>
+    <DocCallout type="warn" title="The planner directory is not in the tree">
+      <p>
+        <code>packages/core/src/cam/program/</code> is absent.
+        <code>packages/api/src/groups/cam-setup.ts</code> is absent.
+        <code>apps/sidecar/src/http/cam-setup.ts</code> is absent. Spec 14 §5 says those program
+        modules are built and that the desktop store and database persistence follow in later
+        steps. Trust the files you can open. The contracts below are the spec you implement
+        against. They are not a claim that <code>planPrograms</code> is importable today.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="model" class="doc-section">
+    <h2>The model</h2>
+    <p>
+      The v6 generator takes one operation per request
+      (<code>POST /api/toolpaths/generate</code>). The desktop multi-toolpath panel stitches texts
+      with <code>combineGCode</code> in
+      <code>apps/desktop/src/features/cam/lib/multiToolpath.ts</code>. Concatenating full programs
+      leaves each block with its own header, <code>G21</code>, <code>M30</code>, and
+      <code>%</code>. No tool change is emitted. A machine cannot run that as one job.
+    </p>
+    <DocCode language="text" title="Spec 14 §2">
+{`Setup      = stock + machine + post + grouping + ordered Operations
+Operation  = element ids + parameters + one Tool
+ToolTable  = pocket T1..Tn -> Tool, derived from the operations
+Program    = one emitted .nc; tool changes between operations
+
+Operations -> planPrograms -> PlannedProgram[] -> generateSetup -> GeneratedProgram[]`}
+    </DocCode>
+    <p>
+      Grouping is <code>single</code> (one program, tool changes inside it), <code>perTool</code>,
+      or <code>perOperation</code>. All three come from the same planner.
+      <code>planPrograms</code> is pure: no geometry and no clock.
+      <code>generateSetup</code> calls the existing generator per operation, then emits each
+      program once. There is no string concatenation.
+    </p>
+  </section>
+
+  <section id="disk" class="doc-section">
+    <h2>What is on disk</h2>
+    <table>
+      <thead>
+        <tr><th>Spec names</th><th>In the tree</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>cam/program/op.ts</code>, <code>setup.ts</code>, <code>tooltable.ts</code>, <code>plan.ts</code>, <code>programs.ts</code></td><td>Directory missing. <code>cam/index.ts</code> does not export a <code>program</code> namespace.</td></tr>
+        <tr><td><code>PostOptions.toolNumbers</code>, <code>retractBeforeToolChange</code></td><td>Present in <code>packages/core/src/cam/post/types.ts</code>. <code>post/emitter.ts</code> applies both. Defaults keep prior output byte-identical.</td></tr>
+        <tr><td><code>analyseGcode</code> splitting a multi-tool file</td><td><code>packages/core/src/cam/generator/analysis.ts</code> exports <code>analyseGcode</code>. Spec 14 says a tool change becomes its own toolpath so the viewport and verifier keep the tools.</td></tr>
+        <tr><td><code>kernel/execute.ts</code> tool-number map</td><td>Present. It passes <code>toolNumbers</code> into <code>post.emit</code>.</td></tr>
+        <tr><td>API group <code>camSetup</code></td><td>Group file not present. <code>packages/api/src/cam-program.ts</code> is the portable saved-program schema, a different contract.</td></tr>
+        <tr><td>Sidecar <code>http/cam-setup.ts</code></td><td>Not present. Toolpath handlers live in <code>apps/sidecar/src/http/toolpaths.ts</code> and <code>toolpath-generator.ts</code>.</td></tr>
+        <tr><td>Desktop <code>setupStore</code></td><td>Spec 14 §5 says this follows later. Do not document a store that is not in <code>features/cam</code>.</td></tr>
+        <tr><td><code>cam/setup.ts</code></td><td>Present, and it is a different type: <code>ManufacturingSetup</code> (work frame, stock box, fixtures, tool assemblies) from spec 04, not the WP14 operation list.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="contracts" class="doc-section">
+    <h2>Contracts</h2>
+    <p>
+      When the program module lands, these are the types spec 14 §3 requires. Geometry resolution
+      stays outside core. <code>generateSetup(setup, geometryOf)</code> receives a function from
+      operation to <code>GeometryInput</code> because core has no I/O.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Symbol</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Operation</code></td><td><code>id</code>, <code>name</code>, <code>elementIds</code>, <code>params</code>, <code>tool</code>, optional <code>pocket</code>, <code>enabled</code>, <code>fromPreviousStock</code>.</td></tr>
+        <tr><td><code>Setup</code></td><td>Stock, machine type, work offset, <code>PostConfig</code>, grouping, <code>retractBeforeToolChange</code>, ordered operations.</td></tr>
+        <tr><td><code>PostConfig</code></td><td><code>postId</code> of <code>generic</code>, <code>fanuc</code>, or <code>grbl</code>, decimals, canned cycles, arc mode, header, tolerance, optional line numbers, stamp, <code>programNumberBase</code>.</td></tr>
+        <tr><td><code>buildToolTable</code></td><td>Pocket to tool, plus warnings. <code>assignPockets</code> keeps an explicit pocket, otherwise first use.</td></tr>
+        <tr><td><code>planPrograms</code></td><td><code>SetupPlan</code>: programs, tool table, tool loads, tool changes, warnings. Warns when a tool appears in non-adjacent operations. <code>reorderByTool</code> is the UI fix.</td></tr>
+        <tr><td><code>generateSetup</code></td><td><code>GeneratedSetup</code>: per-program G-code and IR, totals for cut length, rapid length, and estimated seconds.</td></tr>
+        <tr><td><code>validateSetup</code></td><td>Issues, not throws: duplicate pocket, operation without elements, rpm above <code>tool.maxRpm</code>, a group with no enabled operation.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>toolId</code> is the tool identity. <code>validate(program, machine)</code> already
+      reports <code>MissingTool</code> by id. The pocket number is emission metadata via
+      <code>PostOptions.toolNumbers</code>. Program numbers start at
+      <code>post.programNumberBase</code> (default 1000) plus the index, and the fanuc
+      <code>O</code> number reads <code>metadata.programNumber</code>.
+      <code>fromPreviousStock</code> feeds the previous tool’s diameter into a rest
+      <code>3d_surface</code> pass. Spec 04 §12’s limit still applies: the previous operation is
+      assumed to have cut the same Z levels with the same allowance.
+    </p>
+    <p>
+      Retract before a tool change is opt-in. Turning it on for existing single-tool goldens
+      would move those files. Leave the default off unless the setup asked for it.
+    </p>
+  </section>
+
+  <section id="api" class="doc-section">
+    <h2>API</h2>
+    <p>
+      Spec 14 §4 adds a group <code>camSetup</code>. The legacy routes in spec 05 stay as they
+      are. <code>generate</code> carries resolved elements because core does not load drawings.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Route</th><th>Body</th><th>Result</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>POST /api/cam/setups/plan</code></td><td><code>&#123; setup &#125;</code></td><td><code>SetupPlan</code>. Dry run. No geometry.</td></tr>
+        <tr><td><code>POST /api/cam/setups/generate</code></td><td><code>&#123; setup &#125;</code></td><td><code>GeneratedSetup</code></td></tr>
+        <tr><td><code>POST /api/cam/setups/validate</code></td><td><code>&#123; setup &#125;</code></td><td><code>&#123; issues &#125;</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Those three routes are specified. The group file and the sidecar handler file are not in
+      the repository. Do not call them against a running sidecar until both exist and an HTTP
+      test covers them. Saved multi-operation documents are a related, separate path: spec 05’s
+      change log says a portable <code>CamProgramDocument</code> may carry an optional ordered
+      <code>operations</code> array inside <code>Toolpath.data</code>. That persistence reuses
+      the toolpath tables. It is not the setup planner.
+    </p>
+  </section>
+
+  <section id="frames" class="doc-section">
+    <h2>Work frames</h2>
+    <p>
+      <code>packages/core/src/cam/setup.ts</code> is already exported from the CAM barrel. It
+      defines a rigid right-handed <code>WorkFrame</code>, a revisioned
+      <code>ManufacturingSetup</code> (stock and fixture envelopes in world coordinates, tool
+      assemblies), and <code>validateSetup</code> for finite geometry, an orthonormal frame,
+      unique tool and fixture ids, and clearance-envelope errors. Spec 04’s change log calls this
+      setup validation, not collision certification. Use it when you are placing a work coordinate
+      system. Use spec 14 when you are ordering operations into programs.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li>The planner must not read the database or the clock. Geometry is an argument.</li>
+      <li>Callers must not concatenate finished G-code strings to simulate a tool change.</li>
+      <li>The setup HTTP group must not replace <code>POST /api/toolpaths/generate</code>. Spec 14 says the legacy routes stay.</li>
+      <li>Enabling <code>retractBeforeToolChange</code> by default would change goldens. The post leaves it off unless the setup asks.</li>
+      <li>Desktop persistence of setups is pending. Do not invent a second toolpath table for it.</li>
+    </ul>
+  </section>
+  <section id="setup-symbols" class="doc-section">
+    <h2>Setup symbols</h2>
+    <p>Exports of <code>packages/core/src/cam/setup.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Symbol</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>WorkFrame</code></td></tr>
+        <tr><td><code>ToolAssembly</code></td></tr>
+        <tr><td><code>ManufacturingSetup</code></td></tr>
+        <tr><td><code>SetupIssue</code></td></tr>
+        <tr><td><code>validateWorkFrame</code></td></tr>
+        <tr><td><code>validateSetup</code></td></tr>
+        <tr><td><code>workToWorld</code></td></tr>
+        <tr><td><code>worldToWork</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="indexing" class="doc-section">
+    <h2>Indexing and IR</h2>
+    <p><code>packages/core/src/cam/indexing.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Symbol</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RotaryLayout</code></td></tr>
+        <tr><td><code>indexToolpath</code></td></tr>
+        <tr><td><code>frameFromNormal</code></td></tr>
+        <tr><td><code>anglesFor</code></td></tr>
+      </tbody>
+    </table>
+    <p><code>packages/core/src/cam/ir.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Symbol</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ProgramSchema</code></td></tr>
+        <tr><td><code>Program</code></td></tr>
+        <tr><td><code>WorkOffsetSchema</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Work offsets on that schema are <code>G54</code> through <code>G59</code>.
+      Subprogram text is <code>packages/core/src/cam/subprogram-text.ts</code>.
+      The portable saved-program schema is <code>packages/api/src/cam-program.ts</code>.
+    </p>
+  </section>
+
+  <section id="sidecar-program" class="doc-section">
+    <h2>Sidecar program service</h2>
+    <p>Symbols in <code>apps/sidecar/src/services/cam-program.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Symbol</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>runKernelRequest</code></td></tr>
+        <tr><td><code>prepareCamProgramData</code></td></tr>
+        <tr><td><code>drawingRevision</code></td></tr>
+        <tr><td><code>isPortableProgram</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="desktop-programs" class="doc-section">
+    <h2>Desktop saved programs</h2>
+    <table>
+      <thead>
+        <tr><th>Path</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>apps/desktop/src/features/cam/lib/saved-program.ts</code></td></tr>
+        <tr><td><code>apps/desktop/src/features/cam/store/multiToolpathStore.ts</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "API contract", href: "/docs/api" }, { title: "Desktop UI", href: "/docs/desktop" }]} />
+</DocsLayout>

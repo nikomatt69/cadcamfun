@@ -1,0 +1,116 @@
+---
+interface Props {
+  language?: string
+  title?: string
+}
+const { language = "text", title } = Astro.props
+const raw = Astro.slots.has("default") ? await Astro.slots.render("default") : ""
+// The rendered slot is already HTML-escaped; `{code}` escapes again, so decode
+// first or quotes and `&&` show up as `&quot;` and `&amp;&amp;` on the page.
+const decode = (value: string) =>
+  value
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(Number.parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+const code = decode(raw.replace(/<[^>]+>/g, "")).replace(/^\s*\n/, "").replace(/\s+$/, "")
+---
+
+<figure class="doc-code material not-prose my-6 rounded-[var(--radius-md)]">
+  <figcaption class="flex items-center justify-between gap-3 px-4 py-2">
+    <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-terminal-muted">{title ?? language}</span>
+    <button type="button" class="doc-code-copy pressable" data-doc-code-copy aria-label="Copy code">
+      <span class="doc-code-copy-label" data-label-idle>Copy</span>
+      <span class="doc-code-copy-label" data-label-done aria-hidden="true">Copied</span>
+    </button>
+  </figcaption>
+  <pre class="overflow-x-auto px-4 py-3 text-[13px] leading-6"><code>{code}</code></pre>
+</figure>
+
+<style>
+  .doc-code figcaption {
+    border-bottom: var(--plate-stroke-w) solid var(--plate-ink);
+  }
+
+  [data-theme="dark"] .doc-code figcaption {
+    border-bottom: none;
+  }
+
+  .doc-code-copy {
+    display: inline-grid;
+    place-items: center;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: rgb(var(--terminal-muted));
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Both labels share one cell; the swap is a blurred crossfade, not a jump. */
+  .doc-code-copy-label {
+    grid-area: 1 / 1;
+    transition:
+      opacity 200ms var(--ease-out),
+      filter 200ms var(--ease-out);
+  }
+
+  .doc-code-copy [data-label-done] {
+    opacity: 0;
+    filter: blur(2px);
+    color: rgb(var(--terminal-success));
+  }
+
+  .doc-code-copy[data-copied] [data-label-idle] {
+    opacity: 0;
+    filter: blur(2px);
+  }
+
+  .doc-code-copy[data-copied] [data-label-done] {
+    opacity: 1;
+    filter: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .doc-code-copy:hover {
+      color: rgb(var(--terminal-text));
+      background: var(--surface-hover);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .doc-code-copy-label {
+      filter: none !important;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-doc-code-copy]").forEach((button) => {
+    let timer = 0
+    button.addEventListener("click", async () => {
+      const code = button.closest("figure")?.querySelector("pre code")?.textContent ?? ""
+      try {
+        await navigator.clipboard.writeText(code)
+      } catch {
+        return
+      }
+      button.setAttribute("data-copied", "")
+      button.setAttribute("aria-label", "Copied")
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        button.removeAttribute("data-copied")
+        button.setAttribute("aria-label", "Copy code")
+      }, 1600)
+    })
+  })
+</script>

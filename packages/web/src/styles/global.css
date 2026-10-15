@@ -1,0 +1,463 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Floating acrylic plates. Light stays cool gray. Dark is black.
+  Surfaces separate with soft shadow and glass, never a colored edge.
+*/
+
+:root {
+  color-scheme: light;
+
+  --terminal-bg: 226 234 244;
+  --terminal-panel: 255 255 255;
+  --terminal-border: 186 198 214;
+  --terminal-text: 15 23 42;
+  --terminal-muted: 71 85 105;
+
+  --terminal-accent: 0 96 174;
+  --brand-red: 234 25 33;
+  --brand-green: 12 144 72;
+  --terminal-success: 12 144 72;
+  --terminal-error: 234 25 33;
+  --terminal-warning: 168 92 18;
+
+  --terminal-code: 255 255 255;
+  --terminal-shadow: 0 0 0;
+
+  --terminal-window-bg: 255 255 255;
+  --terminal-window-border: 10 12 14;
+  --terminal-window-code: 255 255 255;
+
+  --wash-1: 0.22;
+  --wash-color: 0 96 174;
+  --surface-hover: rgb(15 23 42 / 0.05);
+  --surface-active: rgb(15 23 42 / 0.08);
+
+  --nav-inset: 0.75rem;
+  --plate-gap: 0.75rem;
+  --plate-stroke-w: 0px;
+  --plate-ink: transparent;
+  --plate-drop:
+    0 0 0 0.5px rgb(15 23 42 / 0.05),
+    0 1px 2px rgb(15 23 42 / 0.06),
+    0 10px 28px -12px rgb(15 23 42 / 0.18);
+  --edge: 0px;
+
+  --topbar-height: 3.25rem;
+  --docs-subnav-height: 2.75rem;
+  --docs-mobilebar-height: 3rem;
+  --topbar-outer: calc(var(--topbar-height) + (var(--plate-stroke-w) * 2));
+  --subnav-outer: calc(var(--docs-subnav-height) + (var(--plate-stroke-w) * 2));
+  --subnav-top: calc(var(--nav-inset) + var(--topbar-outer) + var(--plate-gap));
+  --chrome-top: calc(var(--subnav-top) + var(--subnav-outer) + var(--plate-gap));
+  --rail-max: calc(100dvh - var(--chrome-top) - var(--nav-inset) - (var(--edge) * 2) - (var(--plate-stroke-w) * 2));
+
+  --page-gutter: clamp(1rem, 2vw + 0.5rem, 1.5rem);
+  --section-y: clamp(4.25rem, 7vw, 6.5rem);
+  --content-max: 90rem;
+
+  --radius-plate: 6px;
+  --radius-card: 6px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+
+  --type-eyebrow: 0.6875rem;
+  --type-body-sm: 0.9375rem;
+  --type-card-title: clamp(1.05rem, 1rem + 0.3vw, 1.2rem);
+  --type-page-title: clamp(2.15rem, 1.7rem + 2vw, 3.75rem);
+  --type-page-subtitle: clamp(1rem, 0.96rem + 0.3vw, 1.15rem);
+
+  --shadow-soft: var(--plate-drop);
+  --shadow-strong:
+    0 0 0 0.5px rgb(15 23 42 / 0.06),
+    0 2px 6px rgb(15 23 42 / 0.06),
+    0 24px 56px -18px rgb(15 23 42 / 0.28);
+
+  /*
+    One wash for the whole page. Body and the sticky field masks both paint it
+    with fixed attachment, so the strips behind the bars line up with the page.
+  */
+  --page-wash:
+    radial-gradient(ellipse 48rem 34rem at -6% -10%, rgb(var(--brand-red) / 0.11), transparent 64%),
+    radial-gradient(ellipse 52rem 38rem at 108% -6%, rgb(var(--terminal-accent) / 0.16), transparent 66%),
+    radial-gradient(ellipse 44rem 32rem at 42% 112%, rgb(var(--brand-green) / 0.1), transparent 64%);
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --hairline: 1px;
+
+  --glass-blur: 22px;
+  --glass-saturate: 170%;
+  --glass-fill: rgb(255 255 255 / 0.58);
+  --glass-sheen: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.72) 0%,
+    rgb(255 255 255 / 0.22) 15%,
+    rgb(255 255 255 / 0.05) 16%,
+    transparent 46%
+  );
+}
+
+@media (min-width: 768px) {
+  :root {
+    --nav-inset: 1rem;
+  }
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hairline: 0.5px;
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --terminal-bg: 0 0 0;
+  --terminal-panel: 16 16 16;
+  --terminal-border: 58 58 58;
+  --terminal-text: 250 250 250;
+  --terminal-muted: 168 168 168;
+
+  --terminal-accent: 250 250 250;
+  --brand-red: 234 25 33;
+  --brand-green: 12 144 72;
+  --terminal-success: 88 214 146;
+  --terminal-error: 255 122 118;
+  --terminal-warning: 232 184 96;
+
+  --terminal-code: 12 12 12;
+  --terminal-shadow: 0 0 0;
+
+  --terminal-window-bg: 10 10 10;
+  --terminal-window-border: 250 250 250;
+  --terminal-window-code: 8 8 8;
+
+  --wash-color: 250 250 250;
+  --wash-1: 0.06;
+  --surface-hover: rgb(255 255 255 / 0.06);
+  --surface-active: rgb(255 255 255 / 0.1);
+
+  --plate-ink: transparent;
+  --plate-drop:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.08),
+    0 0 0 0.5px rgb(255 255 255 / 0.06),
+    0 18px 40px -14px rgb(0 0 0 / 0.85);
+  --shadow-soft: var(--plate-drop);
+  --shadow-strong:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.1),
+    0 0 0 0.5px rgb(255 255 255 / 0.08),
+    0 28px 56px -18px rgb(0 0 0 / 0.9);
+
+  --page-wash:
+    radial-gradient(ellipse 42rem 28rem at -8% -12%, rgb(255 255 255 / 0.07), transparent 62%),
+    radial-gradient(ellipse 36rem 24rem at 108% -8%, rgb(255 255 255 / 0.05), transparent 64%),
+    radial-gradient(ellipse 40rem 22rem at 48% 112%, rgb(255 255 255 / 0.04), transparent 62%);
+
+  --glass-fill: rgb(16 16 16 / 0.72);
+  --glass-sheen: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.12) 0%,
+    rgb(255 255 255 / 0.03) 14%,
+    transparent 15%
+  );
+  --glass-saturate: 110%;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-inset) + var(--topbar-outer) + var(--plate-gap) + 1rem);
+  scrollbar-gutter: stable;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  margin: 0;
+  font-family: "Sofia Pro Soft", "Segoe UI", sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: rgb(var(--terminal-text));
+  background-color: rgb(var(--terminal-bg));
+  background-image: var(--page-wash);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-theme="dark"] body {
+  background-color: #000;
+}
+
+.field-mask {
+  background-color: rgb(var(--terminal-bg));
+  background-image: var(--page-wash);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(var(--terminal-accent) / 0.28);
+  color: rgb(var(--terminal-text));
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+textarea:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid rgb(var(--terminal-accent));
+  outline-offset: 2px;
+}
+
+.page-shell {
+  width: min(100%, var(--content-max));
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+.page-section {
+  padding-block: var(--section-y);
+  border-top-width: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+table,
+code,
+pre {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-display {
+  font-family: "CADCAM Rounded", "Sofia Pro Soft", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.pressable {
+  transition:
+    transform 180ms var(--ease-out),
+    translate 180ms var(--ease-out),
+    background-color 180ms var(--ease-out),
+    color 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Press lands fast, release settles: feedback belongs to pointer-down. */
+.pressable:active {
+  transform: scale(0.97);
+  transition-duration: 100ms;
+}
+
+.glass-bar,
+.glass-chip,
+.material,
+.docs-rail {
+  background-color: var(--glass-fill);
+  background-image: var(--glass-sheen);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: none;
+  border-radius: var(--radius-plate);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-chip {
+  border-radius: var(--radius-sm);
+}
+
+.plate-face {
+  border-radius: var(--radius-plate);
+  background-color: rgb(var(--terminal-accent) / 0.9);
+  color: #fff;
+}
+
+[data-theme="dark"] .plate-face {
+  color: #000;
+}
+
+.nav-current {
+  color: rgb(var(--terminal-text));
+  background-color: rgb(var(--terminal-accent) / 0.16);
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.55), transparent 52%);
+  border-radius: 4px;
+  box-shadow: var(--shadow-soft);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+[data-theme="dark"] .nav-current {
+  background-color: rgb(255 255 255 / 0.1);
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.16), transparent 55%);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-bar .rounded-full,
+.material .rounded-full,
+.glass-chip .rounded-full {
+  border-radius: var(--radius-sm);
+}
+
+.mobile-nav {
+  border-top: var(--plate-stroke-w) solid var(--plate-ink);
+  transition:
+    opacity 180ms var(--ease-out),
+    translate 180ms var(--ease-out);
+}
+
+/* The menu drops out of the bar it belongs to. Exit is instant. */
+@starting-style {
+  .mobile-nav {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+/*
+  Theme switch: one crossfade of the whole page instead of every surface
+  running its own colour transition at a different moment.
+*/
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-bar,
+  .glass-chip,
+  .material,
+  .docs-rail,
+  .nav-current {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgb(var(--terminal-panel) / 0.94);
+  }
+
+  .plate-face {
+    background-color: rgb(var(--terminal-accent));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-bar,
+  .glass-chip,
+  .material,
+  .docs-rail,
+  .nav-current {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-image: none;
+    background-color: rgb(var(--terminal-panel));
+  }
+
+  .plate-face {
+    background-color: rgb(var(--terminal-accent));
+    background-image: none;
+    color: #fff;
+  }
+
+  [data-theme="dark"] .plate-face {
+    color: #000;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass-bar,
+  .glass-chip,
+  .material,
+  .docs-rail,
+  .plate-face,
+  .nav-current {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-image: none;
+    border-style: solid;
+    border-width: 2px;
+    border-color: rgb(var(--terminal-text));
+  }
+
+  .glass-bar,
+  .glass-chip,
+  .material,
+  .docs-rail {
+    background-color: rgb(var(--terminal-panel));
+  }
+
+  .plate-face {
+    background-color: rgb(var(--terminal-accent));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    translate: 0 -2px;
+  }
+
+  .mobile-nav a:hover {
+    background: rgb(var(--terminal-accent) / 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .pressable:active,
+  .lift:hover,
+  .hero-anim,
+  .mobile-nav {
+    transform: none;
+    translate: none;
+  }
+}

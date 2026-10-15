@@ -1,0 +1,257 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Status", href: "#status" },
+  { title: "Model", href: "#model" },
+  { title: "Package", href: "#package" },
+  { title: "Tree", href: "#tree" },
+  { title: "HTTP", href: "#http" },
+  { title: "GitHub", href: "#github" },
+  { title: "Boundaries", href: "#boundaries" },
+  { title: "Module exports", href: "#module-exports" },
+  { title: "Snapshot directories", href: "#snapshot-directories" },
+  { title: "GitHub functions", href: "#github-functions" },
+]
+---
+
+<DocsLayout
+  title="History"
+  subtitle="Every project is a git repository. SQLite is the working copy. GitHub is an optional mirror."
+  description="CADCAMFUN git-style history: objects, branches, pull requests, and what is still pending."
+  toc={toc}
+>
+  <section id="status" class="doc-section">
+    <h2>Status</h2>
+    <p>
+      WP11 on the task board is <strong>done</strong> for core, sidecar, and API. The same
+      sentence says desktop panels and GitHub routes are pending. Owner directory:
+      <code>packages/vcs</code> (<code>@cadcamfun/vcs</code>), plus the
+      <code>GitRepo</code>, <code>GitObject</code>, <code>GitRef</code>, and
+      <code>PullRequest*</code> tables, and the sidecar <code>vcs</code> services. Spec:
+      <code>specs/13-vcs-actions-mobile.md</code>.
+    </p>
+    <DocCallout type="note" title="The history route exists. The graph does not.">
+      <p>
+        <code>/projects/:id/history</code> is in <code>apps/desktop/src/app/routes.tsx</code>.
+        Spec 13 §8 says that Version control screen and the per-item History buttons are built.
+        A drawn commit graph and in-editor CAD/CAM history panels are not. GitHub pull-request
+        mirroring is not built. <code>PullRequest.remoteNumber</code> is reserved. A live check
+        that GitHub’s Git Data API reproduces an oid is not done. Unit tests prove the hash.
+      </p>
+    </DocCallout>
+  </section>
+
+  <section id="model" class="doc-section">
+    <h2>Model</h2>
+    <p>
+      Blobs, trees, and commits use git’s loose-object format and SHA-1. An oid matches
+      <code>git cat-file</code> and, when the mirror works, GitHub. Tests in
+      <code>packages/vcs/test</code> check that against the real <code>git</code> binary. SQLite
+      holds the checked-out working copy. <code>commit</code> snapshots it into the repository.
+      <code>checkout</code>, <code>merge</code>, and <code>restore</code> write a tree back. A
+      dirty working copy blocks checkout, merge, and restore.
+    </p>
+    <p>
+      Collaboration is internal. Access follows project ownership and organization roles.
+      Members read, commit to branches, and open and review pull requests. The owner or an
+      organization admin or manager moves shared branches and merges. <code>GitRepo.remote</code>
+      (<code>owner/repo</code>) is the optional GitHub link. Legacy <code>*Version</code> tables
+      stay for the old routes. They are not this history.
+    </p>
+    <p>
+      An AI actor cannot commit, restore, or merge on <code>main</code>. The phone’s assistant
+      commits to <code>ai/*</code> branches and opens a pull request. A person merges. A review
+      of <code>request-changes</code> (latest verdict per reviewer) blocks the merge. Conflicts
+      leave the repository untouched and return the conflicting paths and JSON pointers.
+    </p>
+  </section>
+
+  <section id="package" class="doc-section">
+    <h2>Package</h2>
+    <p>
+      <code>packages/vcs</code> is pure aside from <code>node:crypto</code>. It does not open
+      SQLite. The sidecar <code>ProjectVcsRepo</code> implements the <code>Backend</code>
+      interface on the git tables.
+    </p>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>src/object.ts</code></td><td>Loose git objects and SHA-1 oids.</td></tr>
+        <tr><td><code>src/store.ts</code></td><td><code>Backend</code> interface and the memory backend.</td></tr>
+        <tr><td><code>src/repository.ts</code></td><td>Commit, log, branch, tag, checkout, merge (fast-forward, 3-way, <code>mergeInto</code>), <code>revertTo</code>, diff.</td></tr>
+        <tr><td><code>src/json.ts</code></td><td>Canonical JSON and <code>mergeJson</code>.</td></tr>
+        <tr><td><code>src/diff.ts</code></td><td><code>describeDiff</code>: entity, property pointer, before and after.</td></tr>
+        <tr><td><code>src/snapshot.ts</code></td><td>Project rows to files and back.</td></tr>
+        <tr><td><code>src/github.ts</code></td><td><code>push</code>, <code>fetchBranch</code>, <code>pull</code> over a <code>GitHubTransport</code>.</td></tr>
+        <tr><td><code>src/transport.ts</code></td><td><code>restTransport</code> for the Git Data API. Tested against an in-memory remote that enforces fast-forward and checks every object hash.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Sidecar pieces: <code>apps/sidecar/src/repos/project-vcs-repo.ts</code>,
+      <code>apps/sidecar/src/services/project-vcs.ts</code>,
+      <code>apps/sidecar/src/http/vcs.ts</code>, and
+      <code>apps/sidecar/src/services/ai-vcs-tools.ts</code>. The API group is
+      <code>packages/api/src/groups/vcs.ts</code>.
+    </p>
+  </section>
+
+  <section id="tree" class="doc-section">
+    <h2>Tree</h2>
+    <p>
+      Canonical JSON (sorted keys, two-space indent) keeps text diffs stable. Two people editing
+      different properties of one drawing do not conflict. The same property, or any array,
+      conflicts with a JSON pointer. Applying a commit creates missing library rows and updates
+      an existing one only when the current user owns it. Owners and organizations are
+      installation-specific and are not stored in the tree.
+    </p>
+    <DocCode language="text" title="Tracked paths (spec 13 §2)">
+{`project.json
+drawings/<id>.json
+components/<id>.json
+toolpaths/<id>.json
+materials/<id>.json
+tools/<id>.json
+machine-configs/<id>.json
+costs/<id>.json
+.cadcamfun/workflows/<name>.yml`}
+    </DocCode>
+    <p>
+      Toolpath files include generated G-code. Not tracked: thumbnails, comments, chat, uploaded
+      binaries, and per-user cost settings. Every history-changing action is also appended to
+      <code>ActivityLog</code>. <code>GET …/vcs/log?path=drawings/&lt;id&gt;.json</code> lists
+      commits that touched that file. <code>POST …/vcs/restore</code> with <code>paths</code>
+      restores only those files as a new commit.
+    </p>
+    <p>
+      <code>log</code> is linear in history length. <code>isAncestor</code> walks the graph.
+      Spec 13 says that is fine for thousands of commits. Packfile and delta compression are not
+      implemented. Large STL and DXF blobs are out of this tree.
+    </p>
+  </section>
+
+  <section id="http" class="doc-section">
+    <h2>HTTP</h2>
+    <p>
+      Routes are under <code>/api/projects/:id</code>. A commit or merge triggers
+      <code>push</code> workflows for that branch. Opening a pull request triggers
+      <code>pullRequest</code> workflows. A trigger failure does not fail the user’s operation.
+      The API accepts non-model files only under <code>.cadcamfun/workflows/*.yml</code>.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Route</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GET …/vcs/status</code>, <code>/log</code>, <code>/branches</code>, <code>/diff?from&amp;to</code></td><td>Read state.</td></tr>
+        <tr><td><code>POST …/vcs/commit</code>, <code>/branches</code>, <code>/checkout</code>, <code>/restore</code></td><td>Write state. Commit takes <code>message</code> and optional workflow <code>files</code>.</td></tr>
+        <tr><td><code>GET/PUT …/vcs/remote</code>, <code>POST …/vcs/push</code>, <code>/pull</code></td><td>GitHub mirror. Header <code>x-github-token</code>. Desktop only.</td></tr>
+        <tr><td><code>GET/POST …/pulls</code>, reviews, <code>/merge</code>, <code>/close</code></td><td>Pull requests.</td></tr>
+        <tr><td><code>GET …/actions/runs</code>, <code>POST …/actions/dispatch</code></td><td>Workflow runs. See <a href="/docs/workflows">Workflows</a>.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The companion gateway allow-list includes project, vcs, pulls, and actions reads, and the
+      AI chat routes. It refuses <code>/vcs/push</code> and <code>/vcs/pull</code>. The phone
+      never holds the desktop bearer token or the GitHub token. The desktop keeps the GitHub
+      token in the OS keychain and sends it per request. The sidecar does not store it.
+    </p>
+    <p>
+      Phone flow: <code>vcs_status</code>, <code>vcs_start_change</code> (creates
+      <code>ai/&lt;topic&gt;</code> and refuses a dirty working copy), CAD or CAM edits,
+      <code>vcs_commit</code>, <code>vcs_open_pull_request</code>. After a person merges, the
+      desktop working copy updates when <code>main</code> is checked out, and a configured
+      remote is pushed.
+    </p>
+  </section>
+
+  <section id="github" class="doc-section">
+    <h2>GitHub</h2>
+    <p>
+      <code>restTransport</code> speaks the Git Data API with a fine-grained token.
+      Fast-forward-only updates are what the in-memory test remote enforces. The HTTP routes
+      exist. What spec 13 §7 marks undone: mirroring CADCAMFUN pull requests onto GitHub pull
+      requests, and a live round-trip that proves GitHub stores the same commit oid for a given
+      author and committer date. Treat the mirror as implemented against the transport tests,
+      and treat production GitHub behaviour as unverified.
+    </p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Boundaries</h2>
+    <ul>
+      <li><code>packages/vcs</code> must not open SQLite. The sidecar backend does.</li>
+      <li>Checkout, merge, and restore must refuse a dirty working copy.</li>
+      <li>AI tools must not commit or merge on <code>main</code>.</li>
+      <li>The companion gateway must not forward GitHub push, pull, credentials, or plugin routes.</li>
+      <li>Thumbnails, chat, and binaries must not be committed into the tree.</li>
+      <li>Do not hand-edit the git table migration. It was generated from <code>packages/db/src/schema.ts</code>.</li>
+    </ul>
+  </section>
+  <section id="module-exports" class="doc-section">
+    <h2>Module exports</h2>
+    <p>Symbols in <code>packages/vcs/src</code>:</p>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Names</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>object.ts</code></td><td><code>ObjectType</code>, <code>Oid</code>, <code>TreeEntry</code>, <code>Commit</code>, <code>hashObject</code>, <code>encodeTree</code>, <code>decodeTree</code>, <code>encodeCommit</code>, <code>decodeCommit</code></td></tr>
+        <tr><td><code>store.ts</code></td><td><code>Backend</code>, <code>putObject</code>, <code>memoryBackend</code>, <code>StoredObject</code></td></tr>
+        <tr><td><code>repository.ts</code></td><td><code>Repository</code>, <code>VcsError</code>, <code>LogEntry</code>, <code>FileChange</code>, <code>MergeResult</code>. Methods: <code>writeTree</code>, <code>commit</code>, <code>log</code>, <code>checkout</code>, <code>createBranch</code>, <code>merge</code>, <code>diff</code>, <code>restorePaths</code>, <code>revertTo</code>.</td></tr>
+        <tr><td><code>snapshot.ts</code></td><td><code>ProjectSnapshot</code>, <code>ENTITY_DIRECTORIES</code>, <code>snapshotToFiles</code>, <code>filesToSnapshot</code></td></tr>
+        <tr><td><code>json.ts</code></td><td><code>canonicalJson</code>, <code>mergeJson</code>, <code>JsonMerge</code></td></tr>
+        <tr><td><code>diff.ts</code></td><td><code>EntityChange</code>, <code>PropertyChange</code>, <code>jsonChanges</code>, <code>describeDiff</code></td></tr>
+        <tr><td><code>transport.ts</code></td><td><code>repositoryTransport</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="snapshot-directories" class="doc-section">
+    <h2>Snapshot directories</h2>
+    <p>
+      <code>ENTITY_DIRECTORIES</code> in <code>snapshot.ts</code> names these paths. The tracked
+      file list in Tree uses the same directories.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Directory</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>drawings/</code></td></tr>
+        <tr><td><code>components/</code></td></tr>
+        <tr><td><code>toolpaths/</code></td></tr>
+        <tr><td><code>materials/</code></td></tr>
+        <tr><td><code>tools/</code></td></tr>
+        <tr><td><code>machine-configs/</code></td></tr>
+        <tr><td><code>costs/</code></td></tr>
+        <tr><td><code>.cadcamfun/workflows/</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="github-functions" class="doc-section">
+    <h2>GitHub functions</h2>
+    <p>Exports of <code>packages/vcs/src/github.ts</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Name</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GitHubTransport</code></td></tr>
+        <tr><td><code>push</code></td></tr>
+        <tr><td><code>pull</code></td></tr>
+        <tr><td><code>fetchBranch</code></td></tr>
+        <tr><td><code>restTransport</code></td></tr>
+        <tr><td><code>SyncResult</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Mobile", href: "/docs/mobile" }, { title: "Database", href: "/docs/database" }]} />
+</DocsLayout>

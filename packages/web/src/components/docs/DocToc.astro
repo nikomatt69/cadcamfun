@@ -1,0 +1,103 @@
+---
+interface Item {
+  title: string
+  href: string
+  depth?: number
+}
+interface Props {
+  items?: Item[]
+}
+const { items = [] } = Astro.props
+---
+
+<div class="material rounded-[var(--radius-card)] px-4 py-4">
+  <p class="pl-4 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-terminal-accent">On this page</p>
+  <nav aria-label="On this page" class="doc-toc relative mt-3 flex flex-col pl-4">
+    <div class="doc-toc-line absolute bottom-0 left-0 top-0" aria-hidden="true"></div>
+    {items.map((item) => (
+      <a href={item.href} class="doc-toc-link relative py-1.5 text-[13.5px] text-terminal-muted" data-depth={item.depth ?? 2}>
+        {item.title}
+      </a>
+    ))}
+  </nav>
+</div>
+
+<style>
+  .doc-toc-line {
+    width: var(--hairline);
+    background: rgb(var(--terminal-text) / 0.16);
+  }
+
+  .doc-toc-link {
+    transition: color 160ms var(--ease-out);
+  }
+
+  /* Marker sits on the rail, so the active section reads as a position. */
+  .doc-toc-link::before {
+    content: "";
+    position: absolute;
+    left: -1rem;
+    top: 0.45rem;
+    bottom: 0.45rem;
+    width: 2px;
+    border-radius: 1px;
+    background: rgb(var(--terminal-accent));
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out);
+  }
+
+  .doc-toc-link[data-depth="3"] {
+    padding-left: 0.75rem;
+  }
+
+  .doc-toc-link[aria-current="true"] {
+    color: rgb(var(--terminal-text));
+    font-weight: 600;
+  }
+
+  .doc-toc-link[aria-current="true"]::before {
+    opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .doc-toc-link:hover {
+      color: rgb(var(--terminal-text));
+    }
+  }
+</style>
+
+<script>
+  // Scroll-spy: the last section whose heading crossed the reading line is current.
+  const links = [...document.querySelectorAll<HTMLAnchorElement>(".doc-toc-link")]
+  const targets = links
+    .map((link) => {
+      const id = decodeURIComponent(link.hash.slice(1))
+      const section = id ? document.getElementById(id) : null
+      return section ? { link, section } : null
+    })
+    .filter((entry): entry is { link: HTMLAnchorElement; section: HTMLElement } => entry !== null)
+
+  if (targets.length > 0) {
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const line = window.innerHeight * 0.28
+      let current = targets[0]
+      for (const target of targets) {
+        if (target.section.getBoundingClientRect().top - line <= 0) current = target
+      }
+      const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4
+      if (atEnd) current = targets[targets.length - 1]
+      for (const target of targets) {
+        if (target === current) target.link.setAttribute("aria-current", "true")
+        else target.link.removeAttribute("aria-current")
+      }
+    }
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update)
+    }
+    window.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule, { passive: true })
+    update()
+  }
+</script>

@@ -1,0 +1,108 @@
+---
+import "../styles/global.css"
+import "../styles/docs.css"
+import "../styles/brand.css"
+import SocialMeta from "../components/SocialMeta.astro"
+import Navbar from "../components/Navbar.astro"
+import DocsSubnav from "../components/docs/DocsSubnav.astro"
+import DocsSidebar from "../components/docs/DocsSidebar.astro"
+import DocToc from "../components/docs/DocToc.astro"
+import Mark from "../components/Mark.astro"
+import DocAssistant from "../components/docs/DocAssistant.astro"
+
+interface TocItem {
+  title: string
+  href: string
+  depth?: number
+}
+interface Props {
+  title?: string
+  subtitle?: string
+  description?: string
+  toc?: TocItem[]
+}
+const {
+  title = "Documentation",
+  subtitle,
+  description = "CADCAMFUN architecture and developer documentation.",
+  toc = [],
+} = Astro.props
+const pathname = Astro.url.pathname.replace(/\/$/, "") || "/docs"
+---
+
+<!doctype html>
+<html lang="en" class="docs-root">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e2eaf4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>{title} — CADCAMFUN Docs</title>
+    <meta name="description" content={description} />
+    <SocialMeta title={`${title} — CADCAMFUN Docs`} description={description} />
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem("theme")
+        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches
+        document.documentElement.setAttribute("data-theme", stored || (dark ? "dark" : "light"))
+      })()
+    </script>
+  </head>
+  <body class="flex min-h-screen flex-col">
+    <a class="sr-only focus:not-sr-only focus:fixed focus:left-[var(--nav-inset)] focus:top-[var(--nav-inset)] focus:z-[100] focus:rounded-[6px] focus:bg-terminal-text focus:px-4 focus:py-2 focus:text-terminal-bg" href="#main-content">Skip to content</a>
+    <Navbar />
+    <DocsSubnav />
+    <div class="page-shell flex w-full flex-1 flex-col xl:flex-row xl:gap-8">
+      <div class="glass-bar sticky top-[var(--chrome-top)] z-30 flex h-[var(--docs-mobilebar-height)] items-center justify-between px-3 xl:hidden">
+        <span class="text-sm font-semibold">Docs</span>
+        <button id="mobile-docs-toggle" type="button" class="pressable glass-chip px-3 py-1.5 text-sm font-semibold" aria-expanded="false" aria-controls="docs-sidebar">
+          Browse
+        </button>
+      </div>
+      <DocsSidebar />
+      <main id="main-content" class="min-w-0 flex-1 py-10 xl:px-2" tabindex="-1">
+        <article data-llm-document class="prose mx-auto max-w-[46rem]">
+          <header class="not-prose mb-10">
+            <p data-llm-exclude class="mb-4 inline-flex items-center gap-2 font-mono text-eyebrow uppercase text-terminal-accent">
+              <img src="/brand/icon.png" alt="" width="16" height="16" class="h-4 w-4" />
+              Documentation
+            </p>
+            <h1 class="font-display text-page-title text-terminal-text">{title}</h1>
+            {subtitle && <p class="mt-4 max-w-2xl text-page-subtitle text-terminal-muted">{subtitle}</p>}
+            <div class="plate-rule" aria-hidden="true"></div>
+          </header>
+          <div class="content-body">
+            <slot />
+          </div>
+        </article>
+      </main>
+      {toc.length > 0 && (
+        <div class="hidden w-56 shrink-0 xl:block">
+          <div class="sticky top-[var(--chrome-top)] pt-10">
+            <DocToc items={toc} />
+          </div>
+        </div>
+      )}
+    </div>
+    <footer class="mt-auto w-full px-[var(--nav-inset)] pb-[var(--nav-inset)] pt-[var(--plate-gap)]">
+      <div class="glass-bar mx-auto w-full max-w-[var(--content-max)] py-6">
+        <div class="page-shell flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <a href="/" aria-label="CADCAMFUN home"><Mark class="h-7 w-auto" /></a>
+          <p class="text-[13px] text-terminal-muted">Local-first CAD/CAM. Specs in the repo stay the contract.</p>
+        </div>
+      </div>
+    </footer>
+    <DocAssistant pathname={pathname} />
+    <script>
+      const button = document.getElementById("mobile-docs-toggle")
+      const sidebar = document.getElementById("docs-sidebar")
+      button?.addEventListener("click", () => {
+        const open = button.getAttribute("aria-expanded") === "true"
+        button.setAttribute("aria-expanded", open ? "false" : "true")
+        button.textContent = open ? "Browse" : "Close"
+        sidebar?.classList.toggle("hidden", open)
+        sidebar?.classList.toggle("docs-rail-open", !open)
+      })
+    </script>
+  </body>
+</html>

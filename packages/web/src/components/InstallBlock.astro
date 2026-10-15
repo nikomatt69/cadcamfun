@@ -1,0 +1,23 @@
+---
+const commands = `bun install
+bun test packages apps
+bun run desktop:dev`
+---
+
+<section class="page-section" aria-labelledby="start-heading">
+  <div class="page-shell grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)] lg:items-center">
+    <div>
+      <p class="font-mono text-eyebrow uppercase text-terminal-text">Quickstart</p>
+      <h2 id="start-heading" class="font-display mt-3 text-[clamp(1.8rem,3vw,2.5rem)] font-bold tracking-[-0.035em]">
+        One workspace. The desktop opens from here.
+      </h2>
+      <p class="mt-4 max-w-md text-[15px] leading-relaxed text-terminal-muted">
+        Install with Bun, run the tests, then build the sidecar and open the Tauri window.
+      </p>
+      <a href="/docs/guides/quickstart" class="pressable mt-6 inline-flex text-[14px] font-semibold text-terminal-accent">
+        Full quickstart
+      </a>
+    </div>
+    <pre class="material min-w-0 rounded-[var(--radius-card)]"><code class="block overflow-x-auto p-5 font-mono text-[13px] leading-7 text-terminal-text">{commands}</code></pre>
+  </div>
+</section>

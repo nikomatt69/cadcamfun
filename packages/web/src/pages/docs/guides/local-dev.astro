@@ -1,0 +1,361 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Three processes", href: "#processes" },
+  { title: "Two database files", href: "#databases" },
+  { title: "One package", href: "#one-package" },
+  { title: "Configuration", href: "#configuration" },
+  { title: "Effect and tests", href: "#effect" },
+  { title: "What not to run", href: "#avoid" },
+  { title: "Other commands", href: "#other-commands" },
+]
+---
+
+<DocsLayout
+  title="Local development"
+  subtitle="The Bun sidecar, the Tauri webview, and the SQLite files are different processes and different paths."
+  description="How the CADCAMFUN sidecar, Vite webview, CLI database, and app-data database fit together, and how to test one package."
+  toc={toc}
+>
+  <section id="processes" class="doc-section">
+    <h2>Three processes</h2>
+    <p>
+      <code>bun run desktop:dev</code> from the repo root is the supported loop. It is
+      <code>bun run build:sidecar</code> and then <code>tauri dev</code> in
+      <code>@cadcamfun/desktop</code>. That one command starts the rows below. Do not start them by
+      hand unless you are debugging a single row and you can supply the env vars that row requires.
+    </p>
+    <table>
+      <thead>
+        <tr><th></th><th>Sidecar</th><th>Webview</th><th>Rust shell</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Source</td>
+          <td><code>apps/sidecar/src/main.ts</code></td>
+          <td><code>apps/desktop/src/main.tsx</code></td>
+          <td><code>apps/desktop/src-tauri/src/lib.rs</code></td>
+        </tr>
+        <tr>
+          <td>Runtime</td>
+          <td>Bun, Effect <code>4.0.0-rc.112</code>, Drizzle, <code>bun:sqlite</code></td>
+          <td>SolidJS, Vite 7, Three.js</td>
+          <td>Tauri v2</td>
+        </tr>
+        <tr>
+          <td>How dev starts it</td>
+          <td>Compiled binary <code>src-tauri/binaries/sidecar-&lt;triple&gt;</code></td>
+          <td><code>beforeDevCommand</code>: <code>bun run dev</code> (Vite)</td>
+          <td><code>tauri dev</code></td>
+        </tr>
+        <tr>
+          <td>Address</td>
+          <td><code>127.0.0.1</code> and an OS-assigned port (<code>port: 0</code>)</td>
+          <td><code>http://localhost:1420</code> (<code>devUrl</code> in <code>tauri.conf.json</code>)</td>
+          <td>Window label <code>main</code></td>
+        </tr>
+        <tr>
+          <td>Talks to</td>
+          <td>SQLite under <code>CADCAMFUN_DATA_DIR</code></td>
+          <td>The sidecar over HTTP, using types from <code>@cadcamfun/api</code></td>
+          <td>Spawns the sidecar and owns its token</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Sidecar source beside <code>main.ts</code>: <code>config.ts</code> (the only module that reads
+      process configuration), <code>layers.ts</code> (routes and <code>Database.layer</code>),
+      <code>startup.ts</code>, <code>shutdown.ts</code>, <code>observability.ts</code>,
+      <code>http/</code> (one file per served group), <code>services/</code>, <code>repos/</code>,
+      <code>plugins/</code>, and <code>data/</code>. The package script
+      <code>bun run --filter @cadcamfun/sidecar start</code> is <code>bun src/main.ts</code>. It
+      will not listen until <code>CADCAMFUN_TOKEN</code> and <code>CADCAMFUN_DATA_DIR</code> are set.
+      Those names are required Effect <code>Config</code> keys in <code>config.ts</code>. The shell
+      sets them. Do not put them in a <code>.env</code> file.
+    </p>
+    <p>
+      After <code>GET http://127.0.0.1:&lt;port&gt;/api/health</code> returns ok, stdout receives a
+      single ready line and nothing else. The OpenAPI document is served at
+      <code>/api/openapi.json</code> (<code>HttpApiBuilder.layer</code> in
+      <code>apps/sidecar/src/layers.ts</code>). The server binds loopback only, with
+      <code>idleTimeout: 0</code>, because a long tool call is silent longer than Bun’s default
+      idle close. Do not add <code>HttpServer.layerServices</code> next to
+      <code>BunHttpServer.layer</code>: the comment in <code>main.ts</code> says that layer is the
+      in-process test platform and it shadows the real socket.
+    </p>
+    <p>
+      Stdout then receives
+      <code>&#123;&quot;event&quot;:&quot;ready&quot;,&quot;port&quot;:N&#125;</code>
+      and nothing else. Effect logs go to stderr.
+    </p>
+    <p>
+      The desktop package can also run <code>tauri:dev</code>, which compiles
+      <code>apps/desktop/src-tauri/stub/stub-sidecar.ts</code> only when
+      <code>binaries/sidecar-&lt;triple&gt;</code> is missing. That stub is how WP5 was checked. It
+      is not the HttpApi. Prefer <code>bun run desktop:dev</code> whenever you need real routes.
+    </p>
+  </section>
+
+  <section id="databases" class="doc-section">
+    <h2>Two database files</h2>
+    <p>
+      Both files are SQLite, opened with <code>bun:sqlite</code> through <code>Database.layer</code>
+      in <code>packages/db/src/index.ts</code>. They are not the same path. Applying migrations to
+      one leaves the other untouched.
+    </p>
+    <table>
+      <thead>
+        <tr><th></th><th>CLI migrate</th><th>Running sidecar</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Command or owner</td>
+          <td><code>bun run db:migrate</code></td>
+          <td>Tauri shell in <code>apps/desktop/src-tauri/src/lib.rs</code></td>
+        </tr>
+        <tr>
+          <td>Path</td>
+          <td>Default string <code>./data/cadcamfun.db</code> in <code>packages/db/src/migrate.ts</code>. Filter scripts run in <code>packages/db</code>, so the file is <code>packages/db/data/cadcamfun.db</code> unless <code>DATABASE_URL</code> is already set.</td>
+          <td><code>$CADCAMFUN_DATA_DIR/cadcamfun.db</code>. <code>DATA_DIR</code> is <code>app.path().app_data_dir()</code>. On macOS that is under <code>~/Library/Application Support/com.cadcamfun.app</code>.</td>
+        </tr>
+        <tr>
+          <td>Migrations</td>
+          <td><code>packages/db/drizzle/</code> via <code>import.meta.url</code></td>
+          <td><code>CADCAMFUN_MIGRATIONS_DIR</code>, filled from the bundled resource. <code>build:sidecar</code> copies <code>packages/db/drizzle</code> to <code>apps/desktop/src-tauri/resources/migrations/</code>.</td>
+        </tr>
+        <tr>
+          <td>Who may open it</td>
+          <td>The migrate CLI, and tests that pass an explicit path</td>
+          <td>The sidecar process. Callers never close the handle.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <code>specs/02-database.md</code> describes the sidecar file as
+      <code>&lt;appData&gt;/cadcamfun/cadcamfun.db</code>. The code path is
+      <code>app_data_dir</code> joined with <code>cadcamfun.db</code>
+      (<code>apps/sidecar/src/layers.ts</code>). Trust the log and the code when you need the file
+      you just opened. The migrate script logs <code>migrated</code> and the path.
+    </p>
+    <p>
+      <code>Database.layer</code> sets <code>PRAGMA journal_mode = WAL</code> and
+      <code>PRAGMA foreign_keys = ON</code>, creates the parent directory, and runs pending
+      migrations when <code>migrationsFolder</code> is set. On an existing file, a pending migration
+      takes a backup first (last five snapshots, beside the file, unless
+      <code>backupsDirectory</code> is passed). Backup failure aborts startup as
+      <code>DatabaseError</code> with operation <code>backup</code>. Tests use
+      <code>:memory:</code> and skip that backup. Do not point a test at
+      <code>packages/db/data/cadcamfun.db</code> or at the app-data file.
+    </p>
+    <DocCode language="bash" title="Schema change, from the repo root (WP0 only)">
+{`bun run db:generate
+bun run db:migrate
+bun test packages/db
+bunx tsc -p packages/db/tsconfig.json`}
+    </DocCode>
+    <p>
+      <code>db:generate</code> reads <code>packages/db/src/schema.ts</code> and writes a new folder
+      under <code>packages/db/drizzle/</code>. Leave <code>migration.sql</code> as drizzle-kit wrote
+      it. Then rebuild the sidecar (<code>bun run build:sidecar</code> or the next
+      <code>desktop:dev</code>) so the copy in <code>src-tauri/resources/migrations/</code> matches.
+      The window will not see a new migration that exists only in <code>packages/db/drizzle</code>
+      until that copy is refreshed.
+    </p>
+  </section>
+
+  <section id="one-package" class="doc-section">
+    <h2>One package</h2>
+    <p>
+      Pass the package or app directory to <code>bun test</code>. Typecheck with that package’s
+      <code>tsconfig.json</code>. Tests sit next to source as <code>*.test.ts</code> and import
+      <code>bun:test</code>. Files are <code>kebab-case.ts</code>. Relative imports include the
+      <code>.ts</code> extension.
+    </p>
+    <DocCode language="bash" title="One package, from the repo root">
+{`bun test packages/core
+bun test apps/sidecar
+bunx tsc -p packages/core/tsconfig.json
+bun run --filter @cadcamfun/core typecheck`}
+    </DocCode>
+    <table>
+      <thead>
+        <tr><th>Package</th><th>Directory</th><th>Own <code>typecheck</code> script</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>@cadcamfun/db</code></td><td><code>packages/db</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/core</code></td><td><code>packages/core</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/api</code></td><td><code>packages/api</code></td><td><code>tsgo</code>. Also <code>coverage</code>, <code>generate</code>, <code>generate:check</code>.</td></tr>
+        <tr><td><code>@cadcamfun/ai</code></td><td><code>packages/ai</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/plugin-sdk</code></td><td><code>packages/plugin-sdk</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/vcs</code></td><td><code>packages/vcs</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/workflow</code></td><td><code>packages/workflow</code></td><td><code>tsgo -p tsconfig.json --noEmit</code></td></tr>
+        <tr><td><code>@cadcamfun/sidecar</code></td><td><code>apps/sidecar</code></td><td><code>tsgo</code>. <code>start</code> is <code>bun src/main.ts</code>.</td></tr>
+        <tr><td><code>@cadcamfun/desktop</code></td><td><code>apps/desktop</code></td><td><code>tsgo</code>. <code>dev</code> is Vite. <code>tauri</code> is the CLI.</td></tr>
+        <tr><td><code>@cadcamfun/mobile</code></td><td><code>apps/mobile</code></td><td><code>tsc -p tsconfig.json --noEmit</code>. <code>test</code> is <code>bun test test</code>.</td></tr>
+        <tr><td><code>@cadcamfun/web</code></td><td><code>packages/web</code></td><td><code>tsc</code> plus <code>script/check-docs-index.ts</code>. <code>dev</code> is Astro.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>bun run --filter @cadcamfun/api coverage</code> runs
+      <code>packages/api/scripts/api-coverage.ts</code>. That is the command named in the WP3 status
+      cell. <code>bun run generate</code> regenerates clients;
+      <code>bun run generate:check</code> fails when the generated client is stale.
+      <code>packages/core</code> hot loops are plain functions, so CAD and CAM tests do not boot the
+      sidecar and do not open SQLite. Effect tests elsewhere call <code>Effect.runPromise</code> and
+      pass layers in explicitly. Do not rely on a global test layer.
+    </p>
+    <p>
+      <code>bun test packages apps</code> skips <code>scripts/</code>. <code>bun run test</code> includes
+      them. <code>bun run typecheck</code> is <code>turbo run typecheck</code> and then
+      <code>tsgo -p tsconfig.json --noEmit</code> at the root. Use that before
+      <code>bun run build</code>, because the build’s check step runs the same typecheck and aborts
+      on the first non-zero exit.
+    </p>
+  </section>
+
+  <section id="configuration" class="doc-section">
+    <h2>Configuration</h2>
+    <p>
+      The sidecar reads configuration once, in <code>apps/sidecar/src/config.ts</code>, through
+      Effect <code>Config</code>. Other modules receive an <code>AppConfigService</code>. Required
+      keys are <code>CADCAMFUN_TOKEN</code> and <code>CADCAMFUN_DATA_DIR</code>.
+      <code>CADCAMFUN_MIGRATIONS_DIR</code> is optional in Config and required in practice for a
+      window that must migrate. The shell in <code>apps/desktop/src-tauri/src/sidecar.rs</code> sets
+      all three. The database path inside the sidecar is <code>$&#123;dataDir&#125;/cadcamfun.db</code>.
+    </p>
+    <p>
+      AI provider keys are not environment variables. <code>specs/05-api-sidecar.md</code> says they
+      live in the OS keychain via the shell; the UI pushes them with <code>PUT /ai/credentials</code>,
+      and they are also stored at <code>&lt;data dir&gt;/ai/credentials.json</code>. Do not print
+      that file. Stripe, cron, admin email, and OTLP keys are optional Config reads in the same
+      <code>config.ts</code>. Absent Stripe keys mean paid checkout stays unavailable. That is the
+      local default, not a crash.
+    </p>
+    <DocCallout title="Leave .env files closed" type="warn">
+      <p>
+        Do not read, print, or copy values from <code>.env*</code> files. They are legacy and unused.
+        Do not add <code>process.env</code> reads outside <code>apps/sidecar/src/config.ts</code>.
+        The migrate CLI and <code>packages/db/drizzle.config.ts</code> already consult
+        <code>DATABASE_URL</code> for the CLI file only. A new package does not get its own copy of
+        that pattern.
+      </p>
+    </DocCallout>
+    <p>
+      <code>packages/core</code> and <code>packages/api</code> do not import <code>packages/db</code>.
+      <code>@cadcamfun/vcs</code> has an empty dependency list: it does not open SQLite itself. The
+      sidecar’s <code>repos/project-vcs-repo.ts</code> adapts the synchronous vcs library onto the
+      Drizzle handle. Plugins load from <code>&lt;dataDir&gt;/plugins</code>. Local file storage,
+      the stand-in for the legacy bucket, is <code>&lt;dataDir&gt;/storage</code>.
+    </p>
+  </section>
+
+  <section id="effect" class="doc-section">
+    <h2>Effect and tests</h2>
+    <p>
+      Services use the v4 shape from <code>specs/01-conventions.md</code> §2. The tag string is
+      <code>cadcamfun/…</code>. <code>Database</code> in <code>packages/db/src/index.ts</code> is the
+      example already in the tree.
+    </p>
+    <p>
+      The shape from <code>specs/01-conventions.md</code> §2 is a class that extends
+      <code>Context.Service</code>, tagged <code>cadcamfun/X</code>, with a static
+      <code>layer</code> that owns the resource. <code>Database</code> in
+      <code>packages/db/src/index.ts</code> is the copy already in the tree:
+      <code>class Database extends Context.Service</code> tagged
+      <code>cadcamfun/Database</code>, and <code>Database.layer(&#123; path, migrationsFolder &#125;)</code>
+      opens <code>bun:sqlite</code>.
+    </p>
+    <p>
+      Named workflows are <code>Effect.fn("Module.name")</code>. Hot paths are
+      <code>Effect.fnUntraced</code>. Do not write a function whose body only returns
+      <code>Effect.gen</code>. Errors that cross HTTP are <code>Schema.TaggedError</code>.
+      Internal errors may be <code>Data.TaggedError</code>. Never throw inside Effect. Map foreign
+      exceptions with <code>Effect.try</code> or <code>Effect.tryPromise</code>. Decode external
+      input with <code>Schema.decodeUnknownEffect</code>. Resources use
+      <code>Effect.acquireRelease</code> inside the Layer. Callers never close handles.
+    </p>
+    <p>
+      Pure geometry and CAM stay plain functions over readonly arrays. Effect and Schema wrap them
+      at the edge (validation, errors). A hot loop in <code>packages/core/src/cad</code> or
+      <code>packages/core/src/cam</code> that allocates an Effect per sample is the wrong shape.
+    </p>
+    <p>
+      Log with <code>Effect.log*</code> and <code>Effect.annotateLogs</code>. User-facing errors
+      have a stable <code>_tag</code> and an English message. UI strings go through the i18n tables
+      under <code>apps/desktop/src/i18n</code>. The default locale is <code>en</code>.
+    </p>
+    <DocCode language="bash" title="The definition-of-done trio, from the repo root">
+{`bun install
+bunx tsc -p packages/api/tsconfig.json
+bun test packages/api`}
+    </DocCode>
+  </section>
+
+  <section id="avoid" class="doc-section">
+    <h2>What not to run</h2>
+    <table>
+      <thead>
+        <tr><th>Command or edit</th><th>Why it breaks the loop</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>bun apps/desktop/scripts/build-stub-sidecar.ts</code> without <code>--if-missing</code></td>
+          <td>Overwrites <code>src-tauri/binaries/sidecar-&lt;triple&gt;</code>. The next <code>tauri dev</code> launches the stub.</td>
+        </tr>
+        <tr>
+          <td><code>bun run --filter @cadcamfun/sidecar start</code> with an empty environment</td>
+          <td><code>CADCAMFUN_TOKEN</code> and <code>CADCAMFUN_DATA_DIR</code> are required. The process fails before it listens.</td>
+        </tr>
+        <tr>
+          <td>Hand-editing <code>packages/db/drizzle/*/migration.sql</code></td>
+          <td>The next <code>db:generate</code> and the sidecar’s journal will disagree with a file you rewrote.</td>
+        </tr>
+        <tr>
+          <td>Expecting <code>bun run db:migrate</code> to update the window</td>
+          <td>That command writes the CLI file. The window uses <code>app_data_dir</code>.</td>
+        </tr>
+        <tr>
+          <td><code>bun run build:desktop</code> when you wanted an installable app</td>
+          <td>That script is Vite only. The installable bundle is <code>bun run build</code>.</td>
+        </tr>
+        <tr>
+          <td>Importing <code>.reference/</code> or <code>@cadcamfun/db</code> from core or api</td>
+          <td>Forbidden by the README dependency rule. The legacy tree is git-ignored and read-only.</td>
+        </tr>
+        <tr>
+          <td>Reading <code>.env*</code> to configure a local run</td>
+          <td>Those files are legacy and unused. The shell passes the sidecar its environment.</td>
+        </tr>
+        <tr>
+          <td><code>console.log</code> in sidecar request code</td>
+          <td>Stdout is the ready/error channel the shell parses. Log with <code>Effect.log*</code> (stderr).</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section id="other-commands" class="doc-section">
+    <h2>Other commands</h2>
+    <p>Commands that are not in the sections above.</p>
+    <table>
+      <thead>
+        <tr><th>Command</th><th>Where</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>bun run --filter @cadcamfun/desktop dev</code></td><td>Vite only, from the repo root.</td></tr>
+        <tr><td><code>expo start --dev-client</code></td><td>Metro for an installed mobile development client.</td></tr>
+        <tr><td><code>expo run:ios</code></td><td>Native iOS run from <code>apps/mobile</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <DocRelated
+    items={[
+      { title: "Database", href: "/docs/database" },
+      { title: "Sidecar", href: "/docs/sidecar" },
+    ]}
+  />
+</DocsLayout>

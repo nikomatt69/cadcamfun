@@ -1,0 +1,16 @@
+---
+type CalloutType = "info" | "warn" | "note"
+interface Props {
+  type?: CalloutType
+  title?: string
+}
+const { type = "info", title } = Astro.props
+const label = title ?? (type === "warn" ? "Warning" : type === "note" ? "Note" : "Note")
+---
+
+<div class="material my-6 rounded-[var(--radius-md)] px-4 py-3.5 not-prose" role="note">
+  <p class="font-display text-[13px] font-bold text-terminal-text">{label}</p>
+  <div class="mt-1 text-[14px] leading-relaxed text-terminal-muted [&_a]:text-terminal-text [&_code]:rounded-[4px] [&_code]:bg-terminal-code [&_code]:px-1 [&_p]:m-0 [&_p+p]:mt-2">
+    <slot />
+  </div>
+</div>
