@@ -6,8 +6,11 @@ import type { ViewProps } from "react-native"
 export type PreviewScene = {
   setMesh(positions: Float32Array, normals: Float32Array, indices: Uint32Array): void
   setLines(lines: Float32Array): void
+  /** One move, or an empty buffer. Kept off the path upload so scrubbing does not reallocate it. */
+  setActiveLine(line: Float32Array): void
   setHighlight(start: number, count: number, red: number, green: number, blue: number, selectedRed: number, selectedGreen: number, selectedBlue: number): void
   setCamera(mvp: Float32Array, red: number, green: number, blue: number): void
+  release(): void
 }
 
 type CadPreviewNative = {

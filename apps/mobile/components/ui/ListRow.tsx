@@ -19,6 +19,8 @@ type ListRowProps = {
   onPress?: () => void
   onLongPress?: () => void
   accessibilityLabel?: string
+  /** Selection state for a row that is one choice in a set. Omit it on rows that are not selectable. */
+  selected?: boolean
 }
 
 /**
@@ -27,7 +29,7 @@ type ListRowProps = {
  * both modes. Pair rows with `<Divider inset={...} />`. Row height follows Dynamic Type: the
  * subtitle may wrap to two lines at larger font scales instead of truncating.
  */
-export function ListRow({ leading, title, subtitle, trailing, showChevron, disabled, onPress, onLongPress, accessibilityLabel }: ListRowProps) {
+export function ListRow({ leading, title, subtitle, trailing, showChevron, disabled, onPress, onLongPress, accessibilityLabel, selected }: ListRowProps) {
   const { palette } = useTheme()
   const { fontScale } = useWindowDimensions()
 
@@ -50,7 +52,7 @@ export function ListRow({ leading, title, subtitle, trailing, showChevron, disab
       }}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={accessibilityLabel ?? (typeof title === "string" ? (subtitle ? `${title}, ${subtitle}` : title) : undefined)}
-      accessibilityState={{ disabled: Boolean(disabled) }}
+      accessibilityState={{ disabled: Boolean(disabled), ...(selected === undefined ? {} : { selected }) }}
     >
       {leading ? <View style={{ alignSelf: "flex-start", marginTop: 4 }}>{leading}</View> : null}
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>

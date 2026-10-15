@@ -1,5 +1,5 @@
 /**
- * Camera, picking and G-code sync for the phone preview. Pure: the GL view only draws what this returns.
+ * Camera, picking and G-code sync for the phone preview. Pure: the Metal view only draws what this returns.
  * Z is up, matching the desktop kernel.
  */
 

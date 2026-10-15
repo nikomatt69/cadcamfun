@@ -1,15 +1,17 @@
 import ExpoModulesCore
 import MetalKit
+import UIKit
 
-/// Column-major MVP plus a colour. Layout matches the Metal `Uniforms` struct.
+/// Column-major MVP plus a colour. Layout matches the Metal `Uniforms` struct (80 bytes).
 struct PreviewUniforms {
   var mvp: simd_float4x4
   var color: SIMD4<Float>
 }
 
 /**
- * On-demand Metal view. One finger and pinches stay in JavaScript; this view does not take touches.
- * Shaders are compiled from source so the pod does not need a separate metallib build step.
+ * On-demand Metal view. Touches stay in JavaScript.
+ * Shaders are compiled from source so the pod does not ship a separate metallib.
+ * The command buffer is presented once; a GPU failure is logged and reported as one stable sentence.
  */
 public final class PreviewSurface: ExpoView, MTKViewDelegate {
   let onError = EventDispatcher()
@@ -21,7 +23,8 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   private var depthLess: MTLDepthStencilState?
   private var depthEqual: MTLDepthStencilState?
   private var scene: PreviewScene?
-  private var reported = false
+  private var reported = Set<String>()
+  private var boundDevice: ObjectIdentifier?
 
   required init(appContext: AppContext? = nil) {
     let device = MTLCreateSystemDefaultDevice()
@@ -30,8 +33,11 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
     metalView.delegate = self
     metalView.isPaused = true
     metalView.enableSetNeedsDisplay = true
+    metalView.framebufferOnly = true
+    metalView.isOpaque = true
     metalView.colorPixelFormat = .bgra8Unorm
     metalView.depthStencilPixelFormat = .depth32Float
+    metalView.clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.1, alpha: 1)
     metalView.isUserInteractionEnabled = false
     metalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     addSubview(metalView)
@@ -39,23 +45,15 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   }
 
   func attach(_ scene: PreviewScene) {
+    let same = self.scene === scene
     self.scene = scene
     scene.surface = self
     guard let device = scene.device else {
       report("This iPhone has no Metal device for the preview")
       return
     }
-    metalView.device = device
-    queue = device.makeCommandQueue()
-    if queue == nil { report("This iPhone could not start a Metal command queue") }
-    if library == nil {
-      do {
-        library = try device.makeLibrary(source: shaderSource, options: nil)
-        depthLess = depthState(device, compare: .less)
-        depthEqual = depthState(device, compare: .lessEqual)
-      } catch {
-        report("The preview shaders did not compile")
-      }
+    if !same || queue == nil || boundDevice != ObjectIdentifier(device as AnyObject) {
+      configure(device)
     }
     metalView.setNeedsDisplay()
   }
@@ -70,29 +68,32 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
   public func draw(in view: MTKView) {
+    guard UIApplication.shared.applicationState != .background else { return }
+    guard view.drawableSize.width >= 1, view.drawableSize.height >= 1 else { return }
     guard let scene, let queue else { return }
     do {
       try ensurePipelines(view)
     } catch {
-      report("The preview pipeline did not start")
+      previewLog.error("Preview pipeline failed: \(error.localizedDescription, privacy: .public)")
+      report("The preview could not be displayed")
       return
     }
-    guard let drawable = view.currentDrawable, let pass = view.currentRenderPassDescriptor else { return }
     let frame = scene.snapshot()
+    if let fault = frame.meshFault { report(fault) }
+    if let fault = frame.lineFault { report(fault) }
     let clear = frame.clear
     view.clearColor = MTLClearColor(red: Double(clear.x), green: Double(clear.y), blue: Double(clear.z), alpha: 1)
-    pass.colorAttachments[0].loadAction = .clear
+    guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable else { return }
     pass.colorAttachments[0].clearColor = view.clearColor
-    pass.colorAttachments[0].storeAction = .store
-    if let depth = pass.depthAttachment {
-      depth.loadAction = .clear
-      depth.clearDepth = 1
-      depth.storeAction = .dontCare
+    pass.depthAttachment?.clearDepth = 1
+    guard let command = queue.makeCommandBuffer(), let encoder = command.makeRenderCommandEncoder(descriptor: pass) else {
+      report("The preview could not be displayed")
+      return
     }
-    guard let command = queue.makeCommandBuffer(), let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
+    command.label = "com.cadcamfun.preview.frame"
     var uniforms = PreviewUniforms(mvp: frame.mvp, color: frame.baseColor)
-    if let positions = frame.positions, let normals = frame.normals, let indices = frame.indices, frame.indexCount >= 3,
-      let meshPipeline, let depthLess {
+    encoder.setDepthBias(0, slopeScale: 0, clamp: 0)
+    if meshIsDrawable(frame), let positions = frame.positions, let normals = frame.normals, let indices = frame.indices, let meshPipeline, let depthLess {
       encoder.setRenderPipelineState(meshPipeline)
       encoder.setDepthStencilState(depthLess)
       encoder.setVertexBuffer(positions, offset: 0, index: 0)
@@ -100,41 +101,129 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
       encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 2)
       encoder.setFragmentBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 0)
       encoder.drawIndexedPrimitives(type: .triangle, indexCount: frame.indexCount, indexType: .uint32, indexBuffer: indices, indexBufferOffset: 0)
-      let start = max(frame.selectedStart, 0) * 3
-      let count = max(frame.selectedCount, 0) * 3
-      if count > 0, start + count <= frame.indexCount, let depthEqual {
+      let triangles = frame.indexCount / 3
+      let start = min(max(frame.selectedStart, 0), triangles)
+      let count = min(max(frame.selectedCount, 0), triangles - start)
+      if count > 0, let depthEqual {
         uniforms.color = frame.selectedColor
         encoder.setDepthStencilState(depthEqual)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 2)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 0)
-        encoder.drawIndexedPrimitives(type: .triangle, indexCount: count, indexType: .uint32, indexBuffer: indices, indexBufferOffset: start * MemoryLayout<UInt32>.size)
+        encoder.drawIndexedPrimitives(
+          type: .triangle,
+          indexCount: count * 3,
+          indexType: .uint32,
+          indexBuffer: indices,
+          indexBufferOffset: start * 3 * MemoryLayout<UInt32>.size
+        )
       }
     }
-    if let lines = frame.lines, frame.lineVertices >= 2, let linePipeline, let depthLess {
+    if linesAreDrawable(frame), let lines = frame.lines, let linePipeline, let depthLess {
       encoder.setRenderPipelineState(linePipeline)
       encoder.setDepthStencilState(depthLess)
+      // Negative bias pulls the path toward the camera so it stays visible on the mesh.
+      encoder.setDepthBias(-1, slopeScale: -1, clamp: 0)
       encoder.setVertexBuffer(lines, offset: 0, index: 0)
       encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
       encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: frame.lineVertices)
     }
+    if frame.activeVertices == 2, let active = frame.active, active.length >= 48, let linePipeline, let depthEqual {
+      encoder.setRenderPipelineState(linePipeline)
+      encoder.setDepthStencilState(depthEqual)
+      encoder.setDepthBias(-2, slopeScale: -1, clamp: 0)
+      encoder.setVertexBuffer(active, offset: 0, index: 0)
+      encoder.setVertexBytes(&uniforms, length: MemoryLayout<PreviewUniforms>.stride, index: 1)
+      encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: 2)
+    }
     encoder.endEncoding()
     command.present(drawable)
+    command.addCompletedHandler { [weak self] buffer in
+      guard let error = buffer.error else { return }
+      previewLog.error("Metal command failed: \(error.localizedDescription, privacy: .public)")
+      DispatchQueue.main.async { self?.report("The preview could not be displayed") }
+    }
     command.commit()
+  }
+
+  private func meshIsDrawable(_ frame: PreviewFrame) -> Bool {
+    guard frame.indexCount >= 3, frame.indexCount % 3 == 0, frame.vertexCount > 0 else { return false }
+    guard let positions = frame.positions, let normals = frame.normals, let indices = frame.indices else { return false }
+    return positions.length >= frame.vertexCount * 12 && normals.length >= frame.vertexCount * 12 && indices.length >= frame.indexCount * MemoryLayout<UInt32>.size
+  }
+
+  private func linesAreDrawable(_ frame: PreviewFrame) -> Bool {
+    guard frame.lineVertices >= 2, frame.lineVertices % 2 == 0, let lines = frame.lines else { return false }
+    return lines.length >= frame.lineVertices * 24
+  }
+
+  private func configure(_ device: MTLDevice) {
+    let incoming = ObjectIdentifier(device as AnyObject)
+    if boundDevice != incoming {
+      boundDevice = incoming
+      library = nil
+      meshPipeline = nil
+      linePipeline = nil
+      depthLess = nil
+      depthEqual = nil
+      queue = nil
+      metalView.device = device
+    }
+    let samples = device.supportsTextureSampleCount(4) ? 4 : 1
+    if metalView.sampleCount != samples {
+      meshPipeline = nil
+      linePipeline = nil
+      metalView.sampleCount = samples
+    }
+    if queue == nil {
+      queue = device.makeCommandQueue()
+      queue?.label = "com.cadcamfun.preview"
+      if queue == nil {
+        previewLog.error("Metal command queue was not created")
+        report("The preview could not be displayed")
+      }
+    }
+    guard library == nil else { return }
+    do {
+      library = try device.makeLibrary(source: shaderSource, options: nil)
+      depthLess = depthState(device, compare: .less)
+      depthEqual = depthState(device, compare: .lessEqual)
+    } catch {
+      previewLog.error("Preview shaders failed: \(error.localizedDescription, privacy: .public)")
+      report("The preview could not be displayed")
+    }
   }
 
   private func ensurePipelines(_ view: MTKView) throws {
     if meshPipeline != nil, linePipeline != nil { return }
     guard let device = view.device, let library else { throw PreviewDrawError() }
+    do {
+      try buildPipelines(device, library, view)
+    } catch {
+      guard view.sampleCount > 1 else { throw error }
+      previewLog.error("Multisample pipeline failed, drawing without it: \(error.localizedDescription, privacy: .public)")
+      view.sampleCount = 1
+      meshPipeline = nil
+      linePipeline = nil
+      try buildPipelines(device, library, view)
+    }
+  }
+
+  private func buildPipelines(_ device: MTLDevice, _ library: MTLLibrary, _ view: MTKView) throws {
     meshPipeline = try pipeline(device, library, view, vertex: "meshVertex", fragment: "meshFragment")
     linePipeline = try pipeline(device, library, view, vertex: "lineVertex", fragment: "lineFragment")
   }
 
   private func pipeline(_ device: MTLDevice, _ library: MTLLibrary, _ view: MTKView, vertex: String, fragment: String) throws -> MTLRenderPipelineState {
+    guard let vertexFunction = library.makeFunction(name: vertex), let fragmentFunction = library.makeFunction(name: fragment) else {
+      throw PreviewDrawError()
+    }
     let descriptor = MTLRenderPipelineDescriptor()
-    descriptor.vertexFunction = library.makeFunction(name: vertex)
-    descriptor.fragmentFunction = library.makeFunction(name: fragment)
+    descriptor.vertexFunction = vertexFunction
+    descriptor.fragmentFunction = fragmentFunction
     descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
     descriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
+    descriptor.sampleCount = view.sampleCount
+    descriptor.label = "com.cadcamfun.preview.\(vertex)"
     return try device.makeRenderPipelineState(descriptor: descriptor)
   }
 
@@ -146,8 +235,7 @@ public final class PreviewSurface: ExpoView, MTKViewDelegate {
   }
 
   private func report(_ message: String) {
-    guard !reported else { return }
-    reported = true
+    guard reported.insert(message).inserted else { return }
     onError(["message": message])
   }
 }

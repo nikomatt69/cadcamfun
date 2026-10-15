@@ -47,6 +47,8 @@ export function MeshReview({
             revision={mesh.revision}
             mesh={mesh}
             selectedPartId={selectedPartId}
+            accessibilityLabel="Design preview"
+            accessibilityHint="Drag to orbit. Pinch to zoom. Choose an element from the list."
             onSelectPart={(id) => {
               haptic("selection")
               onSelectPart(id)
@@ -128,6 +130,7 @@ function PartRow({ part, selected, onPress }: { part: MeshPart; selected: boolea
       subtitle={subtitle}
       trailing={selected ? <Text style={{ color: palette.accent, fontSize: 13, fontWeight: "600" }}>Selected</Text> : undefined}
       showChevron={false}
+      selected={selected}
       onPress={onPress}
     />
   )

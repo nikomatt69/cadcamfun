@@ -4,6 +4,7 @@ import type { ToolpathPreview, ToolpathReview as ToolpathReviewPayload, Toolpath
 import { useTheme } from "@/lib/theme"
 import { haptic } from "@/lib/haptics"
 import { clampPlayhead, segmentIndexForLine } from "@/lib/preview-math"
+import { mono } from "@/lib/typography"
 import { PreviewViewport } from "@/components/preview/PreviewViewport"
 import { ErrorBanner } from "@/components/ui/ErrorBanner"
 import { Skeleton } from "@/components/ui/Skeleton"
@@ -36,6 +37,11 @@ export function ToolpathReview({
   const [playhead, setPlayhead] = useState(0)
   const listRef = useRef<FlatList<string>>(null)
   const lines = useMemo(() => (review?.gcode ?? "").split(/\r?\n/), [review?.gcode])
+  const kindByLine = useMemo(() => {
+    const kinds = new Map<number, ToolpathSegment["kind"]>()
+    for (const segment of segments) kinds.set(segment.line, segment.kind)
+    return kinds
+  }, [segments])
   const activeLine = segments[playhead]?.line ?? 0
   const stats = preview?.stats ?? review?.stats
 
@@ -45,14 +51,22 @@ export function ToolpathReview({
 
   useEffect(() => {
     if (activeLine < 1) return
-    listRef.current?.scrollToIndex({ index: Math.min(activeLine - 1, Math.max(lines.length - 1, 0)), viewPosition: 0.35, animated: true })
+    listRef.current?.scrollToIndex({ index: Math.min(activeLine - 1, Math.max(lines.length - 1, 0)), viewPosition: 0.35, animated: false })
   }, [activeLine, lines.length])
 
   return (
     <View style={{ flex: 1, backgroundColor: palette.background }}>
       <View style={{ height: 240 }}>
         {preview ? (
-          <PreviewViewport bounds={preview.bounds} revision={preview.revision} segments={segments} stock={preview.stock} playhead={playhead} />
+          <PreviewViewport
+            bounds={preview.bounds}
+            revision={preview.revision}
+            segments={segments}
+            stock={preview.stock}
+            playhead={playhead}
+            accessibilityLabel="Toolpath preview"
+            accessibilityHint="Drag to orbit. Pinch to zoom. The listing follows the current block."
+          />
         ) : (
           <Skeleton style={{ flex: 1, borderRadius: 0 }} />
         )}
@@ -92,13 +106,12 @@ export function ToolpathReview({
         }}
         renderItem={({ item, index }) => {
           const lineNumber = index + 1
-          const segment = segments.find((entry) => entry.line === lineNumber)
           const active = lineNumber === activeLine
           return (
             <GcodeRow
               lineNumber={lineNumber}
               text={item}
-              kind={segment?.kind}
+              kind={kindByLine.get(lineNumber)}
               active={active}
               disabled={segments.length === 0 || loading}
               onPress={() => {
@@ -130,6 +143,15 @@ function Scrubber({ count, value, onChange }: { count: number; value: number; on
     <View
       accessibilityRole="adjustable"
       accessibilityLabel="Toolpath playback"
+      accessibilityValue={{ min: count === 0 ? 0 : 1, max: Math.max(count, 1), now: count === 0 ? 0 : value + 1, text: count === 0 ? "No motion" : `Block ${value + 1} of ${count}` }}
+      accessibilityActions={[
+        { name: "increment", label: "Next block" },
+        { name: "decrement", label: "Previous block" },
+      ]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "increment") onChange(clampPlayhead(value + 1, count))
+        if (event.nativeEvent.actionName === "decrement") onChange(clampPlayhead(value - 1, count))
+      }}
       style={{ height: 28, justifyContent: "center" }}
       onLayout={(event) => {
         width.current = event.nativeEvent.layout.width
@@ -165,6 +187,7 @@ function GcodeRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`Line ${lineNumber}${text.trim() ? `, ${text.trim()}` : ""}`}
       accessibilityState={{ selected: active, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -178,8 +201,8 @@ function GcodeRow({
       }}
     >
       <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: kind ? KIND_COLOR[kind] : "transparent" }} />
-      <Text style={{ width: 36, color: palette.muted, fontSize: 12, fontFamily: "Menlo" }}>{lineNumber}</Text>
-      <Text style={{ flex: 1, color: active ? palette.ink : palette.soft, fontSize: 13, lineHeight: 18, fontFamily: "Menlo" }}>{text || " "}</Text>
+      <Text style={{ width: 44, color: palette.muted, ...mono(12) }}>{lineNumber}</Text>
+      <Text style={{ flex: 1, color: active ? palette.ink : palette.soft, ...mono(13) }}>{text || " "}</Text>
     </Pressable>
   )
 }
