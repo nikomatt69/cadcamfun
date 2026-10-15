@@ -19,6 +19,7 @@ const toc = [
   { title: "Triage one failure at a time", href: "#triage" },
   { title: "Startup checklist", href: "#startup-checklist" },
   { title: "Reading the logs", href: "#log-reading" },
+  { title: "Error messages and what they mean", href: "#message-index" },
 ]
 ---
 
@@ -185,6 +186,23 @@ bun run --filter @cadcamfun/desktop dev`}
     <h2>Reading the logs</h2>
     <p>Sidecar logs are JSON lines on stderr, kept separate from the stdout handshake. Lines that could contain credentials are replaced by <code>[redacted: line may contain credentials]</code> before they are written, so a redacted line in a log is expected, not corruption. If the handshake itself carried such a line, the reported startup error is the redaction marker; read the surrounding stderr lines for context.</p>
     <p>The log directory is platform-specific. Get it from the <code>get_logs_dir</code> command rather than guessing a path, and open it with <code>open_path</code>, which accepts the application log directory.</p>
+  </section>
+
+    <section id="message-index" class="doc-section">
+    <h2>Error messages and what they mean</h2>
+    <table>
+      <thead><tr><th>Message</th><th>Where it comes from</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>The 3D mesh queue is full. Reduce the scene complexity.</td><td>Viewport meshing queue (128 jobs)</td><td>Hide or simplify bodies; the queue was cleared</td></tr>
+        <tr><td>3D meshing timed out. Reduce the scene complexity.</td><td>One meshing job exceeded 15 s</td><td>Simplify the solid; the worker was restarted</td></tr>
+        <tr><td>No AI provider is configured. Add an API key in the AI settings.</td><td>Assistant stream, <code>code: "config"</code></td><td>Add a provider key; nothing else is wrong</td></tr>
+        <tr><td>Legacy migration journal does not match local migrations</td><td>Database upgrade at startup</td><td>Keep the data directory; install the matching version</td></tr>
+        <tr><td>Pull request is not open</td><td>Merging or closing a merged/closed PR</td><td>Refresh the PR list</td></tr>
+        <tr><td>Unknown revision &lt;rev&gt;</td><td>History restore or log with a bad revision</td><td>Pick a revision from the log</td></tr>
+        <tr><td>Plugin &lt;id&gt; may not use "&lt;capability&gt;": it was not granted at install time</td><td>Plugin context</td><td>Reinstall and grant the capability, or change the plugin</td></tr>
+        <tr><td>The machine's rotary axes cannot reach this work plane within their limits</td><td>Indexed machining</td><td>Use another setup for that face</td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[

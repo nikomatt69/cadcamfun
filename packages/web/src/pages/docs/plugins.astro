@@ -23,6 +23,9 @@ const toc = [
   { title: "Capabilities and the plugin context", href: "#capability-model" },
   { title: "Test a plugin with the SDK test host", href: "#sdk-testing" },
   { title: "How the application loads assistant plugins", href: "#production-loading" },
+  { title: "Identifier and version rules, tested", href: "#id-version-rules" },
+  { title: "Contribution types", href: "#contributions" },
+  { title: "Capability resolution, tested", href: "#capability-resolution" },
 ]
 ---
 
@@ -233,6 +236,62 @@ const toc = [
     <DocCallout type="warn" title="Not an operating-system sandbox">
       <p>The worker has no process, fetch, or file handle of its own, but Bun globals remain reachable inside it. Enable only plugins whose code you trust, and keep write tools to a minimum.</p>
     </DocCallout>
+  </section>
+
+    <section id="id-version-rules" class="doc-section">
+    <h2>Identifier and version rules, tested</h2>
+    <table>
+      <thead><tr><th>Value</th><th>Valid?</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>com.example.gear-generator</code></td><td>yes</td><td>Reverse-DNS: lower-case segments of letters, digits and <code>-</code>, at least two, 3–128 characters</td></tr>
+        <tr><td><code>a.b</code></td><td>yes</td><td>Two one-letter segments are enough</td></tr>
+        <tr><td><code>gear</code></td><td>no</td><td>Needs at least one dot</td></tr>
+        <tr><td><code>Com.Example.x</code></td><td>no</td><td>Upper case is not allowed</td></tr>
+        <tr><td><code>com.example_x.y</code></td><td>no</td><td>Underscore is not allowed</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Version</th><th>Valid?</th></tr></thead>
+      <tbody>
+        <tr><td><code>1.0.0</code></td><td>yes</td></tr>
+        <tr><td><code>1.2.3-beta.1</code></td><td>yes</td></tr>
+        <tr><td><code>1.0</code></td><td>no: three numbers required</td></tr>
+        <tr><td><code>v1.0.0</code></td><td>no: no prefix</td></tr>
+        </tbody>
+    </table>
+    <code>apiVersion</code> must be the string <code>"1"</code>, the only plugin API major that exists. AI tool ids must match <code>^[a-z][a-z0-9_]&#123;0,39&#125;$</code> and are shown to the assistant as <code>plugin_&lt;plugin&gt;_&lt;id&gt;</code>; descriptions must be 10–2,000 characters because the model reads them.
+  </section>
+
+  <section id="contributions" class="doc-section">
+    <h2>Contribution types</h2>
+    <table>
+      <thead><tr><th>Key</th><th>Fields</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>commands</code></td><td><code>id</code>, <code>title</code>, optional <code>keybinding</code> (e.g. <code>Mod+Shift+G</code>)</td><td>Commands in the palette</td></tr>
+        <tr><td><code>panels</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>A panel rendered from a declarative tree the named function returns; no DOM access</td></tr>
+        <tr><td><code>postProcessors</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>A <code>(program, options) =&gt; string</code> post registered at runtime</td></tr>
+        <tr><td><code>operations</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>An exported <code>&#123; schema, generate &#125;</code> record</td></tr>
+        <tr><td><code>aiTools</code></td><td><code>id</code>, <code>description</code>, <code>kind</code> read|write, <code>parameters</code> (JSON Schema), <code>entry</code></td><td>Tools offered to the assistant; a write tool is confirmed before every call</td></tr>
+        </tbody>
+    </table>
+    <p>Other manifest fields: <code>signature</code> (Ed25519 over the archive hash, required for packaged installs) and <code>dev</code> (local development plugin: skips signature checks and shows a badge).</p>
+  </section>
+
+  <section id="capability-resolution" class="doc-section">
+    <h2>Capability resolution, tested</h2>
+    <DocCode language="ts" title="Implication, missing grants, storage keys">
+{"import { effectiveCapabilities, missingCapabilities, storageKey, requireCapability } from \"@cadcamfun/plugin-sdk\"\n\neffectiveCapabilities([\"drawing:write\", \"storage\"])\n// [\"drawing:read\", \"drawing:write\", \"storage\"]   (write implies read; sorted)\n\nmissingCapabilities([\"drawing:read\", \"toolpath:read\", \"ai:tool\"], [\"drawing:write\"])\n// [\"toolpath:read\", \"ai:tool\"]\n\nstorageKey(\"com.example.gear\", \"presets/m2\")   // \"plugin:com.example.gear:presets/m2\"\nstorageKey(\"com.example.gear\", \"../x\")\n// RangeError: storage key \"../x\" may not escape the plugin namespace   (same for \"/abs\")\n\nrequireCapability(ctxWithoutDrawing, \"drawing:read\", \"drawing\")\n// CapabilityError (_tag \"CapabilityDenied\"):\n// Plugin com.example.gear may not use \"drawing:read\": it was not granted at install time"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Surface on the context</th><th>Present when granted</th><th>Methods</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawing</code></td><td><code>drawing:read</code> or <code>drawing:write</code></td><td><code>read()</code> → drawing or <code>undefined</code>; <code>patch(p)</code> → new revision, with <code>AddEntity</code>, <code>UpdateEntity</code>, <code>RemoveEntity</code> patches</td></tr>
+        <tr><td><code>toolpath</code></td><td><code>toolpath:read</code></td><td><code>list()</code>, <code>program(toolpathId)</code></td></tr>
+        <tr><td><code>storage</code></td><td><code>storage</code></td><td><code>get</code>, <code>set</code>, <code>delete</code>, <code>keys</code>; string values</td></tr>
+        <tr><td><code>ui</code></td><td><code>ui:panel</code></td><td><code>registerCommand</code>, <code>registerPanel</code></td></tr>
+        <tr><td><code>log</code></td><td>always</td><td><code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code></td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "AI assistant", href: "/docs/ai" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }]} />

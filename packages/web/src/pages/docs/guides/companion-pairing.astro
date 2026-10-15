@@ -20,6 +20,7 @@ const toc = [
   { title: "What a paired phone can call", href: "#gateway-routes" },
   { title: "Pairing link anatomy", href: "#pairing-link" },
   { title: "Gateway administration API", href: "#gateway-api" },
+  { title: "Gateway status, captured", href: "#status-shape" },
 ]
 ---
 
@@ -214,6 +215,24 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
         </tbody>
     </table>
     <p>Failed bearer attempts are throttled per IP address: after 10 failures within 60 seconds, the gateway answers HTTP 429 ("Too many failed attempts") until the window passes. A wrong or revoked token otherwise gets HTTP 401.</p>
+  </section>
+
+    <section id="status-shape" class="doc-section">
+    <h2>Gateway status, captured</h2>
+    <DocCode language="json" title="GET /api/companion on a fresh installation">
+{"{ \"enabled\": false, \"port\": null, \"fingerprint\": null, \"host\": \"172.30.0.2\", \"devices\": [] }"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>enabled</code></td><td>Whether the HTTPS gateway is running; off by default</td></tr>
+        <tr><td><code>port</code></td><td>Gateway port while enabled, otherwise <code>null</code></td></tr>
+        <tr><td><code>fingerprint</code></td><td>SHA-256 fingerprint of the gateway certificate the phone pins; <code>null</code> until a certificate exists</td></tr>
+        <tr><td><code>host</code></td><td>The LAN address the pairing link will advertise</td></tr>
+        <tr><td><code>devices</code></td><td>Paired devices; each can be revoked on its own</td></tr>
+        </tbody>
+    </table>
+    <p>If <code>host</code> is not the address your phone can reach (for example a container or VPN interface), pairing will fail at the network layer even though everything else is correct.</p>
   </section>
 
   <DocRelated items={[

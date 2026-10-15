@@ -24,6 +24,8 @@ const toc = [
   { title: "Assistant endpoint reference", href: "#endpoint-reference" },
   { title: "Streaming request fields", href: "#stream-request" },
   { title: "Limits and defaults", href: "#limits-reference" },
+  { title: "The full action catalogue", href: "#action-catalogue" },
+  { title: "How an action call ends", href: "#action-outcomes" },
 ]
 ---
 
@@ -257,6 +259,60 @@ const toc = [
     <DocCallout type="note" title="Read the result, not the prose">
       <p>A tool's outcome is in <code>tool_result</code> and <code>tool_diagnostic</code> events. Check whether a mutation was applied before trusting the assistant's summary of what it did.</p>
     </DocCallout>
+  </section>
+
+    <section id="action-catalogue" class="doc-section">
+    <h2>The full action catalogue</h2>
+    <p>The assistant acts through 83 declared actions in 13 families. Every action declares its result schema and its <em>effects</em>: what it changes or reaches beyond reading the open document. Read families (<code>cad</code>, <code>cam</code>, <code>library</code>, <code>memory</code>, <code>research</code>, <code>vcs</code>) mostly have no effect; their <code>_edit</code> counterparts change persistent state. Effects are listed in parentheses.</p>
+    <table>
+      <thead><tr><th>Family</th><th>Count</th><th>Actions (effects)</th></tr></thead>
+      <tbody>
+        <tr><td><code>cad</code></td><td>20</td><td><code>describe</code>, <code>check</code>, <code>relations</code>, <code>grep</code>, <code>vision</code> (interface), <code>inspect_elements</code>, <code>inspect_layers</code>, <code>inspect_search</code>, <code>inspect_property</code>, <code>drawing</code>, <code>parametric_validate</code>, <code>parametric_inspect</code>, <code>parametric_test</code>, <code>parametric_dfm</code>, <code>parametric_exact</code>, <code>exact</code>, <code>assembly</code>, <code>parametric_fastener</code>, <code>parametric_recipe</code>, <code>parametric_from_element</code></td></tr>
+        <tr><td><code>cad_edit</code></td><td>12</td><td><code>add</code> (drawing), <code>add_entities</code> (drawing), <code>modify</code> (drawing), <code>transform</code> (drawing), <code>group</code> (drawing), <code>delete</code> (drawing), <code>editor</code> (interface+drawing), <code>import</code> (drawing), <code>parametric_create</code> (drawing), <code>parametric_update</code> (drawing), <code>parametric_recipe_create</code> (drawing), <code>parametric_convert</code> (drawing)</td></tr>
+        <tr><td><code>cam</code></td><td>14</td><td><code>plan_check</code>, <code>review</code>, <code>machine</code>, <code>operations</code>, <code>suggest</code>, <code>compare_setups</code>, <code>analyze</code>, <code>stock</code>, <code>vision</code> (interface), <code>chain_suggest</code>, <code>materials</code>, <code>cutting_data</code>, <code>manufacture</code>, <code>chain_status</code></td></tr>
+        <tr><td><code>cam_edit</code></td><td>6</td><td><code>manufacture</code> (operation+program), <code>create</code> (operation), <code>update</code> (operation), <code>generate</code> (program), <code>verify</code> (report), <code>stock_set</code> (stock)</td></tr>
+        <tr><td><code>library</code></td><td>5</td><td><code>component_list</code>, <code>lookup_component</code>, <code>lookup_material</code>, <code>lookup_tool</code>, <code>lookup_machine_config</code></td></tr>
+        <tr><td><code>parts</code></td><td>3</td><td><code>save</code> (component), <code>insert</code> (drawing), <code>delete</code> (component)</td></tr>
+        <tr><td><code>library_edit</code></td><td>5</td><td><code>upsert_material</code> (library), <code>upsert_tool</code> (library), <code>upsert_machine_config</code> (library), <code>set_default</code> (library), <code>delete</code> (library)</td></tr>
+        <tr><td><code>memory</code></td><td>2</td><td><code>recall</code>, <code>context_read</code></td></tr>
+        <tr><td><code>memory_edit</code></td><td>2</td><td><code>remember</code> (memory), <code>context_update</code> (context)</td></tr>
+        <tr><td><code>research</code></td><td>2</td><td><code>search</code> (external), <code>read_attachment</code></td></tr>
+        <tr><td><code>vcs</code></td><td>3</td><td><code>status</code>, <code>diff</code>, <code>list_pull_requests</code></td></tr>
+        <tr><td><code>vcs_edit</code></td><td>5</td><td><code>start_change</code> (history), <code>commit</code> (history), <code>restore</code> (history+drawing), <code>open_pull_request</code> (history), <code>run_workflows</code> (workflow)</td></tr>
+        <tr><td><code>agent</code></td><td>4</td><td><code>start</code> (task), <code>list</code>, <code>read</code>, <code>cancel</code> (task)</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Effect</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawing</code>, <code>component</code>, <code>operation</code>, <code>program</code>, <code>stock</code>, <code>report</code></td><td>Persistent design or manufacturing data</td></tr>
+        <tr><td><code>library</code>, <code>memory</code>, <code>context</code></td><td>Library records, project memory, workspace context</td></tr>
+        <tr><td><code>history</code>, <code>workflow</code></td><td>Version control and workflow runs</td></tr>
+        <tr><td><code>task</code></td><td>The delegation scheduler (background agents)</td></tr>
+        <tr><td><code>interface</code></td><td>The editor or viewport on screen; not persistent</td></tr>
+        <tr><td><code>external</code></td><td>The network (web research)</td></tr>
+        </tbody>
+    </table>
+    <p>A read action may only have <code>interface</code> or <code>external</code>; every write names at least one persistent effect. Effects are declared per action and never inferred from the tool that implements it.</p>
+  </section>
+
+  <section id="action-outcomes" class="doc-section">
+    <h2>How an action call ends</h2>
+    <table>
+      <thead><tr><th>Outcome</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>succeeded</code></td><td>The action did what was asked. Includes reads with a negative finding, such as a failing check.</td></tr>
+        <tr><td><code>partial</code></td><td>Part of the answer or batch: <code>complete: false</code>, <code>omitted &gt; 0</code>, non-empty <code>skipped</code>, or a <code>nextOffset</code> to page on</td></tr>
+        <tr><td><code>refused</code></td><td>Nothing done: <code>ok: false</code> with an error or tag (invalid input, denied, unavailable, nothing to do)</td></tr>
+        <tr><td><code>conflict</code></td><td>The document moved on: <code>ActionConflict</code> or status <code>stale</code>/<code>conflict</code>. Inspect again before retrying.</td></tr>
+        <tr><td><code>cancelled</code></td><td><code>ActionInterrupted</code></td></tr>
+        <tr><td><code>uncertain</code></td><td><code>ActionUncertain</code>: a write may have committed but its answer could not be read. Reconcile by inspecting; never retry blindly.</td></tr>
+        </tbody>
+    </table>
+    <p>Writes are bound to a drawing revision. A committed write returns an <code>ActionCommitted</code> receipt with <code>previousRevision</code> and <code>revision</code>; a write against a stale <code>expectedRevision</code> returns <code>ActionConflict</code> with both <code>expectedRevision</code> and <code>actualRevision</code>. The same classification (<code>actionOutcome</code>) is shared by the host, Code Mode, the desktop and the bridge.</p>
+    <DocCode language="json" title="A conflict, as returned">
+{"{\n  \"ok\": false,\n  \"_tag\": \"ActionConflict\",\n  \"actionId\": \"cad_edit.modify\",\n  \"projectId\": \"\u2026\", \"drawingId\": \"\u2026\",\n  \"expectedRevision\": 41, \"actualRevision\": 42,\n  \"message\": \"\u2026\"\n}"}
+    </DocCode>
   </section>
 
   <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "Plugins", href: "/docs/plugins" }, { title: "History", href: "/docs/history" }]} />

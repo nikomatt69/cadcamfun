@@ -146,7 +146,7 @@ curl --silent --show-error "$CADCAMFUN_URL/api/projects/$PROJECT_ID" \
   <section id="tour-cleanup" class="doc-section">
     <h2>Clean up after the tour</h2>
     <DocCode language="bash" title="Remove what the tour created">
-{"curl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/projects/$id\"\ncurl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/kv/docs.walkthrough.units\""}
+{"curl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/projects/$id\"\ncurl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/kv/docs.walkthrough.units\u0022"}
     </DocCode>
     <p>Deleting the project cascades to its drawings, components, toolpaths, history and workflow runs. The key-value entry is independent and must be removed separately.</p>
   </section>

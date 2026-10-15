@@ -18,6 +18,7 @@ const toc = [
   { title: "Separate transport errors from domain outcomes", href: "#failures" },
   { title: "Event reference", href: "#event-reference" },
   { title: "A complete streaming client", href: "#stream-client" },
+  { title: "What a stream looks like without a provider", href: "#no-provider" },
 ]
 ---
 
@@ -190,6 +191,23 @@ const toc = [
 {"const base = process.env.CADCAMFUN_URL!       // e.g. http://127.0.0.1:53211\nconst token = process.env.CADCAMFUN_TOKEN!\n\nconst response = await fetch(`${base}/api/ai/chat/stream`, {\n  method: \"POST\",\n  headers: { \"content-type\": \"application/json\", authorization: `Bearer ${token}` },\n  body: JSON.stringify({ projectId: \"p1\", message: \"Summarise this project\", mode: \"general\" }),\n})\nif (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)\n\nconst reader = response.body.pipeThrough(new TextDecoderStream()).getReader()\nlet buffer = \"\", answer = \"\"\nfor (;;) {\n  const { value, done } = await reader.read()\n  if (done) break\n  buffer += value\n  let end\n  while ((end = buffer.indexOf(\"\\n\\n\")) >= 0) {        // one SSE frame\n    const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2)\n    const data = frame.split(\"\\n\").filter((l) => l.startsWith(\"data:\"))\n                      .map((l) => l.slice(5).trimStart()).join(\"\\n\")\n    if (!data) continue\n    const event = JSON.parse(data)\n    switch (event.type) {\n      case \"delta\": answer += event.text; break\n      case \"permission_request\": /* ask, then POST /api/ai/permission/reply */ break\n      case \"done\": answer = event.text; console.log(answer); break\n      case \"error\": throw new Error(`${event.code}: ${event.message}`)\n    }\n  }\n}"}
     </DocCode>
     <p>If the connection drops, do not send the message again. Read the session with <code>POST /api/ai/sessions/state</code>, because the server may have resumed the model connection and finished the turn without you. Use <code>/api/ai/chat/abort</code> to stop a turn deliberately, and <code>/api/ai/chat/queue</code> to add a message while the session is busy.</p>
+  </section>
+
+    <section id="no-provider" class="doc-section">
+    <h2>What a stream looks like without a provider</h2>
+    <p>With no AI provider configured, the stream still opens and answers with a typed error, followed by a heartbeat. Captured from a fresh sidecar:</p>
+    <DocCode language="text" title="POST /api/ai/chat/stream">
+{"data: {\"type\":\"error\",\"sessionId\":\"\",\"code\":\"config\",\"message\":\"No AI provider is configured. Add an API key in the AI settings.\"}\n\ndata: {\"type\":\"heartbeat\"}"}
+    </DocCode>
+    <ul>
+      <li>The HTTP status is still 200 and the content type <code>text/event-stream</code>: configuration problems are domain outcomes, delivered as events.</li>
+      <li><code>sessionId</code> is empty because no session was created.</li>
+      <li><code>heartbeat</code> frames keep the connection alive; ignore them in rendering and do not count them as progress.</li>
+      <li>Each frame ends with a blank line. Parse by splitting on blank lines and joining the <code>data:</code> lines of a frame, as the SDK iterator does.</li>
+    </ul>
+    <DocCallout type="info" title="Test your client without a model">
+      <p>Point a client at a sidecar without credentials: it exercises the full SSE path and the error branch with no cost.</p>
+    </DocCallout>
   </section>
 
   <DocRelated items={[{ title: "AI service reference", href: "/docs/ai" }, { title: "AI endpoints", href: "/docs/api/ai" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />

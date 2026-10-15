@@ -24,6 +24,9 @@ const toc = [
   { title: "Snapping reference", href: "#snapping-reference" },
   { title: "How toolpath playback is timed", href: "#playback-internals" },
   { title: "Viewport practices", href: "#viewport-practices" },
+  { title: "Hit-testing at scale: the spatial grid", href: "#spatial-index" },
+  { title: "3D meshing queue", href: "#mesh-queue" },
+  { title: "2D tool implementations", href: "#editor-tools" },
 ]
 ---
 
@@ -194,7 +197,7 @@ export function ProgramPreview(props: { program: cam.Program }) {
         </tbody>
     </table>
     <DocCode language="ts" title="Converting and parsing lengths (apps/desktop/src/viewport/units.ts)">
-{"import { formatLength, parseLength, formatAngle, programUnitsOf } from \"./units\"\n\nformatLength(25.4, \"inch\")     // \"1.0000 inch\"\nformatLength(12.5)             // \"12.500 mm\"\nformatLength(0.0254, \"thou\")   // \"1.00 thou\"\nparseLength(\"2 in\", \"inch\")    // 50.8  (a trailing unit word is ignored)\nparseLength(\"abc\")             // undefined\nformatAngle(Math.PI / 2)       // \"90.0\u00b0\"\nprogramUnitsOf(\"thou\")         // \"inch\""}
+{"import { formatLength, parseLength, formatAngle, programUnitsOf } from \"./units\"\n\nformatLength(25.4, \"inch\")     // \"1.0000 inch\"\nformatLength(12.5)             // \"12.500 mm\"\nformatLength(0.0254, \"thou\")   // \"1.00 thou\"\nparseLength(\"2 in\", \"inch\")    // 50.8  (a trailing unit word is ignored)\nparseLength(\"abc\")             // undefined\nformatAngle(Math.PI / 2)       // \"90.0\u00b0\"\nprogramUnitsOf(\"thou\")         // \"inch\u0022"}
     </DocCode>
     <code>parseLength</code> strips a trailing alphabetic suffix (including <code>µ</code> and <code>°</code>) and interprets the number in the current display unit. The suffix is not used to pick a unit, so typing <code>2 mm</code> while the display is in inches yields 50.8 mm. Empty, non-numeric, and infinite input returns <code>undefined</code>, and editors should keep the previous value in that case.
   </section>
@@ -268,6 +271,66 @@ export function ProgramPreview(props: { program: cam.Program }) {
       <li>Keep snap candidate queries spatial. Passing every entity to <code>findSnap</code> on each pointer move defeats the index.</li>
       <li>Treat playback duration as a preview, not a cycle-time quote.</li>
     </ul>
+  </section>
+
+    <section id="spatial-index" class="doc-section">
+    <h2>Hit-testing at scale: the spatial grid</h2>
+    <p>The 2D editor targets 60 fps with 10,000 entities, so hit-testing and culling never scan every entity per pointer event. <code>viewport/spatial/grid.ts</code> keeps a uniform grid: each item is registered in every cell its bounding box touches, and a query returns all items whose bounds intersect the query box, in insertion order. The result is exact, never a sample.</p>
+    <table>
+      <thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Default cell size</td><td>50 world units (mm)</td><td>Suits a drawing about 1 m across</td></tr>
+        <tr><td>Minimum cell size</td><td>1e-6</td><td>Guards against a zero or negative size, which would loop forever</td></tr>
+        <tr><td>Cells per item limit</td><td>4,096</td><td>Larger items (a long line across the sheet) are tracked aside instead of per cell</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Method</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>build(items)</code></td><td>Rebuild from scratch</td></tr>
+        <tr><td><code>upsert(id, item)</code></td><td>Insert or replace one item by id</td></tr>
+        <tr><td><code>remove(id)</code></td><td>Remove; unknown ids are ignored</td></tr>
+        <tr><td><code>query(bounds)</code></td><td>Ids whose bounds intersect the box</td></tr>
+        </tbody>
+    </table>
+    <svg viewBox="0 0 400 220" width="100%" role="img" aria-label="Uniform grid index" style="max-width:400px;font:11px system-ui">
+<g stroke="currentColor" opacity=".25"><path d="M20 10V210"/><path d="M80 10V210"/><path d="M140 10V210"/><path d="M200 10V210"/><path d="M260 10V210"/><path d="M320 10V210"/><path d="M380 10V210"/><path d="M20 10H380"/><path d="M20 60H380"/><path d="M20 110H380"/><path d="M20 160H380"/><path d="M20 210H380"/></g>
+<g fill="none" stroke-width="1.5"><rect x="95" y="70" width="80" height="40" stroke="#3b82f6"/><circle cx="290" cy="150" r="25" stroke="#3fb37f"/><path d="M30 200L370 20" stroke="#c070e0"/><rect x="190" y="55" width="100" height="70" stroke="#ef4444" stroke-dasharray="4 3"/></g>
+<g fill="currentColor"><text x="195" y="50">query box</text><text x="100" y="65" fill="#3b82f6">entity A</text><text x="300" y="185" fill="#3fb37f">B</text><text x="330" y="45" fill="#c070e0">long line</text></g></svg>
+    <p>Cells touched by the dashed query box are visited; A and the long line are returned because their bounds intersect it, B is not.</p>
+  </section>
+
+  <section id="mesh-queue" class="doc-section">
+    <h2>3D meshing queue</h2>
+    <p>Solids are meshed in a Web Worker so the UI thread never blocks. <code>MeshWorkerQueue</code> in <code>view3d/mesh-jobs.ts</code> runs one job at a time:</p>
+    <table>
+      <thead><tr><th>Rule</th><th>Value</th><th>Message on failure</th></tr></thead>
+      <tbody>
+        <tr><td>Capacity (queued + running)</td><td>128</td><td>The 3D mesh queue is full. Reduce the scene complexity.</td></tr>
+        <tr><td>Timeout per job</td><td>15 s</td><td>3D meshing timed out. Reduce the scene complexity.</td></tr>
+        <tr><td>Worker error</td><td>—</td><td>The worker's message, or "The mesh worker stopped unexpectedly."</td></tr>
+        <tr><td>Undecodable reply</td><td>—</td><td>The mesh worker could not decode its response.</td></tr>
+        <tr><td>Bad geometry</td><td>positions must be <code>Float32Array</code>, indices <code>Uint32Array</code></td><td>The mesh worker returned invalid geometry.</td></tr>
+        </tbody>
+    </table>
+    <p>Any failure terminates the worker and clears the whole queue, so stale scene work never lands after a newer edit; the next submission starts a fresh worker. Replies are matched by job id, so a late answer from a terminated worker is ignored.</p>
+  </section>
+
+  <section id="editor-tools" class="doc-section">
+    <h2>2D tool implementations</h2>
+    <table>
+      <thead><tr><th>File</th><th>Tools</th></tr></thead>
+      <tbody>
+        <tr><td><code>tools/two-point.ts</code></td><td>line, rectangle, circle by diameter, ellipse</td></tr>
+        <tr><td><code>tools/chained.ts</code></td><td>polyline, three-point arc</td></tr>
+        <tr><td><code>tools/fillet-chamfer.ts</code></td><td>round or bevel the corner between two lines</td></tr>
+        <tr><td><code>tools/offset.ts</code></td><td>offset a polyline, rectangle, circle or arc by a distance</td></tr>
+        <tr><td><code>tools/trim.ts</code></td><td>trim and extend</td></tr>
+        <tr><td><code>tools/select.ts</code></td><td>click, box and add/remove selection</td></tr>
+        <tr><td><code>tools/annotation-transform.ts</code></td><td>move and transform annotations</td></tr>
+        </tbody>
+    </table>
+    <p>Each tool is a small state machine with <code>onPointerDown</code>, <code>onPointerMove</code> and <code>onPointerUp</code>, created by a factory in <code>tools/index.ts</code>, one per palette entry. Pointer positions pass through <code>snap-pipeline.ts</code> before a tool sees them.</p>
   </section>
 
   <DocRelated items={[

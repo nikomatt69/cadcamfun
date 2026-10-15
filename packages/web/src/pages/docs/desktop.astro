@@ -22,6 +22,7 @@ const toc = [
   { title: "Keyboard and failure diagnosis", href: "#desktop-diagnostics" },
   { title: "Native event payloads", href: "#event-payloads" },
   { title: "Keyboard shortcuts", href: "#shortcut-table" },
+  { title: "Every screen route", href: "#route-table" },
 ]
 ---
 
@@ -225,6 +226,47 @@ bun run build:desktop`}
         </tbody>
     </table>
     <code>Cmd</code> applies on macOS and <code>Ctrl</code> elsewhere. Each shortcut's ID is also its translation key suffix (for example <code>settings.shortcut.palette</code>), and the Settings screen renders this same table, so the documentation and the app cannot drift apart.
+  </section>
+
+    <section id="route-table" class="doc-section">
+    <h2>Every screen route</h2>
+    <p>The router in <code>apps/desktop/src/app/routes.tsx</code> declares 68 routes, each loaded lazily from <code>apps/desktop/src/pages/</code> (dynamic segments are <code>_id_.tsx</code> files). Grouped by first segment:</p>
+    <table>
+      <thead><tr><th>Area</th><th>Routes</th></tr></thead>
+      <tbody>
+        <tr><td><code>*</code></td><td><code>*</code></td></tr>
+        <tr><td><code>500</code></td><td><code>/500</code></td></tr>
+        <tr><td><code>admin</code></td><td><code>/admin/analytics</code> <code>/admin/feature-flags</code></td></tr>
+        <tr><td><code>ai</code></td><td><code>/ai</code></td></tr>
+        <tr><td><code>analytics</code></td><td><code>/analytics/history</code> <code>/analytics</code></td></tr>
+        <tr><td><code>auth</code></td><td><code>/auth/forgot-password</code> <code>/auth/magic-link</code> <code>/auth/magic-link/verify</code> <code>/auth/reset-password</code> <code>/auth/signin</code> <code>/auth/signup</code> <code>/auth/two-factor</code> <code>/auth/verify-email</code> <code>/auth/verify</code></td></tr>
+        <tr><td><code>cad</code></td><td><code>/cad</code></td></tr>
+        <tr><td><code>cam</code></td><td><code>/cam</code></td></tr>
+        <tr><td><code>costs</code></td><td><code>/costs</code></td></tr>
+        <tr><td><code>components</code></td><td><code>/components/:id</code> <code>/components</code></td></tr>
+        <tr><td><code>drawings</code></td><td><code>/drawings/:id</code></td></tr>
+        <tr><td><code>/</code></td><td><code>/</code></td></tr>
+        <tr><td><code>invitations</code></td><td><code>/invitations/:token</code></td></tr>
+        <tr><td><code>legal</code></td><td><code>/legal/privacy</code> <code>/legal/terms</code> <code>/legal/third-party-licenses</code></td></tr>
+        <tr><td><code>library</code></td><td><code>/library</code></td></tr>
+        <tr><td><code>machine</code></td><td><code>/machine/:id</code> <code>/machine</code></td></tr>
+        <tr><td><code>marketplace</code></td><td><code>/marketplace</code> <code>/marketplace/items/:id</code> <code>/marketplace/purchase/success</code> <code>/marketplace/purchases</code> <code>/marketplace/seller/dashboard</code></td></tr>
+        <tr><td><code>materials</code></td><td><code>/materials/:id</code> <code>/materials</code></td></tr>
+        <tr><td><code>mcp</code></td><td><code>/mcp/directory</code> <code>/mcp/servers/:id</code></td></tr>
+        <tr><td><code>offline</code></td><td><code>/offline</code></td></tr>
+        <tr><td><code>organizations</code></td><td><code>/organizations/:id</code> <code>/organizations/:id/chat/:conversationId</code> <code>/organizations/:id/chat</code> <code>/organizations/:id/chat/new-group</code> <code>/organizations/:id/chat/new</code> <code>/organizations/create</code> <code>/organizations</code></td></tr>
+        <tr><td><code>plugins</code></td><td><code>/plugins/:id</code> <code>/plugins</code></td></tr>
+        <tr><td><code>pricing</code></td><td><code>/pricing</code></td></tr>
+        <tr><td><code>profile</code></td><td><code>/profile</code> <code>/profile/settings</code></td></tr>
+        <tr><td><code>projects</code></td><td><code>/projects/:id/history</code> <code>/projects/:id</code> <code>/projects/create</code> <code>/projects</code></td></tr>
+        <tr><td><code>settings</code></td><td><code>/settings</code> <code>/settings/companion</code> <code>/settings/mcp/config-editor</code> <code>/settings/mcp/edit/:id</code> <code>/settings/mcp</code> <code>/settings/subscription</code></td></tr>
+        <tr><td><code>third-party-licenses</code></td><td><code>/third-party-licenses</code></td></tr>
+        <tr><td><code>toolpaths</code></td><td><code>/toolpaths/:id</code> <code>/toolpaths</code></td></tr>
+        <tr><td><code>tools</code></td><td><code>/tools/:id</code> <code>/tools</code></td></tr>
+        <tr><td><code>waitlist</code></td><td><code>/waitlist</code></td></tr>
+        </tbody>
+    </table>
+    <code>*</code> renders the 404 page and <code>/500</code> the error page. <code>/offline</code> renders the offline screen; like the auth, invitation, 404, 500 and purchase-success pages it uses the standalone layout without the app chrome. Because every page is a lazy import, a screen's code is only loaded on first visit; a failed chunk load surfaces as a route error, not a blank app.
   </section>
 
   <DocRelated items={[

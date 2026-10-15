@@ -21,6 +21,9 @@ const toc = [
   { title: "Step reference", href: "#step-reference" },
   { title: "Outputs and interpolation", href: "#interpolation" },
   { title: "Run lifecycle and errors", href: "#run-lifecycle" },
+  { title: "A full run, traced event by event", href: "#engine-trace" },
+  { title: "Trigger matching, tested", href: "#trigger-matching" },
+  { title: "Every parse error, reproduced", href: "#parse-errors" },
 ]
 ---
 
@@ -160,7 +163,7 @@ console.log(result) // { status: "success", jobs: { inspect: "success" } }`}
     <h2>Workflow file format</h2>
     <p>A workflow is a YAML file at <code>.cadcamfun/workflows/&lt;name&gt;.yml</code> in the project repository, versioned with the model it checks. Its shape mirrors GitHub Actions (<code>on</code>, <code>jobs</code>, <code>needs</code>, <code>steps</code>, <code>uses</code>, <code>with</code>), but <code>uses</code> always names a registered CADCAMFUN step. A workflow cannot run a shell command or a container image.</p>
     <DocCode language="yaml" title=".cadcamfun/workflows/release-check.yml">
-{"name: Release check\non:\n  push:\n    branches: [main, \"release/*\"]\n    paths: [\"toolpaths/**\"]\n  pullRequest:\n    branches: [main]\n  manual: {}\njobs:\n  validate:\n    steps:\n      - uses: project/validate\n      - uses: project/require-gcode\n  verify:\n    needs: [validate]\n    steps:\n      - id: verify\n        uses: cam/verify\n        with: { severity: warning }\n  gcode:\n    needs: [validate]\n    steps:\n      - uses: cam/gcode\n      - uses: cam/sequence\n  report:\n    needs: [verify, gcode]\n    steps:\n      - id: review\n        uses: ai/prompt\n        with:\n          prompt: \"Summarise risks in this program: ${{ files.toolpaths/op1.json }}\"\n        continueOnError: true\n      - uses: notify/push\n        if: always\n        with:\n          title: \"Release check finished\"\n          body: \"${{ steps.review.outputs.text }}\""}
+{"name: Release check\non:\n  push:\n    branches: [main, \"release/*\"]\n    paths: [\"toolpaths/**\"]\n  pullRequest:\n    branches: [main]\n  manual: {}\njobs:\n  validate:\n    steps:\n      - uses: project/validate\n      - uses: project/require-gcode\n  verify:\n    needs: [validate]\n    steps:\n      - id: verify\n        uses: cam/verify\n        with: { severity: warning }\n  gcode:\n    needs: [validate]\n    steps:\n      - uses: cam/gcode\n      - uses: cam/sequence\n  report:\n    needs: [verify, gcode]\n    steps:\n      - id: review\n        uses: ai/prompt\n        with:\n          prompt: \"Summarise risks in this program: ${{ files.toolpaths/op1.json }}\"\n        continueOnError: true\n      - uses: notify/push\n        if: always\n        with:\n          title: \"Release check finished\"\n          body: \"${{ steps.review.outputs.text }}\u0022"}
     </DocCode>
     <figure class="not-prose my-6">
       <svg viewBox="0 0 560 170" role="img" aria-label="Job graph: validate runs first; verify and gcode run concurrently after it; report runs last with if always" style="width:100%;max-width:600px;height:auto">
@@ -241,6 +244,73 @@ console.log(result) // { status: "success", jobs: { inspect: "success" } }`}
     <DocCallout type="note" title="Evidence, not decoration">
       <p>Of the built-in steps, only <code>cam/verify</code> replays the program against the stock and tools. The other checks confirm consistency of what was committed. Read <code>skipped</code> lists: an unverifiable toolpath is not a verified one.</p>
     </DocCallout>
+  </section>
+
+    <section id="engine-trace" class="doc-section">
+    <h2>A full run, traced event by event</h2>
+    <p>This workflow exercises every rule of the engine at once: outputs passed between jobs, a whole-value and an embedded interpolation, <code>continueOnError</code>, <code>if: failure</code>, a job skipped because its dependency failed, and an independent job. It was run with <code>runWorkflow</code> and four test step handlers: <code>demo/measure</code> returns <code>&#123; volume: 7842.92, part &#125;</code>, <code>demo/check</code> prints what it received, <code>demo/fail</code> fails with <code>StepError("tolerance exceeded")</code> and <code>demo/notify</code> returns nothing.</p>
+    <DocCode language="yaml" title=".cadcamfun/workflows/release-check.yml">
+{"name: Release check\non:\n  push: { branches: [main, \"release/**\"], paths: [\"parts/**/*.json\"] }\n  manual: {}\njobs:\n  measure:\n    steps:\n      - id: size\n        uses: demo/measure\n        with: { part: bracket }\n  verify:\n    needs: [measure]\n    steps:\n      - uses: demo/check\n        with: { volume: \"${{ steps.size.outputs.volume }}\", label: \"vol=${{ steps.size.outputs.volume }} mm3\" }\n      - uses: demo/fail\n        continueOnError: true\n      - uses: demo/fail\n      - uses: demo/notify\n        if: failure\n      - uses: demo/notify\n  publish:\n    needs: [verify]\n    steps:\n      - uses: demo/notify\n  lint:\n    steps:\n      - uses: demo/notify"}
+    </DocCode>
+    <DocCode language="text" title="Events and result, as emitted">
+{"levels [[\"measure\",\"lint\"],[\"verify\"],[\"publish\"]]\n{\"type\":\"job-start\",\"job\":\"measure\"}\n{\"type\":\"step\",\"job\":\"measure\",\"index\":0,\"uses\":\"demo/measure\",\"status\":\"success\",\"outputs\":{\"volume\":7842.92,\"part\":\"bracket\"}}\n{\"type\":\"job-end\",\"job\":\"measure\",\"status\":\"success\"}\n{\"type\":\"job-start\",\"job\":\"lint\"}\n{\"type\":\"step\",\"job\":\"lint\",\"index\":0,\"uses\":\"demo/notify\",\"status\":\"success\",\"outputs\":{}}\n{\"type\":\"job-end\",\"job\":\"lint\",\"status\":\"success\"}\n{\"type\":\"job-start\",\"job\":\"verify\"}\n  check got {\"volume\":7842.92,\"label\":\"vol=7842.92 mm3\"}\n{\"type\":\"step\",\"job\":\"verify\",\"index\":0,\"uses\":\"demo/check\",\"status\":\"success\",\"outputs\":{\"ok\":true}}\n{\"type\":\"step\",\"job\":\"verify\",\"index\":1,\"uses\":\"demo/fail\",\"status\":\"failure\",\"message\":\"Cause([Fail(StepError: tolerance exceeded)])\"}\n{\"type\":\"step\",\"job\":\"verify\",\"index\":2,\"uses\":\"demo/fail\",\"status\":\"failure\",\"message\":\"Cause([Fail(StepError: tolerance exceeded)])\"}\n{\"type\":\"step\",\"job\":\"verify\",\"index\":3,\"uses\":\"demo/notify\",\"status\":\"success\",\"outputs\":{}}\n{\"type\":\"step\",\"job\":\"verify\",\"index\":4,\"uses\":\"demo/notify\",\"status\":\"skipped\"}\n{\"type\":\"job-end\",\"job\":\"verify\",\"status\":\"failure\"}\n{\"type\":\"job-end\",\"job\":\"publish\",\"status\":\"skipped\"}\nresult {\"status\":\"failure\",\"jobs\":{\"measure\":\"success\",\"lint\":\"success\",\"verify\":\"failure\",\"publish\":\"skipped\"}}"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Observation</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>measure</code> and <code>lint</code> run in the first level</td><td>Jobs without <code>needs</code> form level 0 and run concurrently</td></tr>
+        <tr><td><code>volume</code> arrives as the number 7842.92, <code>label</code> as a string</td><td>A string that is exactly one expression keeps the output's type; an embedded expression is stringified</td></tr>
+        <tr><td>Step 1 fails but the job continues normally</td><td><code>continueOnError: true</code> records the failure without marking the job failed</td></tr>
+        <tr><td>Step 2 fails and marks the job failed</td><td>Default behaviour</td></tr>
+        <tr><td>Step 3 runs, step 4 is skipped</td><td><code>if: failure</code> runs only after a failure; the default <code>if: success</code> is skipped after one</td></tr>
+        <tr><td><code>publish</code> is skipped, never started</td><td>A job whose <code>needs</code> did not all succeed emits only <code>job-end</code> with <code>skipped</code></td></tr>
+        <tr><td>Overall <code>failure</code></td><td>The run succeeds only if every job is <code>success</code>; a skipped job counts as not successful</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="trigger-matching" class="doc-section">
+    <h2>Trigger matching, tested</h2>
+    <table>
+      <thead><tr><th>Event</th><th>Matches?</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>push to <code>main</code>, changed <code>parts/a/b.json</code></td><td>yes</td><td>Branch matches; path matches <code>parts/**/*.json</code></td></tr>
+        <tr><td>push to <code>main</code>, changed <code>README.md</code></td><td>no</td><td>No changed path matches</td></tr>
+        <tr><td>push to <code>release/6.1</code>, changed <code>parts/x.json</code></td><td>no</td><td><code>parts/**/*.json</code> compiles to <code>^parts\/.*\/[^/]*\.json$</code>, which needs a directory between <code>parts/</code> and the file</td></tr>
+        <tr><td>push to <code>feature/x</code></td><td>no</td><td>Branch does not match</td></tr>
+        <tr><td>manual</td><td>yes</td><td><code>manual</code> is declared</td></tr>
+        <tr><td>pull request into <code>main</code></td><td>no</td><td>No <code>pullRequest</code> trigger declared</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="** needs a segment on each side here">
+      <p>Because <code>**</code> becomes <code>.*</code> between two literal slashes, <code>parts/**/*.json</code> does not match files directly in <code>parts/</code>. List both patterns, <code>parts/*.json</code> and <code>parts/**/*.json</code>, to cover both.</p>
+    </DocCallout>
+    <code>*</code> matches within one path segment; <code>**</code> matches across segments. Omitting <code>branches</code> or <code>paths</code> means any value matches.
+  </section>
+
+  <section id="parse-errors" class="doc-section">
+    <h2>Every parse error, reproduced</h2>
+    <table>
+      <thead><tr><th>code</th><th>Input problem</th><th>Message</th></tr></thead>
+      <tbody>
+        <tr><td><code>yaml</code></td><td>Malformed YAML such as <code>name: [x</code></td><td>Invalid YAML: SyntaxError: YAML Parse error: Unexpected token</td></tr>
+        <tr><td><code>schema</code></td><td><code>uses: Shell</code> (not a lower-case <code>area/step</code> id)</td><td>SchemaError(Expected a string matching the RegExp …) with the path <code>["jobs"]["a"]["steps"][0]</code></td></tr>
+        <tr><td><code>needs</code></td><td><code>needs: [b]</code> with no job <code>b</code></td><td>Job a needs unknown job b</td></tr>
+        <tr><td><code>cycle</code></td><td><code>a</code> needs <code>b</code> and <code>b</code> needs <code>a</code></td><td>Workflow jobs form a cycle: a, b</td></tr>
+        <tr><td><code>duplicate-step-id</code></td><td>Two steps with <code>id: s</code>, even in different jobs</td><td>Step ids must be unique across the workflow</td></tr>
+        </tbody>
+    </table>
+    <p>At run time, any <code>uses</code> without a registered handler fails the whole run before the first step, listing every unknown id: <code>Unknown step(s): demo/measure, demo/check, …</code>. A typo therefore never half-applies a workflow.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>1–128 characters</td></tr>
+        <tr><td>Job and step ids</td><td>Letter first, then letters, digits, <code>_</code> or <code>-</code>; at most 64 characters</td></tr>
+        <tr><td><code>uses</code></td><td>Lower-case segments separated by <code>/</code>, at least two segments</td></tr>
+        <tr><td><code>steps</code></td><td>At least one per job</td></tr>
+        <tr><td><code>if</code></td><td><code>success</code> (default), <code>always</code>, <code>failure</code></td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "History", href: "/docs/history" }, { title: "CAM and G-code", href: "/docs/cam" }, { title: "AI assistant", href: "/docs/ai" }]} />

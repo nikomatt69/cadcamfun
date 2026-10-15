@@ -20,6 +20,7 @@ const toc = [
   { title: "Contract rules at a glance", href: "#contract-rules" },
   { title: "Pre-release checklist", href: "#release-checklist" },
   { title: "Troubleshooting matrix", href: "#authoring-troubleshooting" },
+  { title: "Lint a manifest before installing", href: "#manifest-lint" },
 ]
 ---
 
@@ -244,6 +245,25 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
         <tr><td>Assistant passes unexpected argument shapes</td><td>Schema fell back to any object</td><td>Use an object schema with <code>properties</code> under 20,000 characters, and validate inside the function too.</td></tr>
         <tr><td>Calls return <code>ok: false</code> after about 30 s</td><td>Tool exceeded its time budget</td><td>Do less work per call or precompute; avoid unbounded loops.</td></tr>
         <tr><td>Plugin stops answering after an error</td><td>A worker crash or timeout terminates the worker and marks the plugin <code>faulted</code>; crashes are also counted over a 10-minute window with a limit of 3</td><td>Fix the crash, then restart the sidecar to load it again.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+    <section id="manifest-lint" class="doc-section">
+    <h2>Lint a manifest before installing</h2>
+    <DocCode language="ts" title="check-manifest.ts">
+{"import { decodeManifest, requestedCapabilities } from \"@cadcamfun/plugin-sdk\"\nimport { Effect } from \"effect\"\n\nconst raw = JSON.parse(await Bun.file(process.argv[2] ?? \"plugin.json\").text())\nconst manifest = await Effect.runPromise(decodeManifest(raw))   // throws a SchemaError naming the bad field\nconsole.log(manifest.id, manifest.version, requestedCapabilities(manifest))\nfor (const tool of manifest.contributes?.aiTools ?? [])\n  console.log(`plugin_${manifest.id}_${tool.id}`, tool.kind)"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Common mistake</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>"version": "1.0"</code></td><td>Use three numbers: <code>1.0.0</code></td></tr>
+        <tr><td><code>"apiVersion": 1</code></td><td>It is a string: <code>"1"</code></td></tr>
+        <tr><td>Plugin id <code>gear</code> or <code>My.Plugin</code></td><td>Reverse-DNS, lower case: <code>com.example.gear</code></td></tr>
+        <tr><td>Tool id <code>Lookup-Thread</code></td><td>Lower case, digits and underscores, letter first, ≤ 40 characters</td></tr>
+        <tr><td>Tool description shorter than 10 characters</td><td>Describe what it does and when to use it</td></tr>
+        <tr><td>Declaring both <code>drawing:read</code> and <code>drawing:write</code></td><td>Allowed, but <code>drawing:write</code> alone already implies read</td></tr>
+        <tr><td>Storage key starting with <code>/</code> or containing <code>..</code></td><td>Use relative keys such as <code>presets/m2</code></td></tr>
         </tbody>
     </table>
   </section>

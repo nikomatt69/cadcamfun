@@ -23,6 +23,9 @@ const toc = [
   { title: "Build a parametric part", href: "#history-walkthrough" },
   { title: "Exact primitives and placement", href: "#brep-primitives" },
   { title: "Modelling practices that rebuild reliably", href: "#cad-best-practices" },
+  { title: "Design recipes", href: "#recipes" },
+  { title: "Involute gears", href: "#gears" },
+  { title: "Fastener and fit data", href: "#fasteners" },
 ]
 ---
 
@@ -269,6 +272,83 @@ console.log(step.startsWith("ISO-10303-21;")) // true`}
       <li>Check <code>issues</code> after every <code>rebuild</code> and the per-body <code>brep</code> presence after <code>rebuildExact</code> before relying on exact mass properties or STEP export.</li>
       <li>Keep units in millimetres and radians inside sketches. Degree-valued fields are documented as such (revolve angle, taper, countersink angle).</li>
     </ul>
+  </section>
+
+    <section id="recipes" class="doc-section">
+    <h2>Design recipes</h2>
+    <code>cad.buildRecipe(name, input)</code> turns a few engineering inputs into a full parametric history, plus a one-line summary, the derived numbers and the design rules that produced them. Seven recipes exist; parameters without a default are derived from the others when omitted.
+    <table>
+      <thead><tr><th>Name</th><th>Title</th><th>Parameters (defaults)</th></tr></thead>
+      <tbody>
+        <tr><td><code>mounting_plate</code></td><td>Mounting plate</td><td>width=100, depth=60, thickness=10, fastener=M8, fit=medium, counterbore=false, cornerRadius=0, edgeChamfer=0, edgeDistance</td></tr>
+        <tr><td><code>flange</code></td><td>Bolted flange</td><td>outerDiameter=120, boreDiameter=40, thickness=14, boltCount=6, fastener=M10, fit=medium, boltCircleDiameter, hubDiameter=0, hubHeight=0, edgeChamfer=0</td></tr>
+        <tr><td><code>l_bracket</code></td><td>L bracket</td><td>baseLength=60, legHeight=50, thickness=5, width=40, fastener=M6, fit=medium, holesPerLeg=1, cornerRadius=0</td></tr>
+        <tr><td><code>stepped_shaft</code></td><td>Stepped shaft</td><td>sections, chamfer=1, keywaySection=-1, keyLength</td></tr>
+        <tr><td><code>pipe_bend</code></td><td>Pipe elbow</td><td>outerDiameter=30, wall=3, legA=100, legB=100, bendAngle=90, bendRadius</td></tr>
+        <tr><td><code>duct_transition</code></td><td>Duct transition</td><td>shape=rect, width1=80, height1=50, width2=40, height2=40, length=120, wall=2</td></tr>
+        <tr><td><code>enclosure</code></td><td>Enclosure</td><td>length=120, width=80, height=40, wall=3, floor, cornerRadius=6, fastener=M3, bosses=true</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="Mounting plate for M8 screws">
+{"import { cad } from \"@cadcamfun/core\"\n\nconst recipe = cad.buildRecipe(\"mounting_plate\", { width: 100, depth: 60, thickness: 10, fastener: \"M8\" })\nrecipe.summary  // \"100 x 60 x 10 mm plate with four holes for M8 screws (\u00d89 mm, medium fit)\"\nrecipe.derived  // { holeDiameter: 9, edgeDistance: 18, holeSpacingX: 64, holeSpacingY: 24 }\nrecipe.rules    // [\"hole diameter from ISO 273\",\n                //  \"centre to edge >= 1.5 x hole diameter\",\n                //  \"centre to centre >= 2.5 x hole diameter\"]\n\nrecipe.history.parameters  // { width: 100, depth: 60, thick: 10, hole: 9, inset: 18 }\n// features: sketch \"outline\", extrude \"plate\", holes hole_sw, hole_se, hole_ne, hole_nw\n//           placed at [\"inset\",\"inset\"], [\"width - inset\",\"inset\"], \u2026\n\nconst mesh = cad.rebuild(recipe.history)          // issues: []\nconst exact = cad.rebuildExact(recipe.history, mesh)\ncad.brep.massProperties(exact.bodies[0].brep).volume  // 57455.31 mm\u00b3 = 60000 \u2212 4\u00b7\u03c0\u00b74.5\u00b2\u00b710"}
+    </DocCode>
+    <DocViewer3D title="mounting_plate recipe, M8" caption="The rebuilt recipe: 100 × 60 × 10 mm with four Ø9 holes 18 mm from each edge. Because hole positions are expressions of width and inset, changing width in the history moves the right-hand holes with it." solids={[{"kind": "extrude", "profile": [[0, 0], [100, 0], [100, 60], [0, 60]], "holes": [[[22.5, 18.0], [22.445, 18.704], [22.28, 19.391], [22.01, 20.043], [21.641, 20.645], [21.182, 21.182], [20.645, 21.641], [20.043, 22.01], [19.391, 22.28], [18.704, 22.445], [18.0, 22.5], [17.296, 22.445], [16.609, 22.28], [15.957, 22.01], [15.355, 21.641], [14.818, 21.182], [14.359, 20.645], [13.99, 20.043], [13.72, 19.391], [13.555, 18.704], [13.5, 18.0], [13.555, 17.296], [13.72, 16.609], [13.99, 15.957], [14.359, 15.355], [14.818, 14.818], [15.355, 14.359], [15.957, 13.99], [16.609, 13.72], [17.296, 13.555], [18.0, 13.5], [18.704, 13.555], [19.391, 13.72], [20.043, 13.99], [20.645, 14.359], [21.182, 14.818], [21.641, 15.355], [22.01, 15.957], [22.28, 16.609], [22.445, 17.296]], [[86.5, 18.0], [86.445, 18.704], [86.28, 19.391], [86.01, 20.043], [85.641, 20.645], [85.182, 21.182], [84.645, 21.641], [84.043, 22.01], [83.391, 22.28], [82.704, 22.445], [82.0, 22.5], [81.296, 22.445], [80.609, 22.28], [79.957, 22.01], [79.355, 21.641], [78.818, 21.182], [78.359, 20.645], [77.99, 20.043], [77.72, 19.391], [77.555, 18.704], [77.5, 18.0], [77.555, 17.296], [77.72, 16.609], [77.99, 15.957], [78.359, 15.355], [78.818, 14.818], [79.355, 14.359], [79.957, 13.99], [80.609, 13.72], [81.296, 13.555], [82.0, 13.5], [82.704, 13.555], [83.391, 13.72], [84.043, 13.99], [84.645, 14.359], [85.182, 14.818], [85.641, 15.355], [86.01, 15.957], [86.28, 16.609], [86.445, 17.296]], [[86.5, 42.0], [86.445, 42.704], [86.28, 43.391], [86.01, 44.043], [85.641, 44.645], [85.182, 45.182], [84.645, 45.641], [84.043, 46.01], [83.391, 46.28], [82.704, 46.445], [82.0, 46.5], [81.296, 46.445], [80.609, 46.28], [79.957, 46.01], [79.355, 45.641], [78.818, 45.182], [78.359, 44.645], [77.99, 44.043], [77.72, 43.391], [77.555, 42.704], [77.5, 42.0], [77.555, 41.296], [77.72, 40.609], [77.99, 39.957], [78.359, 39.355], [78.818, 38.818], [79.355, 38.359], [79.957, 37.99], [80.609, 37.72], [81.296, 37.555], [82.0, 37.5], [82.704, 37.555], [83.391, 37.72], [84.043, 37.99], [84.645, 38.359], [85.182, 38.818], [85.641, 39.355], [86.01, 39.957], [86.28, 40.609], [86.445, 41.296]], [[22.5, 42.0], [22.445, 42.704], [22.28, 43.391], [22.01, 44.043], [21.641, 44.645], [21.182, 45.182], [20.645, 45.641], [20.043, 46.01], [19.391, 46.28], [18.704, 46.445], [18.0, 46.5], [17.296, 46.445], [16.609, 46.28], [15.957, 46.01], [15.355, 45.641], [14.818, 45.182], [14.359, 44.645], [13.99, 44.043], [13.72, 43.391], [13.555, 42.704], [13.5, 42.0], [13.555, 41.296], [13.72, 40.609], [13.99, 39.957], [14.359, 39.355], [14.818, 38.818], [15.355, 38.359], [15.957, 37.99], [16.609, 37.72], [17.296, 37.555], [18.0, 37.5], [18.704, 37.555], [19.391, 37.72], [20.043, 37.99], [20.645, 38.359], [21.182, 38.818], [21.641, 39.355], [22.01, 39.957], [22.28, 40.609], [22.445, 41.296]]], "height": 10}]} />
+    <p>The history is ordinary: you can open it in the editor, change a parameter and rebuild. The recipe only chose sensible numbers.</p>
+  </section>
+
+  <section id="gears" class="doc-section">
+    <h2>Involute gears</h2>
+    <DocCode language="ts" title="A module-2, 18-tooth spur gear">
+{"const spec = { moduleValue: 2, teeth: 18 }          // pressureAngle defaults to 20\u00b0\ncad.gearDimensions(spec)\n// { pitchRadius: 18, baseRadius: 16.914, tipRadius: 20, rootRadius: 15.5 }\n\nconst outline = cad.gearOutline(spec, 6)   // 324 points, 6 per flank\ncad.gearOutline({ moduleValue: 2, teeth: 5 })\n// throws: 'A gear needs a module > 0 and at least 6 whole teeth'"}
+    </DocCode>
+    <DocViewer3D title="Spur gear m = 2, z = 18" caption="gearOutline extruded 8 mm with an Ø8 bore. Pitch radius = m·z/2 = 18 mm, tip radius = pitch + m = 20 mm, root radius = pitch − 1.25·m = 15.5 mm, base radius = pitch·cos 20° ≈ 16.91 mm." solids={[{"kind": "extrude", "profile": [[15.419, -1.581], [16.826, -1.725], [17.451, -1.675], [18.084, -1.526], [18.72, -1.305], [19.356, -1.022], [19.988, -0.682], [19.999, -0.227], [19.999, 0.227], [19.988, 0.682], [19.356, 1.022], [18.72, 1.305], [18.084, 1.526], [17.451, 1.675], [16.826, 1.725], [15.419, 1.581], [15.325, 2.323], [15.195, 3.059], [15.03, 3.788], [16.402, 4.134], [16.972, 4.394], [17.516, 4.752], [18.038, 5.176], [18.538, 5.66], [19.016, 6.196], [18.87, 6.626], [18.715, 7.053], [18.55, 7.477], [17.839, 7.58], [17.145, 7.629], [16.472, 7.619], [15.826, 7.543], [15.221, 7.376], [13.949, 6.759], [13.606, 7.424], [13.233, 8.071], [12.828, 8.7], [13.999, 9.494], [14.445, 9.934], [14.834, 10.456], [15.179, 11.034], [15.484, 11.659], [15.75, 12.326], [15.466, 12.681], [15.174, 13.029], [14.874, 13.37], [14.171, 13.225], [13.502, 13.033], [12.873, 12.793], [12.292, 12.501], [11.781, 12.137], [10.796, 11.122], [10.247, 11.63], [9.674, 12.111], [9.079, 12.563], [9.907, 13.709], [10.177, 14.276], [10.364, 14.899], [10.49, 15.56], [10.563, 16.252], [10.584, 16.97], [10.196, 17.206], [9.803, 17.433], [9.404, 17.651], [8.793, 17.274], [8.23, 16.865], [7.721, 16.424], [7.275, 15.951], [6.919, 15.435], [6.34, 14.144], [5.651, 14.433], [4.948, 14.689], [4.234, 14.91], [4.621, 16.271], [4.68, 16.895], [4.643, 17.545], [4.536, 18.209], [4.368, 18.884], [4.142, 19.566], [3.697, 19.655], [3.249, 19.734], [2.8, 19.803], [2.355, 19.239], [1.966, 18.663], [1.638, 18.075], [1.381, 17.477], [1.223, 16.87], [1.121, 15.459], [0.374, 15.495], [-0.374, 15.495], [-1.121, 15.459], [-1.223, 16.87], [-1.381, 17.477], [-1.638, 18.075], [-1.966, 18.663], [-2.355, 19.239], [-2.8, 19.803], [-3.249, 19.734], [-3.697, 19.655], [-4.142, 19.566], [-4.368, 18.884], [-4.536, 18.209], [-4.643, 17.545], [-4.68, 16.895], [-4.621, 16.271], [-4.234, 14.91], [-4.948, 14.689], [-5.651, 14.433], [-6.34, 14.144], [-6.919, 15.435], [-7.275, 15.951], [-7.721, 16.424], [-8.23, 16.865], [-8.793, 17.274], [-9.404, 17.651], [-9.803, 17.433], [-10.196, 17.206], [-10.584, 16.97], [-10.563, 16.252], [-10.49, 15.56], [-10.364, 14.899], [-10.177, 14.276], [-9.907, 13.709], [-9.079, 12.563], [-9.674, 12.111], [-10.247, 11.63], [-10.796, 11.122], [-11.781, 12.137], [-12.292, 12.501], [-12.873, 12.793], [-13.502, 13.033], [-14.171, 13.225], [-14.874, 13.37], [-15.174, 13.029], [-15.466, 12.681], [-15.75, 12.326], [-15.484, 11.659], [-15.179, 11.034], [-14.834, 10.456], [-14.445, 9.934], [-13.999, 9.494], [-12.828, 8.7], [-13.233, 8.071], [-13.606, 7.424], [-13.949, 6.759], [-15.221, 7.376], [-15.826, 7.543], [-16.472, 7.619], [-17.145, 7.629], [-17.839, 7.58], [-18.55, 7.477], [-18.715, 7.053], [-18.87, 6.626], [-19.016, 6.196], [-18.538, 5.66], [-18.038, 5.176], [-17.516, 4.752], [-16.972, 4.394], [-16.402, 4.134], [-15.03, 3.788], [-15.195, 3.059], [-15.325, 2.323], [-15.419, 1.581], [-16.826, 1.725], [-17.451, 1.675], [-18.084, 1.526], [-18.72, 1.305], [-19.356, 1.022], [-19.988, 0.682], [-19.999, 0.227], [-19.999, -0.227], [-19.988, -0.682], [-19.356, -1.022], [-18.72, -1.305], [-18.084, -1.526], [-17.451, -1.675], [-16.826, -1.725], [-15.419, -1.581], [-15.325, -2.323], [-15.195, -3.059], [-15.03, -3.788], [-16.402, -4.134], [-16.972, -4.394], [-17.516, -4.752], [-18.038, -5.176], [-18.538, -5.66], [-19.016, -6.196], [-18.87, -6.626], [-18.715, -7.053], [-18.55, -7.477], [-17.839, -7.58], [-17.145, -7.629], [-16.472, -7.619], [-15.826, -7.543], [-15.221, -7.376], [-13.949, -6.759], [-13.606, -7.424], [-13.233, -8.071], [-12.828, -8.7], [-13.999, -9.494], [-14.445, -9.934], [-14.834, -10.456], [-15.179, -11.034], [-15.484, -11.659], [-15.75, -12.326], [-15.466, -12.681], [-15.174, -13.029], [-14.874, -13.37], [-14.171, -13.225], [-13.502, -13.033], [-12.873, -12.793], [-12.292, -12.501], [-11.781, -12.137], [-10.796, -11.122], [-10.247, -11.63], [-9.674, -12.111], [-9.079, -12.563], [-9.907, -13.709], [-10.177, -14.276], [-10.364, -14.899], [-10.49, -15.56], [-10.563, -16.252], [-10.584, -16.97], [-10.196, -17.206], [-9.803, -17.433], [-9.404, -17.651], [-8.793, -17.274], [-8.23, -16.865], [-7.721, -16.424], [-7.275, -15.951], [-6.919, -15.435], [-6.34, -14.144], [-5.651, -14.433], [-4.948, -14.689], [-4.234, -14.91], [-4.621, -16.271], [-4.68, -16.895], [-4.643, -17.545], [-4.536, -18.209], [-4.368, -18.884], [-4.142, -19.566], [-3.697, -19.655], [-3.249, -19.734], [-2.8, -19.803], [-2.355, -19.239], [-1.966, -18.663], [-1.638, -18.075], [-1.381, -17.477], [-1.223, -16.87], [-1.121, -15.459], [-0.374, -15.495], [0.374, -15.495], [1.121, -15.459], [1.223, -16.87], [1.381, -17.477], [1.638, -18.075], [1.966, -18.663], [2.355, -19.239], [2.8, -19.803], [3.249, -19.734], [3.697, -19.655], [4.142, -19.566], [4.368, -18.884], [4.536, -18.209], [4.643, -17.545], [4.68, -16.895], [4.621, -16.271], [4.234, -14.91], [4.948, -14.689], [5.651, -14.433], [6.34, -14.144], [6.919, -15.435], [7.275, -15.951], [7.721, -16.424], [8.23, -16.865], [8.793, -17.274], [9.404, -17.651], [9.803, -17.433], [10.196, -17.206], [10.584, -16.97], [10.563, -16.252], [10.49, -15.56], [10.364, -14.899], [10.177, -14.276], [9.907, -13.709], [9.079, -12.563], [9.674, -12.111], [10.247, -11.63], [10.796, -11.122], [11.781, -12.137], [12.292, -12.501], [12.873, -12.793], [13.502, -13.033], [14.171, -13.225], [14.874, -13.37], [15.174, -13.029], [15.466, -12.681], [15.75, -12.326], [15.484, -11.659], [15.179, -11.034], [14.834, -10.456], [14.445, -9.934], [13.999, -9.494], [12.828, -8.7], [13.233, -8.071], [13.606, -7.424], [13.949, -6.759], [15.221, -7.376], [15.826, -7.543], [16.472, -7.619], [17.145, -7.629], [17.839, -7.58], [18.55, -7.477], [18.715, -7.053], [18.87, -6.626], [19.016, -6.196], [18.538, -5.66], [18.038, -5.176], [17.516, -4.752], [16.972, -4.394], [16.402, -4.134], [15.03, -3.788], [15.195, -3.059], [15.325, -2.323]], "holes": [[[4.0, 0.0], [3.951, 0.626], [3.804, 1.236], [3.564, 1.816], [3.236, 2.351], [2.828, 2.828], [2.351, 3.236], [1.816, 3.564], [1.236, 3.804], [0.626, 3.951], [0.0, 4.0], [-0.626, 3.951], [-1.236, 3.804], [-1.816, 3.564], [-2.351, 3.236], [-2.828, 2.828], [-3.236, 2.351], [-3.564, 1.816], [-3.804, 1.236], [-3.951, 0.626], [-4.0, 0.0], [-3.951, -0.626], [-3.804, -1.236], [-3.564, -1.816], [-3.236, -2.351], [-2.828, -2.828], [-2.351, -3.236], [-1.816, -3.564], [-1.236, -3.804], [-0.626, -3.951], [-0.0, -4.0], [0.626, -3.951], [1.236, -3.804], [1.816, -3.564], [2.351, -3.236], [2.828, -2.828], [3.236, -2.351], [3.564, -1.816], [3.804, -1.236], [3.951, -0.626]]], "height": 8, "color": "#c8a48a"}]} />
+    <table>
+      <thead><tr><th>Dimension</th><th>Formula</th><th>m = 2, z = 18</th></tr></thead>
+      <tbody>
+        <tr><td>Pitch radius</td><td>m·z / 2</td><td>18</td></tr>
+        <tr><td>Tip radius</td><td>pitch + m</td><td>20</td></tr>
+        <tr><td>Root radius</td><td>pitch − 1.25·m</td><td>15.5</td></tr>
+        <tr><td>Base radius</td><td>pitch · cos α</td><td>16.914</td></tr>
+        </tbody>
+    </table>
+    <code>MIN_GEAR_TEETH</code> is 6: below that, the flanks undercut the base circle and neighbouring teeth overlap.
+  </section>
+
+  <section id="fasteners" class="doc-section">
+    <h2>Fastener and fit data</h2>
+    <table>
+      <thead><tr><th>Size</th><th>Pitch</th><th>Tap drill</th><th>Clearance fine / medium / coarse</th><th>Head Ø × h</th><th>Counterbore Ø × depth</th><th>Countersink Ø</th></tr></thead>
+      <tbody>
+        <tr><td>M3</td><td>0.5</td><td>2.5</td><td>3.2 / 3.4 / 3.6</td><td>5.5 × 3</td><td>6.5 × 3.4</td><td>6</td></tr>
+        <tr><td>M5</td><td>0.8</td><td>4.2</td><td>5.3 / 5.5 / 5.8</td><td>8.5 × 5</td><td>10 × 5.7</td><td>10</td></tr>
+        <tr><td>M6</td><td>—</td><td>5</td><td>6.4 / 6.6 / 7</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>M8</td><td>1.25</td><td>6.8</td><td>8.4 / 9 / 10</td><td>13 × 8</td><td>15 × 9</td><td>16</td></tr>
+        <tr><td>M12</td><td>1.75</td><td>10.2</td><td>13 / 13.5 / 14.5</td><td>18 × 12</td><td>20 × 13</td><td>24</td></tr>
+        </tbody>
+    </table>
+    <p>Values come from <code>cad.metricThread(size)</code>, <code>clearanceHole(size, fit)</code> and <code>tapDrill(size)</code>; the M6 row was queried through the two helpers only. Related rules, with real results for an M6 screw and its Ø6.6 clearance hole:</p>
+    <table>
+      <thead><tr><th>Helper</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>threadEngagement("M6", material)</code></td><td>steel 6, aluminium 9, cast 12, plastic 12 mm</td></tr>
+        <tr><td><code>tappedHoleDepth("M6", 12)</code></td><td>15.8 mm</td></tr>
+        <tr><td><code>minEdgeDistance(6.6)</code> / <code>(6.6, "plastic")</code></td><td>9.9 / 13.2 mm</td></tr>
+        <tr><td><code>minHoleSpacing(6.6)</code></td><td>16.5 mm (2.5 × diameter)</td></tr>
+        <tr><td><code>keywayFor(25)</code></td><td>over 22 up to 30: b 8, h 7, t1 4, t2 3.3</td></tr>
+        <tr><td><code>toleranceGrade(7, 25)</code> / <code>(6, 25)</code></td><td>21 / 13 µm</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Fit</th><th>Kind</th><th>Use case</th></tr></thead>
+      <tbody>
+        <tr><td>H7/h6</td><td>location (sliding)</td><td>parts assembled by hand and located precisely, sliding spigots, guide bushings</td></tr>
+        <tr><td>H7/g6</td><td>close running</td><td>precise guiding of moving parts, spindles, slide valves</td></tr>
+        <tr><td>H7/f7</td><td>running</td><td>plain bearings, shafts in general machine building</td></tr>
+        <tr><td>H7/k6</td><td>transition</td><td>gears, pulleys and bearing inner rings driven on with a light press</td></tr>
+        <tr><td>H7/n6</td><td>interference (light press)</td><td>bushings and hubs pressed in; no key needed for small torque</td></tr>
+        <tr><td>H7/p6</td><td>interference (press)</td><td>permanent press fit of bushings in housings</td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "Setups", href: "/docs/setups" }, { title: "API contract", href: "/docs/api" }]} />

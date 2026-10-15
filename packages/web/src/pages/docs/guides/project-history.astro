@@ -18,6 +18,8 @@ const toc = [
   { title: "Mirror committed history and recover conflicts", href: "#remote" },
   { title: "How reviews decide a merge", href: "#pr-review-rules" },
   { title: "Restore recipes", href: "#history-recipes" },
+  { title: "A complete review session, captured", href: "#captured-session" },
+  { title: "Review and query fields", href: "#review-fields" },
 ]
 ---
 
@@ -192,6 +194,42 @@ const encoded = JSON.stringify(body)`}
 {"// Bring back one drawing as it was three commits ago\nconst old = repo.log()[3].oid\nrepo.restorePaths(old, [\"drawings/d1.json\"], me, \"Restore plate outline\")\n\n// Make the whole tree equal to an older commit (a new commit on top)\nrepo.revertTo(old, me)               // message defaults to \"Restore <rev>\"\n\n// Who changed a toolpath, most recent first\nrepo.fileLog(\"toolpaths/op1.json\").map((e) => e.message)"}
     </DocCode>
     <p>Both restore operations add a new commit, so the older state can itself be undone and the history stays shareable. Restoring a toolpath file without the material or tool it references can leave dangling references; restore those library files in the same call.</p>
+  </section>
+
+    <section id="captured-session" class="doc-section">
+    <h2>A complete review session, captured</h2>
+    <p>Every response below was captured from a running sidecar on a fresh project (ids shortened). Paths are relative to <code>/api/projects/&#123;id&#125;/</code>.</p>
+    <DocCode language="text" title="branch → change → diff → PR → review → merge">
+{"# fresh project with one drawing\nGET  vcs/status\n{\"branch\":\"main\",\"head\":null,\"dirty\":[\"drawings/2f315a02-\u2026.json\",\"project.json\"]}\n\nPOST vcs/commit       {\"message\":\"Baseline\"}\n{\"oid\":\"8bdded63\u2026\",\"parents\":[],\"message\":\"Baseline\\n\",\"author\":{\"name\":\"Local user\",\u2026}}\n\nPOST vcs/branches     {\"name\":\"thicker\"}\n{\"current\":\"main\",\"branches\":{\"main\":\"8bdded63\u2026\",\"thicker\":\"8bdded63\u2026\"}}\n\nPOST vcs/checkout     {\"branch\":\"thicker\"}\n{\"branch\":\"thicker\",\"head\":\"8bdded63\u2026\",\"dirty\":[]}\n\nPUT  /api/drawings/{id}  {\"name\":\"Plate 12mm\"}\nGET  vcs/status\n{\"branch\":\"thicker\",\"head\":\"8bdded63\u2026\",\"dirty\":[\"drawings/2f315a02-\u2026.json\"]}\n\nPOST vcs/commit       {\"message\":\"Rename plate\"}\n{\"oid\":\"a6869011\u2026\",\"parents\":[\"8bdded63\u2026\"],\u2026}\n\nGET  vcs/diff?from=main&to=thicker\n[{\"path\":\"drawings/2f315a02-\u2026.json\",\"kind\":\"drawings\",\"id\":\"2f315a02-\u2026\",\"name\":\"Plate 12mm\",\n  \"status\":\"modified\",\"changes\":[\n    {\"pointer\":\"/name\",\"before\":\"Plate\",\"after\":\"Plate 12mm\"},\n    {\"pointer\":\"/updatedAt\",\"before\":\"\u202609:20.069Z\",\"after\":\"\u202609:20.168Z\"}]}]\n\nPOST pulls            {\"title\":\"Thicker plate\",\"head\":\"thicker\",\"base\":\"main\"}\n{\"number\":1,\"state\":\"open\",\"authorKind\":\"user\",\"mergeCommit\":null,\u2026}\n\nPOST pulls/1/reviews  {\"verdict\":\"approve\",\"body\":\"Looks good\"}\n{\"verdict\":\"approve\",\"body\":\"Looks good\",\"path\":null,\"pointer\":null,\u2026}\n\nPOST pulls/1/merge\n{\"number\":1,\"state\":\"merged\",\"mergeCommit\":\"a6869011\u2026\",\u2026}\n\nPOST pulls/1/merge    (again)\n{\"_tag\":\"BadRequest\",\"message\":\"Pull request is not open\"}"}
+    </DocCode>
+    <table>
+      <thead><tr><th>What you see</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td><code>head: null</code> before the first commit</td><td>The repository exists but has no commits yet; every resource is dirty</td></tr>
+        <tr><td>Dirty paths such as <code>drawings/&lt;id&gt;.json</code>, <code>project.json</code></td><td>The working copy is serialised as one JSON file per resource</td></tr>
+        <tr><td>A new branch points at the current head</td><td>Without <code>from</code>, the branch starts at the current head</td></tr>
+        <tr><td>Diff changes are JSON pointers</td><td>Changes are reported per property (<code>/name</code>), not per line</td></tr>
+        <tr><td><code>updatedAt</code> also changed</td><td>Timestamps are versioned with the resource, so every save shows up</td></tr>
+        <tr><td><code>mergeCommit</code> equals the branch head</td><td><code>main</code> had not moved, so the merge fast-forwarded</td></tr>
+        <tr><td>Merging twice → 400</td><td>Only open pull requests can be merged or closed</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="review-fields" class="doc-section">
+    <h2>Review and query fields</h2>
+    <table>
+      <thead><tr><th>Request</th><th>Fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST pulls/&#123;number&#125;/reviews</code></td><td><code>verdict</code> (required): <code>comment</code>, <code>approve</code> or <code>request-changes</code>; optional <code>body</code>, and <code>path</code> + <code>pointer</code> to anchor the review on one property. Any other verdict is rejected with 400.</td></tr>
+        <tr><td><code>GET pulls/&#123;number&#125;</code></td><td>Returns <code>pullRequest</code>, its <code>reviews</code> and the structural <code>changes</code> between base and head</td></tr>
+        <tr><td><code>GET pulls?state=…</code></td><td>Filter the list by state</td></tr>
+        <tr><td><code>GET vcs/log?rev=&amp;limit=&amp;path=</code></td><td>History from a revision, limited, optionally for one resource path</td></tr>
+        <tr><td><code>GET vcs/diff?from=&amp;to=</code></td><td>Structural diff between two revisions or branches</td></tr>
+        <tr><td><code>POST vcs/restore</code></td><td><code>rev</code> (required), optional <code>paths</code>. An unknown revision answers 404 <code>Unknown revision &lt;rev&gt;</code>.</td></tr>
+        <tr><td><code>GET/PUT vcs/remote</code>, <code>POST vcs/push</code>, <code>POST vcs/pull</code></td><td>Configure the mirror remote and push or pull a branch</td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "History reference", href: "/docs/history" }, { title: "History endpoints", href: "/docs/api/history" }, { title: "Workflows", href: "/docs/workflows" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />

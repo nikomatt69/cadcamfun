@@ -22,6 +22,8 @@ const toc = [
   { title: "Recovery without losing context", href: "#mobile-recovery" },
   { title: "Gateway allow-list", href: "#allow-list" },
   { title: "What the phone stores", href: "#pairing-data" },
+  { title: "Screens", href: "#screens" },
+  { title: "Offline assistant queue", href: "#offline-queue" },
 ]
 ---
 
@@ -225,6 +227,42 @@ curl --fail-with-body -X POST "$CADCAM_URL/api/companion/enable" \
         </tbody>
     </table>
     <p>In a browser development build, the same data falls back to local storage, which is not encrypted. Use it only with throwaway pairings.</p>
+  </section>
+
+    <section id="screens" class="doc-section">
+    <h2>Screens</h2>
+    <table>
+      <thead><tr><th>Route file</th><th>Screen</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/index.tsx</code></td><td>Entry: no pairing → the pair screen; paired → projects</td></tr>
+        <tr><td><code>app/connect.tsx</code>, <code>app/pair.tsx</code></td><td>Pairing: scan the QR code with the camera or paste the link</td></tr>
+        <tr><td><code>app/(app)/projects/index.tsx</code></td><td>Project list</td></tr>
+        <tr><td><code>app/(app)/projects/[id].tsx</code></td><td>One project</td></tr>
+        <tr><td><code>app/(app)/projects/[id]/commit/[oid].tsx</code></td><td>A commit and its changes</td></tr>
+        <tr><td><code>app/(app)/projects/[id]/pulls/[number].tsx</code></td><td>A pull request: review and merge</td></tr>
+        <tr><td><code>app/(app)/assistant.tsx</code></td><td>Assistant chat</td></tr>
+        <tr><td><code>app/(app)/activity.tsx</code></td><td>Live activity</td></tr>
+        <tr><td><code>app/(app)/settings.tsx</code></td><td>Connection and device settings</td></tr>
+        </tbody>
+    </table>
+    <p>Routes use Expo Router file conventions: <code>(app)</code> is a group that shares a layout without adding a URL segment, and <code>[id]</code> is a parameter.</p>
+  </section>
+
+  <section id="offline-queue" class="doc-section">
+    <h2>Offline assistant queue</h2>
+    <p>When the desktop cannot be reached, a message typed in the assistant is queued on the phone instead of lost:</p>
+    <table>
+      <thead><tr><th>Rule</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Where</td><td>SecureStore, so a killed app keeps the queue</td></tr>
+        <tr><td>What is stored</td><td><code>projectId</code>, <code>text</code>, optional <code>sessionId</code>, <code>agent</code>, <code>mode</code> (general, cad, cam, gcode, toolpath; default general) and <code>queuedAt</code></td></tr>
+        <tr><td>Capacity</td><td>50 entries; the oldest are dropped first</td></tr>
+        <tr><td>When it drains</td><td>When the app returns to the foreground with a stored pairing</td></tr>
+        <tr><td>How</td><td>Each entry opens a fresh streaming turn and reads until <code>done</code>; an <code>error</code> event or a background transition keeps it queued</td></tr>
+        <tr><td>Feedback</td><td>A toast: "Queued message sent" or "N queued messages sent"</td></tr>
+        </tbody>
+    </table>
+    <p>Only connectivity failures queue a message. A send counts as offline when the client reports status 0, or the error text mentions a network failure, timeout, refused connection or similar; HTTP and business errors ("request to … failed with …") are shown instead of queued.</p>
   </section>
 
   <DocRelated items={[
