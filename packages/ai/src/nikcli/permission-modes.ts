@@ -8,6 +8,15 @@ export type PermissionMode = "auto" | "ask" | "approve"
  * arguments is not approval and never appears here.
  */
 export const NATIVE_APPROVAL_TOOL_IDS: ReadonlyArray<string> = DESTRUCTIVE_TOOL_IDS
+
+/**
+ * The rule for a call a person must approve, in every permission mode. nikcli's auto mode sends an `ask` whose pattern is
+ * the plain `*` (what a string rule becomes) to its classifier instead of the person; an `ask` under any other pattern is
+ * always put to the person (`AutoMode.route`). `**` matches every call exactly as `*` does, so the rule only changes who
+ * decides: destructive tools and extension tools that require approval are never approved by a model.
+ */
+export const HUMAN_APPROVAL = Object.freeze({ "**": "ask" }) as { readonly "**": "ask" }
+export type PermissionRule = "allow" | "deny" | "ask" | typeof HUMAN_APPROVAL
 export const hostAgentWithPermissions = (agent: string, mode: PermissionMode = "approve"): string => mode === "approve" ? agent : `${agent}-${mode}`
 export const inheritedPermissionMode = (agent?: string): PermissionMode => agent?.endsWith("-auto") ? "auto" : agent?.endsWith("-ask") ? "ask" : "approve"
 export const permissionAgents = (agents: Record<string, Record<string, unknown>>, registered: ReadonlyArray<string>): Record<string, Record<string, unknown>> => {

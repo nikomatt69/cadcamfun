@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { HUMAN_APPROVAL } from "../src/nikcli/permission-modes.ts"
 import { buildHostConfig } from "../src/nikcli/config.ts"
 import { PRIMARIES, PRIMARY_IDS } from "../src/nikcli/primaries.ts"
 import { HostToolRegistry } from "../src/nikcli/tool-registry.ts"
@@ -78,7 +79,7 @@ describe("who asks before a plugin tool runs", () => {
     const registry = new HostToolRegistry(() => buildTools(stub, "p", [read, write]))
     const config = buildHostConfig({ providers: [], toolIds: registry.ids("p"), askToolIds: registry.approvalIds("p"), systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
     for (const name of ["cadcam", "cadcam-ask", "cadcam-auto", "cadcam-cad", "cadcam-cam", "cadcam-cad-auto", "cadcam-cam-ask"]) {
-      expect(config.agent[name]!.permission[write.id], name).toBe("ask")
+      expect(config.agent[name]!.permission[write.id] as unknown, name).toEqual(HUMAN_APPROVAL)
       expect(config.agent[name]!.permission[read.id], name).toMatch(/^(allow|ask)$/)
     }
     expect(config.agent["cadcam"]!.permission[read.id]).toBe("allow")

@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Steps 3–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Steps 4–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -170,15 +170,27 @@ Progress (2026-10-15):
 D: Steps 1–2. Placement: RM-01. Code: `nikcli/agents.ts`, `primaries.ts`, `permission-modes.ts`, `config.ts`. The verifier
 receives `cam_edit` today although its prompt forbids creating and updating operations.
 
-- [ ] Separate an action's canonical identity from its exposure in tool groups.
-- [ ] Create the verifier's dedicated exposure, derived from the same generate and verify actions.
-- [ ] Exclude create/update/stock/manufacture from the verifier.
-- [ ] Keep reviewer and researcher read-only.
-- [ ] Classify report, memory, interface, workflow and external effects explicitly.
-- [ ] Keep native approval and deny rules in every mode.
+- [x] Separate an action's canonical identity from its exposure in tool groups.
+- [x] Create the verifier's dedicated exposure, derived from the same generate and verify actions.
+- [x] Exclude create/update/stock/manufacture from the verifier.
+- [x] Keep reviewer and researcher read-only.
+- [x] Classify report, memory, interface, workflow and external effects explicitly.
+- [x] Keep native approval and deny rules in every mode.
 
 Tests: `agents.test.ts`, `policy.test.ts`, `specialists-host.test.ts`. Gate: requests forbidden to a role are refused even when
 the model ignores its prompt entirely.
+
+Progress (2026-10-15):
+
+- **V** Items 1–3 arrived with #21: `ACTION_EXPOSURES` gives `cam_verify` (`cam_edit.generate`, `cam_edit.verify`) to the
+  verifier, which no longer holds `cam_edit`; the canonical action id stays `cam_edit.*`.
+- **V** Item 5 arrived with #23: `ACTION_CONTRACTS` declares effects per action (`report`, `memory`, `interface`, `workflow`,
+  `external`, ...); `cad_edit.editor` touches `interface` and `drawing`, `agent.list`/`agent.read` are reads.
+- **V** Item 6, the real gap: in auto mode the host sends an `ask` with pattern `*` to the model classifier, so a destructive
+  tool could run without a person. Destructive and approval-flagged tools now carry `HUMAN_APPROVAL` (`{ "**": "ask" }`,
+  `permission-modes.ts`), which auto mode routes to a human prompt; deny rules are evaluated before the classifier.
+- **V** `agents.test.ts` regression: in every agent and mode, destructive tools carry `HUMAN_APPROVAL`, a policy denial is never
+  turned into allow or ask, the verifier never holds `cam_edit`, reviewer and researcher hold no write tool.
 
 ### Step 4 — Fix host configuration and lifecycle
 
@@ -411,3 +423,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   parameter names silently dropped by `Record`; handler migration to Effect deferred to Step 5.
 - 2026-10-15: closed Step 2: verified the bundle's `value`/`output` path, end-to-end regression for a large result, and
   `cam_edit.generate` declares what its preview omits and the hash of the stored program.
+- 2026-10-15: closed Step 3: destructive tools require a human in every permission mode (auto no longer routes them to the
+  classifier); regression over every agent and mode for approval, denials, verifier exposure and read-only roles.
