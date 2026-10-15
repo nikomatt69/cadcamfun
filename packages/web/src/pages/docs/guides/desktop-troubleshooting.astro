@@ -17,6 +17,8 @@ const toc = [
   { title: "Recover preference and display issues", href: "#preferences" },
   { title: "Separate UI recovery from machining evidence", href: "#machining" },
   { title: "Triage one failure at a time", href: "#triage" },
+  { title: "Startup checklist", href: "#startup-checklist" },
+  { title: "Reading the logs", href: "#log-reading" },
 ]
 ---
 
@@ -155,6 +157,34 @@ bun run --filter @cadcamfun/desktop dev`}
       <li>Reopen the saved document/program and inspect persisted state, versions, exports, and current verification.</li>
     </ol>
     <p>Implementation anchors are <code>app/App.tsx</code>, <code>app/sidecar.ts</code>, <code>src-tauri/src/&#123;sidecar,commands,lib&#125;.rs</code>, sidecar <code>main.ts</code>/<code>config.ts</code>/<code>shutdown.ts</code>, and the database lifecycle. <a href="/docs/guides/local-dev">Local development</a> supplies configuration details; <a href="/docs/guides/companion-pairing">companion pairing</a> handles its separate network boundary.</p>
+  </section>
+
+    <section id="startup-checklist" class="doc-section">
+    <h2>Startup checklist</h2>
+    <ol>
+      <li>Is the sidecar binary present for this platform (<code>src-tauri/binaries/sidecar-&lt;target triple&gt;</code>)? <code>desktop:dev</code> builds it; <code>tauri:dev</code> may use a stub.</li>
+      <li>Are migrations staged in <code>src-tauri/resources/migrations</code>? <code>bun run build:sidecar</code> or <code>bun scripts/build.ts --only=resources</code> restages them.</li>
+      <li>Did the sidecar print <code>ready</code> within 60 seconds? Look for an <code>error</code> line on stdout and JSON logs on stderr in the log directory (<code>get_logs_dir</code>).</li>
+      <li>Did it restart? Only one automatic restart is allowed; a second failure leaves the status at <code>failed</code>.</li>
+      <li>Does <code>GET /api/health</code> answer on the reported port? If it does but protected routes return 401, the token belongs to a different launch.</li>
+      <li>Is the data directory writable and is the database file not held open by another process with incompatible migrations?</li>
+    </ol>
+    <table>
+      <thead><tr><th>Timer</th><th>Value</th><th>Owner</th></tr></thead>
+      <tbody>
+        <tr><td>Ready handshake</td><td>60 s per attempt</td><td>Rust supervisor</td></tr>
+        <tr><td>Automatic restarts</td><td>1</td><td>Rust supervisor</td></tr>
+        <tr><td>Endpoint wait</td><td>125 s (two handshakes + 5 s)</td><td><code>get_sidecar_endpoint</code></td></tr>
+        <tr><td>Webview recovery budget</td><td>150 s, 30 s per attempt, 750 ms between attempts</td><td>Webview</td></tr>
+        <tr><td>Shutdown grace</td><td>2 s after the shutdown line, then the process is reaped (up to 5 s)</td><td>Rust supervisor</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="log-reading" class="doc-section">
+    <h2>Reading the logs</h2>
+    <p>Sidecar logs are JSON lines on stderr, kept separate from the stdout handshake. Lines that could contain credentials are replaced by <code>[redacted: line may contain credentials]</code> before they are written, so a redacted line in a log is expected, not corruption. If the handshake itself carried such a line, the reported startup error is the redaction marker; read the surrounding stderr lines for context.</p>
+    <p>The log directory is platform-specific. Get it from the <code>get_logs_dir</code> command rather than guessing a path, and open it with <code>open_path</code>, which accepts the application log directory.</p>
   </section>
 
   <DocRelated items={[

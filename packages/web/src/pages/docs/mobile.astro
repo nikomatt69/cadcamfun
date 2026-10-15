@@ -20,6 +20,8 @@ const toc = [
   { title: "Phone settings and local state", href: "#mobile-preferences" },
   { title: "Gateway administration example", href: "#gateway-example" },
   { title: "Recovery without losing context", href: "#mobile-recovery" },
+  { title: "Gateway allow-list", href: "#allow-list" },
+  { title: "What the phone stores", href: "#pairing-data" },
 ]
 ---
 
@@ -191,6 +193,38 @@ curl --fail-with-body -X POST "$CADCAM_URL/api/companion/enable" \
     </ol>
     <p>The offline queue has bounded retention and replays each pending operation through a new chat request carrying the stored session identifier when available. It is not an exactly-once delivery guarantee. A network drop after server execution can leave the client uncertain about completion; inspect resulting project/session state before repeating a change.</p>
     <p>Implementation anchors: <code>app/(app)/settings.tsx</code>, <code>components/layout/AppLockCoordinator.tsx</code>, <code>lib/store.ts</code>, <code>lib/server.tsx</code>, and <code>lib/offline-queue.ts</code>.</p>
+  </section>
+
+    <section id="allow-list" class="doc-section">
+    <h2>Gateway allow-list</h2>
+    <p>The phone talks to the desktop only through the companion gateway, which admits this fixed set of routes and forwards them to the loopback API:</p>
+    <table>
+      <thead><tr><th>Methods</th><th>Path pattern</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/health</code></td><td>Reachability check.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects</code>, <code>/api/projects/:id</code></td><td>Project list and header.</td></tr>
+        <tr><td>GET, POST</td><td><code>/api/projects/:id/vcs/*</code> (except <code>remote</code>, <code>push</code>, <code>pull</code>), <code>/pulls/*</code>, <code>/actions/*</code></td><td>History, pull requests, reviews, and workflow runs. GitHub sync stays on the desktop because it needs the owner's GitHub token.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects/:id/events</code></td><td>Live SSE stream of history, workflow, and assistant activity; the phone's only push channel.</td></tr>
+        <tr><td>GET, POST, PUT, DELETE</td><td><code>/api/notifications</code>, <code>/mark-all-read</code>, <code>/:id</code></td><td>Read, mark read, and delete notifications.</td></tr>
+        <tr><td>GET</td><td><code>/api/ai/status</code>, <code>/models</code>, <code>/agents</code></td><td>Assistant discovery.</td></tr>
+        <tr><td>POST</td><td><code>/api/ai/chat/stream</code>, <code>chat/abort</code>, <code>chat/queue</code>, <code>permission/reply</code>, <code>sessions/state</code>, <code>sessions/control</code></td><td>Assistant sessions.</td></tr>
+        </tbody>
+    </table>
+    <p>Because the list is fixed in the sidecar, a feature that needs another route (for example file upload or GitHub push) is a desktop-only feature until the list changes.</p>
+  </section>
+
+  <section id="pairing-data" class="doc-section">
+    <h2>What the phone stores</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Storage</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Gateway origin(s)</td><td>SecureStore</td><td>The preferred host plus alternates from the pairing link.</td></tr>
+        <tr><td>Device token</td><td>SecureStore, <code>WHEN_UNLOCKED_THIS_DEVICE_ONLY</code></td><td>Never leaves the device except as a bearer header to the gateway.</td></tr>
+        <tr><td>Certificate fingerprint</td><td>SecureStore</td><td>Compared with the gateway's certificate on every connection.</td></tr>
+        <tr><td>Offline queue, session markers</td><td>SecureStore</td><td>Messages composed while offline and the last-seen state of sessions.</td></tr>
+        </tbody>
+    </table>
+    <p>In a browser development build, the same data falls back to local storage, which is not encrypted. Use it only with throwaway pairings.</p>
   </section>
 
   <DocRelated items={[

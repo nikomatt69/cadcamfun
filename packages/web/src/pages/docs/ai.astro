@@ -21,6 +21,9 @@ const toc = [
   { title: "Handle events without losing state", href: "#event-handling" },
   { title: "Attachments and user skills", href: "#attachments" },
   { title: "Diagnose assistant failures", href: "#troubleshooting" },
+  { title: "Assistant endpoint reference", href: "#endpoint-reference" },
+  { title: "Streaming request fields", href: "#stream-request" },
+  { title: "Limits and defaults", href: "#limits-reference" },
 ]
 ---
 
@@ -162,6 +165,98 @@ const toc = [
       <li><strong>A tool partly changed the model:</strong> inspect its <code>tool_diagnostic</code>, including <code>mutationApplied</code>, then read the current drawing. Retrying an editing action without inspecting its result can duplicate geometry.</li>
     </ul>
     <p>Tool results and typed failures preserve the stage that failed. A provider error after successful tools does not roll those project mutations back. Deterministic CAM and history checks remain available separately from the model answer.</p>
+  </section>
+
+    <section id="endpoint-reference" class="doc-section">
+    <h2>Assistant endpoint reference</h2>
+    <p>All assistant routes live under <code>/api/ai</code> and require the application bearer token. A bridge token for a standalone nikcli opens only the action listing and invocation routes, and only for its project.</p>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 620 150" role="img" aria-label="Request flow: client posts to chat stream, sidecar admits the turn, the AI service assembles context, the nikcli host runs the model and tools, events stream back as SSE" style="width:100%;max-width:660px;height:auto">
+        <g fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="5" y="50" width="100" height="44" rx="6"/><rect x="130" y="50" width="110" height="44" rx="6"/>
+          <rect x="265" y="50" width="110" height="44" rx="6"/><rect x="400" y="50" width="100" height="44" rx="6"/><rect x="520" y="50" width="95" height="44" rx="6"/>
+          <path d="M105 72 H130 M240 72 H265 M375 72 H400 M500 72 H520"/>
+          <path d="M565 94 C565 135 55 135 55 94" stroke-dasharray="4 3"/>
+        </g>
+        <g fill="currentColor" font-family="monospace" font-size="11">
+          <text x="18" y="76">desktop/app</text><text x="140" y="70">POST /api/ai/</text><text x="140" y="84">chat/stream</text>
+          <text x="275" y="70">context</text><text x="275" y="84">assembly</text><text x="410" y="70">nikcli host</text><text x="410" y="84">+ model</text>
+          <text x="528" y="70">actions /</text><text x="528" y="84">tools</text>
+          <text x="230" y="145">SSE events: delta, tool_call, tool_result, done …</text>
+        </g>
+      </svg>
+    </figure>
+    <table>
+      <thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /api/ai/chat/stream</code></td><td>Start a streaming turn; the response is an SSE stream of assistant events.</td></tr>
+        <tr><td><code>POST /api/ai/chat/queue</code></td><td>Queue a follow-up message for a busy session.</td></tr>
+        <tr><td><code>POST /api/ai/chat/abort</code></td><td>Abort the running turn of a session.</td></tr>
+        <tr><td><code>POST /api/ai/permission/reply</code></td><td>Answer a permission request: <code>once</code>, <code>always</code>, or <code>reject</code>.</td></tr>
+        <tr><td><code>POST /api/ai/sessions/state</code>, <code>/sessions/control</code>, <code>/sessions/remove</code></td><td>Read session state, control a session, remove one.</td></tr>
+        <tr><td><code>GET /api/ai/status</code>, <code>/models</code>, <code>/providers</code>, <code>/agents</code>, <code>/prompts</code></td><td>Discovery: readiness, model catalogue, providers with their configuration state, specialist agents, prompt suggestions.</td></tr>
+        <tr><td><code>PUT /api/ai/credentials</code>, <code>DELETE /api/ai/credentials/:provider</code></td><td>Store or clear provider credentials.</td></tr>
+        <tr><td><code>GET</code>/<code>PUT /api/ai/skills</code>, <code>DELETE /api/ai/skills/:name</code></td><td>List, save, and delete user skills.</td></tr>
+        <tr><td><code>GET /api/ai/actions</code>, <code>POST /api/ai/actions/invoke</code></td><td>Action catalogue and direct invocation (also used by the nikcli bridge).</td></tr>
+        <tr><td><code>GET</code>/<code>POST /api/ai/bridge/tokens</code>, <code>DELETE /api/ai/bridge/tokens/:id</code></td><td>Issue, list, and revoke scoped bridge tokens.</td></tr>
+        <tr><td><code>POST /api/ai/completion</code></td><td>Single completion: <code>prompt</code>, <code>systemPrompt</code>, <code>model</code>, <code>temperature</code>; returns <code>text</code> and <code>model</code>.</td></tr>
+        <tr><td><code>POST /api/ai/title</code></td><td>Title for a conversation excerpt.</td></tr>
+        <tr><td><code>POST /api/ai/design-analysis</code></td><td>Suggestions with <code>confidence</code>, <code>priority</code> (low/medium/high), and <code>kind</code> (optimization/warning/critical).</td></tr>
+        <tr><td><code>POST /api/ai/machining-parameters</code></td><td>Cutting speed (m/min), feed (mm/min), depth of cut (mm), stepover (%), coolant (flood/mist/none), engagement (conventional/climb), and warnings.</td></tr>
+        <tr><td><code>POST /api/ai/gcode-optimization</code></td><td>Optimised G-code with per-line changes and reasons, estimated time and tool-life savings, and notes.</td></tr>
+        <tr><td><code>POST /api/ai/design-suggestions</code></td><td>Next-step suggestions with title, rationale, and next step.</td></tr>
+        <tr><td><code>POST /api/ai/analyze-gcode</code></td><td>Issues (error/warning/info with code, line, and message) and statistics: lines, rapid and cut moves, tool changes, and bounds.</td></tr>
+        <tr><td><code>POST /api/ai/gcode</code>, <code>/toolpath-analysis</code>, <code>/feedback</code>, <code>/proxy</code></td><td>G-code actions, toolpath insights, feedback, and the provider proxy.</td></tr>
+        </tbody>
+    </table>
+    <p>Model-backed analysis replies are model output in a typed shape. Values such as machining parameters are suggestions to review against tooling data and machine limits, not verified cutting data.</p>
+  </section>
+
+  <section id="stream-request" class="doc-section">
+    <h2>Streaming request fields</h2>
+    <table>
+      <thead><tr><th>Field</th><th>Values</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>message</code></td><td>string</td><td>The user's message for this turn.</td></tr>
+        <tr><td><code>sessionId</code></td><td>string</td><td>Continue an existing session; omit to start a new one.</td></tr>
+        <tr><td><code>projectId</code></td><td>string</td><td>Project whose context and tools the turn uses.</td></tr>
+        <tr><td><code>drawingId</code></td><td>string</td><td>The drawing this turn may act on. It is checked against the project before the turn is admitted, and the turn's tools act on this drawing and nothing else.</td></tr>
+        <tr><td><code>mode</code></td><td><code>general</code>, <code>cad</code>, <code>cam</code>, <code>gcode</code>, <code>toolpath</code></td><td>Focus of the turn.</td></tr>
+        <tr><td><code>permissionMode</code></td><td><code>auto</code>, <code>ask</code>, <code>approve</code></td><td>How tool permissions are requested.</td></tr>
+        <tr><td><code>agent</code></td><td>string</td><td>Specialist agent name from <code>/api/ai/agents</code>.</td></tr>
+        <tr><td><code>attachments</code></td><td><code>[&#123; name, mime?, data, encoding?: "base64" | "text" &#125;]</code></td><td>Up to 5 attachments: images up to 5 MB, PDFs up to 10 MB, and text up to 2,000,000 characters (text files up to 6,000 characters are also written into the message).</td></tr>
+        <tr><td><code>context</code>, <code>includeContext</code></td><td>string, boolean</td><td>Extra context text and whether to include assembled project context.</td></tr>
+        <tr><td><code>model</code></td><td>model selector</td><td>Override the configured model for this turn.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="limits-reference" class="doc-section">
+    <h2>Limits and defaults</h2>
+    <table>
+      <thead><tr><th>Limit</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Assembled context budget</td><td>24,000 characters; a block that does not fit is truncated with a marker, and a block that would be cut below 400 characters is left out instead</td></tr>
+        <tr><td>Project context document</td><td>Up to 8,000 stored characters, 2,000 sent to the model</td></tr>
+        <tr><td>Project memory / user habits</td><td>1,500 characters each</td></tr>
+        <tr><td>Project notes</td><td>Pruned after 90 days when not referenced by the project context</td></tr>
+        <tr><td>Tool output sent to the model</td><td>24,000 characters</td></tr>
+        <tr><td>Elements created per call</td><td>40</td></tr>
+        <tr><td>Output tokens</td><td>32,000 maximum</td></tr>
+        <tr><td>Heartbeat</td><td>Every 5 seconds while the stream is active</td></tr>
+        <tr><td>Exact-geometry actions</td><td>60-second budget; exact reports 1.5 seconds</td></tr>
+        <tr><td>Kernel jobs</td><td>120-second deadline, worker start included</td></tr>
+        <tr><td>Background tasks</td><td>4 active, 16 queued, 2 attempts for read workers, settled tasks kept 7 days</td></tr>
+        <tr><td>Automatic continuations</td><td>50 per request; 5 connection resumes with 2–30 s backoff</td></tr>
+        <tr><td>Direct-call retries</td><td>5 calls including the first; 2 s doubling to 30 s, honouring <code>retry-after</code></td></tr>
+        <tr><td>User skills</td><td>50 skills; name up to 64 characters (lowercase words joined by hyphens), description up to 300, body up to 20,000</td></tr>
+        <tr><td>Web search fetch</td><td>256 KB per response</td></tr>
+        <tr><td>Bridge tokens</td><td>30 days by default, 365 days maximum</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="note" title="Read the result, not the prose">
+      <p>A tool's outcome is in <code>tool_result</code> and <code>tool_diagnostic</code> events. Check whether a mutation was applied before trusting the assistant's summary of what it did.</p>
+    </DocCallout>
   </section>
 
   <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "Plugins", href: "/docs/plugins" }, { title: "History", href: "/docs/history" }]} />

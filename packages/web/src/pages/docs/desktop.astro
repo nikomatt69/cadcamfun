@@ -20,6 +20,8 @@ const toc = [
   { title: "Preferences and settings", href: "#preferences" },
   { title: "Save and reopen a CAM program", href: "#save-workflow" },
   { title: "Keyboard and failure diagnosis", href: "#desktop-diagnostics" },
+  { title: "Native event payloads", href: "#event-payloads" },
+  { title: "Keyboard shortcuts", href: "#shortcut-table" },
 ]
 ---
 
@@ -188,6 +190,41 @@ bun run build:desktop`}
       </tbody>
     </table>
     <p>Implementation anchors: <code>shared/state/settings.ts</code>, <code>app/shortcuts.ts</code>, <code>features/settings/screens/settings.tsx</code>, and <code>features/cam/components/SaveCamModal.tsx</code>.</p>
+  </section>
+
+    <section id="event-payloads" class="doc-section">
+    <h2>Native event payloads</h2>
+    <table>
+      <thead><tr><th>Event</th><th>Payload</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>sidecar-status</code></td><td><code>&#123; state: "starting" &#125;</code>, <code>&#123; state: "ready", port &#125;</code>, <code>&#123; state: "restarting" &#125;</code>, <code>&#123; state: "failed", message &#125;</code></td><td>After <code>restarting</code>, call <code>get_sidecar_endpoint</code> again; the port changes.</td></tr>
+        <tr><td><code>update://status</code></td><td><code>status</code>: <code>checking</code>, <code>upToDate</code> (<code>version</code>), <code>available</code> (<code>version</code>, <code>notes</code>, <code>date</code>, <code>critical</code>), <code>downloading</code> (<code>downloaded</code>, <code>total</code>), <code>ready</code> (<code>version</code>), <code>failed</code> (<code>message</code>); plus <code>dismissible</code></td><td>A critical update and a pending restart are not dismissible. A failed check is never shown as a blocking error.</td></tr>
+        <tr><td><code>menu</code></td><td>Menu item ID, such as <code>file.new</code>, <code>file.open</code>, <code>file.save</code>, <code>view.devtools</code>, <code>help.documentation</code></td><td>Tray items use <code>tray.quit</code> and <code>tray.recent.&lt;projectId&gt;</code>.</td></tr>
+        <tr><td><code>open-file</code></td><td>Paths of <code>.cadcam</code>, <code>.nc</code>, or <code>.gcode</code> files</td><td>Sent when the OS opens a file with the app or a second instance is launched.</td></tr>
+        </tbody>
+    </table>
+    <code>install_update</code> can be refused with a typed reason: <code>unsavedWork</code> ("the editor has unsaved work; apply the update once it is saved"), <code>noneAvailable</code> (nothing pending, or already installed), or <code>failed</code> (download or signature check failed). It installs only the update that the last check announced.
+    <DocCode language="ts" title="Calling native commands from the webview">
+{"import { invoke } from \"@tauri-apps/api/core\"\nimport { listen } from \"@tauri-apps/api/event\"\n\nconst { baseUrl, token } = await invoke<{ baseUrl: string; token: string }>(\"get_sidecar_endpoint\")\n\nconst path = await invoke<string | null>(\"pick_file\", {\n  filters: [{ name: \"G-code\", extensions: [\"nc\", \"gcode\"] }],\n})                                    // null when the user cancels\n\nawait invoke(\"save_file\", { defaultName: \"part.nc\", contents: gcodeText })\n\nconst unlisten = await listen<{ state: string; port?: number }>(\"sidecar-status\", (e) => {\n  if (e.payload.state === \"ready\") reconnect()\n})\n// later: unlisten()\n\ntry {\n  await invoke(\"install_update\", { unsavedWork: editorIsDirty })\n} catch (error) {\n  // { kind, message }: the update variant carries the refusal (unsavedWork | noneAvailable | failed)\n}"}
+    </DocCode>
+    <p><code>get_sidecar_endpoint</code> returns <code>&#123; baseUrl, token &#125;</code> (serialized in camelCase from <code>SidecarEndpoint</code>). Errors from every command arrive as the rejected value of <code>invoke</code>, shaped <code>&#123; kind, message &#125;</code>.</p>
+  </section>
+
+  <section id="shortcut-table" class="doc-section">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <thead><tr><th>Shortcut</th><th>Action</th><th>Group</th></tr></thead>
+      <tbody>
+        <tr><td><code>Cmd/Ctrl+K</code></td><td>Open the command palette</td><td>navigation</td></tr>
+        <tr><td><code>Cmd/Ctrl+Shift+P</code></td><td>New project</td><td>navigation</td></tr>
+        <tr><td><code>Cmd/Ctrl+Z</code> / <code>Cmd/Ctrl+Shift+Z</code></td><td>Undo / redo</td><td>edit</td></tr>
+        <tr><td><code>Cmd/Ctrl+S</code>, <code>Cmd/Ctrl+Shift+E</code></td><td>Save, export (shell placeholders; use the feature's own controls)</td><td>edit</td></tr>
+        <tr><td><code>Cmd/Ctrl+0</code></td><td>Zoom to fit</td><td>view</td></tr>
+        <tr><td><code>Cmd/Ctrl+=</code> / <code>Cmd/Ctrl+-</code></td><td>Zoom in / out</td><td>view</td></tr>
+        <tr><td><code>Cmd/Ctrl+J</code></td><td>Toggle the assistant panel</td><td>ai</td></tr>
+        </tbody>
+    </table>
+    <code>Cmd</code> applies on macOS and <code>Ctrl</code> elsewhere. Each shortcut's ID is also its translation key suffix (for example <code>settings.shortcut.palette</code>), and the Settings screen renders this same table, so the documentation and the app cannot drift apart.
   </section>
 
   <DocRelated items={[

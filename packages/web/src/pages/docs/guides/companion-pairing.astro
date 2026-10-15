@@ -17,6 +17,9 @@ const toc = [
   { title: "Revoke or unpair deliberately", href: "#revoke" },
   { title: "Diagnose failures by layer", href: "#errors" },
   { title: "Implementation map", href: "#sources" },
+  { title: "What a paired phone can call", href: "#gateway-routes" },
+  { title: "Pairing link anatomy", href: "#pairing-link" },
+  { title: "Gateway administration API", href: "#gateway-api" },
 ]
 ---
 
@@ -157,6 +160,60 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
     <h2>Implementation map</h2>
     <p>The management contract is <code>packages/api/src/groups/companion.ts</code>. Sidecar lifecycle and route policy are in <code>services/companion.ts</code> and <code>companion-gateway.ts</code>. Phone parsing, connection recovery, storage, and UI are in <code>lib/pairing.ts</code>, <code>server.tsx</code>, <code>storage.ts</code>, and <code>app/connect.tsx</code>. The native trust delegate is <code>modules/companion-net/ios/CompanionNetModule.swift</code>.</p>
     <p>For a support report, retain the app version, connection method, non-secret gateway host/port, exact error/status, and whether the native module is present. Redact tokens, pairing links, model credentials, and private keys. Add the <a href="/docs/api/system">System API</a> version result when comparing two development processes.</p>
+  </section>
+
+    <section id="gateway-routes" class="doc-section">
+    <h2>What a paired phone can call</h2>
+    <p>Every request through the gateway must carry a device token and match this allow-list. Everything else, including credentials, plugins, files, billing, and <code>/api/companion</code> itself, is refused. Admitted requests are forwarded to the loopback API with the application token, which the phone never sees.</p>
+    <table>
+      <thead><tr><th>Methods</th><th>Path pattern</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/health</code></td><td>Reachability check.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects</code>, <code>/api/projects/:id</code></td><td>Project list and header.</td></tr>
+        <tr><td>GET, POST</td><td><code>/api/projects/:id/vcs/*</code> (except <code>remote</code>, <code>push</code>, <code>pull</code>), <code>/pulls/*</code>, <code>/actions/*</code></td><td>History, pull requests, reviews, and workflow runs. GitHub sync stays on the desktop because it needs the owner's GitHub token.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects/:id/events</code></td><td>Live SSE stream of history, workflow, and assistant activity; the phone's only push channel.</td></tr>
+        <tr><td>GET, POST, PUT, DELETE</td><td><code>/api/notifications</code>, <code>/mark-all-read</code>, <code>/:id</code></td><td>Read, mark read, and delete notifications.</td></tr>
+        <tr><td>GET</td><td><code>/api/ai/status</code>, <code>/models</code>, <code>/agents</code></td><td>Assistant discovery.</td></tr>
+        <tr><td>POST</td><td><code>/api/ai/chat/stream</code>, <code>chat/abort</code>, <code>chat/queue</code>, <code>permission/reply</code>, <code>sessions/state</code>, <code>sessions/control</code></td><td>Assistant sessions.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Current scope of history writes">
+      <p>The history pattern currently also matches commit, checkout, and restore. Treat a paired phone as able to change project history, and revoke devices you no longer control.</p>
+    </DocCallout>
+  </section>
+
+  <section id="pairing-link" class="doc-section">
+    <h2>Pairing link anatomy</h2>
+    <code>POST /api/companion/pair</code> with a device <code>name</code> (and optionally a <code>host</code>) creates a device token and returns its ID together with a link, which the desktop shows as a QR code:
+    <DocCode language="text" title="Pairing link format">
+{"cadcamfun://pair?host=https%3A%2F%2F192.168.1.20%3A8443&token=<43-char base64url>&fp=<sha256 hex>&name=Ada%27s+iPhone&hosts=https%3A%2F%2F100.64.0.7%3A8443"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Parameter</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>host</code></td><td>Preferred origin: the best private address of the desktop and the gateway port.</td></tr>
+        <tr><td><code>token</code></td><td>32 random bytes, base64url-encoded. It is shown once; the desktop stores only its SHA-256 hash, and device IDs are 12 hex characters.</td></tr>
+        <tr><td><code>fp</code></td><td>SHA-256 fingerprint of the gateway certificate, lowercase hex without colons. The phone pins it.</td></tr>
+        <tr><td><code>name</code></td><td>Device name shown in the devices list.</td></tr>
+        <tr><td><code>hosts</code></td><td>Up to five further candidate origins (six addresses in total), which the phone races to find one that answers.</td></tr>
+        </tbody>
+    </table>
+    <p>The certificate is a self-signed P-256 certificate whose subject alternative names include <code>localhost</code>, <code>127.0.0.1</code>, and the machine's reachable private addresses. It is kept in <code>&lt;dataDir&gt;/companion</code>, so pairings survive restarts. Replacing it changes the fingerprint and requires pairing again.</p>
+  </section>
+
+  <section id="gateway-api" class="doc-section">
+    <h2>Gateway administration API</h2>
+    <table>
+      <thead><tr><th>Route</th><th>Body</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /api/companion</code></td><td>—</td><td><code>enabled</code>, <code>port</code>, <code>fingerprint</code>, <code>host</code>, and <code>devices</code> (<code>id</code>, <code>name</code>, <code>createdAt</code>, <code>lastSeen</code>).</td></tr>
+        <tr><td><code>POST /api/companion/enable</code></td><td>optional <code>port</code> (default 8443, or 1024–65535)</td><td>Starts the HTTPS listener on <code>0.0.0.0</code> and persists the setting so it resumes at next launch.</td></tr>
+        <tr><td><code>POST /api/companion/disable</code></td><td>—</td><td>Stops the listener.</td></tr>
+        <tr><td><code>POST /api/companion/pair</code></td><td><code>name</code>, optional <code>host</code></td><td><code>&#123; id, link &#125;</code>.</td></tr>
+        <tr><td><code>DELETE /api/companion/devices/:id</code></td><td>—</td><td>Revokes one device token immediately.</td></tr>
+        </tbody>
+    </table>
+    <p>Failed bearer attempts are throttled per IP address: after 10 failures within 60 seconds, the gateway answers HTTP 429 ("Too many failed attempts") until the window passes. A wrong or revoked token otherwise gets HTTP 401.</p>
   </section>
 
   <DocRelated items={[
