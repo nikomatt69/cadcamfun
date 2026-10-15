@@ -77,7 +77,7 @@ bun run --cwd apps/mobile build
 bun run --cwd apps/mobile ios
 bun run --cwd apps/mobile ios:release --device`}
     </DocCode>
-    <p>The build command exports the iOS JavaScript bundle to <code>apps/mobile/dist</code>; it does not produce an IPA. The iOS run commands require macOS, Xcode, and CocoaPods. Device installation also requires a trusted device, Developer Mode, and an Apple signing team configured for the generated Xcode project. <code>native:generate</code> runs Expo prebuild for iOS without installing pods.</p>
+    <p>The build command exports the iOS JavaScript bundle to <code>apps/mobile/dist</code>; it does not produce an IPA. The iOS run commands require macOS, Xcode, and CocoaPods. Device installation also requires a trusted device, Developer Mode, and an Apple signing team configured for the generated Xcode project. <code>native:generate</code> runs Expo prebuild for iOS without installing pods. For day-to-day work, <code>start</code> (alias <code>dev</code>) runs the Expo development-client bundler, <code>ios:dev</code> starts it on localhost and opens the iOS simulator, <code>ios:build</code> compiles the debug app without starting a bundler, and <code>web</code> starts the Expo web target. The <code>test</code> script runs <code>bun test test</code> inside <code>apps/mobile</code>.</p>
     <p><code>.github/workflows/ci.yml</code> defines companion typechecking, logic tests, and JavaScript export. <code>.github/workflows/ios.yml</code> generates the Xcode project, builds an unsigned Release simulator app, pairs it with a live sidecar, checks authenticated project listing, and captures a screenshot. These configured checks do not establish physical-device, signing, TestFlight, or real-provider acceptance.</p>
   </section>
 

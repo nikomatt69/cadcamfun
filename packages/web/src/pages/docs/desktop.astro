@@ -81,14 +81,14 @@ const toc = [
   <section id="shell" class="doc-section">
     <h2>Native shell</h2>
     <p>The production window is 1440 × 900 by default, with a 960 × 600 minimum. Tauri stages the frontend from <code>apps/desktop/dist</code>, a target-specific sidecar from <code>src-tauri/binaries</code>, and generated migrations as resources. It registers <code>.cadcam</code>, <code>.nc</code>, and <code>.gcode</code> file associations. Opening a supported file or launching a second instance forwards file paths to the existing window.</p>
-    <p><code>src-tauri/src/sidecar.rs</code> supervises the child process. Closing the app sends a shutdown event; the child also observes stdin closure. Logs are separate from stdout, which carries the ready/error handshake. Native secrets are accessed through <code>src-tauri/src/secrets.rs</code> using the operating-system keychain.</p>
+    <p><code>src-tauri/src/sidecar.rs</code> supervises the child process. Closing the app writes a <code>{`{"event":"shutdown"}`}</code> line to the child's stdin and waits briefly before reaping it; the child also observes stdin closure. The launch token is 32 random bytes, hex-encoded as 64 characters, and sidecar log lines that may contain credentials are redacted. Logs are separate from stdout, which carries the ready/error handshake. Native secrets are accessed through <code>src-tauri/src/secrets.rs</code> using the operating-system keychain.</p>
     <p>On macOS, the shell registers the Liquid Glass plugin. The webview follows the glass setting and falls back when the effect is unavailable. The App Store configuration disables the private API option; the regular configuration enables it. These are separate build configurations.</p>
   </section>
 
   <section id="boundaries" class="doc-section">
     <h2>Security and persistence boundaries</h2>
     <p>The production content policy permits local assets, loopback API connections, data/blob images, and WebAssembly evaluation. It does not grant arbitrary remote script execution. Native permissions are scoped in <code>src-tauri/capabilities</code>; the development policy additionally permits Vite and its websocket.</p>
-    <p><code>open_path</code> canonicalizes paths, limits them to allowed user/application directories, and rejects executable extensions. File picking and saving use native dialogs and validation. A launch token grants access to the local application API; treat it separately from a companion token or a project-scoped AI bridge token.</p>
+    <p><code>open_path</code> canonicalizes paths, limits them to allowed user/application directories, and rejects executable extensions such as <code>.exe</code>, <code>.app</code>, <code>.sh</code>, <code>.bat</code>, <code>.msi</code>, and <code>.jar</code>. <code>..</code> segments and symlinks cannot escape the allowed folders because both sides are canonicalized. File picking and saving use native dialogs and validation. A launch token grants access to the local application API; treat it separately from a companion token or a project-scoped AI bridge token.</p>
     <p>UI settings, API query state, editor commands, stored project versions, and native secrets have different owners. Diagnose each through its actual service rather than assuming all application state is stored in SQLite.</p>
   </section>
 
@@ -109,15 +109,15 @@ const toc = [
     <table>
       <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td><code>get_sidecar_endpoint</code></td><td>Wait for the supervised sidecar and return its base URL and launch token.</td></tr>
-        <tr><td><code>get_logs_dir</code>, <code>open_path</code></td><td>Resolve the log directory and open a validated local path.</td></tr>
-        <tr><td><code>secret_get</code>, <code>secret_set</code>, <code>secret_delete</code></td><td>Access native keychain entries.</td></tr>
-        <tr><td><code>pick_file</code>, <code>save_file</code></td><td>Show native file dialogs and return or write the selected file.</td></tr>
+        <tr><td><code>get_sidecar_endpoint</code></td><td>Wait for the supervised sidecar and return its base URL and launch token. The wait covers one restart: two 60-second ready timeouts plus 5 seconds (125 seconds).</td></tr>
+        <tr><td><code>get_logs_dir</code>, <code>open_path</code></td><td>Resolve the application log directory as a string, and open an existing absolute path with the operating-system opener. Paths must resolve under the app data, log, Documents, Downloads, or Desktop folder.</td></tr>
+        <tr><td><code>secret_get</code>, <code>secret_set</code>, <code>secret_delete</code></td><td>Access native keychain entries under the <code>com.cadcamfun.app</code> service. Keys are 1–128 bytes of ASCII letters, digits, and <code>. _ - :</code> (for example <code>ai.anthropic.apiKey</code>); <code>secret_get</code> returns <code>null</code> for a missing entry.</td></tr>
+        <tr><td><code>pick_file</code>, <code>save_file</code></td><td><code>{"pick_file({ filters: [{ name, extensions }] })"}</code> returns the chosen path or <code>null</code> on cancel. <code>{"save_file({ defaultName, contents })"}</code> writes UTF-8 text to the chosen path and returns it, or <code>null</code> on cancel; directories and executable extensions are rejected.</td></tr>
         <tr><td><code>set_recent_projects</code></td><td>Refresh the tray's recent-project menu.</td></tr>
-        <tr><td><code>check_for_updates</code>, <code>install_update</code></td><td>Request an updater check or install a pending update subject to unsaved-work checks.</td></tr>
+        <tr><td><code>check_for_updates</code>, <code>install_update</code></td><td>Request an updater check, or install a pending update. <code>install_update</code> accepts an optional <code>unsavedWork</code> flag (default <code>false</code>) so an install does not interrupt an open editor.</td></tr>
       </tbody>
     </table>
-    <p>The invoke handler is registered in <code>src-tauri/src/lib.rs</code>. Capabilities and generated command permissions also control availability; command registration alone does not establish webview access.</p>
+    <p>The invoke handler is registered in <code>src-tauri/src/lib.rs</code>. Capabilities and generated command permissions also control availability; command registration alone does not establish webview access. Command errors are serialized as <code>{"{ kind, message }"}</code> with kinds such as <code>sidecar</code>, <code>invalid_path</code>, <code>io</code>, <code>dialog</code>, and <code>path</code>; no command panics.</p>
   </section>
 
   <section id="webview-events" class="doc-section">

@@ -50,7 +50,7 @@ const toc = [
 
   <section id="config" class="doc-section">
     <h2>Required configuration</h2>
-<p><code>AppConfigService</code> reads process configuration once in <code>apps/sidecar/src/config.ts</code>. <code>CADCAMFUN_TOKEN</code> is the required application bearer token and <code>CADCAMFUN_DATA_DIR</code> is the required application data directory. The database path is <code>&lt;dataDir&gt;/cadcamfun.db</code>. <code>CADCAMFUN_MIGRATIONS_DIR</code> supplies the SQL migration folder; without it the database layer does not apply application migrations.</p>
+<p><code>AppConfigService</code> reads process configuration once in <code>apps/sidecar/src/config.ts</code>. <code>CADCAMFUN_TOKEN</code> is the required application bearer token and <code>CADCAMFUN_DATA_DIR</code> is the required application data directory. The database path is <code>&lt;dataDir&gt;/cadcamfun.db</code>. <code>CADCAMFUN_MIGRATIONS_DIR</code> is optional and supplies the SQL migration folder; without it the database layer does not apply application migrations.</p>
     <p>The desktop supplies launch configuration. For direct development, provide those configuration names in the launching shell and run the package's start script from the repository root:</p>
     <DocCode language="bash" title="Start a configured sidecar">
 {`bun run --filter @cadcamfun/sidecar start`}
@@ -62,12 +62,12 @@ const toc = [
     <h2>Optional configuration</h2>
 <ul>
       <li><code>CADCAMFUN_APP_URL</code> sets the base for authentication links; <code>CADCAMFUN_DEBUG_LINKS</code> enables returning debug reset/magic links and defaults to false.</li>
-      <li><code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> or <code>direct</code>. <code>CADCAMFUN_AI_OFFLINE</code> disables the optional model-catalogue network path. <code>CADCAMFUN_AI_MINIMAX_BASE_URL</code> overrides MiniMax's endpoint.</li>
+      <li><code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> (default; chat runs through the embedded conversation host) or <code>direct</code> (AI SDK only). <code>CADCAMFUN_AI_OFFLINE</code> (boolean, default false) disables the optional model-catalogue network path. <code>CADCAMFUN_AI_MINIMAX_BASE_URL</code> overrides MiniMax's endpoint.</li>
       <li><code>STRIPE_SECRET_KEY</code> enables the Stripe provider; <code>STRIPE_PRICE_BASIC</code>, <code>STRIPE_PRICE_PRO</code>, and <code>STRIPE_PRICE_ENTERPRISE</code> supply paid-plan prices. <code>STRIPE_WEBHOOK_SECRET</code> is required for signed webhook verification.</li>
-      <li><code>CRON_SECRET</code> supplies the cron route secret; without it the local application can call that route without an additional cron secret. <code>ADMIN_EMAIL</code> configures the administrator identity check.</li>
+      <li><code>CRON_SECRET</code> supplies the cron route secret; without it the local application can call that route without an additional cron secret. <code>ADMIN_EMAIL</code> is a legacy administrator identity check; by default the local profile is the administrator of its own installation.</li>
       <li><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> enables the configured OTLP telemetry export. Without an endpoint, external telemetry export is off.</li>
     </ul>
-    <p>AI provider keys are managed through the credential API and dedicated credential file. They are not read as vendor API-key environment settings by <code>AppConfigService</code>.</p>
+    <p>All of these names are read in one place, <code>AppConfigService</code>; the token and Stripe secret key are held as redacted values so they do not appear in logs. AI provider keys are managed through the credential API and dedicated credential file. They are not read as vendor API-key environment settings by <code>AppConfigService</code>.</p>
   </section>
 
   <section id="served" class="doc-section">
