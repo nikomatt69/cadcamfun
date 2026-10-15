@@ -78,6 +78,8 @@ export const StreamChatBody = Schema.Struct({
   agent: opt(Schema.String), mode: opt(Schema.Literals(["general", "cad", "cam", "gcode", "toolpath"])),
   attachments: opt(Schema.Array(ChatAttachment)),
   message: opt(Schema.String), sessionId: opt(Schema.String), projectId: opt(Schema.String),
+  /** The drawing this turn works on. Checked against the project before admission; the turn's tools act on it and on nothing else. */
+  drawingId: opt(Schema.String),
   context: opt(Schema.String), includeContext: opt(Schema.Boolean), model: opt(AiModelSelector)
 })
 export const AbortBody = Schema.Struct({ sessionId: opt(Schema.String), projectId: opt(Schema.String) })
@@ -203,7 +205,7 @@ export const BridgeTool = Schema.Struct({
   parameters: Schema.Record(Schema.String, Schema.Unknown)
 })
 export const BridgeTools = Schema.Struct({ tools: Schema.Array(BridgeTool) })
-export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
+export const BridgeInvokeBody = Schema.Struct({ projectId: Schema.String, drawingId: opt(Schema.String), tool: Schema.String, input: Schema.Record(Schema.String, Schema.Unknown) })
 export const BridgeInvokeReply = Schema.Struct({ tool: Schema.String, action: Schema.String, result: Schema.Unknown })
 /** RM-11: scoped, revocable tokens for a standalone nikcli (one project, read-only or read-write). Issued with the application's own token. */
 export const BridgeMode = Schema.Literals(["read", "write"])

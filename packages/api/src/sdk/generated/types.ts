@@ -360,6 +360,7 @@ export type UserCreateTokenPayload = {
 
 export type AiInvokeActionPayload = {
   readonly projectId: string
+  readonly drawingId?: string | undefined
   readonly tool: string
   readonly input: { readonly [x: string]: any }
 }
@@ -505,6 +506,7 @@ export type AiChatStreamPayload = {
   readonly message?: string | undefined
   readonly sessionId?: string | undefined
   readonly projectId?: string | undefined
+  readonly drawingId?: string | undefined
   readonly context?: string | undefined
   readonly includeContext?: boolean | undefined
   readonly model?:
@@ -2090,6 +2092,7 @@ export type AiActionsOutput = {
 
 export type AiInvokeActionInput = {
   readonly projectId: AiInvokeActionPayload["projectId"]
+  readonly drawingId?: AiInvokeActionPayload["drawingId"]
   readonly tool: AiInvokeActionPayload["tool"]
   readonly input: AiInvokeActionPayload["input"]
 }
@@ -2458,6 +2461,7 @@ export type AiChatStreamInput = {
   readonly message?: AiChatStreamPayload["message"]
   readonly sessionId?: AiChatStreamPayload["sessionId"]
   readonly projectId?: AiChatStreamPayload["projectId"]
+  readonly drawingId?: AiChatStreamPayload["drawingId"]
   readonly context?: AiChatStreamPayload["context"]
   readonly includeContext?: AiChatStreamPayload["includeContext"]
   readonly model?: AiChatStreamPayload["model"]

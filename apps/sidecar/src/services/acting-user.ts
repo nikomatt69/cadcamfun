@@ -21,6 +21,8 @@ interface InvocationActor {
   readonly user: SessionUser
   readonly prompt?: string
   readonly signal?: AbortSignal
+  /** The drawing the admitted turn works on (checked against the project before admission). */
+  readonly drawingId?: string
 }
 
 export class ActingUser extends Context.Service<ActingUser, {
@@ -34,7 +36,16 @@ export class ActingUser extends Context.Service<ActingUser, {
   readonly owner: (sessionId: string) => Promise<SessionOwner | undefined>
   readonly canControl: (sessionId: string, user: SessionUser, projectId?: string) => Promise<boolean>
   readonly forget: (sessionId: string) => Promise<void>
-  readonly bind: (projectId: string, sessionId: string, user: SessionUser, prompt?: string) => Promise<boolean>
+  /**
+   * Admits a turn: the session's owner and project are fixed on first use; the drawing is the one this turn was admitted for
+   * (each admitted turn names it again), and it is what every tool call of the turn, its Code Mode programs and its children
+   * act on. Nothing outside the admission (another window's editor state) can change it.
+   */
+  readonly bind: (projectId: string, sessionId: string, user: SessionUser, prompt?: string, drawingId?: string) => Promise<boolean>
+  /** The drawing bound to the running invocation; undefined outside an admitted invocation or when the turn named none. */
+  readonly drawing: () => string | undefined
+  /** True inside an admitted invocation (a host tool call or a bridge call), false for the compatibility path. */
+  readonly admitted: () => boolean
   readonly invoke: <A>(projectId: string, sessionId: string, execute: () => Promise<A>, signal?: AbortSignal) => Promise<A>
   readonly assertActive: () => void
 }>()("cadcamfun/ActingUser") {
@@ -86,7 +97,7 @@ export class ActingUser extends Context.Service<ActingUser, {
         const invocation = invocations.getStore()
         return invocation ? invocation.prompt : prompt
       },
-      bind: async (projectId, sessionId, user, message) => {
+      bind: async (projectId, sessionId, user, message, drawingId) => {
         const previous = await owner(sessionId)
         if (previous && (previous.projectId !== projectId || previous.userId !== user.id)) return false
         const file = fileFor(sessionId)
@@ -106,9 +117,11 @@ export class ActingUser extends Context.Service<ActingUser, {
         }
         const active = sessions.get(sessionId)
         if (active && (active.projectId !== projectId || active.actor.user.id !== user.id)) return false
-        sessions.set(sessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(message !== undefined ? { prompt: message } : {}) }) })
+        sessions.set(sessionId, { projectId, actor: Object.freeze({ user: Object.freeze({ ...user }), ...(message !== undefined ? { prompt: message } : {}), ...(drawingId !== undefined ? { drawingId } : {}) }) })
         return true
       },
+      drawing: () => invocations.getStore()?.drawingId,
+      admitted: () => invocations.getStore() !== undefined,
       assertActive: () => {
         if (invocations.getStore()?.signal?.aborted) throw new Error("Tool execution cancelled before mutation.")
       },

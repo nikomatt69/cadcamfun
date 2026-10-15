@@ -582,6 +582,9 @@ export const createAiStore = (): AiStore => {
     }
     if (disposed || generation !== turnGeneration || ownerConversation !== conversationGeneration || sessionId() !== sid || projectId() !== ownerProject || !editorOwner.current()) return
     const m = modelSig()
+    // The turn is admitted for the drawing open now; another window switching drawings later does not move it.
+    const openDocument = useDocumentStore.getState()
+    const turnDrawing = activeProjectId !== undefined && openDocument.projectId === activeProjectId && openDocument.drawingId !== null ? openDocument.drawingId : undefined
     handle = streamChat({
       client: app.client,
       runtime: app.runtime,
@@ -617,6 +620,7 @@ export const createAiStore = (): AiStore => {
       sessionId: sid,
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(activeProjectId ? { projectId: activeProjectId } : {}),
+      ...(turnDrawing !== undefined ? { drawingId: turnDrawing } : {}),
       ...(m ? { model: m } : {}),
       agent: agent(), mode: mode(), permissionMode: permissionMode(),
     })

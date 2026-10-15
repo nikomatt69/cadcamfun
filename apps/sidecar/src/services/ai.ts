@@ -18,7 +18,7 @@ import { changeParameters, historyRevision, inspectParametric, testParametric } 
 import { ActingUser } from "./acting-user.ts"
 import { AiPlugins, AiPluginsLive } from "./ai-plugins.ts"
 import { ComponentRepo } from "../repos/component-repo.ts"
-import { DrawingRepo } from "../repos/drawing-repo.ts"
+import { DrawingConflict, DrawingRepo, drawingContentHash } from "../repos/drawing-repo.ts"
 import { MachineConfigRepo } from "../repos/machine-config-repo.ts"
 import { MaterialRepo } from "../repos/material-repo.ts"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -121,7 +121,12 @@ const toolHandlers = Effect.gen(function*() {
     if (!access || (access.project.ownerId !== actor.id && access.orgRole !== "ADMIN" && access.orgRole !== "MANAGER")) throw new Error("You do not have permission to write this project.")
     actingCell.assertActive()
   }
-  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean }> => {
+  /**
+   * The drawing a tool acts on. Inside an admitted turn that named its drawing, it is that drawing and nothing else: the
+   * editor snapshot another window wrote cannot redirect it, and a bound drawing that is gone is refused, never replaced.
+   * Without a binding (older clients, the compatibility path) the editor snapshot or an unambiguous project resolves it.
+   */
+  const load = async (projectId: string, write = false): Promise<{ id: string; projectId: string; data: Record<string, unknown>; elements: Element[]; created: boolean; contentHash: string }> => {
     const actor = acting()
     let project: { id: string } | undefined = (await Effect.runPromise(projects.find(actor.id, projectId)))?.project
     let created = false
@@ -134,6 +139,13 @@ const toolHandlers = Effect.gen(function*() {
     }
     if (write) await assertWrite(project.id)
     const rows = await Effect.runPromise(drawings.listByProject(project.id))
+    const turnDrawing = actingCell.drawing()
+    if (turnDrawing !== undefined) {
+      const row = rows.find((drawing) => drawing.id === turnDrawing)
+      if (!row) throw new Error("The drawing this conversation works on is not in this project any more; open a drawing and send the request again. Nothing was changed.")
+      const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
+      return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
+    }
     const snapshot = (await Effect.runPromise(kv.get(`ai.context.${project.id}`)))?.value as { projectId?: unknown; drawingId?: unknown } | undefined
     // Resolve only inside the accessible project: a snapshot cannot redirect a tool to another project. A bound drawing
     // that is gone is refused, never replaced by another one; without a binding only an unambiguous project resolves.
@@ -147,13 +159,19 @@ const toolHandlers = Effect.gen(function*() {
       created = true
     }
     const data = row.data !== null && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {}
-    return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created }
+    return { id: row.id, projectId: project.id, data, elements: elementsOf(data), created, contentHash: drawingContentHash(row.data) }
   }
-  const save = async (id: string, data: Record<string, unknown>, elements: ReadonlyArray<Element>) => {
-    const drawing = await Effect.runPromise(drawings.find(acting().id, id))
+  /**
+   * Writes the document a tool read back, only if it is still the content the tool read (`loaded.contentHash`): the check and
+   * the write are one transaction. A concurrent save is a `DrawingConflict` and is not overwritten. Answers the receipt.
+   */
+  const save = async (loaded: { readonly id: string; readonly contentHash: string }, data: Record<string, unknown>, elements: ReadonlyArray<Element>) => {
+    const drawing = await Effect.runPromise(drawings.find(acting().id, loaded.id))
     if (!drawing) throw new Error("Drawing no longer exists.")
     await assertWrite(drawing.project.id)
-    await Effect.runPromise(drawings.update(id, { data: { ...data, elements, version: "1.0" } }))
+    const receipt = await Effect.runPromise(drawings.writeIfUnchanged(loaded.id, loaded.contentHash, { ...data, elements, version: "1.0" }))
+    if (!receipt.ok) throw receipt.reason === "missing" ? new Error("Drawing no longer exists.") : new DrawingConflict(loaded.id)
+    return receipt
   }
   /** What the UI needs to mirror a change in the open editor: where it went and the resulting elements. */
   const where = (loaded: { id: string; projectId: string; created: boolean }) => ({ drawingId: loaded.id, projectId: loaded.projectId, ...(loaded.created ? { createdDrawing: true } : {}) })
@@ -350,7 +368,11 @@ const toolHandlers = Effect.gen(function*() {
       const stock = Schema.decodeUnknownSync(cam.generator.StockSchema)(input.stock)
       const referenced = stock.elementId === undefined ? undefined : loaded.elements.find((e) => e.id === stock.elementId)
       if (stock.elementId !== undefined && referenced === undefined) return { ok: false, error: "Stock reference element does not exist in the active drawing." }
-      const invalidated = await Effect.runPromise(drawings.configureStock(loaded.id, stock))
+      const invalidated = await Effect.runPromise(drawings.configureStock(loaded.id, stock, loaded.contentHash)).catch((error: unknown) => {
+        // The repository reports a conflict through its DatabaseError; the tool reports the conflict itself.
+        for (let cause: unknown = error; cause !== null && typeof cause === "object"; cause = (cause as { cause?: unknown }).cause) if (cause instanceof DrawingConflict) throw cause
+        throw error
+      })
       // One stock with two faces: the drawing's `stock` is what CAM reads, and the `workpiece` element is what the
       // CAD scene draws, so the raw piece is visible now, survives reopening the project and travels with its history.
       // A stock named after a real part element keeps that element as its source and adds nothing to the scene.
@@ -367,7 +389,8 @@ const toolHandlers = Effect.gen(function*() {
         }
         elements = existing === undefined ? [...loaded.elements, workpiece] : loaded.elements.map((e) => (e.id === workpieceId ? workpiece : e))
         // `configureStock` already stored the drawing's stock; both lands in the same document in one write.
-        await save(loaded.id, { ...loaded.data, stock: { ...stock, elementId: workpieceId } }, elements)
+        // The stock write above changed the document: the expected content is the one it stored, in the same turn.
+        await save({ id: loaded.id, contentHash: drawingContentHash({ ...loaded.data, stock }) }, { ...loaded.data, stock: { ...stock, elementId: workpieceId } }, elements)
       }
       const stored = fromElement ? stock : { ...stock, elementId: workpieceId }
       return {
@@ -520,13 +543,13 @@ const toolHandlers = Effect.gen(function*() {
       if (!changed.ok) return changed
       if (!changed.report.ok) return { ...changed.report, error: "Parameters were not changed because the variant failed validation.", ...where(loaded) }
       const updated = { ...element, history: changed.history }
-      await save(loaded.id, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
+      await save(loaded, loaded.data, loaded.elements.map((e) => e.id === element.id ? updated : e))
       return { ok: true, mutation: "update", elements: [updated], ids: [element.id], revision: historyRevision(changed.history), report: changed.report, ...where(loaded) }
     },
     addEntities: async (projectId, entities) => {
       const loaded = await load(projectId, true)
       const created = newElements(entities as Array<Record<string, unknown> & { type: string }>, "default", () => crypto.randomUUID())
-      await save(loaded.id, loaded.data, [...loaded.elements, ...created])
+      await save(loaded, loaded.data, [...loaded.elements, ...created])
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
     addElements: async (projectId, rawInput) => {
@@ -550,7 +573,7 @@ const toolHandlers = Effect.gen(function*() {
         }
         element["operands"] = resolved
       }
-      await save(loaded.id, loaded.data, [...loaded.elements, ...created])
+      await save(loaded, loaded.data, [...loaded.elements, ...created])
       return { ok: true, ids: created.map((e) => e.id), elements: created, ...where(loaded) }
     },
     modifyEntities: async (projectId, changes) => {
@@ -573,13 +596,13 @@ const toolHandlers = Effect.gen(function*() {
         return next
       })
       if (refused.length > 0) return { ok: false, error: `Nothing changed. ${refused.join("; ")}`, ...where(loaded) }
-      await save(loaded.id, loaded.data, elements)
+      await save(loaded, loaded.data, elements)
       return { ok: true, modified: updated.length, elements: updated, ...where(loaded) }
     },
     deleteEntities: async (projectId, ids) => {
       const loaded = await load(projectId, true)
       const elements = loaded.elements.filter((e) => !ids.includes(e.id))
-      await save(loaded.id, loaded.data, elements)
+      await save(loaded, loaded.data, elements)
       return { ok: true, deleted: loaded.elements.length - elements.length, ids: loaded.elements.filter((e) => ids.includes(e.id)).map((e) => e.id), ...where(loaded) }
     },
     transformEntities: async (projectId, input) => {
@@ -589,7 +612,7 @@ const toolHandlers = Effect.gen(function*() {
       const elements = result.copied
         ? [...loaded.elements, ...result.elements]
         : loaded.elements.map((e) => result.elements.find((next) => next.id === e.id) ?? e)
-      await save(loaded.id, loaded.data, elements)
+      await save(loaded, loaded.data, elements)
       return { ok: true, mode: result.copied ? "copied" : "transformed", copied: result.copied, ids: result.elements.map((e) => e.id), elements: result.elements, ...where(loaded) }
     },
     groupEntities: async (projectId, input) => {
@@ -597,7 +620,7 @@ const toolHandlers = Effect.gen(function*() {
       const result = groupElements(loaded.elements, input, () => crypto.randomUUID())
       if (!result.ok) return { ok: false, error: result.error, ...where(loaded) }
       const elements = [...loaded.elements.filter((e) => !result.removed.includes(e.id)), ...result.added]
-      await save(loaded.id, loaded.data, elements)
+      await save(loaded, loaded.data, elements)
       return { ok: true, removed: result.removed, ids: result.added.map((e) => e.id), elements: result.added, ...where(loaded) }
     },
     describeDrawing: async (projectId) => {
@@ -893,7 +916,7 @@ const toolHandlers = Effect.gen(function*() {
         if (!moved.ok) return { ok: false, error: moved.error }
         placed = moved.elements as Element[]
       }
-      await save(loaded.id, loaded.data, [...loaded.elements, ...placed])
+      await save(loaded, loaded.data, [...loaded.elements, ...placed])
       return { ok: true, ids: placed.map((e) => e.id), component: { id: found.id, name: found.name }, elements: placed, ...where(loaded) }
     },
     deleteComponent: async (componentId) => {
@@ -1085,7 +1108,7 @@ const AiToolRegistryLive = Layer.effect(ToolRegistry, Effect.gen(function*() {
 export class AiActions extends Context.Service<AiActions, {
   /** The catalogue as the operator's policy leaves it (`bridge.use`, `tool.use`). */
   readonly list: (mode?: BridgeMode) => ReadonlyArray<BridgeTool>
-  readonly invoke: (call: { readonly projectId: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly mode?: BridgeMode; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
+  readonly invoke: (call: { readonly projectId: string; readonly drawingId?: string; readonly tool: string; readonly input: unknown; readonly user: SessionUser; readonly mode?: BridgeMode; readonly signal?: AbortSignal }) => Effect.Effect<{ readonly tool: string; readonly action: string; readonly result: unknown }, { readonly message: string }>
 }>()("cadcamfun/AiActions") {}
 
 export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
@@ -1102,7 +1125,7 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
   })
   return AiActions.of({
     list: (mode) => [...scopeBridge(describeBridge(), policies, mode), ...scopeBridge(pluginBridge(), policies, mode)],
-    invoke: ({ projectId, tool, input, user, mode, signal }) => Effect.gen(function*() {
+    invoke: ({ projectId, drawingId, tool, input, user, mode, signal }) => Effect.gen(function*() {
       const admission = tool.startsWith("plugin_")
         ? (() => {
             const entry = plugins.listing().find((candidate) => pluginToolId(candidate.pluginId, candidate.id) === tool)
@@ -1117,8 +1140,9 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
       if (Option.isNone(found)) return yield* Effect.fail({ message: `Tool "${tool}" is not available.` })
       const spec = found.value
       // One session per account and project: the owner file and the in-memory binding make a second account's call fail closed.
-      const sessionId = `bridge:${projectId}:${user.id}`
-      const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`))
+      // The drawing is part of the session's identity, so two concurrent calls on different drawings never share a binding.
+      const sessionId = drawingId === undefined ? `bridge:${projectId}:${user.id}` : `bridge:${projectId}:${user.id}:${drawingId}`
+      const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`, drawingId))
       if (!bound) return yield* Effect.fail({ message: "This project's bridge session belongs to another account." })
       const output = yield* Effect.promise((abort) => {
         const cancel = signal ?? abort

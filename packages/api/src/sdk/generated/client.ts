@@ -1121,7 +1121,12 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/ai/actions/invoke`,
-            body: { projectId: input["projectId"], tool: input["tool"], input: input["input"] },
+            body: {
+              projectId: input["projectId"],
+              drawingId: input["drawingId"],
+              tool: input["tool"],
+              input: input["input"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,
@@ -1413,6 +1418,7 @@ export function make(options: ClientOptions) {
               message: input?.["message"],
               sessionId: input?.["sessionId"],
               projectId: input?.["projectId"],
+              drawingId: input?.["drawingId"],
               context: input?.["context"],
               includeContext: input?.["includeContext"],
               model: input?.["model"],

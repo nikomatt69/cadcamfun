@@ -353,13 +353,19 @@ const Endpoint6_0 = (raw: RawClient["ai"]) => () => raw["actions"]({}).pipe(Effe
 type Endpoint6_1Request = Parameters<RawClient["ai"]["invokeAction"]>[0]
 type Endpoint6_1Input = {
   readonly projectId: Endpoint6_1Request["payload"]["projectId"]
+  readonly drawingId?: Endpoint6_1Request["payload"]["drawingId"]
   readonly tool: Endpoint6_1Request["payload"]["tool"]
   readonly input: Endpoint6_1Request["payload"]["input"]
 }
 const Endpoint6_1 = (raw: RawClient["ai"]) => (input: Endpoint6_1Input) =>
-  raw["invokeAction"]({ payload: { projectId: input["projectId"], tool: input["tool"], input: input["input"] } }).pipe(
-    Effect.mapError(mapClientError),
-  )
+  raw["invokeAction"]({
+    payload: {
+      projectId: input["projectId"],
+      drawingId: input["drawingId"],
+      tool: input["tool"],
+      input: input["input"],
+    },
+  }).pipe(Effect.mapError(mapClientError))
 
 type Endpoint6_2Request = Parameters<RawClient["ai"]["issueBridgeToken"]>[0]
 type Endpoint6_2Input = {
@@ -587,6 +593,7 @@ type Endpoint6_24Input = {
   readonly message?: Endpoint6_24Request["payload"]["message"]
   readonly sessionId?: Endpoint6_24Request["payload"]["sessionId"]
   readonly projectId?: Endpoint6_24Request["payload"]["projectId"]
+  readonly drawingId?: Endpoint6_24Request["payload"]["drawingId"]
   readonly context?: Endpoint6_24Request["payload"]["context"]
   readonly includeContext?: Endpoint6_24Request["payload"]["includeContext"]
   readonly model?: Endpoint6_24Request["payload"]["model"]
@@ -602,6 +609,7 @@ const Endpoint6_24 = (raw: RawClient["ai"]) => (input?: Endpoint6_24Input) =>
         message: input?.["message"],
         sessionId: input?.["sessionId"],
         projectId: input?.["projectId"],
+        drawingId: input?.["drawingId"],
         context: input?.["context"],
         includeContext: input?.["includeContext"],
         model: input?.["model"],

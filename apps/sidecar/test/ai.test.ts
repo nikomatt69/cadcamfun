@@ -181,6 +181,17 @@ describe("/api/ai/chat/stream", () => {
     expect(streams).toHaveLength(0)
   })
 
+  test("a drawing that is not in the turn's project is refused before admission and before any model call", async () => {
+    const mine = (await app.call("/api/projects", { method: "POST", json: { name: "Turn project" } })).body.id
+    const other = (await app.call("/api/projects", { method: "POST", json: { name: "Other project" } })).body.id
+    const foreign = (await app.call(`/api/projects/${other}/drawings`, { method: "POST", json: { name: "Foreign" } })).body.id
+    streams.length = 0
+    for (const body of [{ message: "hi", projectId: mine, drawingId: foreign }, { message: "hi", projectId: mine, drawingId: "missing-drawing" }, { message: "hi", drawingId: foreign }]) {
+      expect((await post("/api/ai/chat/stream", body)).status).toBe(400)
+    }
+    expect(streams).toHaveLength(0)
+  })
+
   test("session controls and aborts reject a different project and unknown authority", async () => {
     await configure()
     const projectId: string = (await post("/api/projects", { name: "Session owner" })).body.id

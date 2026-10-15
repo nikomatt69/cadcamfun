@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Steps 5–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Steps 6–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -239,18 +239,40 @@ D: RM-01; persistence under RM-03, setup per RM-02. Start: `apps/sidecar/src/ser
 `drawing-repo.ts`, `packages/api/src/ai-actions.ts`. `load()` picks the drawing from the shared snapshot today; `save()`
 applies no CAS.
 
-- [ ] Introduce the trusted actor/project/drawing/session/turn binding.
-- [ ] Add the drawing to the application request and check it before admission.
-- [ ] Remove the first-drawing fallback for admitted invocations.
-- [ ] Propagate the binding to tools, Code Mode, children and the bridge.
+- [x] Introduce the trusted actor/project/drawing/session/turn binding.
+- [x] Add the drawing to the application request and check it before admission.
+- [x] Remove the first-drawing fallback for admitted invocations.
+- [x] Propagate the binding to tools, Code Mode, children and the bridge.
 - [ ] Separate persisted revision, content hash and history revision.
-- [ ] Apply CAS and receipt in the same transaction as the change.
+- [x] Apply CAS and receipt in the same transaction as the change.
 - [ ] Record invalidations and the confirmed result; deduplicate by operation key and digest.
 - [ ] Update the observed revision only after a valid receipt.
 
 Tests: `acting-user.test.ts`, `drawings.test.ts`, `ai-parametric.test.ts`; new proofs on two drawings of one project, retry and
 crash after commit. Gate: a second window cannot change the turn's target; a concurrent change yields a conflict without
 overwrite.
+
+Progress (2026-10-15):
+
+- **V** Binding: `StreamChatBody.drawingId` and `BridgeInvokeBody.drawingId` (clients regenerated). The sidecar checks the
+  drawing belongs to the turn's accessible project before admission (`checkDrawing`, `http/ai.ts`); `ActingUser.bind` stores it
+  with the owner and every invocation carries it (`ActingUser.drawing()`), so Code Mode inner calls and child sessions inherit
+  it. The bridge keys its session by drawing, so concurrent calls on two drawings never share a binding. The desktop sends the
+  drawing open when the turn is sent (`store.ts`, `stream.ts`).
+- **V** `load()` (`services/ai.ts`): a bound turn acts on its drawing only; the editor snapshot another window wrote is not read,
+  and a bound drawing that is gone is refused, never replaced. Unbound calls (older clients) keep the snapshot rule.
+- **V** CAS: `DrawingRepo.writeIfUnchanged` compares the content hash the tool read with the stored one and writes in the same
+  transaction; a mismatch is `DrawingConflict` and nothing is overwritten. `configureStock` checks the same way. `save()` answers
+  the receipt (`previousHash`, `contentHash`, `updatedAt`).
+- **C** Three identities, named: `drawingContentHash` (the stored document, what CAS compares), `drawingRevision` (CAM source:
+  elements and stock), `historyRevision` (one element's parametric history). A persisted, monotonic revision column, stored
+  receipts with invalidations and deduplication by operation key need the WP0 revision/receipt migration RM-03 owns; they are
+  left open here, as is surfacing the receipt to the editor's observed revision.
+- **V** Tests: `ai-drawing-binding.test.ts` (two drawings with the snapshot naming the other: the tool writes the bound one; a
+  missing bound drawing is refused; a concurrent save is a conflict, not overwritten; a fresh read writes with a receipt),
+  `ai.test.ts` (a drawing of another project, a missing drawing, or a drawing without a project are refused before any model call).
+- Open (C): a second turn on the *same* conversation rebinds its drawing for the turns after it; one conversation open in two
+  windows is still one conversation.
 
 ### Step 6 — One context module
 
@@ -449,3 +471,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   classifier); regression over every agent and mode for approval, denials, verifier exposure and read-only roles.
 - 2026-10-15: closed Step 4: per-Instance configuration file, registration handles closed on replacement, inherited
   DB/auth overrides blocked, CAD environment section, five mandatory host patches with a report.
+- 2026-10-15: Step 5 gate: turn bound to the drawing it was admitted for (request, admission, tools, Code Mode, children,
+  bridge), compare-and-swap writes with receipts; persisted revision, stored receipts and deduplication left to RM-03.

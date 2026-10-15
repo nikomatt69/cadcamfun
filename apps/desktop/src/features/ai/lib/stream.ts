@@ -62,6 +62,8 @@ export interface StreamInput {
   readonly message: string
   readonly sessionId: string
   readonly projectId?: string
+  /** The drawing this turn works on (the one open when it was sent). */
+  readonly drawingId?: string
   readonly context?: string
   readonly includeContext?: boolean
   readonly attachments?: ReadonlyArray<ChatAttachment>
@@ -167,6 +169,7 @@ export const streamChatEffect = (
             message: input.message,
             sessionId: input.sessionId,
             ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+            ...(input.drawingId !== undefined ? { drawingId: input.drawingId } : {}),
             ...(input.context !== undefined ? { context: input.context } : {}),
             ...(input.includeContext !== undefined ? { includeContext: input.includeContext } : {}),
             ...(input.attachments !== undefined && input.attachments.length > 0 ? { attachments: input.attachments } : {}),
