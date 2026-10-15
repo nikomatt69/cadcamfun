@@ -15,6 +15,7 @@ import { AiActions } from "../services/ai.ts"
 import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
+import { DrawingRepo } from "../repos/drawing-repo.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -48,6 +49,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const kv = yield* KvStore
   const appConfig = yield* AppConfigService
   const projects = yield* ProjectRepo
+  const drawings = yield* DrawingRepo
   actingUser.configureDirectory(join(appConfig.dataDir, "ai", "session-owners"))
   const checkProject = Effect.fn("AiHttp.checkProject")(function*(projectId?: string) {
     const actor = yield* CurrentUser
@@ -55,6 +57,14 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     if (projectId.trim() === "") return yield* new BadRequest({ message: "projectId is required" })
     const access = yield* projects.find(actor.id, projectId).pipe(Effect.mapError(() => new InternalError({ message: "Unable to verify project access" })))
     if (!access) return yield* new BadRequest({ message: "Project not found or inaccessible" })
+  })
+  /** A turn's drawing must belong to the turn's (accessible) project; checked before admission, so a turn never starts on another. */
+  const checkDrawing = Effect.fn("AiHttp.checkDrawing")(function*(projectId: string | undefined, drawingId: string | undefined) {
+    if (drawingId === undefined) return
+    if (projectId === undefined || projectId === "default" || projectId.trim() === "") return yield* new BadRequest({ message: "A drawing is always named with its project" })
+    const actor = yield* CurrentUser
+    const drawing = yield* drawings.find(actor.id, drawingId).pipe(Effect.mapError(() => new InternalError({ message: "Unable to verify the drawing" })))
+    if (!drawing || drawing.project.id !== projectId) return yield* new BadRequest({ message: "Drawing not found in this project" })
   })
   const controlProject = Effect.fn("AiHttp.controlProject")(function*(sessionId: string, projectId?: string) {
     const actor = yield* CurrentUser
@@ -240,7 +250,8 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const grant = yield* bridgeGrant
       if (grant !== undefined && grant.scope.projectId !== payload.projectId) return yield* new BadRequest({ message: "This token is for another project." })
       yield* checkProject(payload.projectId)
-      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor, ...(grant ? { mode: grant.scope.mode } : {}) }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
+      yield* checkDrawing(payload.projectId, payload.drawingId)
+      return yield* actions.invoke({ projectId: payload.projectId, tool: payload.tool, input: payload.input, user: actor, ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}), ...(grant ? { mode: grant.scope.mode } : {}) }).pipe(Effect.mapError((e) => new BadRequest({ message: e.message })))
     }))
     .handle("issueBridgeToken", ({ payload }) => Effect.gen(function*() {
       const actor = yield* CurrentUser
@@ -259,6 +270,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       // The tools of this turn act as the account that sent it (the signed-in user, or the local profile).
       const actor = yield* CurrentUser
       yield* checkProject(payload.projectId)
+      yield* checkDrawing(payload.projectId, payload.drawingId)
       if (payload.sessionId) {
         const owner = yield* Effect.tryPromise({ try: () => actingUser.owner(payload.sessionId!), catch: () => new BadRequest({ message: "Unable to verify session owner" }) })
         if (owner && (owner.userId !== actor.id || owner.projectId !== (payload.projectId ?? "default"))) return yield* new BadRequest({ message: "Session not found or inaccessible" })
@@ -266,7 +278,7 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const context = yield* contextFor(payload)
       return withHeartbeat(ai.chat({
         message: payload.message,
-        admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message),
+        admitSession: (projectId, sessionId) => actingUser.bind(projectId, sessionId, actor, payload.message, payload.drawingId),
         ...(payload.permissionMode ? { permissionMode: payload.permissionMode } : {}),
         ...(payload.agent ? { agent: payload.agent } : {}),
         ...(payload.mode ? { mode: payload.mode } : {}),

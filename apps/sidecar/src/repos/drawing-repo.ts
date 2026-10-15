@@ -3,8 +3,33 @@ import { Database, DatabaseError, schema } from "@cadcamfun/db"
 import { desc, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { cam } from "@cadcamfun/core"
+import { createHash } from "node:crypto"
 
 type Row = typeof schema.drawingTable.$inferSelect
+
+const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical) : value !== null && typeof value === "object"
+  ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, canonical(child)])) : value
+
+/**
+ * The content hash of a stored drawing: what a compare-and-swap compares. It covers the whole stored document (elements,
+ * stock, settings), not the drawing's id, and is independent of key order. It is not the parametric history's revision
+ * (`historyRevision`, one element's history) nor the CAM source revision (`drawingRevision`, elements and stock).
+ */
+export const drawingContentHash = (data: unknown): string => createHash("sha256").update(JSON.stringify(canonical(data ?? {}))).digest("hex")
+
+/** A compare-and-swap found a drawing that changed since it was read; nothing was written. */
+export class DrawingConflict extends Error {
+  constructor(readonly drawingId: string) {
+    super("The drawing changed while this tool was working (another window or turn saved it). Nothing was overwritten: inspect it again and retry.")
+    this.name = "DrawingConflict"
+  }
+}
+
+/** The answer of a compare-and-swap write: the receipt of the stored change, or the hash that was found instead. */
+export type DrawingWrite =
+  | { readonly ok: true; readonly drawingId: string; readonly previousHash: string; readonly contentHash: string; readonly updatedAt: string }
+  | { readonly ok: false; readonly reason: "conflict"; readonly drawingId: string; readonly expectedHash: string; readonly currentHash: string }
+  | { readonly ok: false; readonly reason: "missing"; readonly drawingId: string }
 export const toDrawingRow = (d: Row): DrawingRow => ({ ...d, createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString() })
 
 export class DrawingRepo extends Context.Service<DrawingRepo, {
@@ -13,8 +38,16 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
   listByProject(projectId: string): Effect.Effect<DrawingRow[], DatabaseError>
   create(projectId: string, d: { name: string; description?: string | null | undefined; data?: unknown }): Effect.Effect<DrawingRow, DatabaseError>
   update(id: string, d: { name?: string | undefined; description?: string | null | undefined; data?: unknown; thumbnail?: string | null | undefined }): Effect.Effect<DrawingRow, DatabaseError>
-  /** Stores the drawing's CAM stock and invalidates programs generated against the previous raw piece. */
-  configureStock(id: string, stock: unknown): Effect.Effect<ReadonlyArray<string>, DatabaseError>
+  /**
+   * Replaces the document only if it still has the content the caller read (`expectedHash`): the check and the write are one
+   * transaction, so a concurrent save (another window, another turn) is a conflict and is never overwritten.
+   */
+  writeIfUnchanged(id: string, expectedHash: string, data: unknown): Effect.Effect<DrawingWrite, DatabaseError>
+  /**
+   * Stores the drawing's CAM stock and invalidates programs generated against the previous raw piece. With `expectedHash`
+   * it is a compare-and-swap like `writeIfUnchanged`: a drawing that changed since it was read is a `DrawingConflict`.
+   */
+  configureStock(id: string, stock: unknown, expectedHash?: string): Effect.Effect<ReadonlyArray<string>, DatabaseError>
   remove(id: string): Effect.Effect<void, DatabaseError>
 }>()("cadcamfun/DrawingRepo") {
   static readonly layer = Layer.effect(
@@ -55,9 +88,19 @@ export class DrawingRepo extends Context.Service<DrawingRepo, {
             }).where(eq(T.id, id)).returning()
             return toDrawingRow(row!)
           }),
-        configureStock: (id, stock) => query("drawings.configureStock", (db) => db.transaction((tx) => {
+        writeIfUnchanged: (id, expectedHash, data) => query("drawings.writeIfUnchanged", (db) => db.transaction((tx): DrawingWrite => {
+          const row = tx.select({ data: T.data }).from(T).where(eq(T.id, id)).get()
+          if (!row) return { ok: false, reason: "missing", drawingId: id }
+          const currentHash = drawingContentHash(row.data)
+          if (currentHash !== expectedHash) return { ok: false, reason: "conflict", drawingId: id, expectedHash, currentHash }
+          const updatedAt = new Date()
+          tx.update(T).set({ data, updatedAt }).where(eq(T.id, id)).run()
+          return { ok: true, drawingId: id, previousHash: currentHash, contentHash: drawingContentHash(data), updatedAt: updatedAt.toISOString() }
+        })),
+        configureStock: (id, stock, expectedHash) => query("drawings.configureStock", (db) => db.transaction((tx) => {
           const drawing = tx.select().from(T).where(eq(T.id, id)).get()
           if (!drawing) throw new Error("Drawing disappeared before stock update.")
+          if (expectedHash !== undefined && drawingContentHash(drawing.data) !== expectedHash) throw new DrawingConflict(id)
           const data = drawing.data !== null && typeof drawing.data === "object" ? drawing.data as Record<string, unknown> : {}
           const invalidated: string[] = []
           const paths = tx.select().from(schema.toolpathTable).where(eq(schema.toolpathTable.drawingId, id)).all()

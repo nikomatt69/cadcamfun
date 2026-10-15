@@ -47,10 +47,8 @@ export async function makeApp(extra: Partial<AppConfig> = {}) {
   )
   const scope = Effect.runSync(Scope.make())
   /** The AI tool handlers the assistant calls, over the same database as `call`. */
-  const toolHandlers = async () => {
-    const context = await Effect.runPromise(Layer.buildWithMemoMap(Services.pipe(Layer.provide(deps)), memoMap, scope))
-    return Context.get(context, ToolHandlers)
-  }
+  const services = () => Effect.runPromise(Layer.buildWithMemoMap(Services.pipe(Layer.provide(deps)), memoMap, scope))
+  const toolHandlers = async () => Context.get(await services(), ToolHandlers)
   // A second handle on the same layer would open another :memory: DB, so seed through HTTP or the repo only.
   const call = async (path: string, init: RequestInit & { json?: unknown; auth?: boolean } = {}) => {
     const { json, auth = true, ...rest } = init
@@ -73,5 +71,5 @@ export async function makeApp(extra: Partial<AppConfig> = {}) {
     (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => handler(new Request(input, init), Context.empty()),
     { preconnect: globalThis.fetch.preconnect }
   )
-  return { call, dispose: cleanup, schema, Effect, dataDir, transport, toolHandlers }
+  return { call, dispose: cleanup, schema, Effect, dataDir, transport, toolHandlers, services }
 }
