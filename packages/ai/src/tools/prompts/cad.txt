@@ -12,14 +12,14 @@ Actions
 - inspect_property: one property of one element by path, paged by characters.
 - parametric_validate: rebuild a parametric history and report what it cannot build.
 - parametric_inspect: history, parameters and report of one parametric part.
-- drawing: technical sheet from one elementId or history; options (sheet size, projection, title block, views, iso, scale, section, detail, flatness: see schema). SVG, dimensions, callouts, warnings; exact B-rep edges where available; nothing stored.
+- drawing: technical sheet from one elementId or history; options (sheet, projection, views, section, detail: see schema). SVG, dimensions, callouts, warnings; exact B-rep edges where available; nothing stored.
 - parametric_test: run parameter variants; report bodies, volumes and dimensional checks.
 - parametric_dfm: manufacturability findings for a history or an existing part.
 - parametric_exact: exact B-rep per body (volume, area, centroid, throughHoles, faces, surfaces) or why mesh-only; STEP on request.
 - exact: every solid on the exact kernel: validity, volume, bounds, holes, and whether CAM machines it by features or as a 3D surface, with why.
 - assembly: exact interference (clash volumes), bill of materials with mass, hole joints, fasteners still missing.
 - parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.
-- parametric_recipe: standard part history from `recipe` (see schema) and `params`; cad_edit.parametric_recipe_create stores it.
+- parametric_recipe: standard part history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; cad_edit.parametric_recipe_create stores it.
 - parametric_from_element: history with named parameters from an existing solid, flat shape or component; cad_edit.parametric_convert stores it.
 
 Parameters (mm, radians; ids are read, never invented)

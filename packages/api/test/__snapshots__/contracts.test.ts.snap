@@ -1523,6 +1523,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "drawingId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
                   "input": {
                     "type": "object",
                   },
@@ -2754,6 +2764,16 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
                     ],
                   },
                   "context": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "drawingId": {
                     "anyOf": [
                       {
                         "type": "string",
