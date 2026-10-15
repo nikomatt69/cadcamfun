@@ -21,6 +21,8 @@ import { PRIMARIES, PRIMARY_IDS } from "../../src/nikcli/primaries.ts"
 import { toolPrompt } from "../../src/tools/prompts/index.ts"
 import { BASE_LAYERS, MODE_PROMPTS } from "../../src/prompts/system.ts"
 import { CADCAM_SKILLS } from "../../src/skills/index.ts"
+import * as workflows from "../../src/prompts/workflows.ts"
+import type { PromptTemplate } from "../../src/prompts/workflows.ts"
 
 export const REPO = join(import.meta.dir, "..", "..", "..", "..")
 export const INVENTORY_PATH = join(REPO, "specs", "ai", "11-harness-inventory.md")
@@ -243,8 +245,13 @@ const PROMPT_ROOTS: ReadonlyArray<{ readonly dir: string; readonly role: string;
   { dir: "packages/ai/src/prompts/base", role: "main system prompt layer", loader: "prompts/system.ts BASE_LAYERS" },
   { dir: "packages/ai/src/prompts/modes", role: "assistant mode", loader: "prompts/modes/index.ts MODE_PROMPTS" },
   { dir: "packages/ai/src/nikcli/prompts", role: "specialist / host prompt", loader: "nikcli/prompts/index.ts, nikcli/config.ts" },
-  { dir: "packages/ai/src/tools/prompts", role: "tool description", loader: "tools/prompts/index.ts toolPrompt" }
+  { dir: "packages/ai/src/tools/prompts", role: "tool description", loader: "tools/prompts/index.ts toolPrompt" },
+  { dir: "packages/ai/src/prompts/family", role: "model-family style", loader: "prompts/system.ts modelFamilyPrompt" },
+  { dir: "packages/ai/src/prompts/workflows", role: "one-shot workflow", loader: "prompts/workflows.ts" }
 ]
+
+/** Walks every text the model reads (`prompts/corpus.ts`), so it covers each prompt file whether or not it names it. */
+const CORPUS_TEST = "prompt-corpus.test.ts"
 
 export interface PromptEntry { readonly file: string; readonly role: string; readonly loader: string; readonly chars: number; readonly tests: ReadonlyArray<string> }
 
@@ -254,20 +261,15 @@ export const promptInventory = (): ReadonlyArray<PromptEntry> => {
     filesUnder(join(REPO, dir), (name) => name.endsWith(".txt")).map((path) => {
       const base = path.split("/").pop()!.replace(/\.txt$/, "")
       const pattern = new RegExp(`\\b${escape(base)}\\.txt\\b|["'\`]${escape(base)}["'\`]`)
-      return { file: rel(path), role, loader, chars: read(path).trim().length, tests: tests.filter(({ path: p, text }) => /prompt|mode|specialist|tool-def|nikcli-host|skills/.test(p) && pattern.test(text)).map(({ path: p }) => p.split("/").pop()!) }
+      return { file: rel(path), role, loader, chars: read(path).trim().length, tests: [...new Set([CORPUS_TEST, ...tests.filter(({ path: p, text }) => /prompt|mode|specialist|tool-def|nikcli-host|skills/.test(p) && pattern.test(text)).map(({ path: p }) => p.split("/").pop()!)])].sort() }
     }))
 }
 
 export interface WorkflowEntry { readonly name: string; readonly chars: number }
 
-export const workflowInventory = (): ReadonlyArray<WorkflowEntry> => {
-  const source = read(join(AI_SRC, "prompts", "workflows.ts"))
-  const starts = [...source.matchAll(/^export const ([A-Z_]+) = t\(/gm)]
-  return starts.map((match, index) => {
-    const end = index + 1 < starts.length ? starts[index + 1]!.index : source.length
-    return { name: match[1]!, chars: source.slice(match.index, end).length }
-  })
-}
+export const workflowInventory = (): ReadonlyArray<WorkflowEntry> =>
+  Object.entries(workflows).filter((entry): entry is [string, PromptTemplate] => typeof entry[1] === "object" && entry[1] !== null && "system" in entry[1] && "user" in entry[1])
+    .map(([name, template]) => ({ name, chars: template.system.length + template.user.length }))
 
 export interface CommandEntry { readonly name: string; readonly group: string; readonly kind: "prompt" | "panel" | "local" }
 
@@ -344,9 +346,9 @@ export const renderInventory = (): string => {
   }
   push("## Prompt files", "", "| File | Role | Loader | Chars | Tests (mentions) |", "| --- | --- | --- | --- | --- |")
   for (const entry of prompts) push(`| \`${entry.file}\` | ${entry.role} | ${entry.loader} | ${entry.chars} | ${entry.tests.length === 0 ? "**none**" : entry.tests.join(", ")} |`)
-  push("", "## One-shot workflows (`packages/ai/src/prompts/workflows.ts`)", "", "| Template | Source chars |", "| --- | --- |")
+  push("", "## One-shot workflows (`packages/ai/src/prompts/workflows.ts`)", "", "| Template | Prompt chars (system + user) |", "| --- | --- |")
   for (const entry of workflows) push(`| \`${entry.name}\` | ${entry.chars} |`)
-  push("", "## Skills (`packages/ai/src/skills/index.ts`)", "", "| Skill | Category | Body chars | Tools it names |", "| --- | --- | --- | --- |")
+  push("", "## Skills (`packages/ai/src/skills/text/*.md`, loaded by `skills/index.ts`)", "", "| Skill | Category | Body chars | Tools it names |", "| --- | --- | --- | --- |")
   for (const skill of CADCAM_SKILLS) {
     const named = ACTION_TOOL_IDS.filter((tool) => new RegExp(`\\b${escape(tool)}\\b`).test(skill.body))
     push(`| \`${skill.name}\` | ${skill.category} | ${skill.body.length} | ${named.length === 0 ? "—" : named.join(", ")} |`)

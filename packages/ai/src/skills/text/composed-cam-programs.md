@@ -1,0 +1,35 @@
+# Composing CAM programs
+
+A real part has many operations. Plan them in this order and do not skip ahead.
+
+1. Probe the work offset (cam_edit action create with `type: "probing"`). Use the result as the zero.
+2. Face the top (`face`) to establish a reference plane.
+3. Rough (`roughing` or `adaptive`), leaving a small allowance (0.1 to 0.3 mm).
+4. Rest-machine what the big tool could not reach (`rest`) with a smaller tool.
+5. Finish (`parallel`, `waterline` or `steep-shallow`), cusp height from the scallop setting, climb milling.
+6. Drill before tapping or thread milling (`drill`, peck cycle for deep holes).
+7. Chamfer (kernel `deburr` width: 2D chamfer on outlines, pockets and holes) or engrave last.
+8. Indexing (3+2) only after the bulk is removed.
+
+## Picking an operation
+
+- Closed outline, outside a part: `profile`.
+- Closed outline, inside a recess: `pocket`.
+- Hole pattern: `drill` (peck when depth is at least 3 times the diameter; pilot above 12 mm).
+- Curved face: `steep-shallow` (waterline on walls, raster on flats), or `parallel` / `waterline` alone; pencil = rest finishing after a larger ball.
+- Deep pockets: `adaptive` then `rest`.
+- Lathe body: `facing`, then `turning_od`, then `parting`; `threading_od` if needed.
+
+## Picking a tool
+
+Use library action lookup_tool. Confirm the cutter radius fits the smallest inside radius, the cutting length covers the depth, and RPM stays under both the tool and machine maximum.
+
+`toolType` is what an operation says the cutter IS, and the generator reads it: {{toolTypes}}. Everything else (diameter, flutes, reach, materials) comes from the library row.
+
+## Setups
+
+A flip is a new setup with its own stock, origin, work offset, fixtures and tools. Never reuse the first setup's depths.
+
+## Verifying each operation
+
+For every operation: cam_edit action generate, then cam action analyze, then cam_edit action verify. Fix by cause, regenerate, verify again. After three rounds on the same finding, report the blocker. Report what was modelled; never write "safe".

@@ -1,0 +1,12 @@
+Analyse and optimise the following G-code for a {{machineType}} machine working with {{material}}:
+
+{{gcode}}
+
+Constraints and goals:
+{{constraints}}
+
+Return one object with:
+- gcode: the rewritten G-code as a string
+- changes: array of {line, before, after, reason} describing every edit (line is the 1-based line number of the original)
+- estimatedSavings: {timePct, toolLifePct, qualityNote}, estimates only
+- notes: short prose summary, including what still has to be verified

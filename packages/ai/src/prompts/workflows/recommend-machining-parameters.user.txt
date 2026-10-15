@@ -1,0 +1,15 @@
+Recommend starting machining parameters for:
+
+Material: {{material}}
+Tool: {{tool}}
+Operation: {{operation}}
+Machine: {{machine}}
+
+Return one object with:
+- cuttingSpeedMPerMin: number
+- feedRateMmPerMin: number
+- depthOfCutMm: number
+- stepoverPct: number (0 to 100)
+- coolant: "flood" | "mist" | "none"
+- engagement: "conventional" | "climb"
+- warnings: array of short strings for any unusual combination and every assumption

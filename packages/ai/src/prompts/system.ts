@@ -16,6 +16,10 @@ import machinability from "./base/machinability.txt" with { type: "text" }
 import machining from "./base/machining.txt" with { type: "text" }
 import workflow from "./base/workflow.txt" with { type: "text" }
 import evidence from "./base/evidence.txt" with { type: "text" }
+import codexFamily from "./family/codex.txt" with { type: "text" }
+import autonomousFamily from "./family/autonomous.txt" with { type: "text" }
+import geminiFamily from "./family/gemini.txt" with { type: "text" }
+import otherFamily from "./family/other.txt" with { type: "text" }
 
 import { MODE_PROMPTS } from "./modes/index.ts"
 import type { AssistantMode } from "./modes.ts"
@@ -129,22 +133,10 @@ export const modelFamilyOf = (modelId: string): ModelFamily => {
 const FAMILY_PROMPTS: Readonly<Record<ModelFamily, string>> = {
   // The base prompt is written for Claude.
   claude: "",
-  codex: `Working style for this model:
-- Before a tool call, briefly state its purpose in a short sentence and execute it in this turn.
-- Be concise. Report what you built and what you checked, not how you thought about it.
-- Do not hand control back while the plan has open items: finish them, verify, then answer.`,
-  autonomous: `Working style for this model:
-- Keep going until the request is completely resolved before ending your turn. You have the tools you need; do not ask the user for input you can find out yourself.
-- When you say you will do something ("next I will build the holder"), actually make the tool call in that same turn instead of ending it.
-- Plan before each tool call and reflect on its result. Check the finished part against the request rigorously (dimensions, positions, toolpaths) and iterate until it is right.
-- If the user says "continue" or "try again", read the conversation, find the first unfinished plan item and carry on from it.`,
-  gemini: `Working style for this model:
-- Be direct and concise; no filler before or after a tool call.
-- Verify every change with the describe/check tools before you report it done.
-- Never end a turn on an announcement: if you said what comes next, do it.`,
-  other: `Working style for this model:
-- Work through the request one tool call at a time; read each result before the next call.
-- Keep the plan short and explicit in your answer, and do not stop before every step is done and checked.`
+  codex: codexFamily.trim(),
+  autonomous: autonomousFamily.trim(),
+  gemini: geminiFamily.trim(),
+  other: otherFamily.trim()
 }
 
 /** The working-style block for a model, or `""` when the base prompt already fits it. */
