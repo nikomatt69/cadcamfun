@@ -1,5 +1,4 @@
-import { projectMemoryPrefix, projectContextKey, parseProjectContext, renderProjectContext, renderProjectMemory, renderUserHabits, readProjectMemoryFiles } from "@cadcamfun/ai"
-import { withHeartbeat, renderNotes, renderWorkspaceContext, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
+import { withHeartbeat, CADCAM_SKILLS, MAX_USER_SKILLS, SKILL_NAME_PATTERN, createUserSkillStore, parseSkillMarkdown, skillProblems, AiAborted, AiConfigError, AiCredentials, AiHost, AiService, analyzeGcode as analyze, isBuiltinProviderId, isProviderId, replyHostPermission, type ProviderEntry, type ProviderId } from "@cadcamfun/ai"
 import {
   AiBadRequest, AiFailure, AiNotFound, Api, BadRequest, CurrentUser, GcodeActionError, GcodeActionFailure, InternalError
 } from "@cadcamfun/api"
@@ -16,6 +15,7 @@ import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
 import { DrawingRepo } from "../repos/drawing-repo.ts"
+import { makeAiContext } from "../services/ai-context.ts"
 
 const fail = (message: string) => (e: unknown) =>
   Effect.logError(message, e).pipe(Effect.andThen(Effect.fail(new InternalError({ message }))))
@@ -102,41 +102,18 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
    * What the assistant knows before the first word: the caller's context, the project context the UI keeps in the
    * key-value store and notes belonging only to that project.
    */
-  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
-    const parts: string[] = []
-    if (payload.context?.trim()) parts.push(payload.context.trim())
-    if (payload.includeContext === false) return parts.join("\n\n")
-    if (payload.projectId) {
-      const stored = yield* kv.get(`ai.context.${payload.projectId}`).pipe(
-        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI context", error).pipe(Effect.as(undefined)))
-      )
-      if (stored) parts.push(typeof stored.value === "string" ? stored.value : renderWorkspaceContext(stored.value, { projectId: payload.projectId }))
-      // The user's standing rules for this project: instructions, framed so they outrank the mode block.
-      const document = yield* kv.get(projectContextKey(payload.projectId)).pipe(
-        Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load the project AI context", error).pipe(Effect.as(undefined)))
-      )
-      const rules = renderProjectContext(document === undefined ? undefined : parseProjectContext(document.value).text)
-      if (rules !== "") parts.push(rules)
-      // What earlier sessions established and how this person works: data and a prior, never instructions.
-      // A project with no embedded host has no Brain and no habits file, so both blocks are simply absent.
-      if (Option.isSome(host)) {
-        const projectHost = yield* host.value.runtime.host(payload.projectId).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (projectHost !== undefined) {
-          const files = yield* Effect.promise(() => readProjectMemoryFiles(projectHost))
-          const memoryBlock = renderProjectMemory(files.memory)
-          if (memoryBlock !== "") parts.push(memoryBlock)
-          const habitsBlock = renderUserHabits(files.habits)
-          if (habitsBlock !== "") parts.push(habitsBlock)
-        }
-      }
-    }
-    const memoryPrefix = `ai.memory.${projectMemoryPrefix(payload.projectId ?? "default")}`
-    const memory = yield* kv.list(memoryPrefix).pipe(
-      Effect.catchTag("KvError", (error) => Effect.logWarning("Unable to load saved AI notes", error).pipe(Effect.as([])))
-    )
-    const notes = renderNotes(memory.map((m) => ({ key: m.key.slice(memoryPrefix.length), value: m.value })).reverse())
-    if (notes !== "") parts.push(notes)
-    return parts.join("\n\n")
+  const aiContext = makeAiContext({ kv, projects, host })
+  /** The turn's context through the one assembly (`ai-context.ts`): authorised sources, one budget, a manifest. */
+  const contextFor = (payload: { context?: string | undefined; projectId?: string | undefined; drawingId?: string | undefined; includeContext?: boolean | undefined }) => Effect.gen(function*() {
+    const actor = yield* CurrentUser
+    const assembly = yield* aiContext.assemble({
+      actorId: actor.id, includeContext: payload.includeContext !== false,
+      ...(payload.projectId !== undefined ? { projectId: payload.projectId } : {}),
+      ...(payload.drawingId !== undefined ? { drawingId: payload.drawingId } : {}),
+      ...(payload.context !== undefined ? { explicit: payload.context } : {})
+    }).pipe(Effect.mapError(() => new BadRequest({ message: "Project not found or inaccessible" })))
+    if (assembly.manifest.omitted.some((entry) => entry.reason === "budget")) yield* Effect.logDebug("AI context left sources out", assembly.manifest)
+    return assembly.text
   })
   /** Legacy single-shot call: the model selector is the vendor-neutral tier unless a model id is given. */
   const complete = (prompt: string, system?: string, model?: string) =>

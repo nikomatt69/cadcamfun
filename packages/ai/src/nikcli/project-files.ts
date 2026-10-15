@@ -7,9 +7,9 @@
  * application must never read a user's coding-agent files. That flag also hides the Brain's own output, so without
  * this module nikcli writes a memory file nobody ever reads again.
  *
- * `<project_root>/.nikcli/habits.md` is the exception: nikcli injects it through `Profile.reminder`, not through the
- * rule-file scan, so the host does reach the model. Our read is therefore a bounded, tested mirror of a file the
- * host already uses — not a second source of truth, and never longer than `USER_HABITS_BUDGET`.
+ * `<project_root>/.nikcli/habits.md` was injected by the host through `Profile.reminder` as well; the `profile-reminder`
+ * host patch turns that off, so this bounded read (never longer than `USER_HABITS_BUDGET`) is the one delivery, through
+ * the application's context assembly, and none when a turn disables context.
  *
  * Reads are bounded, cached for `CACHE_TTL_MS`, and every failure degrades to "no block": a missing, unreadable or
  * oversized memory file must never fail a chat turn.
@@ -42,7 +42,7 @@ const readText = async (path: string): Promise<string> => {
   return (await file.text()).slice(0, MAX_FILE_BYTES)
 }
 
-/** Cached per project directory; `invalidate` is called by the runtime when skills/config are republished. */
+/** Cached per project directory for `CACHE_TTL_MS`; `invalidateProjectMemoryFiles` drops it after a Brain consolidation. */
 export const readProjectMemoryFiles = async (host: ProjectHost): Promise<ProjectMemoryFiles> => {
   const hit = cache.get(host.directory)
   if (hit !== undefined && Date.now() - hit.at < CACHE_TTL_MS) return hit.value

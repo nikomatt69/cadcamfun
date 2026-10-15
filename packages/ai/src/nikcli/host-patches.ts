@@ -34,6 +34,10 @@
  * 5. The environment section. The host describes a coding workspace (working directory, git, package manager, shell and
  * monitor rules), none of which exists here. The section keeps the date, the platform and the user's locale and language,
  * which the agent needs, and says what the workspace is instead. Instruction sync is untouched.
+ *
+ * 6. The automatic profile reminder. The host appends the declared user profile and `<project>/.nikcli/habits.md` to every
+ * request. The application already delivers the habits through its one context assembly (`AiContext`), so they reached the
+ * model twice, and a turn sent with context disabled still carried them. The reminder is empty; Brain still writes the file.
  */
 export const MEDIA_RULE_MARKER = "return nativeProviders.includes(model.api.npm);"
 export const STEP_INSTRUCTIONS_MARKER = "        const assembled = await InstructionSync.assemble({\n          sessionID,\n          projectID: session.projectID,"
@@ -54,6 +58,7 @@ export const REGISTRATION_MARKER = [
   "          yield* registry.register(tool);",
   "      })))),"
 ].join("\n")
+export const PROFILE_REMINDER_MARKER = "    async function reminderImpl(worktree) {\n      const info = await readImpl();"
 export const ENVIRONMENT_MARKER = "    async function environmentImpl(ctx, config) {\n      const project = ctx.project;"
 
 /** The file the patched loader reads in each Instance's directory (`runtime.ts` writes it in the project's scratch folder). */
@@ -119,7 +124,12 @@ export const HOST_PATCHES: ReadonlyArray<HostPatch> = [
       "      })))),"
     ].join("\n")
   },
-  { name: "cad-environment", marker: ENVIRONMENT_MARKER, replacement: ENVIRONMENT_REPLACEMENT }
+  { name: "cad-environment", marker: ENVIRONMENT_MARKER, replacement: ENVIRONMENT_REPLACEMENT },
+  {
+    name: "profile-reminder",
+    marker: PROFILE_REMINDER_MARKER,
+    replacement: `    async function reminderImpl(worktree) {\n      return [];\n    }\n    async function nativeReminderImpl(worktree) {\n      const info = await readImpl();`
+  }
 ]
 
 export type HostPatchStatus = "applied" | "missing" | "ambiguous"

@@ -75,6 +75,12 @@ describe("host patch: one configuration file per Instance", () => {
     expect(body).toContain("return { close };")
   })
 
+  test("the host's automatic profile and habits reminder is empty; the application's context delivers the habits", () => {
+    const patched = patchHostSource(bundle)
+    const at = patched.indexOf("async function reminderImpl(worktree)")
+    expect(patched.slice(at, patched.indexOf("async function nativeReminderImpl(worktree)", at))).toContain("return [];")
+  })
+
   test("the environment keeps date, platform and locale, and drops the coding workspace", () => {
     const patched = patchHostSource(bundle)
     const at = patched.indexOf("async function environmentImpl(ctx, config)")

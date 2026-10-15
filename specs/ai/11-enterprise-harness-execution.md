@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Steps 6–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Steps 7–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -279,14 +279,14 @@ Progress (2026-10-15):
 D: RM-01; RM-06. Step 5's persistent binding serves integrated writes. Code: `apps/sidecar/src/http/ai.ts`
 (`contextFor`), `workspace-context.ts`, `project-context.ts`, `nikcli/project-files.ts`, `service.ts`.
 
-- [ ] Extract `contextFor` into an Effect module `AiContext`, reusing the renderers.
-- [ ] Define `ContextRequest`, `ContextSource`, `ContextManifest` and `ContextAssembly`.
-- [ ] Acquire authorised sources before rendering them.
-- [ ] Distinguish requirements, current observations, UI snapshots, memory and references.
-- [ ] Apply one aggregate budget, labels and omissions included.
-- [ ] Deliver habits once, through this module.
-- [ ] Invalidate caches after Brain and source updates.
-- [ ] Order notes by effective timestamp.
+- [x] Extract `contextFor` into an Effect module `AiContext`, reusing the renderers.
+- [x] Define `ContextRequest`, `ContextSource`, `ContextManifest` and `ContextAssembly`.
+- [x] Acquire authorised sources before rendering them.
+- [x] Distinguish requirements, current observations, UI snapshots, memory and references.
+- [x] Apply one aggregate budget, labels and omissions included.
+- [x] Deliver habits once, through this module.
+- [x] Invalidate caches after Brain and source updates.
+- [x] Order notes by effective timestamp.
 - [ ] Propagate `includeContext` through `ChatInput`, binding, goal, queue/steer and tasks.
 - [ ] Prepare fresh briefings for specialists, separate from model/variant inheritance.
 - [ ] Scope memory and attachments by actor/project/session; use stable attachment identities.
@@ -294,6 +294,23 @@ D: RM-01; RM-06. Step 5's persistent binding serves integrated writes. Code: `ap
 Tests: `workspace-context.test.ts`, `ai.test.ts`, `specialists-host.test.ts`, `workspace-sessions.test.ts`; new
 `context-assembly.test.ts`. Gate: the provider's effective requests carry no duplicated or foreign sources; disabled context
 also excludes the native automatic injection.
+
+Progress (2026-10-15):
+
+- **V** `packages/ai/src/context-assembly.ts`: `ContextSource` (kind: requirement, observation, ui-snapshot, memory,
+  reference), `ContextRequest`, `ContextManifest`, `ContextAssembly`; `assembleContext` orders by kind, drops duplicates (same
+  id or text) and empties, applies one aggregate budget (`CONTEXT_BUDGET`) with truncation markers and a `<context_omitted>`
+  note inside the budget, and reports what it included, cut and left out. `notesByRecency` orders notes by `updatedAt`.
+- **V** `apps/sidecar/src/services/ai-context.ts` (`makeAiContext`) replaces the inline `contextFor`: it checks the actor reaches
+  the project before reading any stored source, acquires each source once with the existing renderers, and acquires nothing
+  but the client's text when `includeContext` is false.
+- **V** `profile-reminder` host patch: the host no longer appends the profile and `habits.md` to every request, so the habits
+  reach the model once (through the assembly) and not at all when context is disabled. `context-native.test.ts` reads the
+  provider's effective requests: zero occurrences with context disabled, one with the assembled block.
+- **V** A Brain consolidation invalidates the cached memory and habits files (`service.ts`).
+- Open (C): `includeContext` is not yet carried by the session binding into queue/steer, `/goal` continuations and background
+  tasks (today they add no stored context of their own); fresh specialist briefings, actor/session scoping of notes (today per
+  project) and stable attachment identities remain.
 
 ### Step 7 — Refine every prompt and skill
 
@@ -473,3 +490,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   DB/auth overrides blocked, CAD environment section, five mandatory host patches with a report.
 - 2026-10-15: Step 5 gate: turn bound to the drawing it was admitted for (request, admission, tools, Code Mode, children,
   bridge), compare-and-swap writes with receipts; persisted revision, stored receipts and deduplication left to RM-03.
+- 2026-10-15: Step 6 progress: one context assembly with manifest and aggregate budget, authorised acquisition in the
+  sidecar, habits delivered once with the host's automatic reminder disabled, notes by recency, Brain cache invalidation.
