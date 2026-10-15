@@ -17,6 +17,9 @@ const toc = [
   { title: "Operations", href: "#operations" },
   ...entries.map((entry) => ({ title: entry.operation.operationId, href: `#${entry.anchor}`, depth: 3 })),
   ...(schemas.length ? [{ title: "Referenced schemas", href: "#schemas" }] : []),
+  { title: "How to read this page", href: "#reading" },
+  { title: "Calling this group from TypeScript", href: "#group-clients" },
+  { title: "Troubleshooting requests", href: "#group-troubleshooting" },
 ]
 ---
 <DocsLayout title={`${group.title} API`} subtitle={group.summary} description={`CADCAMFUN ${group.title.toLowerCase()} API: methods, paths, authentication, request fields, responses, errors, and schemas.`} toc={toc}>
@@ -76,5 +79,44 @@ const toc = [
       <ApiSchema schema={apiDocument.components.schemas[name]!} title={name} />
     </section>)}
   </section>}
+    <section id="reading" class="doc-section">
+    <h2>How to read this page</h2>
+    <p>Each operation section below has the same parts: method and path, authentication, a parameter table, request body schema per media type, one block per declared response status, and a request template. The schema viewer shows required fields, optional fields, nullable values and constraints such as minimum length or enumerations.</p>
+    <table>
+      <thead><tr><th>You see</th><th>It means</th></tr></thead>
+      <tbody>
+        <tr><td>Required</td><td>The field or parameter must be present. It may still accept <code>null</code> if its type says so.</td></tr>
+        <tr><td>Optional</td><td>May be omitted. The handler can still reject the request for business reasons.</td></tr>
+        <tr><td><code>_tag</code> in an error schema</td><td>The discriminator of the tagged error. Switch on it in clients.</td></tr>
+        <tr><td>Several 4xx schemas for one status</td><td>The status is shared by different failure families; decode by <code>_tag</code>.</td></tr>
+        <tr><td>No response body schema</td><td>An empty body, such as 204, or a body that is not JSON.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="group-clients" class="doc-section">
+    <h2>Calling this group from TypeScript</h2>
+    <p>In the generated Promise SDK, operations of this group live under the client namespace named after the group, and in the Effect client under <code>api.{group.tag}</code>. Operation IDs on this page have the form <code>{group.tag}.&lt;name&gt;</code>; the part after the dot is the method name in both clients.</p>
+    <DocCode language="ts" title="Promise SDK">
+{"import { CadCam, ClientError } from \"@cadcamfun/api/sdk\"\n\nconst client = CadCam.make({\n  baseUrl: process.env.CADCAMFUN_URL!,\n  headers: { authorization: `Bearer ${process.env.CADCAMFUN_TOKEN}` },\n})\n\ntry {\n  // e.g. client.projects.list(), client.projects.get({ id })\n} catch (error) {\n  if (error instanceof ClientError) {\n    // Transport | UnexpectedStatus | UnsupportedContentType | MalformedResponse | SseEventTooLarge\n  } else {\n    // a declared error body: switch on error._tag\n  }\n}"}
+    </DocCode>
+    <p>A declared failure is thrown as the decoded JSON body itself, not wrapped. Anything outside the declared statuses becomes <code>ClientError("UnexpectedStatus")</code>. Network failures and aborts become <code>ClientError("Transport")</code> with the cause folded into the message.</p>
+    <p>A few operations with multipart uploads, binary or JavaScript responses, raw webhooks, or colliding input names are not generated. Use the full Effect <code>ApiClient</code> or <code>fetch</code> for those.</p>
+  </section>
+
+  <section id="group-troubleshooting" class="doc-section">
+    <h2>Troubleshooting requests</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>401 on every call</td><td>Token from a previous launch, or missing <code>Bearer</code> prefix</td><td>Read the current token from the desktop connection; send <code>Authorization: Bearer &lt;token&gt;</code>.</td></tr>
+        <tr><td>400 before anything happens</td><td>Body or parameter does not match the schema</td><td>Compare the payload with the request schema above; check types, enumerations and required fields.</td></tr>
+        <tr><td>403 or 404 on a record you can see elsewhere</td><td>The acting account differs (session header absent or expired)</td><td>Send the right <code>x-session-token</code>, or use the local profile that owns the record.</td></tr>
+        <tr><td>409</td><td>A conflicting state, such as a duplicate name or stale branch head</td><td>Re-read the resource and retry with current data.</td></tr>
+        <tr><td>Connection refused</td><td>The sidecar restarted on a new port</td><td>Resolve the URL again; ports are not stable between launches.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
   <DocRelated items={[{ title: "API overview", href: "/docs/api" }, { title: "Subsystem guide", href: group.guide }, { title: "Local development", href: "/docs/guides/local-dev" }]} />
 </DocsLayout>

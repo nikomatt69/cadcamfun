@@ -15,6 +15,9 @@ const toc = [
   { title: "Persist a preference", href: "#preferences" },
   { title: "Handle failures and retries", href: "#retries" },
   { title: "Next integration steps", href: "#next" },
+  { title: "All captured responses at a glance", href: "#tour-summary" },
+  { title: "The whole tour as one script", href: "#tour-script" },
+  { title: "Clean up after the tour", href: "#tour-cleanup" },
 ]
 ---
 <DocsLayout title="API walkthrough with captured responses" subtitle="Exercise health, authorization, project creation, and preference persistence with real handler responses from an isolated database." description="Hands-on CADCAMFUN API walkthrough with captured success and failure responses, disposable startup, project CRUD, key-value persistence, and retry guidance." toc={toc}>
@@ -113,5 +116,40 @@ curl --silent --show-error "$CADCAMFUN_URL/api/projects/$PROJECT_ID" \
     <p>Use the <a href="/docs/api">full reference</a> to select a resource. The <a href="/docs/api/machining">machining endpoints</a> distinguish computation from saving a toolpath; the <a href="/docs/api/history">history endpoints</a> distinguish working-copy changes from commits and remote synchronization. The <a href="/docs/api/ai">AI resource</a> covers session identifiers and streaming controls.</p>
     <p>Read the running sidecar's <code>/api/openapi.json</code> when integrating a different build. The downloadable documentation snapshot describes the checked-out contract; it cannot establish which binary another machine is running.</p>
   </section>
+    <section id="tour-summary" class="doc-section">
+    <h2>All captured responses at a glance</h2>
+    <p>The responses on this page were captured from a real sidecar with a fresh database. Identifiers and timestamps will differ on your machine; shapes and statuses will not.</p>
+    <table>
+      <thead><tr><th>Step</th><th>Path</th><th>Status</th><th>Body (truncated)</th></tr></thead>
+      <tbody>
+        <tr><td>Public health</td><td><code>/api/health</code></td><td>200</td><td><code>&#123;"status": "ok", "timestamp": "2026-10-15T02:43:50.682Z"&#125;</code></td></tr>
+        <tr><td>Missing bearer</td><td><code>/api/projects</code></td><td>401</td><td><code>&#123;"_tag": "Unauthorized", "message": "Unauthorized"&#125;</code></td></tr>
+        <tr><td>Empty projects</td><td><code>/api/projects</code></td><td>200</td><td><code>[]</code></td></tr>
+        <tr><td>Missing project name</td><td><code>/api/projects</code></td><td>400</td><td><code>&#123;"_tag": "BadRequest", "message": "Project name is required"&#125;</code></td></tr>
+        <tr><td>Create project</td><td><code>/api/projects</code></td><td>201</td><td><code>&#123;"id": "ccaff34c-49f3-4a23-a6b6-427745f9641a", "name": "API walkthrough", "description": "Disposable documenta…</code></td></tr>
+        <tr><td>Read project</td><td><code>/api/projects/ccaff34c-49f3-4a23-a6b6-427745f9641a</code></td><td>200</td><td><code>&#123;"id": "ccaff34c-49f3-4a23-a6b6-427745f9641a", "name": "API walkthrough", "description": "Disposable documenta…</code></td></tr>
+        <tr><td>Missing preference</td><td><code>/api/kv/docs.walkthrough.units</code></td><td>404</td><td><code>&#123;"_tag": "NotFound", "message": "Key not found"&#125;</code></td></tr>
+        <tr><td>Save preference</td><td><code>/api/kv/docs.walkthrough.units</code></td><td>200</td><td><code>&#123;"key": "docs.walkthrough.units", "value": "mm", "updatedAt": "2026-10-15T02:43:50.755Z"&#125;</code></td></tr>
+        <tr><td>Read preference</td><td><code>/api/kv/docs.walkthrough.units</code></td><td>200</td><td><code>&#123;"key": "docs.walkthrough.units", "value": "mm", "updatedAt": "2026-10-15T02:43:50.755Z"&#125;</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="tour-script" class="doc-section">
+    <h2>The whole tour as one script</h2>
+    <DocCode language="bash" title="tour.sh">
+{"#!/usr/bin/env bash\nset -euo pipefail\n: \"${CADCAMFUN_URL:?set to the sidecar URL}\" \"${CADCAMFUN_TOKEN:?set to the launch token}\"\nauth=(--header \"Authorization: Bearer $CADCAMFUN_TOKEN\")\njson=(--header \"Content-Type: application/json\")\n\ncurl -sS \"$CADCAMFUN_URL/api/health\"; echo\ncurl -sS -o /dev/null -w \"no token -> %{http_code}\\n\" \"$CADCAMFUN_URL/api/projects\"\ncurl -sS \"${auth[@]}\" \"$CADCAMFUN_URL/api/projects\"; echo\ncurl -sS \"${auth[@]}\" \"${json[@]}\" -d '{}' \"$CADCAMFUN_URL/api/projects\"; echo   # 400\n\nid=$(curl -sS \"${auth[@]}\" \"${json[@]}\" \\\n  -d '{\"name\":\"API walkthrough\",\"description\":\"Disposable documentation example\"}' \\\n  \"$CADCAMFUN_URL/api/projects\" | sed -E 's/.*\"id\":\"([^\"]+)\".*/\\1/')\ncurl -sS \"${auth[@]}\" \"$CADCAMFUN_URL/api/projects/$id\"; echo\n\nkey=docs.walkthrough.units\ncurl -sS -w \" %{http_code}\\n\" \"${auth[@]}\" \"$CADCAMFUN_URL/api/kv/$key\"   # 404 first time\ncurl -sS -X PUT \"${auth[@]}\" \"${json[@]}\" -d '{\"value\":{\"units\":\"mm\"}}' \"$CADCAMFUN_URL/api/kv/$key\"; echo\ncurl -sS \"${auth[@]}\" \"$CADCAMFUN_URL/api/kv/$key\"; echo"}
+    </DocCode>
+    <p>The script uses <code>sed</code> to extract the id so it has no dependencies; with <code>jq</code> installed, prefer <code>jq -r .id</code>. Run it against a disposable data directory: it creates a real project.</p>
+  </section>
+
+  <section id="tour-cleanup" class="doc-section">
+    <h2>Clean up after the tour</h2>
+    <DocCode language="bash" title="Remove what the tour created">
+{"curl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/projects/$id\"\ncurl -sS -X DELETE --header \"Authorization: Bearer $CADCAMFUN_TOKEN\" \"$CADCAMFUN_URL/api/kv/docs.walkthrough.units\""}
+    </DocCode>
+    <p>Deleting the project cascades to its drawings, components, toolpaths, history and workflow runs. The key-value entry is independent and must be removed separately.</p>
+  </section>
+
   <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Local development", href: "/docs/guides/local-dev" }, { title: "Database", href: "/docs/database" }]} />
 </DocsLayout>

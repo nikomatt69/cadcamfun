@@ -16,6 +16,8 @@ const toc = [
   { title: "Process configuration reference", href: "#config-reference" },
   { title: "Use Studio against an explicit database", href: "#studio-path" },
   { title: "A repeatable development loop", href: "#shutdown-loop" },
+  { title: "Which process runs where", href: "#process-map" },
+  { title: "Inner loop by change type", href: "#inner-loop" },
 ]
 ---
 
@@ -152,6 +154,38 @@ CADCAMFUN_DB=/tmp/cadcamfun-studio/cadcamfun.db \
     </ol>
     <p>The sidecar drains HTTP scopes briefly, checkpoints WAL, and closes SQLite on normal scoped shutdown. Killing a process without that path can interrupt in-flight work. A source edit does not replace the compiled binary already supervised by Tauri; rebuild the sidecar when testing compiled behavior.</p>
     <p>For compiled-runtime validation, <code>scripts/smoke-sidecar.ts</code> can run a selected binary with an isolated home/data directory and offline AI. It measures readiness/health/action behavior and exercises a kernel job. Without <code>--binary</code> it first compiles a temporary executable, so plan for the build cost; its result is separate from source-level tests.</p>
+  </section>
+
+    <section id="process-map" class="doc-section">
+    <h2>Which process runs where</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Starts</th><th>Data directory</th><th>Database</th></tr></thead>
+      <tbody>
+        <tr><td><code>bun run desktop:dev</code></td><td>Compiled sidecar + Tauri dev window</td><td>Application data directory chosen by Tauri</td><td><code>&lt;dataDir&gt;/cadcamfun.db</code></td></tr>
+        <tr><td>Manual sidecar (<code>bun apps/sidecar/src/main.ts</code>)</td><td>Sidecar only, on an ephemeral loopback port</td><td><code>CADCAMFUN_DATA_DIR</code></td><td><code>&lt;dataDir&gt;/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run db:migrate</code></td><td>Migration script</td><td>—</td><td><code>DATABASE_URL</code> or <code>packages/db/data/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run --filter @cadcamfun/web studio</code></td><td>Local Studio</td><td>—</td><td><code>CADCAMFUN_DB</code>, <code>DATABASE_URL</code> or <code>data/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run --filter @cadcamfun/web dev</code></td><td>Docs site</td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Four different database defaults">
+      <p>These entry points do not share a default path. Set the path explicitly when you need two tools to look at the same file.</p>
+    </DocCallout>
+  </section>
+
+  <section id="inner-loop" class="doc-section">
+    <h2>Inner loop by change type</h2>
+    <table>
+      <thead><tr><th>You changed</th><th>Run</th></tr></thead>
+      <tbody>
+        <tr><td>Kernel code in <code>packages/core</code></td><td><code>bun test packages/core</code></td></tr>
+        <tr><td>A contract in <code>packages/api</code></td><td><code>bun run generate</code>, <code>bun run generate:check</code>, the sidecar tests, then the docs <code>generate:api-reference</code></td></tr>
+        <tr><td>A sidecar handler or service</td><td><code>bun test apps/sidecar</code></td></tr>
+        <tr><td>The schema</td><td><code>bun run db:generate</code>, commit the new migration folder, <code>bun scripts/build.ts --only=resources</code></td></tr>
+        <tr><td>Rust in <code>src-tauri</code></td><td><code>cargo clippy</code> and <code>cargo test</code> in <code>apps/desktop/src-tauri</code></td></tr>
+        <tr><td>Docs pages</td><td><code>bun run typecheck</code> and <code>bun run build</code> in <code>packages/web</code></td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[

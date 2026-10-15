@@ -16,6 +16,7 @@ const toc = [
   { title: "Example: change project validation", href: "#trace-example" },
   { title: "Choose a regression at the right depth", href: "#regression-workflow" },
   { title: "Contribute documentation", href: "#documentation-workflow" },
+  { title: "Pull request checklist", href: "#pr-checklist" },
 ]
 ---
 
@@ -151,6 +152,19 @@ bun run --cwd packages/web typecheck
 bun run --cwd packages/web build`}
     </DocCode>
     <p>Claims about configured CI should say what the workflow does. Claims about successful publication or runtime acceptance need the particular run/artifact as evidence. Documentation should distinguish implemented behavior, defaults, and limits without turning internal planning notes into product instructions.</p>
+  </section>
+
+    <section id="pr-checklist" class="doc-section">
+    <h2>Pull request checklist</h2>
+    <ul>
+      <li><code>bun run typecheck</code> passes at the root.</li>
+      <li><code>bun run test</code> passes; new behaviour has a test next to the code.</li>
+      <li>Contract changes are regenerated: <code>bun run generate:check</code> and <code>bun run --filter @cadcamfun/web check</code> are clean.</li>
+      <li>Schema changes include the generated migration folder and are never edits of an applied migration.</li>
+      <li>Rust changes pass <code>cargo clippy</code> and <code>cargo test</code> (CI runs both).</li>
+      <li>User-visible behaviour is reflected in the docs page that describes it.</li>
+    </ul>
+    <p>CI runs the same commands on every push, so a green local run is the best predictor of a green pull request.</p>
   </section>
 
   <DocRelated items={[

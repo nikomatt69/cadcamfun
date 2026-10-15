@@ -21,6 +21,7 @@ const toc = [
   { title: "Operation parameters and defaults", href: "#operation-parameters" },
   { title: "Post processors and output options", href: "#post-processors" },
   { title: "Before sending a program to a machine", href: "#cam-checklist" },
+  { title: "Native kernel evidence claims", href: "#native-claims" },
 ]
 ---
 
@@ -239,6 +240,27 @@ console.log(report.issues)`}
     <DocCallout type="warn" title="Generated code is not a machine guarantee">
       <p>The kernel and posts check geometry, limits, and dialect rules they know about. They do not know your fixtures, tool lengths, or machine condition. A verified program is evidence, not a guarantee of a safe cut.</p>
     </DocCallout>
+  </section>
+
+    <section id="native-claims" class="doc-section">
+    <h2>Native kernel evidence claims</h2>
+    <p>Besides the generators shown above, the native kernel returns an artifact with ten claims. Each is <code>passed</code>, <code>failed</code>, <code>unsupported</code> or <code>unresolved</code>, with a detail string. The release level summarises them: <code>blocked</code>, <code>preview</code> or <code>verified-program</code>.</p>
+    <table>
+      <thead><tr><th>Claim</th><th>Example status</th><th>Detail returned by the kernel</th></tr></thead>
+      <tbody>
+        <tr><td><code>cutting-data</code></td><td>passed</td><td>Every operation runs at cutting data computed for Acetal POM-C (Delrin) and its cutter</td></tr>
+        <tr><td><code>machine-limits</code></td><td>passed</td><td>Spindle speed, feed, power, torque and cutter deflection within limits</td></tr>
+        <tr><td><code>operations-complete</code></td><td>passed</td><td>3 operations generated; every planned feature has an operation</td></tr>
+        <tr><td><code>no-rapid-in-stock</code></td><td>passed</td><td>No rapid move touches the stock as replayed</td></tr>
+        <tr><td><code>holder-clearance</code></td><td>passed</td><td>Shank and holder stay clear of the stock (3-axis height-field replay)</td></tr>
+        <tr><td><code>no-gouge</code></td><td>passed</td><td>No cut below the part beyond 0.030 mm (one cell of lateral slack)</td></tr>
+        <tr><td><code>material-removed</code></td><td>passed</td><td>The replayed stock matches the part within 0.110 mm</td></tr>
+        <tr><td><code>nc-replay</code></td><td>passed</td><td>Interpreted 3035 NC motions independently of the post; extents agree within 2.0e-3 mm</td></tr>
+        <tr><td><code>machine-travel</code></td><td>unsupported</td><td>The machine has no travel limits configured</td></tr>
+        <tr><td><code>machine-clearance</code></td><td>passed</td><td>3035 moves checked; the holder and shank stay at least 6.500 mm from the table</td></tr>
+        </tbody>
+    </table>
+    <p>The rows are the real result for the POM blank in the native manufacturing guide: 3 operations, 3071 NC lines, release <code>verified-program</code>. The artifact's machine post can also be <code>linuxcnc</code> in the schema, but no LinuxCNC post is implemented, so presets do not use it.</p>
   </section>
 
   <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "CAD geometry", href: "/docs/cad" }, { title: "Workflows", href: "/docs/workflows" }]} />

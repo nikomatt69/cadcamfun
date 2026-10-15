@@ -11,7 +11,10 @@ const toc = [
   { title: "Extension packages", href: "#extensions" },
   { title: "HTTP client generator", href: "#codegen" },
   { title: "Application workspaces", href: "#apps" },
-  { title: "Documentation, assistant, and Studio", href: "#web" }
+  { title: "Documentation, assistant, and Studio", href: "#web" },
+  { title: "Workspace at a glance", href: "#package-matrix" },
+  { title: "Dependency graph", href: "#dep-graph" },
+  { title: "Scripts per workspace", href: "#package-scripts" },
 ]
 ---
 
@@ -92,4 +95,62 @@ bun run --filter @cadcamfun/web build`}</DocCode>
     <p>Most library packages are private workspaces exporting TypeScript source; their presence in the monorepo does not imply a separately published npm distribution. The nikcli bridge has explicit publication metadata. Use the <a href="/docs/api">HTTP reference</a> for integrations that should remain independent of internal package layout.</p>
   </section>
 
-</DocsLayout>
+  <section id="package-matrix" class="doc-section">
+    <h2>Workspace at a glance</h2>
+    <table>
+      <thead><tr><th>Workspace</th><th>Package</th><th>Internal deps</th><th>Source files</th><th>Lines</th><th>Test files</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td><code>packages/core</code></td><td><code>@cadcamfun/core</code></td><td>—</td><td>307</td><td>70,774</td><td>106</td><td>Geometry kernel: <code>cad/</code> (80 files), <code>cam/</code> (110), <code>drawing/</code> (7)</td></tr>
+        <tr><td><code>packages/ai</code></td><td><code>@cadcamfun/ai</code></td><td>api, core</td><td>196</td><td>22,579</td><td>83</td><td>Assistant: actions, embedded host, prompts, skills, tools</td></tr>
+        <tr><td><code>packages/api</code></td><td><code>@cadcamfun/api</code></td><td>core, httpapi-codegen</td><td>64</td><td>18,388</td><td>9</td><td>HttpApi contract, errors, Effect and Promise clients</td></tr>
+        <tr><td><code>packages/db</code></td><td><code>@cadcamfun/db</code></td><td>—</td><td>7</td><td>1,730</td><td>2</td><td>SQLite + Drizzle, migrations, backups</td></tr>
+        <tr><td><code>packages/vcs</code></td><td><code>@cadcamfun/vcs</code></td><td>—</td><td>10</td><td>1,133</td><td>1</td><td>Content-addressed project history and merge</td></tr>
+        <tr><td><code>packages/workflow</code></td><td><code>@cadcamfun/workflow</code></td><td>—</td><td>5</td><td>320</td><td>1</td><td>Workflow file schema and run semantics</td></tr>
+        <tr><td><code>packages/plugin-sdk</code></td><td><code>@cadcamfun/plugin-sdk</code></td><td>core</td><td>9</td><td>952</td><td>2</td><td>Plugin manifest, capabilities, test host</td></tr>
+        <tr><td><code>packages/httpapi-codegen</code></td><td><code>@cadcamfun/httpapi-codegen</code></td><td>—</td><td>13</td><td>4,330</td><td>2</td><td>Client generator for HttpApi contracts</td></tr>
+        <tr><td><code>packages/nikcli-plugin</code></td><td><code>@nikoemme_/cadcamfun-nikcli-plugin</code></td><td>—</td><td>5</td><td>359</td><td>2</td><td>Plugin that exposes CADCAMFUN to the nikcli agent</td></tr>
+        <tr><td><code>packages/web</code></td><td><code>@cadcamfun/web</code></td><td>db</td><td>84</td><td>12,991</td><td>3</td><td>This documentation site, Studio, docs assistant</td></tr>
+        <tr><td><code>apps/sidecar</code></td><td><code>@cadcamfun/sidecar</code></td><td>ai, api, core, db, plugin-sdk, vcs, workflow</td><td>172</td><td>20,797</td><td>73</td><td>Local HTTP server: <code>http/</code> (34), <code>repos/</code> (24), <code>services/</code> (29)</td></tr>
+        <tr><td><code>apps/desktop</code></td><td><code>@cadcamfun/desktop</code></td><td>api, core</td><td>557</td><td>85,579</td><td>104</td><td>SolidJS webview (<code>features/</code> 280 files) + Rust shell in <code>src-tauri/</code></td></tr>
+        <tr><td><code>apps/mobile</code></td><td><code>@cadcamfun/mobile</code></td><td>api</td><td>79</td><td>7,637</td><td>7</td><td>Expo iOS companion</td></tr>
+        </tbody>
+    </table>
+    <p>Counts are TypeScript, TSX, Rust and Astro files tracked in git, measured on this branch; test files are <code>*.test.ts(x)</code>. Internal dependencies omit the <code>@cadcamfun/</code> prefix.</p>
+  </section>
+
+  <section id="dep-graph" class="doc-section">
+    <h2>Dependency graph</h2>
+    <svg viewBox="0 0 760 300" width="100%" role="img" aria-label="Workspace dependency graph" style="max-width:760px;font:12px system-ui">
+<defs><marker id="pkar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.2">
+<rect x="20" y="20" width="120" height="34" rx="6"/><rect x="320" y="20" width="120" height="34" rx="6"/><rect x="620" y="20" width="120" height="34" rx="6"/>
+<rect x="20" y="130" width="100" height="34" rx="6"/><rect x="140" y="130" width="100" height="34" rx="6"/><rect x="260" y="130" width="100" height="34" rx="6"/><rect x="380" y="130" width="100" height="34" rx="6"/><rect x="500" y="130" width="100" height="34" rx="6"/><rect x="620" y="130" width="120" height="34" rx="6"/>
+<rect x="250" y="240" width="120" height="34" rx="6"/><rect x="430" y="240" width="140" height="34" rx="6"/>
+<g opacity=".7" marker-end="url(#pkar)"><path d="M380 54L70 128"/><path d="M380 54L190 128"/><path d="M380 54L310 128"/><path d="M380 54L430 128"/><path d="M380 54L550 128"/><path d="M380 54L680 128"/><path d="M380 54L310 238"/>
+<path d="M80 54L310 238"/><path d="M80 54L190 128"/><path d="M680 54L190 128"/>
+<path d="M190 164L310 238"/><path d="M310 164L310 238"/><path d="M262 147L242 147"/><path d="M190 164L495 240"/><path d="M680 164L310 240"/><path d="M190 164L250 252"/></g></g>
+<g fill="currentColor" text-anchor="middle"><text x="80" y="42">desktop</text><text x="380" y="42">sidecar</text><text x="680" y="42">mobile</text>
+<text x="70" y="152">db</text><text x="190" y="152">api</text><text x="310" y="152">ai</text><text x="430" y="152">vcs</text><text x="550" y="152">workflow</text><text x="680" y="152">plugin-sdk</text>
+<text x="310" y="262">core</text><text x="500" y="262">httpapi-codegen</text></g></svg>
+    <p>Arrows point from a workspace to what it imports. <code>core</code> has no internal dependencies, so geometry and CAM can be tested and reused without a server. Only the sidecar touches the database; the desktop and mobile apps reach data through <code>api</code>. <code>plugin-sdk</code> also depends on <code>core</code> (not drawn).</p>
+  </section>
+
+  <section id="package-scripts" class="doc-section">
+    <h2>Scripts per workspace</h2>
+    <table>
+      <thead><tr><th>Workspace</th><th>Scripts</th></tr></thead>
+      <tbody>
+        <tr><td>root</td><td><code>typecheck</code>, <code>test</code>, <code>build</code>, <code>build:sidecar</code>, <code>build:desktop</code>, <code>desktop:dev</code>, <code>generate</code>, <code>generate:check</code>, <code>db:generate</code>, <code>db:migrate</code></td></tr>
+        <tr><td><code>packages/api</code></td><td><code>typecheck</code>, <code>coverage</code>, <code>generate</code>, <code>generate:check</code></td></tr>
+        <tr><td><code>packages/db</code></td><td><code>typecheck</code>, <code>generate</code>, <code>migrate</code></td></tr>
+        <tr><td><code>packages/web</code></td><td><code>dev</code>, <code>start</code>, <code>studio</code>, <code>build</code>, <code>preview</code>, <code>deploy</code>, <code>astro</code>, <code>check</code>, <code>check:docs-index</code>, <code>typecheck</code>, <code>generate:api-reference</code>, <code>check:api-reference</code></td></tr>
+        <tr><td><code>apps/desktop</code></td><td><code>typecheck</code>, <code>dev</code>, <code>build</code>, <code>stub-sidecar</code>, <code>tauri</code>, <code>tauri:dev</code>, <code>tauri:build</code></td></tr>
+        <tr><td><code>apps/mobile</code></td><td><code>start</code>, <code>ios</code>, <code>dev</code>, <code>ios:build</code>, <code>ios:release</code>, <code>ios:dev</code>, <code>web</code>, <code>native:generate</code>, <code>typecheck</code>, <code>build</code>, <code>test</code></td></tr>
+        <tr><td><code>apps/sidecar</code></td><td><code>typecheck</code>, <code>start</code></td></tr>
+        <tr><td>other packages</td><td><code>typecheck</code></td></tr>
+        </tbody>
+    </table>
+    <p>The root <code>typecheck</code> runs every workspace's <code>typecheck</code> through turbo and then checks the root project. The root <code>test</code> runs <code>bun test packages apps scripts</code>.</p>
+  </section>
+
+  </DocsLayout>

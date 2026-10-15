@@ -11,7 +11,10 @@ const toc = [
   { title: "Design to machining", href: "#workflow" },
   { title: "Runtime components", href: "#layout" },
   { title: "Start development", href: "#commands" },
-  { title: "Contracts and persistence", href: "#boundaries" }
+  { title: "Contracts and persistence", href: "#boundaries" },
+  { title: "CADCAMFUN by the numbers", href: "#by-the-numbers" },
+  { title: "What's new", href: "#whats-new" },
+  { title: "Next steps", href: "#next-steps" },
 ]
 ---
 
@@ -89,4 +92,50 @@ bun run --filter @cadcamfun/web dev`}</DocCode>
     <p>For extensions and teamwork, use <a href="/docs/guides/plugin-authoring">plugin authoring</a> and <a href="/docs/guides/project-history">branches, reviews, and workflows</a>. These guides document supported module exports, current host behavior, structural merge rules, committed workflow inputs, and service-backed side effects.</p>
   </section>
 
-</DocsLayout>
+  <section id="by-the-numbers" class="doc-section">
+    <h2>CADCAMFUN by the numbers</h2>
+    <table>
+      <thead><tr><th>Measure</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Application version</td><td>6.0.0</td></tr>
+        <tr><td>HTTP operations / resource groups</td><td>270 / 34</td></tr>
+        <tr><td>Database tables / migrations</td><td>60 / 4</td></tr>
+        <tr><td>Workspaces</td><td>10 packages, 3 apps</td></tr>
+        <tr><td>Desktop release targets</td><td>6 (macOS, Windows and Linux, each x64 and ARM64)</td></tr>
+        <tr><td>G-code post dialects</td><td>generic, GRBL, Fanuc, Haas (LinuxCNC name reserved)</td></tr>
+        <tr><td>Native CAM strategies</td><td>face, adaptive, pocket, profile, bore, drill, thread, engrave, chamfer, surface</td></tr>
+        <tr><td>Kernel evidence claims</td><td>10, from cutting data to NC replay and machine clearance</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="whats-new" class="doc-section">
+    <h2>What's new</h2>
+    <p>Recent work on the main branch, summarised from the commit history:</p>
+    <ul>
+      <li><strong>Exact kernel on the sidecar.</strong> A <code>cadExact</code> group (<code>analyze</code>, <code>step</code>, <code>assembly</code>) runs a shared scene analysis from core: per-solid validity, mass, holes, interference, bill of materials and missing fasteners.</li>
+      <li><strong>Exact modelling.</strong> Sweeps and sweep shells, lofts with rational ruled columns, push-pull and mate on exact faces, and fillets about 2.5× faster.</li>
+      <li><strong>NC subprograms.</strong> Repeated toolpaths are written once as an incremental <code>M98</code> subprogram; replay understands <code>O</code>-programs, <code>M98</code>/<code>M99</code> and <code>G91</code>. Wired end to end from the snapshot to the desktop switch.</li>
+      <li><strong>CAM from B-rep.</strong> The planner reads holes, pockets and outlines from exact solids, including STEP parts and rotated parts; volumetric stock removal works along a tilted tool axis.</li>
+      <li><strong>Assistant hardening.</strong> Every action declares its result schema; destructive tools always need a human; each turn is bound to its drawing with compare-and-swap writes; a durable background-task journal; kernel jobs in a worker.</li>
+      <li><strong>Documentation.</strong> This Astro site with a generated API reference for every operation.</li>
+    </ul>
+  </section>
+
+  <section id="next-steps" class="doc-section">
+    <h2>Next steps</h2>
+    <table>
+      <thead><tr><th>If you want to…</th><th>Go to</th></tr></thead>
+      <tbody>
+        <tr><td>Run the app from source</td><td><a href="/docs/guides/quickstart">Quickstart</a>, then <a href="/docs/guides/local-dev">Local development</a></td></tr>
+        <tr><td>Understand the processes</td><td><a href="/docs/architecture">Architecture</a> and <a href="/docs/sidecar">Sidecar</a></td></tr>
+        <tr><td>Model a part</td><td><a href="/docs/cad">CAD</a> and <a href="/docs/viewport">Viewport</a></td></tr>
+        <tr><td>Generate G-code</td><td><a href="/docs/cam">CAM</a> and <a href="/docs/guides/native-manufacturing">Native manufacturing</a></td></tr>
+        <tr><td>Call the API</td><td><a href="/docs/guides/api-tour">API tour</a> and <a href="/docs/guides/api-clients">API clients</a></td></tr>
+        <tr><td>Extend the app</td><td><a href="/docs/guides/plugin-authoring">Plugin authoring</a></td></tr>
+        <tr><td>Contribute</td><td><a href="/docs/guides/contributing">Contributing</a></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  </DocsLayout>

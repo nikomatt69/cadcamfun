@@ -16,6 +16,7 @@ const toc = [
   { title: "Save and reopen a CAM program", href: "#cam-save" },
   { title: "Choose the history you need", href: "#history" },
   { title: "Verify persistence and resolve failures", href: "#verify" },
+  { title: "Recipe: the whole lifecycle with curl", href: "#curl-recipe" },
 ]
 ---
 
@@ -162,6 +163,28 @@ curl --fail-with-body -X PUT "$CADCAM_URL/api/components/$CADCAM_COMPONENT_ID" \
     </ol>
     <p>A 400 usually points to missing required business fields or invalid document data; a 403 indicates a refused operation; a 404 can mean absent or inaccessible data. The project dashboard currently turns individual resource-list failures into empty arrays, so an empty tab alone is insufficient evidence of deletion. Inspect the direct API result before creating duplicates.</p>
     <p>Implementation anchors are <code>projects.ts</code> and <code>groups/&#123;drawings,components,toolpaths&#125;.ts</code> in the API package; the corresponding sidecar handlers/repositories; <code>projectSnapshot.ts</code>, <code>CadPage.tsx</code>, <code>SaveCamModal.tsx</code>, and <code>ToolpathDetailScreen.tsx</code>. Use an isolated project for deletion tests and preserve user work before restoration.</p>
+  </section>
+
+    <section id="curl-recipe" class="doc-section">
+    <h2>Recipe: the whole lifecycle with curl</h2>
+    <DocCode language="bash" title="project → drawing → toolpath → commit">
+{"A=(--header \"Authorization: Bearer $CADCAMFUN_TOKEN\" --header \"Content-Type: application/json\")\nU=\"$CADCAMFUN_URL\"\n\nproject=$(curl -sS \"${A[@]}\" -d '{\"name\":\"Bracket\"}' \"$U/api/projects\" | jq -r .id)\ndrawing=$(curl -sS \"${A[@]}\" -d '{\"name\":\"Plate\",\"data\":{}}' \"$U/api/projects/$project/drawings\" | jq -r .id)\n\ncurl -sS \"${A[@]}\" \"$U/api/projects/$project/drawings\" | jq 'length'\n\ncurl -sS \"${A[@]}\" -X PUT -d '{\"name\":\"Plate v2\"}' \"$U/api/drawings/$drawing\"\n\ncurl -sS \"${A[@]}\" -d '{\"name\":\"Program\",\"gcode\":\"G21\\nM30\",\"data\":{}}' \\\n  \"$U/api/drawings/$drawing/toolpaths\" | jq .id\n\ncurl -sS \"${A[@]}\" -d '{\"message\":\"First version\"}' \"$U/api/projects/$project/vcs/commit\"\ncurl -sS \"${A[@]}\" \"$U/api/projects/$project/vcs/log\" | jq"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Step</th><th>Operation</th><th>Body fields</th></tr></thead>
+      <tbody>
+        <tr><td>Create project</td><td><code>POST /api/projects</code></td><td><code>name</code> (required by the handler), <code>description</code>, <code>organizationId</code>, <code>isPublic</code></td></tr>
+        <tr><td>Create drawing</td><td><code>POST /api/projects/&#123;id&#125;/drawings</code></td><td><code>name</code>, <code>description</code>, <code>data</code>, <code>thumbnail</code></td></tr>
+        <tr><td>Update drawing</td><td><code>PUT /api/drawings/&#123;id&#125;</code></td><td>same fields, partial</td></tr>
+        <tr><td>Create toolpath</td><td><code>POST /api/drawings/&#123;id&#125;/toolpaths</code></td><td><code>name</code>, <code>data</code>, <code>gcode</code>, <code>type</code>, <code>operationType</code>, <code>materialId</code>, <code>toolId</code>, <code>machineConfigId</code>, …</td></tr>
+        <tr><td>Commit</td><td><code>POST /api/projects/&#123;id&#125;/vcs/commit</code></td><td><code>message</code> (required), <code>authorKind</code>, <code>files</code></td></tr>
+        <tr><td>Branch</td><td><code>POST /api/projects/&#123;id&#125;/vcs/branches</code></td><td><code>name</code> (required), <code>from</code></td></tr>
+        <tr><td>Restore</td><td><code>POST /api/projects/&#123;id&#125;/vcs/restore</code></td><td><code>rev</code> (required), <code>paths</code></td></tr>
+        </tbody>
+    </table>
+    <p>Run against a fresh sidecar, the commit answers with the new commit object, and the log lists it:</p>
+    <DocCode language="json" title="vcs/commit response">{`{"oid":"44d2d03d23b27fbbc4b388e32e15dfb0f39fff87","parents":[],"message":"First version\\n","author":{"name":"Local user","email":"local@cadcamfun.local","time":1792037121}}`}</DocCode>
+    <p>Without a session header the author is the installation's local profile. The recipe uses <code>jq</code>. Free-form toolpath <code>data</code> is accepted as is; a portable <code>cadcamfun-cam</code> document is validated strictly, as described in the native manufacturing guide.</p>
   </section>
 
   <DocRelated items={[

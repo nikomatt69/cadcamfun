@@ -22,6 +22,7 @@ const toc = [
   { title: "Repository layout", href: "#repository-layout" },
   { title: "Commit, branch, diff, and merge in code", href: "#history-walkthrough" },
   { title: "Rules enforced by the application", href: "#service-rules" },
+  { title: "A real commit object", href: "#real-commit" },
 ]
 ---
 
@@ -236,6 +237,29 @@ console.log(repo.log().length) // 2`}
     <DocCallout type="note" title="Byte-compatible with git">
       <p>Object IDs are computed exactly as git computes them. Pushing to GitHub through the Git Data API keeps every commit ID identical on both sides, and a <code>git clone</code> of the mirror shows the same history as the application. GitHub accepts only fast-forward ref updates; pull and merge locally first when the remote has moved.</p>
     </DocCallout>
+  </section>
+
+    <section id="real-commit" class="doc-section">
+    <h2>A real commit object</h2>
+    <DocCode language="json" title="POST /api/projects/:id/vcs/commit">
+{"{\n  \"oid\": \"44d2d03d23b27fbbc4b388e32e15dfb0f39fff87\",\n  \"parents\": [],\n  \"message\": \"First version\\n\",\n  \"author\": { \"name\": \"Local user\", \"email\": \"local@cadcamfun.local\", \"time\": 1792037121 }\n}"}
+    </DocCode>
+    <ul>
+      <li><code>oid</code> is a 40-character hex id of the commit object stored in <code>GitObject</code>.</li>
+      <li>The first commit has no parents; a merge commit has two.</li>
+      <li>The message is stored with a trailing newline, as Git does.</li>
+      <li>Without an <code>x-session-token</code>, the author is the installation's local profile. <code>time</code> is in Unix seconds.</li>
+    </ul>
+    <table>
+      <thead><tr><th>Route</th><th>Body</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST …/vcs/commit</code></td><td><code>message</code>, <code>authorKind</code>, <code>files</code></td><td><code>message</code></td></tr>
+        <tr><td><code>POST …/vcs/branches</code></td><td><code>name</code>, <code>from</code></td><td><code>name</code></td></tr>
+        <tr><td><code>POST …/vcs/checkout</code></td><td><code>branch</code></td><td><code>branch</code></td></tr>
+        <tr><td><code>POST …/vcs/restore</code></td><td><code>rev</code>, <code>paths</code></td><td><code>rev</code></td></tr>
+        <tr><td><code>POST …/pulls</code></td><td><code>title</code>, <code>body</code>, <code>head</code>, <code>base</code>, <code>authorKind</code></td><td><code>title</code>, <code>head</code></td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />

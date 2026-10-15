@@ -14,6 +14,8 @@ const toc = [
   { title: "Next commands", href: "#other-commands" },
   { title: "Verify a real API without a model", href: "#project-smoke" },
   { title: "Interpret first-run failures", href: "#first-run-errors" },
+  { title: "Requirement details", href: "#requirements-table" },
+  { title: "Your first hour, step by step", href: "#first-hour" },
 ]
 ---
 
@@ -151,6 +153,35 @@ curl --fail-with-body "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID" \
       </tbody>
     </table>
     <p>Keep the first verification small: health, one project, one persisted drawing/program, then optional integrations. A successful base application launch does not configure Stripe, AI providers, a remote GitHub repository, or mobile routing automatically.</p>
+  </section>
+
+    <section id="requirements-table" class="doc-section">
+    <h2>Requirement details</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th><th>Needed for</th></tr></thead>
+      <tbody>
+        <tr><td>Bun</td><td>1.4.2 (the repository's <code>packageManager</code>)</td><td>Everything: install, tests, sidecar, scripts</td></tr>
+        <tr><td>Rust toolchain + Tauri prerequisites</td><td>stable; platform webview libraries on Linux</td><td>The desktop shell (<code>desktop:dev</code>, builds)</td></tr>
+        <tr><td>SQLite CLI</td><td>any</td><td>Optional: read-only database inspection</td></tr>
+        <tr><td>Xcode</td><td>—</td><td>Only for the iOS companion</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="first-hour" class="doc-section">
+    <h2>Your first hour, step by step</h2>
+    <DocCode language="bash" title="From clone to a running desktop">
+{"git clone https://github.com/nikomatt69/cadcamfun-tauri.git\ncd cadcamfun-tauri\nbun install --frozen-lockfile\nbun run typecheck                 # all workspaces\nbun run test                      # bun test packages apps scripts\nbun run desktop:dev               # builds the sidecar + migrations, then tauri dev"}
+    </DocCode>
+    <ol>
+      <li>When the window opens, the sidecar status turns ready within seconds; a new data directory is migrated on first launch.</li>
+      <li>Create a project, add a drawing, draw a rectangle and extrude it.</li>
+      <li>Open CAM, pick the solid and generate. Check the release level and claims before exporting NC.</li>
+      <li>Open the history panel and commit: the project now has its first version.</li>
+    </ol>
+    <DocCallout type="info" title="No model key needed">
+      <p>Everything above works without an AI provider. Add a key later in the assistant settings.</p>
+    </DocCallout>
   </section>
 
   <DocRelated items={[

@@ -15,6 +15,10 @@ const toc = [
   { title: "Database path selection", href: "#database-paths" },
   { title: "Apply and verify a change", href: "#change" },
   { title: "Configuration diagnosis", href: "#diagnosis" },
+  { title: "Every sidecar setting in one table", href: "#all-settings" },
+  { title: "Variables read outside the sidecar config", href: "#other-variables" },
+  { title: "What lives in the data directory", href: "#data-layout" },
+  { title: "Example configurations", href: "#profiles" },
 ]
 ---
 <DocsLayout title="Runtime configuration" subtitle="Choose the process, data directory, credential type, and integration settings that actually control each runtime." description="CADCAMFUN configuration reference with sidecar environment settings, defaults, storage paths, AI connectivity, billing integration, telemetry, desktop/mobile client settings, and diagnosis." toc={toc}>
@@ -109,5 +113,75 @@ bun run --filter @cadcamfun/desktop dev`}</DocCode>
     <p>If Studio is unavailable on the hosted site, its production API intentionally returns 503; start its local Bun process against the selected existing file. If the documentation assistant is unavailable, inspect Worker bindings or its configured nikcli backend. Neither diagnosis requires replacing desktop credentials.</p>
     <p>Source evidence: <code>apps/sidecar/src/config.ts</code>, <code>layers.ts</code>, <code>main.ts</code>, <code>observability.ts</code>, <code>services/ai.ts</code>, <code>packages/db/src/migrate.ts</code>, and <code>packages/web/script/studio-server.ts</code>.</p>
   </section>
+    <section id="all-settings" class="doc-section">
+    <h2>Every sidecar setting in one table</h2>
+    <code>AppConfigService</code> is the only place in the sidecar that reads the environment. The table lists every variable it reads, in the order it reads them. Optional values that are empty or whitespace are treated as absent where noted.
+    <table>
+      <thead><tr><th>Variable</th><th>Type</th><th>Default</th><th>Used by</th></tr></thead>
+      <tbody>
+        <tr><td><code>CADCAMFUN_TOKEN</code></td><td>redacted string</td><td>required</td><td>Bearer middleware for every protected route</td></tr>
+        <tr><td><code>CADCAMFUN_DATA_DIR</code></td><td>string</td><td>required</td><td>Database, AI storage, plugins, companion, uploads</td></tr>
+        <tr><td><code>CADCAMFUN_MIGRATIONS_DIR</code></td><td>string</td><td>absent</td><td>Database layer; absent means no schema is created</td></tr>
+        <tr><td><code>CADCAMFUN_APP_URL</code></td><td>string</td><td>absent</td><td>Links in account e-mails (the legacy <code>NEXTAUTH_URL</code>)</td></tr>
+        <tr><td><code>CADCAMFUN_DEBUG_LINKS</code></td><td>boolean</td><td>false</td><td>Echo reset and magic links in responses (development only)</td></tr>
+        <tr><td><code>CADCAMFUN_AI_OFFLINE</code></td><td>boolean</td><td>false</td><td>No provider-catalogue download and no live web search</td></tr>
+        <tr><td><code>CADCAMFUN_AI_HOST</code></td><td><code>nikcli</code> | <code>direct</code></td><td><code>nikcli</code></td><td>Assistant host; any other value fails startup</td></tr>
+        <tr><td><code>CADCAMFUN_AI_MINIMAX_BASE_URL</code></td><td>string, trimmed</td><td>absent</td><td>MiniMax endpoint for the embedded host</td></tr>
+        <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>string</td><td>absent</td><td>Without it, Stripe webhooks are refused</td></tr>
+        <tr><td><code>STRIPE_SECRET_KEY</code></td><td>redacted string</td><td>absent</td><td>Without it, paid checkout and the billing portal are unavailable</td></tr>
+        <tr><td><code>STRIPE_PRICE_BASIC</code>, <code>_PRO</code>, <code>_ENTERPRISE</code></td><td>string, trimmed</td><td>absent</td><td>Price id per paid plan; blank values are ignored</td></tr>
+        <tr><td><code>CRON_SECRET</code></td><td>string</td><td>absent</td><td>Shared secret for <code>/api/cron/*</code>; without it the route is open to the local app</td></tr>
+        <tr><td><code>ADMIN_EMAIL</code></td><td>string</td><td>absent</td><td>Administrator e-mail; by default the local profile administers its own installation</td></tr>
+        <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>string, trimmed</td><td>absent</td><td>OTLP/HTTP collector base URL; telemetry is off without it</td></tr>
+        </tbody>
+    </table>
+    <p>The reported application <code>version</code> is fixed in code (<code>6.0.0</code>), not read from the environment.</p>
+    <DocCallout type="warn" title="Invalid values stop startup">
+      <p>A missing required variable, or a value that does not parse (for example <code>CADCAMFUN_AI_HOST=local</code>), fails the configuration layer. The sidecar then prints an error instead of its ready line, and the desktop reports the startup failure.</p>
+    </DocCallout>
+  </section>
+
+  <section id="other-variables" class="doc-section">
+    <h2>Variables read outside the sidecar config</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Reader</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>DATABASE_URL</code></td><td><code>packages/db</code> migrate script and drizzle-kit</td><td>Target for <code>db:migrate</code> / <code>db:generate</code>; a leading <code>file:</code> is stripped. Default <code>./data/cadcamfun.db</code> relative to <code>packages/db</code>.</td></tr>
+        <tr><td><code>CADCAMFUN_DB</code>, then <code>DATABASE_URL</code></td><td>Web Studio server (<code>packages/web/script/studio-server.ts</code>)</td><td>Database the local Studio opens; default <code>data/cadcamfun.db</code> at the repository root.</td></tr>
+        <tr><td><code>NIKCLI_LOCALE</code>, <code>NIKCLI_LANGUAGE</code>, <code>NIKCLI_REGION</code></td><td>Embedded assistant host</td><td>Override the assistant's language and region.</td></tr>
+        <tr><td><code>LC_ALL</code>, <code>LC_MESSAGES</code>, <code>LANG</code>, <code>LANGUAGE</code>, <code>TZ</code></td><td>Embedded assistant host</td><td>System locale and time-zone detection when no override is set.</td></tr>
+        </tbody>
+    </table>
+    <p>The desktop shell passes exactly three variables to the sidecar it launches: <code>CADCAMFUN_TOKEN</code> (a new random token per launch), <code>CADCAMFUN_DATA_DIR</code> (the application data directory) and <code>CADCAMFUN_MIGRATIONS_DIR</code> (the bundled migrations). Anything else must be present in the environment the desktop app itself was started with.</p>
+  </section>
+
+  <section id="data-layout" class="doc-section">
+    <h2>What lives in the data directory</h2>
+    <DocCode language="text" title="&lt;CADCAMFUN_DATA_DIR&gt;/">
+{"cadcamfun.db            SQLite database (+ -wal / -shm while running)\nbackups/                pre-migration snapshots, newest five kept\nauth-secret             signing secret for account session tokens (0600)\nauth-revoked.json       revoked session tokens\nai/\n  credentials.json      provider API keys (owner-readable only)\n  policy.json           operator policy for the assistant\n  skills/               user skills\n  session-owners/       which account owns which assistant session\n  nikcli/               isolated working and config dirs of the embedded host\nplugins/                assistant plugins loaded at startup\nplugins-registry/       installed marketplace plugin files\ncompanion/              gateway TLS cert.pem and key.pem (0600)\nstorage/                file storage for library import/export, entity I/O and plugins\nuploads/profiles/       profile pictures\ndownloads/              files served by /api/download\nwaitlist.json           local waitlist entries"}
+    </DocCode>
+    <p>Directories are created on first use, so a fresh installation contains only the ones its features have touched. Back up the whole directory with the application stopped: the database, credentials, auth secret and companion keys belong together. Paired companion devices are stored in the key-value table of the database, not in <code>companion/</code>.</p>
+    <DocCallout type="warn" title="Treat the directory as secret">
+      <p><code>ai/credentials.json</code>, <code>auth-secret</code> and the companion private key are credentials. Do not commit a development data directory or attach it to bug reports.</p>
+    </DocCallout>
+  </section>
+
+  <section id="profiles" class="doc-section">
+    <h2>Example configurations</h2>
+    <DocCode language="bash" title="Offline development with a throwaway database">
+{"export CADCAMFUN_TOKEN=dev-$(openssl rand -hex 16)\nexport CADCAMFUN_DATA_DIR=\"$(mktemp -d)\"\nexport CADCAMFUN_MIGRATIONS_DIR=\"$PWD/packages/db/drizzle\"\nexport CADCAMFUN_AI_HOST=direct\nexport CADCAMFUN_AI_OFFLINE=true\nbun --no-env-file apps/sidecar/src/main.ts"}
+    </DocCode>
+    <DocCode language="bash" title="Account e-mail testing">
+{"export CADCAMFUN_APP_URL=http://localhost:4321\nexport CADCAMFUN_DEBUG_LINKS=true      # reset/magic links appear in responses"}
+    </DocCode>
+    <DocCode language="bash" title="Telemetry to a local collector">
+{"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318"}
+    </DocCode>
+    <DocCode language="bash" title="Billing in test mode">
+{"export STRIPE_SECRET_KEY=sk_test_...\nexport STRIPE_WEBHOOK_SECRET=whsec_...\nexport STRIPE_PRICE_PRO=price_..."}
+    </DocCode>
+    <p>Never set <code>CADCAMFUN_DEBUG_LINKS</code> outside development: it puts account links in HTTP responses.</p>
+  </section>
+
   <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "Local development", href: "/docs/guides/local-dev" }, { title: "Documentation operations", href: "/docs/documentation" }]} />
 </DocsLayout>

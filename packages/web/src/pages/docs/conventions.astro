@@ -12,7 +12,9 @@ const toc = [
   { title: "Effect services", href: "#effect" },
   { title: "Validation and errors", href: "#contracts" },
   { title: "Persistence and configuration", href: "#persistence" },
-  { title: "Verification", href: "#verify" }
+  { title: "Verification", href: "#verify" },
+  { title: "Effect patterns used throughout", href: "#effect-patterns" },
+  { title: "Naming and layout rules", href: "#naming" },
 ]
 ---
 
@@ -81,4 +83,33 @@ bun run --filter @cadcamfun/web build`}</DocCode>
     <p>When documenting a response captured from an isolated run, identify any normalized IDs, timestamps, or omitted fields. Label request templates as templates. Do not present an invented identifier or an unexecuted schema example as an observed production response.</p>
   </section>
 
-</DocsLayout>
+  <section id="effect-patterns" class="doc-section">
+    <h2>Effect patterns used throughout</h2>
+    <DocCode language="ts" title="Service, tagged error and layer">
+{"import { Context, Data, Effect, Layer } from \"effect\"\nimport { AppConfigService } from \"../config.ts\"\n\nexport class StorageError extends Data.TaggedError(\"StorageError\")<{\n  readonly operation: string\n  readonly cause: unknown\n}> {}\n\nexport class Storage extends Context.Service<Storage, {\n  readonly read: (key: string) => Effect.Effect<Uint8Array, StorageError>\n}>()(\"cadcamfun/Storage\") {\n  static readonly layer = Layer.effect(Storage, Effect.gen(function* () {\n    const config = yield* AppConfigService       // dependencies come from the context\n    return Storage.of({\n      read: (key) => Effect.tryPromise({\n        try: () => Bun.file(`${config.dataDir}/storage/${key}`).bytes(),\n        catch: (cause) => new StorageError({ operation: \"read\", cause }),\n      }),\n    })\n  }))\n}"}
+    </DocCode>
+    <ul>
+      <li>Service keys are namespaced: <code>"cadcamfun/Database"</code>, <code>"cadcamfun/AppConfig"</code>, <code>"cadcamfun/ApiClient"</code>.</li>
+      <li>Errors are <code>Data.TaggedError</code> inside services and <code>Schema.TaggedError</code> with an <code>httpApiStatus</code> at the HTTP boundary. Handlers map the first to the second.</li>
+      <li>Resources with a lifetime use <code>Effect.acquireRelease</code> so they close when the layer's scope closes.</li>
+      <li>Named functions use <code>Effect.fn("area.name")</code> so traces carry a readable span name, for example <code>cam.runKernelRequest</code>.</li>
+      <li>Configuration is read once, in <code>AppConfigService</code>; no other module reads <code>process.env</code> in the sidecar.</li>
+    </ul>
+  </section>
+
+  <section id="naming" class="doc-section">
+    <h2>Naming and layout rules</h2>
+    <table>
+      <thead><tr><th>Thing</th><th>Convention</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td>Files</td><td>kebab-case, one concept per file, test next to it</td><td><code>cam-program.ts</code>, <code>cam-program.test.ts</code></td></tr>
+        <tr><td>Operation IDs</td><td><code>&lt;group&gt;.&lt;method&gt;</code></td><td><code>projects.create</code>, <code>health.check</code></td></tr>
+        <tr><td>Query labels</td><td>dotted, resource first</td><td><code>projects.list</code>, <code>toolpaths.update</code></td></tr>
+        <tr><td>Units</td><td>millimetres, degrees, seconds; mm/min for feed, m/min for Vc</td><td><code>feed: 5696</code></td></tr>
+        <tr><td>Coordinates</td><td>Z up, right-handed; program moves in work coordinates</td><td>origin at stock-center top</td></tr>
+        <tr><td>Ids</td><td>UUID strings</td><td><code>crypto.randomUUID()</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  </DocsLayout>

@@ -11,7 +11,10 @@ const toc = [
   { title: "HTTP and persistence", href: "#http" },
   { title: "Desktop and mobile", href: "#clients" },
   { title: "AI, plugins, history, and workflows", href: "#automation" },
-  { title: "Documentation and delivery", href: "#web" }
+  { title: "Documentation and delivery", href: "#web" },
+  { title: "Directory tree with file counts", href: "#tree" },
+  { title: "Desktop feature folders", href: "#desktop-features" },
+  { title: "Where CAD concepts live in core", href: "#cad-files" },
 ]
 ---
 
@@ -98,4 +101,51 @@ const toc = [
     <p>For example, a missing name in project creation is rejected in <code>apps/sidecar/src/http/projects.ts</code>; it is not a SQLite error. A portable CAM document mismatch is checked by <code>apps/sidecar/src/services/cam-program.ts</code>; parsing NC in the viewport cannot bypass it. A paired phone route refusal originates in the companion gateway's method/path policy.</p>
   </section>
 
-</DocsLayout>
+  <section id="tree" class="doc-section">
+    <h2>Directory tree with file counts</h2>
+    <DocCode language="text" title="Repository layout (non-test TS/TSX/RS files per directory)">
+{"apps/\n  desktop/src/          app/ 13  features/ 280  pages/ 68  shared/ 44  viewport/ 25  i18n/ 1\n  desktop/src-tauri/src commands.rs lib.rs main.rs menu.rs secrets.rs sidecar.rs tray.rs updater.rs\n  sidecar/src/          http/ 34  repos/ 24  services/ 29  plugins/ 3   (+ main.ts, config.ts, layers.ts)\n  mobile/               app/ 13  components/ 30  lib/ 21  hooks/ 2  modules/ 2\npackages/\n  core/src/             cad/ 80  cam/ 110  drawing/ 7\n  ai/src/               actions/ 14  nikcli/ 27  tools/ 26  prompts/ 5  skills/ 2\n  api/src/              groups/ (one file per group)  sdk/generated/  client/generated/\n  db/                   src/ (index, schema, upgrade, migrate)  drizzle/ (4 migrations)\n  vcs/ workflow/ plugin-sdk/ httpapi-codegen/ nikcli-plugin/ web/\nscripts/                build.ts compile-sidecar.ts stage-release.ts updater-manifest.ts\n                        release-helpers.ts release-ref.ts signing-config.ts smoke-sidecar.ts\n.github/workflows/      ci.yml release.yml build-platforms.yml ios.yml"}
+    </DocCode>
+  </section>
+
+  <section id="desktop-features" class="doc-section">
+    <h2>Desktop feature folders</h2>
+    <p>Each folder under <code>apps/desktop/src/features/</code> owns one product area's components, state and API calls:</p>
+    <DocCode language="text" title="apps/desktop/src/features/">
+{"admin  ai  analytics  auth  billing  cad  cam  chat  companion  costs  dashboard\nlegal  library  marketplace  mcp  organizations  plugins  profile  projects  settings  toolpaths"}
+    </DocCode>
+    <p>A feature calls the sidecar through the shared API client; shared widgets live in <code>shared/</code> and the 3D scene in <code>viewport/</code>.</p>
+  </section>
+
+  <section id="cad-files" class="doc-section">
+    <h2>Where CAD concepts live in core</h2>
+    <table>
+      <thead><tr><th>Concept</th><th>File in packages/core/src/cad/</th></tr></thead>
+      <tbody>
+        <tr><td>Sketch solving</td><td><code>sketch.ts</code>, <code>sketch-shapes.ts</code></td></tr>
+        <tr><td>Feature history and rebuild</td><td><code>history.ts</code>, <code>history-brep.ts</code>, <code>history-edit.ts</code></td></tr>
+        <tr><td>Exact B-rep</td><td><code>brep/</code></td></tr>
+        <tr><td>Booleans on meshes</td><td><code>csg.ts</code></td></tr>
+        <tr><td>Expressions and parameters</td><td><code>expr.ts</code></td></tr>
+        <tr><td>STEP and DXF import</td><td><code>import-step.ts</code>, <code>dxf.ts</code>, <code>import-drawing.ts</code></td></tr>
+        <tr><td>Fillets and blends</td><td><code>edge-blend.ts</code></td></tr>
+        <tr><td>Gears, fasteners, sheet metal</td><td><code>gear.ts</code>, <code>fasteners.ts</code>, <code>smart-fasteners.ts</code>, <code>sheet-metal.ts</code></td></tr>
+        <tr><td>Assembly and scene analysis</td><td><code>assembly-analysis.ts</code>, <code>scene-analysis.ts</code>, <code>scene-step.ts</code></td></tr>
+        <tr><td>Manufacturability</td><td><code>dfm.ts</code></td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Concept</th><th>File in packages/core/src/cam/</th></tr></thead>
+      <tbody>
+        <tr><td>Native kernel (snapshot, run, claims)</td><td><code>kernel/</code></td></tr>
+        <tr><td>Post-processors</td><td><code>post/</code></td></tr>
+        <tr><td>Operations and generators</td><td><code>operations/</code>, <code>generator/</code>, <code>cycles/</code></td></tr>
+        <tr><td>Setups and indexing</td><td><code>setup.ts</code>, <code>indexing.ts</code>, <code>five-axis.ts</code></td></tr>
+        <tr><td>Replay and verification</td><td><code>verify/</code>, <code>program-evidence.ts</code></td></tr>
+        <tr><td>Machines and tools</td><td><code>machine.ts</code>, <code>tool.ts</code></td></tr>
+        <tr><td>Subprograms</td><td><code>subprogram-text.ts</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  </DocsLayout>

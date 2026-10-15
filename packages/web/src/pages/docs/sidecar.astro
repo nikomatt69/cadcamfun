@@ -25,6 +25,7 @@ const toc = [
   { title: "Startup sequence in detail", href: "#startup-sequence" },
   { title: "Authentication model", href: "#auth-model" },
   { title: "What lives in the data directory", href: "#data-directory" },
+  { title: "The ready line, captured", href: "#ready-line" },
 ]
 ---
 
@@ -242,6 +243,14 @@ curl --fail-with-body -H "Authorization: Bearer $CADCAMFUN_TOKEN" "$CADCAMFUN_UR
         </tbody>
     </table>
     <p>Back up the whole directory while the sidecar is stopped, or after a shutdown that checkpointed the WAL. Copying only <code>cadcamfun.db</code> while the sidecar runs can miss recent writes that are still in the WAL file.</p>
+  </section>
+
+    <section id="ready-line" class="doc-section">
+    <h2>The ready line, captured</h2>
+    <DocCode language="bash" title="Start a disposable sidecar and read its port">
+{"CADCAMFUN_TOKEN=t CADCAMFUN_DATA_DIR=\"$(mktemp -d)\" \\\nCADCAMFUN_MIGRATIONS_DIR=\"$PWD/packages/db/drizzle\" \\\nCADCAMFUN_AI_HOST=direct CADCAMFUN_AI_OFFLINE=true \\\nbun --no-env-file apps/sidecar/src/main.ts\n# stdout: {\"event\":\"ready\",\"port\":43461}"}
+    </DocCode>
+    <p>The port is chosen by the operating system on every start. The line is the first stdout output after migrations and layers are ready, so a client that sees it can call the API immediately. Keep stdin open: closing it is the shutdown signal.</p>
   </section>
 
   <DocRelated items={[{ title: "API contract", href: "/docs/api" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />

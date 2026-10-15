@@ -17,6 +17,7 @@ const toc = [
   { title: "Maintain clear boundaries", href: "#leave-alone" },
   { title: "Find the right workflow", href: "#task-directory" },
   { title: "Know what a check establishes", href: "#verification-evidence" },
+  { title: "Guides by task and time", href: "#task-matrix" },
 ]
 ---
 
@@ -143,6 +144,27 @@ bun run --cwd packages/web start`}
     <h3>Operate a second client</h3>
     <p>Enable the companion gateway intentionally, create an individually named device pairing, and connect a native build that includes certificate pinning. Retain the full desktop address, fingerprint, and device token as the paired connection. Read the current route policy before assuming a phone is read-only or unrestricted.</p>
     <p>When access should end, revoke the device from the desktop; removing the connection on the phone alone does not revoke the server-side token. The <a href="/docs/guides/companion-pairing">pairing guide</a> separates network diagnosis, native transport availability, certificate identity, and token revocation.</p>
+  </section>
+
+    <section id="task-matrix" class="doc-section">
+    <h2>Guides by task and time</h2>
+    <table>
+      <thead><tr><th>Guide</th><th>You will</th><th>Needs</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/docs/guides/quickstart">Quickstart</a></td><td>Install, test and open the desktop</td><td>Bun, Rust</td></tr>
+        <tr><td><a href="/docs/guides/local-dev">Local development</a></td><td>Run each process on its own and pick the right checks</td><td>A clone</td></tr>
+        <tr><td><a href="/docs/guides/api-tour">API tour</a></td><td>Make real requests with curl and see the responses</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/api-clients">API clients</a></td><td>Use the Promise SDK and Effect client, handle errors and streams</td><td>TypeScript</td></tr>
+        <tr><td><a href="/docs/guides/project-lifecycle">Project lifecycle</a></td><td>Create, save, reopen and version a project</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/native-manufacturing">Native manufacturing</a></td><td>Generate a verified program and save it</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/ai-streaming">AI streaming</a></td><td>Consume assistant events and recover sessions</td><td>A model key</td></tr>
+        <tr><td><a href="/docs/guides/plugin-authoring">Plugin authoring</a></td><td>Write and test a plugin</td><td>TypeScript</td></tr>
+        <tr><td><a href="/docs/guides/project-history">Project history</a></td><td>Branch, commit, review and merge</td><td>A project</td></tr>
+        <tr><td><a href="/docs/guides/companion-pairing">Companion pairing</a></td><td>Pair the iOS app</td><td>An iPhone</td></tr>
+        <tr><td><a href="/docs/guides/desktop-troubleshooting">Desktop troubleshooting</a></td><td>Diagnose startup and update problems</td><td>The desktop app</td></tr>
+        <tr><td><a href="/docs/guides/contributing">Contributing</a></td><td>Prepare a reviewable change</td><td>A clone</td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[

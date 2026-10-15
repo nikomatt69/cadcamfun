@@ -19,6 +19,12 @@ const toc = [
   { title: "Inspect a database without changing it", href: "#operational-checks" },
   { title: "Use a disposable database in code", href: "#testing-lifecycle" },
   { title: "Diagnose storage failures", href: "#troubleshooting" },
+  { title: "Migration history", href: "#migration-history" },
+  { title: "Upgrade decision flow", href: "#upgrade-flow" },
+  { title: "Backup file anatomy", href: "#backup-files" },
+  { title: "Core table shapes", href: "#core-tables" },
+  { title: "Full table catalog", href: "#table-catalog" },
+  { title: "Writing safely", href: "#write-patterns" },
 ]
 ---
 
@@ -151,6 +157,190 @@ console.log(await Effect.runPromise(program)) // []`}
     </ul>
     <p>Migration backups are pre-upgrade recovery points with a five-file retention policy, not continuous backup of subsequent edits. Back up the complete data directory separately according to the installation's recovery requirements.</p>
     <p>Source: <code>packages/db/src/index.ts</code>, <code>upgrade.ts</code>, <code>schema.ts</code>, and <code>database.test.ts</code>.</p>
+  </section>
+
+    <section id="migration-history" class="doc-section">
+    <h2>Migration history</h2>
+    <p>The checked-in migrations are applied in folder order. Each folder holds a <code>migration.sql</code> and the drizzle-kit <code>snapshot.json</code> used to compute the next diff. The journal row stores the folder name, its hash, the folder timestamp in milliseconds (<code>created_at</code>), and the ISO time it was applied (<code>applied_at</code>).</p>
+    <table>
+      <thead><tr><th>Folder</th><th>Size</th><th>What it creates</th></tr></thead>
+      <tbody>
+        <tr><td><code>20261004223029_careful_monster_badoon</code></td><td>771 lines</td><td>The baseline schema converted from the legacy Prisma model: identity, organizations, projects, drawings, components, toolpaths, libraries, costs, marketplace, plugins and MCP configuration. Table and column names are unchanged so older <code>dev.db</code> data stays readable.</td></tr>
+        <tr><td><code>20261008030518_redundant_dagger</code></td><td>73 lines</td><td>Project history: <code>GitRepo</code>, <code>GitObject</code>, <code>GitRef</code>, <code>PullRequest</code>, <code>PullRequestReview</code>, <code>WorkflowRun</code>.</td></tr>
+        <tr><td><code>20261009012351_moaning_loki</code></td><td>28 lines</td><td>Geometry kernel records: <code>MeshAsset</code> and <code>CadOperationLog</code>.</td></tr>
+        <tr><td><code>20261009171602_brown_mad_thinker</code></td><td>5 lines</td><td><code>LocalKeyValue</code> (<code>key</code> text primary key, <code>value</code> text not null, <code>updatedAt</code> integer not null).</td></tr>
+        </tbody>
+    </table>
+    <p>Folder names come from drizzle-kit: a UTC timestamp followed by a random name. Never rename or edit a folder once it has been applied anywhere; the upgrade planner identifies applied migrations by name and, for older journals, by timestamp and hash.</p>
+  </section>
+
+  <section id="upgrade-flow" class="doc-section">
+    <h2>Upgrade decision flow</h2>
+    <svg viewBox="0 0 760 250" width="100%" role="img" aria-label="Database upgrade flow" style="max-width:760px;font:12px system-ui;color:currentColor">
+<defs><marker id="dbar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.3">
+<rect x="10" y="20" width="150" height="50" rx="8"/><rect x="200" y="20" width="160" height="50" rx="8"/><rect x="400" y="20" width="160" height="50" rx="8"/><rect x="600" y="20" width="150" height="50" rx="8"/>
+<rect x="400" y="150" width="160" height="50" rx="8"/><rect x="600" y="150" width="150" height="50" rx="8"/><rect x="200" y="150" width="160" height="50" rx="8"/>
+<path d="M160 45H198M360 45H398M560 45H598" marker-end="url(#dbar)"/><path d="M480 70V148" marker-end="url(#dbar)"/><path d="M560 175H598" marker-end="url(#dbar)"/><path d="M675 70V148" marker-end="url(#dbar)" stroke-dasharray="4 3"/><path d="M400 175H362" marker-end="url(#dbar)" stroke-dasharray="4 3"/></g>
+<g fill="currentColor" text-anchor="middle">
+<text x="85" y="42">open file</text><text x="85" y="58" opacity=".7">WAL + foreign_keys</text>
+<text x="280" y="42">planUpgrade</text><text x="280" y="58" opacity=".7">read journal + files</text>
+<text x="480" y="42">needed?</text><text x="480" y="58" opacity=".7">legacy or pending &gt; 0</text>
+<text x="675" y="42">no: drizzle()</text><text x="675" y="58" opacity=".7">service ready</text>
+<text x="480" y="172">backupDatabase</text><text x="480" y="188" opacity=".7">only if file existed</text>
+<text x="675" y="172">applyUpgrade</text><text x="675" y="188" opacity=".7">one IMMEDIATE txn</text>
+<text x="280" y="172">failure</text><text x="280" y="188" opacity=".7">DatabaseError, rollback</text>
+<text x="520" y="110" opacity=".7">yes</text></g></svg>
+    <table>
+      <thead><tr><th>Situation</th><th>Backup</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>New file, migrations folder given</td><td>No (the file did not exist before opening)</td><td>All migrations applied in one transaction</td></tr>
+        <tr><td>Existing file, journal up to date</td><td>No</td><td>Opened as is; <code>needed</code> is false</td></tr>
+        <tr><td>Existing file, pending migrations</td><td>Yes, before any change</td><td>Pending migrations applied; journal rows inserted with <code>applied_at</code></td></tr>
+        <tr><td>Existing file, journal without <code>name</code> column</td><td>Yes</td><td>Columns <code>name</code> and <code>applied_at</code> added, rows backfilled, then pending migrations applied</td></tr>
+        <tr><td>Legacy row matches no local migration</td><td>No backup is taken: planning fails first</td><td><code>DatabaseError</code> with operation <code>migrate</code>: "Legacy migration journal does not match local migrations"</td></tr>
+        <tr><td><code>:memory:</code></td><td>Never</td><td>Migrations applied if a folder is given</td></tr>
+        <tr><td>No migrations folder</td><td>Never</td><td>Opened without creating tables</td></tr>
+        </tbody>
+    </table>
+    <p>Backfill matching works like this: a legacy row's <code>created_at</code> is truncated to whole seconds and compared with each migration's folder timestamp. If exactly one migration matches, it is used. Otherwise the hash breaks the tie, and as a last resort any migration with the same hash is used.</p>
+  </section>
+
+  <section id="backup-files" class="doc-section">
+    <h2>Backup file anatomy</h2>
+    <DocCode language="text" title="Pre-migration backup name">
+{"backups/cadcamfun-20261015-034512.123-6f1c2d4e-8a90-4b7c-9e21-3f5a6b7c8d9e-pre-migrate.db\n        \u2514 prefix \u2518 \u2514 UTC timestamp \u2518 \u2514 random UUID                      \u2518"}
+    </DocCode>
+    <ul>
+      <li>The prefix is the database file name without <code>.db</code>, followed by a dash.</li>
+      <li>The timestamp is UTC with millisecond precision. If the newest existing backup has the same or a later timestamp, the new one is set 1 ms after it, so lexical order always equals creation order.</li>
+      <li>The snapshot is written to <code>&lt;name&gt;.partial</code> with <code>VACUUM INTO</code>, then renamed. A crash leaves at most a <code>.partial</code> file, which is removed in a <code>finally</code> block.</li>
+      <li>After a successful backup, only the five newest files matching the exact pattern are kept. Files you copy into the directory under other names are never deleted.</li>
+      <li><code>VACUUM INTO</code> produces a compact, self-contained database with no WAL sibling, so a backup can be opened directly.</li>
+    </ul>
+    <DocCode language="bash" title="Restore a pre-migration backup (application stopped)">
+{"DATA=\"/absolute/path/to/data\"\ncp \"$DATA/cadcamfun.db\" \"$DATA/cadcamfun.db.broken\"         # keep the failed state\nrm -f \"$DATA/cadcamfun.db-wal\" \"$DATA/cadcamfun.db-shm\"\ncp \"$DATA/backups/cadcamfun-<timestamp>-<uuid>-pre-migrate.db\" \"$DATA/cadcamfun.db\"\nsqlite3 -readonly \"$DATA/cadcamfun.db\" 'PRAGMA quick_check;'   # expect: ok"}
+    </DocCode>
+    <DocCallout type="warn" title="Restoring rolls back schema and data">
+      <p>A restored backup is the state just before the upgrade. Edits made after that upgrade are not in it, and the next launch will try the same migration again. Fix the cause of the failure before restarting.</p>
+    </DocCallout>
+  </section>
+
+  <section id="core-tables" class="doc-section">
+    <h2>Core table shapes</h2>
+    <p>These are the tables the desktop editor, history and kernel read most often. Column names are the SQL names; Drizzle exposes them under the same keys.</p>
+    <table>
+      <thead><tr><th>Table</th><th>Columns</th></tr></thead>
+      <tbody>
+        <tr><td><code>Project</code></td><td><code>id</code>, <code>name</code>, <code>description</code>, <code>createdAt</code>, <code>updatedAt</code>, <code>ownerId</code>, <code>organizationId</code>, <code>isPublic</code></td></tr>
+        <tr><td><code>Drawing</code></td><td><code>id</code>, <code>name</code>, <code>description</code>, <code>data</code>, <code>thumbnail</code>, <code>createdAt</code>, <code>updatedAt</code>, <code>projectId</code></td></tr>
+        <tr><td><code>Component</code></td><td><code>id</code>, <code>name</code>, <code>description</code>, <code>data</code>, <code>thumbnail</code>, <code>type</code>, <code>isPublic</code>, <code>createdAt</code>, <code>updatedAt</code>, <code>projectId</code></td></tr>
+        <tr><td><code>Toolpath</code></td><td><code>id</code>, <code>name</code>, <code>description</code>, <code>data</code>, <code>type</code>, <code>operationType</code>, <code>gcode</code>, <code>thumbnail</code>, <code>isPublic</code>, <code>projectId</code>, <code>createdAt</code>, <code>updatedAt</code>, <code>createdBy</code>, <code>drawingId</code>, <code>materialId</code>, <code>toolId</code>, <code>machineConfigId</code></td></tr>
+        <tr><td><code>GitRepo</code></td><td><code>projectId</code>, <code>head</code>, <code>remote</code>, <code>createdAt</code></td></tr>
+        <tr><td><code>GitObject</code></td><td><code>projectId</code>, <code>oid</code>, <code>type</code>, <code>body</code></td></tr>
+        <tr><td><code>GitRef</code></td><td><code>projectId</code>, <code>name</code>, <code>oid</code></td></tr>
+        <tr><td><code>PullRequest</code></td><td><code>id</code>, <code>projectId</code>, <code>number</code>, <code>title</code>, <code>body</code>, <code>head</code>, <code>base</code>, <code>state</code>, <code>authorId</code>, <code>authorKind</code>, <code>mergeCommit</code>, <code>remoteNumber</code>, <code>createdAt</code>, <code>updatedAt</code></td></tr>
+        <tr><td><code>WorkflowRun</code></td><td><code>id</code>, <code>projectId</code>, <code>workflow</code>, <code>event</code>, <code>ref</code>, <code>sha</code>, <code>status</code>, <code>events</code>, <code>startedAt</code>, <code>finishedAt</code></td></tr>
+        <tr><td><code>MeshAsset</code></td><td><code>id</code>, <code>projectId</code>, <code>kind</code>, <code>inputs</code>, <code>stats</code>, <code>mesh</code>, <code>createdAt</code></td></tr>
+        <tr><td><code>CadOperationLog</code></td><td><code>id</code>, <code>projectId</code>, <code>operation</code>, <code>meshAssetId</code>, <code>outcome</code>, <code>durationMs</code>, <code>inputs</code>, <code>error</code>, <code>traceId</code>, <code>spanId</code>, <code>createdAt</code></td></tr>
+        <tr><td><code>LocalKeyValue</code></td><td><code>key</code>, <code>value</code>, <code>updatedAt</code></td></tr>
+        </tbody>
+    </table>
+    <svg viewBox="0 0 760 260" width="100%" role="img" aria-label="Project ownership and cascade deletes" style="max-width:760px;font:12px system-ui">
+<g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="320" y="15" width="120" height="36" rx="6"/>
+<rect x="10" y="110" width="105" height="32" rx="6"/><rect x="125" y="110" width="105" height="32" rx="6"/><rect x="240" y="110" width="105" height="32" rx="6"/><rect x="355" y="110" width="105" height="32" rx="6"/><rect x="470" y="110" width="80" height="32" rx="6"/><rect x="560" y="110" width="90" height="32" rx="6"/><rect x="660" y="110" width="95" height="32" rx="6"/>
+<rect x="10" y="200" width="105" height="32" rx="6"/><rect x="125" y="200" width="105" height="32" rx="6"/><rect x="240" y="200" width="105" height="32" rx="6"/><rect x="560" y="200" width="90" height="32" rx="6"/><rect x="660" y="200" width="95" height="32" rx="6"/>
+<path d="M380 51L62 108M380 51L177 108M380 51L292 108M380 51L407 108M380 51L510 108M380 51L605 108M380 51L707 108M62 142V198M177 142V198M292 142V198M605 142V198"/><path d="M707 198L605 142" stroke-dasharray="4 3"/></g>
+<g fill="currentColor" text-anchor="middle"><text x="380" y="38">Project</text>
+<text x="62" y="130">Drawing</text><text x="177" y="130">Component</text><text x="292" y="130">Toolpath</text><text x="407" y="130">Git* tables</text><text x="510" y="130">PullRequest</text><text x="605" y="130">MeshAsset</text><text x="707" y="130">WorkflowRun</text>
+<text x="62" y="220">DrawingVersion</text><text x="177" y="220">Comp. Version</text><text x="292" y="220">Toolpath Ver.</text><text x="605" y="220">CadOpLog</text><text x="707" y="220" font-size="10">CadOpLog.mesh→null</text>
+<text x="380" y="85" opacity=".7">solid lines: ON DELETE CASCADE</text></g></svg>
+    <p>Deleting a project removes its drawings, components, toolpaths, history objects and refs, pull requests, workflow runs, mesh assets and operation logs. Version and comment rows cascade from their parent resource. A <code>CadOperationLog</code> row survives the deletion of its mesh asset with <code>meshAssetId</code> set to null. Toolpath links to materials, tools and machine configurations have no cascade, so a referenced material cannot be deleted while a toolpath points at it.</p>
+  </section>
+
+  <section id="table-catalog" class="doc-section">
+    <h2>Full table catalog</h2>
+    <p>The schema defines 60 tables. The list below was produced from the Drizzle table definitions: SQL name, exported constant, column count, number of declared indexes, and foreign keys with their delete rule. "no action" is SQLite's default: the delete fails while referencing rows exist (foreign keys are enforced on the application connection).</p>
+    <table>
+      <thead><tr><th>SQL table</th><th>Export</th><th>Cols</th><th>Idx</th><th>Foreign keys</th></tr></thead>
+      <tbody>
+        <tr><td><code>Account</code></td><td><code>accountTable</code></td><td>13</td><td>1</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>ActivityLog</code></td><td><code>activityLogTable</code></td><td>7</td><td>0</td><td><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>AIAnalysisLog</code></td><td><code>aIAnalysisLogTable</code></td><td>7</td><td>0</td><td><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>ApiKey</code></td><td><code>apiKeyTable</code></td><td>7</td><td>1</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>authenticators</code></td><td><code>authenticatorTable</code></td><td>8</td><td>0</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>CadOperationLog</code></td><td><code>cadOperationLogTable</code></td><td>11</td><td>1</td><td><code>projectId</code> → Project (cascade)<br><code>meshAssetId</code> → MeshAsset (set null)</td></tr>
+        <tr><td><code>Component</code></td><td><code>componentTable</code></td><td>10</td><td>0</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>ComponentComment</code></td><td><code>componentCommentTable</code></td><td>6</td><td>0</td><td><code>componentId</code> → Component (cascade)<br><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>ComponentVersion</code></td><td><code>componentVersionTable</code></td><td>6</td><td>0</td><td><code>componentId</code> → Component (cascade)<br><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>Conversation</code></td><td><code>conversationTable</code></td><td>6</td><td>0</td><td><code>organizationId</code> → Organization (cascade)</td></tr>
+        <tr><td><code>ConversationParticipant</code></td><td><code>conversationParticipantTable</code></td><td>5</td><td>1</td><td><code>userId</code> → User (cascade)<br><code>conversationId</code> → Conversation (cascade)</td></tr>
+        <tr><td><code>CostSettings</code></td><td><code>costSettingsTable</code></td><td>11</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>Drawing</code></td><td><code>drawingTable</code></td><td>8</td><td>0</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>DrawingVersion</code></td><td><code>drawingVersionTable</code></td><td>5</td><td>0</td><td><code>drawingId</code> → Drawing (cascade)</td></tr>
+        <tr><td><code>FileUpload</code></td><td><code>fileUploadTable</code></td><td>12</td><td>0</td><td>—</td></tr>
+        <tr><td><code>GitObject</code></td><td><code>gitObjectTable</code></td><td>4</td><td>1</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>GitRef</code></td><td><code>gitRefTable</code></td><td>3</td><td>1</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>GitRepo</code></td><td><code>gitRepoTable</code></td><td>4</td><td>0</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>LibraryItem</code></td><td><code>libraryItemTable</code></td><td>14</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>LocalKeyValue</code></td><td><code>localKeyValueTable</code></td><td>3</td><td>0</td><td>—</td></tr>
+        <tr><td><code>MachineConfig</code></td><td><code>machineConfigTable</code></td><td>9</td><td>0</td><td><code>ownerId</code> → User (no action)</td></tr>
+        <tr><td><code>MarketplaceCategory</code></td><td><code>marketplaceCategoryTable</code></td><td>10</td><td>1</td><td><code>parentId</code> → MarketplaceCategory (no action)</td></tr>
+        <tr><td><code>MarketplaceCollection</code></td><td><code>marketplaceCollectionTable</code></td><td>10</td><td>1</td><td><code>sellerId</code> → MarketplaceSeller (no action)</td></tr>
+        <tr><td><code>MarketplaceCollectionItem</code></td><td><code>marketplaceCollectionItemTable</code></td><td>5</td><td>1</td><td><code>collectionId</code> → MarketplaceCollection (cascade)<br><code>itemId</code> → MarketplaceItem (cascade)</td></tr>
+        <tr><td><code>MarketplaceItem</code></td><td><code>marketplaceItemTable</code></td><td>30</td><td>5</td><td><code>sellerId</code> → MarketplaceSeller (no action)</td></tr>
+        <tr><td><code>MarketplaceOrder</code></td><td><code>marketplaceOrderTable</code></td><td>23</td><td>4</td><td><code>buyerId</code> → User (no action)<br><code>sellerId</code> → MarketplaceSeller (no action)<br><code>itemId</code> → MarketplaceItem (no action)</td></tr>
+        <tr><td><code>MarketplacePayout</code></td><td><code>marketplacePayoutTable</code></td><td>12</td><td>1</td><td><code>sellerId</code> → MarketplaceSeller (no action)</td></tr>
+        <tr><td><code>MarketplaceReview</code></td><td><code>marketplaceReviewTable</code></td><td>12</td><td>2</td><td><code>itemId</code> → MarketplaceItem (no action)<br><code>buyerId</code> → User (no action)<br><code>orderId</code> → MarketplaceOrder (no action)</td></tr>
+        <tr><td><code>MarketplaceSeller</code></td><td><code>marketplaceSellerTable</code></td><td>19</td><td>0</td><td><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>MarketplaceWishlist</code></td><td><code>marketplaceWishlistTable</code></td><td>4</td><td>1</td><td><code>userId</code> → User (cascade)<br><code>itemId</code> → MarketplaceItem (cascade)</td></tr>
+        <tr><td><code>Material</code></td><td><code>materialTable</code></td><td>9</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>MaterialCost</code></td><td><code>materialCostTable</code></td><td>10</td><td>0</td><td><code>materialId</code> → Material (cascade)<br><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>MCPServerConfig</code></td><td><code>mCPServerConfigTable</code></td><td>11</td><td>1</td><td>—</td></tr>
+        <tr><td><code>MeshAsset</code></td><td><code>meshAssetTable</code></td><td>7</td><td>1</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        <tr><td><code>Message</code></td><td><code>messageTable</code></td><td>8</td><td>1</td><td><code>senderId</code> → User (cascade)<br><code>conversationId</code> → Conversation (cascade)<br><code>fileId</code> → FileUpload (set null)</td></tr>
+        <tr><td><code>Notification</code></td><td><code>notificationTable</code></td><td>12</td><td>0</td><td><code>userId</code> → User (cascade)<br><code>organizationId</code> → Organization (cascade)<br><code>projectId</code> → Project (cascade)<br><code>componentId</code> → Component (cascade)<br><code>messageId</code> → Message (cascade)</td></tr>
+        <tr><td><code>OperationCost</code></td><td><code>operationCostTable</code></td><td>10</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>Organization</code></td><td><code>organizationTable</code></td><td>5</td><td>0</td><td>—</td></tr>
+        <tr><td><code>OrganizationInvitation</code></td><td><code>organizationInvitationTable</code></td><td>7</td><td>0</td><td><code>organizationId</code> → Organization (cascade)</td></tr>
+        <tr><td><code>passkey</code></td><td><code>passkeyTable</code></td><td>11</td><td>0</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>PluginConfiguration</code></td><td><code>pluginConfigurationTable</code></td><td>2</td><td>0</td><td><code>pluginId</code> → PluginRegistryEntry (cascade)</td></tr>
+        <tr><td><code>PluginRegistryEntry</code></td><td><code>pluginRegistryEntryTable</code></td><td>9</td><td>0</td><td>—</td></tr>
+        <tr><td><code>ProductionCostEstimate</code></td><td><code>productionCostEstimateTable</code></td><td>17</td><td>0</td><td><code>toolpathId</code> → Toolpath (cascade)<br><code>operationCostId</code> → OperationCost (no action)<br><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>Project</code></td><td><code>projectTable</code></td><td>8</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>PullRequest</code></td><td><code>pullRequestTable</code></td><td>14</td><td>1</td><td><code>projectId</code> → Project (cascade)<br><code>authorId</code> → User (no action)</td></tr>
+        <tr><td><code>PullRequestReview</code></td><td><code>pullRequestReviewTable</code></td><td>8</td><td>1</td><td><code>pullRequestId</code> → PullRequest (cascade)<br><code>reviewerId</code> → User (no action)</td></tr>
+        <tr><td><code>PushSubscription</code></td><td><code>pushSubscriptionTable</code></td><td>6</td><td>0</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>Session</code></td><td><code>sessionTable</code></td><td>8</td><td>0</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>Subscription</code></td><td><code>subscriptionTable</code></td><td>24</td><td>3</td><td><code>referenceId</code> → User (cascade)</td></tr>
+        <tr><td><code>Token</code></td><td><code>tokenTable</code></td><td>8</td><td>2</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>Tool</code></td><td><code>toolTable</code></td><td>17</td><td>0</td><td><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>Toolpath</code></td><td><code>toolpathTable</code></td><td>17</td><td>0</td><td><code>projectId</code> → Project (cascade)<br><code>createdBy</code> → User (no action)<br><code>drawingId</code> → Drawing (no action)<br><code>materialId</code> → Material (no action)<br><code>toolId</code> → Tool (no action)<br><code>machineConfigId</code> → MachineConfig (no action)</td></tr>
+        <tr><td><code>ToolpathComment</code></td><td><code>toolpathCommentTable</code></td><td>6</td><td>0</td><td><code>toolpathId</code> → Toolpath (cascade)<br><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>ToolpathVersion</code></td><td><code>toolpathVersionTable</code></td><td>7</td><td>0</td><td><code>toolpathId</code> → Toolpath (cascade)<br><code>userId</code> → User (no action)</td></tr>
+        <tr><td><code>ToolWearCost</code></td><td><code>toolWearCostTable</code></td><td>10</td><td>0</td><td><code>toolId</code> → Tool (cascade)<br><code>ownerId</code> → User (no action)<br><code>organizationId</code> → Organization (no action)</td></tr>
+        <tr><td><code>twoFactor</code></td><td><code>twoFactorTable</code></td><td>4</td><td>0</td><td><code>userId</code> → User (cascade)</td></tr>
+        <tr><td><code>User</code></td><td><code>userTable</code></td><td>17</td><td>0</td><td>—</td></tr>
+        <tr><td><code>UserOrganization</code></td><td><code>userOrganizationTable</code></td><td>5</td><td>1</td><td><code>userId</code> → User (cascade)<br><code>organizationId</code> → Organization (cascade)</td></tr>
+        <tr><td><code>verification_tokens</code></td><td><code>verificationTokenTable</code></td><td>3</td><td>1</td><td>—</td></tr>
+        <tr><td><code>WorkflowRun</code></td><td><code>workflowRunTable</code></td><td>10</td><td>1</td><td><code>projectId</code> → Project (cascade)</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="write-patterns" class="doc-section">
+    <h2>Writing safely</h2>
+    <ul>
+      <li>Wrap multi-statement changes in a Drizzle transaction inside one <code>query</code> call: <code>database.query("op", (db) =&gt; db.transaction((tx) =&gt; ...))</code>. Separate <code>query</code> calls are separate transactions.</li>
+      <li>Give each query a stable, dotted operation name (<code>projects.list</code>, <code>toolpaths.update</code>). It is the only context a <code>DatabaseError</code> carries besides the cause, and it appears in logs.</li>
+      <li>Generate ids with <code>newId()</code> (a UUID) or let the column default do it; do not build ids from names.</li>
+      <li>Validate JSON columns when reading them. The declared TypeScript type is not checked by SQLite.</li>
+      <li>Use <code>LocalKeyValue</code> through the sidecar key-value service rather than writing rows directly, so the key and value validation is applied.</li>
+    </ul>
+    <DocCode language="ts" title="A transactional write">
+{"import { Database, schema } from \"@cadcamfun/db\"\nimport { eq } from \"drizzle-orm\"\nimport { Effect } from \"effect\"\n\nconst renameProject = (id: string, name: string) => Effect.gen(function* () {\n  const database = yield* Database\n  return yield* database.query(\"projects.rename\", (db) =>\n    db.transaction((tx) => {\n      const updated = tx.update(schema.projectTable)\n        .set({ name, updatedAt: new Date() })\n        .where(eq(schema.projectTable.id, id))\n        .returning().all()\n      if (updated.length === 0) throw new Error(`project ${id} not found`)\n      return updated[0]\n    }))\n})"}
+    </DocCode>
+    <p>To create rows with explicit ids, use <code>schema.newId()</code>; <code>@cadcamfun/db</code> re-exports the schema module as the <code>schema</code> namespace, not as top-level names.</p>
   </section>
 
   <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "History", href: "/docs/history" }, { title: "Setups", href: "/docs/setups" }]} />

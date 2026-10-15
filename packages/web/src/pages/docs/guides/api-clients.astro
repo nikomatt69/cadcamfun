@@ -15,6 +15,10 @@ const toc = [
   { title: "Streaming", href: "#streams" },
   { title: "Coverage and regeneration", href: "#coverage" },
   { title: "Integration verification", href: "#verification" },
+  { title: "Promise SDK options reference", href: "#client-options" },
+  { title: "ClientError reasons", href: "#client-error-reasons" },
+  { title: "Consuming a stream with the SDK", href: "#sse-client" },
+  { title: "Example: preferences through the SDK", href: "#kv-sdk" },
 ]
 ---
 <DocsLayout title="Build an API client integration" subtitle="Use the Promise SDK, full Effect contract client, or generated Effect adapters with their actual inputs and error behavior." description="CADCAMFUN client guide covering CadCam.make, ApiClient.layer, authentication, direct results, thrown errors, abort signals, stream consumption, generated coverage, and verification." toc={toc}>
@@ -142,5 +146,57 @@ bun run --filter @cadcamfun/web check:api-reference`}</DocCode>
     <p>For an integration acceptance check, verify public health; a protected request without a token; the same request with the current token; a valid create/read cycle; a declared validation failure; a cancelled request; and a stream whose terminal state is checked. Use a disposable project and never infer successful persistence from a frontend fixture alone.</p>
     <p>Implementation sources are <code>packages/api/src/sdk/generated/client.ts</code>, its <code>client-error.ts</code>, <code>packages/api/src/client.ts</code>, <code>packages/api/src/client/generated</code>, and <code>packages/httpapi-codegen/src/index.ts</code>. The generator and committed outputs together establish the actual client behavior.</p>
   </section>
+    <section id="client-options" class="doc-section">
+    <h2>Promise SDK options reference</h2>
+    <table>
+      <thead><tr><th>Option</th><th>Where</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>baseUrl</code></td><td><code>CadCam.make</code></td><td>Resolved with <code>new URL(path, baseUrl)</code>; include the scheme and port.</td></tr>
+        <tr><td><code>fetch</code></td><td><code>CadCam.make</code></td><td>Replace the transport, for example to add logging or to inject a test double. Defaults to <code>globalThis.fetch</code>.</td></tr>
+        <tr><td><code>headers</code></td><td><code>CadCam.make</code></td><td>Sent with every request. Put <code>authorization</code> here.</td></tr>
+        <tr><td><code>signal</code></td><td>per call</td><td>Aborts the request; the rejection is <code>ClientError("Transport")</code>.</td></tr>
+        <tr><td><code>headers</code></td><td>per call</td><td>Override or add headers for one call, such as <code>x-session-token</code>. Per-call values win over client values.</td></tr>
+        </tbody>
+    </table>
+    <p>When a body is present and no <code>content-type</code> header was set, the SDK sets <code>application/json</code> and serializes with <code>JSON.stringify</code>. Path parameters are always passed through <code>encodeURIComponent</code>, so a key such as <code>docs.walkthrough.units</code> or one containing <code>/</code> stays a single segment.</p>
+  </section>
+
+  <section id="client-error-reasons" class="doc-section">
+    <h2>ClientError reasons</h2>
+    <table>
+      <thead><tr><th>Reason</th><th>Raised when</th><th>Typical response</th></tr></thead>
+      <tbody>
+        <tr><td><code>Transport</code></td><td><code>fetch</code> threw (refused, reset, DNS, abort) or a stream read failed</td><td>Re-resolve the sidecar URL; retry reads; re-read state before retrying writes.</td></tr>
+        <tr><td><code>UnexpectedStatus</code></td><td>The status is neither the success status nor a declared error status. The cause holds <code>&#123; status &#125;</code>.</td><td>Treat as a contract mismatch, often a different server version.</td></tr>
+        <tr><td><code>UnsupportedContentType</code></td><td>A stream operation answered with something other than <code>text/event-stream</code>, or a JSON operation with a non-JSON type</td><td>Check proxies and the server version.</td></tr>
+        <tr><td><code>MalformedResponse</code></td><td>Empty or invalid JSON, a missing body, or an SSE <code>data:</code> block that is not JSON</td><td>Log the raw response; report it.</td></tr>
+        <tr><td><code>SseEventTooLarge</code></td><td>The unparsed SSE buffer exceeded 16 MiB</td><td>The event is refused; restart the stream.</td></tr>
+        </tbody>
+    </table>
+    <p>The message of a <code>ClientError</code> is the reason followed by the cause message (for example <code>Transport: fetch failed</code>), so logging <code>error.message</code> alone is already diagnostic.</p>
+    <DocCode language="ts" title="Retrying idempotent reads only">
+{"import { CadCam, ClientError } from \"@cadcamfun/api/sdk\"\n\nasync function withRetry<T>(read: () => Promise<T>, attempts = 3): Promise<T> {\n  for (let attempt = 1; ; attempt++) {\n    try {\n      return await read()\n    } catch (error) {\n      const transient = error instanceof ClientError && error.reason === \"Transport\"\n      if (!transient || attempt >= attempts) throw error\n      await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt))\n    }\n  }\n}\n\nconst projects = await withRetry(() => client.projects.list())"}
+    </DocCode>
+    <DocCallout type="warn" title="Do not blindly retry writes">
+      <p>A write that failed with <code>Transport</code> may have been applied. Read the resource again and only resubmit when it is not there; the API has no idempotency keys.</p>
+    </DocCallout>
+  </section>
+
+  <section id="sse-client" class="doc-section">
+    <h2>Consuming a stream with the SDK</h2>
+    <DocCode language="ts" title="Iterate assistant events">
+{"const controller = new AbortController()\nconst events = client.ai.chatStream(\n  { message: \"Pocket the 40 x 30 rectangle, 3 mm deep\", projectId },\n  { signal: controller.signal },\n)\n\nfor await (const event of events) {\n  switch (event.type) {\n    case \"delta\": render(event); break\n    case \"permission_request\": askUser(event); break\n    case \"done\": finish(event); break\n    case \"error\": showError(event); break\n  }\n}"}
+    </DocCode>
+    <p>The iterator parses each SSE block: it joins the <code>data:</code> lines of the block, parses the JSON and yields it. Comments and blocks without <code>data:</code> are skipped. Leaving the loop early (<code>break</code>, an exception, or abort) cancels the reader and releases the connection. The event <code>type</code> values are the ones listed in the assistant streaming guide; check the generated <code>AiChatStreamOutput</code> type for the exact union.</p>
+  </section>
+
+  <section id="kv-sdk" class="doc-section">
+    <h2>Example: preferences through the SDK</h2>
+    <DocCode language="ts" title="Key-value round trip">
+{"const key = \"docs.walkthrough.units\"\n\ntry {\n  await client.kv.get({ key })\n} catch (error) {\n  if ((error as { _tag?: string })._tag !== \"NotFound\") throw error   // first run: 404\n}\n\nconst saved = await client.kv.set({ key, value: { units: \"mm\" } })\n// saved: { key, value: { units: \"mm\" }, updatedAt: \"2026-\u2026\" }\n\nconst { entries } = await client.kv.list({ prefix: \"docs.\" })\nawait client.kv.remove({ key })   // { message: \"\u2026\" }"}
+    </DocCode>
+    <p>Keys are limited to 512 characters and must contain non-whitespace text; values must be JSON-compatible (no cycles, functions or non-finite numbers).</p>
+  </section>
+
   <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Captured walkthrough", href: "/docs/guides/api-tour" }, { title: "AI streaming", href: "/docs/guides/ai-streaming" }]} />
 </DocsLayout>

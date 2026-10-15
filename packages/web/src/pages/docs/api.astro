@@ -23,6 +23,11 @@ const toc = [
   { title: "Generated SDKs", href: "#codegen" },
   { title: "Source organization", href: "#layout" },
   { title: "Integration rules", href: "#boundaries" },
+  { title: "Operations per resource group", href: "#group-stats" },
+  { title: "Status codes across the contract", href: "#status-codes" },
+  { title: "How a request is processed", href: "#request-lifecycle" },
+  { title: "Responses that are not JSON", href: "#non-json" },
+  { title: "Calling the API without a client", href: "#raw-fetch" },
 ]
 ---
 
@@ -164,6 +169,129 @@ bun run check:docs-index`}</DocCode>
       <tr><td>Paired client</td><td><a href="/docs/guides/companion-pairing">Enable and manage device access</a></td><td>Gateway address, certificate fingerprint, individually revocable device token.</td></tr>
     </tbody></table>
     <p>These recipes connect HTTP contracts to real service behavior. A schema can describe required presence, encoding, and a returned shape; its linked guide explains access rules, persistence effects, supported recovery, and limits that cannot be inferred from those types alone.</p>
+  </section>
+
+    <section id="group-stats" class="doc-section">
+    <h2>Operations per resource group</h2>
+    <p>The contract currently declares 270 operations in 34 groups, all under a single <code>bearer</code> HTTP security scheme. The only operation without bearer security is the public health probe. The table is computed from the generated OpenAPI document: operations per group, the HTTP methods used, how many distinct paths, and one representative path.</p>
+    <table>
+      <thead><tr><th>Group</th><th>Tag</th><th>Ops</th><th>Methods</th><th>Paths</th><th>Example path</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/docs/api/health">Health</a></td><td><code>health</code></td><td>1</td><td>GET 1</td><td>1</td><td><code>/api/health</code></td></tr>
+        <tr><td><a href="/docs/api/system">System</a></td><td><code>system</code></td><td>2</td><td>GET 2</td><td>2</td><td><code>/health</code></td></tr>
+        <tr><td><a href="/docs/api/projects">Projects</a></td><td><code>projects</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/projects</code></td></tr>
+        <tr><td><a href="/docs/api/drawings">Drawings</a></td><td><code>drawings</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/drawings/&#123;id&#125;</code></td></tr>
+        <tr><td><a href="/docs/api/components">Components</a></td><td><code>components</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/components/&#123;id&#125;</code></td></tr>
+        <tr><td><a href="/docs/api/cad-exact">Exact CAD</a></td><td><code>cadExact</code></td><td>3</td><td>POST 3</td><td>3</td><td><code>/api/cad/exact/analyze</code></td></tr>
+        <tr><td><a href="/docs/api/toolpaths">Toolpaths</a></td><td><code>toolpaths</code></td><td>7</td><td>DELETE 1, GET 3, POST 2, PUT 1</td><td>3</td><td><code>/api/drawings/&#123;id&#125;/toolpaths</code></td></tr>
+        <tr><td><a href="/docs/api/project-toolpaths">Project toolpaths</a></td><td><code>projectToolpaths</code></td><td>2</td><td>GET 1, POST 1</td><td>1</td><td><code>/api/projects/&#123;id&#125;/toolpaths</code></td></tr>
+        <tr><td><a href="/docs/api/machining">Machining</a></td><td><code>toolpathGenerator</code></td><td>5</td><td>POST 5</td><td>5</td><td><code>/api/toolpaths/generate</code></td></tr>
+        <tr><td><a href="/docs/api/toolpath-history">Toolpath history</a></td><td><code>toolpathExtras</code></td><td>8</td><td>DELETE 1, GET 3, POST 3, PUT 1</td><td>5</td><td><code>/api/toolpaths/library</code></td></tr>
+        <tr><td><a href="/docs/api/materials">Materials</a></td><td><code>materials</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/materials</code></td></tr>
+        <tr><td><a href="/docs/api/material-storage">Material storage</a></td><td><code>materialsStorage</code></td><td>5</td><td>DELETE 1, GET 2, POST 2</td><td>2</td><td><code>/api/materials/export-import</code></td></tr>
+        <tr><td><a href="/docs/api/tools">Tools</a></td><td><code>tools</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/tools</code></td></tr>
+        <tr><td><a href="/docs/api/tool-storage">Tool storage</a></td><td><code>toolsStorage</code></td><td>7</td><td>DELETE 1, GET 3, POST 3</td><td>3</td><td><code>/api/tools/export-import</code></td></tr>
+        <tr><td><a href="/docs/api/machines">Machines</a></td><td><code>machineConfigs</code></td><td>6</td><td>DELETE 1, GET 2, POST 2, PUT 1</td><td>3</td><td><code>/api/machine-configs</code></td></tr>
+        <tr><td><a href="/docs/api/machine-storage">Machine storage</a></td><td><code>machineConfigsStorage</code></td><td>5</td><td>DELETE 1, GET 2, POST 2</td><td>2</td><td><code>/api/machine-configs/export-import</code></td></tr>
+        <tr><td><a href="/docs/api/library">Library</a></td><td><code>library</code></td><td>8</td><td>DELETE 1, GET 5, POST 1, PUT 1</td><td>5</td><td><code>/api/library</code></td></tr>
+        <tr><td><a href="/docs/api/costs">Production costs</a></td><td><code>production-costs</code></td><td>21</td><td>DELETE 4, GET 8, POST 5, PUT 4</td><td>9</td><td><code>/api/production-costs/estimates</code></td></tr>
+        <tr><td><a href="/docs/api/ai">AI sessions and actions</a></td><td><code>ai</code></td><td>34</td><td>DELETE 3, GET 8, POST 21, PUT 2</td><td>32</td><td><code>/api/ai/actions</code></td></tr>
+        <tr><td><a href="/docs/api/history">History and workflows</a></td><td><code>vcs</code></td><td>22</td><td>GET 10, POST 11, PUT 1</td><td>19</td><td><code>/api/projects/&#123;id&#125;/actions/dispatch</code></td></tr>
+        <tr><td><a href="/docs/api/events">Project events</a></td><td><code>events</code></td><td>1</td><td>GET 1</td><td>1</td><td><code>/api/projects/&#123;id&#125;/events</code></td></tr>
+        <tr><td><a href="/docs/api/companion">Companion pairing</a></td><td><code>companion</code></td><td>5</td><td>DELETE 1, GET 1, POST 3</td><td>5</td><td><code>/api/companion</code></td></tr>
+        <tr><td><a href="/docs/api/plugins">Plugins</a></td><td><code>plugins</code></td><td>16</td><td>DELETE 1, GET 8, PATCH 1, POST 4, PUT 2</td><td>12</td><td><code>/api/plugins</code></td></tr>
+        <tr><td><a href="/docs/api/mcp">MCP configuration</a></td><td><code>mcp</code></td><td>8</td><td>DELETE 2, GET 2, POST 2, PUT 2</td><td>3</td><td><code>/api/mcp/config</code></td></tr>
+        <tr><td><a href="/docs/api/files">Files</a></td><td><code>files</code></td><td>2</td><td>GET 1, POST 1</td><td>2</td><td><code>/api/download</code></td></tr>
+        <tr><td><a href="/docs/api/key-value">Key-value storage</a></td><td><code>kv</code></td><td>4</td><td>DELETE 1, GET 2, PUT 1</td><td>2</td><td><code>/api/kv</code></td></tr>
+        <tr><td><a href="/docs/api/organizations">Organizations</a></td><td><code>organizations</code></td><td>5</td><td>DELETE 1, GET 2, POST 1, PUT 1</td><td>2</td><td><code>/api/organizations</code></td></tr>
+        <tr><td><a href="/docs/api/notifications">Notifications</a></td><td><code>notifications</code></td><td>4</td><td>DELETE 1, GET 1, POST 1, PUT 1</td><td>3</td><td><code>/api/notifications</code></td></tr>
+        <tr><td><a href="/docs/api/authentication">Authentication</a></td><td><code>auth</code></td><td>12</td><td>GET 1, POST 11</td><td>12</td><td><code>/api/auth/forgot-password</code></td></tr>
+        <tr><td><a href="/docs/api/users">Users</a></td><td><code>user</code></td><td>16</td><td>DELETE 2, GET 10, POST 2, PUT 2</td><td>12</td><td><code>/api/user/api-keys</code></td></tr>
+        <tr><td><a href="/docs/api/billing">Billing</a></td><td><code>billing</code></td><td>15</td><td>DELETE 1, GET 5, POST 8, PUT 1</td><td>10</td><td><code>/api/better-auth-stripe/billing-portal</code></td></tr>
+        <tr><td><a href="/docs/api/analytics">Analytics</a></td><td><code>analytics</code></td><td>10</td><td>DELETE 1, GET 7, POST 2</td><td>9</td><td><code>/api/analytics</code></td></tr>
+        <tr><td><a href="/docs/api/application">Application services</a></td><td><code>misc</code></td><td>10</td><td>DELETE 2, GET 3, POST 4, PUT 1</td><td>6</td><td><code>/api/app-control/notify</code></td></tr>
+        <tr><td><a href="/docs/api/waitlist">Waitlist</a></td><td><code>waitlist</code></td><td>1</td><td>POST 1</td><td>1</td><td><code>/api/waitlist</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="status-codes" class="doc-section">
+    <h2>Status codes across the contract</h2>
+    <p>Counting each declared response once per operation gives this picture of what a client must be ready to decode:</p>
+    <table>
+      <thead><tr><th>Status</th><th>Declared on</th><th>Typical body</th></tr></thead>
+      <tbody>
+        <tr><td>200</td><td>242 operations</td><td>Resource, array, nullable value or <code>Envelope</code></td></tr>
+        <tr><td>201</td><td>28 operations</td><td>The created record (for example <code>POST /api/projects</code>)</td></tr>
+        <tr><td>204</td><td>1 operation</td><td>No body</td></tr>
+        <tr><td>400</td><td>206 operations</td><td><code>BadRequest</code>, <code>EnvBadRequest</code> and family-specific variants</td></tr>
+        <tr><td>401</td><td>269 operations</td><td><code>Unauthorized</code> (bearer middleware)</td></tr>
+        <tr><td>403</td><td>101 operations</td><td><code>Forbidden</code> / <code>EnvForbidden</code></td></tr>
+        <tr><td>404</td><td>149 operations</td><td><code>NotFound</code> / <code>EnvNotFound</code></td></tr>
+        <tr><td>405</td><td>30 operations</td><td><code>EnvMethodNotAllowed</code> / <code>KeyedMethodNotAllowed</code></td></tr>
+        <tr><td>409</td><td>29 operations</td><td><code>Conflict</code> / <code>EnvConflict</code></td></tr>
+        <tr><td>500</td><td>264 operations</td><td><code>InternalError</code>, <code>EnvInternal</code>, <code>KeyedInternal</code> and family variants</td></tr>
+        <tr><td>501, 503</td><td>1 operation each</td><td>Endpoint-specific</td></tr>
+        </tbody>
+    </table>
+    <p>Every error is an Effect tagged error, so its JSON body always contains a <code>_tag</code> discriminator next to its fields. There are three body families, inherited from the legacy handlers so existing clients keep working:</p>
+    <DocCode language="json" title="Plain error (message only)">
+{"{ \"_tag\": \"NotFound\", \"message\": \"Project not found\" }"}
+    </DocCode>
+    <DocCode language="json" title="Envelope error">
+{"{ \"_tag\": \"EnvNotFound\", \"success\": false, \"message\": \"Material not found\", \"errors\": null }"}
+    </DocCode>
+    <DocCode language="json" title="Keyed error (a few library routes)">
+{"{ \"_tag\": \"KeyedInternal\", \"error\": \"Failed to load components\" }"}
+    </DocCode>
+    <p>Success envelopes mirror the error envelope: <code>&#123; success: true, message, data &#125;</code>, where <code>data</code> may be <code>null</code>. The <code>EnvelopeOpt</code> variant omits <code>message</code> when the handler did not provide one. Switch on <code>_tag</code> rather than on the presence of <code>message</code> or <code>error</code>.</p>
+  </section>
+
+  <section id="request-lifecycle" class="doc-section">
+    <h2>How a request is processed</h2>
+    <svg viewBox="0 0 780 150" width="100%" role="img" aria-label="Request lifecycle" style="max-width:780px;font:12px system-ui">
+<defs><marker id="apar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.2">
+<rect x="5" y="40" width="110" height="56" rx="8"/><rect x="135" y="40" width="120" height="56" rx="8"/><rect x="275" y="40" width="120" height="56" rx="8"/><rect x="415" y="40" width="120" height="56" rx="8"/><rect x="555" y="40" width="100" height="56" rx="8"/><rect x="675" y="40" width="100" height="56" rx="8"/>
+<path d="M115 68H133M255 68H273M395 68H413M535 68H553M655 68H673" marker-end="url(#apar)"/></g>
+<g fill="currentColor" text-anchor="middle">
+<text x="60" y="64">client</text><text x="60" y="80" opacity=".7">fetch / SDK</text>
+<text x="195" y="64">route match</text><text x="195" y="80" opacity=".7">method + path</text>
+<text x="335" y="64">bearer check</text><text x="335" y="80" opacity=".7">401 Unauthorized</text>
+<text x="475" y="64">schema decode</text><text x="475" y="80" opacity=".7">400 on bad input</text>
+<text x="605" y="64">handler</text><text x="605" y="80" opacity=".7">access + logic</text>
+<text x="725" y="64">encode</text><text x="725" y="80" opacity=".7">success / _tag</text>
+<text x="390" y="125" opacity=".7">x-session-token picks the acting account; absent or invalid falls back to the local profile</text></g></svg>
+    <ol>
+      <li>The router matches method and path. Unknown routes never reach a handler.</li>
+      <li>The bearer middleware compares the token in constant time. A missing or wrong token stops the request with 401 before any decoding.</li>
+      <li>Path, query, headers and body are decoded against the operation's schemas. Structural problems become 400 without running business code.</li>
+      <li>The handler resolves the acting account, checks ownership or organization membership (403/404) and runs the service.</li>
+      <li>The result is encoded with the declared success schema, or the failure with its tagged error schema and status.</li>
+    </ol>
+  </section>
+
+  <section id="non-json" class="doc-section">
+    <h2>Responses that are not JSON</h2>
+    <table>
+      <thead><tr><th>Operation</th><th>Media type</th><th>How to consume</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST /api/ai/chat/stream</code></td><td><code>text/event-stream</code></td><td>Read incrementally; each <code>data:</code> line is one typed assistant event.</td></tr>
+        <tr><td><code>GET /api/projects/&#123;id&#125;/events</code></td><td><code>text/event-stream</code></td><td>Live project events; reconnect and re-read state after a drop.</td></tr>
+        <tr><td><code>GET /api/plugins/bootstrap.js</code></td><td><code>application/javascript</code></td><td>Loaded by the plugin host, not parsed as JSON.</td></tr>
+        <tr><td><code>GET /api/plugins/serve</code></td><td><code>application/octet-stream</code></td><td>Plugin file bytes.</td></tr>
+        <tr><td><code>GET /api/download</code></td><td><code>application/zip</code></td><td>Save as a file; use <code>response.blob()</code> or stream to disk.</td></tr>
+        </tbody>
+    </table>
+    <p>The generated Promise SDK rejects a streaming response whose content type is not <code>text/event-stream</code> with <code>ClientError("UnsupportedContentType")</code>, and a single SSE event larger than 16 MiB with <code>SseEventTooLarge</code>.</p>
+  </section>
+
+  <section id="raw-fetch" class="doc-section">
+    <h2>Calling the API without a client</h2>
+    <DocCode language="ts" title="Minimal typed fetch wrapper">
+{"type TaggedError = { _tag: string; message?: string; error?: string }\n\nasync function call<T>(base: string, token: string, method: string, path: string, body?: unknown): Promise<T> {\n  const response = await fetch(new URL(path, base), {\n    method,\n    headers: {\n      authorization: `Bearer ${token}`,\n      ...(body === undefined ? {} : { \"content-type\": \"application/json\" }),\n    },\n    body: body === undefined ? undefined : JSON.stringify(body),\n  })\n  if (response.status === 204) return undefined as T\n  const payload = await response.json()\n  if (!response.ok) {\n    const failure = payload as TaggedError\n    throw new Error(`${response.status} ${failure._tag}: ${failure.message ?? failure.error}`)\n  }\n  return payload as T\n}\n\nconst project = await call<{ id: string; name: string }>(\n  process.env.CADCAMFUN_URL!, process.env.CADCAMFUN_TOKEN!,\n  \"POST\", \"/api/projects\", { name: \"Bracket\" },\n)"}
+    </DocCode>
+    <p>Prefer the generated clients in TypeScript: they know each operation's success status and declared error statuses, and treat anything else as <code>UnexpectedStatus</code> instead of guessing.</p>
   </section>
 
   <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "AI assistant", href: "/docs/ai" }, { title: "Setups", href: "/docs/setups" }]} />
