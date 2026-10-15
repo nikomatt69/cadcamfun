@@ -117,6 +117,16 @@ export const validateCompactionSettings = (settings: HostCompactionSettings): vo
 const withoutDeniedTools = (permission: Record<string, PermissionRule>, policies: ReadonlyArray<PolicyStatement>): Record<string, PermissionRule> =>
   policies.length === 0 ? permission : Object.fromEntries(Object.entries(permission).filter(([id]) => id === "**" || toolAllowed(policies, id)))
 
+/**
+ * The host reads two files (see the `instance-config-file` host patch): the global one every Instance shares (providers,
+ * defaults, policies, compaction) and the one in the Instance's own directory, which holds the project's agents and their
+ * permission maps. A project's allow-list therefore never reaches another project's host.
+ */
+export const splitHostConfig = (config: Record<string, unknown>): { readonly shared: Record<string, unknown>; readonly instance: Record<string, unknown> } => {
+  const { agent, ...shared } = config
+  return { shared, instance: { agent } }
+}
+
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {
   validateCompactionSettings(input.compaction ?? {})
   const timeouts = input.timeouts ?? CAM_TOOL_TIMEOUTS

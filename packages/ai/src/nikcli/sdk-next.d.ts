@@ -248,9 +248,14 @@ declare module "@nikcli-ai/sdk-next" {
     }
   }
 
+  export interface HostRegistration {
+    readonly close: () => Promise<void>
+  }
+
   export interface NikCliHostInstance extends HostClient {
     readonly tools: {
-      register(...tools: ToolInfo[]): Effect.Effect<void, Error>
+      /** With the `registration-handles` host patch: one handle per batch; `close` removes exactly these registrations. */
+      register(...tools: ToolInfo[]): Effect.Effect<HostRegistration, Error>
     }
   }
 

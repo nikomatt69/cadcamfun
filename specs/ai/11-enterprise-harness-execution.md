@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Steps 4–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Steps 5–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -197,19 +197,41 @@ Progress (2026-10-15):
 D: compatibility contract fixed. Placement: WP8/RM-01 refinement; WP10 amendment for the compiler. Start:
 `packages/ai/src/nikcli/runtime.ts`, `isolation.ts`, `host-patches.ts`, `scripts/compile-sidecar.ts`.
 
-- [ ] Keep global provider/skills/defaults separate from project-specific permissions.
-- [ ] Read only the scratch file the app generated for the current Instance.
-- [ ] Keep discovery of external and ancestor configurations disabled.
-- [ ] Extend the SDK registration seam to keep and close handles.
-- [ ] Do not recreate the Instance on a tool update.
-- [ ] Block inherited authentication and database overrides.
-- [ ] Replace the native coding environment while keeping date, locale and instruction sync.
-- [ ] Return a report per mandatory patch; partial compatibility is an explicit error.
+- [x] Keep global provider/skills/defaults separate from project-specific permissions.
+- [x] Read only the scratch file the app generated for the current Instance.
+- [x] Keep discovery of external and ancestor configurations disabled.
+- [x] Extend the SDK registration seam to keep and close handles.
+- [x] Do not recreate the Instance on a tool update.
+- [x] Block inherited authentication and database overrides.
+- [x] Replace the native coding environment while keeping date, locale and instruction sync.
+- [x] Return a report per mandatory patch; partial compatibility is an explicit error.
 
 Tests: `host-bootstrap.test.ts`, `tool-registry-host.test.ts`, `isolation.test.ts`, `host-surface.test.ts`,
 `host-patches.test.ts`. New regressions: two projects with different allow-lists; concurrent reload; repeated
 replacement/removal; DB/auth sentinels; execution of the compiled binary. Gate: isolation proved with different
 configurations, stale registrations released, identical adaptations in development and compiled builds.
+
+Progress (2026-10-15):
+
+- **V** The bug: every host read one global `nikcli.json`, rewritten with the permission map of whichever project was
+  configured last; a host that loaded its configuration afterwards ran with another project's allow-list. Now
+  `splitHostConfig` (`config.ts`) writes the shared part (providers, defaults, policies, compaction) to the global file and
+  the project's agents to `<scratch>/nikcli.json`; the `instance-config-file` host patch makes the loader read that file
+  for its Instance only. Project config stays disabled, so no ancestor or worktree file is discovered.
+- **V** `registration-handles` patch: `NikCli.tools.register` returns one `close` for its batch; the runtime closes the previous
+  batch after registering the next, so a tool that left the set is unregistered (not only denied) and publications no longer
+  stack registrations. A publication reloads configuration in place (`InstanceReload`), never recreating the Instance.
+- **V** `isolation.ts` scrubs inherited `NIKCLI_DB`, `NIKCLI_AUTH_CONTENT`, server/sign-in credentials, plugin autoload and
+  model overrides.
+- **V** `cad-environment` patch: the environment section keeps date, platform, locale, timezone and reply language and drops the
+  working directory, git, package manager and shell/monitor rules. Instruction sync is untouched.
+- **V** `host-patches.ts` reports each of the five patches (`applied`, `missing`, `ambiguous`); a bundle missing any is refused
+  with `HostPatchError`, at import and at compile time (`scripts/compile-sidecar.ts`).
+- **V** Tests: `host-instances.test.ts` (two projects with different allow-lists, repeated replacement and removal, concurrent
+  reloads, same client after reloads), `isolation.test.ts` (DB/auth sentinels, Instance file read, shared file without agents),
+  `host-patches.test.ts` (report, refusal, each patch's effect).
+- **V** The sidecar compiled through `compile-sidecar.ts` reports all five patches and the executable contains the patched code.
+  Open (C): running the compiled executable end to end is left to Step 11.
 
 ### Step 5 — Bind document and revisions to execution
 
@@ -425,3 +447,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   `cam_edit.generate` declares what its preview omits and the hash of the stored program.
 - 2026-10-15: closed Step 3: destructive tools require a human in every permission mode (auto no longer routes them to the
   classifier); regression over every agent and mode for approval, denials, verifier exposure and read-only roles.
+- 2026-10-15: closed Step 4: per-Instance configuration file, registration handles closed on replacement, inherited
+  DB/auth overrides blocked, CAD environment section, five mandatory host patches with a report.

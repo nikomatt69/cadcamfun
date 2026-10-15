@@ -5,14 +5,14 @@ import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
 import { rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
+import type { HostRegistration, NikCliHostInstance, ToolExecuteContext } from "@nikcli-ai/sdk-next"
 import { AiConfigError, AiProviderError } from "../errors.ts"
 import { installSkills } from "../skills/index.ts"
 import { createUserSkillStore } from "../skills/user.ts"
 import type { PolicyStatement } from "./policy.ts"
 import { recordProgramCall } from "./program-calls.ts"
-import { registerHostPatches } from "./host-patches.ts"
-import { buildHostConfig, type HostProviderSpec, type HostCompactionSettings, type HostTimeoutSettings } from "./config.ts"
+import { INSTANCE_CONFIG_FILE, registerHostPatches } from "./host-patches.ts"
+import { buildHostConfig, splitHostConfig, type HostProviderSpec, type HostCompactionSettings, type HostTimeoutSettings } from "./config.ts"
 import { applyIsolation, isolatedPaths, projectScratchDir, type IsolatedPaths, type IsolationOptions } from "./isolation.ts"
 import { installHostLogFilter, type HostLogSink } from "./logs.ts"
 import { seedModelsCache, type CatalogueSeed } from "./models-cache.ts"
@@ -218,6 +218,20 @@ export const makeNikCliRuntime = (
     const configurationLock = yield* Semaphore.make(1)
     let skillsRevision = 0
     let installedSkillsRevision = -1
+    let publishedShared: string | undefined
+    const writeAtomically = async (file: string, text: string): Promise<void> => {
+      const temporary = `${file}.${crypto.randomUUID()}.tmp`
+      try {
+        await writeFile(temporary, text)
+        await rename(temporary, file)
+      } finally {
+        await rm(temporary, { force: true }).catch(() => undefined)
+      }
+    }
+    /**
+     * Publishes the configuration a project's host reads: the shared file (providers, defaults, policies; one for every host)
+     * and the project's own file in its scratch folder (its agents and permission maps), which only that Instance reads.
+     */
     const writeConfig = (projectId: string): Promise<void> => Effect.runPromise(
       configurationLock.withPermit(Effect.tryPromise({
         try: async () => {
@@ -227,33 +241,38 @@ export const makeNikCliRuntime = (
             await installSkills(paths.config, await userSkills.list())
             installedSkillsRevision = revision
           }
-          const file = join(paths.config, "nikcli.json")
-          const temporary = `${file}.${crypto.randomUUID()}.tmp`
-          try {
-            await writeFile(temporary, JSON.stringify(buildHostConfig({
-              providers,
-              toolIds: toolIdsOf(projectId),
-              askToolIds: toolRegistry.approvalIds(projectId),
-              systemPrompt: options.systemPrompt,
-              ...(options.compaction ? { compaction: options.compaction } : {}),
-              ...(options.timeouts ? { timeouts: options.timeouts } : {}),
-              ...(options.policies ? { policies: options.policies } : {})
-            }), null, 2))
-            await rename(temporary, file)
-          } finally {
-            await rm(temporary, { force: true }).catch(() => undefined)
+          const { shared, instance } = splitHostConfig(buildHostConfig({
+            providers,
+            toolIds: toolIdsOf(projectId),
+            askToolIds: toolRegistry.approvalIds(projectId),
+            systemPrompt: options.systemPrompt,
+            ...(options.compaction ? { compaction: options.compaction } : {}),
+            ...(options.timeouts ? { timeouts: options.timeouts } : {}),
+            ...(options.policies ? { policies: options.policies } : {})
+          }))
+          const sharedText = JSON.stringify(shared, null, 2)
+          if (sharedText !== publishedShared) {
+            await writeAtomically(join(paths.config, "nikcli.json"), sharedText)
+            publishedShared = sharedText
           }
+          const scratch = projectScratchDir(paths, projectId)
+          mkdirSync(scratch, { recursive: true })
+          await writeAtomically(join(scratch, INSTANCE_CONFIG_FILE), JSON.stringify(instance, null, 2))
         },
         catch: (cause) => cause instanceof Error ? cause : new Error("Host configuration publication failed")
       }))
     )
 
+    /** The live registration batch of each project's host; closed when the next batch is registered. */
+    const registrations = new Map<string, HostRegistration>()
+
     /**
      * Registers the project's tools on its host. The host keeps the last registration of an id (nikcli `lastWins`), so
-     * calling this again replaces changed tools and adds new ones; a tool that left the set is denied by the permission
-     * map `writeConfig` publishes, which also hides it from `search_tools`.
+     * calling this again replaces changed tools and adds new ones; the previous batch is then closed, so a tool that left the
+     * set is no longer registered at all and repeated publications do not pile up registrations. The permission map
+     * `writeConfig` publishes also denies it and hides it from `search_tools`. The Instance itself is never recreated.
      */
-    const registerTools = (sdk: Sdk, client: NikCliHostInstance, projectId: string): Promise<void> => {
+    const registerTools = async (sdk: Sdk, client: NikCliHostInstance, projectId: string): Promise<void> => {
       assertOpen()
       const specs = toolRegistry.tools(projectId)
       const defined = specs.map((spec) =>
@@ -290,7 +309,10 @@ export const makeNikCliRuntime = (
           }
         }))
       )
-      return Effect.runPromise(client.tools.register(...defined))
+      const registration = await Effect.runPromise(client.tools.register(...defined))
+      const previous = registrations.get(projectId)
+      registrations.set(projectId, registration)
+      await previous?.close()
     }
 
     const createHost = async (projectId: string): Promise<ProjectHost> => {
@@ -318,6 +340,7 @@ export const makeNikCliRuntime = (
         assertOpen()
         return { projectId, directory, client }
       } catch (cause) {
+        registrations.delete(projectId)
         for (const providerId of liveKeys) await client.provider.removeAuth({ providerID: providerId }).catch(() => undefined)
         await client["top-level"].dispose().catch(() => undefined)
         throw cause
@@ -467,6 +490,7 @@ export const makeNikCliRuntime = (
           await host.client["top-level"].dispose().catch(() => undefined)
         }
         hosts.clear()
+        registrations.clear()
         liveKeys.clear()
         pendingKeys.clear()
       })

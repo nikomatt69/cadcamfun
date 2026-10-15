@@ -53,6 +53,8 @@ const config = JSON.stringify(await host.client.config.get())
 const agents = (await host.client["top-level"].agent()).map((a) => String(a["name"]))
 const providers = (await host.client.provider.list()).all.map((p) => p.id)
 const tools = await host.client.experimental.toolIDs()
+const auth = JSON.stringify(await host.client.provider.list())
+const sharedConfig = JSON.parse(fs.readFileSync(`${runtime.paths.config}/nikcli.json`, "utf8")) as Record<string, unknown>
 await Effect.runPromise(Scope.close(scope, { _tag: "Success", value: undefined } as never))
 
 const sentinelPaths = [...touched].filter(
@@ -61,6 +63,7 @@ const sentinelPaths = [...touched].filter(
     (/\/\.config\/nikcli/.test(p) || /\/\.nikcli/.test(p) || /\/\.local\/share\/nikcli/.test(p) || /\/\.claude/.test(p) || /\/\.cache\/nikcli/.test(p))
 )
 const readsOwnConfig = [...touched].some((p) => p.endsWith("/config/nikcli.json"))
+const readsInstanceConfig = [...touched].some((p) => p === `${host.directory}/nikcli.json`)
 
 console.log(
   "PROBE_RESULT " +
@@ -71,7 +74,13 @@ console.log(
       providersHaveSentinel: providers.some((p) => p.includes("sentinel")),
       toolsHaveSentinel: tools.some((t) => t.includes("sentinel")),
       sentinelPaths,
-      readsOwnConfig
+      readsOwnConfig,
+      readsInstanceConfig,
+      agentsHaveCadcam: agents.includes("cadcam"),
+      sharedConfigHasAgents: sharedConfig["agent"] !== undefined,
+      envScrubbed: process.env["NIKCLI_DB"] === undefined && process.env["NIKCLI_AUTH_CONTENT"] === undefined,
+      sentinelDatabase: fs.existsSync(`${fakeHome}/sentinel.db`),
+      authHasSentinel: auth.includes("SENTINEL_AUTH_KEY")
     })
 )
 process.exit(0)

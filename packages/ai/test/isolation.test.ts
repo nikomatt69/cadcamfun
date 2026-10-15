@@ -31,7 +31,8 @@ const runProbe = async (override: "1" | "0") => {
   const dataDir = mkdtempSync(join(root, "data-"))
   plantSentinels(home)
   const child = Bun.spawn(["bun", join(import.meta.dir, "fixtures", "isolation-probe.ts"), home, dataDir, override], {
-    env: { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: "", XDG_DATA_HOME: "" },
+    // Inherited overrides a parent process could pass: another database and injected credentials.
+    env: { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: "", XDG_DATA_HOME: "", NIKCLI_DB: join(home, "sentinel.db"), NIKCLI_AUTH_CONTENT: JSON.stringify({ anthropic: { type: "api", key: "SENTINEL_AUTH_KEY" } }) },
     stdout: "pipe",
     stderr: "pipe"
   })
@@ -51,6 +52,17 @@ describe("embedded host never reads the user's nikcli state (spec 08 section 1.1
     expect(result["providersHaveSentinel"]).toBe(false)
     expect(result["sentinelPaths"]).toEqual([])
     expect(result["readsOwnConfig"]).toBe(true)
+    // The project's agents live only in the Instance's own file, so seeing them proves the host read it.
+    expect(result["readsInstanceConfig"]).toBe(true)
+    expect(result["agentsHaveCadcam"]).toBe(true)
+    expect(result["sharedConfigHasAgents"]).toBe(false)
+  }, 120_000)
+
+  test("inherited database and authentication overrides are blocked", async () => {
+    const { result } = await runProbe("0")
+    expect(result["envScrubbed"]).toBe(true)
+    expect(result["sentinelDatabase"]).toBe(false)
+    expect(result["authHasSentinel"]).toBe(false)
   }, 120_000)
 
   test("default setup also redirects HOME", async () => {
