@@ -16,6 +16,7 @@ export * from "./service.ts"
 export * from "./tools/catalogue.ts"
 export { makeNikCliRuntime, type HostToolSpec, type NikCliRuntime, type NikCliRuntimeOptions } from "./nikcli/runtime.ts"
 export { ToolRegistry, ToolRegistryError, makeToolRegistry, compareToolIds, lastWins, RESERVED_TOOL_IDS, type ToolRegistryShape, type ToolRegistrySources, type ToolHandle, type ToolCatalogueEntry } from "./tools/tool-registry.ts"
+export { assembleContext, notesByRecency, CONTEXT_BUDGET, CONTEXT_KINDS, type ContextAssembly, type ContextKind, type ContextManifest, type ContextManifestEntry, type ContextRequest, type ContextSource, type OmissionReason } from "./context-assembly.ts"
 export { readProjectMemoryFiles, invalidateProjectMemoryFiles, projectMemoryFile, projectHabitsFile, type ProjectMemoryFiles } from "./nikcli/project-files.ts"
 export {
   abortHostSession,

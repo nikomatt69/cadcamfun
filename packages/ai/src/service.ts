@@ -26,6 +26,7 @@ import { systemPrompt, turnSystemPrompt, type ReplyLanguage } from "./prompts/sy
 import { resolveLocale } from "./nikcli/locale.ts"
 import { providerAllowed } from "./nikcli/policy.ts"
 import { goalArgumentsOf, goalSummary } from "./nikcli/goal.ts"
+import { invalidateProjectMemoryFiles } from "./nikcli/project-files.ts"
 import { SUBAGENTS, isSubagentId, childAgent } from "./nikcli/agents.ts"
 import type { HostQuestionRequest } from "@nikcli-ai/sdk-next"
 import type { HostContextPolicy } from "./nikcli/context.ts"
@@ -411,6 +412,8 @@ export class AiService extends Context.Service<AiService, {
           if (state.busy) return yield* new AiConfigError({ message: "Wait for the current turn to finish before consolidating memory." })
           yield* Effect.promise(() => host.value.scheduler.stopParent(owner))
           const learned = yield* Effect.tryPromise({ try: () => projectHost.client.brain.trigger({ force: true, sessionID: sessionId }), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
+          // Brain rewrote the memory and habits files: the next turn's context reads them again, not the cached copy.
+          invalidateProjectMemoryFiles(projectHost.directory)
           if (!learned.success || !learned.sessionID || learned.sessionID === "brain-session-not-created") return yield* new AiProviderError({ message: learned.error ?? "The host did not complete a memory consolidation session." })
           const evidence = yield* Effect.tryPromise({ try: () => projectHost.client.session.messages({ sessionID: learned.sessionID! }), catch: (cause) => new AiProviderError({ message: describeControlError(cause) }) })
           const failure = evidence.findLast((message) => message.info.error)?.info.error
