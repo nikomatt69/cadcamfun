@@ -21,17 +21,30 @@ export interface AnalyticsEvent {
   readonly model?: string
   readonly promptTokens?: number
   readonly completionTokens?: number
+  /**
+   * Where the token counts came from: `reported` by the provider, or `estimated` locally (for example from characters).
+   * Counts without a source are taken as reported, which is what every legacy caller passed.
+   */
+  readonly tokenSource?: TokenSource
+  /** Cost in USD when the provider or a price table gave one; absent means unknown, never zero. */
+  readonly costUsd?: number
   readonly success?: boolean
   readonly errorType?: string
   readonly feedbackRating?: number
   readonly metadata?: Readonly<Record<string, unknown>>
 }
 
+export type TokenSource = "reported" | "estimated"
+
 export interface AnalyticsStats {
   readonly totalRequests: number
   readonly successRate: number
   readonly averageDurationMs: number
+  /** Reported plus estimated; read `tokens` to keep them apart. */
   readonly totalTokens: number
+  readonly tokens: { readonly reported: number; readonly estimated: number }
+  /** Known cost in USD, and how many completed responses had no cost to add (so `knownUsd` is a lower bound). */
+  readonly cost: { readonly knownUsd: number; readonly unavailable: number }
   readonly eventCount: number
   readonly modelUsage: Readonly<Record<string, number>>
 }
@@ -52,6 +65,8 @@ export class AiAnalytics extends Context.Service<
       readonly success: boolean
       readonly promptTokens?: number
       readonly completionTokens?: number
+      readonly tokenSource?: TokenSource
+      readonly costUsd?: number
     }): Effect.Effect<void>
     trackError(requestId: string, errorType: string, metadata?: Readonly<Record<string, unknown>>): Effect.Effect<void>
     trackFeedback(requestId: string, rating: number, comment?: string): Effect.Effect<void>
@@ -113,6 +128,8 @@ export class AiAnalytics extends Context.Service<
         readonly success: boolean
         readonly promptTokens?: number
         readonly completionTokens?: number
+        readonly tokenSource?: TokenSource
+        readonly costUsd?: number
       }): Effect.Effect<void> =>
         track({
           eventType: "response",
@@ -121,6 +138,8 @@ export class AiAnalytics extends Context.Service<
           success: input.success,
           ...(input.promptTokens !== undefined ? { promptTokens: input.promptTokens } : {}),
           ...(input.completionTokens !== undefined ? { completionTokens: input.completionTokens } : {}),
+          ...(input.tokenSource !== undefined ? { tokenSource: input.tokenSource } : {}),
+          ...(input.costUsd !== undefined && Number.isFinite(input.costUsd) ? { costUsd: input.costUsd } : {}),
           metadata: { requestId: input.requestId }
         })
 
@@ -151,10 +170,13 @@ export class AiAnalytics extends Context.Service<
         const responses = events.filter((e) => e.eventType === "response")
         const successful = responses.filter((e) => e.success === true).length
         const durations = responses.map((e) => e.duration ?? 0)
-        const totalTokens = events.reduce(
-          (sum, e) => sum + (e.promptTokens ?? 0) + (e.completionTokens ?? 0),
-          0
-        )
+        const tokens = { reported: 0, estimated: 0 }
+        for (const e of events) tokens[e.tokenSource ?? "reported"] += (e.promptTokens ?? 0) + (e.completionTokens ?? 0)
+        const cost = { knownUsd: 0, unavailable: 0 }
+        for (const e of responses) {
+          if (e.costUsd !== undefined) cost.knownUsd += e.costUsd
+          else cost.unavailable++
+        }
         const modelUsage: Record<string, number> = {}
         for (const e of events) {
           if (e.model !== undefined) modelUsage[e.model] = (modelUsage[e.model] ?? 0) + 1
@@ -163,7 +185,9 @@ export class AiAnalytics extends Context.Service<
           totalRequests,
           successRate: totalRequests === 0 ? 0 : successful / totalRequests,
           averageDurationMs: durations.length === 0 ? 0 : durations.reduce((a, b) => a + b, 0) / durations.length,
-          totalTokens,
+          totalTokens: tokens.reported + tokens.estimated,
+          tokens,
+          cost,
           eventCount: events.length,
           modelUsage
         }

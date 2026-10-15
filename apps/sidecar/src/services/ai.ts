@@ -75,6 +75,9 @@ const settingsForOperation = (params: Record<string, unknown>, type?: string) =>
  * children included. The walk is bounded (depth, matches, value length) so searching a big model stays cheap, and the
  * large geometry arrays (`vertices`, `faces`) are skipped because they are not searchable evidence.
  */
+/** Operations in the order they were created: the store lists the most recently updated first, which is not the chain. */
+const chainOrder = <R extends { readonly createdAt: string }>(rows: ReadonlyArray<R>): ReadonlyArray<R> =>
+  [...rows].reverse().sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 const searchElement = (element: Element, needle: string): Array<{ path: string; value: string }> => {
   const found: Array<{ path: string; value: string }> = []
   const walk = (value: unknown, path: string, depth: number): void => {
@@ -996,7 +999,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     suggestChain: async (input) => {
       const loaded = await load(input.projectId)
-      const rows = await Effect.runPromise(toolpaths.listForDrawing(loaded.id))
+      const rows = chainOrder(await Effect.runPromise(toolpaths.listForDrawing(loaded.id)))
       const rowsById = new Map(rows.map((r) => [r.id, r]))
       const from = input.fromOperationId ? rowsById.get(input.fromOperationId) : rows[rows.length - 1]
       const settingsOf = (row: typeof rows[number] | undefined): Record<string, unknown> => ((row?.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {})
@@ -1010,7 +1013,7 @@ const toolHandlers = Effect.gen(function*() {
     },
     chainStatus: async (input) => {
       const loaded = await load(input.projectId)
-      const rows = await Effect.runPromise(toolpaths.listForDrawing(loaded.id))
+      const rows = chainOrder(await Effect.runPromise(toolpaths.listForDrawing(loaded.id)))
       const row = rows.find((r) => r.id === input.operationId)
       if (!row) return { ok: false, error: `Unknown operation id: ${input.operationId}.` }
       const settings = (row.data as { request?: { settings?: Record<string, unknown> } } | null)?.request?.settings ?? {}

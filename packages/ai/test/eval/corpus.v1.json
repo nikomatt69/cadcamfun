@@ -1,0 +1,747 @@
+{
+ "version": 1,
+ "description": "AI-11 Step 11 evaluation corpus: parts as an assistant would be asked for them, the checks that decide acceptance and the expected verdict. Add cases; never edit a published version's cases, bump the version instead.",
+ "cases": [
+  {
+   "id": "plate-m8",
+   "part": "mounting plate 100 x 60 x 10 with four M8 clearance holes (ISO 273 medium, 9 mm)",
+   "source": {
+    "recipe": "mounting_plate"
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 100,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "width",
+     "axis": "y",
+     "nominal": 60,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "thickness",
+     "axis": "z",
+     "nominal": 10,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 4
+    },
+    {
+     "kind": "hole",
+     "name": "corner bore",
+     "feature": "hole_sw",
+     "diameter": {
+      "nominal": 9,
+      "tolerance": {
+       "plus": 0.01,
+       "minus": 0.01
+      }
+     },
+     "through": true
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 57455.31,
+     "tolerance": {
+      "plus": 57.455,
+      "minus": 57.455
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   },
+   "stepRoundTrip": true
+  },
+  {
+   "id": "flange-6xm10",
+   "part": "flange 120 OD, 40 bore, 14 thick, six M10 holes (11 mm) on an 80 mm circle",
+   "source": {
+    "recipe": "flange"
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "diameter x",
+     "axis": "x",
+     "nominal": 120,
+     "tolerance": {
+      "plus": 0.05,
+      "minus": 0.05
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "diameter y",
+     "axis": "y",
+     "nominal": 120,
+     "tolerance": {
+      "plus": 0.05,
+      "minus": 0.05
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "thickness",
+     "axis": "z",
+     "nominal": 14,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 7
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 132760.564,
+     "tolerance": {
+      "plus": 132.761,
+      "minus": 132.761
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   },
+   "note": "The centre bore is a recognised hole: six bolt holes plus the bore make seven."
+  },
+  {
+   "id": "bracket-m6",
+   "part": "L bracket 60 x 50 x 40, 5 thick, one M6 clearance hole (6.6 mm) per leg",
+   "source": {
+    "recipe": "l_bracket"
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "base",
+     "axis": "x",
+     "nominal": 60,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "leg",
+     "axis": "y",
+     "nominal": 50,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "width",
+     "axis": "z",
+     "nominal": 40,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 2
+    },
+    {
+     "kind": "hole",
+     "name": "base hole",
+     "feature": "base_hole",
+     "diameter": {
+      "nominal": 6.6,
+      "tolerance": {
+       "plus": 0.01,
+       "minus": 0.01
+      }
+     }
+    },
+    {
+     "kind": "hole",
+     "name": "leg hole",
+     "feature": "leg_hole",
+     "diameter": {
+      "nominal": 6.6,
+      "tolerance": {
+       "plus": 0.01,
+       "minus": 0.01
+      }
+     }
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 20657.881,
+     "tolerance": {
+      "plus": 20.658,
+      "minus": 20.658
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   }
+  },
+  {
+   "id": "shaft-stepped",
+   "part": "stepped shaft 20/30/20 mm over 30/40/30 mm, 1 mm end chamfers",
+   "source": {
+    "recipe": "stepped_shaft",
+    "params": {
+     "sections": [
+      {
+       "diameter": 20,
+       "length": 30
+      },
+      {
+       "diameter": 30,
+       "length": 40
+      },
+      {
+       "diameter": 20,
+       "length": 30
+      }
+     ]
+    }
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 100,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "major diameter",
+     "axis": "y",
+     "nominal": 30,
+     "tolerance": {
+      "plus": 0.05,
+      "minus": 0.05
+     }
+    },
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 0
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 47063.152,
+     "tolerance": {
+      "plus": 47.063,
+      "minus": 47.063
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   }
+  },
+  {
+   "id": "pocket-20x10x4",
+   "part": "50 x 40 x 10 block with a 20 x 10 pocket 4 deep",
+   "source": {
+    "history": {
+     "parameters": {
+      "w": 50,
+      "h": 40,
+      "t": 10,
+      "d": 4
+     },
+     "features": [
+      {
+       "id": "s1",
+       "type": "sketch",
+       "plane": "XY",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "r",
+          "kind": "rectangle",
+          "at": [
+           0,
+           0
+          ],
+          "width": "w",
+          "height": "h"
+         }
+        ]
+       }
+      },
+      {
+       "id": "block",
+       "type": "extrude",
+       "sketch": "s1",
+       "depth": "t",
+       "operation": "new"
+      },
+      {
+       "id": "s2",
+       "type": "sketch",
+       "plane": "XY",
+       "offset": "t",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "p",
+          "kind": "rectangle",
+          "at": [
+           15,
+           15
+          ],
+          "width": 20,
+          "height": 10
+         }
+        ]
+       }
+      },
+      {
+       "id": "pocket",
+       "type": "extrude",
+       "sketch": "s2",
+       "depth": "d",
+       "direction": "down",
+       "operation": "subtract"
+      }
+     ]
+    }
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 50,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "width",
+     "axis": "y",
+     "nominal": 40,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "height",
+     "axis": "z",
+     "nominal": 10,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 0
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 19200,
+     "tolerance": {
+      "plus": 19.2,
+      "minus": 19.2
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   }
+  },
+  {
+   "id": "assembly-base-pin",
+   "part": "40 x 20 x 5 base with a separate 10 mm pin 15 long standing on it (two bodies)",
+   "source": {
+    "history": {
+     "parameters": {},
+     "features": [
+      {
+       "id": "s1",
+       "type": "sketch",
+       "plane": "XY",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "r",
+          "kind": "rectangle",
+          "at": [
+           0,
+           0
+          ],
+          "width": 40,
+          "height": 20
+         }
+        ]
+       }
+      },
+      {
+       "id": "base",
+       "type": "extrude",
+       "sketch": "s1",
+       "depth": 5,
+       "operation": "new"
+      },
+      {
+       "id": "s2",
+       "type": "sketch",
+       "plane": "XY",
+       "offset": 5,
+       "sketch": {
+        "shapes": [
+         {
+          "id": "c",
+          "kind": "circle",
+          "at": [
+           20,
+           10
+          ],
+          "diameter": 10
+         }
+        ]
+       }
+      },
+      {
+       "id": "pin",
+       "type": "extrude",
+       "sketch": "s2",
+       "depth": 15,
+       "operation": "new"
+      }
+     ]
+    }
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "stack height",
+     "axis": "z",
+     "nominal": 20,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "pin length",
+     "axis": "z",
+     "nominal": 15,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     },
+     "body": "pin"
+    },
+    {
+     "kind": "extent",
+     "name": "base thickness",
+     "axis": "z",
+     "nominal": 5,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     },
+     "body": "base"
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 5178.097,
+     "tolerance": {
+      "plus": 5.178,
+      "minus": 5.178
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": true,
+    "failing": []
+   },
+   "stepRoundTrip": true
+  },
+  {
+   "id": "negative-wrong-fastener",
+   "part": "plate asked for M10 clearance holes (11 mm); the history has M8 holes",
+   "source": {
+    "recipe": "mounting_plate"
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 100,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "hole",
+     "name": "corner bore",
+     "feature": "hole_sw",
+     "diameter": {
+      "nominal": 11,
+      "tolerance": {
+       "plus": 0.1,
+       "minus": 0.1
+      }
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": false,
+    "failing": [
+     "corner bore"
+    ]
+   }
+  },
+  {
+   "id": "negative-pocket-too-deep",
+   "part": "pocket asked 4 deep; the history cuts 5: every extent passes, the volume does not",
+   "source": {
+    "history": {
+     "parameters": {
+      "w": 50,
+      "h": 40,
+      "t": 10,
+      "d": 5
+     },
+     "features": [
+      {
+       "id": "s1",
+       "type": "sketch",
+       "plane": "XY",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "r",
+          "kind": "rectangle",
+          "at": [
+           0,
+           0
+          ],
+          "width": "w",
+          "height": "h"
+         }
+        ]
+       }
+      },
+      {
+       "id": "block",
+       "type": "extrude",
+       "sketch": "s1",
+       "depth": "t",
+       "operation": "new"
+      },
+      {
+       "id": "s2",
+       "type": "sketch",
+       "plane": "XY",
+       "offset": "t",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "p",
+          "kind": "rectangle",
+          "at": [
+           15,
+           15
+          ],
+          "width": 20,
+          "height": 10
+         }
+        ]
+       }
+      },
+      {
+       "id": "pocket",
+       "type": "extrude",
+       "sketch": "s2",
+       "depth": "d",
+       "direction": "down",
+       "operation": "subtract"
+      }
+     ]
+    }
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 50,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "width",
+     "axis": "y",
+     "nominal": 40,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "extent",
+     "name": "height",
+     "axis": "z",
+     "nominal": 10,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    },
+    {
+     "kind": "volume",
+     "name": "volume",
+     "nominal": 19200,
+     "tolerance": {
+      "plus": 19.2,
+      "minus": 19.2
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": false,
+    "failing": [
+     "volume"
+    ]
+   }
+  },
+  {
+   "id": "negative-flange-bolt-count",
+   "part": "flange asked for eight bolts; the recipe was built with six",
+   "source": {
+    "recipe": "flange"
+   },
+   "checks": [
+    {
+     "kind": "hole_count",
+     "name": "holes",
+     "nominal": 9
+    }
+   ],
+   "expect": {
+    "rebuilt": true,
+    "accepted": false,
+    "failing": [
+     "holes"
+    ]
+   }
+  },
+  {
+   "id": "negative-no-rebuild",
+   "part": "a cut deeper than nothing: the history does not rebuild, so nothing is measured or accepted",
+   "source": {
+    "history": {
+     "parameters": {},
+     "features": [
+      {
+       "id": "s1",
+       "type": "sketch",
+       "plane": "XY",
+       "sketch": {
+        "shapes": [
+         {
+          "id": "r",
+          "kind": "rectangle",
+          "at": [
+           0,
+           0
+          ],
+          "width": 10,
+          "height": 10
+         }
+        ]
+       }
+      },
+      {
+       "id": "block",
+       "type": "extrude",
+       "sketch": "s1",
+       "depth": -5,
+       "operation": "new"
+      }
+     ]
+    }
+   },
+   "checks": [
+    {
+     "kind": "extent",
+     "name": "length",
+     "axis": "x",
+     "nominal": 10,
+     "tolerance": {
+      "plus": 0.01,
+      "minus": 0.01
+     }
+    }
+   ],
+   "expect": {
+    "rebuilt": false,
+    "accepted": false,
+    "failing": []
+   }
+  }
+ ]
+}
