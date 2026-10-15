@@ -70,6 +70,19 @@ describe("AiAnalytics", () => {
     }
   })
 
+  test("reported and estimated tokens stay apart, and an unknown cost is counted, not taken as zero", async () => {
+    const stats = await Effect.runPromise(Effect.gen(function* () {
+      const analytics = yield* AiAnalytics
+      yield* analytics.completeRequest({ requestId: "a", durationMs: 1, success: true, promptTokens: 100, completionTokens: 20, costUsd: 0.25 })
+      yield* analytics.completeRequest({ requestId: "b", durationMs: 1, success: true, promptTokens: 40, completionTokens: 2, tokenSource: "estimated" })
+      yield* analytics.completeRequest({ requestId: "c", durationMs: 1, success: true, costUsd: Number.NaN })
+      return yield* analytics.stats
+    }).pipe(Effect.provide(AiAnalytics.layer)))
+    expect(stats.tokens).toEqual({ reported: 120, estimated: 42 })
+    expect(stats.totalTokens).toBe(162)
+    expect(stats.cost).toEqual({ knownUsd: 0.25, unavailable: 2 })
+  })
+
   test("startRequest returns a requestId and completeRequest closes the loop", async () => {
     const program = Effect.gen(function* () {
       const analytics = yield* AiAnalytics

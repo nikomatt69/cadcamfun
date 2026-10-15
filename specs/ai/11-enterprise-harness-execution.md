@@ -462,13 +462,44 @@ Progress (2026-10-15):
 
 D: previous increments; RM-10/RM-11 per roadmap.
 
-- [ ] Full coverage of the inventory, plugins and bridge included.
-- [ ] Versioned corpus: plate, bracket, shaft, flange, pocket, assembly, STEP import and negative cases.
+- [x] Full coverage of the inventory, plugins and bridge included. (83/83 actions mentioned by a test; see the open note on
+  dedicated regressions)
+- [x] Versioned corpus: plate, bracket, shaft, flange, pocket, assembly, STEP import and negative cases.
 - [ ] Bounded traces with identity and provenance, without secrets or full parts.
-- [ ] Distinguish estimated/reported tokens and known/unavailable cost.
-- [ ] Run the compiled sidecar, not only inspect the bundle.
-- [ ] Record baseline and comparison of latency, memory and stalls.
-- [ ] Keep evaluation with real models separate and authorised with a budget.
+- [x] Distinguish estimated/reported tokens and known/unavailable cost. (`AiAnalytics`; the legacy `userUsage` route is open)
+- [x] Run the compiled sidecar, not only inspect the bundle.
+- [x] Record baseline and comparison of latency, memory and stalls.
+- [x] Keep evaluation with real models separate and authorised with a budget.
+
+Progress (2026-10-15):
+
+- **V** Coverage: `apps/sidecar/test/ai-cam-chain.test.ts` covers the four actions no test named (`cam.machine`,
+  `cam.chain_suggest`, `cam.chain_status`, `cam.vision`); the inventory reports 83/83. Writing it found a real fault:
+  `chain_status` and `chain_suggest` read the store's most-recently-updated-first list as the chain, so the "predecessor" of an
+  operation was the one created after it and a suggestion without a starting point continued the oldest operation. Both now
+  use creation order (`chainOrder` in `apps/sidecar/src/services/ai.ts`).
+- **V** Corpus: `packages/ai/test/eval/corpus.v1.json` (version 1: plate, flange, bracket, stepped shaft, pocket, two-body
+  assembly, STEP round trip of the plate and the assembly, four negative cases) run by `eval-corpus.test.ts`. Nominal values
+  are worked out from the request (ISO 273 clearance, volumes by hand), not copied from a measurement. A published version is
+  never edited: new cases go in a new version. The flange case records that the centre bore is a recognised hole (seven, not
+  six).
+- **V** Tokens and cost: `AnalyticsEvent.tokenSource` (`reported` | `estimated`; legacy callers count as reported) and
+  `costUsd` (absent means unknown); `stats.tokens` keeps the two apart and `stats.cost` gives the known total and how many
+  responses had no cost, so a missing price is never a zero. Test in `analytics.test.ts`.
+- **V** Compiled sidecar: `scripts/smoke-sidecar.ts` compiles the executable, starts it on a throw-away data directory with
+  the AI offline, holds stdin like the shell, and drives it over HTTP through the action route: a recipe part is created and
+  `cad.parametric_test` runs its dimensional checks in the kernel worker inside the executable (accepted), while health is
+  polled to see the stall. Shutdown is the shell's own (`shutdown` event, then stdin closes).
+- **V** Baseline (this container, Linux x64, two runs): ready 1.87–1.97 s; health p50 1.0–1.1 ms, p95 1.6–3.4 ms;
+  `cad.describe` p50 5.7–6.3 ms, p95 137–139 ms (the first calls); `cad.parametric_test` with checks 1.19–1.24 s, slowest
+  health answer during it 22–39 ms over 2300+ samples; RSS 182–185 MB at ready, 364–374 MB after the job; clean shutdown in
+  84–92 ms, exit 0. Compare a later run with `bun --no-env-file scripts/smoke-sidecar.ts --json`.
+- **C** Real models: nothing in this step calls a model. An evaluation with real models is a separate run that needs the
+  owner's authorisation, a named provider and model, and a token/cost budget fixed before it starts; its results are recorded
+  apart from this baseline.
+- Open: bounded traces with identity and provenance; the legacy `GET /api/analytics/user-usage` still answers zero totals that
+  read as "free" instead of "unknown" (a contract change); several actions are covered only by a test that mentions them, not
+  by a dedicated regression; plugin and bridge coverage beyond the existing `nikcli-plugin`/`ai-bridge*` tests.
 
 ## Common closing commands
 
@@ -574,3 +605,6 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   delivery), bounded recovery of readers, uncertain editors reported instead of replayed, retention.
 - 2026-10-15: closed Step 10: dimensional acceptance in `cad.parametric_test` (identified references, full values, genus apart
   from hole count) and kernel jobs in a worker with deadline and cancellation, compiled into the sidecar.
+- 2026-10-15: Step 11: coverage of the four untested CAM actions (fixed the chain order they reported), versioned evaluation
+  corpus v1 with STEP round trip and negative cases, reported/estimated tokens and known/unknown cost kept apart, compiled
+  sidecar smoke with a latency, memory and stall baseline. Open: traces, the legacy usage route, Step 6/9/10 open items.
