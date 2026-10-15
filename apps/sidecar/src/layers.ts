@@ -71,10 +71,11 @@ import { WorkflowRunner } from "./services/workflow-runner.ts"
 import { WorkflowServiceStepsLive } from "./services/workflow-service-steps-live.ts"
 import { AnalyticsRepo } from "./repos/analytics-repo.ts"
 import { EventsHandlers } from "./http/events.ts"
+import { WorkspaceHandlers } from "./http/workspace.ts"
 import { LiveEvents } from "./services/live-events.ts"
 
 /** Every group handler; add new route families here as they are implemented. */
-export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers)
+export const Handlers = Layer.mergeAll(HealthHandlers, SystemHandlers, ProjectsHandlers, MaterialsHandlers, MaterialsStorageHandlers, ToolsHandlers, ToolsStorageHandlers, MachineConfigsHandlers, MachineConfigsStorageHandlers, DrawingsHandlers, ComponentsHandlers, ToolpathsHandlers, ToolpathExtrasHandlers, ToolpathGeneratorHandlers, CadExactHandlers, ProjectToolpathsHandlers, LibraryHandlers, OrganizationsHandlers, NotificationsHandlers, ProductionCostsHandlers, AnalyticsHandlers, WaitlistHandlers, AuthHandlers, FilesHandlers, PluginsHandlers, UserHandlers, AiHandlers, BillingHandlers, MiscHandlers, KvHandlers, McpHandlers, VcsHandlers, EventsHandlers, CompanionHandlers, WorkspaceHandlers)
 
 /**
  * The version-control services themselves. `LocalProfile` is provided here (not in `RepoServices`)
@@ -117,7 +118,7 @@ export class ServedApi extends HttpApi.make(Api.identifier).add(
   Api.groups.health, Api.groups.system, Api.groups.projects, Api.groups.materials, Api.groups.materialsStorage,
   Api.groups.tools, Api.groups.toolsStorage, Api.groups.machineConfigs, Api.groups.machineConfigsStorage,
   Api.groups.drawings, Api.groups.components, Api.groups.toolpaths, Api.groups.toolpathExtras, Api.groups.toolpathGenerator, Api.groups.cadExact, Api.groups.projectToolpaths, Api.groups.library,
-  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion
+  Api.groups.organizations, Api.groups.notifications, Api.groups['production-costs'], Api.groups.analytics, Api.groups.waitlist, Api.groups.auth, Api.groups.files, Api.groups.plugins, Api.groups.user, Api.groups.ai, Api.groups.billing, Api.groups.misc, Api.groups.kv, Api.groups.mcp, Api.groups.vcs, Api.groups.events, Api.groups.companion, Api.groups.workspace
 ) {}
 
 /**

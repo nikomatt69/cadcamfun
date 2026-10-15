@@ -56,8 +56,10 @@ export default function AssistantScreen() {
   const { palette } = useTheme()
 
   const projectId = useUIStore((state) => state.assistantProjectId)
+  const draft = useUIStore((state) => state.assistantDraft)
   const setAssistantProject = useUIStore((state) => state.setAssistantProject)
   const setAssistantSession = useUIStore((state) => state.setAssistantSession)
+  const clearAssistantDraft = useUIStore((state) => state.clearAssistantDraft)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [agentPickerOpen, setAgentPickerOpen] = useState(false)
@@ -65,6 +67,9 @@ export default function AssistantScreen() {
   const [log, setLog] = useState<readonly ChatRow[]>(emptyLog)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<AssistantMode>("general")
+  const [promptSeed, setPromptSeed] = useState<{ projectId: string; text: string; token: number } | null>(null)
+  const draftRef = useRef(draft)
+  draftRef.current = draft
 
   const sessionRef = useRef<string | undefined>(undefined)
   const runningRef = useRef<AbortController | null>(null)
@@ -105,6 +110,19 @@ export default function AssistantScreen() {
       }
     }
   }, [projectId, client])
+
+  useEffect(() => {
+    const pending = draftRef.current
+    if (pending && pending.projectId === projectId) return
+    setPromptSeed(null)
+  }, [projectId])
+
+  useEffect(() => {
+    if (!draft || draft.projectId !== projectId) return
+    setMode(draft.mode)
+    setPromptSeed({ projectId: draft.projectId, text: draft.text, token: Date.now() })
+    clearAssistantDraft()
+  }, [draft, projectId, clearAssistantDraft])
 
   const send = async (text: string) => {
     if (!client || !projectId || runningRef.current || stopping.current) return
@@ -383,6 +401,8 @@ export default function AssistantScreen() {
         onSend={(text) => void send(text)}
         onQueue={(text) => void queue(text)}
         onStop={stop}
+        seed={promptSeed?.projectId === projectId ? promptSeed.text : undefined}
+        seedToken={promptSeed?.projectId === projectId ? promptSeed.token : undefined}
       />
 
       {/* Project picker */}

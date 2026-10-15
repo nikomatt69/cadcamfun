@@ -1,4 +1,4 @@
-import type { SessionControlReply, SessionStateReply, EntityChange, LiveEvent, NotificationRow, PullRequestRow, ReviewRow, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow } from "@cadcamfun/api"
+import type { ComponentPreview, EntityChange, LibraryCatalogue, LiveEvent, MeshPreview, NotificationRow, PullRequestRow, ReviewRow, SessionControlReply, SessionStateReply, ToolpathPreview, ToolpathReview, VcsBranches, VcsCommit, VcsStatus, WorkflowRunRow, WorkspaceEntry } from "@cadcamfun/api"
 import type { Pairing } from "./pairing"
 import type { ChatEvent } from "./sse"
 import { sseParser } from "./sse"
@@ -81,9 +81,26 @@ export class CompanionClient {
 
   private projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}`
 
+  private workspacePath = (id: string) => `${this.projectPath(id)}/workspace`
+
   health = (signal?: AbortSignal) => this.request<{ status?: string }>("GET", "/api/health", undefined, signal)
   projects = (signal?: AbortSignal) => this.request<ProjectSummary[]>("GET", "/api/projects", undefined, signal)
   project = (id: string, signal?: AbortSignal) => this.request<ProjectSummary>("GET", this.projectPath(id), undefined, signal)
+
+  // ── Workspace preview (read-only meshes, G-code and library) ────────────
+
+  workspaceDrawings = (id: string, signal?: AbortSignal) => this.request<WorkspaceEntry[]>("GET", `${this.workspacePath(id)}/drawings`, undefined, signal)
+  drawingPreview = (id: string, drawingId: string, signal?: AbortSignal) =>
+    this.request<MeshPreview>("GET", `${this.workspacePath(id)}/drawings/${encodeURIComponent(drawingId)}/preview`, undefined, signal)
+  workspaceComponents = (id: string, signal?: AbortSignal) => this.request<WorkspaceEntry[]>("GET", `${this.workspacePath(id)}/components`, undefined, signal)
+  componentPreview = (id: string, componentId: string, signal?: AbortSignal) =>
+    this.request<ComponentPreview>("GET", `${this.workspacePath(id)}/components/${encodeURIComponent(componentId)}/preview`, undefined, signal)
+  workspaceToolpaths = (id: string, signal?: AbortSignal) => this.request<WorkspaceEntry[]>("GET", `${this.workspacePath(id)}/toolpaths`, undefined, signal)
+  toolpathReview = (id: string, toolpathId: string, signal?: AbortSignal) =>
+    this.request<ToolpathReview>("GET", `${this.workspacePath(id)}/toolpaths/${encodeURIComponent(toolpathId)}`, undefined, signal)
+  toolpathPreview = (id: string, toolpathId: string, signal?: AbortSignal) =>
+    this.request<ToolpathPreview>("GET", `${this.workspacePath(id)}/toolpaths/${encodeURIComponent(toolpathId)}/preview`, undefined, signal)
+  workspaceLibrary = (id: string, signal?: AbortSignal) => this.request<LibraryCatalogue>("GET", `${this.workspacePath(id)}/library`, undefined, signal)
 
   // ── Version control ─────────────────────────────────────────────────────
 

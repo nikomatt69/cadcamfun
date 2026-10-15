@@ -1,0 +1,58 @@
+import { useCallback, useState } from "react"
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"
+import { useServer } from "@/lib/server"
+import { useResource } from "@/lib/use-resource"
+import { useUIStore } from "@/lib/store"
+import { useCommitRevision } from "@/lib/use-commit-revision"
+import { haptic } from "@/lib/haptics"
+import { changeComponentPrompt } from "@/lib/preview-math"
+import { MeshReview } from "@/components/workspace/MeshReview"
+import { routeParam } from "@/components/workspace/route"
+
+export default function ComponentPreviewScreen() {
+  const params = useLocalSearchParams<{ id: string; componentId: string; name?: string }>()
+  const id = routeParam(params.id)
+  const componentId = routeParam(params.componentId)
+  const name = routeParam(params.name) || "Component"
+  const { client } = useServer()
+  const router = useRouter()
+  const setAssistantDraft = useUIStore((state) => state.setAssistantDraft)
+  const revision = useCommitRevision(id)
+  const [selected, setSelected] = useState<string | undefined>()
+
+  const preview = useResource(
+    useCallback(
+      (signal) => (client ? client.componentPreview(id, componentId, signal) : Promise.reject(new Error("Not connected"))),
+      [client, id, componentId],
+    ),
+    `component:${id}:${componentId}:${revision}`,
+  )
+
+  const proposeChange = () => {
+    if (!preview.data) return
+    haptic("selection")
+    setAssistantDraft({
+      projectId: id,
+      mode: "cad",
+      text: changeComponentPrompt({ id: componentId, name }),
+    })
+    router.navigate("/assistant")
+  }
+
+  return (
+    <>
+      <Stack.Screen options={{ title: name, headerLargeTitle: false }} />
+      <MeshReview
+        mesh={preview.data}
+        loading={preview.loading}
+        error={preview.error}
+        onRetry={() => void preview.reload()}
+        parameters={preview.data?.parameters}
+        selectedPartId={selected}
+        onSelectPart={setSelected}
+        actionLabel="Propose a change"
+        onAction={proposeChange}
+      />
+    </>
+  )
+}

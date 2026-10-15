@@ -27,14 +27,29 @@ export interface UIState {
   /** Queued assistant prompts waiting for the desktop to come back (SecureStore-backed). */
   offlineQueueCount: number
   offlineQueueRevision: number
+  /**
+   * One-shot prompt handed off from a workspace preview. Not persisted: the composer
+   * fills it so the user can confirm before anything is sent.
+   */
+  assistantDraft: AssistantDraft | null
   setThemeMode: (mode: UIState["themeMode"]) => void
   setHaptics: (patch: Partial<UIState["haptics"]>) => void
   setSecurity: (patch: Partial<UIState["security"]>) => void
   setAssistantDesktop: (desktopId: string | null) => void
   setAssistantProject: (projectId: string | null) => void
   setAssistantSession: (projectId: string, sessionId: string) => void
+  setAssistantDraft: (draft: AssistantDraft) => void
+  clearAssistantDraft: () => void
   setOfflineQueue: (count: number) => void
   showToast: (message: string, kind?: "info" | "success" | "error") => void
+}
+
+export type AssistantDraftMode = "general" | "cad" | "cam" | "gcode" | "toolpath"
+
+export interface AssistantDraft {
+  readonly projectId: string
+  readonly text: string
+  readonly mode: AssistantDraftMode
 }
 
 let finishHydration: () => void = () => undefined
@@ -51,6 +66,7 @@ export const useUIStore = create<UIState>()(
       assistantSessions: {},
       offlineQueueCount: 0,
       offlineQueueRevision: 0,
+      assistantDraft: null,
       setThemeMode: (themeMode) => set({ themeMode }),
       setHaptics: (patch) => set((s) => ({ haptics: { ...s.haptics, ...patch } })),
       setSecurity: (patch) => set((s) => ({ security: { ...s.security, ...patch } })),
@@ -58,6 +74,8 @@ export const useUIStore = create<UIState>()(
       setAssistantProject: (assistantProjectId) => set({ assistantProjectId }),
       setAssistantSession: (projectId, sessionId) =>
         set((s) => ({ assistantSessions: { ...s.assistantSessions, [projectId]: sessionId } })),
+      setAssistantDraft: (assistantDraft) => set({ assistantDraft, assistantProjectId: assistantDraft.projectId }),
+      clearAssistantDraft: () => set({ assistantDraft: null }),
       setOfflineQueue: (offlineQueueCount) =>
         set((s) => ({ offlineQueueCount, offlineQueueRevision: s.offlineQueueRevision + 1 })),
       showToast: (message, kind = "info") => {

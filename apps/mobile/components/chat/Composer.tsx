@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
 import { ArrowUp, Square } from "lucide-react-native"
 import Animated from "react-native-reanimated"
@@ -32,6 +32,8 @@ export function Composer({
   onSend,
   onQueue,
   onStop,
+  seed,
+  seedToken,
 }: {
   busy: boolean
   disabled: boolean
@@ -41,6 +43,9 @@ export function Composer({
   onSend: (text: string) => void
   onQueue: (text: string) => void
   onStop: () => void
+  /** Fills the field when `seedToken` changes. The user still sends it. */
+  seed?: string
+  seedToken?: number
 }) {
   const { palette, glass, isDark } = useTheme()
   const [text, setText] = useState("")
@@ -48,6 +53,11 @@ export function Composer({
   const sendScale = usePressScale()
   const stopScale = usePressScale()
   const canSubmit = text.trim().length > 0 && !disabled
+
+  useEffect(() => {
+    if (seedToken === undefined || !seed) return
+    setText(seed)
+  }, [seed, seedToken])
 
   const submit = () => {
     const value = text.trim()
