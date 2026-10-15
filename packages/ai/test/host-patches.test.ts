@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"
-import { MEDIA_RULE_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
+import { applyHostPatches, ENVIRONMENT_MARKER, HOST_PATCHES, HostPatchError, INSTANCE_CONFIG_MARKER, MEDIA_RULE_MARKER, REGISTRATION_MARKER, STEP_INSTRUCTIONS_MARKER, hostPatchesPlugin, patchHostSource } from "../src/nikcli/host-patches.ts"
 
 /** The marker must exist exactly once in the pinned bundle; a bump that moves it fails here, not in a user's chat. */
 describe("host patch: images in tool results", () => {
@@ -17,19 +17,70 @@ describe("host patch: images in tool results", () => {
   })
 
   test("the patch answers false and changes nothing else", () => {
-    const patched = patchHostSource(bundle)!
-    expect(patched).toBeDefined()
+    const patched = patchHostSource(bundle)
     expect(patched).not.toContain(MEDIA_RULE_MARKER)
     const at = patched.indexOf("function supportsMediaInToolResults(model)")
     expect(patched.slice(at, at + 520)).toContain("return false;\n}")
-    // Exactly the two substitutions, nothing else in 15 MB of host.
-    expect(patched).toBe(bundle.replace(MEDIA_RULE_MARKER, () => "return false;").replace(STEP_INSTRUCTIONS_MARKER, () => `        InstructionSync.foldDelivered(sessionID);\n${STEP_INSTRUCTIONS_MARKER}`))
+    // Exactly the declared substitutions, nothing else in 15 MB of host.
+    expect(patched).toBe(HOST_PATCHES.reduce((source, patch) => source.replace(patch.marker, () => patch.replacement), bundle))
+  })
+})
+
+/** Partial compatibility is an explicit error: every patch is reported, and a bundle missing any of them is refused. */
+describe("host patch report", () => {
+  const bundle = readFileSync(createRequire(import.meta.url).resolve("@nikcli-ai/sdk-next"), "utf8")
+
+  test("the pinned bundle takes every patch, each exactly once", () => {
+    const { report, source } = applyHostPatches(bundle)
+    expect(report).toEqual(HOST_PATCHES.map(({ name }) => ({ name, status: "applied" })))
+    expect(source).toBeDefined()
+    for (const patch of HOST_PATCHES) expect(bundle.split(patch.marker), patch.name).toHaveLength(2)
   })
 
-  test("a bundle without the markers, or with one twice, is left alone there", () => {
-    expect(patchHostSource("function other() {}")).toBeUndefined()
-    expect(patchHostSource(`${MEDIA_RULE_MARKER}\n${MEDIA_RULE_MARKER}`)).toBeUndefined()
-    expect(patchHostSource(`${MEDIA_RULE_MARKER}\n${STEP_INSTRUCTIONS_MARKER}\n${STEP_INSTRUCTIONS_MARKER}`)).toBe(`return false;\n${STEP_INSTRUCTIONS_MARKER}\n${STEP_INSTRUCTIONS_MARKER}`)
+  test("a bundle without a marker, or with one twice, is refused with a report naming each patch", () => {
+    expect(applyHostPatches("function other() {}").source).toBeUndefined()
+    expect(applyHostPatches("function other() {}").report.every((entry) => entry.status === "missing")).toBe(true)
+    const withoutEnvironment = bundle.replace(ENVIRONMENT_MARKER, "")
+    const partial = applyHostPatches(withoutEnvironment)
+    expect(partial.source).toBeUndefined()
+    expect(partial.report.find((entry) => entry.name === "cad-environment")?.status).toBe("missing")
+    expect(partial.report.filter((entry) => entry.status === "applied")).toHaveLength(HOST_PATCHES.length - 1)
+    expect(applyHostPatches(`${bundle}\n${MEDIA_RULE_MARKER}`).report[0]).toEqual({ name: "media-in-tool-results", status: "ambiguous" })
+    expect(() => patchHostSource(withoutEnvironment)).toThrow(HostPatchError)
+    expect(() => patchHostSource(withoutEnvironment)).toThrow("cad-environment (missing)")
+  })
+})
+
+describe("host patch: one configuration file per Instance", () => {
+  const bundle = readFileSync(createRequire(import.meta.url).resolve("@nikcli-ai/sdk-next"), "utf8")
+
+  test("the loader reads the Instance's own file after the global one, and still no ancestor or worktree file", () => {
+    const at = bundle.indexOf(INSTANCE_CONFIG_MARKER)
+    expect(bundle.lastIndexOf("async function loadState(ctx, directories, projectFiles)", at)).toBeGreaterThan(at - 2000)
+    const patched = patchHostSource(bundle)
+    const loader = patched.slice(patched.indexOf("async function loadState(ctx, directories, projectFiles)"), patched.indexOf("function makeScopedState(paths, appFs)"))
+    expect(loader).toContain('if (Flag.NIKCLI_DISABLE_PROJECT_CONFIG) {\n        result = mergeConfigConcatArrays(result, await loadFile(path120.join(ctx.directory, "nikcli.json")));')
+    expect(loader.indexOf("await global2()")).toBeLessThan(loader.indexOf("ctx.directory, \"nikcli.json\""))
+    // Discovery stays off: with the flag set, findUp is never called and ancestor `.nikcli` folders are not listed.
+    expect(patched).toContain('const found = Flag.NIKCLI_DISABLE_PROJECT_CONFIG ? [] : yield* appFs.findUp("nikcli.json", ctx.directory, ctx.worktree);')
+  })
+
+  test("the SDK registration answers one close for the batch it registered", () => {
+    const patched = patchHostSource(bundle)
+    const at = patched.indexOf('const register = Effect248.fn("NikCli.tools.register")')
+    const body = patched.slice(at, patched.indexOf("return yield* Effect248.succeed(", at))
+    expect(bundle).toContain(REGISTRATION_MARKER)
+    expect(body).toContain("handles.push(yield* registry.register(tool));")
+    expect(body).toContain("yield* handle.close;")
+    expect(body).toContain("return { close };")
+  })
+
+  test("the environment keeps date, platform and locale, and drops the coding workspace", () => {
+    const patched = patchHostSource(bundle)
+    const at = patched.indexOf("async function environmentImpl(ctx, config)")
+    const env = patched.slice(at, patched.indexOf("async function nativeEnvironmentImpl(ctx, config)", at))
+    for (const kept of ["Today's date", "User locale", "User timezone", "Platform", "<language>"]) expect(env).toContain(kept)
+    for (const dropped of ["Working directory", "git repo", "Package manager", "monitor tool", "<command_execution>"]) expect(env).not.toContain(dropped)
   })
 })
 
@@ -50,7 +101,7 @@ describe("host patch: instructions folded before every step", () => {
   })
 
   test("the patched loop folds delivered instructions before each step's assembly", () => {
-    const patched = patchHostSource(bundle)!
+    const patched = patchHostSource(bundle)
     const at = patched.indexOf(STEP_INSTRUCTIONS_MARKER)
     expect(patched.slice(at - 60, at)).toContain("InstructionSync.foldDelivered(sessionID);\n")
   })

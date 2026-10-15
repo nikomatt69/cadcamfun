@@ -46,7 +46,7 @@ export const projectScratchDir = (paths: IsolatedPaths, projectId: string): stri
  * Variables that would widen the host's trust boundary (auto-approve, remote
  * servers, extra config sources, secrets for connectors). Removed on setup.
  */
-const SCRUBBED = [
+export const SCRUBBED_ENV = [
   "NIKCLI_PERMISSION_MODE",
   "NIKCLI_AUTO_APPROVE",
   "NIKCLI_DANGEROUSLY_SKIP_PERMISSIONS",
@@ -65,6 +65,29 @@ const SCRUBBED = [
   "NIKCLI_FIGMA_TOKEN",
   "NIKCLI_LOG_REDACT",
   "NIKCLI_TEST_MODE",
+  // Inherited authentication and storage: another database, injected credentials, a server identity or a sign-in.
+  "NIKCLI_DB",
+  "NIKCLI_AUTH_CONTENT",
+  "NIKCLI_AUTH_ISSUER",
+  "NIKCLI_AUTH_JWKS_URL",
+  "NIKCLI_AUTH_JWT_SECRET",
+  "NIKCLI_SERVER_PASSWORD",
+  "NIKCLI_SERVER_USERNAME",
+  "NIKCLI_PASSWORD",
+  "NIKCLI_USERNAME",
+  "NIKCLI_STORE_TOKEN",
+  "NIKCLI_ACCOUNT_URL",
+  "NIKCLI_REQUIRE_OAUTH",
+  "NIKCLI_LEGACY_LOGIN",
+  "NIKCLI_OPENROUTER_API_KEY",
+  "NIKCLI_ELEVENLABS_API_KEY",
+  "NIKCLI_LOVABLE_API_KEY",
+  "NIKCLI_LOVABLE_TOKEN",
+  // Code or configuration from outside the isolated folders.
+  "NIKCLI_ALLOW_PLUGIN_AUTOLOAD",
+  "NIKCLI_PLUGIN_META_FILE",
+  "NIKCLI_TUI_CONFIG",
+  "NIKCLI_MODEL",
   // The confined program runner (`code_mode`) is how the agent builds complex geometry and G-code in loops; see config.ts.
   "NIKCLI_DISABLE_CODE_MODE"
 ] as const
@@ -116,6 +139,6 @@ export const applyIsolation = (paths: IsolatedPaths, options?: IsolationOptions)
   }
   // nikcli persists API keys here in plaintext; this app keeps keys in memory only.
   rmSync(join(paths.data, "auth.json"), { force: true })
-  for (const key of SCRUBBED) delete process.env[key]
+  for (const key of SCRUBBED_ENV) delete process.env[key]
   Object.assign(process.env, isolationEnv(paths, options))
 }
