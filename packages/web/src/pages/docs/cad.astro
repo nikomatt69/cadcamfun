@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -17,6 +18,11 @@ const toc = [
   { title: "Build, validate, and export a solid", href: "#exact-example" },
   { title: "Validation and conversion options", href: "#validation-options" },
   { title: "Repair a failed rebuild or export", href: "#troubleshooting" },
+  { title: "Solve a sketch step by step", href: "#sketch-walkthrough" },
+  { title: "Constraint reference", href: "#constraint-reference" },
+  { title: "Build a parametric part", href: "#history-walkthrough" },
+  { title: "Exact primitives and placement", href: "#brep-primitives" },
+  { title: "Modelling practices that rebuild reliably", href: "#cad-best-practices" },
 ]
 ---
 
@@ -125,6 +131,144 @@ console.log(step.startsWith("ISO-10303-21;")) // true`}
     </table>
     <p>Primitive dimensions must be positive and finite. Direct geometry functions can throw range errors for invalid dimensions; transport and service layers must convert those failures into their own typed results. Rebuild issues are keyed to feature IDs so a failure can be repaired at its source rather than concealed by retaining an earlier mesh.</p>
     <p>Source: <code>packages/core/src/cad/sketch.test.ts</code>, <code>history.ts</code>, <code>scene-step.ts</code>, and <code>apps/sidecar/test/cad-exact.test.ts</code>.</p>
+  </section>
+
+    <section id="sketch-walkthrough" class="doc-section">
+    <h2>Solve a sketch step by step</h2>
+    <p>A sketch is plain data: an array of <code>entities</code> (points, lines, circles, arcs) and an array of <code>constraints</code>. Lines, circles, and arcs refer to points by identifier, so two lines that share an endpoint share the same point ID. The solver moves only point coordinates and circle radii; it never adds or removes entities.</p>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 520 260" role="img" aria-label="Constrained rectangle sketch with points p1 to p4, lines l1 to l4, fixed origin, horizontal and vertical constraints, and length dimensions 40 and 25" style="width:100%;max-width:560px;height:auto">
+        <rect x="0" y="0" width="520" height="260" fill="none"/>
+        <g stroke="currentColor" stroke-width="2" fill="none">
+          <line x1="80" y1="200" x2="400" y2="200"/><line x1="400" y1="200" x2="400" y2="40"/>
+          <line x1="400" y1="40" x2="80" y2="40"/><line x1="80" y1="40" x2="80" y2="200"/>
+        </g>
+        <g fill="currentColor" font-size="13" font-family="monospace">
+          <circle cx="80" cy="200" r="5"/><circle cx="400" cy="200" r="4"/><circle cx="400" cy="40" r="4"/><circle cx="80" cy="40" r="4"/>
+          <text x="52" y="222">p1 (fixed)</text><text x="408" y="222">p2</text><text x="408" y="36">p3</text><text x="58" y="34">p4</text>
+          <text x="210" y="194">l1 · horizontal</text><text x="410" y="125">l2 · vertical</text>
+          <text x="210" y="56">l3 · horizontal</text><text x="6" y="125">l4 · vertical</text>
+        </g>
+        <g stroke="#2f80ed" fill="#2f80ed" font-size="13" font-family="monospace">
+          <line x1="80" y1="235" x2="400" y2="235"/><text x="215" y="252" stroke="none">width = 40</text>
+          <line x1="470" y1="200" x2="470" y2="40"/><text x="440" y="125" stroke="none" transform="rotate(-90 478 125)">depth = 25</text>
+        </g>
+      </svg>
+      <figcaption class="text-[13px]">The sketch used in the examples: four points, four lines, one fixed point, four orientation constraints, and two length dimensions. Every degree of freedom is removed, so the solver reports <code>fully-constrained</code> with <code>dof = 0</code>.</figcaption>
+    </figure>
+    <DocCode language="ts" title="Solve a fully constrained rectangle">
+{"import { cad } from \"@cadcamfun/core\"\n\nconst sketch = {\n  entities: [\n    { id: \"p1\", kind: \"point\", x: 0, y: 0 },\n    { id: \"p2\", kind: \"point\", x: 38, y: 1 },   // rough positions are fine:\n    { id: \"p3\", kind: \"point\", x: 39, y: 26 },  // the solver moves them\n    { id: \"p4\", kind: \"point\", x: 1, y: 24 },\n    { id: \"l1\", kind: \"line\", p1: \"p1\", p2: \"p2\" },\n    { id: \"l2\", kind: \"line\", p1: \"p2\", p2: \"p3\" },\n    { id: \"l3\", kind: \"line\", p1: \"p3\", p2: \"p4\" },\n    { id: \"l4\", kind: \"line\", p1: \"p4\", p2: \"p1\" },\n  ],\n  constraints: [\n    { type: \"fixed\", point: \"p1\", x: 0, y: 0 },\n    { type: \"horizontal\", line: \"l1\" },\n    { type: \"horizontal\", line: \"l3\" },\n    { type: \"vertical\", line: \"l2\" },\n    { type: \"vertical\", line: \"l4\" },\n    { id: \"width\", type: \"length\", line: \"l1\", value: 40 },\n    { id: \"depth\", type: \"length\", line: \"l2\", value: 25 },\n  ],\n}\n\nconst result = cad.solveSketch(sketch)\nresult.status     // \"fully-constrained\"\nresult.dof        // 0\nresult.iterations // 3\nresult.residual   // < 1e-9\n// points now at (0,0) (40,0) (40,25) (0,25)"}
+    </DocCode>
+    <p>Run the same sketch without the <code>fixed</code> constraint and the result changes to <code>under-constrained</code> with <code>dof = 2</code> and <code>free = ["p1", "p2", "p3", "p4"]</code>. The rectangle still has the right size, but it can slide in X and Y. Add a third length, <code>&#123; id: "w2", type: "length", line: "l3", value: 50 &#125;</code>, and the status becomes <code>conflicting</code>. <code>conflicts</code> then lists the named constraints that cannot be satisfied together, worst first (for example <code>w2</code> and <code>width</code>). Name the constraints you care about with <code>id</code>; unnamed constraints are reported with a generated label such as <code>vertical#4</code>.</p>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>maxIterations</code></td><td>200</td><td>Upper bound on Levenberg–Marquardt iterations before the solve is reported as <code>failed</code>.</td></tr>
+        <tr><td><code>tolerance</code></td><td>1e-9</td><td>The largest absolute residual accepted as solved.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Result field</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>sketch</code></td><td>The input sketch with solved coordinates and radii.</td></tr>
+        <tr><td><code>status</code></td><td><code>fully-constrained</code>, <code>under-constrained</code>, <code>over-constrained</code>, <code>conflicting</code>, or <code>failed</code>.</td></tr>
+        <tr><td><code>dof</code></td><td>Remaining degrees of freedom.</td></tr>
+        <tr><td><code>free</code></td><td>Point IDs that can still move, and circle IDs whose radius can still change.</td></tr>
+        <tr><td><code>conflicts</code></td><td>Constraint IDs that could not be satisfied, worst first.</td></tr>
+        <tr><td><code>redundant</code></td><td>Number of redundant equations (rank deficiency).</td></tr>
+        <tr><td><code>iterations</code>, <code>residual</code>, <code>message</code></td><td>Solver diagnostics.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Malformed input throws">
+      <p>A sketch that refers to an unknown point or entity is malformed rather than unsolvable, and <code>solveSketch</code> throws a <code>SketchError</code>. Validate imported sketches before solving them in a loop.</p>
+    </DocCallout>
+  </section>
+
+  <section id="constraint-reference" class="doc-section">
+    <h2>Constraint reference</h2>
+    <p>Every constraint is an object with a <code>type</code> and an optional <code>id</code>. Lengths are millimetres and angles are radians. In a parametric history, any <code>value</code> may also be a parameter expression string.</p>
+    <table>
+      <thead><tr><th>Type</th><th>Fields</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>fixed</code></td><td><code>point</code>, optional <code>x</code>, <code>y</code></td><td>Pins a point, optionally to explicit coordinates.</td></tr>
+        <tr><td><code>coincident</code></td><td><code>a</code>, <code>b</code></td><td>Two points occupy the same position.</td></tr>
+        <tr><td><code>horizontal</code> / <code>vertical</code></td><td><code>line</code></td><td>A line is parallel to X / Y.</td></tr>
+        <tr><td><code>horizontalPoints</code> / <code>verticalPoints</code></td><td><code>a</code>, <code>b</code></td><td>Two points share a Y / X coordinate.</td></tr>
+        <tr><td><code>distance</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Euclidean distance between two points.</td></tr>
+        <tr><td><code>distanceX</code> / <code>distanceY</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Signed horizontal / vertical offset.</td></tr>
+        <tr><td><code>length</code></td><td><code>line</code>, <code>value</code></td><td>Length of a line.</td></tr>
+        <tr><td><code>parallel</code> / <code>perpendicular</code></td><td><code>a</code>, <code>b</code></td><td>Relationship between two lines.</td></tr>
+        <tr><td><code>equalLength</code> / <code>equalRadius</code></td><td><code>a</code>, <code>b</code></td><td>Equal line lengths / circle or arc radii.</td></tr>
+        <tr><td><code>radius</code> / <code>diameter</code></td><td><code>circle</code>, <code>value</code></td><td>Size of a circle or arc.</td></tr>
+        <tr><td><code>angle</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Counter-clockwise angle from line <code>a</code> to line <code>b</code>, in radians.</td></tr>
+        <tr><td><code>pointOnLine</code> / <code>pointOnCircle</code></td><td><code>point</code> and <code>line</code> / <code>circle</code></td><td>Incidence.</td></tr>
+        <tr><td><code>midpoint</code></td><td><code>point</code>, <code>line</code></td><td>A point sits at the middle of a line.</td></tr>
+        <tr><td><code>symmetric</code></td><td><code>a</code>, <code>b</code>, <code>line</code></td><td>Two points mirror each other about a line.</td></tr>
+        <tr><td><code>tangentLineCircle</code></td><td><code>line</code>, <code>circle</code></td><td>A line touches a circle or arc.</td></tr>
+        <tr><td><code>tangentCircles</code></td><td><code>a</code>, <code>b</code>, optional <code>internal</code></td><td>Circles touch externally (distance = r1 + r2) or internally (distance = |r1 − r2|).</td></tr>
+        <tr><td><code>concentric</code></td><td><code>a</code>, <code>b</code></td><td>Shared centre of circles or arcs.</td></tr>
+        </tbody>
+    </table>
+    <p>Arcs are counter-clockwise from <code>start</code> to <code>end</code> about <code>center</code>. A circle's radius is a solver variable, so a circle without a <code>radius</code>, <code>diameter</code>, <code>equalRadius</code>, or tangency constraint appears in <code>free</code>.</p>
+  </section>
+
+  <section id="history-walkthrough" class="doc-section">
+    <h2>Build a parametric part</h2>
+    <p>A <code>History</code> is a parameter table plus an ordered feature list. Parameters are numbers or expressions of other parameters. They are resolved in dependency order, and a cycle is an error that names the loop. Features refer to parameters by name in any dimension field.</p>
+    <DocViewer3D title="Parametric plate: 40 × 25 × 8 mm with a Ø5 through hole" caption="Result of the history example below: the sketch is solved, extruded by thick = 8 mm, and the hole (diameter = width / 8 = 5 mm) is subtracted. Exact replay of this history has a volume of 7,842.92 mm³ (8,000 − π·2.5²·8)." solids={[{"kind": "extrude", "profile": [[0, 0], [40, 0], [40, 25], [0, 25]], "holes": [[[22.5, 12.5], [22.479, 12.826], [22.415, 13.147], [22.31, 13.457], [22.165, 13.75], [21.983, 14.022], [21.768, 14.268], [21.522, 14.483], [21.25, 14.665], [20.957, 14.81], [20.647, 14.915], [20.326, 14.979], [20.0, 15.0], [19.674, 14.979], [19.353, 14.915], [19.043, 14.81], [18.75, 14.665], [18.478, 14.483], [18.232, 14.268], [18.017, 14.022], [17.835, 13.75], [17.69, 13.457], [17.585, 13.147], [17.521, 12.826], [17.5, 12.5], [17.521, 12.174], [17.585, 11.853], [17.69, 11.543], [17.835, 11.25], [18.017, 10.978], [18.232, 10.732], [18.478, 10.517], [18.75, 10.335], [19.043, 10.19], [19.353, 10.085], [19.674, 10.021], [20.0, 10.0], [20.326, 10.021], [20.647, 10.085], [20.957, 10.19], [21.25, 10.335], [21.522, 10.517], [21.768, 10.732], [21.983, 10.978], [22.165, 11.25], [22.31, 11.543], [22.415, 11.853], [22.479, 12.174]]], "height": 8}]} />
+    <DocCode language="ts" title="Plate with a parametric hole">
+{"import { cad } from \"@cadcamfun/core\"\n\nconst history = {\n  parameters: { width: 40, depth: 25, thick: 8, hole: \"width / 8\" },\n  features: [\n    // the rectangle sketch from the previous section, with dimension\n    // values replaced by parameter names: value: \"width\", value: \"depth\"\n    { id: \"s1\", type: \"sketch\", plane: \"XY\", sketch: rectangleSketch },\n    { id: \"e1\", type: \"extrude\", sketch: \"s1\", depth: \"thick\", operation: \"new\" },\n    { id: \"h1\", type: \"hole\", plane: \"XY\", offset: \"thick\",\n      at: [20, 12.5], diameter: \"hole\", depth: \"thick\" },\n  ],\n}\n\nconst mesh = cad.rebuild(history)\nmesh.parameters // { width: 40, depth: 25, thick: 8, hole: 5 }\nmesh.bodies     // one mesh body, id \"e1\"\nmesh.issues     // []\n\nconst exact = cad.rebuildExact(history, mesh)\nexact.bodies[0].brep        // present: the history has an exact representation\nexact.warnings              // []\ncad.brep.massProperties(exact.bodies[0].brep).volume // 7842.92\u2026 mm\u00b3\ncad.brep.validateBrep(exact.bodies[0].brep).valid    // true"}
+    </DocCode>
+    <code>rebuild</code> returns <code>bodies</code> (triangle meshes keyed by the feature that created them), the resolved <code>parameters</code>, each sketch's plane, frame, and solve result, the flat patterns of sheet-metal features, and <code>issues</code>. A feature that cannot be built is reported in <code>issues</code> with its feature ID and severity, and it is skipped. Features that do not depend on it still build. <code>rebuildExact(history, given?, options?)</code> can reuse a mesh rebuild you already have, and accepts a <code>budgetMs</code> time budget.
+    <p>Base planes are right-handed: <code>XY</code> has u = X, v = Y, normal +Z; <code>YZ</code> has u = Y, v = Z, normal +X; <code>ZX</code> has u = Z, v = X, normal +Y. A sketch, hole, or text can also be placed on the ID of an earlier <code>plane</code> feature, with an <code>offset</code> along the normal.</p>
+    <table>
+      <thead><tr><th>Feature</th><th>Key fields and defaults</th></tr></thead>
+      <tbody>
+        <tr><td><code>sketch</code></td><td><code>plane</code>, optional <code>offset</code>, <code>sketch</code> (entities, constraints, optional parametric <code>shapes</code>: rectangle, circle, polygon, ellipse, slot, polyline).</td></tr>
+        <tr><td><code>extrude</code></td><td><code>sketch</code>, <code>depth</code>, <code>direction</code> <code>up</code>/<code>down</code>/<code>symmetric</code>, <code>operation</code> <code>new</code>/<code>union</code>/<code>subtract</code>/<code>intersect</code>, optional <code>targets</code> (default: every body so far), <code>edge</code> chamfer/fillet of end faces (<code>ends</code> default <code>both</code>), <code>corner</code> treatment, and <code>taper</code> draft in degrees. Loops inside loops are holes (even-odd).</td></tr>
+        <tr><td><code>revolve</code></td><td><code>sketch</code>, <code>axis</code> (<code>x</code>, <code>y</code>, or a sketch line), <code>angle</code> in degrees (default 360), <code>operation</code>.</td></tr>
+        <tr><td><code>hole</code></td><td><code>plane</code>, <code>offset</code>, <code>at</code> [u, v], <code>diameter</code>, <code>depth</code>; <code>kind</code> <code>simple</code> (default), <code>counterbore</code>, or <code>countersink</code> with <code>headDiameter</code>, <code>headDepth</code>, and <code>angle</code> (default 90°). Optional cosmetic <code>thread</code> note (for example <code>M4</code>), <code>tolerance</code>, and ISO 286 <code>fit</code> such as <code>H7</code>. A cosmetic thread does not change the geometry.</td></tr>
+        <tr><td><code>pattern</code>, <code>mirror</code></td><td>Copies of an earlier feature's tool, applied the same way.</td></tr>
+        <tr><td><code>sweep</code>, <code>loft</code>, <code>coil</code></td><td>Profiles along a path, between sections, or along a helix.</td></tr>
+        <tr><td><code>shell</code>, <code>fillet</code>, <code>draft</code>, <code>pushpull</code></td><td>Face and edge edits.</td></tr>
+        <tr><td><code>move</code>, <code>scale</code>, <code>split</code>, <code>combine</code></td><td>Body operations.</td></tr>
+        <tr><td><code>rib</code>, <code>sheet</code>, <code>thread</code>, <code>text</code></td><td>Ribs, sheet-metal bodies with flat patterns, modelled threads, and stroke-font text.</td></tr>
+        <tr><td><code>plane</code>, <code>primitive</code>, <code>mate</code></td><td>Construction planes, primitive solids, and assembly mating.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="note" title="Edit the history, not the body">
+      <p>Change a parameter and rebuild: every sketch that uses it re-solves and every solid and Boolean after it is redone. Editing a generated mesh directly is lost at the next rebuild.</p>
+    </DocCallout>
+  </section>
+
+  <section id="brep-primitives" class="doc-section">
+    <h2>Exact primitives and placement</h2>
+    <p>The B-rep kernel builds analytic solids directly. Each constructor takes an optional placement <code>Frame</code>; without one, the solid is placed in the world frame.</p>
+    <table>
+      <thead><tr><th>Constructor</th><th>Arguments</th><th>World placement</th></tr></thead>
+      <tbody>
+        <tr><td><code>makeBox(dx, dy, dz, placement?)</code></td><td>Edge lengths in mm</td><td>Minimum corner at the origin.</td></tr>
+        <tr><td><code>makeCylinder(radius, height, placement?)</code></td><td>Radius and height</td><td>A cone with equal radii; axis along Z.</td></tr>
+        <tr><td><code>makeCone(r1, r2, height, placement?)</code></td><td>Base and top radii</td><td>Axis along Z.</td></tr>
+        <tr><td><code>makeSphere(radius, placement?)</code></td><td>Radius</td><td>Centred on the origin.</td></tr>
+        <tr><td><code>makeTorus(major, minor, placement?)</code></td><td>Ring and tube radii</td><td>Axis along Z.</td></tr>
+        </tbody>
+    </table>
+    <DocViewer3D title="Exact primitives" caption="makeBox(40, 25, 8) with its corner at the origin, next to a cylinder of radius 6 and height 20 placed beside it. The axes show +X (red), +Y (green), and +Z (blue)." solids={[{"kind":"box","size":[40,25,8]},{"kind":"cylinder","radius":6,"height":20,"at":[60,12.5,0],"color":"#c8a48a"}]} />
+    <p>Dimensions must be positive and finite; otherwise the constructors throw a range error. Run <code>validateBrep</code> on anything you build from Booleans, sweeps, or imports before trusting volume or export results. A primitive straight from a constructor is valid by construction.</p>
+  </section>
+
+  <section id="cad-best-practices" class="doc-section">
+    <h2>Modelling practices that rebuild reliably</h2>
+    <ul>
+      <li>Fix one point and constrain orientation before adding dimensions. An under-constrained sketch can satisfy every dimension and still move at the next rebuild.</li>
+      <li>Give every user-facing dimension an <code>id</code> so a conflict report names something a person recognises.</li>
+      <li>Prefer parameters and expressions (<code>"width / 2 + 3"</code>, <code>"max(a, b) * 2"</code>) over repeated literals; one edit then drives the whole part.</li>
+      <li>Reference earlier features by ID only after they exist in the list. Reordering a history can turn a valid reference into an issue.</li>
+      <li>Use <code>targets</code> on Booleans when a part has several bodies. The default applies the operation to every body built so far.</li>
+      <li>Check <code>issues</code> after every <code>rebuild</code> and the per-body <code>brep</code> presence after <code>rebuildExact</code> before relying on exact mass properties or STEP export.</li>
+      <li>Keep units in millimetres and radians inside sketches. Degree-valued fields are documented as such (revolve angle, taper, countersink angle).</li>
+    </ul>
   </section>
 
   <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "Setups", href: "/docs/setups" }, { title: "API contract", href: "/docs/api" }]} />

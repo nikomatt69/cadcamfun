@@ -16,6 +16,8 @@ const toc = [
   { title: "Open, review, and merge a proposal", href: "#pull-request" },
   { title: "Restore content without rewriting history", href: "#restore" },
   { title: "Mirror committed history and recover conflicts", href: "#remote" },
+  { title: "How reviews decide a merge", href: "#pr-review-rules" },
+  { title: "Restore recipes", href: "#history-recipes" },
 ]
 ---
 
@@ -161,6 +163,35 @@ const encoded = JSON.stringify(body)`}
     <p>Push uploads reachable objects and refuses to overwrite unpulled remote commits. Pull requires a clean working copy, fetches the remote branch, and merges. A structural JSON conflict identifies paths and pointers without writing a partial repository merge commit. Inspect both sides, create a deliberate resolution, and retry instead of forcing one side over the other.</p>
     <p>HTTP 409 usually means dirty state or merge conflict; 403 can mean a maintainer or AI-main restriction; 404 can mean inaccessible project or unknown revision; 400 covers invalid names, empty messages, or no changes. A database failure maps to a server storage error. Preserve the OIDs and failure message when diagnosing a mismatch.</p>
     <p>Source provenance: <code>packages/vcs/src/repository.ts</code>, <code>json.ts</code>, <code>snapshot.ts</code>, <code>github.ts</code>; <code>apps/sidecar/src/services/project-vcs.ts</code>, <code>repos/project-vcs-repo.ts</code>, and <code>http/vcs.ts</code>; workflow schema/runner in <code>packages/workflow/src</code> and sidecar <code>workflow-runner.ts</code>/<code>workflow-steps.ts</code>.</p>
+  </section>
+
+    <section id="pr-review-rules" class="doc-section">
+    <h2>How reviews decide a merge</h2>
+    <ol>
+      <li>Open a pull request from a feature branch (an AI actor must use an <code>ai/*</code> branch) into <code>main</code>.</li>
+      <li>Reviewers submit <code>comment</code>, <code>approve</code>, or <code>request-changes</code>, optionally anchored to a file <code>path</code> and a JSON <code>pointer</code>.</li>
+      <li>At merge time, the service takes each reviewer's latest non-comment verdict. If any of them is <code>request-changes</code>, the merge fails with <code>blocked</code>: "A reviewer requested changes".</li>
+      <li>If the base branch is checked out, its working copy must be clean.</li>
+      <li>The merge is three-way per JSON property. Conflicts are returned with their paths and pointers, and nothing is committed.</li>
+      <li>Workflows with <code>on.pullRequest</code> matching the base branch run when the pull request is opened, so their results are available during review.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td><code>blocked</code> for an AI actor on <code>main</code></td><td>Commit on an <code>ai/*</code> branch and open a pull request; a person merges it.</td></tr>
+        <tr><td><code>conflict</code> on <code>/width</code> of <code>drawings/d1.json</code></td><td>Decide the value on one branch, commit, and merge again.</td></tr>
+        <tr><td><code>dirty</code></td><td>Commit or discard local edits first; automated steps never absorb unfinished work.</td></tr>
+        <tr><td><code>nothing-to-commit</code></td><td>The saved resources already match the last commit.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="history-recipes" class="doc-section">
+    <h2>Restore recipes</h2>
+    <DocCode language="ts" title="Restore without rewriting history">
+{"// Bring back one drawing as it was three commits ago\nconst old = repo.log()[3].oid\nrepo.restorePaths(old, [\"drawings/d1.json\"], me, \"Restore plate outline\")\n\n// Make the whole tree equal to an older commit (a new commit on top)\nrepo.revertTo(old, me)               // message defaults to \"Restore <rev>\"\n\n// Who changed a toolpath, most recent first\nrepo.fileLog(\"toolpaths/op1.json\").map((e) => e.message)"}
+    </DocCode>
+    <p>Both restore operations add a new commit, so the older state can itself be undone and the history stays shareable. Restoring a toolpath file without the material or tool it references can leave dangling references; restore those library files in the same call.</p>
   </section>
 
   <DocRelated items={[{ title: "History reference", href: "/docs/history" }, { title: "History endpoints", href: "/docs/api/history" }, { title: "Workflows", href: "/docs/workflows" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />

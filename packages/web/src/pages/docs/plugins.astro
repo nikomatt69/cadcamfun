@@ -19,6 +19,10 @@ const toc = [
   { title: "Complete the sample assistant module", href: "#assistant-module" },
   { title: "Argument schemas and lifecycle limits", href: "#schema-and-lifecycle" },
   { title: "Diagnose a missing or failing extension", href: "#troubleshooting" },
+  { title: "Manifest reference", href: "#manifest-reference" },
+  { title: "Capabilities and the plugin context", href: "#capability-model" },
+  { title: "Test a plugin with the SDK test host", href: "#sdk-testing" },
+  { title: "How the application loads assistant plugins", href: "#production-loading" },
 ]
 ---
 
@@ -151,6 +155,84 @@ const toc = [
       <li><strong>ZIP installer rejects the manifest:</strong> use the browser-plugin <code>manifest.json</code> contract for that endpoint. Renaming a worker <code>plugin.json</code> does not translate its fields.</li>
     </ul>
     <p>Source: <code>apps/sidecar/test/plugins-ai-tools.test.ts</code>, <code>ai-plugin-tools.test.ts</code>, <code>plugins-http.test.ts</code>, and <code>src/plugins/host.ts</code>.</p>
+  </section>
+
+    <section id="manifest-reference" class="doc-section">
+    <h2>Manifest reference</h2>
+    <p>Every plugin ships a <code>plugin.json</code>. <code>parseManifest(json)</code> parses and validates it in one step, turning a JSON syntax error into the same error channel as a schema error, so an install screen only needs to handle one failure type.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Reverse-DNS identifier: 3–128 characters, lowercase letters, digits, and hyphens in at least two dot-separated labels, for example <code>com.example.gear-generator</code>.</td></tr>
+        <tr><td><code>name</code></td><td>Non-empty display name.</td></tr>
+        <tr><td><code>version</code></td><td><code>major.minor.patch</code>, optionally followed by a pre-release suffix such as <code>-beta.1</code>.</td></tr>
+        <tr><td><code>apiVersion</code></td><td>Must be the string <code>"1"</code>; it is the only plugin API version.</td></tr>
+        <tr><td><code>entry</code></td><td>ES module path relative to the plugin folder.</td></tr>
+        <tr><td><code>capabilities</code></td><td>Array of capability strings (see below). Anything outside the closed list is a manifest error.</td></tr>
+        <tr><td><code>contributes</code></td><td>Optional <code>commands</code>, <code>panels</code>, <code>postProcessors</code>, <code>operations</code>, and <code>aiTools</code>.</td></tr>
+        <tr><td><code>signature</code></td><td>Ed25519 signature over the archive hash; required for packaged installs.</td></tr>
+        <tr><td><code>dev</code></td><td><code>true</code> marks a local development plugin: signature checks are skipped and the UI shows a badge.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Contribution</th><th>Fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>commands[]</code></td><td><code>id</code>, <code>title</code>, optional <code>keybinding</code> such as <code>Mod+Shift+G</code>.</td></tr>
+        <tr><td><code>panels[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported function that returns the panel's declarative tree. There is never DOM access.</td></tr>
+        <tr><td><code>postProcessors[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported <code>(program, options) =&gt; string</code> function.</td></tr>
+        <tr><td><code>operations[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported record with a parameter <code>schema</code> and a pure <code>generate(params, geometry, tool, stock)</code> that returns a toolpath.</td></tr>
+        <tr><td><code>aiTools[]</code></td><td><code>id</code> matching <code>^[a-z][a-z0-9_]&#123;0,39&#125;$</code>, <code>description</code> (10–2,000 characters; the model reads it), <code>kind</code> <code>read</code> or <code>write</code>, <code>parameters</code> (JSON Schema of the arguments), and <code>entry</code>.</td></tr>
+        </tbody>
+    </table>
+    <p>Helpers: <code>manifestKey(m)</code> returns <code>id@version</code>; <code>requestedCapabilities(m)</code> returns the sorted capability list for display; <code>isDevPlugin(m)</code> and <code>isSigned(m)</code> answer the install-policy questions.</p>
+  </section>
+
+  <section id="capability-model" class="doc-section">
+    <h2>Capabilities and the plugin context</h2>
+    <p>Capabilities are the only thing a plugin can act through. The manifest declares what the plugin needs, the user grants a subset, and the host builds a context that contains exactly the granted surfaces. Each surface is optional in the type, so a missing capability is visible both at compile time and at runtime instead of becoming a silent no-op.</p>
+    <table>
+      <thead><tr><th>Capability</th><th>Context surface</th><th>Allows</th><th>Implies</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawing:read</code></td><td><code>ctx.drawing.read()</code></td><td>Read the open drawing (or <code>undefined</code> when none is open).</td><td>—</td></tr>
+        <tr><td><code>drawing:write</code></td><td><code>ctx.drawing.patch(patch)</code></td><td>Apply <code>AddEntity</code>, <code>UpdateEntity</code>, or <code>RemoveEntity</code> patches; returns the new revision.</td><td><code>drawing:read</code></td></tr>
+        <tr><td><code>toolpath:read</code></td><td><code>ctx.toolpath.list()</code>, <code>.program(id)</code></td><td>Read toolpaths and G-code programs.</td><td>—</td></tr>
+        <tr><td><code>storage</code></td><td><code>ctx.storage</code></td><td>Namespaced key-value strings: <code>get</code>, <code>set</code>, <code>delete</code>, <code>keys</code>.</td><td>—</td></tr>
+        <tr><td><code>ui:panel</code></td><td><code>ctx.ui</code></td><td><code>registerCommand</code> and <code>registerPanel</code> (declarative only).</td><td>—</td></tr>
+        <tr><td><code>ai:tool</code></td><td>none (manifest contributions)</td><td>Offer tools to the assistant and, read-only, to a standalone nikcli.</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <code>effectiveCapabilities(granted)</code> resolves implications, so a plugin that declares <code>drawing:write</code> does not need to declare <code>drawing:read</code>. Every context also has <code>pluginId</code>, the resolved <code>capabilities</code>, and a <code>log</code> with <code>debug</code>, <code>info</code>, <code>warn</code>, and <code>error</code>; the host prefixes log lines with the plugin ID. Use <code>requireCapability(ctx, capability, surface)</code> to obtain a surface or fail with a <code>CapabilityError</code> that names the missing grant.
+  </section>
+
+  <section id="sdk-testing" class="doc-section">
+    <h2>Test a plugin with the SDK test host</h2>
+    <code>createTestHost</code> builds an in-memory host with the same capability rules as the sidecar. Only granted capabilities appear on the context, and you can supply a drawing, toolpaths, and programs. The example below is complete and runs with <code>bun</code> in the workspace.
+    <DocCode language="ts" title="frame-plugin.test.ts">
+{"import { cad } from \"@cadcamfun/core\"\nimport { createTestHost, definePlugin, requireCapability, testManifest } from \"@cadcamfun/plugin-sdk\"\n\nconst manifest = testManifest({\n  id: \"com.example.frame\",\n  capabilities: [\"drawing:write\", \"storage\", \"ui:panel\"],\n})\n\nconst plugin = definePlugin({\n  manifest,\n  activate(ctx) {\n    const drawing = requireCapability(ctx, \"drawing:write\", \"drawing\")\n    ctx.ui?.registerCommand({ id: \"frame.add\", title: \"Add frame line\" })\n    ctx.storage?.set(\"runs\", \"1\")\n    drawing.patch({\n      _tag: \"AddEntity\",\n      entity: { ...cad.baseEntity(\"frame-1\"), _tag: \"Line\",\n                start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },\n    })                                   // returns revision 1\n    return () => ctx.log.info(\"teardown\") // runs on deactivation\n  },\n})\n\nconst host = createTestHost({ manifest, drawing: cad.emptyDrawing(\"d1\", \"Demo\") })\nconst stop = await host.activate(plugin)\nhost.drawing()?.entities.length     // 1\nhost.context.storage?.get(\"runs\")   // \"1\"\nhost.ui.commands                    // [{ id: \"frame.add\", title: \"Add frame line\" }]\nawait stop()\n\n// Without the grant, requireCapability throws:\nconst denied = createTestHost({ manifest, granted: [\"storage\"] })\nawait denied.activate(plugin)\n// CapabilityError: Plugin com.example.frame may not use \"drawing:write\":\n// it was not granted at install time"}
+    </DocCode>
+    <ul>
+      <li><code>testManifest(overrides)</code> starts from a minimal valid manifest (<code>com.example.test-plugin</code>, version 1.0.0, API 1, entry <code>index.js</code>, no capabilities).</li>
+      <li><code>granted</code> defaults to everything the manifest asks for. Pass a smaller list to test the denied paths.</li>
+      <li><code>host.storage</code> is a snapshot taken when the host is created. Read live values through <code>host.context.storage</code>.</li>
+      <li><code>host.on(commandId, handler)</code> and <code>host.invoke(commandId, args)</code> exercise registered commands.</li>
+      <li><code>runPostProcessor</code> runs a contributed post against a program, and <code>keyOf(pluginId, key)</code> shows the namespaced storage key so tests can assert isolation.</li>
+    </ul>
+  </section>
+
+  <section id="production-loading" class="doc-section">
+    <h2>How the application loads assistant plugins</h2>
+    <ol>
+      <li>At startup the sidecar reads <code>&lt;data dir&gt;/plugins/enabled.json</code>, a JSON array of plugin IDs. Nothing is loaded unless it is listed there.</li>
+      <li>For each ID it reads <code>&lt;data dir&gt;/plugins/&lt;id&gt;/plugin.json</code> and parses it. The folder name must equal the manifest <code>id</code>.</li>
+      <li>Only <code>ai:tool</code> is wired in this host. A manifest that asks for drawing, toolpath, storage, or UI access is skipped with a warning rather than loaded with surfaces that would silently do nothing.</li>
+      <li>The plugin is installed into a worker host and enabled. A plugin that fails to load logs <code>Plugin &lt;id&gt; was not loaded: ...</code> and never stops the application from starting.</li>
+      <li>Each contributed tool is offered to the assistant as <code>plugin_&lt;slug of plugin id&gt;_&lt;tool id&gt;</code>, at most 80 characters, where the slug lowercases the ID and replaces other characters with underscores. <code>com.example.bolt-circle</code> with tool <code>bolt_circle</code> becomes <code>plugin_com_example_bolt_circle_bolt_circle</code>.</li>
+      <li>Arguments are validated against the tool's JSON Schema before the worker sees them. If the schema exceeds 20,000 characters, is not an object schema, or cannot be converted, the host accepts any object and the plugin must validate.</li>
+      <li>A call that throws, times out, or finds the plugin gone returns <code>&#123; ok: false, error &#125;</code> (error text up to 500 characters) to the assistant instead of crashing the turn. A <code>write</code> tool is confirmed with the person before every call, whatever its arguments say.</li>
+    </ol>
+    <DocCallout type="warn" title="Not an operating-system sandbox">
+      <p>The worker has no process, fetch, or file handle of its own, but Bun globals remain reachable inside it. Enable only plugins whose code you trust, and keep write tools to a minimum.</p>
+    </DocCallout>
   </section>
 
   <DocRelated items={[{ title: "AI assistant", href: "/docs/ai" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }]} />

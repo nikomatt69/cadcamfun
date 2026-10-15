@@ -49,7 +49,6 @@ const toc = [
     <p>Application repositories use the <code>Database</code> service from <code>@cadcamfun/db</code> and its <code>query(operation, run)</code> helper. Change <code>packages/db/src/schema.ts</code> before generating migrations. Review generated SQL and metadata together; do not run a destructive schema experiment against a user's database.</p>
     <p>The sidecar reads configuration in <code>apps/sidecar/src/config.ts</code> and passes it through <code>AppConfigService</code>. Credentials use redacted values where the service requires them. Keep token and provider secret values out of logs, documentation, and troubleshooting output. The native shell supplies its own launch token and storage paths.</p>
     <p>The documentation Studio is a separate local tool with its own path selection in <code>packages/web/script/studio-server.ts</code>. Do not assume its database path or login session matches the running desktop.</p>
-    <p>The design specifications behind these conventions live in <code>specs/</code> at the repository root, for example <code>01-conventions.md</code>, <code>02-database.md</code>, and <code>05-api-sidecar.md</code>. Source comments often cite them as "spec 05 §1". When code and a specification disagree, the code and its tests describe current behavior.</p>
   </section>
 
   <section id="verify" class="doc-section">

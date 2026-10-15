@@ -19,6 +19,9 @@ const toc = [
   { title: "Try the repository without application data", href: "#local-example" },
   { title: "Review, restore, and synchronize deliberately", href: "#review-sequence" },
   { title: "Recover from history failures", href: "#troubleshooting" },
+  { title: "Repository layout", href: "#repository-layout" },
+  { title: "Commit, branch, diff, and merge in code", href: "#history-walkthrough" },
+  { title: "Rules enforced by the application", href: "#service-rules" },
 ]
 ---
 
@@ -151,6 +154,88 @@ console.log(repo.log().length) // 2`}
       </tbody>
     </table>
     <p>Source: <code>packages/vcs/src/repository.ts</code>, <code>apps/sidecar/src/services/project-vcs.ts</code>, and <code>http/vcs.ts</code>. The <a href="/docs/api">API reference</a> lists the actual request and response schemas.</p>
+  </section>
+
+    <section id="repository-layout" class="doc-section">
+    <h2>Repository layout</h2>
+    <p>A project is stored in the repository as one JSON file per entity. Editing a drawing therefore never touches a toolpath file, and the layout reads naturally on GitHub. <code>snapshotToFiles</code> writes this layout from a <code>ProjectSnapshot</code>, and <code>filesToSnapshot</code> reads it back.</p>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 560 210" role="img" aria-label="Repository layout: project.json and one JSON file per entity in drawings, components, toolpaths, materials, tools, machine-configs and costs, plus .cadcamfun/workflows" style="width:100%;max-width:600px;height:auto">
+        <g font-family="monospace" font-size="13" fill="currentColor">
+          <text x="10" y="22">/</text>
+          <text x="30" y="44">project.json</text>
+          <text x="30" y="66">drawings/&lt;id&gt;.json</text><text x="300" y="66">components/&lt;id&gt;.json</text>
+          <text x="30" y="88">toolpaths/&lt;id&gt;.json</text><text x="300" y="88">materials/&lt;id&gt;.json</text>
+          <text x="30" y="110">tools/&lt;id&gt;.json</text><text x="300" y="110">machine-configs/&lt;id&gt;.json</text>
+          <text x="30" y="132">costs/&lt;id&gt;.json</text>
+          <text x="30" y="154">.cadcamfun/workflows/&lt;name&gt;.yml</text>
+          <text x="30" y="190" fill="#2f80ed">one file per entity → diffs and merges stay local to what changed</text>
+        </g>
+      </svg>
+    </figure>
+    <table>
+      <thead><tr><th>Snapshot list</th><th>Directory</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>project</code></td><td><code>project.json</code></td><td>Project metadata.</td></tr>
+        <tr><td><code>drawings</code>, <code>components</code>, <code>toolpaths</code></td><td>same names</td><td>Design and manufacturing entities.</td></tr>
+        <tr><td><code>materials</code>, <code>tools</code>, <code>machineConfigs</code></td><td><code>materials/</code>, <code>tools/</code>, <code>machine-configs/</code></td><td>Library items the toolpaths reference, versioned with the project so a restored toolpath still finds them.</td></tr>
+        <tr><td><code>costs</code></td><td><code>costs/</code></td><td>Production cost estimates of the toolpaths.</td></tr>
+        <tr><td><code>extra</code></td><td>any path</td><td>Text files stored verbatim: workflows, README, generated G-code.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="history-walkthrough" class="doc-section">
+    <h2>Commit, branch, diff, and merge in code</h2>
+    <p>The <code>Repository</code> class works on any storage backend. The sidecar backs it with SQLite (tables <code>GitObject</code> and <code>GitRef</code>); <code>memoryBackend()</code> is used for tests and experiments. The following example is complete and its output is shown in comments.</p>
+    <DocCode language="ts" title="history-demo.ts">
+{"import { Repository, memoryBackend, snapshotToFiles, describeDiff } from \"@cadcamfun/vcs\"\n\nconst repo = new Repository(memoryBackend())\nconst me = { name: \"Ada\", email: \"ada@example.com\", time: 1767225600, tz: \"+0100\" }\nconst files = (width: number, height: number) => snapshotToFiles({\n  project: { id: \"p1\", name: \"Bracket\" },\n  drawings: [{ id: \"d1\", name: \"Plate\", width, height }],\n  components: [], toolpaths: [],\n})\n\nconst base = repo.commit(files(40, 25), { message: \"base\", author: me })\nrepo.currentBranch()                    // \"main\"\n\nrepo.createBranch(\"a\"); repo.createBranch(\"b\")\nrepo.checkout(\"a\"); const a = repo.commit(files(50, 25), { message: \"a: width 50\", author: me })\nrepo.checkout(\"b\"); repo.commit(files(40, 30), { message: \"b: height 30\", author: me })\n\ndescribeDiff(repo, base, a)\n// [{ path: \"drawings/d1.json\", kind: \"drawings\", id: \"d1\", name: \"Plate\",\n//    status: \"modified\", changes: [{ pointer: \"/width\", before: 40, after: 50 }] }]\n\nrepo.mergeInto(\"a\", \"b\", me)            // { kind: \"merge\", oid: \"46e7\u2026\" }\n// different properties of the same entity merge cleanly\n\nrepo.checkout(\"b\"); repo.commit(files(60, 30), { message: \"b: width 60\", author: me })\nrepo.mergeInto(\"a\", \"b\", me)\n// { kind: \"conflict\", conflicts: [{ path: \"drawings/d1.json\", pointers: [\"/width\"] }] }\n\nrepo.createBranch(\"bad..name\")          // throws: Invalid branch name bad..name\nrepo.commit(sameFilesAsHead, { message: \"x\", author: me })\n// throws: No changes since the last commit   (unless allowEmpty: true)"}
+    </DocCode>
+    <p>Merges are three-way at the level of JSON properties. When both sides changed different properties of one entity, the merge succeeds. When both changed the same property to different values, the result is a <code>conflict</code> that lists RFC 6901 pointers inside each file. Arrays of equal length are compared per index, so a moved vertex shows up as one change; arrays of different lengths are compared as a whole.</p>
+    <table>
+      <thead><tr><th>Merge result</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>up-to-date</code></td><td>Nothing to merge; returns the current commit.</td></tr>
+        <tr><td><code>fast-forward</code></td><td>The branch pointer moved forward; no merge commit was created.</td></tr>
+        <tr><td><code>merge</code></td><td>A merge commit was created.</td></tr>
+        <tr><td><code>conflict</code></td><td>No commit; <code>conflicts</code> lists paths and pointers to resolve.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Repository method</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>commit(files, &#123; message, author, allowEmpty? &#125;)</code></td><td>Write a full tree as a new commit on the current branch.</td></tr>
+        <tr><td><code>log(rev = "HEAD", limit?)</code> / <code>fileLog(path, rev?, limit?)</code></td><td>History of the branch / of one file.</td></tr>
+        <tr><td><code>createBranch(name, from = "HEAD")</code>, <code>deleteBranch</code>, <code>checkout</code></td><td>Branch management. Names must not contain <code>..</code> or <code>//</code>, end in <code>/</code> or <code>.lock</code>, or contain <code>@&#123;</code>.</td></tr>
+        <tr><td><code>tag(name, rev = "HEAD")</code>, <code>tags()</code></td><td>Lightweight tags under <code>refs/tags/</code>.</td></tr>
+        <tr><td><code>diff(from, to)</code></td><td>File-level changes: added, modified, deleted, with blob IDs.</td></tr>
+        <tr><td><code>restorePaths(rev, paths, author, message?)</code></td><td>New commit restoring selected files from an older revision.</td></tr>
+        <tr><td><code>revertTo(rev, author, message?)</code></td><td>New commit whose tree equals an older revision; history is not rewritten.</td></tr>
+        <tr><td><code>merge(theirs, author)</code> / <code>mergeInto(into, theirs, author)</code></td><td>Three-way merge into the current branch / a named branch.</td></tr>
+        <tr><td><code>isAncestor</code>, <code>mergeBase</code></td><td>Graph queries.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="service-rules" class="doc-section">
+    <h2>Rules enforced by the application</h2>
+    <p>The sidecar's project history service adds rules on top of the repository:</p>
+    <table>
+      <thead><tr><th>Failure code</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>blocked</code></td><td>An AI actor tries to commit or merge on <code>main</code> (the message says to use an <code>ai/*</code> branch and open a pull request), or a pull request is merged while a reviewer's latest verdict is <code>request-changes</code>.</td></tr>
+        <tr><td><code>dirty</code></td><td>The working copy has uncommitted changes and the operation would overwrite them: "Uncommitted changes in N file(s); commit or discard them first".</td></tr>
+        <tr><td><code>conflict</code></td><td>A merge produced conflicts; the failure carries the conflict list.</td></tr>
+        <tr><td><code>nothing-to-commit</code></td><td>The tree is unchanged since the last commit.</td></tr>
+        <tr><td><code>not-found</code></td><td>Unknown branch, commit, object, or pull request.</td></tr>
+        <tr><td><code>remote</code></td><td>GitHub synchronisation failed.</td></tr>
+        <tr><td><code>invalid</code></td><td>Other invalid input, for example reviewing or merging a pull request that is not open.</td></tr>
+        </tbody>
+    </table>
+    <p>Only the latest non-comment verdict of each reviewer counts. A reviewer who requested changes and later approved no longer blocks the merge. Commits, pull request events, and reviews are published as live events, so the desktop and the companion update without polling.</p>
+    <DocCallout type="note" title="Byte-compatible with git">
+      <p>Object IDs are computed exactly as git computes them. Pushing to GitHub through the Git Data API keeps every commit ID identical on both sides, and a <code>git clone</code> of the mirror shows the same history as the application. GitHub accepts only fast-forward ref updates; pull and merge locally first when the remote has moved.</p>
+    </DocCallout>
   </section>
 
   <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />

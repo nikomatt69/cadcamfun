@@ -61,7 +61,6 @@ bun run --filter @cadcamfun/web dev`}</DocCode>
     <p><code>packages/api/src/index.ts</code> composes the schema-first HTTP contract. The sidecar's <code>ServedApi</code> selects the groups it serves and publishes an OpenAPI document at <code>/api/openapi.json</code>. The shell discovers the dynamically allocated loopback port from a readiness event and gives the webview an endpoint and bearer token.</p>
     <p>The sidecar database is <code>cadcamfun.db</code> under its configured data directory. The database layer enables foreign keys and WAL, applies configured migrations, and backs up an existing file before a pending upgrade. The documentation Studio has its own database path selection; it does not discover the running sidecar's file automatically.</p>
     <p>These pages describe the implementation in this repository. A package export, an HTTP endpoint, a desktop control, and a released installer are different integration surfaces; consult the relevant reference for supported behavior and limits.</p>
-    <p>Design specifications for each area are kept in <code>specs/</code> at the repository root. Source comments reference them by number, for example <code>specs/10-release-sync.md</code> for the build pipeline.</p>
   </section>
 
 
