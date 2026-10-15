@@ -538,7 +538,7 @@ const toolHandlers = Effect.gen(function*() {
       if (!element) return { ok: false, error: "Parametric element not found in this drawing.", ...where(loaded) }
       const history = element["history"]
       if (input.action === "inspect") return { ...inspectParametric(history), elementId: element.id, ...where(loaded) }
-      if (input.action === "test") return { ...testParametric(history, input), elementId: element.id, ...where(loaded) }
+      if (input.action === "test") return { ...(await testParametric(history, input)), elementId: element.id, ...where(loaded) }
       if (input.expectedRevision !== historyRevision(history)) return { ok: false, error: "The part changed since inspection. Inspect it again before updating.", ...where(loaded) }
       const changed = changeParameters(history, input.parameters)
       if (!changed.ok) return changed

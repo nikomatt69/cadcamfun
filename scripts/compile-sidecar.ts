@@ -6,7 +6,13 @@
  * a patch (`packages/ai/src/nikcli/host-patches.ts`, with the other mandatory host patches). A run-time plugin cannot reach a bundle
  * that is compiled into the executable, so the same patches are applied here, while the bundle is read. `bun scripts/compile-sidecar.ts <entry> <bun-target> <outfile>`.
  */
+import { join } from "node:path"
 import { hostPatchesPlugin, hostPatchesApplied, hostPatchReport } from "../packages/ai/src/nikcli/host-patches.ts"
+
+/** The repository root is the build root: an entry point lives in the executable at its path from here (`kernelWorkerUrl`). */
+const REPO = join(import.meta.dir, "..")
+/** Extra entry points the executable must carry: the kernel worker (`packages/ai/src/kernel-job.ts`). */
+const WORKERS = [join(REPO, "packages", "ai", "src", "kernel-worker.ts")]
 
 const [entry, target, outfile] = process.argv.slice(2)
 if (!entry || !target || !outfile) {
@@ -14,7 +20,8 @@ if (!entry || !target || !outfile) {
   process.exit(2)
 }
 const result = await Bun.build({
-  entrypoints: [entry],
+  entrypoints: [entry, ...WORKERS],
+  root: REPO,
   compile: { target: target as never, outfile },
   plugins: [hostPatchesPlugin as never]
 })

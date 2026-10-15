@@ -335,11 +335,29 @@ const recipeParams = optional(namedRecord(Schema.Unknown, /^.{1,80}$/s, "1 to 80
 const principal = Schema.Literals(["front", "top", "right"])
 const sheetText = Schema.String.check(Schema.isMaxLength(120))
 
+/** Allowed deviation from a nominal: `plus` above, `minus` below (mm, or mm³ for a volume). */
+const deviation = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
+const ToleranceBand = Schema.Struct({ plus: deviation, minus: deviation })
+const Measure = Schema.Struct({ nominal: length, tolerance: ToleranceBand })
+
+/**
+ * One dimensional acceptance check (AI-11 Step 10): a quantity measured on the rebuilt part through a named reference and
+ * compared with its limits. `hole` names the history's hole feature; `hole_count` counts recognised holes, not genus.
+ */
+export const AcceptanceCheck = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("extent"), name, axis: Schema.Literals(["x", "y", "z"]), nominal: length, tolerance: ToleranceBand, body: optional(name) }),
+  Schema.Struct({ kind: Schema.Literal("hole"), name, feature: name, diameter: Measure, depth: optional(Measure), through: optional(Schema.Boolean) }),
+  Schema.Struct({ kind: Schema.Literal("hole_count"), name, nominal: intBetween(0, 500) }),
+  Schema.Struct({ kind: Schema.Literal("volume"), name, nominal: length, tolerance: ToleranceBand })
+])
+
 export const ParametricTestCase = Schema.Struct({
   name, parameters: ParametricParameters,
   expectedBodies: optional(intBetween(1, 40)),
   minVolumeMm3: optional(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
-  maxVolumeMm3: optional(length)
+  maxVolumeMm3: optional(length),
+  /** Dimensional acceptance: the case passes only when every check measures within its limits. */
+  checks: optional(between(Schema.Array(AcceptanceCheck), 1, 24))
 })
 
 export const ParametricDrawingOptions = Schema.Struct({
