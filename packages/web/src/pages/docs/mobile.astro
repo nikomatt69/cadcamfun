@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -24,6 +25,7 @@ const toc = [
   { title: "What the phone stores", href: "#pairing-data" },
   { title: "Screens", href: "#screens" },
   { title: "Offline assistant queue", href: "#offline-queue" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -265,6 +267,10 @@ curl --fail-with-body -X POST "$CADCAM_URL/api/companion/enable" \
     <p>Only connectivity failures queue a message. A send counts as offline when the client reports status 0, or the error text mentions a network failure, timeout, refused connection or similar; HTTP and business errors ("request to … failed with …") are shown instead of queued.</p>
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Mobile and the sidecar" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#e05050"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Pair the iOS companion", href: "/docs/guides/companion-pairing" },
       { title: "Desktop UI", href: "/docs/desktop" },

@@ -1,14 +1,24 @@
 ---
 export const prerender = true
 import { apiGroups } from "../../data/apiGroups"
-import { apiStats } from "../../lib/apiReference"
+import "../../styles/api.css"
+import { apiStats, apiCategories, operationsFor } from "../../lib/apiReference"
 import DocCard from "../../components/docs/DocCard.astro"
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
+  { title: "Overview", href: "#overview" },
+  { title: "Base URL", href: "#base-url" },
+  { title: "Authentication", href: "#auth" },
+  { title: "Conventions", href: "#conventions" },
+  { title: "Streaming", href: "#streaming" },
+  { title: "Clients", href: "#clients" },
+  { title: "Resources", href: "#resources" },
+  { title: "OpenAPI document", href: "#openapi" },
   { title: "Integration recipes", href: "#integration-recipes" },
   { title: "Resource reference", href: "#resource-reference" },
   { title: "Connection and request conventions", href: "#connection" },
@@ -28,6 +38,7 @@ const toc = [
   { title: "How a request is processed", href: "#request-lifecycle" },
   { title: "Responses that are not JSON", href: "#non-json" },
   { title: "Calling the API without a client", href: "#raw-fetch" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -37,6 +48,93 @@ const toc = [
   description="Complete CADCAMFUN HTTP API reference with every resource, parameter, request and response schema, authentication, client examples, and captured request walkthrough."
   toc={toc}
 >
+  <section id="overview" class="doc-section">
+    <h2>Overview</h2>
+    <p>The sidecar is a single Effect <code>HttpApi</code>. Every endpoint is a typed <code>HttpApiEndpoint</code> with schema-checked request and response bodies, so this reference, the generated SDK and the running server come from the same declaration in <code>packages/api</code>.</p>
+    <div class="grid gap-3 sm:grid-cols-2 not-prose my-6">
+      <div class="api-op"><div class="api-op-body"><div class="api-block-title">Surface</div><div class="text-[22px] font-bold">{apiStats.operations} operations</div><p class="api-op-desc">Across {apiStats.paths} paths and {apiStats.groups} resource groups.</p></div></div>
+      <div class="api-op"><div class="api-op-body"><div class="api-block-title">Types</div><div class="text-[22px] font-bold">{apiStats.schemas} schemas</div><p class="api-op-desc">Request, response and error shapes, each linked from the operations that use it.</p></div></div>
+      <div class="api-op"><div class="api-op-body"><div class="api-block-title">Contract</div><div class="text-[22px] font-bold">OpenAPI 3.1.0</div><p class="api-op-desc">Emitted by the sidecar at <code>/api/openapi.json</code>; the snapshot in <code>packages/web</code> is checked by <code>bun run check:api-reference</code>.</p></div></div>
+      <div class="api-op"><div class="api-op-body"><div class="api-block-title">Clients</div><div class="text-[22px] font-bold">One surface</div><p class="api-op-desc">The desktop webview, the mobile companion, the AI bridge and scripts all call these same routes.</p></div></div>
+    </div>
+  </section>
+
+  <section id="base-url" class="doc-section">
+    <h2>Base URL</h2>
+    <p>There is no hosted CADCAMFUN API. The sidecar runs on your machine, binds <code>127.0.0.1</code> on a port the operating system picks (it listens on port 0), checks its own <code>/api/health</code>, and only then prints one JSON line on stdout. The base URL is <code>http://127.0.0.1:&lt;port&gt;</code> from that line.</p>
+    <DocCode language="bash" title="Start a disposable sidecar and read its port">
+{"export CADCAMFUN_TOKEN=dev-token\nCADCAMFUN_DATA_DIR=$(mktemp -d) \\\nCADCAMFUN_MIGRATIONS_DIR=$PWD/packages/db/drizzle \\\nCADCAMFUN_AI_OFFLINE=true \\\n  bun --no-env-file apps/sidecar/src/main.ts\n# stdout: {\u0022event\u0022:\u0022ready\u0022,\u0022port\u0022:46709}\nexport CADCAMFUN_URL=http://127.0.0.1:46709"}
+    </DocCode>
+    <DocCallout type="info" title="The port changes on every launch">Read it from the <code>ready</code> line (the desktop shell does exactly that) instead of assuming a fixed number. Logs go to stderr so stdout carries only the ready or error event.</DocCallout>
+  </section>
+
+  <section id="auth" class="doc-section">
+    <h2>Authentication</h2>
+    <p>The contract declares one security scheme, <code>bearer</code> (HTTP <code>Bearer</code>). {apiStats.operations - 1} of {apiStats.operations} operations require it; only <code>GET /api/health</code> is public.</p>
+    <table>
+      <thead><tr><th>Credential</th><th>Sent as</th><th>Used by</th></tr></thead>
+      <tbody>
+        <tr><td>Launch token</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>The desktop webview and local scripts; the value of <code>CADCAMFUN_TOKEN</code>.</td></tr>
+        <tr><td>Companion token</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>A paired phone; narrower access, see <a href="/docs/guides/companion-pairing">companion pairing</a>.</td></tr>
+        <tr><td>Account session</td><td><code>x-session-token</code></td><td>Selects the acting account on top of the bearer token; see <a href="#authorization">identity</a> below.</td></tr>
+      </tbody>
+    </table>
+    <DocCode language="bash" title="Public and protected">
+{"curl -s \u0022$CADCAMFUN_URL/api/health\u0022\ncurl -s \u0022$CADCAMFUN_URL/api/projects\u0022 -H \u0022Authorization: Bearer $CADCAMFUN_TOKEN\u0022"}
+    </DocCode>
+  </section>
+
+  <section id="conventions" class="doc-section">
+    <h2>Conventions</h2>
+    <ul>
+      <li><strong>JSON in, JSON out.</strong> Bodies are <code>application/json</code> unless a card says otherwise: two multipart uploads, one octet-stream webhook, a JavaScript bootstrap, a zip download, a binary plugin file, and two event streams.</li>
+      <li><strong>Operation ids are dotted.</strong> <code>projects.get</code>, <code>vcs.commit</code>: the group tag, a dot, the method name used by the generated clients.</li>
+      <li><strong>Errors are typed.</strong> Failures are declared per endpoint and carry a <code>_tag</code>; switch on it instead of parsing messages. Across the contract, 401 is declared on 269 operations, 500 on 264 and 400 on 206.</li>
+      <li><strong>Operation anchors are stable.</strong> Each card is linkable as <code>#op-&lt;method&gt;-&lt;path&gt;</code>, for example <code>/docs/api/projects#op-get-api-projects-id</code>.</li>
+    </ul>
+  </section>
+
+  <section id="streaming" class="doc-section">
+    <h2>Streaming</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Shape</th><th>Carries</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/docs/api/events"><code>GET /api/projects/&#123;id&#125;/events</code></a></td><td>SSE</td><td>Change events for one project.</td></tr>
+        <tr><td><a href="/docs/api/ai"><code>POST /api/ai/chat/stream</code></a></td><td>SSE</td><td>Assistant output as it is produced, plus heartbeats; see <a href="/docs/guides/ai-streaming">AI streaming</a>.</td></tr>
+      </tbody>
+    </table>
+    <DocCode language="bash" title="Follow a project's events">
+{"curl -N \u0022$CADCAMFUN_URL/api/projects/$PROJECT_ID/events\u0022 \\\n  -H \u0022Authorization: Bearer $CADCAMFUN_TOKEN\u0022"}
+    </DocCode>
+  </section>
+
+  <section id="clients" class="doc-section">
+    <h2>Clients</h2>
+    <p><code>@cadcamfun/api/sdk</code> is generated from this same contract: every operation id below is a typed method on <code>CadCam.make(...)</code>, taking one flat input of path parameters and body fields. 259 of the {apiStats.operations} operations are generated; each card shows its exact call.</p>
+    <DocCode language="ts" title="@cadcamfun/api/sdk">
+{"import { CadCam } from \u0022@cadcamfun/api/sdk\u0022\n\nconst client = CadCam.make({\n  baseUrl: process.env.CADCAMFUN_URL!,\n  headers: { authorization: `Bearer ${process.env.CADCAMFUN_TOKEN}` },\n})\n\nconst projects = await client.projects.list()\nconst created = await client.projects.create({ name: \u0022Bracket\u0022 })"}
+    </DocCode>
+  </section>
+
+  <section id="resources" class="doc-section">
+    <h2>Resources</h2>
+    <p>{apiStats.operations} operations in {apiStats.groups} groups, arranged by what they serve.</p>
+    {apiCategories.map((category) => <>
+      <h3>{category.title}</h3>
+      <div class="grid gap-3 sm:grid-cols-2 not-prose">
+        {category.slugs.map((slug) => apiGroups.find((g) => g.slug === slug)!).map((group) => <a href={`/docs/api/${group.slug}`} class="api-op block no-underline">
+          <div class="api-op-head"><span class="font-bold">{group.title}</span><code class="api-op-id">{operationsFor(group).length} endpoints</code></div>
+          <div class="api-op-body"><p class="api-op-desc">{group.summary}</p></div>
+        </a>)}
+      </div>
+    </>)}
+  </section>
+
+  <section id="openapi" class="doc-section">
+    <h2>OpenAPI document</h2>
+    <p>Download <a href="/docs/api/openapi.json">/docs/api/openapi.json</a> (the checked-in snapshot this site renders) or fetch the live document from a running sidecar at <code>/api/openapi.json</code>. Regenerate the snapshot with <code>bun run generate:api-reference</code> in <code>packages/web</code> after changing an endpoint.</p>
+  </section>
+
   <section id="status" class="doc-section">
     <h2>Contract and server</h2>
 <p><code>@cadcamfun/api</code> defines request and response schemas with Effect HttpApi. It exports the root <code>Api</code>, domain records, tagged errors, and clients. Request handlers, authorization decisions, database queries, and provider calls run in the sidecar. Importing a schema does not start a server.</p>
@@ -236,13 +334,13 @@ bun run check:docs-index`}</DocCode>
     </table>
     <p>Every error is an Effect tagged error, so its JSON body always contains a <code>_tag</code> discriminator next to its fields. There are three body families, inherited from the legacy handlers so existing clients keep working:</p>
     <DocCode language="json" title="Plain error (message only)">
-{"{ \"_tag\": \"NotFound\", \"message\": \"Project not found\" }"}
+{"{ \u0022_tag\u0022: \u0022NotFound\u0022, \u0022message\u0022: \u0022Project not found\u0022 }"}
     </DocCode>
     <DocCode language="json" title="Envelope error">
-{"{ \"_tag\": \"EnvNotFound\", \"success\": false, \"message\": \"Material not found\", \"errors\": null }"}
+{"{ \u0022_tag\u0022: \u0022EnvNotFound\u0022, \u0022success\u0022: false, \u0022message\u0022: \u0022Material not found\u0022, \u0022errors\u0022: null }"}
     </DocCode>
     <DocCode language="json" title="Keyed error (a few library routes)">
-{"{ \"_tag\": \"KeyedInternal\", \"error\": \"Failed to load components\" }"}
+{"{ \u0022_tag\u0022: \u0022KeyedInternal\u0022, \u0022error\u0022: \u0022Failed to load components\u0022 }"}
     </DocCode>
     <p>Success envelopes mirror the error envelope: <code>&#123; success: true, message, data &#125;</code>, where <code>data</code> may be <code>null</code>. The <code>EnvelopeOpt</code> variant omits <code>message</code> when the handler did not provide one. Switch on <code>_tag</code> rather than on the presence of <code>message</code> or <code>error</code>.</p>
   </section>
@@ -289,10 +387,14 @@ bun run check:docs-index`}</DocCode>
   <section id="raw-fetch" class="doc-section">
     <h2>Calling the API without a client</h2>
     <DocCode language="ts" title="Minimal typed fetch wrapper">
-{"type TaggedError = { _tag: string; message?: string; error?: string }\n\nasync function call<T>(base: string, token: string, method: string, path: string, body?: unknown): Promise<T> {\n  const response = await fetch(new URL(path, base), {\n    method,\n    headers: {\n      authorization: `Bearer ${token}`,\n      ...(body === undefined ? {} : { \"content-type\": \"application/json\" }),\n    },\n    body: body === undefined ? undefined : JSON.stringify(body),\n  })\n  if (response.status === 204) return undefined as T\n  const payload = await response.json()\n  if (!response.ok) {\n    const failure = payload as TaggedError\n    throw new Error(`${response.status} ${failure._tag}: ${failure.message ?? failure.error}`)\n  }\n  return payload as T\n}\n\nconst project = await call<{ id: string; name: string }>(\n  process.env.CADCAMFUN_URL!, process.env.CADCAMFUN_TOKEN!,\n  \"POST\", \"/api/projects\", { name: \"Bracket\" },\n)"}
+{"type TaggedError = { _tag: string; message?: string; error?: string }\n\nasync function call<T>(base: string, token: string, method: string, path: string, body?: unknown): Promise<T> {\n  const response = await fetch(new URL(path, base), {\n    method,\n    headers: {\n      authorization: `Bearer ${token}`,\n      ...(body === undefined ? {} : { \u0022content-type\u0022: \u0022application/json\u0022 }),\n    },\n    body: body === undefined ? undefined : JSON.stringify(body),\n  })\n  if (response.status === 204) return undefined as T\n  const payload = await response.json()\n  if (!response.ok) {\n    const failure = payload as TaggedError\n    throw new Error(`${response.status} ${failure._tag}: ${failure.message ?? failure.error}`)\n  }\n  return payload as T\n}\n\nconst project = await call<{ id: string; name: string }>(\n  process.env.CADCAMFUN_URL!, process.env.CADCAMFUN_TOKEN!,\n  \u0022POST\u0022, \u0022/api/projects\u0022, { name: \u0022Bracket\u0022 },\n)"}
     </DocCode>
     <p>Prefer the generated clients in TypeScript: they know each operation's success status and declared error statuses, and treat anything else as <code>UnexpectedStatus</code> instead of guessing.</p>
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="API groups by size" caption="Every API group as a column, height = operations counted from the generated OpenAPI document (270 in total). Rows are the six sidebar categories; ai (34), history (22) and costs (21) are the largest groups." solids={[{"kind":"box","size":[6,6,1],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,2],"at":[9,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,1],"at":[18,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,4],"at":[27,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,2],"at":[36,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,5],"at":[0,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,5],"at":[9,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,5],"at":[18,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,3],"at":[27,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,8],"at":[36,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,7],"at":[0,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,2],"at":[9,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,5],"at":[18,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,8],"at":[27,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,21],"at":[36,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,5],"at":[0,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[9,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[18,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,7],"at":[27,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,6],"at":[36,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[45,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,34],"at":[0,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,22],"at":[9,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,16],"at":[18,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,8],"at":[27,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,5],"at":[36,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,12],"at":[0,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,16],"at":[9,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,5],"at":[18,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,4],"at":[27,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,15],"at":[36,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,10],"at":[45,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,10],"at":[54,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,1],"at":[63,80,0],"color":"#5fb0c0"}]} labels={[{"text":"health 1","at":[3,3,3.5],"size":2.4},{"text":"system 2","at":[12,3,4.5],"size":2.4},{"text":"events 1","at":[21,3,3.5],"size":2.4},{"text":"key-value 4","at":[30,3,6.5],"size":2.4},{"text":"files 2","at":[39,3,4.5],"size":2.4},{"text":"Core","at":[-10,3,2],"size":3.6,"color":"#e0a030"},{"text":"projects 5","at":[3,19,7.5],"size":2.4},{"text":"drawings 5","at":[12,19,7.5],"size":2.4},{"text":"components 5","at":[21,19,7.5],"size":2.4},{"text":"cad-exact 3","at":[30,19,5.5],"size":2.4},{"text":"library 8","at":[39,19,10.5],"size":2.4},{"text":"Design","at":[-10,19,2],"size":3.6,"color":"#e0a030"},{"text":"toolpaths 7","at":[3,35,9.5],"size":2.4},{"text":"project-toolpaths 2","at":[12,35,4.5],"size":2.4},{"text":"machining 5","at":[21,35,7.5],"size":2.4},{"text":"toolpath-history 8","at":[30,35,10.5],"size":2.4},{"text":"costs 21","at":[39,35,23.5],"size":2.4},{"text":"Manufacturing","at":[-10,35,2],"size":3.6,"color":"#e0a030"},{"text":"materials 5","at":[3,51,7.5],"size":2.4},{"text":"material-storage 5","at":[12,51,7.5],"size":2.4},{"text":"tools 5","at":[21,51,7.5],"size":2.4},{"text":"tool-storage 7","at":[30,51,9.5],"size":2.4},{"text":"machines 6","at":[39,51,8.5],"size":2.4},{"text":"machine-storage 5","at":[48,51,7.5],"size":2.4},{"text":"Resources","at":[-10,51,2],"size":3.6,"color":"#e0a030"},{"text":"ai 34","at":[3,67,36.5],"size":2.4},{"text":"history 22","at":[12,67,24.5],"size":2.4},{"text":"plugins 16","at":[21,67,18.5],"size":2.4},{"text":"mcp 8","at":[30,67,10.5],"size":2.4},{"text":"companion 5","at":[39,67,7.5],"size":2.4},{"text":"Extensions","at":[-10,67,2],"size":3.6,"color":"#e0a030"},{"text":"authentication 12","at":[3,83,14.5],"size":2.4},{"text":"users 16","at":[12,83,18.5],"size":2.4},{"text":"organizations 5","at":[21,83,7.5],"size":2.4},{"text":"notifications 4","at":[30,83,6.5],"size":2.4},{"text":"billing 15","at":[39,83,17.5],"size":2.4},{"text":"analytics 10","at":[48,83,12.5],"size":2.4},{"text":"application 10","at":[57,83,12.5],"size":2.4},{"text":"waitlist 1","at":[66,83,3.5],"size":2.4},{"text":"Accounts","at":[-10,83,2],"size":3.6,"color":"#e0a030"}]} height={440} />
+  </section>
   <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "AI assistant", href: "/docs/ai" }, { title: "Setups", href: "/docs/setups" }]} />
 </DocsLayout>

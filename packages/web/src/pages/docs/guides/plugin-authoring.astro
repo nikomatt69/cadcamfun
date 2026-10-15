@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -21,6 +22,7 @@ const toc = [
   { title: "Pre-release checklist", href: "#release-checklist" },
   { title: "Troubleshooting matrix", href: "#authoring-troubleshooting" },
   { title: "Lint a manifest before installing", href: "#manifest-lint" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -252,7 +254,7 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
     <section id="manifest-lint" class="doc-section">
     <h2>Lint a manifest before installing</h2>
     <DocCode language="ts" title="check-manifest.ts">
-{"import { decodeManifest, requestedCapabilities } from \"@cadcamfun/plugin-sdk\"\nimport { Effect } from \"effect\"\n\nconst raw = JSON.parse(await Bun.file(process.argv[2] ?? \"plugin.json\").text())\nconst manifest = await Effect.runPromise(decodeManifest(raw))   // throws a SchemaError naming the bad field\nconsole.log(manifest.id, manifest.version, requestedCapabilities(manifest))\nfor (const tool of manifest.contributes?.aiTools ?? [])\n  console.log(`plugin_${manifest.id}_${tool.id}`, tool.kind)"}
+{"import { decodeManifest, requestedCapabilities } from \u0022@cadcamfun/plugin-sdk\u0022\nimport { Effect } from \u0022effect\u0022\n\nconst raw = JSON.parse(await Bun.file(process.argv[2] ?? \u0022plugin.json\u0022).text())\nconst manifest = await Effect.runPromise(decodeManifest(raw))   // throws a SchemaError naming the bad field\nconsole.log(manifest.id, manifest.version, requestedCapabilities(manifest))\nfor (const tool of manifest.contributes?.aiTools ?? [])\n  console.log(`plugin_${manifest.id}_${tool.id}`, tool.kind)"}
     </DocCode>
     <table>
       <thead><tr><th>Common mistake</th><th>Fix</th></tr></thead>
@@ -268,5 +270,9 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
     </table>
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Plugin tables" caption="PluginRegistryEntry and PluginConfiguration from the migrations: configurations reference registry entries." solids={[{"kind":"box","size":[12,5,3],"at":[-6.0,-2.5,10],"color":"#e0a030"},{"kind":"box","size":[12,5,3],"at":[30.0,-2.5,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[-42.0,-2.4999999999999956,0],"color":"#8aa4c8"}]} paths={[{"points":[[0.0,0,11.5],[-18.0,2.204364238465236e-15,14.5],[-36.0,4.408728476930472e-15,1.5]],"color":"#2fbf71"}]} labels={[{"text":"PluginConfiguration","at":[0.0,0,15.4],"size":3.2},{"text":"MCPServerConfig","at":[36.0,0.0,5.4],"size":3.2},{"text":"PluginRegistryEntry","at":[-36.0,4.408728476930472e-15,5.4],"size":3.2}]} height={340} />
+  </section>
   <DocRelated items={[{ title: "Plugin reference", href: "/docs/plugins" }, { title: "AI action API", href: "/docs/api/ai" }, { title: "Streaming client", href: "/docs/guides/ai-streaming" }, { title: "Browser plugin API", href: "/docs/api/plugins" }]} />
 </DocsLayout>

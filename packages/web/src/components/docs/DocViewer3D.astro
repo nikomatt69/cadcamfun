@@ -5,7 +5,7 @@
  * Coordinates are millimetres, Z up, matching the CADCAMFUN core conventions.
  */
 export interface ViewerSolid {
-  kind: "box" | "extrude" | "cylinder"
+  kind: "box" | "extrude" | "cylinder" | "sphere" | "mesh"
   /** box: [x, y, z] size, placed with its minimum corner at `at`. */
   size?: [number, number, number]
   /** extrude: outer ring [[x, y], ...] (counter-clockwise) and optional holes. */
@@ -15,8 +15,18 @@ export interface ViewerSolid {
   /** cylinder: radius and height, axis along Z, base centre at `at`. */
   radius?: number
   at?: [number, number, number]
+  /** mesh: flat [x, y, z, ...] vertex positions and triangle indices, e.g. a kernel's Mesh output. */
+  positions?: number[]
+  indices?: number[]
   color?: string
   opacity?: number
+}
+export interface ViewerLabel {
+  text: string
+  at: [number, number, number]
+  color?: string
+  /** Text height in scene units (default 4). */
+  size?: number
 }
 export interface ViewerPath {
   /** Polyline points [x, y, z]. */
@@ -29,11 +39,12 @@ interface Props {
   caption?: string
   solids?: ViewerSolid[]
   paths?: ViewerPath[]
+  labels?: ViewerLabel[]
   height?: number
   animate?: boolean
 }
-const { title, caption, solids = [], paths = [], height = 340, animate = false } = Astro.props
-const scene = JSON.stringify({ solids, paths, animate })
+const { title, caption, solids = [], paths = [], labels = [], height = 340, animate = false } = Astro.props
+const scene = JSON.stringify({ solids, paths, labels, animate })
 ---
 
 <figure class="doc-viewer3d not-prose my-6 rounded-[var(--radius-md)] border border-terminal-border bg-terminal-panel" data-scene={scene}>
@@ -52,14 +63,15 @@ const scene = JSON.stringify({ solids, paths, animate })
   import * as THREE from "three"
   import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 
-  type Solid = { kind: string; size?: number[]; profile?: number[][]; holes?: number[][][]; height?: number; radius?: number; at?: number[]; color?: string; opacity?: number }
+  type Solid = { kind: string; size?: number[]; profile?: number[][]; holes?: number[][][]; height?: number; radius?: number; at?: number[]; positions?: number[]; indices?: number[]; color?: string; opacity?: number }
+  type Label = { text: string; at: number[]; color?: string; size?: number }
   type Path = { points: number[][]; rapid?: boolean; color?: string }
 
   const mount = (figure: HTMLElement) => {
     if (figure.dataset.mounted) return
     figure.dataset.mounted = "1"
     const host = figure.querySelector<HTMLElement>(".doc-viewer3d-canvas")!
-    const data = JSON.parse(figure.dataset.scene ?? "{}") as { solids: Solid[]; paths: Path[]; animate: boolean }
+    const data = JSON.parse(figure.dataset.scene ?? "{}") as { solids: Solid[]; paths: Path[]; labels?: Label[]; animate: boolean }
     let renderer: THREE.WebGLRenderer
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -89,6 +101,15 @@ const scene = JSON.stringify({ solids, paths, animate })
         geometry = new THREE.CylinderGeometry(s.radius, s.radius, s.height, 48)
         geometry.rotateX(Math.PI / 2)
         geometry.translate(at[0], at[1], at[2] + s.height / 2)
+      } else if (s.kind === "sphere" && s.radius) {
+        geometry = new THREE.SphereGeometry(s.radius, 32, 16)
+        geometry.translate(at[0], at[1], at[2])
+      } else if (s.kind === "mesh" && s.positions && s.indices) {
+        geometry = new THREE.BufferGeometry()
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(s.positions, 3))
+        geometry.setIndex(s.indices)
+        geometry.computeVertexNormals()
+        geometry.translate(at[0], at[1], at[2])
       } else if (s.kind === "extrude" && s.profile) {
         const shape = new THREE.Shape(s.profile.map(([x, y]) => new THREE.Vector2(x, y)))
         for (const hole of s.holes ?? []) shape.holes.push(new THREE.Path(hole.map(([x, y]) => new THREE.Vector2(x, y))))
@@ -111,6 +132,27 @@ const scene = JSON.stringify({ solids, paths, animate })
       if (p.rapid) line.computeLineDistances()
       pathLines.push(line)
       group.add(line)
+    }
+    for (const l of data.labels ?? []) {
+      const canvas = document.createElement("canvas")
+      const ctx = canvas.getContext("2d")
+      if (!ctx) continue
+      const font = "600 48px ui-monospace, SFMono-Regular, Menlo, monospace"
+      ctx.font = font
+      canvas.width = Math.ceil(ctx.measureText(l.text).width) + 24
+      canvas.height = 64
+      ctx.font = font
+      ctx.fillStyle = l.color ?? "#d8e0ea"
+      ctx.textBaseline = "middle"
+      ctx.fillText(l.text, 12, 32)
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }))
+      const h = l.size ?? 4
+      sprite.scale.set((h * canvas.width) / canvas.height, h, 1)
+      sprite.position.set(l.at[0] ?? 0, l.at[1] ?? 0, l.at[2] ?? 0)
+      sprite.renderOrder = 10
+      group.add(sprite)
     }
     scene.add(group)
 

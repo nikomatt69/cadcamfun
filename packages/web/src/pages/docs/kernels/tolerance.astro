@@ -1,0 +1,119 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
+
+const toc = [
+  { title: "One tolerance, every curve", href: "#purpose" },
+  { title: "Constants", href: "#constants" },
+  { title: "Presets in numbers", href: "#table" },
+  { title: "Tessellating drawing entities", href: "#entities" },
+  { title: "Where tolerances meet", href: "#where" },
+  { title: "Troubleshooting", href: "#troubleshooting" },
+]
+---
+
+<DocsLayout
+  title="Tolerance and tessellation"
+  subtitle="How one chord-height tolerance decides segment counts, display decimals and curve tessellation across the CAD kernels."
+  description="CADCAMFUN drawing tolerance: presets, segmentsFor and chordError, decimals, entity tessellation rules, and where each kernel takes its tolerance, with real outputs."
+  toc={toc}
+>
+  <section id="purpose" class="doc-section">
+    <h2>One tolerance, every curve</h2>
+    <p>A tolerance is the largest distance the model may be from the true shape, in millimetres. For a circle drawn as a polygon that distance is the chord&apos;s sagitta r(1 − cos(π/n)), so the number of segments follows from the tolerance. <code>packages/core/src/cad/tolerance.ts</code> (39 lines) holds that rule; the editor&apos;s renderer, the assistant&apos;s element catalogue, the entity tessellator and the tests all use it.</p>
+    <DocViewer3D title="Ø20 circle at three tolerances" caption="The same radius-10 circle as segmentsFor gives it: 10 segments at 0.5 mm (chord error 0.489), 23 at 0.1 mm (0.093) and 71 at the 0.01 mm default (0.0098). Each polygon is extruded 2 mm." solids={[{"kind":"extrude","profile":[[10.0,0.0],[8.09,5.878],[3.09,9.511],[-3.09,9.511],[-8.09,5.878],[-10.0,0.0],[-8.09,-5.878],[-3.09,-9.511],[3.09,-9.511],[8.09,-5.878]],"height":2,"color":"#c88a8a"},{"kind":"extrude","profile":[[35.0,0.0],[34.629,2.698],[33.544,5.196],[31.826,7.308],[29.601,8.879],[27.035,9.791],[24.318,9.977],[21.651,9.423],[19.233,8.17],[17.243,6.311],[15.828,3.984],[15.093,1.362],[15.093,-1.362],[15.828,-3.984],[17.243,-6.311],[19.233,-8.17],[21.651,-9.423],[24.318,-9.977],[27.035,-9.791],[29.601,-8.879],[31.826,-7.308],[33.544,-5.196],[34.629,-2.698]],"height":2,"color":"#c8a48a"},{"kind":"extrude","profile":[[60.0,0.0],[59.961,0.884],[59.844,1.761],[59.65,2.624],[59.38,3.466],[59.037,4.282],[58.623,5.064],[58.142,5.806],[57.597,6.503],[56.992,7.149],[56.333,7.739],[55.624,8.268],[54.872,8.733],[54.081,9.129],[53.258,9.454],[52.41,9.705],[51.542,9.88],[50.663,9.978],[49.779,9.998],[48.896,9.939],[48.022,9.802],[47.163,9.589],[46.327,9.301],[45.519,8.94],[44.747,8.509],[44.015,8.011],[43.331,7.451],[42.698,6.833],[42.123,6.16],[41.609,5.44],[41.161,4.677],[40.783,3.878],[40.476,3.048],[40.244,2.194],[40.088,1.324],[40.01,0.442],[40.01,-0.442],[40.088,-1.324],[40.244,-2.194],[40.476,-3.048],[40.783,-3.878],[41.161,-4.677],[41.609,-5.44],[42.123,-6.16],[42.698,-6.833],[43.331,-7.451],[44.015,-8.011],[44.747,-8.509],[45.519,-8.94],[46.327,-9.301],[47.163,-9.589],[48.022,-9.802],[48.896,-9.939],[49.779,-9.998],[50.663,-9.978],[51.542,-9.88],[52.41,-9.705],[53.258,-9.454],[54.081,-9.129],[54.872,-8.733],[55.624,-8.268],[56.333,-7.739],[56.992,-7.149],[57.597,-6.503],[58.142,-5.806],[58.623,-5.064],[59.037,-4.282],[59.38,-3.466],[59.65,-2.624],[59.844,-1.761],[59.961,-0.884]],"height":2,"color":"#8aa4c8"}]} labels={[{"text":"0.5 \u2192 10","at":[0,-14,2],"size":3},{"text":"0.1 \u2192 23","at":[25,-14,2],"size":3},{"text":"0.01 \u2192 71","at":[50,-14,2],"size":3}]} />
+  </section>
+
+  <section id="constants" class="doc-section">
+    <h2>Constants</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Value</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>TOLERANCE_PRESETS</td><td>0.1, 0.05, 0.01, 0.005, 0.002, 0.001, 0.0005</td><td>what the UI offers, coarse to fine</td></tr>
+        <tr><td>DEFAULT_TOLERANCE</td><td>0.01</td><td>editor and tessellation default</td></tr>
+        <tr><td>MIN_TOLERANCE</td><td>0.0001</td><td>below this isTolerance is false</td></tr>
+        <tr><td>MAX_TOLERANCE</td><td>10</td><td>above this isTolerance is false</td></tr>
+        <tr><td>MIN_CURVE_SEGMENTS</td><td>8</td><td>fewest segments of a circle</td></tr>
+        <tr><td>MAX_CURVE_SEGMENTS</td><td>2048</td><td>default cap of segmentsFor</td></tr>
+        <tr><td>MAX_SEGMENTS (tessellate.ts)</td><td>65 536</td><td>hard cap per entity in the entity tessellator</td></tr>
+        <tr><td>MIN_TOLERANCE (tessellate.ts)</td><td>1e-6</td><td>floor so a zero tolerance cannot produce unbounded counts</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="tolerance.ts">
+{"export const isTolerance: (value: unknown) => value is number      // finite, in [0.0001, 10]\n/** Smallest n \u2265 8 with r(1 \u2212 cos(\u03c0/n)) \u2264 tolerance, capped. */\nexport const segmentsFor: (radius: number, tolerance: number, cap?: number /* 2048 */) => number\nexport const chordError: (radius: number, segments: number) => number   // r(1 \u2212 cos(\u03c0/n))\n/** 0.001 \u2192 3, 0.05 \u2192 2, 0.5 \u2192 1; at most 6. */\nexport const decimalsForTolerance: (tolerance: number) => number"}
+    </DocCode>
+  </section>
+
+  <section id="table" class="doc-section">
+    <h2>Presets in numbers</h2>
+    <p>Real <code>segmentsFor</code>, <code>chordError</code> and <code>decimalsForTolerance</code> output for each preset:</p>
+    <table>
+      <thead><tr><th>Tolerance, mm</th><th>segments r 10</th><th>chord error r 10</th><th>decimals</th><th>segments r 50</th></tr></thead>
+      <tbody>
+        <tr><td>0.1</td><td>23</td><td>9.314e-2</td><td>1</td><td>50</td></tr>
+        <tr><td>0.05</td><td>32</td><td>4.815e-2</td><td>2</td><td>71</td></tr>
+        <tr><td>0.01 (default)</td><td>71</td><td>9.788e-3</td><td>2</td><td>158</td></tr>
+        <tr><td>0.005</td><td>100</td><td>4.934e-3</td><td>3</td><td>223</td></tr>
+        <tr><td>0.002</td><td>158</td><td>1.977e-3</td><td>3</td><td>352</td></tr>
+        <tr><td>0.001</td><td>223</td><td>9.923e-4</td><td>3</td><td>497</td></tr>
+        <tr><td>0.0005</td><td>315</td><td>4.973e-4</td><td>4</td><td>703</td></tr>
+        </tbody>
+    </table>
+    <p>Edge cases, also real: <code>segmentsFor(1000, 0.0001)</code> = 2048 (the cap), <code>segmentsFor(2, 5)</code> = 8 (tolerance ≥ radius), <code>isTolerance(0.00005)</code> = false, <code>isTolerance(10)</code> = true, <code>decimalsForTolerance(0.0001)</code> = 4.</p>
+  </section>
+
+  <section id="entities" class="doc-section">
+    <h2>Tessellating drawing entities</h2>
+    <code>tessellate(entity, tolerance)</code> in <code>tessellate.ts</code> turns any drawing entity into polylines within the chord tolerance. That polyline is what the CAM layer offsets and what the viewport renders. A closed shape returns a ring whose first and last points differ; the closing segment is implicit.
+    <table>
+      <thead><tr><th>Entity</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td>Line</td><td>its two end points</td></tr>
+        <tr><td>Circle, Arc</td><td>arc segment count from radius, sweep and tolerance, capped at 65 536</td></tr>
+        <tr><td>Ellipse</td><td>uniform parameter step h = √(8·tol / a), a the larger radius, at least 8 segments</td></tr>
+        <tr><td>Spline</td><td>analytic bound of splinePolyline</td></tr>
+        <tr><td>Polyline</td><td>bulged segments as arcs</td></tr>
+        <tr><td>Rectangle</td><td>four corners</td></tr>
+        <tr><td>Text, Dimension</td><td>no outline: empty list</td></tr>
+        </tbody>
+    </table>
+    <p>For an ellipse with radii 20 and 10, <code>ellipseSegmentCount</code> gives 100 segments at 0.01 mm and 32 at 0.1 mm.</p>
+  </section>
+
+  <section id="where" class="doc-section">
+    <h2>Where tolerances meet</h2>
+    <table>
+      <thead><tr><th>Kernel</th><th>Tolerance parameter</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td>Sketch profiles</td><td>sketchProfiles(sketch, tolerance)</td><td>0.01 mm</td></tr>
+        <tr><td>Mesh primitives</td><td>meshOf(solid, tolerance)</td><td>0.1 mm</td></tr>
+        <tr><td>CSG coincidence</td><td>CsgOptions.tolerance</td><td>1e-7 × extent</td></tr>
+        <tr><td>B-rep tessellation</td><td>TessellateOptions.chordTol</td><td>diagonal / 2000, in [0.001, 0.05]</td></tr>
+        <tr><td>B-rep Boolean coincidence</td><td>BooleanOptions.tol</td><td>1e-8 × size, ≥ 1e-7</td></tr>
+        <tr><td>Helix chords</td><td>stepsPerTurn</td><td>0.01 mm</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="info" title="Display tolerance is not machining tolerance">
+      <p>The drawing tolerance controls how curves are approximated. CAM verification and G-code arc fitting carry their own tolerances; see the CAM kernel.</p>
+    </DocCallout>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Troubleshooting</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>circles look polygonal</td><td>tolerance 0.1 on a large radius</td><td>choose a finer preset; segments grow with √r</td></tr>
+        <tr><td>viewport slow on a large drawing</td><td>very fine tolerance on many curves</td><td>0.01 is enough for display; keep finer values for export</td></tr>
+        <tr><td>length shows too many decimals</td><td>decimals follow the tolerance</td><td>decimalsForTolerance(0.01) = 2</td></tr>
+        <tr><td>a value is rejected as tolerance</td><td>outside [0.0001, 10]</td><td>use a preset</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <DocRelated items={[{"title": "Kernel overview", "href": "/docs/kernels"}, {"title": "Mesh and CSG", "href": "/docs/kernels/mesh"}, {"title": "Exact B-rep", "href": "/docs/kernels/brep"}, {"title": "Viewport", "href": "/docs/viewport"}]} />
+</DocsLayout>

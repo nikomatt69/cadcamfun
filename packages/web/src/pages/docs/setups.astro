@@ -194,7 +194,7 @@ console.log(result.value.identity.nc)`}
 <g fill="currentColor"><circle cx="300" cy="190" r="3"/><text x="365" y="132" fill="#3b82f6">z = (0.707, 0, 0.707)</text><text x="365" y="250" fill="#ef4444">x = (0.707, 0, −0.707)</text>
 <text x="200" y="180" text-anchor="end">origin (40, 0, 10)</text><text x="470" y="215" text-anchor="end" opacity=".6">world X</text><text x="66" y="50" opacity=".6">world Z</text></g></svg>
     <DocCode language="ts" title="Build, check and use a 45° frame">
-{"import { cam } from \"@cadcamfun/core\"\n\nconst frame = cam.frameFromNormal({ x: 40, y: 0, z: 10 }, { x: 1, y: 0, z: 1 })\n// xAxis (0.707, 0, -0.707)  yAxis (0, 1, 0)  zAxis (0.707, 0, 0.707)\ncam.validateWorkFrame(frame)                     // []\n\nconst world = cam.workToWorld(frame, { x: 10, y: 5, z: 0 })   // (47.071, 5, 2.929)\ncam.worldToWork(frame, world)                    // (10, 5, 0)\n\ncam.validateWorkFrame({ origin: { x: 0, y: 0, z: 0 },\n  xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: 0, z: 1 }, zAxis: { x: 0, y: 1, z: 0 } })\n// [{ field: \"frame\", message: \"Work frame axes must be orthonormal and right-handed\" }]"}
+{"import { cam } from \u0022@cadcamfun/core\u0022\n\nconst frame = cam.frameFromNormal({ x: 40, y: 0, z: 10 }, { x: 1, y: 0, z: 1 })\n// xAxis (0.707, 0, -0.707)  yAxis (0, 1, 0)  zAxis (0.707, 0, 0.707)\ncam.validateWorkFrame(frame)                     // []\n\nconst world = cam.workToWorld(frame, { x: 10, y: 5, z: 0 })   // (47.071, 5, 2.929)\ncam.worldToWork(frame, world)                    // (10, 5, 0)\n\ncam.validateWorkFrame({ origin: { x: 0, y: 0, z: 0 },\n  xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: 0, z: 1 }, zAxis: { x: 0, y: 1, z: 0 } })\n// [{ field: \u0022frame\u0022, message: \u0022Work frame axes must be orthonormal and right-handed\u0022 }]"}
     </DocCode>
     <code>frameFromNormal</code> takes the normal as Z and projects the X hint (world X by default) onto the plane. When the hint is parallel to the normal it picks another perpendicular. Y is always Z × X, so the result is right-handed by construction.
   </section>
@@ -213,14 +213,14 @@ console.log(result.value.identity.nc)`}
     </table>
     <p>An underside needs a 180° tilt, outside the default limits, so the list is empty and <code>indexToolpath</code> throws "The machine's rotary axes cannot reach this work plane within their limits". Machine the underside in a second setup instead.</p>
     <DocCode language="ts" title="Where the frame origin lands after indexing">
-{"const [angles] = cam.anglesFor({ x: 1, y: 0, z: 1 }, \"table-BC\")   // { b: -45, c: 0 }\ncam.partToMachine({ x: 40, y: 0, z: 10 }, angles, \"table-BC\", { x: 0, y: 0, z: 0 })\n// (21.213, 0, 35.355): the origin rotated -45\u00b0 about Y around the pivot"}
+{"const [angles] = cam.anglesFor({ x: 1, y: 0, z: 1 }, \u0022table-BC\u0022)   // { b: -45, c: 0 }\ncam.partToMachine({ x: 40, y: 0, z: 10 }, angles, \u0022table-BC\u0022, { x: 0, y: 0, z: 0 })\n// (21.213, 0, 35.355): the origin rotated -45\u00b0 about Y around the pivot"}
     </DocCode>
   </section>
 
   <section id="setup-validation" class="doc-section">
     <h2>Setup validation messages</h2>
     <DocCode language="ts" title="Everything wrong at once">
-{"cam.validateSetup({\n  id: \"\", revision: -1, frame,\n  stock: { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 10, z: 10 } },\n  fixtures: [],\n  tools: [{ toolId: \"t\", cuttingDiameter: 6, cuttingLength: 30, stickout: 20,\n            holderDiameter: 32, holderLength: 40 }],\n})"}
+{"cam.validateSetup({\n  id: \u0022\u0022, revision: -1, frame,\n  stock: { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 10, z: 10 } },\n  fixtures: [],\n  tools: [{ toolId: \u0022t\u0022, cuttingDiameter: 6, cuttingLength: 30, stickout: 20,\n            holderDiameter: 32, holderLength: 40 }],\n})"}
     </DocCode>
     <table>
       <thead><tr><th>field</th><th>message</th></tr></thead>

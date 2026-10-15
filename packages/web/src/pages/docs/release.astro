@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -17,6 +18,7 @@ const toc = [
   { title: "Release failure diagnosis", href: "#release-diagnostics" },
   { title: "The six build steps", href: "#pipeline-steps" },
   { title: "Release matrix", href: "#release-matrix" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -218,6 +220,10 @@ bun --no-env-file scripts/build.ts \
     <p>CI on every push runs two jobs: install, typecheck and test (and stages the sidecar binary and migrations), and a Rust job with clippy and the <code>src-tauri</code> tests.</p>
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Release matrix" caption="The six include entries of the release build job: runner, slug and bundles (one block per bundle format), read from release.yml." solids={[{"kind":"box","size":[14,10,3],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[0,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,8],"color":"#9fc88a"},{"kind":"box","size":[14,10,3],"at":[60,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,20,8],"color":"#9fc88a"}]} labels={[{"text":"app","at":[7,-1.5,1.5],"size":2.4},{"text":"dmg","at":[7,-1.5,5.5],"size":2.4},{"text":"macos-arm64 (macos-14)","at":[7,5,11],"size":2.8},{"text":"app","at":[7,18.5,1.5],"size":2.4},{"text":"dmg","at":[7,18.5,5.5],"size":2.4},{"text":"macos-x64 (macos-14)","at":[7,25,11],"size":2.8},{"text":"msi","at":[37,-1.5,1.5],"size":2.4},{"text":"nsis","at":[37,-1.5,5.5],"size":2.4},{"text":"windows-x64 (windows-latest)","at":[37,5,11],"size":2.8},{"text":"msi","at":[37,18.5,1.5],"size":2.4},{"text":"nsis","at":[37,18.5,5.5],"size":2.4},{"text":"windows-arm64 (windows-11-arm)","at":[37,25,11],"size":2.8},{"text":"deb","at":[67,-1.5,1.5],"size":2.4},{"text":"rpm","at":[67,-1.5,5.5],"size":2.4},{"text":"appimage","at":[67,-1.5,9.5],"size":2.4},{"text":"linux-x64 (ubuntu-22.04)","at":[67,5,15],"size":2.8},{"text":"deb","at":[67,18.5,1.5],"size":2.4},{"text":"rpm","at":[67,18.5,5.5],"size":2.4},{"text":"appimage","at":[67,18.5,9.5],"size":2.4},{"text":"linux-arm64 (ubuntu-22.04-arm)","at":[67,25,15],"size":2.8}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Quickstart", href: "/docs/guides/quickstart" },
       { title: "Database", href: "/docs/database" },

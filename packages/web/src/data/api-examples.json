@@ -1,0 +1,234 @@
+{
+ "health.check": {
+  "status": 200,
+  "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-10-15T04:52:23.303Z\"\n}"
+ },
+ "system.ready": {
+  "status": 200,
+  "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-10-15T04:52:23.307Z\"\n}"
+ },
+ "system.version": {
+  "status": 200,
+  "body": "{\n  \"version\": \"6.0.0\"\n}"
+ },
+ "auth.getSession": {
+  "status": 200,
+  "body": "{\n  \"session\": {\n    \"user\": {\n      \"id\": \"c942817d-0162-4291-84ff-77321d387acc\",\n      \"email\": \"local@cadcamfun.local\",\n      \"name\": \"Local user\",\n      \"emailVerified\": null,\n      \"createdAt\": \"2026-10-15T04:52:06.538Z\",\n      \"updatedAt\": \"2026-10-15T04:52:06.538Z\"\n    },\n    \"expires\": \"2026-10-22T04:52:23.311Z\"\n  }\n}"
+ },
+ "analytics.systemMetrics": {
+  "status": 200,
+  "body": "{\n  \"cpuUsage\": 6,\n  \"memoryUsage\": 79,\n  \"storageUsed\": 72,\n  \"networkLatency\": 15,\n  \"activeConnections\": 145,\n  \"cacheHitRatio\": 98,\n  \"errorRate\": 0.04,\n  \"responseTime\": 52\n}"
+ },
+ "analytics.index": {
+  "status": 200,
+  "body": "{\n  \"success\": true,\n  \"data\": {\n    \"countByType\": [],\n    \"countByAction\": []\n  },\n  \"isAdmin\": true,\n  \"filters\": {\n    \"groupBy\": \"day\"\n  }\n}"
+ },
+ "analytics.dashboardData": {
+  "status": 200,
+  "body": "{\n  \"components\": {\n    \"total\": 0,\n    \"trend\": 0,\n    \"recentActivity\": 0\n  },\n  \"projects\": {\n    \"total\": 0,\n    \"trend\": 0,\n    \"activeProjects\": 0\n  },\n  \"tools\": {\n    \"total\": 0,\n    \"trend\": 0,\n    \"mostUsed\": \"No tools used yet\"\n  },\n  \"materials\": {\n    \"total\": 0,\n    \"trend\": 0,\n    \"lowStock\": 0\n  }\n}"
+ },
+ "analytics.recentActivity": {
+  "status": 200,
+  "body": "[]"
+ },
+ "analytics.userHistory": {
+  "status": 200,
+  "body": "{\n  \"logs\": [],\n  \"total\": 0\n}"
+ },
+ "analytics.userMetrics": {
+  "status": 200,
+  "body": "{\n  \"summary\": {\n    \"totalAiRequests\": 0,\n    \"totalCadDrawings\": 0,\n    \"totalStorageUsage\": 0,\n    \"totalProjects\": 0,\n    \"totalComponents\": 0,\n    \"totalToolpaths\": 0,\n    \"totalActivityCount\": 0\n  },\n  \"chartData\": [\n    {\n      \"date\": \"2026-09-15\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-16\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-17\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-18\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-19\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-20\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-21\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"date\": \"2026-09-22\",\n      \"activityCount\": 0,\n      \"toolpathsGenerated\": 0,\n      \"connections\": 0,\n      \"programRuns\": 0,\n      \"aiRequests\": 0,\n      \"cadDrawings\": 0,\n      \"storageUsage\": 0,\n      \"projects\": 0,\n      \"components\": 0,\n      \"toolpaths\": 0\n    },\n    {\n      \"\n\u2026"
+ },
+ "analytics.userUsage": {
+  "status": 200,
+  "body": "{\n  \"users\": [],\n  \"systemStats\": {\n    \"totalUsers\": 0,\n    \"totalTokens\": 0,\n    \"totalCost\": 0,\n    \"totalRequests\": 0,\n    \"averageCostPerUser\": 0,\n    \"topSpendingUsers\": [],\n    \"modelDistribution\": {}\n  }\n}"
+ },
+ "user.profile": {
+  "status": 200,
+  "body": "{\n  \"id\": \"c942817d-0162-4291-84ff-77321d387acc\",\n  \"name\": \"Local user\",\n  \"email\": \"local@cadcamfun.local\",\n  \"image\": null,\n  \"bio\": null,\n  \"location\": null,\n  \"website\": null,\n  \"company\": null,\n  \"title\": null,\n  \"publicProfile\": true,\n  \"showEmail\": false,\n  \"createdAt\": \"2026-10-15T04:52:06.538Z\",\n  \"_count\": {\n    \"projects\": 0\n  }\n}"
+ },
+ "user.stats": {
+  "status": 200,
+  "body": "{\n  \"projectsCount\": 0,\n  \"drawingsCount\": 0,\n  \"toolpathsCount\": 0,\n  \"componentsCount\": 0,\n  \"totalDesigns\": 0,\n  \"memberSince\": \"2026-10-15T04:52:06.538Z\"\n}"
+ },
+ "user.components": {
+  "status": 200,
+  "body": "[]"
+ },
+ "user.projects": {
+  "status": 200,
+  "body": "[]"
+ },
+ "user.toolpaths": {
+  "status": 200,
+  "body": "[]"
+ },
+ "user.organizations": {
+  "status": 200,
+  "body": "[]"
+ },
+ "user.apiKeys": {
+  "status": 200,
+  "body": "[]"
+ },
+ "user.tokens": {
+  "status": 200,
+  "body": "{\n  \"tokens\": [\n    {\n      \"id\": \"token-1\",\n      \"name\": \"Development Token\",\n      \"prefix\": \"cad_dev_abc123\",\n      \"permissions\": [\n        \"read:projects\",\n        \"write:drawings\",\n        \"read:toolpaths\"\n      ],\n      \"createdAt\": \"2026-10-08T04:52:23.364Z\",\n      \"lastUsed\": \"2026-10-15T03:52:23.364Z\",\n      \"isActive\": true\n    },\n    {\n      \"id\": \"token-2\",\n      \"name\": \"Mobile App Token\",\n      \"prefix\": \"cad_mobile_xyz789\",\n      \"permissions\": [\n        \"read:projects\",\n        \"write:toolpaths\"\n      ],\n      \"createdAt\": \"2026-10-01T04:52:23.364Z\",\n      \"lastUsed\": \"2026-10-15T01:52:23.364Z\",\n      \"expiresAt\": \"2026-11-14T04:52:23.364Z\",\n      \"isActive\": true\n    },\n    {\n      \"id\": \"token-3\",\n      \"name\": \"Analytics Integration\",\n      \"prefix\": \"cad_analytics_def456\",\n      \"permissions\": [\n        \"read:analytics\",\n        \"read:usage\"\n      ],\n      \"createdAt\": \"2026-09-24T04:52:23.364Z\",\n      \"expiresAt\": \"2026-10-14T04:52:23.364Z\",\n      \"isActive\": false\n    }\n  ]\n}"
+ },
+ "user.verifyChange": {
+  "status": 400,
+  "body": "{\n  \"_tag\": \"BadRequest\",\n  \"message\": \"Token and verification type are required\"\n}"
+ },
+ "ai.actions": {
+  "status": 200,
+  "body": "{\n  \"tools\": [\n    {\n      \"id\": \"cad\",\n      \"description\": \"Read the open drawing. All actions are read-only.\\n\\nActions\\n- describe: the drawing: counts, bounds and layers. Start here.\\n- check: model checks (sizes, rotations, Boolean operands, duplicates, floating parts); fix findings after modelling.\\n- relations: bounds, placement, distances and parameter dependencies; equal names do not bind parameters.\\n- grep: search ids, names, layers and properties; includes each parametric hit's revision.\\n- vision: the CAD viewport plus scene evidence as an image.\\n- inspect_elements: full properties and bounds of elements, paged.\\n- inspect_layers: the workspace layers and the active one.\\n- inspect_search: elements whose text matches a query, paged.\\n- inspect_property: one property of one element by path, paged by characters.\\n- parametric_validate: rebuild a parametric history and report what it cannot build.\\n- parametric_inspect: history, parameters and report of one parametric part.\\n- drawing: technical sheet from one elementId or history; options (sheet, projection, views, section, detail: see schema). SVG, dimensions, callouts, warnings; exact B-rep edges where available; nothing stored.\\n- parametric_test: run parameter variants; report bodies, volumes and dimensional checks.\\n- parametric_dfm: manufacturability findings for a history or an existing part.\\n- parametric_exact: exact B-rep per body (volume, area, centroid, throughHoles, faces, surfaces) or why mesh-only; STEP on request.\\n- exact: every solid on the exact kernel: validity, volume, bounds, holes, and whether CAM machines it by features or as a 3D surface, with why.\\n- assembly: exact interference (clash volumes), bill of materials with mass, hole joints, fasteners still missing.\\n- parametric_fastener: thread, tap drill, clearance and counterbore of a metric size.\\n- parametric_recipe: standard part history from `recipe` (mounting_plate, flange, l_bracket, stepped_shaft, pipe_bend, duct_transition, enclosure) and `params`; cad_edit.parametric_recipe_create stores it.\\n- parametric_from_element: history with named parameters from an existing solid, flat shape or component; cad_edit.parametric_convert stores it.\\n\\nParameters (mm, radians; ids are read, never invented)\\n- describe, check, inspect_layers: none.\\n- relations: firstId, secondId - two different existing ids.\\n- grep: query (1-200 chars), layerId, parametricOnly, includeParameters, offset, limit (1-50).\\n- vision: focus - wha\n\u2026"
+ },
+ "ai.bridgeTokens": {
+  "status": 200,
+  "body": "[]"
+ },
+ "ai.agents": {
+  "status": 200,
+  "body": "[\n  {\n    \"id\": \"general\",\n    \"title\": \"General\",\n    \"description\": \"Does drawing and machining itself, and delegates separable work to subagents (background tasks included).\",\n    \"tools\": [],\n    \"edits\": true\n  },\n  {\n    \"id\": \"cad\",\n    \"title\": \"CAD\",\n    \"description\": \"Drawing and 3D modelling. Reads the machining side but does not change operations, G-code or the machining libraries.\",\n    \"tools\": [],\n    \"edits\": true\n  },\n  {\n    \"id\": \"cam\",\n    \"title\": \"CAM\",\n    \"description\": \"Machining: operations, G-code, verification and the machining libraries. Reads the drawing but does not change it.\",\n    \"tools\": [],\n    \"edits\": true\n  }\n]"
+ },
+ "ai.skills": {
+  "status": 200,
+  "body": "{\n  \"skills\": [\n    {\n      \"name\": \"cad-3d-modeling\",\n      \"description\": \"Model 3D and 2D geometry in the open editor (45 element types): conventions, recipes for common parts, how to build complex objects.\",\n      \"builtIn\": true,\n      \"category\": \"cad\"\n    },\n    {\n      \"name\": \"cam-operation-workflow\",\n      \"description\": \"The loop from a drawing to verified G-code: describe, parameters, operation, generate, analyse, verify, fix.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"toolpath-verification\",\n      \"description\": \"How to read and report a cam_edit action verify result: every finding code, its cause and its fix, and what was not modelled.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"cutting-parameters\",\n      \"description\": \"Speeds, feeds, stepdown and stepover starting points by material, and the formulas behind them.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"drilling-and-holes\",\n      \"description\": \"Drilling operations: cycles, peck rules, through-hole depth, large holes.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"precision-and-tolerances\",\n      \"description\": \"Working to microns: nominal sizes, tolerance on round shapes, ISO 286 grades, finishing strategy and what the verification can and cannot show.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"industrial-standards\",\n      \"description\": \"Mechanical and industrial rules for professional parts: ISO 2768 general tolerances, ISO 286 fits, surface finish, ISO 273 / ISO 4762 fastener holes, tap drills, DIN 6885 keys, ISO 54 gears, preferred numbers, design rules per process (milling, turning, sheet metal, casting, printing) and material densities.\",\n      \"builtIn\": true,\n      \"category\": \"cad\"\n    },\n    {\n      \"name\": \"machines-and-axes\",\n      \"description\": \"Mill, lathe and 3D printer: what turns, the sense of every axis, zeros and work offsets, touch probes and tool setters, and how to check a program against its machine.\",\n      \"builtIn\": true,\n      \"category\": \"cam\"\n    },\n    {\n      \"name\": \"drawings-and-images\",\n      \"description\": \"From a DXF/SVG file, an image of a dimensioned drawing, a photo or a sketch to a 3D model: which tool, what to ask, how to check the result.\",\n      \"builtIn\": true,\n      \"category\": \"cad\"\n    },\n    {\n      \"name\": \"plugin-authoring\",\n      \"description\": \"Write an extension for the ap\n\u2026"
+ },
+ "ai.status": {
+  "status": 200,
+  "body": "{\n  \"providers\": {\n    \"anthropic\": \"missing\",\n    \"openai\": \"missing\",\n    \"minimax\": \"missing\",\n    \"gateway\": \"missing\"\n  },\n  \"configured\": false,\n  \"host\": \"direct\"\n}"
+ },
+ "ai.models": {
+  "status": 200,
+  "body": "[\n  {\n    \"id\": \"claude-haiku-4-5\",\n    \"provider\": \"anthropic\",\n    \"tier\": \"fast\",\n    \"contextWindow\": 200000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"claude-sonnet-5-5\",\n    \"provider\": \"anthropic\",\n    \"tier\": \"balanced\",\n    \"contextWindow\": 1000000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"claude-opus-5-5\",\n    \"provider\": \"anthropic\",\n    \"tier\": \"best\",\n    \"contextWindow\": 1000000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"gpt-5-mini\",\n    \"provider\": \"openai\",\n    \"tier\": \"fast\",\n    \"contextWindow\": 400000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"gpt-5\",\n    \"provider\": \"openai\",\n    \"tier\": \"balanced\",\n    \"contextWindow\": 400000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"MiniMax-M2\",\n    \"provider\": \"minimax\",\n    \"tier\": \"fast\",\n    \"contextWindow\": 200000,\n    \"tools\": true,\n    \"vision\": false,\n    \"configured\": false\n  },\n  {\n    \"id\": \"anthropic/claude-haiku-4-5\",\n    \"provider\": \"gateway\",\n    \"tier\": \"fast\",\n    \"contextWindow\": 200000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"anthropic/claude-sonnet-5-5\",\n    \"provider\": \"gateway\",\n    \"tier\": \"balanced\",\n    \"contextWindow\": 1000000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  },\n  {\n    \"id\": \"anthropic/claude-opus-5-5\",\n    \"provider\": \"gateway\",\n    \"tier\": \"best\",\n    \"contextWindow\": 1000000,\n    \"tools\": true,\n    \"vision\": true,\n    \"configured\": false\n  }\n]"
+ },
+ "ai.providers": {
+  "status": 200,
+  "body": "[\n  {\n    \"id\": \"anthropic\",\n    \"name\": \"anthropic\",\n    \"source\": \"config\",\n    \"auth\": [\n      \"api\"\n    ],\n    \"configured\": false,\n    \"models\": [\n      {\n        \"id\": \"claude-haiku-4-5\",\n        \"name\": \"claude-haiku-4-5\",\n        \"provider\": \"anthropic\",\n        \"contextWindow\": 200000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": true,\n        \"cost\": {\n          \"input\": 0,\n          \"output\": 0\n        }\n      },\n      {\n        \"id\": \"claude-sonnet-5-5\",\n        \"name\": \"claude-sonnet-5-5\",\n        \"provider\": \"anthropic\",\n        \"contextWindow\": 1000000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": true,\n        \"cost\": {\n          \"input\": 0,\n          \"output\": 0\n        }\n      },\n      {\n        \"id\": \"claude-opus-5-5\",\n        \"name\": \"claude-opus-5-5\",\n        \"provider\": \"anthropic\",\n        \"contextWindow\": 1000000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": true,\n        \"cost\": {\n          \"input\": 0,\n          \"output\": 0\n        }\n      }\n    ]\n  },\n  {\n    \"id\": \"openai\",\n    \"name\": \"openai\",\n    \"source\": \"config\",\n    \"auth\": [\n      \"api\"\n    ],\n    \"configured\": false,\n    \"models\": [\n      {\n        \"id\": \"gpt-5-mini\",\n        \"name\": \"gpt-5-mini\",\n        \"provider\": \"openai\",\n        \"contextWindow\": 400000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": true,\n        \"cost\": {\n          \"input\": 0,\n          \"output\": 0\n        }\n      },\n      {\n        \"id\": \"gpt-5\",\n        \"name\": \"gpt-5\",\n        \"provider\": \"openai\",\n        \"contextWindow\": 400000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": true,\n        \"cost\": {\n          \"input\": 0,\n          \"output\": 0\n        }\n      }\n    ]\n  },\n  {\n    \"id\": \"minimax\",\n    \"name\": \"minimax\",\n    \"source\": \"config\",\n    \"auth\": [\n      \"api\"\n    ],\n    \"configured\": false,\n    \"models\": [\n      {\n        \"id\": \"MiniMax-M2\",\n        \"name\": \"MiniMax-M2\",\n        \"provider\": \"minimax\",\n        \"contextWindow\": 200000,\n        \"maxOutput\": 16000,\n        \"reasoning\": false,\n        \"variants\": [],\n        \"tools\": true,\n        \"vision\": false,\n        \"cost\": {\n          \"input\": 0,\n          \"output\"\n\u2026"
+ },
+ "ai.prompts": {
+  "status": 200,
+  "body": "{\n  \"prompts\": [\n    \"How do I get started with CAD/CAM?\",\n    \"What's the difference between CAD and CAM?\",\n    \"Can you recommend resources for learning more?\"\n  ]\n}"
+ },
+ "mcp.listConfig": {
+  "status": 200,
+  "body": "{\n  \"success\": true,\n  \"source\": \"claude\",\n  \"servers\": [],\n  \"count\": 0\n}"
+ },
+ "billing.info": {
+  "status": 400,
+  "body": "{\n  \"_tag\": \"BillingBadRequest\",\n  \"error\": \"User ID is required\"\n}"
+ },
+ "billing.current": {
+  "status": 200,
+  "body": "{\n  \"plan\": \"FREE\",\n  \"status\": \"active\",\n  \"periodEnd\": null,\n  \"cancelAtPeriodEnd\": false\n}"
+ },
+ "billing.baGet": {
+  "status": 200,
+  "body": "{\n  \"id\": \"c942817d-0162-4291-84ff-77321d387acc\",\n  \"plan\": \"FREE\",\n  \"status\": \"active\",\n  \"currentPeriodEnd\": null,\n  \"cancelAtPeriodEnd\": false,\n  \"stripeCustomerId\": null,\n  \"stripeSubscriptionId\": null,\n  \"source\": \"better-auth\"\n}"
+ },
+ "billing.cronGet": {
+  "status": 200,
+  "body": "{\n  \"success\": true,\n  \"updatedCount\": 0,\n  \"message\": \"Successfully updated 0 expired trials\",\n  \"timestamp\": \"2026-10-15T04:52:23.475Z\"\n}"
+ },
+ "billing.stripeHealth": {
+  "status": 503,
+  "body": "{\n  \"_tag\": \"StripeUnhealthy\",\n  \"status\": \"unhealthy\",\n  \"message\": \"Stripe is not configured on this installation\",\n  \"timestamp\": \"2026-10-15T04:52:23.476Z\",\n  \"service\": \"stripe\"\n}"
+ },
+ "misc.desktopProjects": {
+  "status": 200,
+  "body": "{\n  \"success\": true,\n  \"data\": [],\n  \"message\": \"Retrieved 0 projects\"\n}"
+ },
+ "misc.desktopUserByEmail": {
+  "status": 400,
+  "body": "{\n  \"_tag\": \"DesktopBadRequest\",\n  \"success\": false,\n  \"error\": \"Email parameter is required\"\n}"
+ },
+ "kv.list": {
+  "status": 200,
+  "body": "{\n  \"entries\": []\n}"
+ },
+ "production-costs.listEstimates": {
+  "status": 200,
+  "body": "[]"
+ },
+ "production-costs.listMaterialCosts": {
+  "status": 200,
+  "body": "[]"
+ },
+ "production-costs.listOperationCosts": {
+  "status": 200,
+  "body": "[]"
+ },
+ "production-costs.listToolWear": {
+  "status": 200,
+  "body": "[]"
+ },
+ "plugins.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "plugins.registry": {
+  "status": 200,
+  "body": "[]"
+ },
+ "organizations.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "notifications.list": {
+  "status": 200,
+  "body": "{\n  \"notifications\": [],\n  \"unreadCount\": 0\n}"
+ },
+ "projects.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "materials.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "materialsStorage.export": {
+  "status": 404,
+  "body": "{\n  \"_tag\": \"EnvNotFound\",\n  \"success\": false,\n  \"message\": \"No accessible materials found\",\n  \"errors\": null\n}"
+ },
+ "tools.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "toolsStorage.export": {
+  "status": 404,
+  "body": "{\n  \"_tag\": \"EnvNotFound\",\n  \"success\": false,\n  \"message\": \"No accessible tools found\",\n  \"errors\": null\n}"
+ },
+ "machineConfigs.list": {
+  "status": 200,
+  "body": "{\n  \"success\": true,\n  \"data\": {\n    \"data\": [],\n    \"pagination\": {\n      \"page\": 1,\n      \"limit\": 20,\n      \"total\": 0,\n      \"totalPages\": 0\n    }\n  }\n}"
+ },
+ "machineConfigsStorage.export": {
+  "status": 404,
+  "body": "{\n  \"_tag\": \"EnvNotFound\",\n  \"success\": false,\n  \"message\": \"No accessible machine configurations found\",\n  \"errors\": null\n}"
+ },
+ "toolpaths.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "library.list": {
+  "status": 200,
+  "body": "[]"
+ },
+ "library.components": {
+  "status": 200,
+  "body": "{\n  \"data\": []\n}"
+ },
+ "library.materials": {
+  "status": 200,
+  "body": "{\n  \"data\": []\n}"
+ },
+ "library.tools": {
+  "status": 200,
+  "body": "{\n  \"data\": []\n}"
+ },
+ "companion.status": {
+  "status": 200,
+  "body": "{\n  \"enabled\": false,\n  \"port\": null,\n  \"fingerprint\": null,\n  \"host\": \"172.30.0.2\",\n  \"devices\": []\n}"
+ }
+}

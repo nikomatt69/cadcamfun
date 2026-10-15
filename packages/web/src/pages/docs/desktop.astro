@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -23,6 +24,7 @@ const toc = [
   { title: "Native event payloads", href: "#event-payloads" },
   { title: "Keyboard shortcuts", href: "#shortcut-table" },
   { title: "Every screen route", href: "#route-table" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -206,7 +208,7 @@ bun run build:desktop`}
     </table>
     <code>install_update</code> can be refused with a typed reason: <code>unsavedWork</code> ("the editor has unsaved work; apply the update once it is saved"), <code>noneAvailable</code> (nothing pending, or already installed), or <code>failed</code> (download or signature check failed). It installs only the update that the last check announced.
     <DocCode language="ts" title="Calling native commands from the webview">
-{"import { invoke } from \"@tauri-apps/api/core\"\nimport { listen } from \"@tauri-apps/api/event\"\n\nconst { baseUrl, token } = await invoke<{ baseUrl: string; token: string }>(\"get_sidecar_endpoint\")\n\nconst path = await invoke<string | null>(\"pick_file\", {\n  filters: [{ name: \"G-code\", extensions: [\"nc\", \"gcode\"] }],\n})                                    // null when the user cancels\n\nawait invoke(\"save_file\", { defaultName: \"part.nc\", contents: gcodeText })\n\nconst unlisten = await listen<{ state: string; port?: number }>(\"sidecar-status\", (e) => {\n  if (e.payload.state === \"ready\") reconnect()\n})\n// later: unlisten()\n\ntry {\n  await invoke(\"install_update\", { unsavedWork: editorIsDirty })\n} catch (error) {\n  // { kind, message }: the update variant carries the refusal (unsavedWork | noneAvailable | failed)\n}"}
+{"import { invoke } from \u0022@tauri-apps/api/core\u0022\nimport { listen } from \u0022@tauri-apps/api/event\u0022\n\nconst { baseUrl, token } = await invoke<{ baseUrl: string; token: string }>(\u0022get_sidecar_endpoint\u0022)\n\nconst path = await invoke<string | null>(\u0022pick_file\u0022, {\n  filters: [{ name: \u0022G-code\u0022, extensions: [\u0022nc\u0022, \u0022gcode\u0022] }],\n})                                    // null when the user cancels\n\nawait invoke(\u0022save_file\u0022, { defaultName: \u0022part.nc\u0022, contents: gcodeText })\n\nconst unlisten = await listen<{ state: string; port?: number }>(\u0022sidecar-status\u0022, (e) => {\n  if (e.payload.state === \u0022ready\u0022) reconnect()\n})\n// later: unlisten()\n\ntry {\n  await invoke(\u0022install_update\u0022, { unsavedWork: editorIsDirty })\n} catch (error) {\n  // { kind, message }: the update variant carries the refusal (unsavedWork | noneAvailable | failed)\n}"}
     </DocCode>
     <p><code>get_sidecar_endpoint</code> returns <code>&#123; baseUrl, token &#125;</code> (serialized in camelCase from <code>SidecarEndpoint</code>). Errors from every command arrive as the rejected value of <code>invoke</code>, shaped <code>&#123; kind, message &#125;</code>.</p>
   </section>
@@ -269,6 +271,10 @@ bun run build:desktop`}
     <code>*</code> renders the 404 page and <code>/500</code> the error page. <code>/offline</code> renders the offline screen; like the auth, invitation, 404, 500 and purchase-success pages it uses the standalone layout without the app chrome. Because every page is a lazy import, a screen's code is only loaded on first visit; a failed chunk load surfaces as a route error, not a blank app.
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Desktop process topology" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },
       { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" },

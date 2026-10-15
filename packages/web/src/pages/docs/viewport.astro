@@ -197,7 +197,7 @@ export function ProgramPreview(props: { program: cam.Program }) {
         </tbody>
     </table>
     <DocCode language="ts" title="Converting and parsing lengths (apps/desktop/src/viewport/units.ts)">
-{"import { formatLength, parseLength, formatAngle, programUnitsOf } from \"./units\"\n\nformatLength(25.4, \"inch\")     // \"1.0000 inch\"\nformatLength(12.5)             // \"12.500 mm\"\nformatLength(0.0254, \"thou\")   // \"1.00 thou\"\nparseLength(\"2 in\", \"inch\")    // 50.8  (a trailing unit word is ignored)\nparseLength(\"abc\")             // undefined\nformatAngle(Math.PI / 2)       // \"90.0\u00b0\"\nprogramUnitsOf(\"thou\")         // \"inch\u0022"}
+{"import { formatLength, parseLength, formatAngle, programUnitsOf } from \u0022./units\u0022\n\nformatLength(25.4, \u0022inch\u0022)     // \u00221.0000 inch\u0022\nformatLength(12.5)             // \u002212.500 mm\u0022\nformatLength(0.0254, \u0022thou\u0022)   // \u00221.00 thou\u0022\nparseLength(\u00222 in\u0022, \u0022inch\u0022)    // 50.8  (a trailing unit word is ignored)\nparseLength(\u0022abc\u0022)             // undefined\nformatAngle(Math.PI / 2)       // \u002290.0\u00b0\u0022\nprogramUnitsOf(\u0022thou\u0022)         // \u0022inch\u0022"}
     </DocCode>
     <code>parseLength</code> strips a trailing alphabetic suffix (including <code>µ</code> and <code>°</code>) and interprets the number in the current display unit. The suffix is not used to pick a unit, so typing <code>2 mm</code> while the display is in inches yields 50.8 mm. Empty, non-numeric, and infinite input returns <code>undefined</code>, and editors should keep the previous value in that case.
   </section>

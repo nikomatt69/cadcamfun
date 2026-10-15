@@ -1,122 +1,90 @@
 ---
 export const prerender = true
+import "../../../styles/api.css"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
 import DocRelated from "../../../components/docs/DocRelated.astro"
-import ApiSchema from "../../../components/docs/ApiSchema.astro"
+import ApiOperation from "../../../components/docs/ApiOperation.astro"
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
+import ApiPlayground from "../../../components/docs/ApiPlayground.astro"
 import { apiGroups } from "../../../data/apiGroups"
-import { operationsFor, referencedSchemas, apiDocument, schemaAnchor, schemaType, schemaRules, requestExample } from "../../../lib/apiReference"
+import { operationsFor, referencedSchemas, apiDocument, schemaAnchor, schemaHtml, opAnchor, apiCategories } from "../../../lib/apiReference"
 export function getStaticPaths() {
   return apiGroups.map((group) => ({ params: { group: group.slug }, props: { group } }))
 }
 const { group } = Astro.props
 const entries = operationsFor(group)
 const schemas = referencedSchemas(entries)
+const category = apiCategories.find((c) => c.slugs.includes(group.slug))?.title ?? "API"
+// Operations grouped by the first path segment after /api, like the resource sections of the server.
+const sectionOf = (path: string) => path.replace(/^\/api\//, "/").split("/").filter(Boolean).slice(0, 2).filter((s) => !s.startsWith("{")).join("/") || path
+const sections = [...new Map(entries.map((e) => [sectionOf(e.path), entries.filter((x) => sectionOf(x.path) === sectionOf(e.path))])).entries()]
+const sectionId = (name: string) => `section-${name.replace(/[^a-zA-Z0-9]+/g, "-")}`
+const isProtected = entries.some((e) => (e.operation.security?.length ?? 0) > 0)
+const methodColor: Record<string, string> = { GET: "#2fbf71", POST: "#e0a030", PUT: "#8aa4c8", PATCH: "#a48ac8", DELETE: "#e05050" }
+const opSolids = sections.flatMap(([, list], si) => list.map((entry, k) => ({ kind: "box" as const, size: [8, 8, 2.4] as [number, number, number], at: [si * 14, 0, k * 3] as [number, number, number], color: methodColor[entry.method] ?? "#7a8aa0" })))
+const opLabels = sections.map(([name, list], si) => ({ text: `/${name} (${list.length})`, at: [si * 14 + 4, -3, list.length * 3 + 2] as [number, number, number], size: 2.6 }))
 const toc = [
-  { title: "Resource contract", href: "#overview" },
+  { title: "Playground", href: "#playground" },
   { title: "Operations", href: "#operations" },
-  ...entries.map((entry) => ({ title: entry.operation.operationId, href: `#${entry.anchor}`, depth: 3 })),
-  ...(schemas.length ? [{ title: "Referenced schemas", href: "#schemas" }] : []),
-  { title: "How to read this page", href: "#reading" },
-  { title: "Calling this group from TypeScript", href: "#group-clients" },
-  { title: "Troubleshooting requests", href: "#group-troubleshooting" },
+  ...sections.map(([name]) => ({ title: `/${name}`, href: `#${sectionId(name)}`, depth: 3 })),
+  ...(schemas.length ? [{ title: "Schemas", href: "#schemas" }] : []),
+  { title: "Calling this group", href: "#group-clients" },
+  { title: "Troubleshooting", href: "#group-troubleshooting" },
 ]
 ---
-<DocsLayout title={`${group.title} API`} subtitle={group.summary} description={`CADCAMFUN ${group.title.toLowerCase()} API: methods, paths, authentication, request fields, responses, errors, and schemas.`} toc={toc}>
-  <section id="overview" class="doc-section">
-    <h2>Resource contract</h2>
-    <p>{entries.length} operations in the <code>{group.tag}</code> HttpApi group. Methods, paths, parameters, payload schemas, response status codes, and media types below come directly from the application's composed contract.</p>
-    <p>Use the sidecar URL announced at startup as <code>CADCAMFUN_URL</code>. Protected operations take the application launch token in the <code>Authorization</code> header. Companion tokens and AI bridge tokens have narrower access; their presence does not grant access to this entire resource.</p>
-    <p><a href={group.guide}>Read the related subsystem guide</a> for behavior and operational limits. <a href="/docs/api#authorization">API authentication</a> explains the account-session distinction. <a href="/docs/api/openapi.json">Download the complete OpenAPI document</a> for nested schemas and client generation.</p>
-    <p>Request examples are templates: replace path and query placeholders, set the actual connection variables, and create a payload file matching the indicated media type and schema before submitting a write. Optional fields may still be required by a business rule; the contract describes transport validation.</p>
-  </section>
+<DocsLayout title={group.title} subtitle={group.summary} description={`CADCAMFUN ${group.title} API (${category}): ${entries.length} operations with parameters, typed request and response schemas, SDK and curl examples.`} toc={toc}>
+  <div id="playground"><ApiPlayground /></div>
+
   <section id="operations" class="doc-section">
     <h2>Operations</h2>
-    <div class="overflow-x-auto"><table>
-      <thead><tr><th>Method</th><th>Path</th><th>Operation ID</th></tr></thead>
-      <tbody>{entries.map((entry) => <tr><td><strong>{entry.method}</strong></td><td><a href={`#${entry.anchor}`}><code>{entry.path}</code></a></td><td><code>{entry.operation.operationId}</code></td></tr>)}</tbody>
-    </table></div>
-  </section>
-  {entries.map((entry) => <section id={entry.anchor} class="doc-section">
-    <h2><code>{entry.operation.operationId}</code></h2>
-    <p><strong>{entry.method}</strong> <code>{entry.path}</code></p>
-    {entry.operation.summary && <p>{entry.operation.summary}</p>}
-    {entry.operation.description && <p>{entry.operation.description}</p>}
-    <p><strong>Authentication:</strong> {entry.operation.security?.length ? "Bearer token required." : "No bearer middleware is declared for this operation."} {entry.operation.deprecated && "This operation is marked deprecated."}</p>
-    <h3>Parameters</h3>
-    {(entry.operation.parameters?.length ?? 0) > 0 ? <div class="overflow-x-auto"><table>
-      <thead><tr><th>Name</th><th>Location</th><th>Presence</th><th>Type and constraints</th></tr></thead>
-      <tbody>{entry.operation.parameters!.map((parameter) => <tr>
-        <td><code>{parameter.name}</code></td><td>{parameter.in}</td><td>{parameter.required ? "Required" : "Optional"}</td>
-        <td><code>{schemaType(parameter.schema)}</code>{parameter.description && <p>{parameter.description}</p>}{schemaRules(parameter.schema) && <p>{schemaRules(parameter.schema)}</p>}</td>
+    <p>{entries.length} endpoint{entries.length === 1 ? "" : "s"} in the <code>{group.tag}</code> group, generated from the sidecar's own <a href="/docs/api/openapi.json">OpenAPI document</a>. {isProtected ? <>Protected operations take <code>Authorization: Bearer $CADCAMFUN_TOKEN</code>; see <a href="/docs/api#auth">authentication</a>.</> : <>Every operation here is public.</>} Behaviour and limits are in <a href={group.guide}>the subsystem guide</a>.</p>
+    <table class="api-index not-prose">
+      <tbody>{entries.map((entry) => <tr>
+        <td class="api-index-method"><span class={`api-method api-method-${entry.method.toLowerCase()}`}>{entry.method.toLowerCase()}</span></td>
+        <td><a href={`#${opAnchor(entry)}`}>{entry.path}</a></td>
+        <td class="api-index-id">{entry.operation.operationId}</td>
       </tr>)}</tbody>
-    </table></div> : <p>No path, query, or endpoint-specific header parameters are declared.</p>}
-    <h3>Request body</h3>
-    {entry.operation.requestBody ? <>
-      <p>{entry.operation.requestBody.required ? "Required" : "Optional"} request body. Use one of the declared encodings.</p>
-      {Object.entries(entry.operation.requestBody.content).map(([media, value]) => <>
-        <h4><code>{media}</code></h4>
-        {value.schema !== undefined ? <ApiSchema schema={value.schema} title="Request schema" /> : <p>No body schema is declared for this encoding.</p>}
-      </>)}
-    </> : <p>No request body is declared.</p>}
-    <h3>Responses</h3>
-    {Object.entries(entry.operation.responses).map(([status, response]) => <>
-      <h4><code>{status}</code> — {response.description ?? "Response"}</h4>
-      {response.headers && <p>Response headers: {Object.keys(response.headers).map((header) => <code>{header} </code>)}</p>}
-      {Object.keys(response.content ?? {}).length ? Object.entries(response.content!).map(([media, value]) => <>
-        <p><strong>Content type:</strong> <code>{media}</code></p>
-        {value.schema !== undefined ? <ApiSchema schema={value.schema} title={`Response ${status} schema`} /> : <p>This media type has no declared JSON schema.</p>}
-      </>) : <p>No response body schema is declared.</p>}
-    </>)}
-    <h3>Request template</h3>
-    {entry.operation.requestBody?.content["multipart/form-data"] ? <p>This operation uses multipart form data. Build form parts according to its schema using the client upload API or <code>curl --form</code>; do not set a multipart boundary manually.</p> : <DocCode language="bash" title="Connection and payload placeholders">{requestExample(entry)}</DocCode>}
-  </section>)}
-  {schemas.length > 0 && <section id="schemas" class="doc-section">
-    <h2>Referenced schemas</h2>
-    <p>These named schemas are reachable from this resource's parameters, payloads, and responses. Optional presence and nullable values are different: a required field can explicitly accept <code>null</code>.</p>
-    {schemas.map((name) => <section id={schemaAnchor(name)}>
-      <h3><code>{name}</code></h3>
-      <ApiSchema schema={apiDocument.components.schemas[name]!} title={name} />
-    </section>)}
-  </section>}
-    <section id="reading" class="doc-section">
-    <h2>How to read this page</h2>
-    <p>Each operation section below has the same parts: method and path, authentication, a parameter table, request body schema per media type, one block per declared response status, and a request template. The schema viewer shows required fields, optional fields, nullable values and constraints such as minimum length or enumerations.</p>
-    <table>
-      <thead><tr><th>You see</th><th>It means</th></tr></thead>
-      <tbody>
-        <tr><td>Required</td><td>The field or parameter must be present. It may still accept <code>null</code> if its type says so.</td></tr>
-        <tr><td>Optional</td><td>May be omitted. The handler can still reject the request for business reasons.</td></tr>
-        <tr><td><code>_tag</code> in an error schema</td><td>The discriminator of the tagged error. Switch on it in clients.</td></tr>
-        <tr><td>Several 4xx schemas for one status</td><td>The status is shared by different failure families; decode by <code>_tag</code>.</td></tr>
-        <tr><td>No response body schema</td><td>An empty body, such as 204, or a body that is not JSON.</td></tr>
-        </tbody>
     </table>
+    <DocViewer3D title={`${group.title} operations in 3D`} caption={`One block per operation (${entries.length}), stacked per resource section of this page and coloured by method: green GET, orange POST, blue PUT, violet PATCH, red DELETE. Generated from the OpenAPI document at build time.`} solids={opSolids} labels={opLabels} height={340} />
   </section>
 
+  {sections.map(([name, list]) => <section id={sectionId(name)} class="doc-section">
+    <h2>{`/api/${name}`}</h2>
+    {list.map((entry) => <ApiOperation entry={entry} />)}
+  </section>)}
+
+  {schemas.length > 0 && <section id="schemas" class="doc-section">
+    <h2>Schemas</h2>
+    <p>Named schemas reachable from this group's parameters, bodies and responses. A <code>?</code> marks an optional field; <code>| null</code> marks a field that may be present with a null value.</p>
+    {schemas.map((name) => <div id={schemaAnchor(name)} class="api-schema-entry not-prose">
+      <div class="api-schema-name"><code>{name}</code></div>
+      <pre class="api-schema" set:html={schemaHtml(apiDocument.components.schemas[name]!, 0, new Set([name]), false)} />
+    </div>)}
+  </section>}
+
   <section id="group-clients" class="doc-section">
-    <h2>Calling this group from TypeScript</h2>
-    <p>In the generated Promise SDK, operations of this group live under the client namespace named after the group, and in the Effect client under <code>api.{group.tag}</code>. Operation IDs on this page have the form <code>{group.tag}.&lt;name&gt;</code>; the part after the dot is the method name in both clients.</p>
-    <DocCode language="ts" title="Promise SDK">
-{"import { CadCam, ClientError } from \"@cadcamfun/api/sdk\"\n\nconst client = CadCam.make({\n  baseUrl: process.env.CADCAMFUN_URL!,\n  headers: { authorization: `Bearer ${process.env.CADCAMFUN_TOKEN}` },\n})\n\ntry {\n  // e.g. client.projects.list(), client.projects.get({ id })\n} catch (error) {\n  if (error instanceof ClientError) {\n    // Transport | UnexpectedStatus | UnsupportedContentType | MalformedResponse | SseEventTooLarge\n  } else {\n    // a declared error body: switch on error._tag\n  }\n}"}
+    <h2>Calling this group</h2>
+    <p>Operation ids have the form <code>{group.tag}.&lt;name&gt;</code>. The generated Promise SDK (<code>@cadcamfun/api/sdk</code>) exposes most of them as <code>client.&lt;namespace&gt;.&lt;method&gt;(input)</code>, where <code>input</code> is one flat object of path parameters and body fields; each card's SDK example shows the exact accessor and input type. Multipart uploads, binary or JavaScript responses and raw webhooks are not generated; those cards show <code>fetch</code> instead.</p>
+    <DocCode language="ts" title="Errors from the Promise SDK">
+{"import { CadCam, ClientError } from \u0022@cadcamfun/api/sdk\u0022\n\nconst client = CadCam.make({\n  baseUrl: process.env.CADCAMFUN_URL!,\n  headers: { authorization: `Bearer ${process.env.CADCAMFUN_TOKEN}` },\n})\n\ntry {\n  await client.projects.list()\n} catch (error) {\n  if (error instanceof ClientError) {\n    // Transport | UnexpectedStatus | UnsupportedContentType | MalformedResponse | SseEventTooLarge\n  } else {\n    // a declared error body: switch on error._tag\n  }\n}"}
     </DocCode>
-    <p>A declared failure is thrown as the decoded JSON body itself, not wrapped. Anything outside the declared statuses becomes <code>ClientError("UnexpectedStatus")</code>. Network failures and aborts become <code>ClientError("Transport")</code> with the cause folded into the message.</p>
-    <p>A few operations with multipart uploads, binary or JavaScript responses, raw webhooks, or colliding input names are not generated. Use the full Effect <code>ApiClient</code> or <code>fetch</code> for those.</p>
   </section>
 
   <section id="group-troubleshooting" class="doc-section">
-    <h2>Troubleshooting requests</h2>
+    <h2>Troubleshooting</h2>
     <table>
       <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
       <tbody>
-        <tr><td>401 on every call</td><td>Token from a previous launch, or missing <code>Bearer</code> prefix</td><td>Read the current token from the desktop connection; send <code>Authorization: Bearer &lt;token&gt;</code>.</td></tr>
-        <tr><td>400 before anything happens</td><td>Body or parameter does not match the schema</td><td>Compare the payload with the request schema above; check types, enumerations and required fields.</td></tr>
-        <tr><td>403 or 404 on a record you can see elsewhere</td><td>The acting account differs (session header absent or expired)</td><td>Send the right <code>x-session-token</code>, or use the local profile that owns the record.</td></tr>
-        <tr><td>409</td><td>A conflicting state, such as a duplicate name or stale branch head</td><td>Re-read the resource and retry with current data.</td></tr>
-        <tr><td>Connection refused</td><td>The sidecar restarted on a new port</td><td>Resolve the URL again; ports are not stable between launches.</td></tr>
-        </tbody>
+        <tr><td>401 on every call</td><td>Token from a previous launch, or missing <code>Bearer</code> prefix</td><td>Send <code>Authorization: Bearer &lt;token&gt;</code> with the token the sidecar was started with.</td></tr>
+        <tr><td>400 before anything happens</td><td>Body or parameter does not match the schema</td><td>Compare the payload with the request schema on the card.</td></tr>
+        <tr><td>403 or 404 on a record you can see elsewhere</td><td>The acting account differs</td><td>Send the right <code>x-session-token</code>, or use the local profile that owns the record.</td></tr>
+        <tr><td>409</td><td>Conflicting state, such as a duplicate name or a stale branch head</td><td>Re-read the resource and retry with current data.</td></tr>
+        <tr><td>Try it says "blocked by CORS"</td><td>The docs are served from a non-loopback origin</td><td>Run the docs locally or copy the request as curl.</td></tr>
+        <tr><td>Connection refused</td><td>The sidecar restarted on a new port</td><td>Read the port from the new <code>ready</code> line.</td></tr>
+      </tbody>
     </table>
   </section>
 
-  <DocRelated items={[{ title: "API overview", href: "/docs/api" }, { title: "Subsystem guide", href: group.guide }, { title: "Local development", href: "/docs/guides/local-dev" }]} />
+  <DocRelated items={[{ title: "API overview", href: "/docs/api" }, { title: "Subsystem guide", href: group.guide }, { title: "API walkthrough", href: "/docs/guides/api-tour" }]} />
 </DocsLayout>

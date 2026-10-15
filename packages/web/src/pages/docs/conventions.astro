@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -15,6 +16,7 @@ const toc = [
   { title: "Verification", href: "#verify" },
   { title: "Effect patterns used throughout", href: "#effect-patterns" },
   { title: "Naming and layout rules", href: "#naming" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -86,7 +88,7 @@ bun run --filter @cadcamfun/web build`}</DocCode>
   <section id="effect-patterns" class="doc-section">
     <h2>Effect patterns used throughout</h2>
     <DocCode language="ts" title="Service, tagged error and layer">
-{"import { Context, Data, Effect, Layer } from \"effect\"\nimport { AppConfigService } from \"../config.ts\"\n\nexport class StorageError extends Data.TaggedError(\"StorageError\")<{\n  readonly operation: string\n  readonly cause: unknown\n}> {}\n\nexport class Storage extends Context.Service<Storage, {\n  readonly read: (key: string) => Effect.Effect<Uint8Array, StorageError>\n}>()(\"cadcamfun/Storage\") {\n  static readonly layer = Layer.effect(Storage, Effect.gen(function* () {\n    const config = yield* AppConfigService       // dependencies come from the context\n    return Storage.of({\n      read: (key) => Effect.tryPromise({\n        try: () => Bun.file(`${config.dataDir}/storage/${key}`).bytes(),\n        catch: (cause) => new StorageError({ operation: \"read\", cause }),\n      }),\n    })\n  }))\n}"}
+{"import { Context, Data, Effect, Layer } from \u0022effect\u0022\nimport { AppConfigService } from \u0022../config.ts\u0022\n\nexport class StorageError extends Data.TaggedError(\u0022StorageError\u0022)<{\n  readonly operation: string\n  readonly cause: unknown\n}> {}\n\nexport class Storage extends Context.Service<Storage, {\n  readonly read: (key: string) => Effect.Effect<Uint8Array, StorageError>\n}>()(\u0022cadcamfun/Storage\u0022) {\n  static readonly layer = Layer.effect(Storage, Effect.gen(function* () {\n    const config = yield* AppConfigService       // dependencies come from the context\n    return Storage.of({\n      read: (key) => Effect.tryPromise({\n        try: () => Bun.file(`${config.dataDir}/storage/${key}`).bytes(),\n        catch: (cause) => new StorageError({ operation: \u0022read\u0022, cause }),\n      }),\n    })\n  }))\n}"}
     </DocCode>
     <ul>
       <li>Service keys are namespaced: <code>"cadcamfun/Database"</code>, <code>"cadcamfun/AppConfig"</code>, <code>"cadcamfun/ApiClient"</code>.</li>
@@ -112,4 +114,8 @@ bun run --filter @cadcamfun/web build`}</DocCode>
     </table>
   </section>
 
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Package boundaries the conventions apply to" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
   </DocsLayout>

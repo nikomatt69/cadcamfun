@@ -1,0 +1,158 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
+
+const toc = [
+  { title: "What the solver does", href: "#purpose" },
+  { title: "Data model", href: "#model" },
+  { title: "Constraint catalogue", href: "#constraints" },
+  { title: "Solving: Levenberg\u2013Marquardt", href: "#algorithm" },
+  { title: "Status and diagnosis", href: "#status" },
+  { title: "API", href: "#api" },
+  { title: "From sketch to profiles", href: "#profiles" },
+  { title: "Troubleshooting", href: "#troubleshooting" },
+]
+---
+
+<DocsLayout
+  title="Sketch solver"
+  subtitle="Constrained 2D sketches solved by Levenberg\u2013Marquardt, with degrees of freedom, free points and named conflicts."
+  description="How the CADCAMFUN sketch solver works: entities, 24 constraint kinds, Levenberg\u2013Marquardt with a numeric Jacobian, rank analysis, statuses, profiles, and real solver output."
+  toc={toc}
+>
+  <section id="purpose" class="doc-section">
+    <h2>What the solver does</h2>
+    <p>The sketch solver turns a set of points, lines, circles and arcs plus geometric and dimensional constraints into concrete coordinates. It lives in <code>packages/core/src/cad/sketch.ts</code> (522 lines) and is exported from <code>@cadcamfun/core</code> as <code>solveSketch</code>, <code>sketchProfiles</code> and <code>polygonArea</code>. The parametric history resolves its expressions to numbers first, then calls the solver; the solved profiles feed extrudes, revolves and pockets.</p>
+    <table>
+      <thead><tr><th>Input</th><th>Output</th></tr></thead>
+      <tbody>
+        <tr><td>entities: points, lines, circles, arcs</td><td>the same entities with solved coordinates and radii</td></tr>
+        <tr><td>constraints: 24 kinds, optionally named</td><td>status, degrees of freedom, free points, redundant equations, conflicts</td></tr>
+        <tr><td>options: maxIterations (200), tolerance (1e-9)</td><td>iterations used and the largest residual left</td></tr>
+        </tbody>
+    </table>
+    <DocViewer3D title="Solved sketch extruded" caption="The fully constrained 40 × 25 rectangle with a Ø10 hole at (20, 12.5), exactly as sketchProfiles returned it (the circle is a 50-point loop at the default 0.01 mm tolerance), extruded 6 mm." solids={[{"kind":"extrude","profile":[[0,0],[40,0],[40,25],[0,25]],"holes":[[[24.961,11.873],[24.843,11.257],[24.649,10.659],[24.382,10.091],[24.045,9.561],[23.645,9.077],[23.187,8.647],[22.679,8.278],[22.129,7.976],[21.545,7.745],[20.937,7.589],[20.314,7.51],[19.686,7.51],[19.063,7.589],[18.455,7.745],[17.871,7.976],[17.321,8.278],[16.813,8.647],[16.355,9.077],[15.955,9.561],[15.618,10.091],[15.351,10.659],[15.157,11.257],[15.039,11.873],[15,12.5],[15.039,13.127],[15.157,13.743],[15.351,14.341],[15.618,14.909],[15.955,15.439],[16.355,15.923],[16.813,16.353],[17.321,16.722],[17.871,17.024],[18.455,17.255],[19.063,17.411],[19.686,17.49],[20.314,17.49],[20.937,17.411],[21.545,17.255],[22.129,17.024],[22.679,16.722],[23.187,16.353],[23.645,15.923],[24.045,15.439],[24.382,14.909],[24.649,14.341],[24.843,13.743],[24.961,13.127],[25,12.5]]],"height":6,"color":"#8aa4c8"}]} labels={[{"text":"a (fixed)","at":[0,0,8],"size":3},{"text":"b","at":[40,0,8],"size":3},{"text":"c","at":[40,25,8],"size":3},{"text":"d","at":[0,25,8],"size":3}]} />
+  </section>
+
+  <section id="model" class="doc-section">
+    <h2>Data model</h2>
+    <p>Points are the unknowns. Every line, circle and arc refers to points by id, so two lines that share an end share the point and move together. A circle adds one more unknown, its radius. An arc is a centre and two points on the circle, counter-clockwise from <code>start</code> to <code>end</code>; its radius is |start − centre| and the solver adds its own equation keeping <code>end</code> on the same circle.</p>
+    <DocCode language="ts" title="Entity and sketch types (sketch.ts)">
+{"export interface SketchPoint  { id: string; kind: \u0022point\u0022;  x: number; y: number }\nexport interface SketchLine   { id: string; kind: \u0022line\u0022;   p1: PointId; p2: PointId }\nexport interface SketchCircle { id: string; kind: \u0022circle\u0022; center: PointId; radius: number }\n/** Counter-clockwise from `start` to `end` about `center`. */\nexport interface SketchArc    { id: string; kind: \u0022arc\u0022;    center: PointId; start: PointId; end: PointId }\n\nexport interface Sketch {\n  readonly entities: ReadonlyArray<SketchEntity>\n  readonly constraints: ReadonlyArray<Constraint>\n}"}
+    </DocCode>
+    <p>The unknown vector is laid out as every point&apos;s <code>x</code>, <code>y</code> in entity order, then every circle&apos;s <code>r</code>. A rectangle of four points has 8 unknowns; add a circle with its own centre and it has 11.</p>
+  </section>
+
+  <section id="constraints" class="doc-section">
+    <h2>Constraint catalogue</h2>
+    <p>Each constraint contributes residual equations that are zero when it holds. A constraint can carry an <code>id</code>; without one it is named <code>type#index</code> (for example <code>vertical#2</code>) in conflict reports.</p>
+    <table>
+      <thead><tr><th>Type</th><th>Fields</th><th>Meaning</th><th>Equations</th></tr></thead>
+      <tbody>
+        <tr><td><code>fixed</code></td><td>point, x?, y?</td><td>pins a point (either coordinate optional)</td><td>1–2</td></tr>
+        <tr><td><code>coincident</code></td><td>a, b</td><td>two points are one</td><td>2</td></tr>
+        <tr><td><code>horizontal / vertical</code></td><td>line</td><td>a line is level or plumb</td><td>1</td></tr>
+        <tr><td><code>horizontalPoints / verticalPoints</code></td><td>a, b</td><td>two points share y / x</td><td>1</td></tr>
+        <tr><td><code>distance</code></td><td>a, b, value</td><td>point-to-point distance</td><td>1</td></tr>
+        <tr><td><code>distanceX / distanceY</code></td><td>a, b, value</td><td>signed offset along one axis</td><td>1</td></tr>
+        <tr><td><code>length</code></td><td>line, value</td><td>line length</td><td>1</td></tr>
+        <tr><td><code>parallel / perpendicular</code></td><td>a, b</td><td>between two lines</td><td>1</td></tr>
+        <tr><td><code>equalLength</code></td><td>a, b</td><td>two lines</td><td>1</td></tr>
+        <tr><td><code>equalRadius</code></td><td>a, b</td><td>two circles or arcs</td><td>1</td></tr>
+        <tr><td><code>radius / diameter</code></td><td>circle, value</td><td>size of a circle or arc</td><td>1</td></tr>
+        <tr><td><code>angle</code></td><td>a, b, value</td><td>from line a to line b, counter-clockwise, radians</td><td>1</td></tr>
+        <tr><td><code>pointOnLine / pointOnCircle</code></td><td>point, line | circle</td><td>incidence</td><td>1</td></tr>
+        <tr><td><code>midpoint</code></td><td>point, line</td><td>point at the middle of a line</td><td>2</td></tr>
+        <tr><td><code>symmetric</code></td><td>a, b, line</td><td>mirror pair about a line</td><td>2</td></tr>
+        <tr><td><code>tangentLineCircle</code></td><td>line, circle</td><td>line touches circle</td><td>1</td></tr>
+        <tr><td><code>tangentCircles</code></td><td>a, b, internal?</td><td>external r1 + r2 or internal |r1 − r2|</td><td>1</td></tr>
+        <tr><td><code>concentric</code></td><td>a, b</td><td>centres coincide</td><td>2</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="algorithm" class="doc-section">
+    <h2>Solving: Levenberg–Marquardt</h2>
+    <p>The solver minimises the sum of squared residuals with Levenberg–Marquardt and a central-difference Jacobian. Each step solves the damped normal equations by Cholesky factorisation; a step that lowers the residual is accepted and the damping drops, a step that does not is rejected and the damping grows. Because every step is the smallest change that reduces the residuals, a dragged point drags the rest of the sketch the way it would on a drawing board.</p>
+    <ol>
+      <li>Build the residual function of every constraint, and record which constraint owns each equation.</li>
+      <li>Start with λ = 1e-3. Solve (JᵀJ + λ·max(1, diag)) Δx = −Jᵀr; if Cholesky fails, multiply λ by 10 and retry.</li>
+      <li>Accept the step if the residual norm drops (λ = max(λ/5, 1e-12)); otherwise λ ×= 10.</li>
+      <li>Stop when the residual is below <code>tolerance</code> (1e-9) or after <code>maxIterations</code> (200).</li>
+      <li>Analyse the Jacobian at the solution: rank by Gaussian elimination with full pivoting (tolerance 1e-7), null-space basis, free unknowns (component above 1e-6).</li>
+    </ol>
+    <table>
+      <thead><tr><th>Constant</th><th>Value</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>maxIterations default</td><td>200</td><td>SolveOptions</td></tr>
+        <tr><td>tolerance default</td><td>1e-9</td><td>SolveOptions</td></tr>
+        <tr><td>initial damping λ</td><td>1e-3</td><td>solveSketch</td></tr>
+        <tr><td>damping floor</td><td>1e-12</td><td>solveSketch</td></tr>
+        <tr><td>solved if residual ≤</td><td>1e-6</td><td>status</td></tr>
+        <tr><td>rank tolerance</td><td>1e-7</td><td>nullSpace</td></tr>
+        <tr><td>free-unknown threshold</td><td>1e-6</td><td>free points</td></tr>
+        <tr><td>conflict threshold (per equation)</td><td>1e-6</td><td>conflicts</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="status" class="doc-section">
+    <h2>Status and diagnosis</h2>
+    <p>After solving, degrees of freedom = unknowns − rank and redundant equations = equations − rank. The status follows from those two numbers and from whether the residual reached 1e-6.</p>
+    <table>
+      <thead><tr><th>Status</th><th>Condition</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td><code>fully-constrained</code></td><td>solved, dof 0, no redundancy</td><td>nothing</td></tr>
+        <tr><td><code>under-constrained</code></td><td>solved, dof &gt; 0</td><td>add dimensions for the ids in <code>free</code></td></tr>
+        <tr><td><code>over-constrained</code></td><td>solved, redundant &gt; 0</td><td>remove a duplicate constraint (harmless but noisy)</td></tr>
+        <tr><td><code>conflicting</code></td><td>not solved, redundant &gt; 0</td><td>fix the constraint in <code>conflicts[0]</code></td></tr>
+        <tr><td><code>failed</code></td><td>not solved, no redundancy</td><td>start nearer the intended shape or raise maxIterations</td></tr>
+        </tbody>
+    </table>
+    <p>These results come from running the solver on a rectangle drawn slightly askew: a(0,0) b(38,2) c(41,27) d(−1,24), with a fixed at the origin and the four lines horizontal/vertical.</p>
+    <DocCode language="json" title="Real results, one per added constraint">
+{"// + length(l1) = 40\n{\u0022status\u0022:\u0022under-constrained\u0022,\u0022dof\u0022:1,\u0022free\u0022:[\u0022c\u0022,\u0022d\u0022],\u0022iterations\u0022:3,\u0022redundant\u0022:0}\n// + length(l2) = 25\n{\u0022status\u0022:\u0022fully-constrained\u0022,\u0022dof\u0022:0,\u0022iterations\u0022:3,\u0022residual\u0022:7.95e-12,\n \u0022points\u0022:[[\u0022a\u0022,0,0],[\u0022b\u0022,40,0],[\u0022c\u0022,40,25],[\u0022d\u0022,0,25]]}\n// + length(l3) = 40   (implied by the others)\n{\u0022status\u0022:\u0022over-constrained\u0022,\u0022dof\u0022:0,\u0022redundant\u0022:1}\n// + length(l3) = 30   named \u0022bad\u0022\n{\u0022status\u0022:\u0022conflicting\u0022,\u0022redundant\u0022:1,\n \u0022conflicts\u0022:[\u0022bad\u0022,\u0022vertical#2\u0022,\u0022length#5\u0022,\u0022vertical#4\u0022],\n \u0022message\u0022:\u0022The constraints cannot all hold; the worst miss is bad\u0022}"}
+    </DocCode>
+    <DocCallout type="info" title="Least change, not least surprise">
+      <p>With height still free, moving c to (55, 31) and solving gave c = (40, 27.5) and d = (0, 27.5): the free height settled at the mean of the dragged c.y (31) and the old d.y (24), because Levenberg–Marquardt makes the smallest change that satisfies the constraints.</p>
+    </DocCallout>
+  </section>
+
+  <section id="api" class="doc-section">
+    <h2>API</h2>
+    <DocCode language="ts" title="Signatures">
+{"export const solveSketch: (sketch: Sketch, options?: SolveOptions) => SolveResult\nexport const sketchProfiles: (sketch: Sketch, tolerance?: number /* 0.01 */) =>\n  { readonly loops: Vec2[][]; readonly open: Vec2[][] }\nexport const polygonArea: (ring: ReadonlyArray<Vec2>) => number   // positive counter-clockwise\nexport class SketchError extends Error {}\n\nexport interface SolveResult {\n  sketch: Sketch; status: SolveStatus; dof: number; iterations: number\n  residual: number          // largest absolute residual left\n  free: string[]            // points and circles that can still move\n  conflicts: string[]       // worst first, only when not solved\n  redundant: number\n  message?: string\n}"}
+    </DocCode>
+    <DocCode language="ts" title="Plate with a hole, end to end">
+{"import { solveSketch, sketchProfiles, polygonArea } from \u0022@cadcamfun/core\u0022\n\nconst P = (id: string, x: number, y: number) => ({ id, kind: \u0022point\u0022 as const, x, y })\nconst L = (id: string, p1: string, p2: string) => ({ id, kind: \u0022line\u0022 as const, p1, p2 })\n\nconst result = solveSketch({\n  entities: [P(\u0022a\u0022, 0, 0), P(\u0022b\u0022, 38, 2), P(\u0022c\u0022, 41, 27), P(\u0022d\u0022, -1, 24),\n    L(\u0022l1\u0022, \u0022a\u0022, \u0022b\u0022), L(\u0022l2\u0022, \u0022b\u0022, \u0022c\u0022), L(\u0022l3\u0022, \u0022c\u0022, \u0022d\u0022), L(\u0022l4\u0022, \u0022d\u0022, \u0022a\u0022),\n    P(\u0022o\u0022, 20, 12), { id: \u0022h\u0022, kind: \u0022circle\u0022, center: \u0022o\u0022, radius: 4 }],\n  constraints: [\n    { type: \u0022fixed\u0022, point: \u0022a\u0022, x: 0, y: 0 },\n    { type: \u0022horizontal\u0022, line: \u0022l1\u0022 }, { type: \u0022vertical\u0022, line: \u0022l2\u0022 },\n    { type: \u0022horizontal\u0022, line: \u0022l3\u0022 }, { type: \u0022vertical\u0022, line: \u0022l4\u0022 },\n    { type: \u0022length\u0022, line: \u0022l1\u0022, value: 40 }, { type: \u0022length\u0022, line: \u0022l2\u0022, value: 25 },\n    { type: \u0022distanceX\u0022, a: \u0022a\u0022, b: \u0022o\u0022, value: 20 }, { type: \u0022distanceY\u0022, a: \u0022a\u0022, b: \u0022o\u0022, value: 12.5 },\n    { type: \u0022diameter\u0022, circle: \u0022h\u0022, value: 10 },\n  ],\n})\nresult.status                       // \u0022fully-constrained\u0022, dof 0\nconst { loops } = sketchProfiles(result.sketch)\nloops.map((l) => [l.length, polygonArea(l)])\n// [[50, 78.333], [4, 1000]]   circle: 50 points; rectangle: 4 points, area 1000"}
+    </DocCode>
+  </section>
+
+  <section id="profiles" class="doc-section">
+    <h2>From sketch to profiles</h2>
+    <code>sketchProfiles</code> chains lines and arcs end to end through their shared point ids into closed loops, and returns every circle as a loop of its own. An arc becomes points spaced so the chord stays within <code>tolerance</code> of the true arc (n = ⌈sweep / (2·acos(1 − tol/r))⌉, at least 2); a full circle gets at least 8 points. A chain that does not close is returned in <code>open</code> instead of being dropped.
+    <DocViewer3D title="Slot from two arcs and two lines" caption="A 30 mm slot of radius 8: two arcs and two lines sharing end points, solved and chained by sketchProfiles into one 66-point loop (area 680.739 mm² against the exact 681.062 mm²; the polygon is inscribed, so it is always slightly smaller)." solids={[{"kind":"extrude","profile":[[0,8],[-0.784,7.961],[-1.561,7.846],[-2.322,7.656],[-3.061,7.391],[-3.771,7.055],[-4.445,6.652],[-5.075,6.184],[-5.657,5.657],[-6.184,5.075],[-6.652,4.445],[-7.055,3.771],[-7.391,3.061],[-7.656,2.322],[-7.846,1.561],[-7.961,0.784],[-8,0],[-7.961,-0.784],[-7.846,-1.561],[-7.656,-2.322],[-7.391,-3.061],[-7.055,-3.771],[-6.652,-4.445],[-6.184,-5.075],[-5.657,-5.657],[-5.075,-6.184],[-4.445,-6.652],[-3.771,-7.055],[-3.061,-7.391],[-2.322,-7.656],[-1.561,-7.846],[-0.784,-7.961],[0,-8],[30,-8],[30.784,-7.961],[31.561,-7.846],[32.322,-7.656],[33.061,-7.391],[33.771,-7.055],[34.445,-6.652],[35.075,-6.184],[35.657,-5.657],[36.184,-5.075],[36.652,-4.445],[37.055,-3.771],[37.391,-3.061],[37.656,-2.322],[37.846,-1.561],[37.961,-0.784],[38,0],[37.961,0.784],[37.846,1.561],[37.656,2.322],[37.391,3.061],[37.055,3.771],[36.652,4.445],[36.184,5.075],[35.657,5.657],[35.075,6.184],[34.445,6.652],[33.771,7.055],[33.061,7.391],[32.322,7.656],[31.561,7.846],[30.784,7.961],[30,8]],"height":4,"color":"#c8a48a"}]} />
+    <p>The slot above solved as <code>over-constrained</code> with dof 0 and 1 redundant equation: making <code>top</code> horizontal is implied once c1–a1 and c2–b1 are vertical and c1, c2 share a y. The solve still succeeds; the status only flags the duplicate.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Troubleshooting</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>SketchError: Duplicate entity id</code></td><td>two entities share an id</td><td>ids are unique across points, lines, circles and arcs</td></tr>
+        <tr><td><code>SketchError: Unknown unknown</code></td><td>a constraint names a point or circle that is not there</td><td>check the ids in the constraint</td></tr>
+        <tr><td><code>conflicting</code> with a long conflicts list</td><td>one wrong dimension pulls several equations off zero</td><td>fix the first entry; the rest are usually collateral</td></tr>
+        <tr><td><code>failed</code></td><td>the start is far from any solution</td><td>draw closer to the intended shape; raise maxIterations</td></tr>
+        <tr><td>profile missing from <code>loops</code></td><td>a chain does not close: it is in <code>open</code></td><td>make end points shared ids, or add a coincident constraint</td></tr>
+        <tr><td>circle has too few points</td><td>tolerance too coarse for a small radius</td><td>pass a smaller tolerance to sketchProfiles</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <DocRelated items={[{"title": "Kernel overview", "href": "/docs/kernels"}, {"title": "Exact B-rep", "href": "/docs/kernels/brep"}, {"title": "CAD geometry", "href": "/docs/cad"}, {"title": "Tolerance and tessellation", "href": "/docs/kernels/tolerance"}]} />
+</DocsLayout>
