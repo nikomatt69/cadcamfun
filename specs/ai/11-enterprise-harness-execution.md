@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Step 9 partial (task journal: durable enqueue, report and outcome, bounded recovery, editors never replayed; event sequences, leases and session lifecycle open); Steps 10–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Step 9 partial (task journal: durable enqueue, report and outcome, bounded recovery, editors never replayed; event sequences, leases and session lifecycle open); Step 10 gate passed (dimensional acceptance; kernel jobs in a worker with a deadline); Step 11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -425,18 +425,38 @@ D: RM-02 for core; RM-03/RM-06 for integration; RM-09. Code: `packages/ai/src/pa
 `apps/sidecar/src/services/ai-parametric.ts`, `packages/core/src/cad/history-brep.ts`, `cad/brep/budget.ts`,
 `cam/verify/verify.ts`.
 
-- [ ] Distinguish a valid rebuild from dimensional acceptance.
-- [ ] Measure requested features through identified references and frames.
-- [ ] Separate topological genus from the number of requested holes.
-- [ ] Keep full numeric values in structured results.
-- [ ] Declare capabilities and limits of mesh, B-rep and STEP.
-- [ ] Run expensive pure work in a scoped worker with a deadline on the whole job.
-- [ ] On cancellation end the job; nothing persists before commit.
-- [ ] Prove equivalence between the inline and the worker path.
+- [x] Distinguish a valid rebuild from dimensional acceptance.
+- [x] Measure requested features through identified references and frames.
+- [x] Separate topological genus from the number of requested holes.
+- [x] Keep full numeric values in structured results.
+- [ ] Declare capabilities and limits of mesh, B-rep and STEP. (per check: `method` exact / mesh / recognition; a full capability table is open)
+- [x] Run expensive pure work in a scoped worker with a deadline on the whole job.
+- [x] On cancellation end the job; nothing persists before commit.
+- [x] Prove equivalence between the inline and the worker path.
 
 Tests: `parametric-exact.test.ts`, `parametric-engineering*.test.ts`; new `kernel-job.test.ts` and dimensional acceptance
 tests. Gate: a part with the right volume but a wrong measure is rejected; heartbeat and cancellation keep working during the
 heavy workload.
+
+Progress (2026-10-15):
+
+- **V** `packages/ai/src/acceptance.ts` `acceptPart`: checks `extent` (world-frame size of all bodies or one), `hole` (the hole a
+  history `hole` feature asked for, found by `brep.recognizeHoles` on that feature's axis in its plane frame; diameter, depth,
+  through), `hole_count` (recognised holes) and `volume` (exact when every body is exact). Each result carries nominal,
+  limits, the measured value at full precision, reference, frame and method; `accepted` needs every check to pass, and an
+  `unmeasured` check (no exact model, a work-plane hole, a later move or scale) is never accepted. `holes` reports requested
+  holes, recognised holes and genus apart.
+- **V** Contract: `ParametricTestCase.checks` (`@cadcamfun/api`); `cad.parametric_test` runs them and a case passes only when the
+  rebuild, the volume band and every check pass. Tool description updated within its budget.
+- **V** `kernel-job.ts` `runKernelJob`: one worker per job (`kernel-worker.ts`), a deadline on the whole job, abort terminates the
+  worker; the jobs are pure, so a cancelled job leaves nothing. `compile-sidecar.ts` adds the worker as an entry point with the
+  repository as build root; a probe compiled with it ran the acceptance job inside the executable (`accepted: true`, measured 8).
+- **V** Tests: `dimensional-acceptance.test.ts` (accepted part; right volume, wrong bore and length rejected; axis identity and
+  a later move unmeasured; a slot has genus 1 and zero holes; unmeasured never accepted), `kernel-job.test.ts` (inline equals
+  worker; heartbeat keeps beating during a heavy job; deadline; cancellation within a second; failure reason; compiled worker
+  URL), `apps/sidecar/test/ai-parametric-acceptance.test.ts` (end to end through `cad.parametric_test`).
+- Open: holes on work planes, after moves and in patterns; extents in a part frame other than world; a declared capability
+  table for mesh, B-rep and STEP; moving `parametric_exact` and the validation report itself into kernel jobs.
 
 ### Step 11 — Evaluation and final gate
 
@@ -552,3 +572,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   NC, NC change with identical inputs, verification never writes NC); machine configuration recorded as the open input.
 - 2026-10-15: Step 9 progress: background-task journal (enqueue before run, report before session removal, outcome before
   delivery), bounded recovery of readers, uncertain editors reported instead of replayed, retention.
+- 2026-10-15: closed Step 10: dimensional acceptance in `cad.parametric_test` (identified references, full values, genus apart
+  from hole count) and kernel jobs in a worker with deadline and cancellation, compiled into the sidecar.
