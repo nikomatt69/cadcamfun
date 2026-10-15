@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { toolOutput } from "../src/tools/tool-output.ts"
+import { z } from "zod"
+import { MODEL_TEXT_BUDGET, toolOutput } from "../src/tools/tool-output.ts"
+import { defineTool, toSpec } from "../src/tools/define.ts"
+import type { ToolHandlersShape } from "../src/tools/handlers.ts"
 
 describe("tool output: whole value, bounded text", () => {
   test("a result that fits is the plain JSON text, not bounded", () => {
@@ -45,5 +48,21 @@ describe("tool output: whole value, bounded text", () => {
     expect(toolOutput({ ok: false, error: "No drawing." }).outcome).toBe("refused")
     expect(toolOutput({ ok: true, complete: false, nextOffset: 40, hits: [] }).outcome).toBe("partial")
     expect(toolOutput({ ok: false, _tag: "ActionConflict", message: "moved" }).outcome).toBe("conflict")
+  })
+
+  test("through the host adapter, a large result reaches Code Mode whole while the model text declares what it omits", async () => {
+    const rows = Array.from({ length: 5000 }, (_, i) => ({ id: `op-${i}`, name: `Operation ${i}`, note: "x".repeat(40) }))
+    const value = { ok: true, drawingId: "d", revision: "r3", total: rows.length, operations: rows }
+    const tool = defineTool("probe_large", { description: "probe", parameters: z.object({}), execute: async () => value })
+    const spec = toSpec(tool, { handlers: {} as ToolHandlersShape, projectId: "p" })
+    const answer = await spec.executeWithFiles!({}, { sessionId: "s", projectId: "p", signal: new AbortController().signal })
+    // Code Mode and the stored part read `value`: every row, unshortened.
+    expect(answer.value).toEqual(value)
+    expect(answer.bounded).toBe(true)
+    // The model reads a bounded text that keeps identity and revision and says exactly what it left out.
+    expect(answer.output.length).toBeLessThanOrEqual(MODEL_TEXT_BUDGET)
+    const text = JSON.parse(answer.output) as Record<string, any>
+    expect(text).toMatchObject({ ok: true, drawingId: "d", revision: "r3", total: 5000, _preview: { complete: false } })
+    expect(text._preview.omitted).toContainEqual({ path: "operations", total: 5000, returned: (text.operations as unknown[]).length, unit: "items" })
   })
 })

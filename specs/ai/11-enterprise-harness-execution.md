@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Steps 2–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Steps 3–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -139,15 +139,31 @@ Progress (2026-10-14):
 D: Step 1. Placement: RM-01. Code: `tools/define.ts`, `nikcli/runtime.ts`, `nikcli/sdk-next.d.ts`, `nikcli/program-calls.ts`.
 The pinned bundle already supports `output` and `result.value`; the application adapter mostly hands over JSON strings.
 
-- [ ] Extend the local types to the capabilities really present in the bundle.
-- [ ] Deliver the validated result in `value`.
-- [ ] Produce a separate bounded text for the model.
-- [ ] Make Code Mode consume the structured value.
-- [ ] Add total, returned, omitted, revision and artifact reference to previews.
-- [ ] Never truncate receipts, identities or JSON objects the consumers need.
+- [x] Extend the local types to the capabilities really present in the bundle.
+- [x] Deliver the validated result in `value`.
+- [x] Produce a separate bounded text for the model.
+- [x] Make Code Mode consume the structured value.
+- [x] Add total, returned, omitted, revision and artifact reference to previews.
+- [x] Never truncate receipts, identities or JSON objects the consumers need.
 
 Tests: `program-calls.test.ts`, `cam-wire.test.ts`, `tool-schemas-json-schema.test.ts`; new regressions for large results and
 incomplete previews. Gate: a large result stays complete for Code Mode and persistence while the text declares what it omits.
+
+Progress (2026-10-15):
+
+- Most of this step arrived with #21: `sdk-next.d.ts` declares `ToolExecuteResult.value` and the `output` codec; the runtime
+  declares `output` for every catalogue tool and returns `value` (the whole validated result) beside `output` (the bounded
+  text, `tools/tool-output.ts`), with `metadata.truncated` so the host does not cut it again and `metadata.value` stored when
+  the text is bounded.
+- **V** The pinned bundle (`@nikcli-ai/sdk-next` 1.428.0, `Tool.encoded`) returns `result.value` to Code Mode when the tool
+  declares `output`, and the text otherwise.
+- **V** `tool-output.test.ts`: through the host adapter (`toSpec`) a 5,000-row result reaches `value` whole while the text stays
+  within `MODEL_TEXT_BUDGET`, keeps identity, revision and totals, and lists each omission (path, total, returned).
+- **V** `cam_edit.generate` previews a stored program: it answers `lines`, `previewLines`, `omittedLines`, `programHash` and
+  `operationId` (the full program is read back with `cam.analyze` by `operationId`); the contract pins them
+  (`action-outcome.test.ts`, `action-contracts.test.ts`).
+- Open (C): two outcome classifiers exist, `actions/outcome.ts` (contract-aware, Step 1) and `actionOutcome` in
+  `@cadcamfun/api` (used for the tool text); unify them in Step 6 or earlier if they disagree.
 
 ### Step 3 — Enforce role limits in code
 
@@ -393,3 +409,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   `parametric_convert` missing `mutation` and `cam_edit.generate` reporting a failed generation as success.
 - 2026-10-14: closed Step 1: every action's input declared once in Effect and decoded at the seam; strict inputs; fixed
   parameter names silently dropped by `Record`; handler migration to Effect deferred to Step 5.
+- 2026-10-15: closed Step 2: verified the bundle's `value`/`output` path, end-to-end regression for a large result, and
+  `cam_edit.generate` declares what its preview omits and the hash of the stored program.

@@ -111,7 +111,9 @@ describe("outcome classification", () => {
     const failed = await outcome("cam_edit.generate", { operationId: "o" }, { generateGcode: async () => ({ gcode: "", stats: { error: "Tool larger than the pocket." } }) })
     expect(failed).toMatchObject({ kind: "refused", value: { ok: false, _tag: "ActionRefused", actionId: "cam_edit.generate", error: "Tool larger than the pocket." } })
     const made = await outcome("cam_edit.generate", { operationId: "o", maxLines: 1 }, { generateGcode: async () => ({ gcode: "G0 Z5\nG1 Z-1", stats: { lines: 2 } }) })
-    expect(made).toMatchObject({ kind: "succeeded", validated: true, value: { ok: true, preview: "G0 Z5" } })
+    // The preview says how much it leaves out and names the stored program it is a preview of.
+    expect(made).toMatchObject({ kind: "succeeded", validated: true, value: { ok: true, operationId: "o", preview: "G0 Z5", lines: 2, previewLines: 1, omittedLines: 1 } })
+    expect((made.value as { programHash: string }).programHash).toMatch(/^[0-9a-f]{64}$/)
   })
 
   test("a delegated task that stopped in error is an answer about the task; an unknown agent is a refusal", async () => {
