@@ -155,6 +155,31 @@ describe("companion gateway", () => {
     expect(isCompanionRoute("GET", "/api/companion/devices")).toBe(false)
   })
 
+  test("workspace preview is read-only and the stored document routes stay closed", () => {
+    const project = "/api/projects/proj"
+    for (const path of [
+      `${project}/workspace/drawings`,
+      `${project}/workspace/drawings/d1/preview`,
+      `${project}/workspace/components`,
+      `${project}/workspace/components/c1/preview`,
+      `${project}/workspace/toolpaths`,
+      `${project}/workspace/toolpaths/t1`,
+      `${project}/workspace/toolpaths/t1/preview`,
+      `${project}/workspace/library`,
+    ]) {
+      expect(isCompanionRoute("GET", path)).toBe(true)
+      expect(isCompanionRoute("POST", path)).toBe(false)
+      expect(isCompanionRoute("PUT", path)).toBe(false)
+      expect(isCompanionRoute("DELETE", path)).toBe(false)
+    }
+    // The existing document routes embed the CAD JSON. The phone uses the workspace summaries instead.
+    expect(isCompanionRoute("GET", `${project}/drawings`)).toBe(false)
+    expect(isCompanionRoute("PUT", `${project}/drawings/d1`)).toBe(false)
+    expect(isCompanionRoute("POST", "/api/drawings/d1")).toBe(false)
+    expect(isCompanionRoute("GET", "/api/library")).toBe(false)
+    expect(isCompanionRoute("POST", "/api/toolpaths/parse")).toBe(false)
+  })
+
   test("repeated failures are rate limited", async () => {
     const g = startGateway({ certificate: cert, port: 0, upstream: () => ({ port: upstream.port!, token: "t" }), tokens: async () => [] })
     try {

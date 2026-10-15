@@ -111,6 +111,8 @@ export const COMPANION_ROUTES: readonly Rule[] = [
   // Project list + single-project read so the phone can show a richer header (description, owner, org).
   { methods: ["GET"], path: /^\/api\/projects$/ },
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },
+  // Read-only workspace: summaries, meshes and toolpath polylines. The stored CAD document and every write stay off the phone.
+  { methods: ["GET"], path: /^\/api\/projects\/[^/]+\/workspace(?:\/[^/]+)*$/ },
   // GitHub sync (`vcs/remote|push|pull`) needs the owner's GitHub token and stays on the desktop.
   // Reference rule for future hardening: `vcs/restore`, `vcs/commit` and `vcs/checkout` are destructive enough
   // that a phone session should be refused them (403) and only a desktop-initiated session allowed; today the

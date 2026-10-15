@@ -1,0 +1,8 @@
+{
+  "platforms": ["apple"],
+  "apple": {
+    "podspecPath": "CadPreview.podspec",
+    "swiftModuleName": "CadPreview",
+    "modules": ["CadPreviewModule"]
+  }
+}

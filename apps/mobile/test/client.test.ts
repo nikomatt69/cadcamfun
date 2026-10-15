@@ -36,6 +36,22 @@ describe("CompanionClient", () => {
     expect(t.calls[0]).toEqual({ path: "/api/ai/agents", method: "GET" })
   })
 
+  test("workspace preview routes are GET and encode ids", async () => {
+    const t = new FakeTransport()
+    t.handler = () => ({ status: 200, body: JSON.stringify([]) })
+    const api = client(t)
+    await api.workspaceDrawings("p 1")
+    await api.drawingPreview("p 1", "d/1")
+    await api.toolpathReview("p 1", "t 1")
+    await api.workspaceLibrary("p 1")
+    expect(t.calls.map((call) => [call.method, call.path])).toEqual([
+      ["GET", "/api/projects/p%201/workspace/drawings"],
+      ["GET", "/api/projects/p%201/workspace/drawings/d%2F1/preview"],
+      ["GET", "/api/projects/p%201/workspace/toolpaths/t%201"],
+      ["GET", "/api/projects/p%201/workspace/library"],
+    ])
+  })
+
   test("project paths are URL-encoded", async () => {
     const t = new FakeTransport()
     await client(t).status("a b/c")

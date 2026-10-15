@@ -24,6 +24,13 @@ export default function ProjectsLayout() {
       <Stack.Screen name="[id]" />
       <Stack.Screen name="[id]/commit/[oid]" options={{ title: "Commit", headerLargeTitle: false }} />
       <Stack.Screen name="[id]/pulls/[number]" options={{ title: "Pull Request", presentation: "formSheet", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/drawings" options={{ title: "Designs", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/drawings/[drawingId]" options={{ title: "Design", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/components" options={{ title: "Components", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/components/[componentId]" options={{ title: "Component", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/toolpaths" options={{ title: "Toolpaths", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/toolpaths/[toolpathId]" options={{ title: "Toolpath", headerLargeTitle: false }} />
+      <Stack.Screen name="[id]/workspace/library" options={{ title: "Library", headerLargeTitle: false }} />
     </Stack>
   )
 }

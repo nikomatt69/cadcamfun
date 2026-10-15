@@ -477,6 +477,22 @@ import type {
   CompanionPairOutput,
   CompanionRevokeInput,
   CompanionRevokeOutput,
+  WorkspaceDrawingsInput,
+  WorkspaceDrawingsOutput,
+  WorkspaceDrawingPreviewInput,
+  WorkspaceDrawingPreviewOutput,
+  WorkspaceComponentsInput,
+  WorkspaceComponentsOutput,
+  WorkspaceComponentPreviewInput,
+  WorkspaceComponentPreviewOutput,
+  WorkspaceToolpathsInput,
+  WorkspaceToolpathsOutput,
+  WorkspaceToolpathInput,
+  WorkspaceToolpathOutput,
+  WorkspaceToolpathPreviewInput,
+  WorkspaceToolpathPreviewOutput,
+  WorkspaceLibraryInput,
+  WorkspaceLibraryOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -4015,6 +4031,96 @@ export function make(options: ClientOptions) {
           {
             method: "DELETE",
             path: `/api/companion/devices/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    workspace: {
+      drawings: (input: WorkspaceDrawingsInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceDrawingsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/drawings`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      drawingPreview: (input: WorkspaceDrawingPreviewInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceDrawingPreviewOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/drawings/${encodeURIComponent(input.drawingId)}/preview`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      components: (input: WorkspaceComponentsInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceComponentsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/components`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      componentPreview: (input: WorkspaceComponentPreviewInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceComponentPreviewOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/components/${encodeURIComponent(input.componentId)}/preview`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      toolpaths: (input: WorkspaceToolpathsInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceToolpathsOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/toolpaths`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      toolpath: (input: WorkspaceToolpathInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceToolpathOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/toolpaths/${encodeURIComponent(input.toolpathId)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      toolpathPreview: (input: WorkspaceToolpathPreviewInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceToolpathPreviewOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/toolpaths/${encodeURIComponent(input.toolpathId)}/preview`,
+            successStatus: 200,
+            declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      library: (input: WorkspaceLibraryInput, requestOptions?: RequestOptions) =>
+        request<WorkspaceLibraryOutput>(
+          {
+            method: "GET",
+            path: `/api/projects/${encodeURIComponent(input.id)}/workspace/library`,
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
             empty: false,

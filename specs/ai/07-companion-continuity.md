@@ -37,7 +37,7 @@ Before implementation, amend RM-08's exact owner paths and `specs/13-vcs-actions
 ## Precise Interface and invariant contracts
 
 1. Paired credentials identify a trusted actor and pairing record, with project grants checked per request. A phone-supplied actor/owner/session alias is not authority. Consume AI-06 owner triple, host/client session resolution, task attempts, receipt identities and event cursor exactly; do not synthesize a phone-owned shadow task.
-2. Keep `COMPANION_ROUTES` scope unchanged or narrower. No credentials, plugin management, files, billing, GitHub remote/push/pull, machine control or external-agent bridge routes. Explicitly enforce desktop-initiated-only `vcs_restore_paths`/restore and other destructive restrictions already required by the cited contracts; a broad gateway regexp must not evade application authorization.
+2. Keep `COMPANION_ROUTES` unchanged or narrower, except the read-only workspace preview: `GET /api/projects/:id/workspace/**` may return summaries, bounded meshes and G-code-linked polylines. Those responses omit the stored CAD document. POST, PUT and DELETE on that prefix stay 403. No credentials, plugin management, files, billing, GitHub remote/push/pull, machine control, raw `/api/drawings|components|toolpaths|library` document routes, or external-agent bridge routes. Explicitly enforce desktop-initiated-only `vcs_restore_paths`/restore and other destructive restrictions already required by the cited contracts; a broad gateway regexp must not evade application authorization.
 3. `connect/resume` authenticates pairing and pins the existing TLS fingerprint, then requests authorized session/task/decision snapshot and cursor. Persist only versioned project/session IDs and safe cursor state. A fingerprint change requires trusted re-pairing, never a silent trust fallback. Revocation closes streams and denies subsequent controls before execution; reconnect cannot reactivate a revoked pairing.
 4. Reduce eventId once and `(taskId, attempt, outcomeVersion)` once. On epoch mismatch, sequence gap, expired retention or overflow, suspend normal receipt application, fetch authoritative snapshot/high-water cursor, then resume. A late child result is shown against its original document, not the currently open one. Snapshot model revision and NC artifact hash must match desktop evidence; do not label a locally cached result current.
 5. Pending `question_request` and `permission_request` use native nikcli request IDs and choices. Show action, document/revision, request age and destructive consequences. Replies carry requestId and decision evidence, never a generic remembered approval. Server validates owner, current revision/digest, expiry and authority. Duplicate identical replies are acknowledged as already consumed without executing twice; conflicting/stale replies return typed `StaleDecision` and refresh state.
@@ -59,7 +59,7 @@ Failures: `PairingRevoked`, `PinMismatch`, `Forbidden`, `OwnerMismatch`, `StaleD
 
 ## Non-goals
 
-No phone-side orchestration/kernel, autonomous machining, broader allow-list, credential forwarding, external nikcli installation, background model training or TestFlight release in this design task. Remote access does not grant more manufacturing authority than desktop. No paid provider calls.
+No phone-side orchestration/kernel, autonomous machining, allow-list growth beyond the read-only workspace preview, credential forwarding, external nikcli installation, background model training or TestFlight release in this design task. Remote access does not grant more manufacturing authority than desktop. The phone does not PUT geometry or send a machine. No paid provider calls.
 
 ## Migration, failure and rollback
 
@@ -97,4 +97,5 @@ JS export is not native notification, TLS, signing or device proof. A separate s
 
 ## Change log
 
+- 2026-10-15: Read-only workspace preview (`GET /api/projects/:id/workspace/**`) is the one allow-list addition: bounded meshes, toolpath polylines, G-code review text and the project library. Writes and document routes stay refused.
 - 2026-10-12: Documentation-only continuity design specified. Known broad destructive VCS route match recorded for contract-first enforcement, not described as already safe. Conditional owner amendments remain unapplied; no tests executed and implementation pending.

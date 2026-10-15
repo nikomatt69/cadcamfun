@@ -44980,6 +44980,1938 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
         ],
       },
     },
+    "/api/projects/{id}/workspace/components": {
+      "get": {
+        "operationId": "workspace.components",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "subtitle": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "subtitle",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/components/{componentId}/preview": {
+      "get": {
+        "operationId": "workspace.componentPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "componentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bounds": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "max": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                        "min": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "min",
+                        "max",
+                      ],
+                      "type": "object",
+                    },
+                    "indices": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "normals": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "parameters": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                          },
+                          "value": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "key",
+                          "value",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "parts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "triangleCount": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "triangleStart": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "triangleStart",
+                          "triangleCount",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "positions": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "revision": {
+                      "type": "string",
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "positions",
+                    "indices",
+                    "normals",
+                    "bounds",
+                    "parts",
+                    "truncated",
+                    "revision",
+                    "parameters",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/drawings": {
+      "get": {
+        "operationId": "workspace.drawings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "subtitle": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "subtitle",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/drawings/{drawingId}/preview": {
+      "get": {
+        "operationId": "workspace.drawingPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "drawingId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bounds": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "max": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                        "min": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "min",
+                        "max",
+                      ],
+                      "type": "object",
+                    },
+                    "indices": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "normals": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "parts": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "triangleCount": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "triangleStart": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "triangleStart",
+                          "triangleCount",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "positions": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                          },
+                          {
+                            "enum": [
+                              "Infinity",
+                              "-Infinity",
+                              "NaN",
+                            ],
+                            "type": "string",
+                          },
+                        ],
+                      },
+                      "type": "array",
+                    },
+                    "revision": {
+                      "type": "string",
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "positions",
+                    "indices",
+                    "normals",
+                    "bounds",
+                    "parts",
+                    "truncated",
+                    "revision",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/library": {
+      "get": {
+        "operationId": "workspace.library",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "components": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "subtitle": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subtitle",
+                          "updatedAt",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "machines": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "subtitle": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subtitle",
+                          "updatedAt",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "materials": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "subtitle": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subtitle",
+                          "updatedAt",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "tools": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                          },
+                          "name": {
+                            "type": "string",
+                          },
+                          "subtitle": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subtitle",
+                          "updatedAt",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "materials",
+                    "tools",
+                    "machines",
+                    "components",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/toolpaths": {
+      "get": {
+        "operationId": "workspace.toolpaths",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                      "subtitle": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "subtitle",
+                      "updatedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/toolpaths/{toolpathId}": {
+      "get": {
+        "operationId": "workspace.toolpath",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "toolpathId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "gcode": {
+                      "type": "string",
+                    },
+                    "id": {
+                      "type": "string",
+                    },
+                    "name": {
+                      "type": "string",
+                    },
+                    "operationType": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "revision": {
+                      "type": "string",
+                    },
+                    "stats": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "circularMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "linearMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "machineFunctions": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "rapidMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "rapidMoves",
+                        "linearMoves",
+                        "circularMoves",
+                        "machineFunctions",
+                      ],
+                      "type": "object",
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "operationType",
+                    "gcode",
+                    "stats",
+                    "revision",
+                    "updatedAt",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
+    "/api/projects/{id}/workspace/toolpaths/{toolpathId}/preview": {
+      "get": {
+        "operationId": "workspace.toolpathPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "toolpathId",
+            "required": true,
+            "schema": {
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bounds": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "max": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                        "min": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "min",
+                        "max",
+                      ],
+                      "type": "object",
+                    },
+                    "revision": {
+                      "type": "string",
+                    },
+                    "segments": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "from": {
+                            "maxItems": 3,
+                            "minItems": 3,
+                            "prefixItems": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            ],
+                            "type": "array",
+                          },
+                          "kind": {
+                            "enum": [
+                              "rapid",
+                              "linear",
+                              "circular",
+                            ],
+                            "type": "string",
+                          },
+                          "line": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                              },
+                              {
+                                "enum": [
+                                  "Infinity",
+                                  "-Infinity",
+                                  "NaN",
+                                ],
+                                "type": "string",
+                              },
+                            ],
+                          },
+                          "to": {
+                            "maxItems": 3,
+                            "minItems": 3,
+                            "prefixItems": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                  },
+                                  {
+                                    "enum": [
+                                      "Infinity",
+                                      "-Infinity",
+                                      "NaN",
+                                    ],
+                                    "type": "string",
+                                  },
+                                ],
+                              },
+                            ],
+                            "type": "array",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "line",
+                          "from",
+                          "to",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                    "stats": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "circularMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "linearMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "machineFunctions": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                        "rapidMoves": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                            },
+                            {
+                              "enum": [
+                                "Infinity",
+                                "-Infinity",
+                                "NaN",
+                              ],
+                              "type": "string",
+                            },
+                          ],
+                        },
+                      },
+                      "required": [
+                        "rapidMoves",
+                        "linearMoves",
+                        "circularMoves",
+                        "machineFunctions",
+                      ],
+                      "type": "object",
+                    },
+                    "stock": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "max": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                        "min": {
+                          "maxItems": 3,
+                          "minItems": 3,
+                          "prefixItems": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                },
+                                {
+                                  "enum": [
+                                    "Infinity",
+                                    "-Infinity",
+                                    "NaN",
+                                  ],
+                                  "type": "string",
+                                },
+                              ],
+                            },
+                          ],
+                          "type": "array",
+                        },
+                      },
+                      "required": [
+                        "min",
+                        "max",
+                      ],
+                      "type": "object",
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                    },
+                  },
+                  "required": [
+                    "segments",
+                    "bounds",
+                    "stock",
+                    "truncated",
+                    "stats",
+                    "revision",
+                  ],
+                  "type": "object",
+                },
+              },
+            },
+            "description": "Success",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestEncoded",
+                },
+              },
+            },
+            "description": "BadRequest",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedEncoded",
+                },
+              },
+            },
+            "description": "Unauthorized",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundEncoded",
+                },
+              },
+            },
+            "description": "NotFound",
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalErrorEncoded",
+                },
+              },
+            },
+            "description": "InternalError",
+          },
+        },
+        "security": [
+          {
+            "bearer": [],
+          },
+        ],
+        "tags": [
+          "workspace",
+        ],
+      },
+    },
     "/api/push-subscription": {
       "delete": {
         "operationId": "misc.pushUnsubscribe",
@@ -60688,6 +62620,9 @@ exports[`OpenAPI preserves status codes, concrete payloads and non-JSON encoding
     },
     {
       "name": "companion",
+    },
+    {
+      "name": "workspace",
     },
   ],
 }

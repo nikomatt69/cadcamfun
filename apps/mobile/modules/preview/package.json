@@ -1,0 +1,9 @@
+{
+  "name": "preview",
+  "version": "1.0.0",
+  "description": "CADCAMFUN companion preview. Metal drawer for bounded meshes and toolpath lines. iOS only.",
+  "main": "index.ts",
+  "license": "MIT",
+  "author": "CADCAMFUN",
+  "homepage": "https://cadcamfun.com"
+}

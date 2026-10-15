@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { ScrollView, Text, View } from "react-native"
-import { GitBranch, Sparkles } from "lucide-react-native"
+import { useRouter } from "expo-router"
+import { Box, Boxes, GitBranch, Library, Route, Sparkles } from "lucide-react-native"
 import type { CompanionClient } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
 import { useServer } from "@/lib/server"
@@ -32,6 +33,10 @@ export function OverviewPanel({
 }) {
   const { palette } = useTheme()
   const { ai } = useServer()
+  const router = useRouter()
+  const openWorkspace = (screen: "drawings" | "components" | "toolpaths" | "library") => {
+    router.push(`/projects/${projectId}/workspace/${screen}`)
+  }
 
   const status = useResource(useCallback((signal) => client.status(projectId, signal), [client, projectId]), `status:${projectId}:${refreshKey}`)
   const branches = useResource(useCallback((signal) => client.branches(projectId, signal), [client, projectId]), `branches:${projectId}:${refreshKey}`)
@@ -88,6 +93,21 @@ export function OverviewPanel({
           <View style={{ padding: 14, paddingTop: 0 }}>
             <ActionButton label="Commit changes" fullWidth small variant="secondary" disabled={!vcs || vcs.dirty.length === 0} onPress={onCommit} />
           </View>
+        </SurfaceCard>
+
+        <SurfaceCard>
+          <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 }}>
+            <Text style={{ color: palette.muted, fontSize: 13, lineHeight: 18, textTransform: "uppercase", fontWeight: "600", letterSpacing: 0.08 }}>
+              Workspace
+            </Text>
+          </View>
+          <ListRow leading={<Box size={16} color={palette.accent} />} title="Designs" subtitle="3D preview" onPress={() => openWorkspace("drawings")} />
+          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
+          <ListRow leading={<Boxes size={16} color={palette.accent} />} title="Components" subtitle="3D preview and parameters" onPress={() => openWorkspace("components")} />
+          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
+          <ListRow leading={<Route size={16} color={palette.accent} />} title="Toolpaths" subtitle="Path and G-code" onPress={() => openWorkspace("toolpaths")} />
+          <View style={{ height: 0.5, marginLeft: 14, backgroundColor: palette.border }} />
+          <ListRow leading={<Library size={16} color={palette.accent} />} title="Library" subtitle="Materials, tools, machines" onPress={() => openWorkspace("library")} />
         </SurfaceCard>
 
         {/* Branches */}

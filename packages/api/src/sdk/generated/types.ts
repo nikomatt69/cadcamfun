@@ -6416,3 +6416,89 @@ export type CompanionRevokeOutput = {
   host: string
   devices: Array<{ id: string; name: string; createdAt: string; lastSeen: string | null }>
 }
+
+export type WorkspaceDrawingsInput = { readonly id: { readonly id: string }["id"] }
+
+export type WorkspaceDrawingsOutput = Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+
+export type WorkspaceDrawingPreviewInput = {
+  readonly id: { readonly id: string; readonly drawingId: string }["id"]
+  readonly drawingId: { readonly id: string; readonly drawingId: string }["drawingId"]
+}
+
+export type WorkspaceDrawingPreviewOutput = {
+  positions: Array<number>
+  indices: Array<number>
+  normals: Array<number>
+  bounds: { min: [number, number, number]; max: [number, number, number] }
+  parts: Array<{ id: string; name: string; triangleStart: number; triangleCount: number }>
+  truncated: boolean
+  revision: string
+}
+
+export type WorkspaceComponentsInput = { readonly id: { readonly id: string }["id"] }
+
+export type WorkspaceComponentsOutput = Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+
+export type WorkspaceComponentPreviewInput = {
+  readonly id: { readonly id: string; readonly componentId: string }["id"]
+  readonly componentId: { readonly id: string; readonly componentId: string }["componentId"]
+}
+
+export type WorkspaceComponentPreviewOutput = {
+  positions: Array<number>
+  indices: Array<number>
+  normals: Array<number>
+  bounds: { min: [number, number, number]; max: [number, number, number] }
+  parts: Array<{ id: string; name: string; triangleStart: number; triangleCount: number }>
+  truncated: boolean
+  revision: string
+  parameters: Array<{ key: string; value: string }>
+}
+
+export type WorkspaceToolpathsInput = { readonly id: { readonly id: string }["id"] }
+
+export type WorkspaceToolpathsOutput = Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+
+export type WorkspaceToolpathInput = {
+  readonly id: { readonly id: string; readonly toolpathId: string }["id"]
+  readonly toolpathId: { readonly id: string; readonly toolpathId: string }["toolpathId"]
+}
+
+export type WorkspaceToolpathOutput = {
+  id: string
+  name: string
+  operationType: string | null
+  gcode: string
+  stats: { rapidMoves: number; linearMoves: number; circularMoves: number; machineFunctions: number }
+  revision: string
+  updatedAt: string
+}
+
+export type WorkspaceToolpathPreviewInput = {
+  readonly id: { readonly id: string; readonly toolpathId: string }["id"]
+  readonly toolpathId: { readonly id: string; readonly toolpathId: string }["toolpathId"]
+}
+
+export type WorkspaceToolpathPreviewOutput = {
+  segments: Array<{
+    kind: "rapid" | "linear" | "circular"
+    line: number
+    from: [number, number, number]
+    to: [number, number, number]
+  }>
+  bounds: { min: [number, number, number]; max: [number, number, number] }
+  stock: { min: [number, number, number]; max: [number, number, number] }
+  truncated: boolean
+  stats: { rapidMoves: number; linearMoves: number; circularMoves: number; machineFunctions: number }
+  revision: string
+}
+
+export type WorkspaceLibraryInput = { readonly id: { readonly id: string }["id"] }
+
+export type WorkspaceLibraryOutput = {
+  materials: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+  tools: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+  machines: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+  components: Array<{ id: string; name: string; subtitle: string | null; updatedAt: string }>
+}
