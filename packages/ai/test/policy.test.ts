@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { HUMAN_APPROVAL } from "../src/nikcli/permission-modes.ts"
 import { MockLanguageModelV4 } from "ai/test"
 import { Effect, Layer, Redacted, Stream } from "effect"
 import { AiConfig } from "../src/ai-config.ts"
@@ -63,6 +64,7 @@ describe("the host configuration", () => {
     for (const [name, agent] of Object.entries(config.agent)) {
       if (name === "compaction" || agent.permission === undefined) continue
       expect(agent.permission[victim], `${name} must not hold ${victim}`).not.toBe("allow")
+      expect(agent.permission[victim], `${name} must not ask for ${victim}`).not.toEqual(HUMAN_APPROVAL)
       expect(agent.permission[victim], `${name} must not ask for ${victim}`).not.toBe("ask")
       expect(agent.permission["code_mode"], `${name} must not run programs`).not.toBe("allow")
     }

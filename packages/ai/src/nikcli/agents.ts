@@ -15,6 +15,7 @@
 import { specialistPrompt } from "./prompts/index.ts"
 import { SPECIALIST_NATIVE_TOOLS } from "./tool-registry.ts"
 import { DESTRUCTIVE_TOOL_IDS } from "../tools/project-tools.ts"
+import { HUMAN_APPROVAL, type PermissionRule } from "./permission-modes.ts"
 
 export const SUBAGENT_IDS = ["researcher", "editor", "modeler", "machinist", "reviewer", "planner", "diagnostician", "verifier", "optimizer"] as const
 export type SubagentId = (typeof SUBAGENT_IDS)[number]
@@ -168,11 +169,11 @@ export const isSubagentId = (value: unknown): value is SubagentId =>
 export const subagentById = (id: string | undefined): SubagentSpec => SUBAGENTS[isSubagentId(id) ? id : "researcher"]
 
 /** A specialist's permission block: deny everything, allow its tools (those the project registered) and the playbooks. */
-export const subagentPermission = (spec: SubagentSpec, registeredToolIds: ReadonlyArray<string>): Record<string, "allow" | "deny" | "ask"> => {
-  const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
+export const subagentPermission = (spec: SubagentSpec, registeredToolIds: ReadonlyArray<string>): Record<string, PermissionRule> => {
+  const permission: Record<string, PermissionRule> = { "**": "deny" }
   for (const id of spec.tools) if (registeredToolIds.includes(id)) permission[id] = "allow"
   // A tool that contains a destructive action asks natively; the catalogue is where that is decided.
-  for (const id of DESTRUCTIVE_TOOL_IDS) if (permission[id] === "allow") permission[id] = "ask"
+  for (const id of DESTRUCTIVE_TOOL_IDS) if (permission[id] === "allow") permission[id] = HUMAN_APPROVAL
   for (const id of SPECIALIST_NATIVE_TOOLS) permission[id] = "allow"
   // The confined program runner sees only the tools allowed above.
   permission["code_mode"] = "allow"

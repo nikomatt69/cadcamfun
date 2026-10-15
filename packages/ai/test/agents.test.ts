@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { HUMAN_APPROVAL } from "../src/nikcli/permission-modes.ts"
 import { PRIMARIES, PRIMARY_IDS, resolvePrimary } from "../src/nikcli/primaries.ts"
 import { adoptChildSession, SUBAGENT_IDS, SUBAGENTS, subagentCatalogue } from "../src/nikcli/agents.ts"
 import { BackgroundTaskManager, type BackgroundTaskRunnerInput } from "../src/nikcli/background-tasks.ts"
@@ -14,14 +15,14 @@ const REGISTERED = [...TOOL_IDS]
 describe("specialist roster", () => {
   test("a tool that contains a destructive action requires native approval, in every role", () => {
     expect(DESTRUCTIVE_TOOL_IDS.length).toBeGreaterThan(0)
-    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
     for (const id of DESTRUCTIVE_TOOL_IDS) {
-      for (const name of ["cadcam", "cadcam-ask"]) expect(config.agent[name]!.permission[id], name).toBe("ask")
+      for (const name of ["cadcam", "cadcam-ask"]) expect(config.agent[name]!.permission[id], name).toEqual(HUMAN_APPROVAL)
     }
     // The editor deletes elements and the machinist removes library rows: both ask, and the researcher has neither tool.
     // The researcher's host name is the worker's (`cadcam-worker`), not a name spelled after the specialist.
-    expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toBe("ask")
-    expect(config.agent["cadcam-machinist"]!.permission["library_edit"]).toBe("ask")
+    expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
+    expect(config.agent["cadcam-machinist"]!.permission["library_edit"]).toEqual(HUMAN_APPROVAL)
     expect(config.agent[SUBAGENTS.researcher.host]!.permission["cad_edit"]).toBeUndefined()
     expect(config.agent[SUBAGENTS.researcher.host]!.permission["cad"]).toBe("allow")
   })
@@ -33,7 +34,7 @@ describe("specialist roster", () => {
         expect(SUBAGENTS[id].tools, `${id} must not have ${tool}`).not.toContain(tool)
       }
     }
-    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
     for (const id of ["researcher", "reviewer"] as const) {
       for (const suffix of ["", "-auto", "-ask"]) {
         const permission = config.agent[`${SUBAGENTS[id].host}${suffix}`]!.permission
@@ -94,12 +95,12 @@ describe("specialist roster", () => {
   })
 
   test("the host config has one deny-by-default agent per specialist with only its tools", () => {
-    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { mode: string; permission: Record<string, string>; steps: number }> }
+    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { mode: string; permission: Record<string, unknown>; steps: number }> }
     for (const id of SUBAGENT_IDS) {
       const agent = config.agent[SUBAGENTS[id].host]!
       expect(agent.mode).toBe("subagent")
       expect(agent.permission["**"]).toBe("deny")
-      const allowed = Object.keys(agent.permission).filter((k) => ["allow", "ask"].includes(agent.permission[k]!) && k !== "skill" && k !== "code_mode").sort()
+      const allowed = Object.keys(agent.permission).filter((k) => (agent.permission[k] === "allow" || agent.permission[k] === "ask" || agent.permission[k] === HUMAN_APPROVAL) && k !== "skill" && k !== "code_mode").sort()
       expect(allowed).toEqual([...SUBAGENTS[id].tools, "invalid", "search_tools", "question"].sort())
       expect(agent.permission["task"]).toBeUndefined()
     }
@@ -108,7 +109,7 @@ describe("specialist roster", () => {
   })
 
   test("three primary agents (plus the internal memory consolidator), every other agent a subagent", () => {
-    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { mode: string; prompt?: string; permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { mode: string; prompt?: string; permission: Record<string, unknown> }> }
     expect(PRIMARY_IDS).toEqual(["general", "cad", "cam"])
     expect(Object.entries(config.agent).filter(([name, spec]) => spec.mode === "primary" && name !== "cadcam-memory" && !/-(ask|auto)$/.test(name)).map(([name]) => name).sort())
       .toEqual(PRIMARY_IDS.map((id) => PRIMARIES[id].host).sort())
@@ -120,7 +121,7 @@ describe("specialist roster", () => {
   })
 
   test("the CAD primary changes the drawing and the CAM primary the machining; both read both and delegate", () => {
-    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { prompt?: string; permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "base" }) as { agent: Record<string, { prompt?: string; permission: Record<string, unknown> }> }
     const general = config.agent[PRIMARIES.general.host]!
     const cad = config.agent[PRIMARIES.cad.host]!
     const cam = config.agent[PRIMARIES.cam.host]!
@@ -140,18 +141,37 @@ describe("specialist roster", () => {
   })
 
   test("permission modes use native evaluation and preserve role denials", () => {
-    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission_mode?: string; permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission_mode?: string; permission: Record<string, unknown> }> }
     expect(config.agent["cadcam-auto"]?.permission_mode).toBe("auto")
     expect(config.agent["cadcam-ask"]?.permission_mode).toBe("default")
-    expect(config.agent["cadcam-ask"]?.permission["cad_edit"]).toBe("ask")
-    expect(config.agent["cadcam"]?.permission["cad_edit"]).toBe("ask")
+    expect(config.agent["cadcam-ask"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
+    expect(config.agent["cadcam"]?.permission["cad_edit"]).toEqual(HUMAN_APPROVAL)
     expect(config.agent["cadcam"]?.permission["cam"]).toBe("allow")
     expect(config.agent["cadcam-modeler-auto"]?.permission["cam_edit"]).toBeUndefined()
     expect(config.agent["cadcam-modeler-auto"]?.permission["**"]).toBe("deny")
   })
 
+  test("role limits hold in every permission mode: auto never sends a destructive tool to the classifier and keeps denials", () => {
+    const victim = "vcs_edit"
+    const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x", policies: [{ effect: "deny", action: "tool.use", resource: victim }] }) as { agent: Record<string, { permission_mode?: string; permission?: Record<string, unknown> }> }
+    for (const [name, agent] of Object.entries(config.agent)) {
+      if (agent.permission === undefined) continue
+      // A plain "ask" (pattern *) is routed to the model classifier in auto mode; a destructive tool must reach a person.
+      for (const id of DESTRUCTIVE_TOOL_IDS) if (id !== victim && agent.permission[id] !== undefined) expect(agent.permission[id], `${name} ${id}`).toEqual(HUMAN_APPROVAL)
+      expect(agent.permission[victim], `${name} keeps the policy denial`).not.toBe("allow")
+      expect(agent.permission[victim], `${name} keeps the policy denial`).not.toEqual(HUMAN_APPROVAL)
+    }
+    // The verifier generates and verifies; it never holds cam_edit (create, update, stock, release).
+    for (const name of ["cadcam-verifier", "cadcam-verifier-auto", "cadcam-verifier-ask"]) if (config.agent[name]) expect(config.agent[name]!.permission?.["cam_edit"], name).toBeUndefined()
+    // The reviewer and the researcher are read-only: no write tool at all.
+    for (const id of ["reviewer", "researcher"] as const) {
+      const permission = config.agent[SUBAGENTS[id].host]!.permission!
+      for (const write of WRITE_TOOL_IDS) expect(permission[write], `${id} ${write}`).toBeUndefined()
+    }
+  })
+
   test("a tool the project did not register is left out of the specialist's permissions", () => {
-    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: ["cad"], systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string> }> }
+    const config = buildHostConfig({ providers: defaultProviderSpecs(), toolIds: ["cad"], systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown> }> }
     expect(config.agent["cadcam-editor"]!.permission["cad_edit"]).toBeUndefined()
     expect(config.agent["cadcam-editor"]!.permission["cad"]).toBe("allow")
   })
@@ -268,7 +288,7 @@ describe("specialist events reach the parent's stream", () => {
 })
 describe("the nikcli-style roster for CAD/CAM", () => {
   const NIKCLI_STYLE = ["planner", "diagnostician", "verifier", "optimizer"] as const
-  const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, string>; prompt: string; mode: string }> }
+  const config = buildHostConfig({ providers: [], toolIds: REGISTERED, systemPrompt: "x" }) as { agent: Record<string, { permission: Record<string, unknown>; prompt: string; mode: string }> }
 
   test("each has its own title, host agent and role prompt on top of the shared contract", () => {
     const prompts = new Set<string>()

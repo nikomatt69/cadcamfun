@@ -1,4 +1,5 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
+import { HUMAN_APPROVAL } from "../src/nikcli/permission-modes.ts"
 import { historyVolume, rebuild, withParameter, type History } from "@cadcamfun/core"
 import { normalizeElement } from "../src/element-catalog.ts"
 import { decodeHistory, parseHistory, parametricReport } from "../src/parametric.ts"
@@ -102,7 +103,7 @@ describe("recipes still behave", () => {
 })
 
 describe("nikcli's policy and permission layers govern the new capabilities", () => {
-  type Config = { agent: Record<string, { permission?: Record<string, string> }> }
+  type Config = { agent: Record<string, { permission?: Record<string, unknown> }> }
   const host = (policies: ReadonlyArray<{ effect: "allow" | "deny"; action: string; resource: string }>) =>
     buildHostConfig({ providers: [], toolIds: [...TOOL_IDS], systemPrompt: "x", policies: [...policies] }) as unknown as Config
 
@@ -112,7 +113,7 @@ describe("nikcli's policy and permission layers govern the new capabilities", ()
     for (const [name, agent] of Object.entries(config.agent)) {
       if (agent.permission === undefined) continue
       expect(agent.permission["cad_edit"], `${name} must not create parts`).not.toBe("allow")
-      expect(agent.permission["cad_edit"], `${name} must not ask to create parts`).not.toBe("ask")
+      expect(agent.permission["cad_edit"], `${name} must not ask to create parts`).not.toEqual(HUMAN_APPROVAL)
       if (agent.permission["cad"] === "allow") holders.push(name)
     }
     // The tool that validates a history (cad parametric_validate) is a different tool and is still there.
@@ -123,13 +124,13 @@ describe("nikcli's policy and permission layers govern the new capabilities", ()
   test("by default creating a part asks the person, only the agent, the editor and the modeller can, and every specialist can still validate", () => {
     const config = host([])
     const can = (name: string, tool: string) => config.agent[name]?.permission?.[tool]
-    for (const name of ["cadcam", "cadcam-editor", "cadcam-modeler"]) expect(can(name, "cad_edit"), name).toBe("ask")
+    for (const name of ["cadcam", "cadcam-editor", "cadcam-modeler"]) expect(can(name, "cad_edit"), name).toEqual(HUMAN_APPROVAL)
     for (const name of ["cadcam-worker", "cadcam-reviewer", "cadcam-planner", "cadcam-diagnostician", "cadcam-machinist", "cadcam-verifier", "cadcam-optimizer"]) {
       expect(can(name, "cad_edit"), `${name} must not create parts`).toBeUndefined()
       expect(can(name, "cad"), `${name} reads the drawing and validates histories`).toBe("allow")
     }
     // The permission modes keep the person in the loop for the whole tool.
-    for (const mode of ["auto", "ask"]) expect(can(`cadcam-modeler-${mode}`, "cad_edit")).toBe("ask")
+    for (const mode of ["auto", "ask"]) expect(can(`cadcam-modeler-${mode}`, "cad_edit")).toEqual(HUMAN_APPROVAL)
   })
 
   test("the catalogue marks the parametric writes as writes and the validation as a read, which is what the bridge and code_mode scope by", async () => {

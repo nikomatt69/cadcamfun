@@ -1,4 +1,4 @@
-import { NATIVE_APPROVAL_TOOL_IDS, permissionAgents } from "./permission-modes.ts"
+import { HUMAN_APPROVAL, NATIVE_APPROVAL_TOOL_IDS, permissionAgents, type PermissionRule } from "./permission-modes.ts"
 import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
 import { SUBAGENT_IDS, SUBAGENTS, subagentPermission } from "./agents.ts"
@@ -114,7 +114,7 @@ export const validateCompactionSettings = (settings: HostCompactionSettings): vo
 }
 
 /** Natives such as `code_mode` are granted by the role itself; a `tool.use` deny must still take them away. */
-const withoutDeniedTools = (permission: Record<string, "allow" | "deny" | "ask">, policies: ReadonlyArray<PolicyStatement>): Record<string, "allow" | "deny" | "ask"> =>
+const withoutDeniedTools = (permission: Record<string, PermissionRule>, policies: ReadonlyArray<PolicyStatement>): Record<string, PermissionRule> =>
   policies.length === 0 ? permission : Object.fromEntries(Object.entries(permission).filter(([id]) => id === "**" || toolAllowed(policies, id)))
 
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {
@@ -125,13 +125,13 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   // the special curated `*` fallback, it preserves nikcli's deferred schema loading.
   const policies = input.policies ?? []
   const toolIds = permittedTools(policies, input.toolIds)
-  const permission: Record<string, "allow" | "deny" | "ask"> = { "**": "deny" }
+  const permission: Record<string, PermissionRule> = { "**": "deny" }
   // Exposures (`cam_verify`) are narrow views for one specialist; the main agent already holds the canonical tool.
   for (const id of toolIds) if (!Object.hasOwn(ACTION_EXPOSURES, id)) permission[id] = "allow"
   for (const id of NATIVE_APPROVAL_TOOL_IDS) {
-    if (toolIds.includes(id)) permission[id] = "ask"
+    if (toolIds.includes(id)) permission[id] = HUMAN_APPROVAL
   }
-  for (const id of input.askToolIds ?? []) if (toolIds.includes(id)) permission[id] = "ask"
+  for (const id of input.askToolIds ?? []) if (toolIds.includes(id)) permission[id] = HUMAN_APPROVAL
   for (const tool of NATIVE_TOOLS) if (toolAllowed(policies, tool.id)) permission[tool.id] = "allow"
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.
