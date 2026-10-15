@@ -1,10 +1,11 @@
 import { guidePages } from "./guidePages"
 import { apiGroups } from "./apiGroups"
+import { apiCategories } from "../lib/apiCategories"
 
 /**
  * Docs information architecture.
  *
- * Three areas: Docs (the system), Guides (how to work), Reference (where code lives).
+ * Four areas: Docs (the system), Guides (how to work), API (every HTTP operation), Reference (where code lives).
  * `activeDocsSection` picks the area whose item href is the longest match, so
  * `/docs/guides/quickstart` stays in Guides while `/docs` stays in Docs.
  */
@@ -52,10 +53,21 @@ export const docsNav: readonly DocsSection[] = [
         ],
       },
       {
+        title: "Kernels",
+        items: [
+          { title: "Kernel overview", href: "/docs/kernels" },
+          { title: "Sketch solver", href: "/docs/kernels/sketch-solver" },
+          { title: "Mesh and CSG", href: "/docs/kernels/mesh" },
+          { title: "Exact B-rep", href: "/docs/kernels/brep" },
+          { title: "Feature generators", href: "/docs/kernels/features" },
+          { title: "Tolerance and tessellation", href: "/docs/kernels/tolerance" },
+          { title: "CAM machining kernel", href: "/docs/kernels/cam" },
+        ],
+      },
+      {
         title: "Runtime",
         items: [
           { title: "Database", href: "/docs/database" },
-          { title: "API reference", href: "/docs/api" },
           { title: "Sidecar", href: "/docs/sidecar" },
           { title: "Desktop", href: "/docs/desktop" },
           { title: "Mobile", href: "/docs/mobile" },
@@ -100,6 +112,18 @@ export const docsNav: readonly DocsSection[] = [
     ],
   },
   {
+    id: "api",
+    title: "API",
+    href: "/docs/api",
+    groups: [
+      { title: "API Reference", items: [{ title: "Overview", href: "/docs/api" }] },
+      ...apiCategories.map((category) => ({
+        title: category.title,
+        items: category.slugs.map((slug) => apiGroups.find((group) => group.slug === slug)!).map((group) => ({ title: group.title, href: `/docs/api/${group.slug}` })),
+      })),
+    ],
+  },
+  {
     id: "reference",
     title: "Reference",
     href: "/docs/packages",
@@ -111,10 +135,6 @@ export const docsNav: readonly DocsSection[] = [
           { title: "Source map", href: "/docs/source-map" },
           { title: "Documentation operations", href: "/docs/documentation" },
         ],
-      },
-      {
-        title: "HTTP resources",
-        items: apiGroups.map((group) => ({ title: `${group.title} API`, href: `/docs/api/${group.slug}` })),
       },
     ],
   },

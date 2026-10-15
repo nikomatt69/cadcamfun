@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -17,6 +18,14 @@ const toc = [
   { title: "Build, validate, and export a solid", href: "#exact-example" },
   { title: "Validation and conversion options", href: "#validation-options" },
   { title: "Repair a failed rebuild or export", href: "#troubleshooting" },
+  { title: "Solve a sketch step by step", href: "#sketch-walkthrough" },
+  { title: "Constraint reference", href: "#constraint-reference" },
+  { title: "Build a parametric part", href: "#history-walkthrough" },
+  { title: "Exact primitives and placement", href: "#brep-primitives" },
+  { title: "Modelling practices that rebuild reliably", href: "#cad-best-practices" },
+  { title: "Design recipes", href: "#recipes" },
+  { title: "Involute gears", href: "#gears" },
+  { title: "Fastener and fit data", href: "#fasteners" },
 ]
 ---
 
@@ -76,7 +85,7 @@ const toc = [
 
   <section id="modules" class="doc-section">
     <h2>Where to extend geometry</h2>
-<p>Start with <code>packages/core/src/cad/index.ts</code> for the public CAD surface. Entity operations live beside <code>entities.ts</code>; constraint solving is in <code>sketch.ts</code>; mesh history is in <code>history.ts</code>; exact replay is in <code>history-brep.ts</code>; exact topology and exchange are under <code>brep/</code>. <code>packages/core/src/drawing/</code> owns sheet output.</p>
+<p>Start with <code>packages/core/src/cad/index.ts</code> for the public CAD surface. Entity operations live beside <code>entities.ts</code>; constraint solving is in <code>sketch.ts</code>; mesh history is in <code>history.ts</code>; exact replay is in <code>history-brep.ts</code>; exact topology and exchange are under <code>brep/</code>. <code>packages/core/src/drawing/</code> owns sheet output. Supporting modules in the same folder include <code>expr.ts</code> (parameter expressions such as <code>width / 2 + 3</code>, resolved in dependency order with cycles reported as errors), <code>tolerance.ts</code> (chord-sagitta segment counts for curves), <code>gear.ts</code> (ISO 53 involute spur-gear outlines), <code>thread.ts</code>, <code>sheet-metal.ts</code>, <code>fasteners.ts</code>, <code>recipes.ts</code> (generators that emit complete, fully constrained feature histories), <code>dfm.ts</code> (design-for-manufacture findings with measured and required values), and <code>dxf.ts</code>.</p>
     <p>Geometry functions operate on values without opening application storage. Sidecar services handle access and persistence, and desktop adapters handle interaction and rendering. Keep conversions explicit at the boundaries so a display mesh, an exact solid, and a saved history retain their distinct meaning.</p>
   </section>
 
@@ -125,6 +134,221 @@ console.log(step.startsWith("ISO-10303-21;")) // true`}
     </table>
     <p>Primitive dimensions must be positive and finite. Direct geometry functions can throw range errors for invalid dimensions; transport and service layers must convert those failures into their own typed results. Rebuild issues are keyed to feature IDs so a failure can be repaired at its source rather than concealed by retaining an earlier mesh.</p>
     <p>Source: <code>packages/core/src/cad/sketch.test.ts</code>, <code>history.ts</code>, <code>scene-step.ts</code>, and <code>apps/sidecar/test/cad-exact.test.ts</code>.</p>
+  </section>
+
+    <section id="sketch-walkthrough" class="doc-section">
+    <h2>Solve a sketch step by step</h2>
+    <p>A sketch is plain data: an array of <code>entities</code> (points, lines, circles, arcs) and an array of <code>constraints</code>. Lines, circles, and arcs refer to points by identifier, so two lines that share an endpoint share the same point ID. The solver moves only point coordinates and circle radii; it never adds or removes entities.</p>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 520 260" role="img" aria-label="Constrained rectangle sketch with points p1 to p4, lines l1 to l4, fixed origin, horizontal and vertical constraints, and length dimensions 40 and 25" style="width:100%;max-width:560px;height:auto">
+        <rect x="0" y="0" width="520" height="260" fill="none"/>
+        <g stroke="currentColor" stroke-width="2" fill="none">
+          <line x1="80" y1="200" x2="400" y2="200"/><line x1="400" y1="200" x2="400" y2="40"/>
+          <line x1="400" y1="40" x2="80" y2="40"/><line x1="80" y1="40" x2="80" y2="200"/>
+        </g>
+        <g fill="currentColor" font-size="13" font-family="monospace">
+          <circle cx="80" cy="200" r="5"/><circle cx="400" cy="200" r="4"/><circle cx="400" cy="40" r="4"/><circle cx="80" cy="40" r="4"/>
+          <text x="52" y="222">p1 (fixed)</text><text x="408" y="222">p2</text><text x="408" y="36">p3</text><text x="58" y="34">p4</text>
+          <text x="210" y="194">l1 · horizontal</text><text x="410" y="125">l2 · vertical</text>
+          <text x="210" y="56">l3 · horizontal</text><text x="6" y="125">l4 · vertical</text>
+        </g>
+        <g stroke="#2f80ed" fill="#2f80ed" font-size="13" font-family="monospace">
+          <line x1="80" y1="235" x2="400" y2="235"/><text x="215" y="252" stroke="none">width = 40</text>
+          <line x1="470" y1="200" x2="470" y2="40"/><text x="440" y="125" stroke="none" transform="rotate(-90 478 125)">depth = 25</text>
+        </g>
+      </svg>
+      <figcaption class="text-[13px]">The sketch used in the examples: four points, four lines, one fixed point, four orientation constraints, and two length dimensions. Every degree of freedom is removed, so the solver reports <code>fully-constrained</code> with <code>dof = 0</code>.</figcaption>
+    </figure>
+    <DocCode language="ts" title="Solve a fully constrained rectangle">
+{"import { cad } from \u0022@cadcamfun/core\u0022\n\nconst sketch = {\n  entities: [\n    { id: \u0022p1\u0022, kind: \u0022point\u0022, x: 0, y: 0 },\n    { id: \u0022p2\u0022, kind: \u0022point\u0022, x: 38, y: 1 },   // rough positions are fine:\n    { id: \u0022p3\u0022, kind: \u0022point\u0022, x: 39, y: 26 },  // the solver moves them\n    { id: \u0022p4\u0022, kind: \u0022point\u0022, x: 1, y: 24 },\n    { id: \u0022l1\u0022, kind: \u0022line\u0022, p1: \u0022p1\u0022, p2: \u0022p2\u0022 },\n    { id: \u0022l2\u0022, kind: \u0022line\u0022, p1: \u0022p2\u0022, p2: \u0022p3\u0022 },\n    { id: \u0022l3\u0022, kind: \u0022line\u0022, p1: \u0022p3\u0022, p2: \u0022p4\u0022 },\n    { id: \u0022l4\u0022, kind: \u0022line\u0022, p1: \u0022p4\u0022, p2: \u0022p1\u0022 },\n  ],\n  constraints: [\n    { type: \u0022fixed\u0022, point: \u0022p1\u0022, x: 0, y: 0 },\n    { type: \u0022horizontal\u0022, line: \u0022l1\u0022 },\n    { type: \u0022horizontal\u0022, line: \u0022l3\u0022 },\n    { type: \u0022vertical\u0022, line: \u0022l2\u0022 },\n    { type: \u0022vertical\u0022, line: \u0022l4\u0022 },\n    { id: \u0022width\u0022, type: \u0022length\u0022, line: \u0022l1\u0022, value: 40 },\n    { id: \u0022depth\u0022, type: \u0022length\u0022, line: \u0022l2\u0022, value: 25 },\n  ],\n}\n\nconst result = cad.solveSketch(sketch)\nresult.status     // \u0022fully-constrained\u0022\nresult.dof        // 0\nresult.iterations // 3\nresult.residual   // < 1e-9\n// points now at (0,0) (40,0) (40,25) (0,25)"}
+    </DocCode>
+    <p>Run the same sketch without the <code>fixed</code> constraint and the result changes to <code>under-constrained</code> with <code>dof = 2</code> and <code>free = ["p1", "p2", "p3", "p4"]</code>. The rectangle still has the right size, but it can slide in X and Y. Add a third length, <code>&#123; id: "w2", type: "length", line: "l3", value: 50 &#125;</code>, and the status becomes <code>conflicting</code>. <code>conflicts</code> then lists the named constraints that cannot be satisfied together, worst first (for example <code>w2</code> and <code>width</code>). Name the constraints you care about with <code>id</code>; unnamed constraints are reported with a generated label such as <code>vertical#4</code>.</p>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>maxIterations</code></td><td>200</td><td>Upper bound on Levenberg–Marquardt iterations before the solve is reported as <code>failed</code>.</td></tr>
+        <tr><td><code>tolerance</code></td><td>1e-9</td><td>The largest absolute residual accepted as solved.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Result field</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>sketch</code></td><td>The input sketch with solved coordinates and radii.</td></tr>
+        <tr><td><code>status</code></td><td><code>fully-constrained</code>, <code>under-constrained</code>, <code>over-constrained</code>, <code>conflicting</code>, or <code>failed</code>.</td></tr>
+        <tr><td><code>dof</code></td><td>Remaining degrees of freedom.</td></tr>
+        <tr><td><code>free</code></td><td>Point IDs that can still move, and circle IDs whose radius can still change.</td></tr>
+        <tr><td><code>conflicts</code></td><td>Constraint IDs that could not be satisfied, worst first.</td></tr>
+        <tr><td><code>redundant</code></td><td>Number of redundant equations (rank deficiency).</td></tr>
+        <tr><td><code>iterations</code>, <code>residual</code>, <code>message</code></td><td>Solver diagnostics.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Malformed input throws">
+      <p>A sketch that refers to an unknown point or entity is malformed rather than unsolvable, and <code>solveSketch</code> throws a <code>SketchError</code>. Validate imported sketches before solving them in a loop.</p>
+    </DocCallout>
+  </section>
+
+  <section id="constraint-reference" class="doc-section">
+    <h2>Constraint reference</h2>
+    <p>Every constraint is an object with a <code>type</code> and an optional <code>id</code>. Lengths are millimetres and angles are radians. In a parametric history, any <code>value</code> may also be a parameter expression string.</p>
+    <table>
+      <thead><tr><th>Type</th><th>Fields</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>fixed</code></td><td><code>point</code>, optional <code>x</code>, <code>y</code></td><td>Pins a point, optionally to explicit coordinates.</td></tr>
+        <tr><td><code>coincident</code></td><td><code>a</code>, <code>b</code></td><td>Two points occupy the same position.</td></tr>
+        <tr><td><code>horizontal</code> / <code>vertical</code></td><td><code>line</code></td><td>A line is parallel to X / Y.</td></tr>
+        <tr><td><code>horizontalPoints</code> / <code>verticalPoints</code></td><td><code>a</code>, <code>b</code></td><td>Two points share a Y / X coordinate.</td></tr>
+        <tr><td><code>distance</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Euclidean distance between two points.</td></tr>
+        <tr><td><code>distanceX</code> / <code>distanceY</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Signed horizontal / vertical offset.</td></tr>
+        <tr><td><code>length</code></td><td><code>line</code>, <code>value</code></td><td>Length of a line.</td></tr>
+        <tr><td><code>parallel</code> / <code>perpendicular</code></td><td><code>a</code>, <code>b</code></td><td>Relationship between two lines.</td></tr>
+        <tr><td><code>equalLength</code> / <code>equalRadius</code></td><td><code>a</code>, <code>b</code></td><td>Equal line lengths / circle or arc radii.</td></tr>
+        <tr><td><code>radius</code> / <code>diameter</code></td><td><code>circle</code>, <code>value</code></td><td>Size of a circle or arc.</td></tr>
+        <tr><td><code>angle</code></td><td><code>a</code>, <code>b</code>, <code>value</code></td><td>Counter-clockwise angle from line <code>a</code> to line <code>b</code>, in radians.</td></tr>
+        <tr><td><code>pointOnLine</code> / <code>pointOnCircle</code></td><td><code>point</code> and <code>line</code> / <code>circle</code></td><td>Incidence.</td></tr>
+        <tr><td><code>midpoint</code></td><td><code>point</code>, <code>line</code></td><td>A point sits at the middle of a line.</td></tr>
+        <tr><td><code>symmetric</code></td><td><code>a</code>, <code>b</code>, <code>line</code></td><td>Two points mirror each other about a line.</td></tr>
+        <tr><td><code>tangentLineCircle</code></td><td><code>line</code>, <code>circle</code></td><td>A line touches a circle or arc.</td></tr>
+        <tr><td><code>tangentCircles</code></td><td><code>a</code>, <code>b</code>, optional <code>internal</code></td><td>Circles touch externally (distance = r1 + r2) or internally (distance = |r1 − r2|).</td></tr>
+        <tr><td><code>concentric</code></td><td><code>a</code>, <code>b</code></td><td>Shared centre of circles or arcs.</td></tr>
+        </tbody>
+    </table>
+    <p>Arcs are counter-clockwise from <code>start</code> to <code>end</code> about <code>center</code>. A circle's radius is a solver variable, so a circle without a <code>radius</code>, <code>diameter</code>, <code>equalRadius</code>, or tangency constraint appears in <code>free</code>.</p>
+  </section>
+
+  <section id="history-walkthrough" class="doc-section">
+    <h2>Build a parametric part</h2>
+    <p>A <code>History</code> is a parameter table plus an ordered feature list. Parameters are numbers or expressions of other parameters. They are resolved in dependency order, and a cycle is an error that names the loop. Features refer to parameters by name in any dimension field.</p>
+    <DocViewer3D title="Parametric plate: 40 × 25 × 8 mm with a Ø5 through hole" caption="Result of the history example below: the sketch is solved, extruded by thick = 8 mm, and the hole (diameter = width / 8 = 5 mm) is subtracted. Exact replay of this history has a volume of 7,842.92 mm³ (8,000 − π·2.5²·8)." solids={[{"kind": "extrude", "profile": [[0, 0], [40, 0], [40, 25], [0, 25]], "holes": [[[22.5, 12.5], [22.479, 12.826], [22.415, 13.147], [22.31, 13.457], [22.165, 13.75], [21.983, 14.022], [21.768, 14.268], [21.522, 14.483], [21.25, 14.665], [20.957, 14.81], [20.647, 14.915], [20.326, 14.979], [20.0, 15.0], [19.674, 14.979], [19.353, 14.915], [19.043, 14.81], [18.75, 14.665], [18.478, 14.483], [18.232, 14.268], [18.017, 14.022], [17.835, 13.75], [17.69, 13.457], [17.585, 13.147], [17.521, 12.826], [17.5, 12.5], [17.521, 12.174], [17.585, 11.853], [17.69, 11.543], [17.835, 11.25], [18.017, 10.978], [18.232, 10.732], [18.478, 10.517], [18.75, 10.335], [19.043, 10.19], [19.353, 10.085], [19.674, 10.021], [20.0, 10.0], [20.326, 10.021], [20.647, 10.085], [20.957, 10.19], [21.25, 10.335], [21.522, 10.517], [21.768, 10.732], [21.983, 10.978], [22.165, 11.25], [22.31, 11.543], [22.415, 11.853], [22.479, 12.174]]], "height": 8}]} />
+    <DocCode language="ts" title="Plate with a parametric hole">
+{"import { cad } from \u0022@cadcamfun/core\u0022\n\nconst history = {\n  parameters: { width: 40, depth: 25, thick: 8, hole: \u0022width / 8\u0022 },\n  features: [\n    // the rectangle sketch from the previous section, with dimension\n    // values replaced by parameter names: value: \u0022width\u0022, value: \u0022depth\u0022\n    { id: \u0022s1\u0022, type: \u0022sketch\u0022, plane: \u0022XY\u0022, sketch: rectangleSketch },\n    { id: \u0022e1\u0022, type: \u0022extrude\u0022, sketch: \u0022s1\u0022, depth: \u0022thick\u0022, operation: \u0022new\u0022 },\n    { id: \u0022h1\u0022, type: \u0022hole\u0022, plane: \u0022XY\u0022, offset: \u0022thick\u0022,\n      at: [20, 12.5], diameter: \u0022hole\u0022, depth: \u0022thick\u0022 },\n  ],\n}\n\nconst mesh = cad.rebuild(history)\nmesh.parameters // { width: 40, depth: 25, thick: 8, hole: 5 }\nmesh.bodies     // one mesh body, id \u0022e1\u0022\nmesh.issues     // []\n\nconst exact = cad.rebuildExact(history, mesh)\nexact.bodies[0].brep        // present: the history has an exact representation\nexact.warnings              // []\ncad.brep.massProperties(exact.bodies[0].brep).volume // 7842.92\u2026 mm\u00b3\ncad.brep.validateBrep(exact.bodies[0].brep).valid    // true"}
+    </DocCode>
+    <code>rebuild</code> returns <code>bodies</code> (triangle meshes keyed by the feature that created them), the resolved <code>parameters</code>, each sketch's plane, frame, and solve result, the flat patterns of sheet-metal features, and <code>issues</code>. A feature that cannot be built is reported in <code>issues</code> with its feature ID and severity, and it is skipped. Features that do not depend on it still build. <code>rebuildExact(history, given?, options?)</code> can reuse a mesh rebuild you already have, and accepts a <code>budgetMs</code> time budget.
+    <p>Base planes are right-handed: <code>XY</code> has u = X, v = Y, normal +Z; <code>YZ</code> has u = Y, v = Z, normal +X; <code>ZX</code> has u = Z, v = X, normal +Y. A sketch, hole, or text can also be placed on the ID of an earlier <code>plane</code> feature, with an <code>offset</code> along the normal.</p>
+    <table>
+      <thead><tr><th>Feature</th><th>Key fields and defaults</th></tr></thead>
+      <tbody>
+        <tr><td><code>sketch</code></td><td><code>plane</code>, optional <code>offset</code>, <code>sketch</code> (entities, constraints, optional parametric <code>shapes</code>: rectangle, circle, polygon, ellipse, slot, polyline).</td></tr>
+        <tr><td><code>extrude</code></td><td><code>sketch</code>, <code>depth</code>, <code>direction</code> <code>up</code>/<code>down</code>/<code>symmetric</code>, <code>operation</code> <code>new</code>/<code>union</code>/<code>subtract</code>/<code>intersect</code>, optional <code>targets</code> (default: every body so far), <code>edge</code> chamfer/fillet of end faces (<code>ends</code> default <code>both</code>), <code>corner</code> treatment, and <code>taper</code> draft in degrees. Loops inside loops are holes (even-odd).</td></tr>
+        <tr><td><code>revolve</code></td><td><code>sketch</code>, <code>axis</code> (<code>x</code>, <code>y</code>, or a sketch line), <code>angle</code> in degrees (default 360), <code>operation</code>.</td></tr>
+        <tr><td><code>hole</code></td><td><code>plane</code>, <code>offset</code>, <code>at</code> [u, v], <code>diameter</code>, <code>depth</code>; <code>kind</code> <code>simple</code> (default), <code>counterbore</code>, or <code>countersink</code> with <code>headDiameter</code>, <code>headDepth</code>, and <code>angle</code> (default 90°). Optional cosmetic <code>thread</code> note (for example <code>M4</code>), <code>tolerance</code>, and ISO 286 <code>fit</code> such as <code>H7</code>. A cosmetic thread does not change the geometry.</td></tr>
+        <tr><td><code>pattern</code>, <code>mirror</code></td><td>Copies of an earlier feature's tool, applied the same way.</td></tr>
+        <tr><td><code>sweep</code>, <code>loft</code>, <code>coil</code></td><td>Profiles along a path, between sections, or along a helix.</td></tr>
+        <tr><td><code>shell</code>, <code>fillet</code>, <code>draft</code>, <code>pushpull</code></td><td>Face and edge edits.</td></tr>
+        <tr><td><code>move</code>, <code>scale</code>, <code>split</code>, <code>combine</code></td><td>Body operations.</td></tr>
+        <tr><td><code>rib</code>, <code>sheet</code>, <code>thread</code>, <code>text</code></td><td>Ribs, sheet-metal bodies with flat patterns, modelled threads, and stroke-font text.</td></tr>
+        <tr><td><code>plane</code>, <code>primitive</code>, <code>mate</code></td><td>Construction planes, primitive solids, and assembly mating.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="note" title="Edit the history, not the body">
+      <p>Change a parameter and rebuild: every sketch that uses it re-solves and every solid and Boolean after it is redone. Editing a generated mesh directly is lost at the next rebuild.</p>
+    </DocCallout>
+  </section>
+
+  <section id="brep-primitives" class="doc-section">
+    <h2>Exact primitives and placement</h2>
+    <p>The B-rep kernel builds analytic solids directly. Each constructor takes an optional placement <code>Frame</code>; without one, the solid is placed in the world frame.</p>
+    <table>
+      <thead><tr><th>Constructor</th><th>Arguments</th><th>World placement</th></tr></thead>
+      <tbody>
+        <tr><td><code>makeBox(dx, dy, dz, placement?)</code></td><td>Edge lengths in mm</td><td>Minimum corner at the origin.</td></tr>
+        <tr><td><code>makeCylinder(radius, height, placement?)</code></td><td>Radius and height</td><td>A cone with equal radii; axis along Z.</td></tr>
+        <tr><td><code>makeCone(r1, r2, height, placement?)</code></td><td>Base and top radii</td><td>Axis along Z.</td></tr>
+        <tr><td><code>makeSphere(radius, placement?)</code></td><td>Radius</td><td>Centred on the origin.</td></tr>
+        <tr><td><code>makeTorus(major, minor, placement?)</code></td><td>Ring and tube radii</td><td>Axis along Z.</td></tr>
+        </tbody>
+    </table>
+    <DocViewer3D title="Exact primitives" caption="makeBox(40, 25, 8) with its corner at the origin, next to a cylinder of radius 6 and height 20 placed beside it. The axes show +X (red), +Y (green), and +Z (blue)." solids={[{"kind":"box","size":[40,25,8]},{"kind":"cylinder","radius":6,"height":20,"at":[60,12.5,0],"color":"#c8a48a"}]} />
+    <p>Dimensions must be positive and finite; otherwise the constructors throw a range error. Run <code>validateBrep</code> on anything you build from Booleans, sweeps, or imports before trusting volume or export results. A primitive straight from a constructor is valid by construction.</p>
+  </section>
+
+  <section id="cad-best-practices" class="doc-section">
+    <h2>Modelling practices that rebuild reliably</h2>
+    <ul>
+      <li>Fix one point and constrain orientation before adding dimensions. An under-constrained sketch can satisfy every dimension and still move at the next rebuild.</li>
+      <li>Give every user-facing dimension an <code>id</code> so a conflict report names something a person recognises.</li>
+      <li>Prefer parameters and expressions (<code>"width / 2 + 3"</code>, <code>"max(a, b) * 2"</code>) over repeated literals; one edit then drives the whole part.</li>
+      <li>Reference earlier features by ID only after they exist in the list. Reordering a history can turn a valid reference into an issue.</li>
+      <li>Use <code>targets</code> on Booleans when a part has several bodies. The default applies the operation to every body built so far.</li>
+      <li>Check <code>issues</code> after every <code>rebuild</code> and the per-body <code>brep</code> presence after <code>rebuildExact</code> before relying on exact mass properties or STEP export.</li>
+      <li>Keep units in millimetres and radians inside sketches. Degree-valued fields are documented as such (revolve angle, taper, countersink angle).</li>
+    </ul>
+  </section>
+
+    <section id="recipes" class="doc-section">
+    <h2>Design recipes</h2>
+    <code>cad.buildRecipe(name, input)</code> turns a few engineering inputs into a full parametric history, plus a one-line summary, the derived numbers and the design rules that produced them. Seven recipes exist; parameters without a default are derived from the others when omitted.
+    <table>
+      <thead><tr><th>Name</th><th>Title</th><th>Parameters (defaults)</th></tr></thead>
+      <tbody>
+        <tr><td><code>mounting_plate</code></td><td>Mounting plate</td><td>width=100, depth=60, thickness=10, fastener=M8, fit=medium, counterbore=false, cornerRadius=0, edgeChamfer=0, edgeDistance</td></tr>
+        <tr><td><code>flange</code></td><td>Bolted flange</td><td>outerDiameter=120, boreDiameter=40, thickness=14, boltCount=6, fastener=M10, fit=medium, boltCircleDiameter, hubDiameter=0, hubHeight=0, edgeChamfer=0</td></tr>
+        <tr><td><code>l_bracket</code></td><td>L bracket</td><td>baseLength=60, legHeight=50, thickness=5, width=40, fastener=M6, fit=medium, holesPerLeg=1, cornerRadius=0</td></tr>
+        <tr><td><code>stepped_shaft</code></td><td>Stepped shaft</td><td>sections, chamfer=1, keywaySection=-1, keyLength</td></tr>
+        <tr><td><code>pipe_bend</code></td><td>Pipe elbow</td><td>outerDiameter=30, wall=3, legA=100, legB=100, bendAngle=90, bendRadius</td></tr>
+        <tr><td><code>duct_transition</code></td><td>Duct transition</td><td>shape=rect, width1=80, height1=50, width2=40, height2=40, length=120, wall=2</td></tr>
+        <tr><td><code>enclosure</code></td><td>Enclosure</td><td>length=120, width=80, height=40, wall=3, floor, cornerRadius=6, fastener=M3, bosses=true</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="Mounting plate for M8 screws">
+{"import { cad } from \u0022@cadcamfun/core\u0022\n\nconst recipe = cad.buildRecipe(\u0022mounting_plate\u0022, { width: 100, depth: 60, thickness: 10, fastener: \u0022M8\u0022 })\nrecipe.summary  // \u0022100 x 60 x 10 mm plate with four holes for M8 screws (\u00d89 mm, medium fit)\u0022\nrecipe.derived  // { holeDiameter: 9, edgeDistance: 18, holeSpacingX: 64, holeSpacingY: 24 }\nrecipe.rules    // [\u0022hole diameter from ISO 273\u0022,\n                //  \u0022centre to edge >= 1.5 x hole diameter\u0022,\n                //  \u0022centre to centre >= 2.5 x hole diameter\u0022]\n\nrecipe.history.parameters  // { width: 100, depth: 60, thick: 10, hole: 9, inset: 18 }\n// features: sketch \u0022outline\u0022, extrude \u0022plate\u0022, holes hole_sw, hole_se, hole_ne, hole_nw\n//           placed at [\u0022inset\u0022,\u0022inset\u0022], [\u0022width - inset\u0022,\u0022inset\u0022], \u2026\n\nconst mesh = cad.rebuild(recipe.history)          // issues: []\nconst exact = cad.rebuildExact(recipe.history, mesh)\ncad.brep.massProperties(exact.bodies[0].brep).volume  // 57455.31 mm\u00b3 = 60000 \u2212 4\u00b7\u03c0\u00b74.5\u00b2\u00b710"}
+    </DocCode>
+    <DocViewer3D title="mounting_plate recipe, M8" caption="The rebuilt recipe: 100 × 60 × 10 mm with four Ø9 holes 18 mm from each edge. Because hole positions are expressions of width and inset, changing width in the history moves the right-hand holes with it." solids={[{"kind": "extrude", "profile": [[0, 0], [100, 0], [100, 60], [0, 60]], "holes": [[[22.5, 18.0], [22.445, 18.704], [22.28, 19.391], [22.01, 20.043], [21.641, 20.645], [21.182, 21.182], [20.645, 21.641], [20.043, 22.01], [19.391, 22.28], [18.704, 22.445], [18.0, 22.5], [17.296, 22.445], [16.609, 22.28], [15.957, 22.01], [15.355, 21.641], [14.818, 21.182], [14.359, 20.645], [13.99, 20.043], [13.72, 19.391], [13.555, 18.704], [13.5, 18.0], [13.555, 17.296], [13.72, 16.609], [13.99, 15.957], [14.359, 15.355], [14.818, 14.818], [15.355, 14.359], [15.957, 13.99], [16.609, 13.72], [17.296, 13.555], [18.0, 13.5], [18.704, 13.555], [19.391, 13.72], [20.043, 13.99], [20.645, 14.359], [21.182, 14.818], [21.641, 15.355], [22.01, 15.957], [22.28, 16.609], [22.445, 17.296]], [[86.5, 18.0], [86.445, 18.704], [86.28, 19.391], [86.01, 20.043], [85.641, 20.645], [85.182, 21.182], [84.645, 21.641], [84.043, 22.01], [83.391, 22.28], [82.704, 22.445], [82.0, 22.5], [81.296, 22.445], [80.609, 22.28], [79.957, 22.01], [79.355, 21.641], [78.818, 21.182], [78.359, 20.645], [77.99, 20.043], [77.72, 19.391], [77.555, 18.704], [77.5, 18.0], [77.555, 17.296], [77.72, 16.609], [77.99, 15.957], [78.359, 15.355], [78.818, 14.818], [79.355, 14.359], [79.957, 13.99], [80.609, 13.72], [81.296, 13.555], [82.0, 13.5], [82.704, 13.555], [83.391, 13.72], [84.043, 13.99], [84.645, 14.359], [85.182, 14.818], [85.641, 15.355], [86.01, 15.957], [86.28, 16.609], [86.445, 17.296]], [[86.5, 42.0], [86.445, 42.704], [86.28, 43.391], [86.01, 44.043], [85.641, 44.645], [85.182, 45.182], [84.645, 45.641], [84.043, 46.01], [83.391, 46.28], [82.704, 46.445], [82.0, 46.5], [81.296, 46.445], [80.609, 46.28], [79.957, 46.01], [79.355, 45.641], [78.818, 45.182], [78.359, 44.645], [77.99, 44.043], [77.72, 43.391], [77.555, 42.704], [77.5, 42.0], [77.555, 41.296], [77.72, 40.609], [77.99, 39.957], [78.359, 39.355], [78.818, 38.818], [79.355, 38.359], [79.957, 37.99], [80.609, 37.72], [81.296, 37.555], [82.0, 37.5], [82.704, 37.555], [83.391, 37.72], [84.043, 37.99], [84.645, 38.359], [85.182, 38.818], [85.641, 39.355], [86.01, 39.957], [86.28, 40.609], [86.445, 41.296]], [[22.5, 42.0], [22.445, 42.704], [22.28, 43.391], [22.01, 44.043], [21.641, 44.645], [21.182, 45.182], [20.645, 45.641], [20.043, 46.01], [19.391, 46.28], [18.704, 46.445], [18.0, 46.5], [17.296, 46.445], [16.609, 46.28], [15.957, 46.01], [15.355, 45.641], [14.818, 45.182], [14.359, 44.645], [13.99, 44.043], [13.72, 43.391], [13.555, 42.704], [13.5, 42.0], [13.555, 41.296], [13.72, 40.609], [13.99, 39.957], [14.359, 39.355], [14.818, 38.818], [15.355, 38.359], [15.957, 37.99], [16.609, 37.72], [17.296, 37.555], [18.0, 37.5], [18.704, 37.555], [19.391, 37.72], [20.043, 37.99], [20.645, 38.359], [21.182, 38.818], [21.641, 39.355], [22.01, 39.957], [22.28, 40.609], [22.445, 41.296]]], "height": 10}]} />
+    <p>The history is ordinary: you can open it in the editor, change a parameter and rebuild. The recipe only chose sensible numbers.</p>
+  </section>
+
+  <section id="gears" class="doc-section">
+    <h2>Involute gears</h2>
+    <DocCode language="ts" title="A module-2, 18-tooth spur gear">
+{"const spec = { moduleValue: 2, teeth: 18 }          // pressureAngle defaults to 20\u00b0\ncad.gearDimensions(spec)\n// { pitchRadius: 18, baseRadius: 16.914, tipRadius: 20, rootRadius: 15.5 }\n\nconst outline = cad.gearOutline(spec, 6)   // 324 points, 6 per flank\ncad.gearOutline({ moduleValue: 2, teeth: 5 })\n// throws: 'A gear needs a module > 0 and at least 6 whole teeth'"}
+    </DocCode>
+    <DocViewer3D title="Spur gear m = 2, z = 18" caption="gearOutline extruded 8 mm with an Ø8 bore. Pitch radius = m·z/2 = 18 mm, tip radius = pitch + m = 20 mm, root radius = pitch − 1.25·m = 15.5 mm, base radius = pitch·cos 20° ≈ 16.91 mm." solids={[{"kind": "extrude", "profile": [[15.419, -1.581], [16.826, -1.725], [17.451, -1.675], [18.084, -1.526], [18.72, -1.305], [19.356, -1.022], [19.988, -0.682], [19.999, -0.227], [19.999, 0.227], [19.988, 0.682], [19.356, 1.022], [18.72, 1.305], [18.084, 1.526], [17.451, 1.675], [16.826, 1.725], [15.419, 1.581], [15.325, 2.323], [15.195, 3.059], [15.03, 3.788], [16.402, 4.134], [16.972, 4.394], [17.516, 4.752], [18.038, 5.176], [18.538, 5.66], [19.016, 6.196], [18.87, 6.626], [18.715, 7.053], [18.55, 7.477], [17.839, 7.58], [17.145, 7.629], [16.472, 7.619], [15.826, 7.543], [15.221, 7.376], [13.949, 6.759], [13.606, 7.424], [13.233, 8.071], [12.828, 8.7], [13.999, 9.494], [14.445, 9.934], [14.834, 10.456], [15.179, 11.034], [15.484, 11.659], [15.75, 12.326], [15.466, 12.681], [15.174, 13.029], [14.874, 13.37], [14.171, 13.225], [13.502, 13.033], [12.873, 12.793], [12.292, 12.501], [11.781, 12.137], [10.796, 11.122], [10.247, 11.63], [9.674, 12.111], [9.079, 12.563], [9.907, 13.709], [10.177, 14.276], [10.364, 14.899], [10.49, 15.56], [10.563, 16.252], [10.584, 16.97], [10.196, 17.206], [9.803, 17.433], [9.404, 17.651], [8.793, 17.274], [8.23, 16.865], [7.721, 16.424], [7.275, 15.951], [6.919, 15.435], [6.34, 14.144], [5.651, 14.433], [4.948, 14.689], [4.234, 14.91], [4.621, 16.271], [4.68, 16.895], [4.643, 17.545], [4.536, 18.209], [4.368, 18.884], [4.142, 19.566], [3.697, 19.655], [3.249, 19.734], [2.8, 19.803], [2.355, 19.239], [1.966, 18.663], [1.638, 18.075], [1.381, 17.477], [1.223, 16.87], [1.121, 15.459], [0.374, 15.495], [-0.374, 15.495], [-1.121, 15.459], [-1.223, 16.87], [-1.381, 17.477], [-1.638, 18.075], [-1.966, 18.663], [-2.355, 19.239], [-2.8, 19.803], [-3.249, 19.734], [-3.697, 19.655], [-4.142, 19.566], [-4.368, 18.884], [-4.536, 18.209], [-4.643, 17.545], [-4.68, 16.895], [-4.621, 16.271], [-4.234, 14.91], [-4.948, 14.689], [-5.651, 14.433], [-6.34, 14.144], [-6.919, 15.435], [-7.275, 15.951], [-7.721, 16.424], [-8.23, 16.865], [-8.793, 17.274], [-9.404, 17.651], [-9.803, 17.433], [-10.196, 17.206], [-10.584, 16.97], [-10.563, 16.252], [-10.49, 15.56], [-10.364, 14.899], [-10.177, 14.276], [-9.907, 13.709], [-9.079, 12.563], [-9.674, 12.111], [-10.247, 11.63], [-10.796, 11.122], [-11.781, 12.137], [-12.292, 12.501], [-12.873, 12.793], [-13.502, 13.033], [-14.171, 13.225], [-14.874, 13.37], [-15.174, 13.029], [-15.466, 12.681], [-15.75, 12.326], [-15.484, 11.659], [-15.179, 11.034], [-14.834, 10.456], [-14.445, 9.934], [-13.999, 9.494], [-12.828, 8.7], [-13.233, 8.071], [-13.606, 7.424], [-13.949, 6.759], [-15.221, 7.376], [-15.826, 7.543], [-16.472, 7.619], [-17.145, 7.629], [-17.839, 7.58], [-18.55, 7.477], [-18.715, 7.053], [-18.87, 6.626], [-19.016, 6.196], [-18.538, 5.66], [-18.038, 5.176], [-17.516, 4.752], [-16.972, 4.394], [-16.402, 4.134], [-15.03, 3.788], [-15.195, 3.059], [-15.325, 2.323], [-15.419, 1.581], [-16.826, 1.725], [-17.451, 1.675], [-18.084, 1.526], [-18.72, 1.305], [-19.356, 1.022], [-19.988, 0.682], [-19.999, 0.227], [-19.999, -0.227], [-19.988, -0.682], [-19.356, -1.022], [-18.72, -1.305], [-18.084, -1.526], [-17.451, -1.675], [-16.826, -1.725], [-15.419, -1.581], [-15.325, -2.323], [-15.195, -3.059], [-15.03, -3.788], [-16.402, -4.134], [-16.972, -4.394], [-17.516, -4.752], [-18.038, -5.176], [-18.538, -5.66], [-19.016, -6.196], [-18.87, -6.626], [-18.715, -7.053], [-18.55, -7.477], [-17.839, -7.58], [-17.145, -7.629], [-16.472, -7.619], [-15.826, -7.543], [-15.221, -7.376], [-13.949, -6.759], [-13.606, -7.424], [-13.233, -8.071], [-12.828, -8.7], [-13.999, -9.494], [-14.445, -9.934], [-14.834, -10.456], [-15.179, -11.034], [-15.484, -11.659], [-15.75, -12.326], [-15.466, -12.681], [-15.174, -13.029], [-14.874, -13.37], [-14.171, -13.225], [-13.502, -13.033], [-12.873, -12.793], [-12.292, -12.501], [-11.781, -12.137], [-10.796, -11.122], [-10.247, -11.63], [-9.674, -12.111], [-9.079, -12.563], [-9.907, -13.709], [-10.177, -14.276], [-10.364, -14.899], [-10.49, -15.56], [-10.563, -16.252], [-10.584, -16.97], [-10.196, -17.206], [-9.803, -17.433], [-9.404, -17.651], [-8.793, -17.274], [-8.23, -16.865], [-7.721, -16.424], [-7.275, -15.951], [-6.919, -15.435], [-6.34, -14.144], [-5.651, -14.433], [-4.948, -14.689], [-4.234, -14.91], [-4.621, -16.271], [-4.68, -16.895], [-4.643, -17.545], [-4.536, -18.209], [-4.368, -18.884], [-4.142, -19.566], [-3.697, -19.655], [-3.249, -19.734], [-2.8, -19.803], [-2.355, -19.239], [-1.966, -18.663], [-1.638, -18.075], [-1.381, -17.477], [-1.223, -16.87], [-1.121, -15.459], [-0.374, -15.495], [0.374, -15.495], [1.121, -15.459], [1.223, -16.87], [1.381, -17.477], [1.638, -18.075], [1.966, -18.663], [2.355, -19.239], [2.8, -19.803], [3.249, -19.734], [3.697, -19.655], [4.142, -19.566], [4.368, -18.884], [4.536, -18.209], [4.643, -17.545], [4.68, -16.895], [4.621, -16.271], [4.234, -14.91], [4.948, -14.689], [5.651, -14.433], [6.34, -14.144], [6.919, -15.435], [7.275, -15.951], [7.721, -16.424], [8.23, -16.865], [8.793, -17.274], [9.404, -17.651], [9.803, -17.433], [10.196, -17.206], [10.584, -16.97], [10.563, -16.252], [10.49, -15.56], [10.364, -14.899], [10.177, -14.276], [9.907, -13.709], [9.079, -12.563], [9.674, -12.111], [10.247, -11.63], [10.796, -11.122], [11.781, -12.137], [12.292, -12.501], [12.873, -12.793], [13.502, -13.033], [14.171, -13.225], [14.874, -13.37], [15.174, -13.029], [15.466, -12.681], [15.75, -12.326], [15.484, -11.659], [15.179, -11.034], [14.834, -10.456], [14.445, -9.934], [13.999, -9.494], [12.828, -8.7], [13.233, -8.071], [13.606, -7.424], [13.949, -6.759], [15.221, -7.376], [15.826, -7.543], [16.472, -7.619], [17.145, -7.629], [17.839, -7.58], [18.55, -7.477], [18.715, -7.053], [18.87, -6.626], [19.016, -6.196], [18.538, -5.66], [18.038, -5.176], [17.516, -4.752], [16.972, -4.394], [16.402, -4.134], [15.03, -3.788], [15.195, -3.059], [15.325, -2.323]], "holes": [[[4.0, 0.0], [3.951, 0.626], [3.804, 1.236], [3.564, 1.816], [3.236, 2.351], [2.828, 2.828], [2.351, 3.236], [1.816, 3.564], [1.236, 3.804], [0.626, 3.951], [0.0, 4.0], [-0.626, 3.951], [-1.236, 3.804], [-1.816, 3.564], [-2.351, 3.236], [-2.828, 2.828], [-3.236, 2.351], [-3.564, 1.816], [-3.804, 1.236], [-3.951, 0.626], [-4.0, 0.0], [-3.951, -0.626], [-3.804, -1.236], [-3.564, -1.816], [-3.236, -2.351], [-2.828, -2.828], [-2.351, -3.236], [-1.816, -3.564], [-1.236, -3.804], [-0.626, -3.951], [-0.0, -4.0], [0.626, -3.951], [1.236, -3.804], [1.816, -3.564], [2.351, -3.236], [2.828, -2.828], [3.236, -2.351], [3.564, -1.816], [3.804, -1.236], [3.951, -0.626]]], "height": 8, "color": "#c8a48a"}]} />
+    <table>
+      <thead><tr><th>Dimension</th><th>Formula</th><th>m = 2, z = 18</th></tr></thead>
+      <tbody>
+        <tr><td>Pitch radius</td><td>m·z / 2</td><td>18</td></tr>
+        <tr><td>Tip radius</td><td>pitch + m</td><td>20</td></tr>
+        <tr><td>Root radius</td><td>pitch − 1.25·m</td><td>15.5</td></tr>
+        <tr><td>Base radius</td><td>pitch · cos α</td><td>16.914</td></tr>
+        </tbody>
+    </table>
+    <code>MIN_GEAR_TEETH</code> is 6: below that, the flanks undercut the base circle and neighbouring teeth overlap.
+  </section>
+
+  <section id="fasteners" class="doc-section">
+    <h2>Fastener and fit data</h2>
+    <table>
+      <thead><tr><th>Size</th><th>Pitch</th><th>Tap drill</th><th>Clearance fine / medium / coarse</th><th>Head Ø × h</th><th>Counterbore Ø × depth</th><th>Countersink Ø</th></tr></thead>
+      <tbody>
+        <tr><td>M3</td><td>0.5</td><td>2.5</td><td>3.2 / 3.4 / 3.6</td><td>5.5 × 3</td><td>6.5 × 3.4</td><td>6</td></tr>
+        <tr><td>M5</td><td>0.8</td><td>4.2</td><td>5.3 / 5.5 / 5.8</td><td>8.5 × 5</td><td>10 × 5.7</td><td>10</td></tr>
+        <tr><td>M6</td><td>—</td><td>5</td><td>6.4 / 6.6 / 7</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>M8</td><td>1.25</td><td>6.8</td><td>8.4 / 9 / 10</td><td>13 × 8</td><td>15 × 9</td><td>16</td></tr>
+        <tr><td>M12</td><td>1.75</td><td>10.2</td><td>13 / 13.5 / 14.5</td><td>18 × 12</td><td>20 × 13</td><td>24</td></tr>
+        </tbody>
+    </table>
+    <p>Values come from <code>cad.metricThread(size)</code>, <code>clearanceHole(size, fit)</code> and <code>tapDrill(size)</code>; the M6 row was queried through the two helpers only. Related rules, with real results for an M6 screw and its Ø6.6 clearance hole:</p>
+    <table>
+      <thead><tr><th>Helper</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>threadEngagement("M6", material)</code></td><td>steel 6, aluminium 9, cast 12, plastic 12 mm</td></tr>
+        <tr><td><code>tappedHoleDepth("M6", 12)</code></td><td>15.8 mm</td></tr>
+        <tr><td><code>minEdgeDistance(6.6)</code> / <code>(6.6, "plastic")</code></td><td>9.9 / 13.2 mm</td></tr>
+        <tr><td><code>minHoleSpacing(6.6)</code></td><td>16.5 mm (2.5 × diameter)</td></tr>
+        <tr><td><code>keywayFor(25)</code></td><td>over 22 up to 30: b 8, h 7, t1 4, t2 3.3</td></tr>
+        <tr><td><code>toleranceGrade(7, 25)</code> / <code>(6, 25)</code></td><td>21 / 13 µm</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Fit</th><th>Kind</th><th>Use case</th></tr></thead>
+      <tbody>
+        <tr><td>H7/h6</td><td>location (sliding)</td><td>parts assembled by hand and located precisely, sliding spigots, guide bushings</td></tr>
+        <tr><td>H7/g6</td><td>close running</td><td>precise guiding of moving parts, spindles, slide valves</td></tr>
+        <tr><td>H7/f7</td><td>running</td><td>plain bearings, shafts in general machine building</td></tr>
+        <tr><td>H7/k6</td><td>transition</td><td>gears, pulleys and bearing inner rings driven on with a light press</td></tr>
+        <tr><td>H7/n6</td><td>interference (light press)</td><td>bushings and hubs pressed in; no key needed for small torque</td></tr>
+        <tr><td>H7/p6</td><td>interference (press)</td><td>permanent press fit of bushings in housings</td></tr>
+        </tbody>
+    </table>
   </section>
 
   <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "Setups", href: "/docs/setups" }, { title: "API contract", href: "/docs/api" }]} />

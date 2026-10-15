@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -17,6 +18,10 @@ const toc = [
   { title: "Recover preference and display issues", href: "#preferences" },
   { title: "Separate UI recovery from machining evidence", href: "#machining" },
   { title: "Triage one failure at a time", href: "#triage" },
+  { title: "Startup checklist", href: "#startup-checklist" },
+  { title: "Reading the logs", href: "#log-reading" },
+  { title: "Error messages and what they mean", href: "#message-index" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -118,6 +123,7 @@ bun run --filter @cadcamfun/desktop dev`}
     </DocCode>
     <p>Protected calls can use account session context in addition to the application token. Companion and standalone bridge tokens have narrower scopes and are not substitutes for a launch token. A 401 needs credential diagnosis; a 403 needs operation/access diagnosis; an absent or inaccessible project can be reported as 404.</p>
     <p>Some screens, including project child-resource tabs, currently turn individual list errors into empty arrays. A blank tab is not sufficient evidence that records were deleted. Read the corresponding <a href="/docs/api/projects">project</a>, <a href="/docs/api/drawings">drawing</a>, or <a href="/docs/api/toolpaths">toolpath</a> endpoint before recreating work.</p>
+    <p>A valid launch token is 64 hexadecimal characters (32 random bytes) and changes on every launch. A token of a different shape was not issued by the desktop shell.</p>
   </section>
 
   <section id="preview" class="doc-section">
@@ -156,6 +162,55 @@ bun run --filter @cadcamfun/desktop dev`}
     <p>Implementation anchors are <code>app/App.tsx</code>, <code>app/sidecar.ts</code>, <code>src-tauri/src/&#123;sidecar,commands,lib&#125;.rs</code>, sidecar <code>main.ts</code>/<code>config.ts</code>/<code>shutdown.ts</code>, and the database lifecycle. <a href="/docs/guides/local-dev">Local development</a> supplies configuration details; <a href="/docs/guides/companion-pairing">companion pairing</a> handles its separate network boundary.</p>
   </section>
 
+    <section id="startup-checklist" class="doc-section">
+    <h2>Startup checklist</h2>
+    <ol>
+      <li>Is the sidecar binary present for this platform (<code>src-tauri/binaries/sidecar-&lt;target triple&gt;</code>)? <code>desktop:dev</code> builds it; <code>tauri:dev</code> may use a stub.</li>
+      <li>Are migrations staged in <code>src-tauri/resources/migrations</code>? <code>bun run build:sidecar</code> or <code>bun scripts/build.ts --only=resources</code> restages them.</li>
+      <li>Did the sidecar print <code>ready</code> within 60 seconds? Look for an <code>error</code> line on stdout and JSON logs on stderr in the log directory (<code>get_logs_dir</code>).</li>
+      <li>Did it restart? Only one automatic restart is allowed; a second failure leaves the status at <code>failed</code>.</li>
+      <li>Does <code>GET /api/health</code> answer on the reported port? If it does but protected routes return 401, the token belongs to a different launch.</li>
+      <li>Is the data directory writable and is the database file not held open by another process with incompatible migrations?</li>
+    </ol>
+    <table>
+      <thead><tr><th>Timer</th><th>Value</th><th>Owner</th></tr></thead>
+      <tbody>
+        <tr><td>Ready handshake</td><td>60 s per attempt</td><td>Rust supervisor</td></tr>
+        <tr><td>Automatic restarts</td><td>1</td><td>Rust supervisor</td></tr>
+        <tr><td>Endpoint wait</td><td>125 s (two handshakes + 5 s)</td><td><code>get_sidecar_endpoint</code></td></tr>
+        <tr><td>Webview recovery budget</td><td>150 s, 30 s per attempt, 750 ms between attempts</td><td>Webview</td></tr>
+        <tr><td>Shutdown grace</td><td>2 s after the shutdown line, then the process is reaped (up to 5 s)</td><td>Rust supervisor</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="log-reading" class="doc-section">
+    <h2>Reading the logs</h2>
+    <p>Sidecar logs are JSON lines on stderr, kept separate from the stdout handshake. Lines that could contain credentials are replaced by <code>[redacted: line may contain credentials]</code> before they are written, so a redacted line in a log is expected, not corruption. If the handshake itself carried such a line, the reported startup error is the redaction marker; read the surrounding stderr lines for context.</p>
+    <p>The log directory is platform-specific. Get it from the <code>get_logs_dir</code> command rather than guessing a path, and open it with <code>open_path</code>, which accepts the application log directory.</p>
+  </section>
+
+    <section id="message-index" class="doc-section">
+    <h2>Error messages and what they mean</h2>
+    <table>
+      <thead><tr><th>Message</th><th>Where it comes from</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>The 3D mesh queue is full. Reduce the scene complexity.</td><td>Viewport meshing queue (128 jobs)</td><td>Hide or simplify bodies; the queue was cleared</td></tr>
+        <tr><td>3D meshing timed out. Reduce the scene complexity.</td><td>One meshing job exceeded 15 s</td><td>Simplify the solid; the worker was restarted</td></tr>
+        <tr><td>No AI provider is configured. Add an API key in the AI settings.</td><td>Assistant stream, <code>code: "config"</code></td><td>Add a provider key; nothing else is wrong</td></tr>
+        <tr><td>Legacy migration journal does not match local migrations</td><td>Database upgrade at startup</td><td>Keep the data directory; install the matching version</td></tr>
+        <tr><td>Pull request is not open</td><td>Merging or closing a merged/closed PR</td><td>Refresh the PR list</td></tr>
+        <tr><td>Unknown revision &lt;rev&gt;</td><td>History restore or log with a bad revision</td><td>Pick a revision from the log</td></tr>
+        <tr><td>Plugin &lt;id&gt; may not use "&lt;capability&gt;": it was not granted at install time</td><td>Plugin context</td><td>Reinstall and grant the capability, or change the plugin</td></tr>
+        <tr><td>The machine's rotary axes cannot reach this work plane within their limits</td><td>Indexed machining</td><td>Use another setup for that face</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Where desktop failures happen" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
     { title: "Local development", href: "/docs/guides/local-dev" },
     { title: "System API", href: "/docs/api/system" },

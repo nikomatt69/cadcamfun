@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -20,6 +21,11 @@ const toc = [
   { title: "Phone settings and local state", href: "#mobile-preferences" },
   { title: "Gateway administration example", href: "#gateway-example" },
   { title: "Recovery without losing context", href: "#mobile-recovery" },
+  { title: "Gateway allow-list", href: "#allow-list" },
+  { title: "What the phone stores", href: "#pairing-data" },
+  { title: "Screens", href: "#screens" },
+  { title: "Offline assistant queue", href: "#offline-queue" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -58,6 +64,7 @@ const toc = [
     <DocCallout type="note" title="Device access includes write operations">
       <p>The gateway currently permits version-control commit, branch, checkout, and restore requests as well as pull-request review and merge. Device tokens are scoped to the gateway route policy; they are not a read-only role or a per-project restriction. Revoke a lost or untrusted phone in desktop companion settings.</p>
     </DocCallout>
+    <p>The gateway limits failed authentication attempts: after ten failed bearer attempts from one IP address within 60 seconds, further requests from that address receive HTTP 429 until the window expires (<code>apps/sidecar/src/services/companion-gateway.ts</code>).</p>
   </section>
 
   <section id="assistant" class="doc-section">
@@ -77,7 +84,7 @@ bun run --cwd apps/mobile build
 bun run --cwd apps/mobile ios
 bun run --cwd apps/mobile ios:release --device`}
     </DocCode>
-    <p>The build command exports the iOS JavaScript bundle to <code>apps/mobile/dist</code>; it does not produce an IPA. The iOS run commands require macOS, Xcode, and CocoaPods. Device installation also requires a trusted device, Developer Mode, and an Apple signing team configured for the generated Xcode project. <code>native:generate</code> runs Expo prebuild for iOS without installing pods.</p>
+    <p>The build command exports the iOS JavaScript bundle to <code>apps/mobile/dist</code>; it does not produce an IPA. The iOS run commands require macOS, Xcode, and CocoaPods. Device installation also requires a trusted device, Developer Mode, and an Apple signing team configured for the generated Xcode project. <code>native:generate</code> runs Expo prebuild for iOS without installing pods. For day-to-day work, <code>start</code> (alias <code>dev</code>) runs the Expo development-client bundler, <code>ios:dev</code> starts it on localhost and opens the iOS simulator, <code>ios:build</code> compiles the debug app without starting a bundler, and <code>web</code> starts the Expo web target. The <code>test</code> script runs <code>bun test test</code> inside <code>apps/mobile</code>.</p>
     <p><code>.github/workflows/ci.yml</code> defines companion typechecking, logic tests, and JavaScript export. <code>.github/workflows/ios.yml</code> generates the Xcode project, builds an unsigned Release simulator app, pairs it with a live sidecar, checks authenticated project listing, and captures a screenshot. These configured checks do not establish physical-device, signing, TestFlight, or real-provider acceptance.</p>
   </section>
 
@@ -192,6 +199,78 @@ curl --fail-with-body -X POST "$CADCAM_URL/api/companion/enable" \
     <p>Implementation anchors: <code>app/(app)/settings.tsx</code>, <code>components/layout/AppLockCoordinator.tsx</code>, <code>lib/store.ts</code>, <code>lib/server.tsx</code>, and <code>lib/offline-queue.ts</code>.</p>
   </section>
 
+    <section id="allow-list" class="doc-section">
+    <h2>Gateway allow-list</h2>
+    <p>The phone talks to the desktop only through the companion gateway, which admits this fixed set of routes and forwards them to the loopback API:</p>
+    <table>
+      <thead><tr><th>Methods</th><th>Path pattern</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/health</code></td><td>Reachability check.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects</code>, <code>/api/projects/:id</code></td><td>Project list and header.</td></tr>
+        <tr><td>GET, POST</td><td><code>/api/projects/:id/vcs/*</code> (except <code>remote</code>, <code>push</code>, <code>pull</code>), <code>/pulls/*</code>, <code>/actions/*</code></td><td>History, pull requests, reviews, and workflow runs. GitHub sync stays on the desktop because it needs the owner's GitHub token.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects/:id/events</code></td><td>Live SSE stream of history, workflow, and assistant activity; the phone's only push channel.</td></tr>
+        <tr><td>GET, POST, PUT, DELETE</td><td><code>/api/notifications</code>, <code>/mark-all-read</code>, <code>/:id</code></td><td>Read, mark read, and delete notifications.</td></tr>
+        <tr><td>GET</td><td><code>/api/ai/status</code>, <code>/models</code>, <code>/agents</code></td><td>Assistant discovery.</td></tr>
+        <tr><td>POST</td><td><code>/api/ai/chat/stream</code>, <code>chat/abort</code>, <code>chat/queue</code>, <code>permission/reply</code>, <code>sessions/state</code>, <code>sessions/control</code></td><td>Assistant sessions.</td></tr>
+        </tbody>
+    </table>
+    <p>Because the list is fixed in the sidecar, a feature that needs another route (for example file upload or GitHub push) is a desktop-only feature until the list changes.</p>
+  </section>
+
+  <section id="pairing-data" class="doc-section">
+    <h2>What the phone stores</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Storage</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Gateway origin(s)</td><td>SecureStore</td><td>The preferred host plus alternates from the pairing link.</td></tr>
+        <tr><td>Device token</td><td>SecureStore, <code>WHEN_UNLOCKED_THIS_DEVICE_ONLY</code></td><td>Never leaves the device except as a bearer header to the gateway.</td></tr>
+        <tr><td>Certificate fingerprint</td><td>SecureStore</td><td>Compared with the gateway's certificate on every connection.</td></tr>
+        <tr><td>Offline queue, session markers</td><td>SecureStore</td><td>Messages composed while offline and the last-seen state of sessions.</td></tr>
+        </tbody>
+    </table>
+    <p>In a browser development build, the same data falls back to local storage, which is not encrypted. Use it only with throwaway pairings.</p>
+  </section>
+
+    <section id="screens" class="doc-section">
+    <h2>Screens</h2>
+    <table>
+      <thead><tr><th>Route file</th><th>Screen</th></tr></thead>
+      <tbody>
+        <tr><td><code>app/index.tsx</code></td><td>Entry: no pairing → the pair screen; paired → projects</td></tr>
+        <tr><td><code>app/connect.tsx</code>, <code>app/pair.tsx</code></td><td>Pairing: scan the QR code with the camera or paste the link</td></tr>
+        <tr><td><code>app/(app)/projects/index.tsx</code></td><td>Project list</td></tr>
+        <tr><td><code>app/(app)/projects/[id].tsx</code></td><td>One project</td></tr>
+        <tr><td><code>app/(app)/projects/[id]/commit/[oid].tsx</code></td><td>A commit and its changes</td></tr>
+        <tr><td><code>app/(app)/projects/[id]/pulls/[number].tsx</code></td><td>A pull request: review and merge</td></tr>
+        <tr><td><code>app/(app)/assistant.tsx</code></td><td>Assistant chat</td></tr>
+        <tr><td><code>app/(app)/activity.tsx</code></td><td>Live activity</td></tr>
+        <tr><td><code>app/(app)/settings.tsx</code></td><td>Connection and device settings</td></tr>
+        </tbody>
+    </table>
+    <p>Routes use Expo Router file conventions: <code>(app)</code> is a group that shares a layout without adding a URL segment, and <code>[id]</code> is a parameter.</p>
+  </section>
+
+  <section id="offline-queue" class="doc-section">
+    <h2>Offline assistant queue</h2>
+    <p>When the desktop cannot be reached, a message typed in the assistant is queued on the phone instead of lost:</p>
+    <table>
+      <thead><tr><th>Rule</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Where</td><td>SecureStore, so a killed app keeps the queue</td></tr>
+        <tr><td>What is stored</td><td><code>projectId</code>, <code>text</code>, optional <code>sessionId</code>, <code>agent</code>, <code>mode</code> (general, cad, cam, gcode, toolpath; default general) and <code>queuedAt</code></td></tr>
+        <tr><td>Capacity</td><td>50 entries; the oldest are dropped first</td></tr>
+        <tr><td>When it drains</td><td>When the app returns to the foreground with a stored pairing</td></tr>
+        <tr><td>How</td><td>Each entry opens a fresh streaming turn and reads until <code>done</code>; an <code>error</code> event or a background transition keeps it queued</td></tr>
+        <tr><td>Feedback</td><td>A toast: "Queued message sent" or "N queued messages sent"</td></tr>
+        </tbody>
+    </table>
+    <p>Only connectivity failures queue a message. A send counts as offline when the client reports status 0, or the error text mentions a network failure, timeout, refused connection or similar; HTTP and business errors ("request to … failed with …") are shown instead of queued.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Mobile and the sidecar" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#e05050"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Pair the iOS companion", href: "/docs/guides/companion-pairing" },
       { title: "Desktop UI", href: "/docs/desktop" },

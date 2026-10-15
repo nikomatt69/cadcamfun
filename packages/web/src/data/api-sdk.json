@@ -1,0 +1,1038 @@
+{
+"GET /api/health": {
+"call": "health.check",
+"input": null
+},
+"GET /health": {
+"call": "system.ready",
+"input": null
+},
+"GET /version": {
+"call": "system.version",
+"input": null
+},
+"POST /api/auth/forgot-password": {
+"call": "auth.forgotPassword",
+"input": "AuthForgotPasswordInput"
+},
+"POST /api/auth/reset-password": {
+"call": "auth.resetPassword",
+"input": "AuthResetPasswordInput"
+},
+"POST /api/auth/send-magic-link": {
+"call": "auth.sendMagicLink",
+"input": "AuthSendMagicLinkInput"
+},
+"POST /api/auth/send-verification-email": {
+"call": "auth.sendVerificationEmail",
+"input": "AuthSendVerificationEmailInput"
+},
+"POST /api/auth/verify-email": {
+"call": "auth.verifyEmail",
+"input": "AuthVerifyEmailInput"
+},
+"POST /api/auth/signout": {
+"call": "auth.signout",
+"input": null
+},
+"GET /api/auth/get-session": {
+"call": "auth.getSession",
+"input": null
+},
+"POST /api/auth/signin-direct": {
+"call": "auth.signinDirect",
+"input": "AuthSigninDirectInput"
+},
+"POST /api/auth/signup": {
+"call": "auth.signup",
+"input": "AuthSignupInput"
+},
+"POST /api/auth/test-direct-create": {
+"call": "auth.testDirectCreate",
+"input": "AuthTestDirectCreateInput"
+},
+"POST /api/auth/verify-magic-link": {
+"call": "auth.verifyMagicLink",
+"input": "AuthVerifyMagicLinkInput"
+},
+"POST /api/auth/passkey-register": {
+"call": "auth.registerPasskey",
+"input": null
+},
+"POST /api/waitlist": {
+"call": "waitlist.join",
+"input": "WaitlistJoinInput"
+},
+"GET /api/analytics/system-metrics": {
+"call": "analytics.systemMetrics",
+"input": null
+},
+"GET /api/analytics": {
+"call": "analytics.index",
+"input": "AnalyticsIndexInput"
+},
+"GET /api/analytics/dashboard-data": {
+"call": "analytics.dashboardData",
+"input": null
+},
+"POST /api/analytics/log-view": {
+"call": "analytics.logView",
+"input": "AnalyticsLogViewInput"
+},
+"GET /api/analytics/recent-activity": {
+"call": "analytics.recentActivity",
+"input": "AnalyticsRecentActivityInput"
+},
+"GET /api/analytics/user-history": {
+"call": "analytics.userHistory",
+"input": "AnalyticsUserHistoryInput"
+},
+"GET /api/analytics/user-metrics": {
+"call": "analytics.userMetrics",
+"input": "AnalyticsUserMetricsInput"
+},
+"GET /api/analytics/user-usage": {
+"call": "analytics.userUsage",
+"input": "AnalyticsUserUsageInput"
+},
+"DELETE /api/analytics/user-usage": {
+"call": "analytics.clearUserUsage",
+"input": null
+},
+"POST /api/analytics/track": {
+"call": "analytics.track",
+"input": "AnalyticsTrackInput"
+},
+"GET /api/user/profile": {
+"call": "user.profile",
+"input": null
+},
+"GET /api/user/stats": {
+"call": "user.stats",
+"input": null
+},
+"GET /api/user/components": {
+"call": "user.components",
+"input": null
+},
+"GET /api/user/projects": {
+"call": "user.projects",
+"input": null
+},
+"GET /api/user/toolpaths": {
+"call": "user.toolpaths",
+"input": null
+},
+"GET /api/user/organizations": {
+"call": "user.organizations",
+"input": null
+},
+"GET /api/user/api-keys": {
+"call": "user.apiKeys",
+"input": null
+},
+"POST /api/user/api-keys": {
+"call": "user.createApiKey",
+"input": "UserCreateApiKeyInput"
+},
+"DELETE /api/user/api-keys": {
+"call": "user.revokeApiKey",
+"input": "UserRevokeApiKeyInput"
+},
+"DELETE /api/user/delete-account": {
+"call": "user.deleteAccount",
+"input": null
+},
+"PUT /api/user/password": {
+"call": "user.password",
+"input": "UserPasswordInput"
+},
+"GET /api/user/tokens": {
+"call": "user.tokens",
+"input": null
+},
+"POST /api/user/tokens": {
+"call": "user.createToken",
+"input": "UserCreateTokenInput"
+},
+"GET /api/user/verify-change": {
+"call": "user.verifyChange",
+"input": "UserVerifyChangeInput"
+},
+"GET /api/user/{id}": {
+"call": "user.byId",
+"input": "UserByIdInput"
+},
+"GET /api/ai/actions": {
+"call": "ai.actions",
+"input": null
+},
+"POST /api/ai/actions/invoke": {
+"call": "ai.invokeAction",
+"input": "AiInvokeActionInput"
+},
+"POST /api/ai/bridge/tokens": {
+"call": "ai.issueBridgeToken",
+"input": "AiIssueBridgeTokenInput"
+},
+"GET /api/ai/bridge/tokens": {
+"call": "ai.bridgeTokens",
+"input": null
+},
+"DELETE /api/ai/bridge/tokens/{id}": {
+"call": "ai.revokeBridgeToken",
+"input": "AiRevokeBridgeTokenInput"
+},
+"GET /api/ai/agents": {
+"call": "ai.agents",
+"input": null
+},
+"POST /api/ai/sessions/control": {
+"call": "ai.sessionControl",
+"input": "AiSessionControlInput"
+},
+"POST /api/ai/sessions/state": {
+"call": "ai.sessionState",
+"input": "AiSessionStateInput"
+},
+"POST /api/ai/sessions/remove": {
+"call": "ai.removeSession",
+"input": "AiRemoveSessionInput"
+},
+"GET /api/ai/skills": {
+"call": "ai.skills",
+"input": null
+},
+"PUT /api/ai/skills": {
+"call": "ai.saveSkill",
+"input": "AiSaveSkillInput"
+},
+"DELETE /api/ai/skills/{name}": {
+"call": "ai.deleteSkill",
+"input": "AiDeleteSkillInput"
+},
+"PUT /api/ai/credentials": {
+"call": "ai.setCredentials",
+"input": "AiSetCredentialsInput"
+},
+"DELETE /api/ai/credentials/{provider}": {
+"call": "ai.clearCredentials",
+"input": "AiClearCredentialsInput"
+},
+"GET /api/ai/status": {
+"call": "ai.status",
+"input": null
+},
+"GET /api/ai/models": {
+"call": "ai.models",
+"input": "AiModelsInput"
+},
+"GET /api/ai/providers": {
+"call": "ai.providers",
+"input": null
+},
+"GET /api/ai/prompts": {
+"call": "ai.prompts",
+"input": "AiPromptsInput"
+},
+"POST /api/ai/title": {
+"call": "ai.title",
+"input": "AiTitleInput"
+},
+"POST /api/ai/design-analysis": {
+"call": "ai.designAnalysis",
+"input": "AiDesignAnalysisInput"
+},
+"POST /api/ai/machining-parameters": {
+"call": "ai.machiningParameters",
+"input": "AiMachiningParametersInput"
+},
+"POST /api/ai/gcode-optimization": {
+"call": "ai.gcodeOptimization",
+"input": "AiGcodeOptimizationInput"
+},
+"POST /api/ai/design-suggestions": {
+"call": "ai.designSuggestions",
+"input": "AiDesignSuggestionsInput"
+},
+"POST /api/ai/chat": {
+"call": "ai.chat",
+"input": "AiChatInput"
+},
+"POST /api/ai/chat/stream": {
+"call": "ai.chatStream",
+"input": "AiChatStreamInput"
+},
+"POST /api/ai/chat/queue": {
+"call": "ai.chatQueue",
+"input": "AiChatQueueInput"
+},
+"POST /api/ai/chat/abort": {
+"call": "ai.chatAbort",
+"input": "AiChatAbortInput"
+},
+"POST /api/ai/permission/reply": {
+"call": "ai.permissionReply",
+"input": "AiPermissionReplyInput"
+},
+"POST /api/ai/completion": {
+"call": "ai.completion",
+"input": "AiCompletionInput"
+},
+"POST /api/ai/analyze-gcode": {
+"call": "ai.analyzeGcode",
+"input": "AiAnalyzeGcodeInput"
+},
+"POST /api/ai/gcode": {
+"call": "ai.gcode",
+"input": "AiGcodeInput"
+},
+"POST /api/ai/toolpath-analysis": {
+"call": "ai.toolpathAnalysis",
+"input": "AiToolpathAnalysisInput"
+},
+"POST /api/ai/feedback": {
+"call": "ai.feedback",
+"input": "AiFeedbackInput"
+},
+"POST /api/ai/proxy": {
+"call": "ai.proxy",
+"input": "AiProxyInput"
+},
+"GET /api/mcp/config": {
+"call": "mcp.listConfig",
+"input": "McpListConfigInput"
+},
+"PUT /api/mcp/config": {
+"call": "mcp.updateConfig",
+"input": "McpUpdateConfigInput"
+},
+"DELETE /api/mcp/config": {
+"call": "mcp.removeConfig",
+"input": "McpRemoveConfigInput"
+},
+"GET /api/mcp/config/{id}": {
+"call": "mcp.getConfig",
+"input": "McpGetConfigInput"
+},
+"DELETE /api/mcp/config/{id}": {
+"call": "mcp.removeConfigById",
+"input": "McpRemoveConfigByIdInput"
+},
+"POST /api/mcp/server-info": {
+"call": "mcp.serverInfo",
+"input": "McpServerInfoInput"
+},
+"GET /api/subscription/info": {
+"call": "billing.info",
+"input": "BillingInfoInput"
+},
+"GET /api/subscriptions": {
+"call": "billing.current",
+"input": null
+},
+"POST /api/subscriptions": {
+"call": "billing.subscribe",
+"input": "BillingSubscribeInput"
+},
+"POST /api/subscriptions/portal": {
+"call": "billing.portal",
+"input": "BillingPortalInput"
+},
+"GET /api/better-auth-stripe/subscription": {
+"call": "billing.baGet",
+"input": null
+},
+"POST /api/better-auth-stripe/subscription": {
+"call": "billing.baCheckout",
+"input": "BillingBaCheckoutInput"
+},
+"PUT /api/better-auth-stripe/subscription": {
+"call": "billing.baUpdate",
+"input": "BillingBaUpdateInput"
+},
+"DELETE /api/better-auth-stripe/subscription": {
+"call": "billing.baCancel",
+"input": null
+},
+"POST /api/better-auth-stripe/billing-portal": {
+"call": "billing.baPortal",
+"input": "BillingBaPortalInput"
+},
+"POST /api/better-auth-stripe/feature-access": {
+"call": "billing.baFeature",
+"input": "BillingBaFeatureInput"
+},
+"POST /api/better-auth-stripe/sync": {
+"call": "billing.baSync",
+"input": null
+},
+"GET /api/cron/update-expired-trials": {
+"call": "billing.cronGet",
+"input": "BillingCronGetInput"
+},
+"POST /api/cron/update-expired-trials": {
+"call": "billing.cronPost",
+"input": "BillingCronPostInput"
+},
+"GET /api/health/stripe": {
+"call": "billing.stripeHealth",
+"input": null
+},
+"POST /api/push-subscription": {
+"call": "misc.pushSubscribe",
+"input": "MiscPushSubscribeInput"
+},
+"DELETE /api/push-subscription": {
+"call": "misc.pushUnsubscribe",
+"input": "MiscPushUnsubscribeInput"
+},
+"POST /api/app-control/notify": {
+"call": "misc.notify",
+"input": "MiscNotifyInput"
+},
+"POST /api/desktop/auth/signin": {
+"call": "misc.desktopSignin",
+"input": "MiscDesktopSigninInput"
+},
+"GET /api/desktop/projects": {
+"call": "misc.desktopProjects",
+"input": null
+},
+"POST /api/desktop/projects": {
+"call": "misc.desktopCreateProject",
+"input": "MiscDesktopCreateProjectInput"
+},
+"GET /api/desktop/user/by-email": {
+"call": "misc.desktopUserByEmail",
+"input": "MiscDesktopUserByEmailInput"
+},
+"GET /api/projects/tracked/{id}": {
+"call": "misc.trackedGet",
+"input": "MiscTrackedGetInput"
+},
+"PUT /api/projects/tracked/{id}": {
+"call": "misc.trackedUpdate",
+"input": "MiscTrackedUpdateInput"
+},
+"DELETE /api/projects/tracked/{id}": {
+"call": "misc.trackedRemove",
+"input": "MiscTrackedRemoveInput"
+},
+"GET /api/kv": {
+"call": "kv.list",
+"input": "KvListInput"
+},
+"GET /api/kv/{key}": {
+"call": "kv.get",
+"input": "KvGetInput"
+},
+"PUT /api/kv/{key}": {
+"call": "kv.set",
+"input": "KvSetInput"
+},
+"DELETE /api/kv/{key}": {
+"call": "kv.remove",
+"input": "KvRemoveInput"
+},
+"GET /api/production-costs/estimates": {
+"call": "[\"production-costs\"].listEstimates",
+"input": "ProductionCostsListEstimatesInput"
+},
+"POST /api/production-costs/estimates": {
+"call": "[\"production-costs\"].createEstimate",
+"input": "ProductionCostsCreateEstimateInput"
+},
+"GET /api/production-costs/estimates/{id}": {
+"call": "[\"production-costs\"].getEstimate",
+"input": "ProductionCostsGetEstimateInput"
+},
+"PUT /api/production-costs/estimates/{id}": {
+"call": "[\"production-costs\"].updateEstimate",
+"input": "ProductionCostsUpdateEstimateInput"
+},
+"DELETE /api/production-costs/estimates/{id}": {
+"call": "[\"production-costs\"].deleteEstimate",
+"input": "ProductionCostsDeleteEstimateInput"
+},
+"POST /api/production-costs/estimates/calculate": {
+"call": "[\"production-costs\"].calculateEstimate",
+"input": "ProductionCostsCalculateEstimateInput"
+},
+"GET /api/production-costs/material-costs": {
+"call": "[\"production-costs\"].listMaterialCosts",
+"input": "ProductionCostsListMaterialCostsInput"
+},
+"POST /api/production-costs/material-costs": {
+"call": "[\"production-costs\"].createMaterialCost",
+"input": "ProductionCostsCreateMaterialCostInput"
+},
+"GET /api/production-costs/material-costs/{id}": {
+"call": "[\"production-costs\"].getMaterialCost",
+"input": "ProductionCostsGetMaterialCostInput"
+},
+"PUT /api/production-costs/material-costs/{id}": {
+"call": "[\"production-costs\"].updateMaterialCost",
+"input": "ProductionCostsUpdateMaterialCostInput"
+},
+"DELETE /api/production-costs/material-costs/{id}": {
+"call": "[\"production-costs\"].deleteMaterialCost",
+"input": "ProductionCostsDeleteMaterialCostInput"
+},
+"GET /api/production-costs/operation-costs": {
+"call": "[\"production-costs\"].listOperationCosts",
+"input": "ProductionCostsListOperationCostsInput"
+},
+"POST /api/production-costs/operation-costs": {
+"call": "[\"production-costs\"].createOperationCost",
+"input": "ProductionCostsCreateOperationCostInput"
+},
+"GET /api/production-costs/operation-costs/{id}": {
+"call": "[\"production-costs\"].getOperationCost",
+"input": "ProductionCostsGetOperationCostInput"
+},
+"PUT /api/production-costs/operation-costs/{id}": {
+"call": "[\"production-costs\"].updateOperationCost",
+"input": "ProductionCostsUpdateOperationCostInput"
+},
+"DELETE /api/production-costs/operation-costs/{id}": {
+"call": "[\"production-costs\"].deleteOperationCost",
+"input": "ProductionCostsDeleteOperationCostInput"
+},
+"GET /api/production-costs/tool-wear": {
+"call": "[\"production-costs\"].listToolWear",
+"input": "ProductionCostsListToolWearInput"
+},
+"POST /api/production-costs/tool-wear": {
+"call": "[\"production-costs\"].createToolWear",
+"input": "ProductionCostsCreateToolWearInput"
+},
+"GET /api/production-costs/tool-wear/{id}": {
+"call": "[\"production-costs\"].getToolWear",
+"input": "ProductionCostsGetToolWearInput"
+},
+"PUT /api/production-costs/tool-wear/{id}": {
+"call": "[\"production-costs\"].updateToolWear",
+"input": "ProductionCostsUpdateToolWearInput"
+},
+"DELETE /api/production-costs/tool-wear/{id}": {
+"call": "[\"production-costs\"].deleteToolWear",
+"input": "ProductionCostsDeleteToolWearInput"
+},
+"GET /api/plugins": {
+"call": "plugins.list",
+"input": null
+},
+"GET /api/plugins/{id}": {
+"call": "plugins.get",
+"input": "PluginsGetInput"
+},
+"DELETE /api/plugins/{id}": {
+"call": "plugins.uninstall",
+"input": "PluginsUninstallInput"
+},
+"GET /api/plugins/{id}/config": {
+"call": "plugins.getConfig",
+"input": "PluginsGetConfigInput"
+},
+"POST /api/plugins/{id}/config": {
+"call": "plugins.setConfig",
+"input": "PluginsSetConfigInput"
+},
+"PUT /api/plugins/{id}/config": {
+"call": "plugins.updateConfig",
+"input": "PluginsUpdateConfigInput"
+},
+"POST /api/plugins/{id}/enable": {
+"call": "plugins.enable",
+"input": "PluginsEnableInput"
+},
+"POST /api/plugins/{id}/disable": {
+"call": "plugins.disable",
+"input": "PluginsDisableInput"
+},
+"PUT /api/plugins/{id}/update": {
+"call": "plugins.update",
+"input": "PluginsUpdateInput"
+},
+"PATCH /api/plugins/{id}/update": {
+"call": "plugins.patch",
+"input": "PluginsPatchInput"
+},
+"GET /api/plugins/registry": {
+"call": "plugins.registry",
+"input": null
+},
+"GET /api/plugins/registry/{id}": {
+"call": "plugins.registryGet",
+"input": "PluginsRegistryGetInput"
+},
+"GET /api/plugins/registry/search": {
+"call": "plugins.registrySearch",
+"input": "PluginsRegistrySearchInput"
+},
+"POST /api/upload": {
+"call": "files.upload",
+"input": "FilesUploadInput"
+},
+"GET /api/organizations": {
+"call": "organizations.list",
+"input": null
+},
+"POST /api/organizations": {
+"call": "organizations.create",
+"input": "OrganizationsCreateInput"
+},
+"GET /api/organizations/{id}": {
+"call": "organizations.get",
+"input": "OrganizationsGetInput"
+},
+"PUT /api/organizations/{id}": {
+"call": "organizations.update",
+"input": "OrganizationsUpdateInput"
+},
+"DELETE /api/organizations/{id}": {
+"call": "organizations.remove",
+"input": "OrganizationsRemoveInput"
+},
+"GET /api/notifications": {
+"call": "notifications.list",
+"input": "NotificationsListInput"
+},
+"PUT /api/notifications/{id}": {
+"call": "notifications.update",
+"input": "NotificationsUpdateInput"
+},
+"DELETE /api/notifications/{id}": {
+"call": "notifications.remove",
+"input": "NotificationsRemoveInput"
+},
+"POST /api/notifications/mark-all-read": {
+"call": "notifications.markAllRead",
+"input": null
+},
+"GET /api/projects": {
+"call": "projects.list",
+"input": null
+},
+"POST /api/projects": {
+"call": "projects.create",
+"input": "ProjectsCreateInput"
+},
+"GET /api/projects/{id}": {
+"call": "projects.get",
+"input": "ProjectsGetInput"
+},
+"PUT /api/projects/{id}": {
+"call": "projects.update",
+"input": "ProjectsUpdateInput"
+},
+"DELETE /api/projects/{id}": {
+"call": "projects.remove",
+"input": "ProjectsRemoveInput"
+},
+"GET /api/materials": {
+"call": "materials.list",
+"input": "MaterialsListInput"
+},
+"POST /api/materials": {
+"call": "materials.create",
+"input": "MaterialsCreateInput"
+},
+"GET /api/materials/{id}": {
+"call": "materials.get",
+"input": "MaterialsGetInput"
+},
+"PUT /api/materials/{id}": {
+"call": "materials.update",
+"input": "MaterialsUpdateInput"
+},
+"DELETE /api/materials/{id}": {
+"call": "materials.remove",
+"input": "MaterialsRemoveInput"
+},
+"POST /api/materials/{id}/storage": {
+"call": "materialsStorage.save",
+"input": "MaterialsStorageSaveInput"
+},
+"GET /api/materials/{id}/storage": {
+"call": "materialsStorage.read",
+"input": "MaterialsStorageReadInput"
+},
+"DELETE /api/materials/{id}/storage": {
+"call": "materialsStorage.remove",
+"input": "MaterialsStorageRemoveInput"
+},
+"GET /api/materials/export-import": {
+"call": "materialsStorage.export",
+"input": "MaterialsStorageExportInput"
+},
+"POST /api/materials/export-import": {
+"call": "materialsStorage.import",
+"input": "MaterialsStorageImportInput"
+},
+"GET /api/tools": {
+"call": "tools.list",
+"input": "ToolsListInput"
+},
+"POST /api/tools": {
+"call": "tools.create",
+"input": "ToolsCreateInput"
+},
+"GET /api/tools/{id}": {
+"call": "tools.get",
+"input": "ToolsGetInput"
+},
+"PUT /api/tools/{id}": {
+"call": "tools.update",
+"input": "ToolsUpdateInput"
+},
+"DELETE /api/tools/{id}": {
+"call": "tools.remove",
+"input": "ToolsRemoveInput"
+},
+"POST /api/tools/{id}/storage": {
+"call": "toolsStorage.save",
+"input": "ToolsStorageSaveInput"
+},
+"GET /api/tools/{id}/storage": {
+"call": "toolsStorage.read",
+"input": "ToolsStorageReadInput"
+},
+"DELETE /api/tools/{id}/storage": {
+"call": "toolsStorage.remove",
+"input": "ToolsStorageRemoveInput"
+},
+"GET /api/tools/export-import": {
+"call": "toolsStorage.export",
+"input": "ToolsStorageExportInput"
+},
+"POST /api/tools/export-import": {
+"call": "toolsStorage.import",
+"input": "ToolsStorageImportInput"
+},
+"GET /api/tools/{id}/export-import": {
+"call": "toolsStorage.exportById",
+"input": "ToolsStorageExportByIdInput"
+},
+"POST /api/tools/{id}/export-import": {
+"call": "toolsStorage.importById",
+"input": "ToolsStorageImportByIdInput"
+},
+"GET /api/machine-configs": {
+"call": "machineConfigs.list",
+"input": "MachineConfigsListInput"
+},
+"POST /api/machine-configs": {
+"call": "machineConfigs.create",
+"input": "MachineConfigsCreateInput"
+},
+"GET /api/machine-configs/{id}": {
+"call": "machineConfigs.get",
+"input": "MachineConfigsGetInput"
+},
+"PUT /api/machine-configs/{id}": {
+"call": "machineConfigs.update",
+"input": "MachineConfigsUpdateInput"
+},
+"DELETE /api/machine-configs/{id}": {
+"call": "machineConfigs.remove",
+"input": "MachineConfigsRemoveInput"
+},
+"POST /api/machine-configs/{id}/clone": {
+"call": "machineConfigs.clone",
+"input": "MachineConfigsCloneInput"
+},
+"POST /api/machine-configs/{id}/storage": {
+"call": "machineConfigsStorage.save",
+"input": "MachineConfigsStorageSaveInput"
+},
+"GET /api/machine-configs/{id}/storage": {
+"call": "machineConfigsStorage.read",
+"input": "MachineConfigsStorageReadInput"
+},
+"DELETE /api/machine-configs/{id}/storage": {
+"call": "machineConfigsStorage.remove",
+"input": "MachineConfigsStorageRemoveInput"
+},
+"GET /api/machine-configs/export-import": {
+"call": "machineConfigsStorage.export",
+"input": "MachineConfigsStorageExportInput"
+},
+"POST /api/machine-configs/export-import": {
+"call": "machineConfigsStorage.import",
+"input": "MachineConfigsStorageImportInput"
+},
+"GET /api/drawings/{id}": {
+"call": "drawings.get",
+"input": "DrawingsGetInput"
+},
+"PUT /api/drawings/{id}": {
+"call": "drawings.update",
+"input": "DrawingsUpdateInput"
+},
+"DELETE /api/drawings/{id}": {
+"call": "drawings.remove",
+"input": "DrawingsRemoveInput"
+},
+"GET /api/projects/{id}/drawings": {
+"call": "drawings.listForProject",
+"input": "DrawingsListForProjectInput"
+},
+"POST /api/projects/{id}/drawings": {
+"call": "drawings.createForProject",
+"input": "DrawingsCreateForProjectInput"
+},
+"GET /api/components/{id}": {
+"call": "components.get",
+"input": "ComponentsGetInput"
+},
+"PUT /api/components/{id}": {
+"call": "components.update",
+"input": "ComponentsUpdateInput"
+},
+"DELETE /api/components/{id}": {
+"call": "components.remove",
+"input": "ComponentsRemoveInput"
+},
+"GET /api/projects/{id}/components": {
+"call": "components.listForProject",
+"input": "ComponentsListForProjectInput"
+},
+"POST /api/projects/{id}/components": {
+"call": "components.createForProject",
+"input": "ComponentsCreateForProjectInput"
+},
+"GET /api/toolpaths": {
+"call": "toolpaths.list",
+"input": "ToolpathsListInput"
+},
+"POST /api/toolpaths": {
+"call": "toolpaths.create",
+"input": "ToolpathsCreateInput"
+},
+"GET /api/toolpaths/{id}": {
+"call": "toolpaths.get",
+"input": "ToolpathsGetInput"
+},
+"PUT /api/toolpaths/{id}": {
+"call": "toolpaths.update",
+"input": "ToolpathsUpdateInput"
+},
+"DELETE /api/toolpaths/{id}": {
+"call": "toolpaths.remove",
+"input": "ToolpathsRemoveInput"
+},
+"GET /api/drawings/{id}/toolpaths": {
+"call": "toolpaths.listForDrawing",
+"input": "ToolpathsListForDrawingInput"
+},
+"POST /api/drawings/{id}/toolpaths": {
+"call": "toolpaths.createForDrawing",
+"input": "ToolpathsCreateForDrawingInput"
+},
+"GET /api/toolpaths/library": {
+"call": "toolpathExtras.library",
+"input": "ToolpathExtrasLibraryInput"
+},
+"GET /api/toolpaths/{id}/versions": {
+"call": "toolpathExtras.listVersions",
+"input": "ToolpathExtrasListVersionsInput"
+},
+"POST /api/toolpaths/{id}/versions": {
+"call": "toolpathExtras.createVersion",
+"input": "ToolpathExtrasCreateVersionInput"
+},
+"POST /api/toolpaths/{id}/versions/restore": {
+"call": "toolpathExtras.restoreVersion",
+"input": "ToolpathExtrasRestoreVersionInput"
+},
+"GET /api/toolpaths/{id}/comments": {
+"call": "toolpathExtras.listComments",
+"input": "ToolpathExtrasListCommentsInput"
+},
+"POST /api/toolpaths/{id}/comments": {
+"call": "toolpathExtras.createComment",
+"input": "ToolpathExtrasCreateCommentInput"
+},
+"PUT /api/toolpaths/{id}/comments/{commentId}": {
+"call": "toolpathExtras.updateComment",
+"input": "ToolpathExtrasUpdateCommentInput"
+},
+"DELETE /api/toolpaths/{id}/comments/{commentId}": {
+"call": "toolpathExtras.removeComment",
+"input": "ToolpathExtrasRemoveCommentInput"
+},
+"POST /api/toolpaths/manufacture": {
+"call": "toolpathGenerator.manufacture",
+"input": "ToolpathGeneratorManufactureInput"
+},
+"POST /api/toolpaths/parse": {
+"call": "toolpathGenerator.parse",
+"input": "ToolpathGeneratorParseInput"
+},
+"POST /api/toolpaths/verify": {
+"call": "toolpathGenerator.verify",
+"input": "ToolpathGeneratorVerifyInput"
+},
+"POST /api/cad/exact/analyze": {
+"call": "cadExact.analyze",
+"input": "CadExactAnalyzeInput"
+},
+"POST /api/cad/exact/step": {
+"call": "cadExact.step",
+"input": "CadExactStepInput"
+},
+"POST /api/cad/exact/assembly": {
+"call": "cadExact.assembly",
+"input": "CadExactAssemblyInput"
+},
+"GET /api/library": {
+"call": "library.list",
+"input": "LibraryListInput"
+},
+"POST /api/library": {
+"call": "library.create",
+"input": "LibraryCreateInput"
+},
+"GET /api/library/{id}": {
+"call": "library.get",
+"input": "LibraryGetInput"
+},
+"PUT /api/library/{id}": {
+"call": "library.update",
+"input": "LibraryUpdateInput"
+},
+"DELETE /api/library/{id}": {
+"call": "library.remove",
+"input": "LibraryRemoveInput"
+},
+"GET /api/library/components": {
+"call": "library.components",
+"input": null
+},
+"GET /api/library/materials": {
+"call": "library.materials",
+"input": null
+},
+"GET /api/library/tools": {
+"call": "library.tools",
+"input": null
+},
+"GET /api/projects/{id}/toolpaths": {
+"call": "projectToolpaths.list",
+"input": "ProjectToolpathsListInput"
+},
+"GET /api/projects/{id}/vcs/status": {
+"call": "vcs.status",
+"input": "VcsStatusInput"
+},
+"GET /api/projects/{id}/vcs/log": {
+"call": "vcs.log",
+"input": "VcsLogInput"
+},
+"POST /api/projects/{id}/vcs/commit": {
+"call": "vcs.commit",
+"input": "VcsCommitInput"
+},
+"GET /api/projects/{id}/vcs/branches": {
+"call": "vcs.branches",
+"input": "VcsBranchesInput"
+},
+"POST /api/projects/{id}/vcs/branches": {
+"call": "vcs.createBranch",
+"input": "VcsCreateBranchInput"
+},
+"POST /api/projects/{id}/vcs/checkout": {
+"call": "vcs.checkout",
+"input": "VcsCheckoutInput"
+},
+"POST /api/projects/{id}/vcs/restore": {
+"call": "vcs.restore",
+"input": "VcsRestoreInput"
+},
+"GET /api/projects/{id}/vcs/diff": {
+"call": "vcs.diff",
+"input": "VcsDiffInput"
+},
+"GET /api/projects/{id}/pulls": {
+"call": "vcs.listPullRequests",
+"input": "VcsListPullRequestsInput"
+},
+"POST /api/projects/{id}/pulls": {
+"call": "vcs.openPullRequest",
+"input": "VcsOpenPullRequestInput"
+},
+"GET /api/projects/{id}/pulls/{number}": {
+"call": "vcs.pullRequest",
+"input": "VcsPullRequestInput"
+},
+"POST /api/projects/{id}/pulls/{number}/reviews": {
+"call": "vcs.review",
+"input": "VcsReviewInput"
+},
+"POST /api/projects/{id}/pulls/{number}/merge": {
+"call": "vcs.mergePullRequest",
+"input": "VcsMergePullRequestInput"
+},
+"POST /api/projects/{id}/pulls/{number}/close": {
+"call": "vcs.closePullRequest",
+"input": "VcsClosePullRequestInput"
+},
+"GET /api/projects/{id}/vcs/remote": {
+"call": "vcs.remote",
+"input": "VcsRemoteInput"
+},
+"PUT /api/projects/{id}/vcs/remote": {
+"call": "vcs.setRemote",
+"input": "VcsSetRemoteInput"
+},
+"POST /api/projects/{id}/vcs/push": {
+"call": "vcs.push",
+"input": "VcsPushInput"
+},
+"POST /api/projects/{id}/vcs/pull": {
+"call": "vcs.pull",
+"input": "VcsPullInput"
+},
+"GET /api/projects/{id}/actions/runs": {
+"call": "vcs.runs",
+"input": "VcsRunsInput"
+},
+"POST /api/projects/{id}/actions/dispatch": {
+"call": "vcs.dispatch",
+"input": "VcsDispatchInput"
+},
+"GET /api/projects/{id}/actions/workflows": {
+"call": "vcs.listWorkflows",
+"input": "VcsListWorkflowsInput"
+},
+"GET /api/projects/{id}/actions/workflows/{name}": {
+"call": "vcs.workflow",
+"input": "VcsWorkflowInput"
+},
+"GET /api/projects/{id}/events": {
+"call": "events.subscribe",
+"input": "EventsSubscribeInput"
+},
+"GET /api/companion": {
+"call": "companion.status",
+"input": null
+},
+"POST /api/companion/enable": {
+"call": "companion.enable",
+"input": "CompanionEnableInput"
+},
+"POST /api/companion/disable": {
+"call": "companion.disable",
+"input": null
+},
+"POST /api/companion/pair": {
+"call": "companion.pair",
+"input": "CompanionPairInput"
+},
+"DELETE /api/companion/devices/{id}": {
+"call": "companion.revoke",
+"input": "CompanionRevokeInput"
+}
+}

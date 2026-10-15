@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -18,6 +19,14 @@ const toc = [
   { title: "Controlled playback example", href: "#playback-example" },
   { title: "Editing recipes and current tool limits", href: "#editing-recipes" },
   { title: "Rendering and meshing failures", href: "#rendering-failures" },
+  { title: "Display units in detail", href: "#units-reference" },
+  { title: "2D camera and grid", href: "#camera-math" },
+  { title: "Snapping reference", href: "#snapping-reference" },
+  { title: "How toolpath playback is timed", href: "#playback-internals" },
+  { title: "Viewport practices", href: "#viewport-practices" },
+  { title: "Hit-testing at scale: the spatial grid", href: "#spatial-index" },
+  { title: "3D meshing queue", href: "#mesh-queue" },
+  { title: "2D tool implementations", href: "#editor-tools" },
 ]
 ---
 
@@ -75,6 +84,7 @@ const [tool, setTool] = createSignal<ToolId>("select")
     <h2>Coordinates and units</h2>
     <p>Core drawing coordinates and stock sizes use millimetres. Drawing angles and Three.js rotation components use radians; do not apply that convention to CAM rotary-axis values or feature inputs that explicitly use degrees. <code>viewport/units.ts</code> contains conversion helpers for displayed millimetres and inches. Convert at input/output boundaries so snapping, geometry, and toolpath motion retain a consistent unit system.</p>
     <p>The 2D camera maps world coordinates to CSS pixels; backing canvas dimensions incorporate device pixel ratio. Resizing updates the camera and backing buffer through <code>ResizeObserver</code>. Camera scale determines grid spacing and screen-space hit tolerances.</p>
+    <p>Inch display converts with exactly 25.4 mm per inch, and lengths default to 3 decimals (<code>apps/desktop/src/viewport/units.ts</code>). In the 2D editor, each wheel step zooms by a factor of 1.15, the scale is clamped between 0.001 and 100,000, and fit-to-view leaves a 10% margin (<code>editor2d/camera.ts</code>).</p>
   </section>
 
   <section id="boundaries" class="doc-section">
@@ -170,6 +180,157 @@ export function ProgramPreview(props: { program: cam.Program }) {
       </tbody>
     </table>
     <p>Relevant tests include <code>editor2d/tools/offset.test.ts</code>, <code>annotation-transform.test.ts</code>, <code>spatial/grid.test.ts</code>, <code>view3d/playback.test.ts</code>, and <code>toolpath-overlays.test.ts</code>. The mesh queue implementation is <code>view3d/mesh-jobs.ts</code>.</p>
+  </section>
+
+    <section id="units-reference" class="doc-section">
+    <h2>Display units in detail</h2>
+    <p>The editor always works in millimetres. Only what the user reads and types is converted, using the exact factors below. A stored drawing's own unit stays <code>mm</code> or <code>inch</code>; the extra units are display choices only.</p>
+    <table>
+      <thead><tr><th>Unit</th><th>Label</th><th>mm per unit</th><th>Default decimals</th><th>G-code program unit</th></tr></thead>
+      <tbody>
+        <tr><td><code>mm</code></td><td>mm</td><td>1</td><td>3</td><td>mm</td></tr>
+        <tr><td><code>um</code></td><td>µm</td><td>0.001</td><td>1</td><td>mm</td></tr>
+        <tr><td><code>cm</code></td><td>cm</td><td>10</td><td>4</td><td>mm</td></tr>
+        <tr><td><code>m</code></td><td>m</td><td>1000</td><td>6</td><td>mm</td></tr>
+        <tr><td><code>inch</code></td><td>inch</td><td>25.4</td><td>4</td><td>inch</td></tr>
+        <tr><td><code>thou</code></td><td>thou</td><td>0.0254</td><td>2</td><td>inch</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="Converting and parsing lengths (apps/desktop/src/viewport/units.ts)">
+{"import { formatLength, parseLength, formatAngle, programUnitsOf } from \u0022./units\u0022\n\nformatLength(25.4, \u0022inch\u0022)     // \u00221.0000 inch\u0022\nformatLength(12.5)             // \u002212.500 mm\u0022\nformatLength(0.0254, \u0022thou\u0022)   // \u00221.00 thou\u0022\nparseLength(\u00222 in\u0022, \u0022inch\u0022)    // 50.8  (a trailing unit word is ignored)\nparseLength(\u0022abc\u0022)             // undefined\nformatAngle(Math.PI / 2)       // \u002290.0\u00b0\u0022\nprogramUnitsOf(\u0022thou\u0022)         // \u0022inch\u0022"}
+    </DocCode>
+    <code>parseLength</code> strips a trailing alphabetic suffix (including <code>µ</code> and <code>°</code>) and interprets the number in the current display unit. The suffix is not used to pick a unit, so typing <code>2 mm</code> while the display is in inches yields 50.8 mm. Empty, non-numeric, and infinite input returns <code>undefined</code>, and editors should keep the previous value in that case.
+  </section>
+
+  <section id="camera-math" class="doc-section">
+    <h2>2D camera and grid</h2>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 520 250" role="img" aria-label="World coordinates with Y up mapped to screen pixels with Y down; the camera centre maps to the middle of the viewport" style="width:100%;max-width:560px;height:auto">
+        <g fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="20" y="20" width="220" height="200"/><rect x="290" y="20" width="220" height="200"/>
+        </g>
+        <g stroke="#2f80ed" stroke-width="2"><line x1="130" y1="120" x2="200" y2="120"/><line x1="130" y1="120" x2="130" y2="50"/>
+          <line x1="290" y1="20" x2="360" y2="20"/><line x1="290" y1="20" x2="290" y2="90"/></g>
+        <g fill="currentColor" font-family="monospace" font-size="12">
+          <text x="60" y="240">world (mm, +Y up)</text><text x="330" y="240">screen (px, +Y down)</text>
+          <circle cx="130" cy="120" r="4"/><text x="88" y="140">center</text><text x="205" y="124">+X</text><text x="134" y="46">+Y</text>
+          <circle cx="400" cy="120" r="4"/><text x="352" y="140">(width/2, height/2)</text><text x="364" y="24">+x</text><text x="294" y="104">+y</text>
+          <text x="245" y="114">→</text>
+        </g>
+      </svg>
+      <figcaption class="text-[13px]">The 2D editor's camera stores the world point at the centre of the viewport and a scale in pixels per millimetre. <code>worldToScreen</code> flips Y so that world +Y points up on screen.</figcaption>
+    </figure>
+    <table>
+      <thead><tr><th>Constant / function</th><th>Value</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>ZOOM_STEP</code></td><td>1.15</td><td>Factor per wheel step; <code>zoomAt</code> keeps the world point under the cursor fixed.</td></tr>
+        <tr><td><code>MIN_SCALE</code> / <code>MAX_SCALE</code></td><td>0.001 / 100,000 px per mm</td><td>Scale is clamped to this range.</td></tr>
+        <tr><td><code>FIT_MARGIN</code></td><td>0.1</td><td>Fraction of the viewport kept as margin by <code>cameraForBounds</code>.</td></tr>
+        <tr><td><code>createCamera()</code></td><td>centre (0, 0), scale 1, 800 × 600</td><td>Initial camera before the first resize.</td></tr>
+        <tr><td><code>gridStep(scale, major = 10, minPixels = 8)</code></td><td>1-2-5 ladder</td><td>Smallest step that keeps grid dots at least 8 px apart.</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="Mapping between world and screen">
+{"const camera = createCamera({ x: 0, y: 0 }, 2, 800, 600)   // 2 px per mm\nworldToScreen(camera, { x: 10, y: 10 })   // { x: 420, y: 280 }\nscreenToWorld(camera, { x: 420, y: 280 }) // { x: 10, y: 10 }\ngridStep(2)    // 5   -> 5 mm apart = 10 px\ngridStep(0.5)  // 20  -> 20 mm apart = 10 px"}
+    </DocCode>
+    <p>Rendering culls entities against <code>visibleBounds(camera)</code>. Snapping also avoids scanning the whole drawing: a uniform spatial grid returns entities whose bounds lie within the snap tolerance plus a 2 mm candidate margin, and only those are passed to the core <code>findSnap</code>. This keeps pointer moves fast in drawings with many entities.</p>
+  </section>
+
+  <section id="snapping-reference" class="doc-section">
+    <h2>Snapping reference</h2>
+    <p>Snap types are tried in priority order. The default order matches the legacy editor: <code>endpoint</code>, <code>midpoint</code>, <code>center</code>, <code>intersection</code>, <code>perpendicular</code>, <code>tangent</code>, <code>nearest</code>, and <code>quadrant</code>. Endpoints are the source entity's vertices, not its tessellation's.</p>
+    <table>
+      <thead><tr><th>Setting</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>enabled</code></td><td>Master switch; <code>false</code> disables all snapping.</td></tr>
+        <tr><td><code>types</code></td><td>Enabled snap types, highest priority first.</td></tr>
+        <tr><td><code>tolerance</code></td><td>Snap radius in millimetres; it does not depend on zoom.</td></tr>
+        <tr><td><code>gridEnabled</code>, <code>gridSpacing</code></td><td>Snap to the grid when no object snap applies.</td></tr>
+        <tr><td><code>referencePoint</code></td><td>The point being drawn from. <code>perpendicular</code> and <code>tangent</code> find nothing without it.</td></tr>
+        </tbody>
+    </table>
+    <p>The pipeline returns the snap, the IDs of entities under the cursor (nearest first, which the select tool consumes), and the number of candidates considered.</p>
+  </section>
+
+  <section id="playback-internals" class="doc-section">
+    <h2>How toolpath playback is timed</h2>
+    <code>buildPlayback(program, rapidRate = 5000, tolerance = 0.1)</code> converts a CAM program into timed segments. Each move's duration is its length divided by its feed (or by the rapid rate for rapids), times 60, giving seconds. Dwells add their own time without moving. Comments, orientation moves, and canned cycles are not drawn as segments. Arcs are split into chords whose sagitta stays within <code>tolerance</code> (between 2 and 65,536 chords per arc), and Z is interpolated along the arc for helices.
+    <DocCode language="ts" title="Seek and colour a preview">
+{"const playback = buildPlayback(program)          // rapids at 5000 mm/min\nplayback.duration                                // total seconds\npositionAt(playback, 12.5)                       // tool position at t = 12.5 s\ntoolAt(playback, 12.5)                           // toolId cutting at that time\ntoolColors(program)                              // Map toolId -> colour, first use order\n\n// A 10 mm feed move at 600 mm/min lasts 10 / 600 \u00d7 60 = 1 s.\n// The same 10 mm as a rapid lasts 10 / 5000 \u00d7 60 = 0.12 s."}
+    </DocCode>
+    <DocViewer3D title="Playback preview" animate={true} caption="The same pocket program as on the CAM page, replayed in the first tool colour (#38bdf8). In the desktop, each additional tool gets the next colour in the palette: #22c55e, #f97316, #e879f9, #facc15, and so on." paths={[{"points": [[30, 21, 10], [30, 21, 5], [30, 21, 2], [30, 21, 1], [36, 21, 0.732], [36, 19, 0.643], [24, 19, 0.107], [24, 21, 0.018], [30, 21, -0.25], [36, 21, -0.518], [36, 19, -0.607], [24, 19, -1.143], [24, 21, -1.232], [30, 21, -1.5], [36, 21, -1.5], [36, 19, -1.5], [24, 19, -1.5], [24, 21, -1.5], [30, 21, -1.5], [22.8, 22.2, -1.5], [37.2, 22.2, -1.5], [37.2, 17.8, -1.5], [22.8, 17.8, -1.5], [22.8, 22.2, -1.5], [20.4, 24.6, -1.5], [39.6, 24.6, -1.5], [39.6, 15.4, -1.5], [20.4, 15.4, -1.5], [20.4, 24.6, -1.5], [18, 27, -1.5], [42, 27, -1.5], [42, 13, -1.5], [18, 13, -1.5], [18, 27, -1.5], [18, 27, 2], [18, 27, 5], [30, 21, 5], [30, 21, 2], [30, 21, 1], [30, 21, -1.5], [36, 21, -1.661], [36, 19, -1.714], [24, 19, -2.036], [24, 21, -2.089], [30, 21, -2.25], [36, 21, -2.411], [36, 19, -2.464], [24, 19, -2.786], [24, 21, -2.839], [30, 21, -3], [36, 21, -3], [36, 19, -3], [24, 19, -3], [24, 21, -3], [30, 21, -3], [22.8, 22.2, -3], [37.2, 22.2, -3], [37.2, 17.8, -3], [22.8, 17.8, -3], [22.8, 22.2, -3], [20.4, 24.6, -3], [39.6, 24.6, -3], [39.6, 15.4, -3], [20.4, 15.4, -3], [20.4, 24.6, -3], [18, 27, -3], [42, 27, -3], [42, 13, -3], [18, 13, -3], [18, 27, -3], [18, 27, 2], [18, 27, 10]], "color": "#38bdf8"}]} solids={[{"kind":"box","size":[60,40,10],"at":[0,0,-10],"color":"#9fb3c8","opacity":0.3}]} />
+    <code>segmentIndexAt</code> finds the playing segment by binary search, so seeking is cheap even for long programs. Seeking past the end returns the final position, and <code>toolAt</code> then reports the last tool. Playback time is a visual estimate based on programmed feeds; it ignores machine acceleration, so a real machine takes longer.
+  </section>
+
+  <section id="viewport-practices" class="doc-section">
+    <h2>Viewport practices</h2>
+    <ul>
+      <li>Convert at the edge: store and compute in millimetres and radians, and format only for display with <code>formatLength</code> and <code>formatAngle</code>.</li>
+      <li>Never reuse a parsed length after <code>parseLength</code> returns <code>undefined</code>; keep the previous value and show a validation hint.</li>
+      <li>When adding a drawing tool, register it in the tool factory table so the toolbar, shortcuts, and tests address it by the same ID.</li>
+      <li>Keep snap candidate queries spatial. Passing every entity to <code>findSnap</code> on each pointer move defeats the index.</li>
+      <li>Treat playback duration as a preview, not a cycle-time quote.</li>
+    </ul>
+  </section>
+
+    <section id="spatial-index" class="doc-section">
+    <h2>Hit-testing at scale: the spatial grid</h2>
+    <p>The 2D editor targets 60 fps with 10,000 entities, so hit-testing and culling never scan every entity per pointer event. <code>viewport/spatial/grid.ts</code> keeps a uniform grid: each item is registered in every cell its bounding box touches, and a query returns all items whose bounds intersect the query box, in insertion order. The result is exact, never a sample.</p>
+    <table>
+      <thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Default cell size</td><td>50 world units (mm)</td><td>Suits a drawing about 1 m across</td></tr>
+        <tr><td>Minimum cell size</td><td>1e-6</td><td>Guards against a zero or negative size, which would loop forever</td></tr>
+        <tr><td>Cells per item limit</td><td>4,096</td><td>Larger items (a long line across the sheet) are tracked aside instead of per cell</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Method</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>build(items)</code></td><td>Rebuild from scratch</td></tr>
+        <tr><td><code>upsert(id, item)</code></td><td>Insert or replace one item by id</td></tr>
+        <tr><td><code>remove(id)</code></td><td>Remove; unknown ids are ignored</td></tr>
+        <tr><td><code>query(bounds)</code></td><td>Ids whose bounds intersect the box</td></tr>
+        </tbody>
+    </table>
+    <svg viewBox="0 0 400 220" width="100%" role="img" aria-label="Uniform grid index" style="max-width:400px;font:11px system-ui">
+<g stroke="currentColor" opacity=".25"><path d="M20 10V210"/><path d="M80 10V210"/><path d="M140 10V210"/><path d="M200 10V210"/><path d="M260 10V210"/><path d="M320 10V210"/><path d="M380 10V210"/><path d="M20 10H380"/><path d="M20 60H380"/><path d="M20 110H380"/><path d="M20 160H380"/><path d="M20 210H380"/></g>
+<g fill="none" stroke-width="1.5"><rect x="95" y="70" width="80" height="40" stroke="#3b82f6"/><circle cx="290" cy="150" r="25" stroke="#3fb37f"/><path d="M30 200L370 20" stroke="#c070e0"/><rect x="190" y="55" width="100" height="70" stroke="#ef4444" stroke-dasharray="4 3"/></g>
+<g fill="currentColor"><text x="195" y="50">query box</text><text x="100" y="65" fill="#3b82f6">entity A</text><text x="300" y="185" fill="#3fb37f">B</text><text x="330" y="45" fill="#c070e0">long line</text></g></svg>
+    <p>Cells touched by the dashed query box are visited; A and the long line are returned because their bounds intersect it, B is not.</p>
+  </section>
+
+  <section id="mesh-queue" class="doc-section">
+    <h2>3D meshing queue</h2>
+    <p>Solids are meshed in a Web Worker so the UI thread never blocks. <code>MeshWorkerQueue</code> in <code>view3d/mesh-jobs.ts</code> runs one job at a time:</p>
+    <table>
+      <thead><tr><th>Rule</th><th>Value</th><th>Message on failure</th></tr></thead>
+      <tbody>
+        <tr><td>Capacity (queued + running)</td><td>128</td><td>The 3D mesh queue is full. Reduce the scene complexity.</td></tr>
+        <tr><td>Timeout per job</td><td>15 s</td><td>3D meshing timed out. Reduce the scene complexity.</td></tr>
+        <tr><td>Worker error</td><td>—</td><td>The worker's message, or "The mesh worker stopped unexpectedly."</td></tr>
+        <tr><td>Undecodable reply</td><td>—</td><td>The mesh worker could not decode its response.</td></tr>
+        <tr><td>Bad geometry</td><td>positions must be <code>Float32Array</code>, indices <code>Uint32Array</code></td><td>The mesh worker returned invalid geometry.</td></tr>
+        </tbody>
+    </table>
+    <p>Any failure terminates the worker and clears the whole queue, so stale scene work never lands after a newer edit; the next submission starts a fresh worker. Replies are matched by job id, so a late answer from a terminated worker is ignored.</p>
+  </section>
+
+  <section id="editor-tools" class="doc-section">
+    <h2>2D tool implementations</h2>
+    <table>
+      <thead><tr><th>File</th><th>Tools</th></tr></thead>
+      <tbody>
+        <tr><td><code>tools/two-point.ts</code></td><td>line, rectangle, circle by diameter, ellipse</td></tr>
+        <tr><td><code>tools/chained.ts</code></td><td>polyline, three-point arc</td></tr>
+        <tr><td><code>tools/fillet-chamfer.ts</code></td><td>round or bevel the corner between two lines</td></tr>
+        <tr><td><code>tools/offset.ts</code></td><td>offset a polyline, rectangle, circle or arc by a distance</td></tr>
+        <tr><td><code>tools/trim.ts</code></td><td>trim and extend</td></tr>
+        <tr><td><code>tools/select.ts</code></td><td>click, box and add/remove selection</td></tr>
+        <tr><td><code>tools/annotation-transform.ts</code></td><td>move and transform annotations</td></tr>
+        </tbody>
+    </table>
+    <p>Each tool is a small state machine with <code>onPointerDown</code>, <code>onPointerMove</code> and <code>onPointerUp</code>, created by a factory in <code>tools/index.ts</code>, one per palette entry. Pointer positions pass through <code>snap-pipeline.ts</code> before a tool sees them.</p>
   </section>
 
   <DocRelated items={[

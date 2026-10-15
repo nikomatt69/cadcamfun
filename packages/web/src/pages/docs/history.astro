@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -19,6 +20,11 @@ const toc = [
   { title: "Try the repository without application data", href: "#local-example" },
   { title: "Review, restore, and synchronize deliberately", href: "#review-sequence" },
   { title: "Recover from history failures", href: "#troubleshooting" },
+  { title: "Repository layout", href: "#repository-layout" },
+  { title: "Commit, branch, diff, and merge in code", href: "#history-walkthrough" },
+  { title: "Rules enforced by the application", href: "#service-rules" },
+  { title: "A real commit object", href: "#real-commit" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -61,6 +67,7 @@ costs/<id>.json
     </DocCode>
     <p>One JSON file per entity keeps unrelated changes separate. The snapshot includes library items referenced by toolpaths and production cost estimates so restored manufacturing data can retain its dependencies. Entity identifiers used as file names are restricted to safe letters, digits, underscores, and hyphens, with a maximum of 128 characters.</p>
     <p>JSON keys are sorted recursively and files use stable pretty-printing with a final newline. Arrays retain their order. Extra text files can travel with a package-level snapshot; the public commit endpoint accepts extra files only under <code>.cadcamfun/workflows/</code> with a safe YAML file name.</p>
+    <p>Objects use git's loose-object format byte for byte, so object IDs match those computed by <code>git</code>. Tree entries are either files (mode <code>100644</code>) or directories (mode <code>40000</code>). A commit signature records name, email, Unix-seconds time, and a <code>+hhmm</code>/<code>-hhmm</code> offset. Branches are stored under <code>refs/heads/</code>, and a project's default branch is <code>main</code> (<code>packages/vcs/src/object.ts</code>, <code>repository.ts</code>).</p>
   </section>
 
   <section id="package" class="doc-section">
@@ -152,5 +159,114 @@ console.log(repo.log().length) // 2`}
     <p>Source: <code>packages/vcs/src/repository.ts</code>, <code>apps/sidecar/src/services/project-vcs.ts</code>, and <code>http/vcs.ts</code>. The <a href="/docs/api">API reference</a> lists the actual request and response schemas.</p>
   </section>
 
+    <section id="repository-layout" class="doc-section">
+    <h2>Repository layout</h2>
+    <p>A project is stored in the repository as one JSON file per entity. Editing a drawing therefore never touches a toolpath file, and the layout reads naturally on GitHub. <code>snapshotToFiles</code> writes this layout from a <code>ProjectSnapshot</code>, and <code>filesToSnapshot</code> reads it back.</p>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 560 210" role="img" aria-label="Repository layout: project.json and one JSON file per entity in drawings, components, toolpaths, materials, tools, machine-configs and costs, plus .cadcamfun/workflows" style="width:100%;max-width:600px;height:auto">
+        <g font-family="monospace" font-size="13" fill="currentColor">
+          <text x="10" y="22">/</text>
+          <text x="30" y="44">project.json</text>
+          <text x="30" y="66">drawings/&lt;id&gt;.json</text><text x="300" y="66">components/&lt;id&gt;.json</text>
+          <text x="30" y="88">toolpaths/&lt;id&gt;.json</text><text x="300" y="88">materials/&lt;id&gt;.json</text>
+          <text x="30" y="110">tools/&lt;id&gt;.json</text><text x="300" y="110">machine-configs/&lt;id&gt;.json</text>
+          <text x="30" y="132">costs/&lt;id&gt;.json</text>
+          <text x="30" y="154">.cadcamfun/workflows/&lt;name&gt;.yml</text>
+          <text x="30" y="190" fill="#2f80ed">one file per entity → diffs and merges stay local to what changed</text>
+        </g>
+      </svg>
+    </figure>
+    <table>
+      <thead><tr><th>Snapshot list</th><th>Directory</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>project</code></td><td><code>project.json</code></td><td>Project metadata.</td></tr>
+        <tr><td><code>drawings</code>, <code>components</code>, <code>toolpaths</code></td><td>same names</td><td>Design and manufacturing entities.</td></tr>
+        <tr><td><code>materials</code>, <code>tools</code>, <code>machineConfigs</code></td><td><code>materials/</code>, <code>tools/</code>, <code>machine-configs/</code></td><td>Library items the toolpaths reference, versioned with the project so a restored toolpath still finds them.</td></tr>
+        <tr><td><code>costs</code></td><td><code>costs/</code></td><td>Production cost estimates of the toolpaths.</td></tr>
+        <tr><td><code>extra</code></td><td>any path</td><td>Text files stored verbatim: workflows, README, generated G-code.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="history-walkthrough" class="doc-section">
+    <h2>Commit, branch, diff, and merge in code</h2>
+    <p>The <code>Repository</code> class works on any storage backend. The sidecar backs it with SQLite (tables <code>GitObject</code> and <code>GitRef</code>); <code>memoryBackend()</code> is used for tests and experiments. The following example is complete and its output is shown in comments.</p>
+    <DocCode language="ts" title="history-demo.ts">
+{"import { Repository, memoryBackend, snapshotToFiles, describeDiff } from \u0022@cadcamfun/vcs\u0022\n\nconst repo = new Repository(memoryBackend())\nconst me = { name: \u0022Ada\u0022, email: \u0022ada@example.com\u0022, time: 1767225600, tz: \u0022+0100\u0022 }\nconst files = (width: number, height: number) => snapshotToFiles({\n  project: { id: \u0022p1\u0022, name: \u0022Bracket\u0022 },\n  drawings: [{ id: \u0022d1\u0022, name: \u0022Plate\u0022, width, height }],\n  components: [], toolpaths: [],\n})\n\nconst base = repo.commit(files(40, 25), { message: \u0022base\u0022, author: me })\nrepo.currentBranch()                    // \u0022main\u0022\n\nrepo.createBranch(\u0022a\u0022); repo.createBranch(\u0022b\u0022)\nrepo.checkout(\u0022a\u0022); const a = repo.commit(files(50, 25), { message: \u0022a: width 50\u0022, author: me })\nrepo.checkout(\u0022b\u0022); repo.commit(files(40, 30), { message: \u0022b: height 30\u0022, author: me })\n\ndescribeDiff(repo, base, a)\n// [{ path: \u0022drawings/d1.json\u0022, kind: \u0022drawings\u0022, id: \u0022d1\u0022, name: \u0022Plate\u0022,\n//    status: \u0022modified\u0022, changes: [{ pointer: \u0022/width\u0022, before: 40, after: 50 }] }]\n\nrepo.mergeInto(\u0022a\u0022, \u0022b\u0022, me)            // { kind: \u0022merge\u0022, oid: \u002246e7\u2026\u0022 }\n// different properties of the same entity merge cleanly\n\nrepo.checkout(\u0022b\u0022); repo.commit(files(60, 30), { message: \u0022b: width 60\u0022, author: me })\nrepo.mergeInto(\u0022a\u0022, \u0022b\u0022, me)\n// { kind: \u0022conflict\u0022, conflicts: [{ path: \u0022drawings/d1.json\u0022, pointers: [\u0022/width\u0022] }] }\n\nrepo.createBranch(\u0022bad..name\u0022)          // throws: Invalid branch name bad..name\nrepo.commit(sameFilesAsHead, { message: \u0022x\u0022, author: me })\n// throws: No changes since the last commit   (unless allowEmpty: true)"}
+    </DocCode>
+    <p>Merges are three-way at the level of JSON properties. When both sides changed different properties of one entity, the merge succeeds. When both changed the same property to different values, the result is a <code>conflict</code> that lists RFC 6901 pointers inside each file. Arrays of equal length are compared per index, so a moved vertex shows up as one change; arrays of different lengths are compared as a whole.</p>
+    <table>
+      <thead><tr><th>Merge result</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>up-to-date</code></td><td>Nothing to merge; returns the current commit.</td></tr>
+        <tr><td><code>fast-forward</code></td><td>The branch pointer moved forward; no merge commit was created.</td></tr>
+        <tr><td><code>merge</code></td><td>A merge commit was created.</td></tr>
+        <tr><td><code>conflict</code></td><td>No commit; <code>conflicts</code> lists paths and pointers to resolve.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Repository method</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>commit(files, &#123; message, author, allowEmpty? &#125;)</code></td><td>Write a full tree as a new commit on the current branch.</td></tr>
+        <tr><td><code>log(rev = "HEAD", limit?)</code> / <code>fileLog(path, rev?, limit?)</code></td><td>History of the branch / of one file.</td></tr>
+        <tr><td><code>createBranch(name, from = "HEAD")</code>, <code>deleteBranch</code>, <code>checkout</code></td><td>Branch management. Names must not contain <code>..</code> or <code>//</code>, end in <code>/</code> or <code>.lock</code>, or contain <code>@&#123;</code>.</td></tr>
+        <tr><td><code>tag(name, rev = "HEAD")</code>, <code>tags()</code></td><td>Lightweight tags under <code>refs/tags/</code>.</td></tr>
+        <tr><td><code>diff(from, to)</code></td><td>File-level changes: added, modified, deleted, with blob IDs.</td></tr>
+        <tr><td><code>restorePaths(rev, paths, author, message?)</code></td><td>New commit restoring selected files from an older revision.</td></tr>
+        <tr><td><code>revertTo(rev, author, message?)</code></td><td>New commit whose tree equals an older revision; history is not rewritten.</td></tr>
+        <tr><td><code>merge(theirs, author)</code> / <code>mergeInto(into, theirs, author)</code></td><td>Three-way merge into the current branch / a named branch.</td></tr>
+        <tr><td><code>isAncestor</code>, <code>mergeBase</code></td><td>Graph queries.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="service-rules" class="doc-section">
+    <h2>Rules enforced by the application</h2>
+    <p>The sidecar's project history service adds rules on top of the repository:</p>
+    <table>
+      <thead><tr><th>Failure code</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>blocked</code></td><td>An AI actor tries to commit or merge on <code>main</code> (the message says to use an <code>ai/*</code> branch and open a pull request), or a pull request is merged while a reviewer's latest verdict is <code>request-changes</code>.</td></tr>
+        <tr><td><code>dirty</code></td><td>The working copy has uncommitted changes and the operation would overwrite them: "Uncommitted changes in N file(s); commit or discard them first".</td></tr>
+        <tr><td><code>conflict</code></td><td>A merge produced conflicts; the failure carries the conflict list.</td></tr>
+        <tr><td><code>nothing-to-commit</code></td><td>The tree is unchanged since the last commit.</td></tr>
+        <tr><td><code>not-found</code></td><td>Unknown branch, commit, object, or pull request.</td></tr>
+        <tr><td><code>remote</code></td><td>GitHub synchronisation failed.</td></tr>
+        <tr><td><code>invalid</code></td><td>Other invalid input, for example reviewing or merging a pull request that is not open.</td></tr>
+        </tbody>
+    </table>
+    <p>Only the latest non-comment verdict of each reviewer counts. A reviewer who requested changes and later approved no longer blocks the merge. Commits, pull request events, and reviews are published as live events, so the desktop and the companion update without polling.</p>
+    <DocCallout type="note" title="Byte-compatible with git">
+      <p>Object IDs are computed exactly as git computes them. Pushing to GitHub through the Git Data API keeps every commit ID identical on both sides, and a <code>git clone</code> of the mirror shows the same history as the application. GitHub accepts only fast-forward ref updates; pull and merge locally first when the remote has moved.</p>
+    </DocCallout>
+  </section>
+
+    <section id="real-commit" class="doc-section">
+    <h2>A real commit object</h2>
+    <DocCode language="json" title="POST /api/projects/:id/vcs/commit">
+{"{\n  \u0022oid\u0022: \u002244d2d03d23b27fbbc4b388e32e15dfb0f39fff87\u0022,\n  \u0022parents\u0022: [],\n  \u0022message\u0022: \u0022First version\\n\u0022,\n  \u0022author\u0022: { \u0022name\u0022: \u0022Local user\u0022, \u0022email\u0022: \u0022local@cadcamfun.local\u0022, \u0022time\u0022: 1792037121 }\n}"}
+    </DocCode>
+    <ul>
+      <li><code>oid</code> is a 40-character hex id of the commit object stored in <code>GitObject</code>.</li>
+      <li>The first commit has no parents; a merge commit has two.</li>
+      <li>The message is stored with a trailing newline, as Git does.</li>
+      <li>Without an <code>x-session-token</code>, the author is the installation's local profile. <code>time</code> is in Unix seconds.</li>
+    </ul>
+    <table>
+      <thead><tr><th>Route</th><th>Body</th><th>Required</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST …/vcs/commit</code></td><td><code>message</code>, <code>authorKind</code>, <code>files</code></td><td><code>message</code></td></tr>
+        <tr><td><code>POST …/vcs/branches</code></td><td><code>name</code>, <code>from</code></td><td><code>name</code></td></tr>
+        <tr><td><code>POST …/vcs/checkout</code></td><td><code>branch</code></td><td><code>branch</code></td></tr>
+        <tr><td><code>POST …/vcs/restore</code></td><td><code>rev</code>, <code>paths</code></td><td><code>rev</code></td></tr>
+        <tr><td><code>POST …/pulls</code></td><td><code>title</code>, <code>body</code>, <code>head</code>, <code>base</code>, <code>authorKind</code></td><td><code>title</code>, <code>head</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="A commit graph" caption="The last 14 commits of origin/main from git log --format=%h|%p: each pull request branch commit (back lane) is merged into main (front lane, orange merge commits), then the docs commits. A project history in the app is the same kind of graph: commits with parents, refs pointing at them." solids={[{"kind":"box","size":[6,6,3],"at":[-3.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[7.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[17.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[27.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[37.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[47.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[57.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[67.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[77.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[87.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[97.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[107.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[117.0,-3.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[127.0,-3.0,0],"color":"#8aa4c8"}]} paths={[{"points":[[0,16,1.5],[5.0,8.0,4.5],[10,0,1.5]],"color":"#2fbf71"},{"points":[[10,0,1.5],[15.0,8.0,4.5],[20,16,1.5]],"color":"#2fbf71"},{"points":[[10,0,1.5],[20.0,0.0,4.5],[30,0,1.5]],"color":"#7a8aa0"},{"points":[[20,16,1.5],[25.0,8.0,4.5],[30,0,1.5]],"color":"#2fbf71"},{"points":[[30,0,1.5],[35.0,8.0,4.5],[40,16,1.5]],"color":"#2fbf71"},{"points":[[30,0,1.5],[40.0,0.0,4.5],[50,0,1.5]],"color":"#7a8aa0"},{"points":[[40,16,1.5],[45.0,8.0,4.5],[50,0,1.5]],"color":"#2fbf71"},{"points":[[50,0,1.5],[55.0,8.0,4.5],[60,16,1.5]],"color":"#2fbf71"},{"points":[[50,0,1.5],[60.0,0.0,4.5],[70,0,1.5]],"color":"#7a8aa0"},{"points":[[60,16,1.5],[65.0,8.0,4.5],[70,0,1.5]],"color":"#2fbf71"},{"points":[[70,0,1.5],[75.0,8.0,4.5],[80,16,1.5]],"color":"#2fbf71"},{"points":[[70,0,1.5],[80.0,0.0,4.5],[90,0,1.5]],"color":"#7a8aa0"},{"points":[[80,16,1.5],[85.0,8.0,4.5],[90,0,1.5]],"color":"#2fbf71"},{"points":[[90,0,1.5],[95.0,8.0,4.5],[100,16,1.5]],"color":"#2fbf71"},{"points":[[90,0,1.5],[100.0,0.0,4.5],[110,0,1.5]],"color":"#7a8aa0"},{"points":[[100,16,1.5],[105.0,8.0,4.5],[110,0,1.5]],"color":"#2fbf71"},{"points":[[110,0,1.5],[115.0,0.0,4.5],[120,0,1.5]],"color":"#2fbf71"},{"points":[[120,0,1.5],[125.0,0.0,4.5],[130,0,1.5]],"color":"#2fbf71"}]} labels={[{"text":"fd88a79","at":[0,16,5.4],"size":4},{"text":"b735c65 merge","at":[10,0,5.4],"size":4},{"text":"ccd10d4","at":[20,16,5.4],"size":4},{"text":"db4a937 merge","at":[30,0,5.4],"size":4},{"text":"271bd35","at":[40,16,5.4],"size":4},{"text":"7c69343 merge","at":[50,0,5.4],"size":4},{"text":"9e67ed7","at":[60,16,5.4],"size":4},{"text":"40f6509 merge","at":[70,0,5.4],"size":4},{"text":"427b218","at":[80,16,5.4],"size":4},{"text":"b9c56cd merge","at":[90,0,5.4],"size":4},{"text":"23db23e","at":[100,16,5.4],"size":4},{"text":"43adb8a merge","at":[110,0,5.4],"size":4},{"text":"795925e","at":[120,0,5.4],"size":4},{"text":"00ef0c2","at":[130,0,5.4],"size":4}]} height={360} />
+  </section>
   <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />
 </DocsLayout>

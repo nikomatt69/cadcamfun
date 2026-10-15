@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -17,6 +18,11 @@ const toc = [
   { title: "Revoke or unpair deliberately", href: "#revoke" },
   { title: "Diagnose failures by layer", href: "#errors" },
   { title: "Implementation map", href: "#sources" },
+  { title: "What a paired phone can call", href: "#gateway-routes" },
+  { title: "Pairing link anatomy", href: "#pairing-link" },
+  { title: "Gateway administration API", href: "#gateway-api" },
+  { title: "Gateway status, captured", href: "#status-shape" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -150,6 +156,7 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
       </tbody>
     </table>
     <p>Native CI builds an unsigned simulator app and checks real gateway pairing/project listing. Separate CI checks typecheck, logic tests, and JavaScript export. These do not prove physical-device signing, TestFlight distribution, remote-network routing, or a real model provider.</p>
+    <p>Repeated bad tokens are throttled: ten failed attempts from one IP address within 60 seconds make further requests from it return HTTP 429 until the window expires. A 429 after re-pairing usually means an old device token is still being retried.</p>
   </section>
 
   <section id="sources" class="doc-section">
@@ -158,6 +165,82 @@ curl --fail-with-body "$CADCAM_URL/api/companion" \
     <p>For a support report, retain the app version, connection method, non-secret gateway host/port, exact error/status, and whether the native module is present. Redact tokens, pairing links, model credentials, and private keys. Add the <a href="/docs/api/system">System API</a> version result when comparing two development processes.</p>
   </section>
 
+    <section id="gateway-routes" class="doc-section">
+    <h2>What a paired phone can call</h2>
+    <p>Every request through the gateway must carry a device token and match this allow-list. Everything else, including credentials, plugins, files, billing, and <code>/api/companion</code> itself, is refused. Admitted requests are forwarded to the loopback API with the application token, which the phone never sees.</p>
+    <table>
+      <thead><tr><th>Methods</th><th>Path pattern</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/health</code></td><td>Reachability check.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects</code>, <code>/api/projects/:id</code></td><td>Project list and header.</td></tr>
+        <tr><td>GET, POST</td><td><code>/api/projects/:id/vcs/*</code> (except <code>remote</code>, <code>push</code>, <code>pull</code>), <code>/pulls/*</code>, <code>/actions/*</code></td><td>History, pull requests, reviews, and workflow runs. GitHub sync stays on the desktop because it needs the owner's GitHub token.</td></tr>
+        <tr><td>GET</td><td><code>/api/projects/:id/events</code></td><td>Live SSE stream of history, workflow, and assistant activity; the phone's only push channel.</td></tr>
+        <tr><td>GET, POST, PUT, DELETE</td><td><code>/api/notifications</code>, <code>/mark-all-read</code>, <code>/:id</code></td><td>Read, mark read, and delete notifications.</td></tr>
+        <tr><td>GET</td><td><code>/api/ai/status</code>, <code>/models</code>, <code>/agents</code></td><td>Assistant discovery.</td></tr>
+        <tr><td>POST</td><td><code>/api/ai/chat/stream</code>, <code>chat/abort</code>, <code>chat/queue</code>, <code>permission/reply</code>, <code>sessions/state</code>, <code>sessions/control</code></td><td>Assistant sessions.</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Current scope of history writes">
+      <p>The history pattern currently also matches commit, checkout, and restore. Treat a paired phone as able to change project history, and revoke devices you no longer control.</p>
+    </DocCallout>
+  </section>
+
+  <section id="pairing-link" class="doc-section">
+    <h2>Pairing link anatomy</h2>
+    <code>POST /api/companion/pair</code> with a device <code>name</code> (and optionally a <code>host</code>) creates a device token and returns its ID together with a link, which the desktop shows as a QR code:
+    <DocCode language="text" title="Pairing link format">
+{"cadcamfun://pair?host=https%3A%2F%2F192.168.1.20%3A8443&token=<43-char base64url>&fp=<sha256 hex>&name=Ada%27s+iPhone&hosts=https%3A%2F%2F100.64.0.7%3A8443"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Parameter</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>host</code></td><td>Preferred origin: the best private address of the desktop and the gateway port.</td></tr>
+        <tr><td><code>token</code></td><td>32 random bytes, base64url-encoded. It is shown once; the desktop stores only its SHA-256 hash, and device IDs are 12 hex characters.</td></tr>
+        <tr><td><code>fp</code></td><td>SHA-256 fingerprint of the gateway certificate, lowercase hex without colons. The phone pins it.</td></tr>
+        <tr><td><code>name</code></td><td>Device name shown in the devices list.</td></tr>
+        <tr><td><code>hosts</code></td><td>Up to five further candidate origins (six addresses in total), which the phone races to find one that answers.</td></tr>
+        </tbody>
+    </table>
+    <p>The certificate is a self-signed P-256 certificate whose subject alternative names include <code>localhost</code>, <code>127.0.0.1</code>, and the machine's reachable private addresses. It is kept in <code>&lt;dataDir&gt;/companion</code>, so pairings survive restarts. Replacing it changes the fingerprint and requires pairing again.</p>
+  </section>
+
+  <section id="gateway-api" class="doc-section">
+    <h2>Gateway administration API</h2>
+    <table>
+      <thead><tr><th>Route</th><th>Body</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>GET /api/companion</code></td><td>—</td><td><code>enabled</code>, <code>port</code>, <code>fingerprint</code>, <code>host</code>, and <code>devices</code> (<code>id</code>, <code>name</code>, <code>createdAt</code>, <code>lastSeen</code>).</td></tr>
+        <tr><td><code>POST /api/companion/enable</code></td><td>optional <code>port</code> (default 8443, or 1024–65535)</td><td>Starts the HTTPS listener on <code>0.0.0.0</code> and persists the setting so it resumes at next launch.</td></tr>
+        <tr><td><code>POST /api/companion/disable</code></td><td>—</td><td>Stops the listener.</td></tr>
+        <tr><td><code>POST /api/companion/pair</code></td><td><code>name</code>, optional <code>host</code></td><td><code>&#123; id, link &#125;</code>.</td></tr>
+        <tr><td><code>DELETE /api/companion/devices/:id</code></td><td>—</td><td>Revokes one device token immediately.</td></tr>
+        </tbody>
+    </table>
+    <p>Failed bearer attempts are throttled per IP address: after 10 failures within 60 seconds, the gateway answers HTTP 429 ("Too many failed attempts") until the window passes. A wrong or revoked token otherwise gets HTTP 401.</p>
+  </section>
+
+    <section id="status-shape" class="doc-section">
+    <h2>Gateway status, captured</h2>
+    <DocCode language="json" title="GET /api/companion on a fresh installation">
+{"{ \u0022enabled\u0022: false, \u0022port\u0022: null, \u0022fingerprint\u0022: null, \u0022host\u0022: \u0022172.30.0.2\u0022, \u0022devices\u0022: [] }"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>enabled</code></td><td>Whether the HTTPS gateway is running; off by default</td></tr>
+        <tr><td><code>port</code></td><td>Gateway port while enabled, otherwise <code>null</code></td></tr>
+        <tr><td><code>fingerprint</code></td><td>SHA-256 fingerprint of the gateway certificate the phone pins; <code>null</code> until a certificate exists</td></tr>
+        <tr><td><code>host</code></td><td>The LAN address the pairing link will advertise</td></tr>
+        <tr><td><code>devices</code></td><td>Paired devices; each can be revoked on its own</td></tr>
+        </tbody>
+    </table>
+    <p>If <code>host</code> is not the address your phone can reach (for example a container or VPN interface), pairing will fail at the network layer even though everything else is correct.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Companion pairing path" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#e05050"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
     { title: "Companion API", href: "/docs/api/companion" },
     { title: "Mobile reference", href: "/docs/mobile" },

@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -22,6 +23,11 @@ const toc = [
   { title: "Launch a disposable local instance", href: "#development-launch" },
   { title: "Logs and optional telemetry", href: "#observability" },
   { title: "Identify the failing boundary", href: "#troubleshooting" },
+  { title: "Startup sequence in detail", href: "#startup-sequence" },
+  { title: "Authentication model", href: "#auth-model" },
+  { title: "What lives in the data directory", href: "#data-directory" },
+  { title: "The ready line, captured", href: "#ready-line" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -50,7 +56,7 @@ const toc = [
 
   <section id="config" class="doc-section">
     <h2>Required configuration</h2>
-<p><code>AppConfigService</code> reads process configuration once in <code>apps/sidecar/src/config.ts</code>. <code>CADCAMFUN_TOKEN</code> is the required application bearer token and <code>CADCAMFUN_DATA_DIR</code> is the required application data directory. The database path is <code>&lt;dataDir&gt;/cadcamfun.db</code>. <code>CADCAMFUN_MIGRATIONS_DIR</code> supplies the SQL migration folder; without it the database layer does not apply application migrations.</p>
+<p><code>AppConfigService</code> reads process configuration once in <code>apps/sidecar/src/config.ts</code>. <code>CADCAMFUN_TOKEN</code> is the required application bearer token and <code>CADCAMFUN_DATA_DIR</code> is the required application data directory. The database path is <code>&lt;dataDir&gt;/cadcamfun.db</code>. <code>CADCAMFUN_MIGRATIONS_DIR</code> is optional and supplies the SQL migration folder; without it the database layer does not apply application migrations.</p>
     <p>The desktop supplies launch configuration. For direct development, provide those configuration names in the launching shell and run the package's start script from the repository root:</p>
     <DocCode language="bash" title="Start a configured sidecar">
 {`bun run --filter @cadcamfun/sidecar start`}
@@ -62,12 +68,12 @@ const toc = [
     <h2>Optional configuration</h2>
 <ul>
       <li><code>CADCAMFUN_APP_URL</code> sets the base for authentication links; <code>CADCAMFUN_DEBUG_LINKS</code> enables returning debug reset/magic links and defaults to false.</li>
-      <li><code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> or <code>direct</code>. <code>CADCAMFUN_AI_OFFLINE</code> disables the optional model-catalogue network path. <code>CADCAMFUN_AI_MINIMAX_BASE_URL</code> overrides MiniMax's endpoint.</li>
+      <li><code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> (default; chat runs through the embedded conversation host) or <code>direct</code> (AI SDK only). <code>CADCAMFUN_AI_OFFLINE</code> (boolean, default false) disables the optional model-catalogue network path. <code>CADCAMFUN_AI_MINIMAX_BASE_URL</code> overrides MiniMax's endpoint.</li>
       <li><code>STRIPE_SECRET_KEY</code> enables the Stripe provider; <code>STRIPE_PRICE_BASIC</code>, <code>STRIPE_PRICE_PRO</code>, and <code>STRIPE_PRICE_ENTERPRISE</code> supply paid-plan prices. <code>STRIPE_WEBHOOK_SECRET</code> is required for signed webhook verification.</li>
-      <li><code>CRON_SECRET</code> supplies the cron route secret; without it the local application can call that route without an additional cron secret. <code>ADMIN_EMAIL</code> configures the administrator identity check.</li>
+      <li><code>CRON_SECRET</code> supplies the cron route secret; without it the local application can call that route without an additional cron secret. <code>ADMIN_EMAIL</code> is a legacy administrator identity check; by default the local profile is the administrator of its own installation.</li>
       <li><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> enables the configured OTLP telemetry export. Without an endpoint, external telemetry export is off.</li>
     </ul>
-    <p>AI provider keys are managed through the credential API and dedicated credential file. They are not read as vendor API-key environment settings by <code>AppConfigService</code>.</p>
+    <p>All of these names are read in one place, <code>AppConfigService</code>; the token and Stripe secret key are held as redacted values so they do not appear in logs. AI provider keys are managed through the credential API and dedicated credential file. They are not read as vendor API-key environment settings by <code>AppConfigService</code>.</p>
   </section>
 
   <section id="served" class="doc-section">
@@ -75,6 +81,7 @@ const toc = [
 <p>The sidecar publishes <code>/api/openapi.json</code> for its served contract and uses bearer middleware on protected groups. A second optional session header chooses the acting account. The local profile is created or reused under <code>local@cadcamfun.local</code>, keeping the installation usable without account sign-in.</p>
     <p>CORS admits <code>tauri://localhost</code>, HTTP/HTTPS <code>tauri.localhost</code>, and HTTP localhost or 127.0.0.1 origins with an optional port. Other origins receive no allowed-origin response header. CORS is a browser policy; the bearer middleware remains the access control for protected routes.</p>
     <p>The served groups cover design resources, manufacturing generation and verification, exact CAD, libraries, costs, AI, VCS/workflows, events, companion controls, identity, organizations, notifications, files, plugins, billing, analytics, waitlist, MCP, and local state. Consult the running OpenAPI document for method and payload details.</p>
+    <p>The acting-account header is <code>x-session-token</code>. Without it, or with a token that does not verify as a session token for an existing user, requests act as the local profile (<code>src/http/authorization.ts</code>).</p>
   </section>
 
   <section id="layout" class="doc-section">
@@ -168,5 +175,89 @@ curl --fail-with-body -H "Authorization: Bearer $CADCAMFUN_TOKEN" "$CADCAMFUN_UR
     <p>Source: <code>apps/sidecar/test/process.test.ts</code>, <code>src/http/authorization.ts</code>, <code>src/layers.ts</code>, and <code>src/services/companion.ts</code>.</p>
   </section>
 
+    <section id="startup-sequence" class="doc-section">
+    <h2>Startup sequence in detail</h2>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 640 230" role="img" aria-label="Startup sequence between the Tauri shell, the sidecar and the webview" style="width:100%;max-width:680px;height:auto">
+        <g font-family="monospace" font-size="12" fill="currentColor">
+          <text x="40" y="18">Tauri shell</text><text x="290" y="18">sidecar (Bun)</text><text x="520" y="18">webview</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1" stroke-dasharray="3 3"><line x1="80" y1="25" x2="80" y2="225"/><line x1="330" y1="25" x2="330" y2="225"/><line x1="560" y1="25" x2="560" y2="225"/></g>
+        <g stroke="currentColor" stroke-width="1.5" fill="none">
+          <path d="M80 45 H330"/><path d="M330 85 H80"/><path d="M560 125 H80"/><path d="M80 150 H560"/><path d="M560 185 H330"/><path d="M80 215 H330"/>
+        </g>
+        <g font-family="monospace" font-size="11" fill="currentColor">
+          <text x="90" y="40">spawn: CADCAMFUN_TOKEN (64 hex), DATA_DIR, MIGRATIONS_DIR</text>
+          <text x="140" y="80">stdout &#123;"event":"ready","port":N&#125; (≤ 60 s)</text>
+          <text x="330" y="120">invoke get_sidecar_endpoint (waits ≤ 125 s)</text>
+          <text x="330" y="145">&#123; url, token &#125;</text>
+          <text x="370" y="180">GET /api/health, then API calls</text>
+          <text x="90" y="210">quit: stdin &#123;"event":"shutdown"&#125;</text>
+        </g>
+      </svg>
+    </figure>
+    <ol>
+      <li>The shell generates a launch token of 32 random bytes, hex-encoded as 64 characters, and starts the sidecar with <code>CADCAMFUN_TOKEN</code>, <code>CADCAMFUN_DATA_DIR</code>, and <code>CADCAMFUN_MIGRATIONS_DIR</code>.</li>
+      <li><code>AppConfigService</code> reads all settings once. A missing required setting fails startup with an <code>error</code> event.</li>
+      <li>The database layer opens <code>&lt;dataDir&gt;/cadcamfun.db</code>, enables WAL mode and foreign keys, and applies migrations from the migrations directory.</li>
+      <li>Layers are composed: database, then repositories, then services, then HTTP handlers. Every resource is owned by a layer, so shutdown releases it in reverse dependency order.</li>
+      <li>The HTTP server binds <code>127.0.0.1</code> on port 0, and the operating system picks a free port.</li>
+      <li>The public health route is probed. Only after it answers is <code>&#123;"event":"ready","port":N&#125;</code> written to stdout.</li>
+      <li>The shell waits up to 60 seconds for that line and restarts the sidecar at most once. The webview waits up to 125 seconds for <code>get_sidecar_endpoint</code>, then connects.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Stream</th><th>Carries</th><th>Consumer</th></tr></thead>
+      <tbody>
+        <tr><td>stdout</td><td>Exactly one <code>ready</code> or <code>error</code> JSON line</td><td>The parent process (shell or your script).</td></tr>
+        <tr><td>stderr</td><td>JSON operational logs</td><td>Log files and diagnostics. Lines that may carry credentials (for example containing <code>Bearer</code>, <code>secret</code>, or <code>cadcamfun_token</code>) are redacted by the shell.</td></tr>
+        <tr><td>stdin</td><td><code>&#123;"event":"shutdown"&#125;</code> lines; EOF also shuts down</td><td>The sidecar's shutdown reader. Oversized or malformed lines are ignored.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="auth-model" class="doc-section">
+    <h2>Authentication model</h2>
+    <table>
+      <thead><tr><th>Credential</th><th>Where it comes from</th><th>What it opens</th></tr></thead>
+      <tbody>
+        <tr><td>Launch token (<code>Authorization: Bearer</code>)</td><td>Generated by the shell per launch, or set by you for manual runs</td><td>Every protected route of the loopback API.</td></tr>
+        <tr><td>Session token (<code>x-session-token</code>)</td><td>Sign-in flows; signed by a per-installation secret stored next to the database</td><td>Selects the acting user. If missing or invalid, requests act as <code>local@cadcamfun.local</code>.</td></tr>
+        <tr><td>Bridge token</td><td><code>POST /api/ai/bridge/tokens</code>; shown once</td><td>Only the action listing and invocation routes, for one project, read or read-write, until expiry (default 30 days, maximum 365).</td></tr>
+        <tr><td>Companion device token</td><td>Pairing; shown once inside the pairing link; stored only as a SHA-256 hash</td><td>The companion gateway's allow-listed routes, over HTTPS.</td></tr>
+        </tbody>
+    </table>
+    <p>Signed tokens use HS256 with issuer <code>cadcamfun</code>. Revoked tokens verify as <code>invalid</code>, and unknown or forged tokens are ignored by revocation. The signing secret is generated once per installation and stored in the data directory, so links issued before a restart still verify afterwards.</p>
+    <DocCallout type="warn" title="Keep the launch token out of logs">
+      <p>Treat the launch token like a password for the whole local API. Scripts should read it from the environment and never print it. Use a bridge or device token when another program or device needs narrower access.</p>
+    </DocCallout>
+  </section>
+
+  <section id="data-directory" class="doc-section">
+    <h2>What lives in the data directory</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><code>cadcamfun.db</code> (+ <code>-wal</code>, <code>-shm</code>)</td><td>SQLite database in WAL mode.</td></tr>
+        <tr><td><code>auth-secret</code></td><td>Per-installation signing secret for session and link tokens.</td></tr>
+        <tr><td><code>companion/</code></td><td>Gateway certificate and private key (owner-only permissions).</td></tr>
+        <tr><td><code>plugins/</code></td><td><code>enabled.json</code> and one folder per assistant plugin.</td></tr>
+        <tr><td>file storage</td><td>Uploaded files (local bucket).</td></tr>
+        </tbody>
+    </table>
+    <p>Back up the whole directory while the sidecar is stopped, or after a shutdown that checkpointed the WAL. Copying only <code>cadcamfun.db</code> while the sidecar runs can miss recent writes that are still in the WAL file.</p>
+  </section>
+
+    <section id="ready-line" class="doc-section">
+    <h2>The ready line, captured</h2>
+    <DocCode language="bash" title="Start a disposable sidecar and read its port">
+{"CADCAMFUN_TOKEN=t CADCAMFUN_DATA_DIR=\u0022$(mktemp -d)\u0022 \\\nCADCAMFUN_MIGRATIONS_DIR=\u0022$PWD/packages/db/drizzle\u0022 \\\nCADCAMFUN_AI_HOST=direct CADCAMFUN_AI_OFFLINE=true \\\nbun --no-env-file apps/sidecar/src/main.ts\n# stdout: {\u0022event\u0022:\u0022ready\u0022,\u0022port\u0022:43461}"}
+    </DocCode>
+    <p>The port is chosen by the operating system on every start. The line is the first stdout output after migrations and layers are ready, so a client that sees it can call the API immediately. Keep stdin open: closing it is the shutdown signal.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Sidecar process topology" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[{ title: "API contract", href: "/docs/api" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />
 </DocsLayout>

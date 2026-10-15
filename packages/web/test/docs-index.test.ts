@@ -1,5 +1,6 @@
 import { guidePages } from "../src/data/guidePages"
 import { apiGroups } from "../src/data/apiGroups"
+import { apiCategories } from "../src/lib/apiCategories"
 import { describe, expect, test } from "bun:test"
 import { apps, dependencyNote, packages, stack } from "../src/data/architecture"
 import { docsIndex, docsIndexGaps } from "../src/data/docsIndex"
@@ -15,8 +16,14 @@ const sidebarContract = [
   "/docs/cam",
   "/docs/setups",
   "/docs/viewport",
+  "/docs/kernels",
+  "/docs/kernels/sketch-solver",
+  "/docs/kernels/mesh",
+  "/docs/kernels/brep",
+  "/docs/kernels/features",
+  "/docs/kernels/tolerance",
+  "/docs/kernels/cam",
   "/docs/database",
-  "/docs/api",
   "/docs/sidecar",
   "/docs/desktop",
   "/docs/mobile",
@@ -31,10 +38,11 @@ const sidebarContract = [
   "/docs/guides/local-dev",
   "/docs/guides/contributing",
   ...guidePages.map((guide) => `/docs/guides/${guide.slug}`),
+  "/docs/api",
+  ...apiCategories.flatMap((category) => category.slugs.map((slug) => `/docs/api/${slug}`)),
   "/docs/packages",
   "/docs/source-map",
   "/docs/documentation",
-  ...apiGroups.map((group) => `/docs/api/${group.slug}`),
 ]
 
 describe("docs index", () => {
@@ -72,6 +80,16 @@ describe("docs index", () => {
     expect(activeDocsSection("/docs").id).toBe("docs")
     expect(activeDocsSection("/docs/architecture").id).toBe("docs")
     expect(activeDocsSection("/docs/release").id).toBe("docs")
+  })
+
+  test("the API overview and every resource page are in the API area", () => {
+    expect(activeDocsSection("/docs/api").id).toBe("api")
+    for (const group of apiGroups) expect(activeDocsSection(`/docs/api/${group.slug}`).id).toBe("api")
+  })
+
+  test("kernel pages stay in Docs", () => {
+    expect(activeDocsSection("/docs/kernels").id).toBe("docs")
+    expect(activeDocsSection("/docs/kernels/brep").id).toBe("docs")
   })
 
   test("reference pages stay out of Docs", () => {

@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -17,6 +18,14 @@ const toc = [
   { title: "Run an isolated workflow engine example", href: "#engine-example" },
   { title: "Match filters and consume outputs safely", href: "#matching-and-outputs" },
   { title: "Diagnose workflow results", href: "#troubleshooting" },
+  { title: "Workflow file format", href: "#file-format" },
+  { title: "Step reference", href: "#step-reference" },
+  { title: "Outputs and interpolation", href: "#interpolation" },
+  { title: "Run lifecycle and errors", href: "#run-lifecycle" },
+  { title: "A full run, traced event by event", href: "#engine-trace" },
+  { title: "Trigger matching, tested", href: "#trigger-matching" },
+  { title: "Every parse error, reproduced", href: "#parse-errors" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -68,6 +77,7 @@ jobs:
     <p><code>vcs/commit</code> requires a message and accepts a <code>files</code> record of text under <code>.cadcamfun/</code> with YAML, Markdown, JSON, or text extensions. It acts as the run's account and obeys protected-branch policy. The extra-file argument cannot directly replace CAD entity paths. The current implementation delegates to project commit without checking for a clean working copy: it also snapshots current database edits on the checked-out branch, which can differ from the ref being checked. Run this writing step only when that current branch and working state are intended to be committed.</p>
     <p><code>notify/push</code> creates an application notification for the run's actor, with optional title, body, and success/failure outcome. It is a persisted notification step; it does not by itself establish delivery through an external push provider.</p>
     <p><code>ai/prompt</code> requires a prompt and optionally accepts system text and a model. It can substitute committed file content and returns answer text and model identity. Missing credentials or a provider error fail this step; a model answer is advisory output, separate from deterministic geometry checks.</p>
+    <p>The pure built-in steps are registered in <code>builtinSteps</code> (<code>apps/sidecar/src/services/workflow-steps.ts</code>): <code>project/validate</code>, <code>project/require-gcode</code>, <code>cam/verify</code>, <code>cam/gcode</code>, and <code>cam/sequence</code>. They need only the committed files and <code>@cadcamfun/core</code>, so they are available even when the assistant is not running.</p>
   </section>
 
   <section id="running" class="doc-section">
@@ -131,6 +141,7 @@ console.log(result) // { status: "success", jobs: { inspect: "success" } }`}
     <p>Output substitution traverses nested arrays and records. An exact missing output expression evaluates to undefined; an absent output embedded in a longer string becomes empty text. Do not rely on a skipped or failed step to have produced an output. Declare <code>needs</code> for cross-job consumers so dependency scheduling establishes the data order.</p>
     <p>Step <code>if</code> is one of three literal modes, not a general expression language. Workflow variables, shell interpolation, matrix builds, arbitrary JavaScript conditions, and third-party action loading are not implemented by this engine. The separate <code>ai/prompt</code> handler substitutes committed <code>files.&lt;path&gt;</code> references in its prompt; ordinary steps do not receive that extra substitution.</p>
     <p>Source: <code>packages/workflow/src/trigger.ts</code>, <code>run.ts</code>, and <code>apps/sidecar/src/services/workflow-service-steps.ts</code>.</p>
+    <p>An omitted branch or path filter matches every value. A manual dispatch matches only workflows that declare <code>on.manual</code>, and a pull-request event matches the workflow's <code>branches</code> globs against the pull request's base branch (<code>packages/workflow/src/trigger.ts</code>).</p>
   </section>
 
   <section id="troubleshooting" class="doc-section">
@@ -150,5 +161,163 @@ console.log(result) // { status: "success", jobs: { inspect: "success" } }`}
     <p>Source: <code>apps/sidecar/src/services/workflow-runner.ts</code>, <code>workflow-steps.ts</code>, and <code>http/vcs.ts</code>.</p>
   </section>
 
+    <section id="file-format" class="doc-section">
+    <h2>Workflow file format</h2>
+    <p>A workflow is a YAML file at <code>.cadcamfun/workflows/&lt;name&gt;.yml</code> in the project repository, versioned with the model it checks. Its shape mirrors GitHub Actions (<code>on</code>, <code>jobs</code>, <code>needs</code>, <code>steps</code>, <code>uses</code>, <code>with</code>), but <code>uses</code> always names a registered CADCAMFUN step. A workflow cannot run a shell command or a container image.</p>
+    <DocCode language="yaml" title=".cadcamfun/workflows/release-check.yml">
+{"name: Release check\non:\n  push:\n    branches: [main, \u0022release/*\u0022]\n    paths: [\u0022toolpaths/**\u0022]\n  pullRequest:\n    branches: [main]\n  manual: {}\njobs:\n  validate:\n    steps:\n      - uses: project/validate\n      - uses: project/require-gcode\n  verify:\n    needs: [validate]\n    steps:\n      - id: verify\n        uses: cam/verify\n        with: { severity: warning }\n  gcode:\n    needs: [validate]\n    steps:\n      - uses: cam/gcode\n      - uses: cam/sequence\n  report:\n    needs: [verify, gcode]\n    steps:\n      - id: review\n        uses: ai/prompt\n        with:\n          prompt: \u0022Summarise risks in this program: ${{ files.toolpaths/op1.json }}\u0022\n        continueOnError: true\n      - uses: notify/push\n        if: always\n        with:\n          title: \u0022Release check finished\u0022\n          body: \u0022${{ steps.review.outputs.text }}\u0022"}
+    </DocCode>
+    <figure class="not-prose my-6">
+      <svg viewBox="0 0 560 170" role="img" aria-label="Job graph: validate runs first; verify and gcode run concurrently after it; report runs last with if always" style="width:100%;max-width:600px;height:auto">
+        <g fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="10" y="65" width="110" height="40" rx="6"/><rect x="190" y="15" width="110" height="40" rx="6"/>
+          <rect x="190" y="115" width="110" height="40" rx="6"/><rect x="380" y="65" width="150" height="40" rx="6"/>
+          <path d="M120 85 L190 35 M120 85 L190 135 M300 35 L380 85 M300 135 L380 85"/>
+        </g>
+        <g fill="currentColor" font-family="monospace" font-size="12">
+          <text x="30" y="90">validate</text><text x="215" y="40">verify</text><text x="218" y="140">gcode</text><text x="398" y="90">report (needs both)</text>
+          <text x="10" y="20">level 0</text><text x="190" y="10">level 1 (concurrent)</text><text x="380" y="60">level 2</text>
+        </g>
+      </svg>
+      <figcaption class="text-[13px]">Jobs run level by level. Jobs in the same level run concurrently, and a job runs only when every job in its <code>needs</code> succeeded; otherwise it is reported as <code>skipped</code>.</figcaption>
+    </figure>
+    <table>
+      <thead><tr><th>Key</th><th>Rules</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>Required, 1–128 characters.</td></tr>
+        <tr><td><code>on.push</code></td><td>Optional <code>branches</code> and <code>paths</code> glob lists. A push matches when the branch matches and at least one changed path matches.</td></tr>
+        <tr><td><code>on.pullRequest</code></td><td>Optional <code>branches</code> globs, matched against the pull request's base branch when it is opened.</td></tr>
+        <tr><td><code>on.manual</code></td><td>Any value (for example <code>&#123;&#125;</code>) enables dispatch from the desktop or the mobile companion.</td></tr>
+        <tr><td><code>jobs.&lt;id&gt;</code></td><td>Job IDs start with a letter and may contain letters, digits, <code>_</code>, and <code>-</code> (at most 64 characters). Each job needs at least one step.</td></tr>
+        <tr><td><code>needs</code></td><td>Job IDs that must succeed first. Unknown IDs and cycles are rejected when the file is parsed.</td></tr>
+        <tr><td><code>steps[].uses</code></td><td>A lowercase step identifier with at least one slash, such as <code>cam/verify</code>.</td></tr>
+        <tr><td><code>steps[].id</code></td><td>Optional; unique across the whole workflow. Required for later steps to read its outputs.</td></tr>
+        <tr><td><code>steps[].with</code></td><td>Free-form parameters for the step. Strings are interpolated.</td></tr>
+        <tr><td><code>steps[].if</code></td><td><code>success</code> (default: run only if nothing failed so far in the job), <code>failure</code> (run only after a failure), or <code>always</code>.</td></tr>
+        <tr><td><code>steps[].continueOnError</code></td><td>When true, a failure of this step does not mark the job as failed.</td></tr>
+        </tbody>
+    </table>
+    <p>Globs use <code>*</code> to match within one path segment and <code>**</code> to match across segments. An omitted filter list matches everything. <code>toolpaths/*.json</code> matches <code>toolpaths/a.json</code> but not <code>toolpaths/x/a.json</code>; <code>toolpaths/**</code> matches both.</p>
+  </section>
+
+  <section id="step-reference" class="doc-section">
+    <h2>Step reference</h2>
+    <p>Pure steps read only the files of the commit being checked, never the live database, so a run reports on exactly the tree that was pushed. Service-backed steps are registered once their service exists. Until then, naming one is a hard error, not a silent no-op.</p>
+    <table>
+      <thead><tr><th>Step</th><th>with</th><th>Outputs</th><th>Fails when</th></tr></thead>
+      <tbody>
+        <tr><td><code>project/validate</code></td><td>none</td><td><code>issues</code> (0), <code>drawings</code>, <code>workflows</code></td><td>An entity JSON file is invalid, a <code>drawings/</code>, <code>components/</code>, or <code>toolpaths/</code> file's <code>id</code> does not match its file name, or <code>name</code> is missing.</td></tr>
+        <tr><td><code>project/require-gcode</code></td><td>none</td><td><code>toolpaths</code></td><td>Any toolpath in the commit has no G-code.</td></tr>
+        <tr><td><code>cam/verify</code></td><td><code>toolpath?</code>, <code>tolerance?</code>, <code>severity?</code> (<code>error</code> default, or <code>warning</code>)</td><td><code>verified</code>, <code>toolpaths</code>, <code>skipped</code></td><td>Replay finds an error (or a warning, with <code>severity: warning</code>): rapids into stock, gouges, shank or fixture collisions, material left. Programs without G-code or a stored generation request are listed in <code>skipped</code>, never counted as passing.</td></tr>
+        <tr><td><code>cam/gcode</code></td><td><code>toolpath?</code></td><td><code>matched</code>, <code>toolpaths</code>, <code>skipped</code></td><td>Regenerating from the stored request does not reproduce the committed G-code (ignoring the header stamp and surrounding whitespace).</td></tr>
+        <tr><td><code>cam/sequence</code></td><td><code>toolpath?</code></td><td><code>toolpaths</code>, <code>tools</code></td><td>One tool number names two different tools, or a rest-machining operation's <code>restToolDiameter</code> is not larger than its <code>toolDiameter</code>.</td></tr>
+        <tr><td><code>vcs/commit</code></td><td><code>message</code> (required), <code>files</code> map</td><td><code>commit</code>, <code>files</code></td><td>The working copy is dirty, a path is outside <code>.cadcamfun/</code>, or a file is not <code>.yml</code>, <code>.yaml</code>, <code>.md</code>, <code>.json</code>, or <code>.txt</code>. An AI actor is refused on <code>main</code>.</td></tr>
+        <tr><td><code>notify/push</code></td><td><code>title?</code>, <code>body?</code>, <code>outcome?</code> (<code>success</code> default, or <code>failure</code>)</td><td><code>notified</code></td><td>Never fails the run. Creates a <code>WORKFLOW_PASSED</code> or <code>WORKFLOW_FAILED</code> notification for the dispatching account, linked to the project history.</td></tr>
+        <tr><td><code>ai/prompt</code></td><td><code>prompt</code> (required), <code>system?</code>, <code>model?</code></td><td><code>text</code>, <code>model</code></td><td>No model is available or the call fails. Only this step fails; the geometry verdict is unaffected.</td></tr>
+        </tbody>
+    </table>
+    <p>Malformed <code>with</code> values are read defensively: a non-string where a string is expected, or a non-finite number, is ignored rather than failing the run. Check outputs to confirm a filter such as <code>toolpath</code> actually applied.</p>
+  </section>
+
+  <section id="interpolation" class="doc-section">
+    <h2>Outputs and interpolation</h2>
+    <p>A step with an <code>id</code> stores its outputs run-wide, so a job can read outputs of the jobs it <code>needs</code>. Inside any string in <code>with</code>, <code>$&#123;&#123; steps.&lt;id&gt;.outputs.&lt;key&gt; &#125;&#125;</code> is replaced recursively through objects and arrays. When a string consists of exactly one expression, the value keeps its type (a number stays a number). Embedded in other text, the value is converted to a string, and a missing value becomes an empty string. <code>ai/prompt</code> additionally expands <code>$&#123;&#123; files.&lt;path&gt; &#125;&#125;</code> to the text of that file in the commit (empty if the file is absent).</p>
+    <table>
+      <thead><tr><th>Expression in with</th><th>Output value</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>"$&#123;&#123; steps.verify.outputs.verified &#125;&#125;"</code></td><td><code>3</code></td><td><code>3</code> (number)</td></tr>
+        <tr><td><code>"Verified $&#123;&#123; steps.verify.outputs.verified &#125;&#125; programs"</code></td><td><code>3</code></td><td><code>"Verified 3 programs"</code></td></tr>
+        <tr><td><code>"$&#123;&#123; steps.missing.outputs.x &#125;&#125;"</code></td><td>none</td><td><code>undefined</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="run-lifecycle" class="doc-section">
+    <h2>Run lifecycle and errors</h2>
+    <ol>
+      <li>The trigger event (push, pull request, or manual) selects workflows in the tree of the ref, read from the commit rather than the working copy.</li>
+      <li>Each file is parsed. YAML errors (<code>yaml</code>), schema errors (<code>schema</code>), unknown <code>needs</code> (<code>needs</code>), cycles (<code>cycle</code>), and duplicate step IDs (<code>duplicate-step-id</code>) are reported as an invalid run with the reason.</li>
+      <li>Every <code>uses</code> is checked against the registry before anything runs. An unknown step fails the run with <code>Unknown step(s): ...</code>, so a typo never half-applies a change.</li>
+      <li>Jobs are ordered into levels. Each level runs concurrently; a job whose <code>needs</code> did not all succeed is skipped.</li>
+      <li>Progress events (<code>job-start</code>, <code>step</code> with status and outputs or message, <code>job-end</code>) stream to the desktop and the companion, and the run is persisted with its events.</li>
+      <li>The run succeeds only if every job succeeded. Skipped jobs count as not successful.</li>
+    </ol>
+    <p>Live events <code>workflow.started</code> (with the triggering event) and <code>workflow.finished</code> (<code>success</code>, <code>failure</code>, or <code>cancelled</code>) are published for each run.</p>
+    <DocCallout type="note" title="Evidence, not decoration">
+      <p>Of the built-in steps, only <code>cam/verify</code> replays the program against the stock and tools. The other checks confirm consistency of what was committed. Read <code>skipped</code> lists: an unverifiable toolpath is not a verified one.</p>
+    </DocCallout>
+  </section>
+
+    <section id="engine-trace" class="doc-section">
+    <h2>A full run, traced event by event</h2>
+    <p>This workflow exercises every rule of the engine at once: outputs passed between jobs, a whole-value and an embedded interpolation, <code>continueOnError</code>, <code>if: failure</code>, a job skipped because its dependency failed, and an independent job. It was run with <code>runWorkflow</code> and four test step handlers: <code>demo/measure</code> returns <code>&#123; volume: 7842.92, part &#125;</code>, <code>demo/check</code> prints what it received, <code>demo/fail</code> fails with <code>StepError("tolerance exceeded")</code> and <code>demo/notify</code> returns nothing.</p>
+    <DocCode language="yaml" title=".cadcamfun/workflows/release-check.yml">
+{"name: Release check\non:\n  push: { branches: [main, \u0022release/**\u0022], paths: [\u0022parts/**/*.json\u0022] }\n  manual: {}\njobs:\n  measure:\n    steps:\n      - id: size\n        uses: demo/measure\n        with: { part: bracket }\n  verify:\n    needs: [measure]\n    steps:\n      - uses: demo/check\n        with: { volume: \u0022${{ steps.size.outputs.volume }}\u0022, label: \u0022vol=${{ steps.size.outputs.volume }} mm3\u0022 }\n      - uses: demo/fail\n        continueOnError: true\n      - uses: demo/fail\n      - uses: demo/notify\n        if: failure\n      - uses: demo/notify\n  publish:\n    needs: [verify]\n    steps:\n      - uses: demo/notify\n  lint:\n    steps:\n      - uses: demo/notify"}
+    </DocCode>
+    <DocCode language="text" title="Events and result, as emitted">
+{"levels [[\u0022measure\u0022,\u0022lint\u0022],[\u0022verify\u0022],[\u0022publish\u0022]]\n{\u0022type\u0022:\u0022job-start\u0022,\u0022job\u0022:\u0022measure\u0022}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022measure\u0022,\u0022index\u0022:0,\u0022uses\u0022:\u0022demo/measure\u0022,\u0022status\u0022:\u0022success\u0022,\u0022outputs\u0022:{\u0022volume\u0022:7842.92,\u0022part\u0022:\u0022bracket\u0022}}\n{\u0022type\u0022:\u0022job-end\u0022,\u0022job\u0022:\u0022measure\u0022,\u0022status\u0022:\u0022success\u0022}\n{\u0022type\u0022:\u0022job-start\u0022,\u0022job\u0022:\u0022lint\u0022}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022lint\u0022,\u0022index\u0022:0,\u0022uses\u0022:\u0022demo/notify\u0022,\u0022status\u0022:\u0022success\u0022,\u0022outputs\u0022:{}}\n{\u0022type\u0022:\u0022job-end\u0022,\u0022job\u0022:\u0022lint\u0022,\u0022status\u0022:\u0022success\u0022}\n{\u0022type\u0022:\u0022job-start\u0022,\u0022job\u0022:\u0022verify\u0022}\n  check got {\u0022volume\u0022:7842.92,\u0022label\u0022:\u0022vol=7842.92 mm3\u0022}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022index\u0022:0,\u0022uses\u0022:\u0022demo/check\u0022,\u0022status\u0022:\u0022success\u0022,\u0022outputs\u0022:{\u0022ok\u0022:true}}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022index\u0022:1,\u0022uses\u0022:\u0022demo/fail\u0022,\u0022status\u0022:\u0022failure\u0022,\u0022message\u0022:\u0022Cause([Fail(StepError: tolerance exceeded)])\u0022}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022index\u0022:2,\u0022uses\u0022:\u0022demo/fail\u0022,\u0022status\u0022:\u0022failure\u0022,\u0022message\u0022:\u0022Cause([Fail(StepError: tolerance exceeded)])\u0022}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022index\u0022:3,\u0022uses\u0022:\u0022demo/notify\u0022,\u0022status\u0022:\u0022success\u0022,\u0022outputs\u0022:{}}\n{\u0022type\u0022:\u0022step\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022index\u0022:4,\u0022uses\u0022:\u0022demo/notify\u0022,\u0022status\u0022:\u0022skipped\u0022}\n{\u0022type\u0022:\u0022job-end\u0022,\u0022job\u0022:\u0022verify\u0022,\u0022status\u0022:\u0022failure\u0022}\n{\u0022type\u0022:\u0022job-end\u0022,\u0022job\u0022:\u0022publish\u0022,\u0022status\u0022:\u0022skipped\u0022}\nresult {\u0022status\u0022:\u0022failure\u0022,\u0022jobs\u0022:{\u0022measure\u0022:\u0022success\u0022,\u0022lint\u0022:\u0022success\u0022,\u0022verify\u0022:\u0022failure\u0022,\u0022publish\u0022:\u0022skipped\u0022}}"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Observation</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>measure</code> and <code>lint</code> run in the first level</td><td>Jobs without <code>needs</code> form level 0 and run concurrently</td></tr>
+        <tr><td><code>volume</code> arrives as the number 7842.92, <code>label</code> as a string</td><td>A string that is exactly one expression keeps the output's type; an embedded expression is stringified</td></tr>
+        <tr><td>Step 1 fails but the job continues normally</td><td><code>continueOnError: true</code> records the failure without marking the job failed</td></tr>
+        <tr><td>Step 2 fails and marks the job failed</td><td>Default behaviour</td></tr>
+        <tr><td>Step 3 runs, step 4 is skipped</td><td><code>if: failure</code> runs only after a failure; the default <code>if: success</code> is skipped after one</td></tr>
+        <tr><td><code>publish</code> is skipped, never started</td><td>A job whose <code>needs</code> did not all succeed emits only <code>job-end</code> with <code>skipped</code></td></tr>
+        <tr><td>Overall <code>failure</code></td><td>The run succeeds only if every job is <code>success</code>; a skipped job counts as not successful</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="trigger-matching" class="doc-section">
+    <h2>Trigger matching, tested</h2>
+    <table>
+      <thead><tr><th>Event</th><th>Matches?</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>push to <code>main</code>, changed <code>parts/a/b.json</code></td><td>yes</td><td>Branch matches; path matches <code>parts/**/*.json</code></td></tr>
+        <tr><td>push to <code>main</code>, changed <code>README.md</code></td><td>no</td><td>No changed path matches</td></tr>
+        <tr><td>push to <code>release/6.1</code>, changed <code>parts/x.json</code></td><td>no</td><td><code>parts/**/*.json</code> compiles to <code>^parts\/.*\/[^/]*\.json$</code>, which needs a directory between <code>parts/</code> and the file</td></tr>
+        <tr><td>push to <code>feature/x</code></td><td>no</td><td>Branch does not match</td></tr>
+        <tr><td>manual</td><td>yes</td><td><code>manual</code> is declared</td></tr>
+        <tr><td>pull request into <code>main</code></td><td>no</td><td>No <code>pullRequest</code> trigger declared</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="** needs a segment on each side here">
+      <p>Because <code>**</code> becomes <code>.*</code> between two literal slashes, <code>parts/**/*.json</code> does not match files directly in <code>parts/</code>. List both patterns, <code>parts/*.json</code> and <code>parts/**/*.json</code>, to cover both.</p>
+    </DocCallout>
+    <code>*</code> matches within one path segment; <code>**</code> matches across segments. Omitting <code>branches</code> or <code>paths</code> means any value matches.
+  </section>
+
+  <section id="parse-errors" class="doc-section">
+    <h2>Every parse error, reproduced</h2>
+    <table>
+      <thead><tr><th>code</th><th>Input problem</th><th>Message</th></tr></thead>
+      <tbody>
+        <tr><td><code>yaml</code></td><td>Malformed YAML such as <code>name: [x</code></td><td>Invalid YAML: SyntaxError: YAML Parse error: Unexpected token</td></tr>
+        <tr><td><code>schema</code></td><td><code>uses: Shell</code> (not a lower-case <code>area/step</code> id)</td><td>SchemaError(Expected a string matching the RegExp …) with the path <code>["jobs"]["a"]["steps"][0]</code></td></tr>
+        <tr><td><code>needs</code></td><td><code>needs: [b]</code> with no job <code>b</code></td><td>Job a needs unknown job b</td></tr>
+        <tr><td><code>cycle</code></td><td><code>a</code> needs <code>b</code> and <code>b</code> needs <code>a</code></td><td>Workflow jobs form a cycle: a, b</td></tr>
+        <tr><td><code>duplicate-step-id</code></td><td>Two steps with <code>id: s</code>, even in different jobs</td><td>Step ids must be unique across the workflow</td></tr>
+        </tbody>
+    </table>
+    <p>At run time, any <code>uses</code> without a registered handler fails the whole run before the first step, listing every unknown id: <code>Unknown step(s): demo/measure, demo/check, …</code>. A typo therefore never half-applies a workflow.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>1–128 characters</td></tr>
+        <tr><td>Job and step ids</td><td>Letter first, then letters, digits, <code>_</code> or <code>-</code>; at most 64 characters</td></tr>
+        <tr><td><code>uses</code></td><td>Lower-case segments separated by <code>/</code>, at least two segments</td></tr>
+        <tr><td><code>steps</code></td><td>At least one per job</td></tr>
+        <tr><td><code>if</code></td><td><code>success</code> (default), <code>always</code>, <code>failure</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="GitHub Actions job graph" caption="Every job in .github/workflows, by needs: depth to the right. Jobs marked ×6 fan out over the six-target platform matrix; release.yml chains trusted → build → manifest → publish-platform → publish-index." solids={[{"kind":"box","size":[16,6,4],"at":[-8.0,-15.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[-8.0,-3.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[-8.0,9.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[-34.0,-3.0,0],"color":"#a48ac8"},{"kind":"box","size":[16,6,4],"at":[-8.0,21.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[-34.0,21.0,0],"color":"#a48ac8"},{"kind":"box","size":[16,6,4],"at":[-8.0,45.0,0],"color":"#e0a030"},{"kind":"box","size":[16,6,4],"at":[-34.0,45.0,0],"color":"#a48ac8"},{"kind":"box","size":[16,6,4],"at":[-8.0,69.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[18.0,63.0,0],"color":"#e0a030"},{"kind":"box","size":[16,6,4],"at":[18.0,75.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[44.0,69.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[70.0,69.0,0],"color":"#e0a030"},{"kind":"box","size":[16,6,4],"at":[96.0,69.0,0],"color":"#8aa4c8"},{"kind":"box","size":[16,6,4],"at":[-34.0,69.0,0],"color":"#a48ac8"}]} paths={[{"points":[[-26,0,2.0],[-13.0,-6.0,5.0],[0,-12.0,2.0]],"color":"#7a8aa0"},{"points":[[-26,0,2.0],[-13.0,0.0,5.0],[0,0.0,2.0]],"color":"#7a8aa0"},{"points":[[-26,0,2.0],[-13.0,6.0,5.0],[0,12.0,2.0]],"color":"#7a8aa0"},{"points":[[-26,24,2.0],[-13.0,24.0,5.0],[0,24.0,2.0]],"color":"#7a8aa0"},{"points":[[-26,48,2.0],[-13.0,48.0,5.0],[0,48.0,2.0]],"color":"#7a8aa0"},{"points":[[0,72.0,2.0],[13.0,69.0,5.0],[26,66.0,2.0]],"color":"#2fbf71"},{"points":[[0,72.0,2.0],[26.0,72.0,5.0],[52,72.0,2.0]],"color":"#2fbf71"},{"points":[[26,66.0,2.0],[39.0,69.0,5.0],[52,72.0,2.0]],"color":"#2fbf71"},{"points":[[0,72.0,2.0],[39.0,72.0,5.0],[78,72.0,2.0]],"color":"#2fbf71"},{"points":[[26,66.0,2.0],[52.0,69.0,5.0],[78,72.0,2.0]],"color":"#2fbf71"},{"points":[[52,72.0,2.0],[65.0,72.0,5.0],[78,72.0,2.0]],"color":"#2fbf71"},{"points":[[0,72.0,2.0],[52.0,72.0,5.0],[104,72.0,2.0]],"color":"#2fbf71"},{"points":[[52,72.0,2.0],[78.0,72.0,5.0],[104,72.0,2.0]],"color":"#2fbf71"},{"points":[[78,72.0,2.0],[91.0,72.0,5.0],[104,72.0,2.0]],"color":"#2fbf71"},{"points":[[0,72.0,2.0],[13.0,75.0,5.0],[26,78.0,2.0]],"color":"#2fbf71"},{"points":[[-26,72,2.0],[-13.0,72.0,5.0],[0,72.0,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"workspace","at":[0,-12.0,6.4],"size":5},{"text":"src-tauri","at":[0,0.0,6.4],"size":5},{"text":"mobile","at":[0,12.0,6.4],"size":5},{"text":"ci.yml","at":[-26,0,6.4],"size":5},{"text":"simulator-build","at":[0,24.0,6.4],"size":5},{"text":"ios.yml","at":[-26,24,6.4],"size":5},{"text":"build \u00d76","at":[0,48.0,6.4],"size":5},{"text":"build-platforms.yml","at":[-26,48,6.4],"size":5},{"text":"trusted","at":[0,72.0,6.4],"size":5},{"text":"build \u00d76","at":[26,66.0,6.4],"size":5},{"text":"publish-npm","at":[26,78.0,6.4],"size":5},{"text":"manifest","at":[52,72.0,6.4],"size":5},{"text":"publish-platform \u00d76","at":[78,72.0,6.4],"size":5},{"text":"publish-index","at":[104,72.0,6.4],"size":5},{"text":"release.yml","at":[-26,72,6.4],"size":5}]} height={420} />
+  </section>
   <DocRelated items={[{ title: "History", href: "/docs/history" }, { title: "CAM and G-code", href: "/docs/cam" }, { title: "AI assistant", href: "/docs/ai" }]} />
 </DocsLayout>

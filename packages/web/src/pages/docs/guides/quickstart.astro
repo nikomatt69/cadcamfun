@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -14,6 +15,9 @@ const toc = [
   { title: "Next commands", href: "#other-commands" },
   { title: "Verify a real API without a model", href: "#project-smoke" },
   { title: "Interpret first-run failures", href: "#first-run-errors" },
+  { title: "Requirement details", href: "#requirements-table" },
+  { title: "Your first hour, step by step", href: "#first-hour" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -72,6 +76,7 @@ bun run db:migrate`}
     </DocCode>
     <p>Open <code>http://localhost:1420</code>. With no <code>VITE_SIDECAR_URL</code>, this uses the in-memory fake API. It supports a subset of requests and does not provide persistent projects, provider sessions, or native dialogs. Connect to a live sidecar by setting both Vite sidecar URL and token process variables.</p>
     <p>The desktop package's <code>tauri:dev</code> script creates a stub sidecar when the binary is missing. The stub supports shell isolation. Prefer the root <code>desktop:dev</code> command when exercising application services.</p>
+    <p><code>bun run desktop:dev</code> first runs <code>build:sidecar</code>, which compiles the sidecar and stages migrations (pipeline steps <code>compile</code> and <code>resources</code>). It then starts <code>tauri dev</code> in the desktop package.</p>
   </section>
 
   <section id="after" class="doc-section">
@@ -152,6 +157,39 @@ curl --fail-with-body "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID" \
     <p>Keep the first verification small: health, one project, one persisted drawing/program, then optional integrations. A successful base application launch does not configure Stripe, AI providers, a remote GitHub repository, or mobile routing automatically.</p>
   </section>
 
+    <section id="requirements-table" class="doc-section">
+    <h2>Requirement details</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th><th>Needed for</th></tr></thead>
+      <tbody>
+        <tr><td>Bun</td><td>1.4.2 (the repository's <code>packageManager</code>)</td><td>Everything: install, tests, sidecar, scripts</td></tr>
+        <tr><td>Rust toolchain + Tauri prerequisites</td><td>stable; platform webview libraries on Linux</td><td>The desktop shell (<code>desktop:dev</code>, builds)</td></tr>
+        <tr><td>SQLite CLI</td><td>any</td><td>Optional: read-only database inspection</td></tr>
+        <tr><td>Xcode</td><td>—</td><td>Only for the iOS companion</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="first-hour" class="doc-section">
+    <h2>Your first hour, step by step</h2>
+    <DocCode language="bash" title="From clone to a running desktop">
+{"git clone https://github.com/nikomatt69/cadcamfun-tauri.git\ncd cadcamfun-tauri\nbun install --frozen-lockfile\nbun run typecheck                 # all workspaces\nbun run test                      # bun test packages apps scripts\nbun run desktop:dev               # builds the sidecar + migrations, then tauri dev"}
+    </DocCode>
+    <ol>
+      <li>When the window opens, the sidecar status turns ready within seconds; a new data directory is migrated on first launch.</li>
+      <li>Create a project, add a drawing, draw a rectangle and extrude it.</li>
+      <li>Open CAM, pick the solid and generate. Check the release level and claims before exporting NC.</li>
+      <li>Open the history panel and commit: the project now has its first version.</li>
+    </ol>
+    <DocCallout type="info" title="No model key needed">
+      <p>Everything above works without an AI provider. Add a key later in the assistant settings.</p>
+    </DocCallout>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="The pieces quickstart starts" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" },
       { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },

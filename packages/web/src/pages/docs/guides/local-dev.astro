@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -16,6 +17,9 @@ const toc = [
   { title: "Process configuration reference", href: "#config-reference" },
   { title: "Use Studio against an explicit database", href: "#studio-path" },
   { title: "A repeatable development loop", href: "#shutdown-loop" },
+  { title: "Which process runs where", href: "#process-map" },
+  { title: "Inner loop by change type", href: "#inner-loop" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -101,6 +105,7 @@ bun run --cwd packages/web build`}
     <h2>Documentation and companion development</h2>
     <p><code>bun run --cwd packages/web start</code> runs Astro alone. <code>bun run --cwd packages/web dev</code> starts Astro plus the local Studio API. The documentation check validates the route index; the build validates Astro compilation and prerendering.</p>
     <p>For iOS, <code>bun run --cwd apps/mobile start</code> starts Metro for a custom development client. <code>bun run --cwd apps/mobile ios</code> builds/runs the native app; <code>build</code> exports JavaScript only. Native pinning requires the local Swift module and cannot run in Expo Go.</p>
+    <p><code>bun scripts/build.ts --help</code> lists the release pipeline's options. <code>--only=resources</code> restages migrations without rebuilding, and <code>--dry-run</code> prints the plan without writing anything.</p>
   </section>
 
   <section id="config-reference" class="doc-section">
@@ -153,6 +158,42 @@ CADCAMFUN_DB=/tmp/cadcamfun-studio/cadcamfun.db \
     <p>For compiled-runtime validation, <code>scripts/smoke-sidecar.ts</code> can run a selected binary with an isolated home/data directory and offline AI. It measures readiness/health/action behavior and exercises a kernel job. Without <code>--binary</code> it first compiles a temporary executable, so plan for the build cost; its result is separate from source-level tests.</p>
   </section>
 
+    <section id="process-map" class="doc-section">
+    <h2>Which process runs where</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Starts</th><th>Data directory</th><th>Database</th></tr></thead>
+      <tbody>
+        <tr><td><code>bun run desktop:dev</code></td><td>Compiled sidecar + Tauri dev window</td><td>Application data directory chosen by Tauri</td><td><code>&lt;dataDir&gt;/cadcamfun.db</code></td></tr>
+        <tr><td>Manual sidecar (<code>bun apps/sidecar/src/main.ts</code>)</td><td>Sidecar only, on an ephemeral loopback port</td><td><code>CADCAMFUN_DATA_DIR</code></td><td><code>&lt;dataDir&gt;/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run db:migrate</code></td><td>Migration script</td><td>—</td><td><code>DATABASE_URL</code> or <code>packages/db/data/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run --filter @cadcamfun/web studio</code></td><td>Local Studio</td><td>—</td><td><code>CADCAMFUN_DB</code>, <code>DATABASE_URL</code> or <code>data/cadcamfun.db</code></td></tr>
+        <tr><td><code>bun run --filter @cadcamfun/web dev</code></td><td>Docs site</td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <DocCallout type="warn" title="Four different database defaults">
+      <p>These entry points do not share a default path. Set the path explicitly when you need two tools to look at the same file.</p>
+    </DocCallout>
+  </section>
+
+  <section id="inner-loop" class="doc-section">
+    <h2>Inner loop by change type</h2>
+    <table>
+      <thead><tr><th>You changed</th><th>Run</th></tr></thead>
+      <tbody>
+        <tr><td>Kernel code in <code>packages/core</code></td><td><code>bun test packages/core</code></td></tr>
+        <tr><td>A contract in <code>packages/api</code></td><td><code>bun run generate</code>, <code>bun run generate:check</code>, the sidecar tests, then the docs <code>generate:api-reference</code></td></tr>
+        <tr><td>A sidecar handler or service</td><td><code>bun test apps/sidecar</code></td></tr>
+        <tr><td>The schema</td><td><code>bun run db:generate</code>, commit the new migration folder, <code>bun scripts/build.ts --only=resources</code></td></tr>
+        <tr><td>Rust in <code>src-tauri</code></td><td><code>cargo clippy</code> and <code>cargo test</code> in <code>apps/desktop/src-tauri</code></td></tr>
+        <tr><td>Docs pages</td><td><code>bun run typecheck</code> and <code>bun run build</code> in <code>packages/web</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="What runs when you develop locally" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },
       { title: "Pair the iOS companion", href: "/docs/guides/companion-pairing" },

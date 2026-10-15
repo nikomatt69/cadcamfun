@@ -1,0 +1,129 @@
+---
+/** Connection panel for the API pages: base URL and token are kept in this browser's localStorage and used by every "Try it". */
+---
+<section class="api-pg not-prose" data-api-playground>
+  <header class="api-pg-head">
+    <div>
+      <div class="api-pg-title">Playground</div>
+      <p class="api-pg-sub">Send these requests to your own running sidecar. Values stay in this browser.</p>
+    </div>
+    <div class="api-pg-state" data-pg-state="idle"><span class="api-pg-dot" aria-hidden="true"></span> <span data-pg-state-label>Not connected</span></div>
+  </header>
+  <div class="api-pg-grid">
+    <label class="api-pg-field"><span>Base URL</span><input type="url" data-pg-input="baseUrl" placeholder="http://127.0.0.1:46709" spellcheck="false" /></label>
+    <label class="api-pg-field"><span>Bearer token <em>optional</em></span><input type="password" data-pg-input="token" placeholder="CADCAMFUN_TOKEN" spellcheck="false" autocomplete="off" /></label>
+    <label class="api-pg-field"><span>Session token <em>optional</em></span><input type="password" data-pg-input="session" placeholder="x-session-token" spellcheck="false" autocomplete="off" /></label>
+    <div class="api-pg-actions">
+      <button type="button" class="api-btn api-btn-primary" data-pg-connect>Check connection</button>
+      <button type="button" class="api-btn" data-pg-clear>Clear</button>
+    </div>
+  </div>
+  <p class="api-pg-hint" data-pg-hint hidden></p>
+  <details class="api-details api-pg-details">
+    <summary>How this works</summary>
+    <div class="api-details-body">
+      <p class="api-pg-sub">The sidecar listens on a loopback port chosen at startup and prints it in its <code>ready</code> line; use that URL and the <code>CADCAMFUN_TOKEN</code> it was started with. Requests go straight from this page to that address.</p>
+      <p class="api-pg-sub">The sidecar sends CORS headers only to the Tauri origins and to <code>http://localhost</code> or <code>http://127.0.0.1</code> on any port. From the hosted docs the browser blocks the response, so run the docs locally (<code>bun run dev</code> in <code>packages/web</code>) to use the playground, or copy the request as curl. To experiment without touching real data, start the sidecar with <code>CADCAMFUN_DATA_DIR</code> pointed at a throwaway directory — see <a href="/docs/guides/api-tour">the API walkthrough</a>.</p>
+    </div>
+  </details>
+</section>
+
+<script>
+  const KEY = "cadcamfun.api.playground"
+  type Conn = { baseUrl?: string; token?: string; session?: string }
+  const load = (): Conn => { try { return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Conn } catch { return {} } }
+  const save = (c: Conn) => localStorage.setItem(KEY, JSON.stringify(c))
+  const headersOf = (c: Conn, json: boolean): Record<string, string> => ({
+    ...(c.token ? { authorization: `Bearer ${c.token}` } : {}),
+    ...(c.session ? { "x-session-token": c.session } : {}),
+    ...(json ? { "content-type": "application/json" } : {}),
+  })
+  const pg = document.querySelector<HTMLElement>("[data-api-playground]")
+  if (pg) {
+    const inputs = [...pg.querySelectorAll<HTMLInputElement>("[data-pg-input]")]
+    const state = pg.querySelector<HTMLElement>("[data-pg-state]")!
+    const label = pg.querySelector<HTMLElement>("[data-pg-state-label]")!
+    const hint = pg.querySelector<HTMLElement>("[data-pg-hint]")!
+    const conn = load()
+    for (const input of inputs) {
+      const k = input.dataset.pgInput as keyof Conn
+      input.value = conn[k] ?? ""
+      input.addEventListener("change", () => { const c = load(); c[k] = input.value.trim(); save(c) })
+    }
+    const set = (s: string, text: string) => { state.dataset.pgState = s; label.textContent = text }
+    pg.querySelector("[data-pg-connect]")!.addEventListener("click", async () => {
+      const c = load()
+      if (!c.baseUrl) { hint.hidden = false; hint.textContent = "Enter the sidecar URL first."; return }
+      set("busy", "Checking…")
+      try {
+        const r = await fetch(new URL("/health", c.baseUrl), { headers: headersOf(c, false) })
+        set(r.ok ? "ok" : "error", r.ok ? "Connected" : `HTTP ${r.status}`)
+        hint.hidden = r.ok
+        if (!r.ok) hint.textContent = r.status === 401 ? "The sidecar answered 401: check the bearer token." : `The sidecar answered ${r.status}.`
+      } catch {
+        set("error", "Unreachable")
+        hint.hidden = false
+        hint.textContent = "No response. Check the URL and port; from a non-loopback origin the browser blocks the request (CORS)."
+      }
+    })
+    pg.querySelector("[data-pg-clear]")!.addEventListener("click", () => { localStorage.removeItem(KEY); inputs.forEach((i) => (i.value = "")); set("idle", "Not connected") })
+  }
+
+  const build = (form: HTMLElement): { url: string; init: RequestInit; curl: string } | string => {
+    const c = load()
+    if (!c.baseUrl) return "Set the base URL in the playground at the top of the page."
+    let path = form.dataset.path ?? "/"
+    const query = new URLSearchParams()
+    const headers = headersOf(c, form.dataset.media === "application/json")
+    for (const input of form.querySelectorAll<HTMLInputElement>("[data-try-param]")) {
+      const v = input.value.trim()
+      if (!v) continue
+      if (input.dataset.tryIn === "path") path = path.replace(`{${input.dataset.tryParam}}`, encodeURIComponent(v))
+      else if (input.dataset.tryIn === "header") headers[input.dataset.tryParam!] = v
+      else query.set(input.dataset.tryParam!, v)
+    }
+    if (/\{[^}]+\}/.test(path)) return "Fill in every path parameter."
+    const url = new URL(path, c.baseUrl)
+    query.forEach((v, k) => url.searchParams.set(k, v))
+    const body = form.querySelector<HTMLTextAreaElement>("[data-try-body]")?.value
+    const method = form.dataset.method ?? "GET"
+    const init: RequestInit = { method, headers, ...(body && method !== "GET" ? { body } : {}) }
+    const curl = [`curl -sS -X ${method} '${url}'`, ...Object.entries(headers).map(([k, v]) => `  -H '${k}: ${k === "authorization" ? "Bearer $CADCAMFUN_TOKEN" : v}'`), ...(init.body ? [`  --data '${String(init.body).replace(/'/g, "'\\''")}'`] : [])].join(" \\\n")
+    return { url: url.toString(), init, curl }
+  }
+  for (const form of document.querySelectorAll<HTMLElement>("[data-api-try]")) {
+    const note = form.querySelector<HTMLElement>("[data-try-note]")!
+    form.querySelector("[data-try-curl]")!.addEventListener("click", async () => {
+      const b = build(form)
+      if (typeof b === "string") { note.textContent = b; return }
+      await navigator.clipboard?.writeText(b.curl)
+      note.textContent = "Copied."
+    })
+    form.querySelector("[data-try-send]")!.addEventListener("click", async () => {
+      const b = build(form)
+      if (typeof b === "string") { note.textContent = b; return }
+      const result = form.querySelector<HTMLElement>("[data-try-result]")!
+      const status = form.querySelector<HTMLElement>("[data-try-status]")!
+      note.textContent = "Sending…"
+      const t0 = performance.now()
+      try {
+        const r = await fetch(b.url, b.init)
+        const text = await r.text()
+        let shown = text
+        try { shown = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+        status.textContent = String(r.status)
+        status.className = `api-pill api-pill-status-${String(r.status)[0]}`
+        form.querySelector<HTMLElement>("[data-try-output]")!.textContent = shown.slice(0, 20000)
+        note.textContent = ""
+      } catch {
+        status.textContent = "failed"
+        status.className = "api-pill api-pill-status-5"
+        form.querySelector<HTMLElement>("[data-try-output]")!.textContent = "The request failed before a response: wrong URL, sidecar stopped, or blocked by CORS."
+        note.textContent = ""
+      }
+      form.querySelector<HTMLElement>("[data-try-timing]")!.textContent = `${Math.round(performance.now() - t0)} ms`
+      form.querySelector<HTMLElement>("[data-try-url]")!.textContent = b.url
+      result.hidden = false
+    })
+  }
+</script>

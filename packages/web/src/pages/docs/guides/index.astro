@@ -2,6 +2,7 @@
 export const prerender = true
 import { guidePages } from "../../../data/guidePages"
 import DocCard from "../../../components/docs/DocCard.astro"
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -17,6 +18,8 @@ const toc = [
   { title: "Maintain clear boundaries", href: "#leave-alone" },
   { title: "Find the right workflow", href: "#task-directory" },
   { title: "Know what a check establishes", href: "#verification-evidence" },
+  { title: "Guides by task and time", href: "#task-matrix" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -69,6 +72,7 @@ bun run --cwd packages/web start`}
       </tbody>
     </table>
     <p>Migration generation is for schema changes, not an installation prerequisite. The database layer creates a new database and applies available migrations when opened. Consult the quickstart before choosing a CLI database path.</p>
+    <p>Root scripts are defined in the repository <code>package.json</code>: <code>typecheck</code>, <code>test</code>, <code>build</code>, <code>build:sidecar</code>, <code>build:desktop</code>, <code>desktop:dev</code>, <code>generate</code>, <code>generate:check</code>, <code>db:generate</code>, and <code>db:migrate</code>.</p>
   </section>
 
   <section id="open" class="doc-section">
@@ -144,6 +148,31 @@ bun run --cwd packages/web start`}
     <p>When access should end, revoke the device from the desktop; removing the connection on the phone alone does not revoke the server-side token. The <a href="/docs/guides/companion-pairing">pairing guide</a> separates network diagnosis, native transport availability, certificate identity, and token revocation.</p>
   </section>
 
+    <section id="task-matrix" class="doc-section">
+    <h2>Guides by task and time</h2>
+    <table>
+      <thead><tr><th>Guide</th><th>You will</th><th>Needs</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/docs/guides/quickstart">Quickstart</a></td><td>Install, test and open the desktop</td><td>Bun, Rust</td></tr>
+        <tr><td><a href="/docs/guides/local-dev">Local development</a></td><td>Run each process on its own and pick the right checks</td><td>A clone</td></tr>
+        <tr><td><a href="/docs/guides/api-tour">API tour</a></td><td>Make real requests with curl and see the responses</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/api-clients">API clients</a></td><td>Use the Promise SDK and Effect client, handle errors and streams</td><td>TypeScript</td></tr>
+        <tr><td><a href="/docs/guides/project-lifecycle">Project lifecycle</a></td><td>Create, save, reopen and version a project</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/native-manufacturing">Native manufacturing</a></td><td>Generate a verified program and save it</td><td>A running sidecar</td></tr>
+        <tr><td><a href="/docs/guides/ai-streaming">AI streaming</a></td><td>Consume assistant events and recover sessions</td><td>A model key</td></tr>
+        <tr><td><a href="/docs/guides/plugin-authoring">Plugin authoring</a></td><td>Write and test a plugin</td><td>TypeScript</td></tr>
+        <tr><td><a href="/docs/guides/project-history">Project history</a></td><td>Branch, commit, review and merge</td><td>A project</td></tr>
+        <tr><td><a href="/docs/guides/companion-pairing">Companion pairing</a></td><td>Pair the iOS app</td><td>An iPhone</td></tr>
+        <tr><td><a href="/docs/guides/desktop-troubleshooting">Desktop troubleshooting</a></td><td>Diagnose startup and update problems</td><td>The desktop app</td></tr>
+        <tr><td><a href="/docs/guides/contributing">Contributing</a></td><td>Prepare a reviewable change</td><td>A clone</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="What the guides exercise" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e0a030"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#a48ac8"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Quickstart", href: "/docs/guides/quickstart" },
       { title: "Local development", href: "/docs/guides/local-dev" },

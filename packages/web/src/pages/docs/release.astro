@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -15,6 +16,9 @@ const toc = [
   { title: "Target and asset reference", href: "#targets" },
   { title: "Local build options and signing inputs", href: "#build-options" },
   { title: "Release failure diagnosis", href: "#release-diagnostics" },
+  { title: "The six build steps", href: "#pipeline-steps" },
+  { title: "Release matrix", href: "#release-matrix" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -50,6 +54,7 @@ bun scripts/build.ts --no-updater`}
     </DocCode>
     <p><code>--only</code> and <code>--skip</code> accept stage names; <code>--target</code>, <code>--bundles</code>, and <code>--out-dir</code> select outputs. The default target is the host reported by <code>rustc -vV</code>. Sidecar binaries are written to <code>apps/desktop/src-tauri/binaries/sidecar-&lt;triple&gt;</code>, with <code>.exe</code> on Windows. Identical binaries and migration trees are kept unchanged to avoid unnecessary development restarts.</p>
     <p>Use <code>compile-sidecar.ts</code> through the pipeline: it applies the embedded-host bundling adaptations. A direct generic compile command does not represent the same build procedure. The default artifact directory is <code>apps/desktop/src-tauri/target/release-artifacts</code>.</p>
+    <p>The <code>resources</code> step copies <code>packages/db/drizzle/</code> into <code>apps/desktop/src-tauri/resources/migrations/</code> and is safe to repeat. The <code>artifacts</code> step writes <code>SHA256SUMS</code> and <code>RELEASE_NOTES.md</code>, built from the commits since the last tag. Step aliases are accepted by <code>--only</code> and <code>--skip</code>: <code>deps</code>, <code>checks</code>/<code>test</code>, <code>sidecar</code>, <code>migrations</code>, and <code>notes</code>/<code>checksums</code>/<code>release</code>. The script never reads <code>.env*</code> files or prints secret values.</p>
   </section>
 
   <section id="ci" class="doc-section">
@@ -161,6 +166,64 @@ bun --no-env-file scripts/build.ts \
     <p>Implementation anchors: <code>scripts/release-helpers.ts</code>, <code>signing-config.ts</code>, <code>updater-manifest.ts</code>, <code>stage-release.ts</code>, and <code>apps/desktop/src-tauri/src/updater.rs</code>.</p>
   </section>
 
+    <section id="pipeline-steps" class="doc-section">
+    <h2>The six build steps</h2>
+    <table>
+      <thead><tr><th>#</th><th>Step</th><th>Aliases</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>install</code></td><td>deps</td><td><code>bun install --frozen-lockfile</code></td></tr>
+        <tr><td>2</td><td><code>check</code></td><td>checks, test, tests</td><td><code>bun run typecheck</code></td></tr>
+        <tr><td>3</td><td><code>compile</code></td><td>sidecar</td><td>Compile <code>apps/sidecar/src/main.ts</code> to <code>src-tauri/binaries/sidecar-&lt;triple&gt;</code></td></tr>
+        <tr><td>4</td><td><code>resources</code></td><td>resource, migrations</td><td>Copy <code>packages/db/drizzle/</code> to <code>src-tauri/resources/migrations/</code></td></tr>
+        <tr><td>5</td><td><code>bundle</code></td><td>bundling</td><td>Desktop <code>vite build</code>, then <code>bunx tauri build</code></td></tr>
+        <tr><td>6</td><td><code>artifacts</code></td><td>artefacts, notes, checksums, release</td><td><code>SHA256SUMS</code> and <code>RELEASE_NOTES.md</code> from commits since the last tag</td></tr>
+        </tbody>
+    </table>
+    <p>Steps always run in this order and a failing step stops the run. The script never reads <code>.env</code> files and never prints secret values.</p>
+    <table>
+      <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>--only=a,b</code> / <code>--skip=a,b</code></td><td>Run or skip steps (names or aliases)</td></tr>
+        <tr><td><code>--skip-install</code></td><td>Same as <code>--skip=install</code></td></tr>
+        <tr><td><code>--target=&lt;triple&gt;</code></td><td>Rust target; default is the host triple from <code>rustc -vV</code></td></tr>
+        <tr><td><code>--bundles=&lt;list&gt;</code></td><td>Forwarded to <code>tauri build --bundles</code></td></tr>
+        <tr><td><code>--no-updater</code></td><td>Installers without updater archives and signatures</td></tr>
+        <tr><td><code>--out-dir=&lt;path&gt;</code></td><td>Where step 6 writes; default <code>apps/desktop/src-tauri/target/release-artifacts</code></td></tr>
+        <tr><td><code>--dry-run</code></td><td>Print the plan; write and change nothing</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="bash" title="Common invocations">
+{"bun scripts/build.ts --dry-run                  # whole plan, no side effects\nbun scripts/build.ts --only=resources           # restage migrations (idempotent)\nbun scripts/build.ts --only=compile,resources   # rebuild the sidecar and migrations\nbun scripts/build.ts --only=notes --dry-run     # preview release notes\nbun scripts/build.ts --target=aarch64-apple-darwin"}
+    </DocCode>
+    <p>Local updater signing uses an ignored <code>tauri-signing.json</code> when no signing key is set in the environment. Platform certificates are still required when <code>CADCAM_RELEASE=1</code>.</p>
+  </section>
+
+  <section id="release-matrix" class="doc-section">
+    <h2>Release matrix</h2>
+    <table>
+      <thead><tr><th>Target</th><th>Runner</th><th>Bundles</th><th>Release slug</th></tr></thead>
+      <tbody>
+        <tr><td><code>aarch64-apple-darwin</code></td><td>macos-14</td><td>app, dmg</td><td>macos-arm64</td></tr>
+        <tr><td><code>x86_64-apple-darwin</code></td><td>macos-14</td><td>app, dmg</td><td>macos-x64</td></tr>
+        <tr><td><code>x86_64-pc-windows-msvc</code></td><td>windows-latest</td><td>msi, nsis</td><td>windows-x64</td></tr>
+        <tr><td><code>aarch64-pc-windows-msvc</code></td><td>windows-11-arm</td><td>msi, nsis</td><td>windows-arm64</td></tr>
+        <tr><td><code>x86_64-unknown-linux-gnu</code></td><td>ubuntu-22.04</td><td>deb, rpm, appimage</td><td>linux-x64</td></tr>
+        <tr><td><code>aarch64-unknown-linux-gnu</code></td><td>ubuntu-22.04-arm</td><td>deb, rpm, appimage</td><td>linux-arm64</td></tr>
+        </tbody>
+    </table>
+    <ol>
+      <li>A trusted job validates the release tag against the application version.</li>
+      <li>Each matrix job runs <code>bun --no-env-file scripts/build.ts --target=… --bundles=… --out-dir=release</code>, signs, and builds an architecture-specific updater manifest. Windows imports and afterwards removes its signing certificate.</li>
+      <li>A merge job validates all six updater manifests and merges them into one <code>latest.json</code>.</li>
+      <li>A publish job per platform uploads installers under the tag suffixed with the slug, for example <code>&lt;tag&gt;-macos-arm64</code>.</li>
+    </ol>
+    <p>CI on every push runs two jobs: install, typecheck and test (and stages the sidecar binary and migrations), and a Rust job with clippy and the <code>src-tauri</code> tests.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Release matrix" caption="The six include entries of the release build job: runner, slug and bundles (one block per bundle format), read from release.yml." solids={[{"kind":"box","size":[14,10,3],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[0,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[0,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[30,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[30,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,0,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,0,8],"color":"#9fc88a"},{"kind":"box","size":[14,10,3],"at":[60,20,0],"color":"#8aa4c8"},{"kind":"box","size":[14,10,3],"at":[60,20,4],"color":"#e0a030"},{"kind":"box","size":[14,10,3],"at":[60,20,8],"color":"#9fc88a"}]} labels={[{"text":"app","at":[7,-1.5,1.5],"size":2.4},{"text":"dmg","at":[7,-1.5,5.5],"size":2.4},{"text":"macos-arm64 (macos-14)","at":[7,5,11],"size":2.8},{"text":"app","at":[7,18.5,1.5],"size":2.4},{"text":"dmg","at":[7,18.5,5.5],"size":2.4},{"text":"macos-x64 (macos-14)","at":[7,25,11],"size":2.8},{"text":"msi","at":[37,-1.5,1.5],"size":2.4},{"text":"nsis","at":[37,-1.5,5.5],"size":2.4},{"text":"windows-x64 (windows-latest)","at":[37,5,11],"size":2.8},{"text":"msi","at":[37,18.5,1.5],"size":2.4},{"text":"nsis","at":[37,18.5,5.5],"size":2.4},{"text":"windows-arm64 (windows-11-arm)","at":[37,25,11],"size":2.8},{"text":"deb","at":[67,-1.5,1.5],"size":2.4},{"text":"rpm","at":[67,-1.5,5.5],"size":2.4},{"text":"appimage","at":[67,-1.5,9.5],"size":2.4},{"text":"linux-x64 (ubuntu-22.04)","at":[67,5,15],"size":2.8},{"text":"deb","at":[67,18.5,1.5],"size":2.4},{"text":"rpm","at":[67,18.5,5.5],"size":2.4},{"text":"appimage","at":[67,18.5,9.5],"size":2.4},{"text":"linux-arm64 (ubuntu-22.04-arm)","at":[67,25,15],"size":2.8}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Quickstart", href: "/docs/guides/quickstart" },
       { title: "Database", href: "/docs/database" },

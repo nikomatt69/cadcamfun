@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -16,6 +17,10 @@ const toc = [
   { title: "Recover after losing the stream", href: "#recovery" },
   { title: "Context, attachments, and compaction", href: "#context" },
   { title: "Separate transport errors from domain outcomes", href: "#failures" },
+  { title: "Event reference", href: "#event-reference" },
+  { title: "A complete streaming client", href: "#stream-client" },
+  { title: "What a stream looks like without a provider", href: "#no-provider" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -138,6 +143,7 @@ const toc = [
 <p>When the reader ends without a final event, treat completion as unknown. Call <code>POST /api/ai/sessions/state</code> with the same sessionId and projectId. The response contains busy and text, with optional recovered tool/todo/diagnostic events, usage, and tasks. Reconstruct the UI from this snapshot; replaying recovered tool events does not execute them again.</p>
     <p>Then request <code>/api/ai/sessions/control</code> with action status to inspect pending permissions/questions, worker tasks, goal, and context policy. A busy turn waiting for an unanswered question needs a reply, not a second copy of the original prompt. A session reported idle with accumulated text can be displayed as recovered output even though the original TCP connection vanished.</p>
     <p>Keep a distinction between network failure, a typed provider/config error event, explicit abort, and session removal. Retry the model request only after checking what the first turn actually did. In particular, read the current drawing after a partial mutation diagnostic or interrupted editing worker.</p>
+    <p>Inside the server, a dropped model connection is resumed up to five times with a 2-second backoff that doubles up to 30 seconds. A client reconnecting to the stream should still read the session state, because those resumes can finish work that the client did not see stream.</p>
   </section>
 
   <section id="context" class="doc-section">
@@ -154,5 +160,61 @@ const toc = [
     <p>Read the executable contracts in <code>packages/api/src/groups/ai.ts</code> and <code>ai-events.ts</code>; admission and wire behavior in <code>apps/sidecar/src/http/ai.ts</code>; session mapping in <code>packages/ai/src/service.ts</code>; question validation in <code>nikcli/session-controls.ts</code>; heartbeat timing in <code>heartbeat.ts</code>. These sources define which outcome the client must present, independently of the assistant's prose.</p>
   </section>
 
+    <section id="event-reference" class="doc-section">
+    <h2>Event reference</h2>
+    <p>Every SSE <code>data:</code> frame is one JSON object with a <code>type</code> and a <code>sessionId</code>. Parse complete frames only; a frame may arrive split across network chunks.</p>
+    <table>
+      <thead><tr><th>type</th><th>Key fields</th><th>How to handle</th></tr></thead>
+      <tbody>
+        <tr><td><code>turn</code></td><td><code>phase</code>: <code>start</code>, <code>recovering</code>, <code>continuing</code>, <code>finish</code>; optional <code>reason</code></td><td>Show progress state. <code>recovering</code> means the connection to the model is being resumed.</td></tr>
+        <tr><td><code>session_status</code></td><td><code>status</code>: <code>busy</code>, <code>idle</code>, <code>retry</code></td><td>Enable or disable the send button and the queue.</td></tr>
+        <tr><td><code>user_message</code></td><td>the stored user message</td><td>Reconcile optimistic UI.</td></tr>
+        <tr><td><code>delta</code></td><td><code>text</code></td><td>Append to the visible answer.</td></tr>
+        <tr><td><code>reasoning</code></td><td>reasoning text</td><td>Optional; show in a collapsible area.</td></tr>
+        <tr><td><code>step</code>, <code>todo</code>, <code>goal</code></td><td>plan progress</td><td>Render the task list or plan.</td></tr>
+        <tr><td><code>tool_call</code></td><td><code>callId</code>, tool, arguments, optional <code>agent</code></td><td>Show which tool runs and for which specialist.</td></tr>
+        <tr><td><code>tool_progress</code></td><td><code>callId</code>, progress</td><td>Update a long-running tool.</td></tr>
+        <tr><td><code>tool_result</code></td><td><code>callId</code>, result</td><td>Show the outcome; match it by <code>callId</code>.</td></tr>
+        <tr><td><code>tool_diagnostic</code></td><td>details including <code>mutationApplied</code></td><td>Decide whether the model changed. Read it before retrying an edit.</td></tr>
+        <tr><td><code>permission_request</code> / <code>permission_resolved</code> / <code>permission_blocked</code></td><td><code>requestId</code>; reply <code>once</code>, <code>always</code>, <code>reject</code></td><td>Ask the user, then <code>POST /api/ai/permission/reply</code>.</td></tr>
+        <tr><td><code>question_request</code> / <code>question_resolved</code></td><td>question data</td><td>Present the question and send the answer.</td></tr>
+        <tr><td><code>context_snapshot</code>, <code>compaction</code>, <code>compacted</code></td><td>context state</td><td>Inform the user that older history was summarised.</td></tr>
+        <tr><td><code>retry</code></td><td><code>attempt</code>, <code>message</code></td><td>Show a transient notice; do not resend the prompt.</td></tr>
+        <tr><td><code>done</code></td><td><code>text</code>, optional <code>usage</code>, optional <code>recovered</code></td><td>Final text of the turn. Replace the accumulated deltas with it.</td></tr>
+        <tr><td><code>error</code></td><td><code>code</code>: <code>provider</code>, <code>config</code>, <code>aborted</code>, <code>internal</code>; <code>message</code></td><td>End the turn in the UI with the message; <code>config</code> usually means missing credentials.</td></tr>
+        <tr><td><code>heartbeat</code></td><td>none</td><td>Keep-alive about every 5 seconds; ignore.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="stream-client" class="doc-section">
+    <h2>A complete streaming client</h2>
+    <DocCode language="ts" title="stream-turn.ts">
+{"const base = process.env.CADCAMFUN_URL!       // e.g. http://127.0.0.1:53211\nconst token = process.env.CADCAMFUN_TOKEN!\n\nconst response = await fetch(`${base}/api/ai/chat/stream`, {\n  method: \u0022POST\u0022,\n  headers: { \u0022content-type\u0022: \u0022application/json\u0022, authorization: `Bearer ${token}` },\n  body: JSON.stringify({ projectId: \u0022p1\u0022, message: \u0022Summarise this project\u0022, mode: \u0022general\u0022 }),\n})\nif (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)\n\nconst reader = response.body.pipeThrough(new TextDecoderStream()).getReader()\nlet buffer = \u0022\u0022, answer = \u0022\u0022\nfor (;;) {\n  const { value, done } = await reader.read()\n  if (done) break\n  buffer += value\n  let end\n  while ((end = buffer.indexOf(\u0022\\n\\n\u0022)) >= 0) {        // one SSE frame\n    const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2)\n    const data = frame.split(\u0022\\n\u0022).filter((l) => l.startsWith(\u0022data:\u0022))\n                      .map((l) => l.slice(5).trimStart()).join(\u0022\\n\u0022)\n    if (!data) continue\n    const event = JSON.parse(data)\n    switch (event.type) {\n      case \u0022delta\u0022: answer += event.text; break\n      case \u0022permission_request\u0022: /* ask, then POST /api/ai/permission/reply */ break\n      case \u0022done\u0022: answer = event.text; console.log(answer); break\n      case \u0022error\u0022: throw new Error(`${event.code}: ${event.message}`)\n    }\n  }\n}"}
+    </DocCode>
+    <p>If the connection drops, do not send the message again. Read the session with <code>POST /api/ai/sessions/state</code>, because the server may have resumed the model connection and finished the turn without you. Use <code>/api/ai/chat/abort</code> to stop a turn deliberately, and <code>/api/ai/chat/queue</code> to add a message while the session is busy.</p>
+  </section>
+
+    <section id="no-provider" class="doc-section">
+    <h2>What a stream looks like without a provider</h2>
+    <p>With no AI provider configured, the stream still opens and answers with a typed error, followed by a heartbeat. Captured from a fresh sidecar:</p>
+    <DocCode language="text" title="POST /api/ai/chat/stream">
+{"data: {\u0022type\u0022:\u0022error\u0022,\u0022sessionId\u0022:\u0022\u0022,\u0022code\u0022:\u0022config\u0022,\u0022message\u0022:\u0022No AI provider is configured. Add an API key in the AI settings.\u0022}\n\ndata: {\u0022type\u0022:\u0022heartbeat\u0022}"}
+    </DocCode>
+    <ul>
+      <li>The HTTP status is still 200 and the content type <code>text/event-stream</code>: configuration problems are domain outcomes, delivered as events.</li>
+      <li><code>sessionId</code> is empty because no session was created.</li>
+      <li><code>heartbeat</code> frames keep the connection alive; ignore them in rendering and do not count them as progress.</li>
+      <li>Each frame ends with a blank line. Parse by splitting on blank lines and joining the <code>data:</code> lines of a frame, as the SDK iterator does.</li>
+    </ul>
+    <DocCallout type="info" title="Test your client without a model">
+      <p>Point a client at a sidecar without credentials: it exercises the full SSE path and the error branch with no cost.</p>
+    </DocCallout>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Conversation storage" caption="Conversation, Message and related tables with their foreign keys, from the migrations." solids={[{"kind":"box","size":[12,5,3],"at":[-26.0,-2.5,10],"color":"#e0a030"},{"kind":"box","size":[12,5,3],"at":[14.0,-2.5,10],"color":"#e0a030"},{"kind":"box","size":[12,5,3],"at":[36.0,-2.5,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[15.000000000000004,33.873066958946424,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[-26.99999999999999,33.873066958946424,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[-48.0,-2.4999999999999947,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[-27.000000000000018,-38.87306695894641,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[15.000000000000004,-38.873066958946424,0],"color":"#8aa4c8"}]} paths={[{"points":[[42.0,0.0,1.5],[31.0,0.0,14.5],[20.0,0,11.5]],"color":"#2fbf71"},{"points":[[21.000000000000004,36.373066958946424,1.5],[21.000000000000004,0.0,4.5],[21.000000000000004,-36.373066958946424,1.5]],"color":"#2fbf71"},{"points":[[-20.99999999999999,36.373066958946424,1.5],[7.105427357601002e-15,36.373066958946424,4.5],[21.000000000000004,36.373066958946424,1.5]],"color":"#2fbf71"},{"points":[[-20.99999999999999,36.373066958946424,1.5],[-0.49999999999999467,18.186533479473212,14.5],[20.0,0,11.5]],"color":"#2fbf71"},{"points":[[-20.0,0,11.5],[0.5000000000000018,18.186533479473212,14.5],[21.000000000000004,36.373066958946424,1.5]],"color":"#2fbf71"},{"points":[[-20.0,0,11.5],[-31.0,2.5717582782094417e-15,14.5],[-42.0,5.143516556418883e-15,1.5]],"color":"#2fbf71"},{"points":[[-20.0,0,11.5],[0.0,0.0,14.5],[20.0,0,11.5]],"color":"#2fbf71"},{"points":[[-21.000000000000018,-36.37306695894641,1.5],[-20.500000000000007,-18.186533479473205,14.5],[-20.0,0,11.5]],"color":"#2fbf71"},{"points":[[-21.000000000000018,-36.37306695894641,1.5],[-7.105427357601002e-15,-36.37306695894642,4.5],[21.000000000000004,-36.373066958946424,1.5]],"color":"#2fbf71"},{"points":[[-21.000000000000018,-36.37306695894641,1.5],[-0.5000000000000089,-18.186533479473205,14.5],[20.0,0,11.5]],"color":"#2fbf71"}]} labels={[{"text":"Message","at":[-20.0,0,15.4],"size":3.2},{"text":"User","at":[20.0,0,15.4],"size":3.2},{"text":"AIAnalysisLog","at":[42.0,0.0,5.4],"size":3.2},{"text":"Conversation","at":[21.000000000000004,36.373066958946424,5.4],"size":3.2},{"text":"ConversationParticipant","at":[-20.99999999999999,36.373066958946424,5.4],"size":3.2},{"text":"FileUpload","at":[-42.0,5.143516556418883e-15,5.4],"size":3.2},{"text":"Notification","at":[-21.000000000000018,-36.37306695894641,5.4],"size":3.2},{"text":"Organization","at":[21.000000000000004,-36.373066958946424,5.4],"size":3.2}]} height={380} />
+  </section>
   <DocRelated items={[{ title: "AI service reference", href: "/docs/ai" }, { title: "AI endpoints", href: "/docs/api/ai" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />
 </DocsLayout>

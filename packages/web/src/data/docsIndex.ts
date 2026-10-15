@@ -37,6 +37,34 @@ const pageCopy: Record<string, DocsIndexCopy> = {
     summary: `${group.summary} HTTP reference with methods, paths, authentication, request fields, response statuses, media types, and full schemas.`,
     keywords: ["http", "api reference", group.tag, group.slug, group.title.toLowerCase(), "parameters", "request", "response", "schema"],
   }])),
+  "/docs/kernels": {
+    summary: "Overview of the pure geometry and machining kernels in packages/core: sketch solver, mesh and CSG, exact B-rep, feature generators, tolerance, CAM kernel, their import graph and shared rules.",
+    keywords: ["kernel", "geometry kernel", "packages/core", "import graph", "pure functions", "millimetres"],
+  },
+  "/docs/kernels/sketch-solver": {
+    summary: "Constrained 2D sketch solver: entities, 24 constraint kinds, Levenberg-Marquardt with a numeric Jacobian, rank analysis, degrees of freedom, free points, conflicts and profiles.",
+    keywords: ["sketch", "solver", "constraints", "Levenberg-Marquardt", "degrees of freedom", "dof", "conflicting", "sketchProfiles"],
+  },
+  "/docs/kernels/mesh": {
+    summary: "Mesh kernel: solid primitives, tolerance-driven segments, BSP Booleans with a convex fast path, polygon soup cleanup, topology and genus, triangulation.",
+    keywords: ["mesh", "CSG", "boolean", "BSP", "union", "subtract", "intersect", "meshTopology", "genus", "triangulate"],
+  },
+  "/docs/kernels/brep": {
+    summary: "Exact B-rep kernel: topology tables, analytic and NURBS geometry, exact Booleans, fillets and chamfers, hole recognition, mass properties, tessellation, STEP and time budgets.",
+    keywords: ["B-rep", "brep", "exact", "NURBS", "boolean", "fillet", "chamfer", "STEP", "mass properties", "validateBrep"],
+  },
+  "/docs/kernels/features": {
+    summary: "Feature generators: involute gear outlines, ISO metric thread sizes and helical thread solids, coil helices, sheet-metal outlines and developed length.",
+    keywords: ["gear", "involute", "thread", "ISO metric", "helix", "coil", "sheet metal", "K-factor", "flat pattern"],
+  },
+  "/docs/kernels/tolerance": {
+    summary: "Drawing tolerance: presets, segmentsFor and chordError, display decimals, entity tessellation rules and the tolerance parameter of each kernel.",
+    keywords: ["tolerance", "chord error", "segments", "tessellation", "presets", "decimals"],
+  },
+  "/docs/kernels/cam": {
+    summary: "CAM machining kernel: modules and entry points, feature-based planning, cutter library and tool assemblies, voxel stock with a remaining-volume bracket, certified collision checks.",
+    keywords: ["CAM kernel", "runJob", "planner", "cutters", "voxel", "stock", "collision", "checkMotion", "five-axis"],
+  },
   "/docs": {
     summary: "Local desktop CAD/CAM: drawing, solid modelling, toolpaths, G-code, local persistence, history, AI, and companion access. Start development and understand application boundaries.",
     keywords: ["overview", "local-first", "monorepo", "g-code", "toolpaths", "offline", "cadcamfun"],

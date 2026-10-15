@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -11,7 +12,11 @@ const toc = [
   { title: "Library dependencies", href: "#dependencies" },
   { title: "HTTP request lifecycle", href: "#request" },
   { title: "Service lifecycle and storage", href: "#lifecycle" },
-  { title: "Extension boundaries", href: "#extensions" }
+  { title: "Extension boundaries", href: "#extensions" },
+  { title: "Architecture snapshot by source path", href: "#snapshot" },
+  { title: "Trace: from launch to first request", href: "#startup-trace" },
+  { title: "Trace: a manufacture request", href: "#manufacture-trace" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -46,6 +51,7 @@ const toc = [
     <p>Effect layers acquire the database and shared services within the application scope. The database layer creates its parent directory, enables WAL and foreign keys, optionally applies migrations, and wraps query failures with an operation name. Finalization attempts a truncating WAL checkpoint and closes the SQLite handle.</p>
     <p>The <code>DatabaseLive</code> layer selects <code>dataDir/cadcamfun.db</code>. A migration folder must be supplied to apply migrations at startup. AI credentials, plugin state, VCS objects, workflow execution, and file storage are handled through their respective service interfaces; storage details are described on their module pages.</p>
     <p>The local Studio in <code>packages/web/script/studio-server.ts</code> is an additional Bun process. It opens a configured existing application database directly and serves authenticated overview data on loopback port 4396. Its development proxy and cookie sessions are independent of the Tauri sidecar connection.</p>
+    <p>Live project events (pull requests, commits, workflow runs, and assistant session phases) are published through an in-process event service. A new subscriber first receives up to the 20 most recent matching events and then live ones, optionally filtered by project and event type (<code>apps/sidecar/src/services/live-events.ts</code>).</p>
   </section>
 
   <section id="extensions" class="doc-section">
@@ -81,4 +87,52 @@ const toc = [
     <p>For a failing API request, record its method, path, status, endpoint ID, and relevant non-secret identifiers. Compare the running <code>/api/openapi.json</code> with the <a href="/docs/api/openapi.json">documentation contract snapshot</a> when client and server versions differ. Avoid troubleshooting with a token from a previous sidecar launch.</p>
   </section>
 
-</DocsLayout>
+  <section id="snapshot" class="doc-section">
+    <h2>Architecture snapshot by source path</h2>
+    <table>
+      <thead><tr><th>Area</th><th>Where it lives</th><th>What to read first</th></tr></thead>
+      <tbody>
+        <tr><td>Desktop shell (Rust)</td><td><code>apps/desktop/src-tauri/src/</code></td><td><code>sidecar.rs</code> (supervisor), <code>commands.rs</code>, <code>updater.rs</code>, <code>menu.rs</code>, <code>tray.rs</code>, <code>secrets.rs</code></td></tr>
+        <tr><td>Desktop UI</td><td><code>apps/desktop/src/</code></td><td><code>app/</code>, <code>features/</code> (cad, cam, ai, chat, projects, toolpaths, plugins, …), <code>viewport/</code>, <code>shared/</code></td></tr>
+        <tr><td>Sidecar entry</td><td><code>apps/sidecar/src/main.ts</code></td><td>Ready handshake, layers in <code>layers.ts</code>, configuration in <code>config.ts</code></td></tr>
+        <tr><td>HTTP handlers</td><td><code>apps/sidecar/src/http/</code></td><td>One file per group, e.g. <code>toolpath-generator.ts</code>, <code>ai.ts</code>, <code>kv.ts</code></td></tr>
+        <tr><td>Services and repositories</td><td><code>apps/sidecar/src/services/</code>, <code>repos/</code></td><td><code>cam-program.ts</code>, <code>companion.ts</code>, <code>auth-tokens.ts</code>, <code>storage.ts</code></td></tr>
+        <tr><td>Contract</td><td><code>packages/api/src/</code></td><td><code>index.ts</code>, <code>groups/</code>, <code>errors.ts</code>, <code>client.ts</code></td></tr>
+        <tr><td>Kernel</td><td><code>packages/core/src/</code></td><td><code>cad/history.ts</code>, <code>cad/sketch.ts</code>, <code>cam/kernel/</code>, <code>cam/post/</code></td></tr>
+        <tr><td>Assistant</td><td><code>packages/ai/src/</code></td><td><code>actions/</code>, <code>tools/</code>, <code>nikcli/</code>, <code>prompts/</code></td></tr>
+        <tr><td>Storage</td><td><code>packages/db/src/</code></td><td><code>index.ts</code>, <code>upgrade.ts</code>, <code>schema.ts</code></td></tr>
+        <tr><td>History</td><td><code>packages/vcs/</code>, <code>packages/workflow/</code></td><td>Repository API, merge, workflow schema</td></tr>
+        <tr><td>Companion</td><td><code>apps/mobile/</code></td><td><code>app/</code> routes, <code>lib/</code> connection and pairing</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="startup-trace" class="doc-section">
+    <h2>Trace: from launch to first request</h2>
+    <ol>
+      <li>Tauri starts and the supervisor in <code>sidecar.rs</code> generates a random token.</li>
+      <li>It spawns <code>sidecar-&lt;triple&gt;</code> with <code>CADCAMFUN_TOKEN</code>, <code>CADCAMFUN_DATA_DIR</code> and <code>CADCAMFUN_MIGRATIONS_DIR</code>.</li>
+      <li>The sidecar reads its configuration, opens SQLite (WAL, foreign keys), backs up and migrates if needed, and builds its service layers.</li>
+      <li>It binds <code>127.0.0.1</code> on an ephemeral port and prints a JSON ready line on stdout. The supervisor waits up to 60 s for it.</li>
+      <li>The supervisor emits <code>sidecar-status</code> <code>&#123; state: "ready", port &#125;</code>; the webview calls <code>get_sidecar_endpoint</code> for <code>&#123; baseUrl, token &#125;</code>.</li>
+      <li>The webview builds <code>ApiClient.layer(&#123; baseUrl, token &#125;)</code> and starts loading projects.</li>
+    </ol>
+    <p>If the sidecar exits, the supervisor restarts it once and announces the new port; a second failure leaves the status at <code>failed</code>. On quit, the supervisor writes the shutdown line, waits 2 s, and then reaps the process; the database layer checkpoints the WAL as its scope closes.</p>
+  </section>
+
+  <section id="manufacture-trace" class="doc-section">
+    <h2>Trace: a manufacture request</h2>
+    <ol>
+      <li>The CAM workspace captures the drawing elements and stock and calls <code>POST /api/toolpaths/manufacture</code>.</li>
+      <li>The bearer middleware admits the request; the body is decoded against <code>CamKernelRequest</code>.</li>
+      <li><code>runKernelRequest</code> in <code>services/cam-program.ts</code> calls <code>cam.kernel.jobOfSnapshot</code>; preparation issues become a 400.</li>
+      <li><code>cam.kernel.runJob</code> plans or follows operations, computes cutting data, generates toolpaths, posts NC for the machine's dialect and replays it on voxel stock to evaluate claims.</li>
+      <li>The result is decoded against <code>CamKernelResult</code> and returned. Nothing is stored until the client saves a toolpath with a portable document, at which point the sidecar reruns the captured request and compares.</li>
+    </ol>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Workspace dependency graph" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
+  </DocsLayout>

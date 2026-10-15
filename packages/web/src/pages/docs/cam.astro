@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -16,6 +17,11 @@ const toc = [
   { title: "Depths, heights, feeds, and defaults", href: "#operation-options" },
   { title: "Replay a small NC program", href: "#replay-example" },
   { title: "Read a failed or preview artifact", href: "#diagnostics" },
+  { title: "Generate a pocket and post it", href: "#pocket-walkthrough" },
+  { title: "Operation parameters and defaults", href: "#operation-parameters" },
+  { title: "Post processors and output options", href: "#post-processors" },
+  { title: "Before sending a program to a machine", href: "#cam-checklist" },
+  { title: "Native kernel evidence claims", href: "#native-claims" },
 ]
 ---
 
@@ -57,6 +63,7 @@ const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
 <p>The built-in registry implements <code>generic</code>, <code>fanuc</code>, <code>grbl</code>, and <code>haas</code>. <code>linuxcnc</code> is a recognized post identifier without an implementation in this registry; <code>getPost</code> can return undefined. Resolve and check the post before calling it.</p>
     <p>Posts share an emitter with fixed-decimal formatting, comment sanitization, tool changes, arc handling, optional line numbering, and cycle expansion. Defaults are three decimal places, canned cycles enabled, IJK arcs, header enabled, and 0.01 mm tolerance. Unsupported arc formats fall back through the dialect's supported forms and linearization.</p>
     <p><code>toolNumbers</code> maps tool identifiers to explicit positive integer pockets. Unmapped tools use first-use numbering while avoiding occupied numbers. <code>retractBeforeToolChange</code> is opt-in; it raises Z to the program's highest reached position before a tool change. Subprogram emission is also opt-in and depends on dialect support. Review the selected controller's output and machine configuration before production use.</p>
+    <p>Repeated toolpaths can be emitted as subprograms. A toolpath qualifies when, after its positioning move, its motion is another toolpath's motion translated within 5 × 10⁻⁶ mm, with the same move kinds, feeds, and arc senses. Each group needs at least six body moves and must save at least twelve moves in total. Toolpaths with canned cycles or rotary words are never candidates (<code>packages/core/src/cam/post/subprograms.ts</code>).</p>
   </section>
 
   <section id="kernel" class="doc-section">
@@ -96,6 +103,7 @@ const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
     <p>Heights must satisfy clearance ≥ safe ≥ retract. Profile defaults are outside compensation, climb direction, zero finishing allowance, direct lead-in, arc fitting off, and 0.01 mm tolerance. Ramp angle defaults to 3° and accepts 0.1–45°; helix pitch defaults to 1 mm per revolution. A declared side and allowance move the tool-center path, rather than changing the source contour.</p>
     <p>These are pure operation defaults. The application generator's settings and native kernel's material-derived process data are separate parameter layers; do not assume the same field names or defaults across them.</p>
     <p>Source: <code>packages/core/src/cam/params.ts</code> and <code>operations/profile.ts</code>.</p>
+    <p>Thread milling uses the ISO 68-1 basic profile heights: 0.54127 × pitch for internal threads and 0.61343 × pitch for external threads (<code>packages/core/src/cam/operations/thread.ts</code>). The toolpath viewer assumes 500 mm/min for cutting moves without a feed and 1,000 mm/min for rapids when timing an animation; these are playback assumptions, not machine estimates.</p>
   </section>
 
   <section id="replay-example" class="doc-section">
@@ -117,6 +125,7 @@ console.log(report.issues)`}
     <p>Changing the plunge to <code>G0 Z-3</code> produces a <code>RapidInMaterial</code> finding. Adding a short cutting length or holder dimensions can introduce shank/holder findings that the original request could not test. Supplying target geometry adds finished-part comparison; this example makes no claim about a target or fixtures.</p>
     <p>The verifier budgets at most 2,500,000 grid cells and 3,000,000 path samples, with an 80,000,000 work budget. Requests can be coarsened to meet those limits. Preview stock is downsampled for display, so its pixels are not a second, finer verification result.</p>
     <p>Source: <code>packages/core/src/cam/verify/verify.ts</code> and <code>verify/verify.test.ts</code>.</p>
+    <p>When replaying text that calls subprograms, the interpreter follows <code>M98</code> nesting up to eight levels deep and stops unrolling at 2,000,000 lines, so a large repeat count cannot exhaust memory (<code>packages/core/src/cam/subprogram-text.ts</code>).</p>
   </section>
 
   <section id="diagnostics" class="doc-section">
@@ -131,6 +140,127 @@ console.log(report.issues)`}
     </ul>
     <p>Machine presets represent typical classes, not measured machines. The available snapshot preset IDs are <code>vmc-standard</code>, <code>haas-vf2</code>, <code>hsc-mill</code>, <code>desktop-mill</code>, and <code>cnc-router</code>. The first is the default. Inspect actual machine travel and clearance evidence instead of inferring it from a preset's display name.</p>
     <p>Source: <code>packages/core/src/cam/kernel/execute.ts</code>, <code>machines.ts</code>, and <code>kernel.test.ts</code>; wire issue fields are in <code>packages/api/src/cam-kernel.ts</code>.</p>
+  </section>
+
+    <section id="pocket-walkthrough" class="doc-section">
+    <h2>Generate a pocket and post it</h2>
+    <p>The CAM layer is a pipeline of pure functions: geometry and parameters go into an operation, the operation returns a <code>Toolpath</code> of intermediate-representation (IR) moves, a <code>Program</code> groups toolpaths, and a post processor turns the program into dialect-specific text. Nothing before the post knows about G-code words, so the same toolpath can be emitted for GRBL, Fanuc, Haas, or the generic dialect.</p>
+    <DocCode language="ts" title="pocket.ts — complete, runnable with bun">
+{"import { cam } from \u0022@cadcamfun/core\u0022\n\nconst tool = { id: \u0022t6\u0022, name: \u00226 mm flat end mill\u0022, kind: \u0022endmill\u0022,\n               diameter: 6, flutes: 3, maxRpm: 18000 }\n// 60 \u00d7 40 \u00d7 10 mm block; its top face is at origin.z (Z = 0)\nconst stock = { x: 60, y: 40, z: 10, origin: { x: 0, y: 0, z: 0 },\n                material: \u0022aluminium-6061\u0022 }\n\nconst params = new cam.PocketParams({\n  name: \u0022Pocket 30x20\u0022,\n  totalDepth: 3,   // mm below the stock top\n  stepdown: 1.5,   // two levels: -1.5 and -3.0\n  entry: \u0022ramp\u0022,   // default is \u0022helix\u0022\n})\n\nconst ring = [{ x: 15, y: 10 }, { x: 45, y: 10 }, { x: 45, y: 30 }, { x: 15, y: 30 }]\nconst pocket = cam.generatePocket(params, ring, tool, stock)\n\nconst program = { name: \u0022pocket-demo\u0022, units: \u0022mm\u0022, workOffset: \u0022G54\u0022,\n                  toolpaths: [pocket] }\nconst gcode = cam.getPost(\u0022grbl\u0022)!.emit(program)\nconsole.log(gcode)"}
+    </DocCode>
+    <DocViewer3D title="Pocket toolpath: 30 × 20 mm, 3 mm deep, Ø6 end mill" animate={true} caption="The moves generated by the example below, drawn in machine coordinates. Dashed amber lines are rapids (G0); green lines are feed moves (G1). Watch the ramp entry spiral down at the start of each 1.5 mm level, then the offset rings work outward (order insideOut). The translucent block is the 60 × 40 × 10 mm stock, whose top face is Z = 0." solids={[{"kind": "box", "size": [60, 40, 10], "at": [0, 0, -10], "color": "#9fb3c8", "opacity": 0.35}]} paths={[{"points": [[30, 21, 10], [30, 21, 5], [30, 21, 2], [30, 21, 1]], "rapid": true}, {"points": [[30, 21, 1], [36, 21, 0.732], [36, 19, 0.643], [24, 19, 0.107], [24, 21, 0.018], [30, 21, -0.25], [36, 21, -0.518], [36, 19, -0.607], [24, 19, -1.143], [24, 21, -1.232], [30, 21, -1.5], [36, 21, -1.5], [36, 19, -1.5], [24, 19, -1.5], [24, 21, -1.5], [30, 21, -1.5], [22.8, 22.2, -1.5], [37.2, 22.2, -1.5], [37.2, 17.8, -1.5], [22.8, 17.8, -1.5], [22.8, 22.2, -1.5], [20.4, 24.6, -1.5], [39.6, 24.6, -1.5], [39.6, 15.4, -1.5], [20.4, 15.4, -1.5], [20.4, 24.6, -1.5], [18, 27, -1.5], [42, 27, -1.5], [42, 13, -1.5], [18, 13, -1.5], [18, 27, -1.5]], "rapid": false}, {"points": [[18, 27, -1.5], [18, 27, 2], [18, 27, 5], [30, 21, 5], [30, 21, 2], [30, 21, 1]], "rapid": true}, {"points": [[30, 21, 1], [30, 21, -1.5], [36, 21, -1.661], [36, 19, -1.714], [24, 19, -2.036], [24, 21, -2.089], [30, 21, -2.25], [36, 21, -2.411], [36, 19, -2.464], [24, 19, -2.786], [24, 21, -2.839], [30, 21, -3], [36, 21, -3], [36, 19, -3], [24, 19, -3], [24, 21, -3], [30, 21, -3], [22.8, 22.2, -3], [37.2, 22.2, -3], [37.2, 17.8, -3], [22.8, 17.8, -3], [22.8, 22.2, -3], [20.4, 24.6, -3], [39.6, 24.6, -3], [39.6, 15.4, -3], [20.4, 15.4, -3], [20.4, 24.6, -3], [18, 27, -3], [42, 27, -3], [42, 13, -3], [18, 13, -3], [18, 27, -3]], "rapid": false}, {"points": [[18, 27, -3], [18, 27, 2], [18, 27, 10]], "rapid": true}]} height={380} />
+    <DocCode language="gcode" title="Output (GRBL, 85 lines, middle elided)">
+{"(PROGRAM: pocket-demo)\n(UNITS: MM)\n(WORK OFFSET: G54)\n(OP 1: Pocket 30x20 | T1 [t6] | S10000 | F300-800)\nG21 G90 G17 G94\nG54\n(OPERATION: Pocket 30x20)\n(TOOL T1)\nM3 S10000\n(Pocket: Pocket 30x20)\nG0 X30.000 Y21.000 Z10.000\nZ5.000\nZ2.000\nZ1.000\nG1 X36.000 Z0.732 F300\nY19.000 Z0.643\nX24.000 Z0.107\nY21.000 Z0.018\nX30.000 Z-0.250\nX36.000 Z-0.518\nY19.000 Z-0.607\nX24.000 Z-1.143\nY21.000 Z-1.232\nX30.000 Z-1.500\n...\n(the second level repeats the ramp from Z-1.500 to Z-3.000)\n...\nX18.000\nY27.000\nG0 Z2.000\nZ10.000\nM5\nM2"}
+    </DocCode>
+    <p>Reading the output from the top: the header comments list the program, units, work offset, and a per-operation summary (tool number, ID, spindle speed, and feed range). <code>G21 G90 G17 G94</code> selects millimetres, absolute coordinates, the XY plane, and feed per minute. GRBL has no tool changer, so the first tool is announced as a comment and later tool changes become <code>(CHANGE TO TOOL Tn)</code> followed by <code>M0</code>. The pocket starts with rapids down through clearance (10), safe (5), and retract (2) heights, then ramps at the 300 mm/min plunge feed. Once the ramp reaches depth it switches to the 800 mm/min cutting feed. The program ends with <code>M5</code> (spindle stop) and <code>M2</code>.</p>
+    <DocCallout type="warn" title="Empty geometry is reported, not silently skipped">
+      <p>If the region is not a closed boundary, the operation emits the comment <code>(nothing to cut: no closed boundary)</code> and no motion. Pass ring points as <code>&#123; x, y &#125;</code> objects. Search generated programs for that comment when an operation produces no cuts.</p>
+    </DocCallout>
+  </section>
+
+  <section id="operation-parameters" class="doc-section">
+    <h2>Operation parameters and defaults</h2>
+    <p>Every operation's parameter class extends the same common fields. Heights are absolute Z values and must satisfy clearance ≥ safe ≥ retract; the schema rejects anything else. Depths are positive distances below the stock top; the last pass is clipped to <code>totalDepth</code>.</p>
+    <table>
+      <thead><tr><th>Common field</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code>, <code>name</code></td><td><code>operation</code>, <code>Operation</code></td><td>Identity shown in comments and summaries.</td></tr>
+        <tr><td><code>clearanceHeight</code></td><td>10</td><td>Height for moves between operations.</td></tr>
+        <tr><td><code>safeHeight</code></td><td>5</td><td>Height for moves between regions.</td></tr>
+        <tr><td><code>retractHeight</code></td><td>2</td><td>Height before plunging/feeding.</td></tr>
+        <tr><td><code>totalDepth</code></td><td>required</td><td>Positive depth below the stock top.</td></tr>
+        <tr><td><code>stepdown</code></td><td>required</td><td>Positive depth per pass.</td></tr>
+        <tr><td><code>feed</code></td><td>800</td><td>Cutting feed, mm/min.</td></tr>
+        <tr><td><code>plungeFeed</code></td><td>300</td><td>Feed for plunging and ramping, mm/min.</td></tr>
+        <tr><td><code>spindleRpm</code></td><td>10000</td><td>Spindle speed.</td></tr>
+        <tr><td><code>coolant</code></td><td><code>off</code></td><td>Coolant mode.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Operation</th><th>Specific fields (defaults)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Pocket</code></td><td><code>stepover</code> 40 (% of diameter, 1–100), <code>allowance</code> 0, <code>finishPass</code> false, <code>climb</code> true, <code>entry</code> <code>helix</code> | <code>ramp</code> | <code>plunge</code>, <code>order</code> <code>insideOut</code> | <code>outsideIn</code>, <code>helixPitch</code> 1, <code>helixRadius</code> 0 (= tool radius), <code>rampAngle</code> 3° (0.1–45), <code>tolerance</code> 0.01, <code>toolCentre</code> false.</td></tr>
+        <tr><td><code>Profile</code></td><td><code>side</code> <code>outside</code> | <code>inside</code> | <code>onLine</code>, <code>climb</code> true, <code>allowance</code> 0, <code>leadIn</code> <code>direct</code> | <code>ramp</code> | <code>helix</code> | <code>arc</code>, <code>helixPitch</code> 1, <code>helixRadius</code> 0, <code>leadRadius</code> 2, <code>rampAngle</code> 3°, <code>tabs</code> [] (each tab: <code>position</code> 0–1 along the path, <code>width</code>, <code>height</code>), <code>arcFit</code> false, <code>tolerance</code> 0.01.</td></tr>
+        <tr><td><code>Drill</code></td><td>No <code>stepdown</code> or <code>feed</code>. <code>peck</code> 0 (one stroke), <code>chipBreak</code> false, <code>dwell</code> 0 s. Peck cycles keep 0.5 mm clearance above the last depth, and chip-break retracts are 0.5 mm.</td></tr>
+        <tr><td><code>Face</code></td><td><code>stepover</code> 60, <code>overshoot</code> 0 (= tool radius + 1 mm), <code>alongX</code> true, <code>tolerance</code> 0.01.</td></tr>
+        <tr><td><code>Engrave</code></td><td><code>tolerance</code> 0.01.</td></tr>
+        <tr><td><code>Thread</code></td><td>Thread milling; profile depth 0.54127 × pitch internal and 0.61343 × pitch external.</td></tr>
+        <tr><td><code>Adaptive</code>, rest, surface, chamfer, multi-axis</td><td>Further strategies exported from the same module; chamfer adds <code>tipOffset</code> 0.2 and <code>lead</code> 1.</td></tr>
+        </tbody>
+    </table>
+    <p>Construct parameters with <code>new cam.PocketParams(&#123; ... &#125;)</code> (or the matching class) so that defaults are applied and constraints are checked once. Each operation is also exported as a pair, such as <code>cam.Pocket = &#123; Params, generate &#125;</code>, for code that dispatches by operation kind.</p>
+  </section>
+
+  <section id="post-processors" class="doc-section">
+    <h2>Post processors and output options</h2>
+    <p>Posts are registered by ID in <code>cam.posts</code> and looked up with <code>cam.getPost(id)</code>. The <code>linuxcnc</code> ID is reserved but not implemented, so <code>getPost("linuxcnc")</code> returns <code>undefined</code>. Check for that before calling <code>emit</code>.</p>
+    <table>
+      <thead><tr><th>Post</th><th>Canned cycles</th><th>Dwell unit</th><th>Rotary axes</th><th>Tool change</th><th>Program frame</th></tr></thead>
+      <tbody>
+        <tr><td><code>generic</code></td><td>yes</td><td>seconds</td><td>yes</td><td><code>Tn M6</code></td><td>none</td></tr>
+        <tr><td><code>grbl</code></td><td>no (expanded to moves)</td><td>seconds</td><td>refused</td><td>comment, then <code>M0</code> pause</td><td>none</td></tr>
+        <tr><td><code>fanuc</code></td><td>yes</td><td>milliseconds</td><td>yes</td><td><code>Tn M6</code> + <code>G43 Hn</code></td><td><code>%</code> / <code>O####</code>, subprograms</td></tr>
+        <tr><td><code>haas</code></td><td>yes</td><td>milliseconds</td><td>yes, <code>G234</code> TCP</td><td><code>Tn M6</code> + <code>G43 Hn</code></td><td><code>%</code> / <code>O####</code>, subprograms</td></tr>
+        </tbody>
+    </table>
+    <p>All four accept arcs as <code>ijk</code> or <code>radius</code>; <code>linearize</code> is always possible. A program whose moves carry rotary angles is rejected by GRBL rather than silently losing the angles.</p>
+    <table>
+      <thead><tr><th>emit option</th><th>Default</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>decimals</code></td><td>3</td><td>Digits after the decimal point.</td></tr>
+        <tr><td><code>lineNumbers</code></td><td>off</td><td><code>&#123; start, step &#125;</code> writes N-words, for example <code>N10</code>, <code>N20</code>.</td></tr>
+        <tr><td><code>useCannedCycles</code></td><td>true</td><td>Emit drilling cycles where the dialect has them.</td></tr>
+        <tr><td><code>arcMode</code></td><td><code>ijk</code></td><td><code>ijk</code>, <code>radius</code>, or <code>linearize</code>.</td></tr>
+        <tr><td><code>header</code></td><td>true</td><td>Write the descriptive comment header.</td></tr>
+        <tr><td><code>tolerance</code></td><td>0.01</td><td>Chord tolerance when arcs are linearized.</td></tr>
+        <tr><td><code>toolNumbers</code></td><td>first-use order</td><td>Map of tool ID to carousel pocket. Missing entries keep first-use numbering without colliding with explicit pockets.</td></tr>
+        <tr><td><code>retractBeforeToolChange</code></td><td>off</td><td>Raise Z to the highest point reached before a tool change.</td></tr>
+        <tr><td><code>stamp</code></td><td>absent</td><td>Header stamp. Leave it out for deterministic output.</td></tr>
+        <tr><td><code>subprograms</code></td><td>off</td><td>Write repeated, translated toolpaths once as an incremental subprogram (Fanuc and Haas).</td></tr>
+        </tbody>
+    </table>
+    <DocCode language="ts" title="Same program for a Fanuc control with line numbers">
+{"const text = cam.getPost(\u0022fanuc\u0022)!.emit(program, { lineNumbers: { start: 10, step: 10 } })\n// %\n// O1000\n// (PROGRAM: POCKET-DEMO)          comments are upper-cased\n// ...\n// N10 G21 G90 G17 G94 G40 G49 G80\n// N20 G54\n// N30 T1 M6\n// N40 G43 H1\n// N50 M3 S10000"}
+    </DocCode>
+    <DocCallout type="note" title="Byte-identical by default">
+      <p>Options that change output (tool-change retract, subprograms, stamps) are off by default, so regenerating a stored request produces identical text. The <code>cam/gcode</code> workflow step relies on this to detect stale programs.</p>
+    </DocCallout>
+  </section>
+
+  <section id="cam-checklist" class="doc-section">
+    <h2>Before sending a program to a machine</h2>
+    <ol>
+      <li>Confirm the stock: size, the origin of its minimum corner, and that its top face is at <code>origin.z</code>. Every depth is measured from that face.</li>
+      <li>Check heights against fixtures. Clearance, safe, and retract heights are absolute Z values in the work offset.</li>
+      <li>Choose the post for the actual controller and confirm it is implemented (<code>getPost</code> returned a post).</li>
+      <li>Replay the program with verification and read every issue. Do not treat the absence of an error comment as proof.</li>
+      <li>If the NC text was edited by hand, regenerate or re-verify. Evidence computed for the original text no longer applies.</li>
+      <li>Dry-run on the machine above the part with feed override reduced, as you would for any new program.</li>
+    </ol>
+    <DocCallout type="warn" title="Generated code is not a machine guarantee">
+      <p>The kernel and posts check geometry, limits, and dialect rules they know about. They do not know your fixtures, tool lengths, or machine condition. A verified program is evidence, not a guarantee of a safe cut.</p>
+    </DocCallout>
+  </section>
+
+    <section id="native-claims" class="doc-section">
+    <h2>Native kernel evidence claims</h2>
+    <p>Besides the generators shown above, the native kernel returns an artifact with ten claims. Each is <code>passed</code>, <code>failed</code>, <code>unsupported</code> or <code>unresolved</code>, with a detail string. The release level summarises them: <code>blocked</code>, <code>preview</code> or <code>verified-program</code>.</p>
+    <table>
+      <thead><tr><th>Claim</th><th>Example status</th><th>Detail returned by the kernel</th></tr></thead>
+      <tbody>
+        <tr><td><code>cutting-data</code></td><td>passed</td><td>Every operation runs at cutting data computed for Acetal POM-C (Delrin) and its cutter</td></tr>
+        <tr><td><code>machine-limits</code></td><td>passed</td><td>Spindle speed, feed, power, torque and cutter deflection within limits</td></tr>
+        <tr><td><code>operations-complete</code></td><td>passed</td><td>3 operations generated; every planned feature has an operation</td></tr>
+        <tr><td><code>no-rapid-in-stock</code></td><td>passed</td><td>No rapid move touches the stock as replayed</td></tr>
+        <tr><td><code>holder-clearance</code></td><td>passed</td><td>Shank and holder stay clear of the stock (3-axis height-field replay)</td></tr>
+        <tr><td><code>no-gouge</code></td><td>passed</td><td>No cut below the part beyond 0.030 mm (one cell of lateral slack)</td></tr>
+        <tr><td><code>material-removed</code></td><td>passed</td><td>The replayed stock matches the part within 0.110 mm</td></tr>
+        <tr><td><code>nc-replay</code></td><td>passed</td><td>Interpreted 3035 NC motions independently of the post; extents agree within 2.0e-3 mm</td></tr>
+        <tr><td><code>machine-travel</code></td><td>unsupported</td><td>The machine has no travel limits configured</td></tr>
+        <tr><td><code>machine-clearance</code></td><td>passed</td><td>3035 moves checked; the holder and shank stay at least 6.500 mm from the table</td></tr>
+        </tbody>
+    </table>
+    <p>The rows are the real result for the POM blank in the native manufacturing guide: 3 operations, 3071 NC lines, release <code>verified-program</code>. The artifact's machine post can also be <code>linuxcnc</code> in the schema, but no LinuxCNC post is implemented, so presets do not use it.</p>
   </section>
 
   <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "CAD geometry", href: "/docs/cad" }, { title: "Workflows", href: "/docs/workflows" }]} />

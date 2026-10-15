@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
@@ -15,6 +16,11 @@ const toc = [
   { title: "Streaming", href: "#streams" },
   { title: "Coverage and regeneration", href: "#coverage" },
   { title: "Integration verification", href: "#verification" },
+  { title: "Promise SDK options reference", href: "#client-options" },
+  { title: "ClientError reasons", href: "#client-error-reasons" },
+  { title: "Consuming a stream with the SDK", href: "#sse-client" },
+  { title: "Example: preferences through the SDK", href: "#kv-sdk" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 <DocsLayout title="Build an API client integration" subtitle="Use the Promise SDK, full Effect contract client, or generated Effect adapters with their actual inputs and error behavior." description="CADCAMFUN client guide covering CadCam.make, ApiClient.layer, authentication, direct results, thrown errors, abort signals, stream consumption, generated coverage, and verification." toc={toc}>
@@ -134,12 +140,69 @@ bun run generate:check
 bun run --filter @cadcamfun/web generate:api-reference
 bun run --filter @cadcamfun/web check:api-reference`}</DocCode>
     <p>Client regeneration and documentation regeneration are separate outputs from the same contract. Keep both current after endpoint changes. Do not edit generated method bodies to change the server's input requirements.</p>
+    <p>Generated code is written to <code>packages/api/src/client/generated</code> and <code>packages/api/src/sdk/generated</code>. Do not edit those files by hand; change the contract and regenerate.</p>
   </section>
   <section id="verification" class="doc-section">
     <h2>Integration verification</h2>
     <p>The Promise create/read/plain-result behavior and thrown declared failure shown here were exercised against the real sidecar handler stack using a migrated disposable database. The HTTP walkthrough contains the corresponding observed responses. Repeat focused checks when changing the generator, authentication, or endpoint schemas.</p>
     <p>For an integration acceptance check, verify public health; a protected request without a token; the same request with the current token; a valid create/read cycle; a declared validation failure; a cancelled request; and a stream whose terminal state is checked. Use a disposable project and never infer successful persistence from a frontend fixture alone.</p>
     <p>Implementation sources are <code>packages/api/src/sdk/generated/client.ts</code>, its <code>client-error.ts</code>, <code>packages/api/src/client.ts</code>, <code>packages/api/src/client/generated</code>, and <code>packages/httpapi-codegen/src/index.ts</code>. The generator and committed outputs together establish the actual client behavior.</p>
+  </section>
+    <section id="client-options" class="doc-section">
+    <h2>Promise SDK options reference</h2>
+    <table>
+      <thead><tr><th>Option</th><th>Where</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>baseUrl</code></td><td><code>CadCam.make</code></td><td>Resolved with <code>new URL(path, baseUrl)</code>; include the scheme and port.</td></tr>
+        <tr><td><code>fetch</code></td><td><code>CadCam.make</code></td><td>Replace the transport, for example to add logging or to inject a test double. Defaults to <code>globalThis.fetch</code>.</td></tr>
+        <tr><td><code>headers</code></td><td><code>CadCam.make</code></td><td>Sent with every request. Put <code>authorization</code> here.</td></tr>
+        <tr><td><code>signal</code></td><td>per call</td><td>Aborts the request; the rejection is <code>ClientError("Transport")</code>.</td></tr>
+        <tr><td><code>headers</code></td><td>per call</td><td>Override or add headers for one call, such as <code>x-session-token</code>. Per-call values win over client values.</td></tr>
+        </tbody>
+    </table>
+    <p>When a body is present and no <code>content-type</code> header was set, the SDK sets <code>application/json</code> and serializes with <code>JSON.stringify</code>. Path parameters are always passed through <code>encodeURIComponent</code>, so a key such as <code>docs.walkthrough.units</code> or one containing <code>/</code> stays a single segment.</p>
+  </section>
+
+  <section id="client-error-reasons" class="doc-section">
+    <h2>ClientError reasons</h2>
+    <table>
+      <thead><tr><th>Reason</th><th>Raised when</th><th>Typical response</th></tr></thead>
+      <tbody>
+        <tr><td><code>Transport</code></td><td><code>fetch</code> threw (refused, reset, DNS, abort) or a stream read failed</td><td>Re-resolve the sidecar URL; retry reads; re-read state before retrying writes.</td></tr>
+        <tr><td><code>UnexpectedStatus</code></td><td>The status is neither the success status nor a declared error status. The cause holds <code>&#123; status &#125;</code>.</td><td>Treat as a contract mismatch, often a different server version.</td></tr>
+        <tr><td><code>UnsupportedContentType</code></td><td>A stream operation answered with something other than <code>text/event-stream</code>, or a JSON operation with a non-JSON type</td><td>Check proxies and the server version.</td></tr>
+        <tr><td><code>MalformedResponse</code></td><td>Empty or invalid JSON, a missing body, or an SSE <code>data:</code> block that is not JSON</td><td>Log the raw response; report it.</td></tr>
+        <tr><td><code>SseEventTooLarge</code></td><td>The unparsed SSE buffer exceeded 16 MiB</td><td>The event is refused; restart the stream.</td></tr>
+        </tbody>
+    </table>
+    <p>The message of a <code>ClientError</code> is the reason followed by the cause message (for example <code>Transport: fetch failed</code>), so logging <code>error.message</code> alone is already diagnostic.</p>
+    <DocCode language="ts" title="Retrying idempotent reads only">
+{"import { CadCam, ClientError } from \u0022@cadcamfun/api/sdk\u0022\n\nasync function withRetry<T>(read: () => Promise<T>, attempts = 3): Promise<T> {\n  for (let attempt = 1; ; attempt++) {\n    try {\n      return await read()\n    } catch (error) {\n      const transient = error instanceof ClientError && error.reason === \u0022Transport\u0022\n      if (!transient || attempt >= attempts) throw error\n      await new Promise((resolve) => setTimeout(resolve, 250 * 2 ** attempt))\n    }\n  }\n}\n\nconst projects = await withRetry(() => client.projects.list())"}
+    </DocCode>
+    <DocCallout type="warn" title="Do not blindly retry writes">
+      <p>A write that failed with <code>Transport</code> may have been applied. Read the resource again and only resubmit when it is not there; the API has no idempotency keys.</p>
+    </DocCallout>
+  </section>
+
+  <section id="sse-client" class="doc-section">
+    <h2>Consuming a stream with the SDK</h2>
+    <DocCode language="ts" title="Iterate assistant events">
+{"const controller = new AbortController()\nconst events = client.ai.chatStream(\n  { message: \u0022Pocket the 40 x 30 rectangle, 3 mm deep\u0022, projectId },\n  { signal: controller.signal },\n)\n\nfor await (const event of events) {\n  switch (event.type) {\n    case \u0022delta\u0022: render(event); break\n    case \u0022permission_request\u0022: askUser(event); break\n    case \u0022done\u0022: finish(event); break\n    case \u0022error\u0022: showError(event); break\n  }\n}"}
+    </DocCode>
+    <p>The iterator parses each SSE block: it joins the <code>data:</code> lines of the block, parses the JSON and yields it. Comments and blocks without <code>data:</code> are skipped. Leaving the loop early (<code>break</code>, an exception, or abort) cancels the reader and releases the connection. The event <code>type</code> values are the ones listed in the assistant streaming guide; check the generated <code>AiChatStreamOutput</code> type for the exact union.</p>
+  </section>
+
+  <section id="kv-sdk" class="doc-section">
+    <h2>Example: preferences through the SDK</h2>
+    <DocCode language="ts" title="Key-value round trip">
+{"const key = \u0022docs.walkthrough.units\u0022\n\ntry {\n  await client.kv.get({ key })\n} catch (error) {\n  if ((error as { _tag?: string })._tag !== \u0022NotFound\u0022) throw error   // first run: 404\n}\n\nconst saved = await client.kv.set({ key, value: { units: \u0022mm\u0022 } })\n// saved: { key, value: { units: \u0022mm\u0022 }, updatedAt: \u00222026-\u2026\u0022 }\n\nconst { entries } = await client.kv.list({ prefix: \u0022docs.\u0022 })\nawait client.kv.remove({ key })   // { message: \u0022\u2026\u0022 }"}
+    </DocCode>
+    <p>Keys are limited to 512 characters and must contain non-whitespace text; values must be JSON-compatible (no cycles, functions or non-finite numbers).</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="What the clients cover" caption="Every API group as a column, height = operations counted from the generated OpenAPI document (270 in total). Rows are the six sidebar categories; ai (34), history (22) and costs (21) are the largest groups." solids={[{"kind":"box","size":[6,6,1],"at":[0,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,2],"at":[9,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,1],"at":[18,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,4],"at":[27,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,2],"at":[36,0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,5],"at":[0,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,5],"at":[9,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,5],"at":[18,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,3],"at":[27,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,8],"at":[36,16,0],"color":"#a48ac8"},{"kind":"box","size":[6,6,7],"at":[0,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,2],"at":[9,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,5],"at":[18,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,8],"at":[27,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,21],"at":[36,32,0],"color":"#e0a030"},{"kind":"box","size":[6,6,5],"at":[0,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[9,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[18,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,7],"at":[27,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,6],"at":[36,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,5],"at":[45,48,0],"color":"#9fc88a"},{"kind":"box","size":[6,6,34],"at":[0,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,22],"at":[9,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,16],"at":[18,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,8],"at":[27,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,5],"at":[36,64,0],"color":"#e05050"},{"kind":"box","size":[6,6,12],"at":[0,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,16],"at":[9,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,5],"at":[18,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,4],"at":[27,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,15],"at":[36,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,10],"at":[45,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,10],"at":[54,80,0],"color":"#5fb0c0"},{"kind":"box","size":[6,6,1],"at":[63,80,0],"color":"#5fb0c0"}]} labels={[{"text":"health 1","at":[3,3,3.5],"size":2.4},{"text":"system 2","at":[12,3,4.5],"size":2.4},{"text":"events 1","at":[21,3,3.5],"size":2.4},{"text":"key-value 4","at":[30,3,6.5],"size":2.4},{"text":"files 2","at":[39,3,4.5],"size":2.4},{"text":"Core","at":[-10,3,2],"size":3.6,"color":"#e0a030"},{"text":"projects 5","at":[3,19,7.5],"size":2.4},{"text":"drawings 5","at":[12,19,7.5],"size":2.4},{"text":"components 5","at":[21,19,7.5],"size":2.4},{"text":"cad-exact 3","at":[30,19,5.5],"size":2.4},{"text":"library 8","at":[39,19,10.5],"size":2.4},{"text":"Design","at":[-10,19,2],"size":3.6,"color":"#e0a030"},{"text":"toolpaths 7","at":[3,35,9.5],"size":2.4},{"text":"project-toolpaths 2","at":[12,35,4.5],"size":2.4},{"text":"machining 5","at":[21,35,7.5],"size":2.4},{"text":"toolpath-history 8","at":[30,35,10.5],"size":2.4},{"text":"costs 21","at":[39,35,23.5],"size":2.4},{"text":"Manufacturing","at":[-10,35,2],"size":3.6,"color":"#e0a030"},{"text":"materials 5","at":[3,51,7.5],"size":2.4},{"text":"material-storage 5","at":[12,51,7.5],"size":2.4},{"text":"tools 5","at":[21,51,7.5],"size":2.4},{"text":"tool-storage 7","at":[30,51,9.5],"size":2.4},{"text":"machines 6","at":[39,51,8.5],"size":2.4},{"text":"machine-storage 5","at":[48,51,7.5],"size":2.4},{"text":"Resources","at":[-10,51,2],"size":3.6,"color":"#e0a030"},{"text":"ai 34","at":[3,67,36.5],"size":2.4},{"text":"history 22","at":[12,67,24.5],"size":2.4},{"text":"plugins 16","at":[21,67,18.5],"size":2.4},{"text":"mcp 8","at":[30,67,10.5],"size":2.4},{"text":"companion 5","at":[39,67,7.5],"size":2.4},{"text":"Extensions","at":[-10,67,2],"size":3.6,"color":"#e0a030"},{"text":"authentication 12","at":[3,83,14.5],"size":2.4},{"text":"users 16","at":[12,83,18.5],"size":2.4},{"text":"organizations 5","at":[21,83,7.5],"size":2.4},{"text":"notifications 4","at":[30,83,6.5],"size":2.4},{"text":"billing 15","at":[39,83,17.5],"size":2.4},{"text":"analytics 10","at":[48,83,12.5],"size":2.4},{"text":"application 10","at":[57,83,12.5],"size":2.4},{"text":"waitlist 1","at":[66,83,3.5],"size":2.4},{"text":"Accounts","at":[-10,83,2],"size":3.6,"color":"#e0a030"}]} height={440} />
   </section>
   <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Captured walkthrough", href: "/docs/guides/api-tour" }, { title: "AI streaming", href: "/docs/guides/ai-streaming" }]} />
 </DocsLayout>

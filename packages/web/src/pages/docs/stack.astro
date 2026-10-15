@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -10,7 +11,11 @@ const toc = [
   { title: "Database and contracts", href: "#data" },
   { title: "Desktop and graphics", href: "#desktop" },
   { title: "AI runtime", href: "#ai" },
-  { title: "Mobile and documentation", href: "#clients" }
+  { title: "Mobile and documentation", href: "#clients" },
+  { title: "Pinned versions", href: "#versions" },
+  { title: "Rust crates in the desktop shell", href: "#rust-crates" },
+  { title: "Why these choices", href: "#why" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -45,6 +50,7 @@ const toc = [
     <p>The mobile manifest uses Expo <code>~57.0.27</code>, React <code>19.2.3</code>, React Native <code>0.86.3</code>, and Expo Router <code>~57.0.25</code>. Its custom companion transport is a native module. NativeWind, Reanimated, Gesture Handler, SecureStore, and local authentication support the mobile application.</p>
     <p>This site uses Astro <code>^5.14.1</code> with the Cloudflare adapter, MDX and Tailwind integrations. Documentation pages are prerendered; assistant, Markdown, Studio fallback, and artifact routes run on the server. The local Studio API runs in Bun because it uses <code>bun:sqlite</code>.</p>
     <p>TypeScript tooling includes TypeScript 5.9 and the native preview compiler. Most application workspaces use <code>tsgo</code>; web and mobile use <code>tsc</code>. The manifest ranges describe allowed dependency versions; the lockfile records the installed resolution.</p>
+    <p>The documentation site uses Astro 5 with the Cloudflare adapter, MDX, and Tailwind (<code>packages/web/package.json</code>). The desktop webview reaches native code through <code>@tauri-apps/api</code> v2.</p>
   </section>
 
 
@@ -64,4 +70,61 @@ const toc = [
     <p>Use the build artifact corresponding to the environment being tested. Frontend output, a compiled sidecar, migration resources, an exported mobile bundle, and signed native installers are distinct outputs even when one command coordinates several stages.</p>
   </section>
 
-</DocsLayout>
+  <section id="versions" class="doc-section">
+    <h2>Pinned versions</h2>
+    <table>
+      <thead><tr><th>Layer</th><th>Technology</th><th>Version (from package manifests)</th></tr></thead>
+      <tbody>
+        <tr><td>Package manager / runtime</td><td>Bun</td><td>1.4.2 (<code>packageManager</code>)</td></tr>
+        <tr><td>Service framework</td><td>Effect</td><td>4.0.0-rc.112 (all workspaces, with platform-bun and opentelemetry at the same version)</td></tr>
+        <tr><td>Database</td><td>drizzle-orm / drizzle-kit, <code>bun:sqlite</code></td><td>1.0.0-beta.22</td></tr>
+        <tr><td>Desktop shell</td><td>Tauri</td><td>2 (Rust crates and <code>@tauri-apps/*</code> ^2)</td></tr>
+        <tr><td>Desktop UI</td><td>SolidJS, @solidjs/router, Kobalte</td><td>^1.9.0, ^0.15.0, ^0.13.0</td></tr>
+        <tr><td>3D</td><td>three.js, three-csg-ts</td><td>^0.180.0, ^3.2.0</td></tr>
+        <tr><td>STEP import</td><td>occt-import-js</td><td>0.0.23</td></tr>
+        <tr><td>Code editor</td><td>monaco-editor</td><td>^0.57.0</td></tr>
+        <tr><td>Bundler</td><td>Vite</td><td>^7.0.0</td></tr>
+        <tr><td>AI</td><td>ai (Vercel AI SDK), @ai-sdk/anthropic, openai, gateway, openai-compatible, @nikcli-ai/sdk-next</td><td>7.0.127, 4.0.71, 4.0.83, 4.0.103, 3.0.62, 1.428.0</td></tr>
+        <tr><td>Validation (AI tools)</td><td>zod</td><td>^4.1.8</td></tr>
+        <tr><td>Telemetry</td><td>OpenTelemetry SDK + OTLP/HTTP exporters</td><td>api 1.9.1, sdk 2.12.0, exporters 0.223.0</td></tr>
+        <tr><td>Mobile</td><td>Expo, React Native, React</td><td>~57, 0.86.3, 19.2.3</td></tr>
+        <tr><td>Docs</td><td>Astro, Tailwind, Cloudflare adapter, wrangler</td><td>^5.14.1, ^3.4.17, ^12.0.0, 4.103.0</td></tr>
+        <tr><td>Type checking</td><td>TypeScript, tsgo (native preview)</td><td>^5.9.0, 7.0.0-dev</td></tr>
+        <tr><td>Monorepo tasks</td><td>turbo</td><td>^2.11.7</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="rust-crates" class="doc-section">
+    <h2>Rust crates in the desktop shell</h2>
+    <table>
+      <thead><tr><th>Crate</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>tauri</code> (tray-icon, macos-private-api)</td><td>Windows, tray, IPC</td></tr>
+        <tr><td><code>tauri-plugin-shell</code></td><td>Launching the sidecar binary</td></tr>
+        <tr><td><code>tauri-plugin-dialog</code>, <code>-fs</code>, <code>-opener</code></td><td>File pickers, file access, opening paths and URLs</td></tr>
+        <tr><td><code>tauri-plugin-updater</code></td><td>Signed in-app updates</td></tr>
+        <tr><td><code>tauri-plugin-log</code>, <code>-os</code></td><td>Logging, platform detection</td></tr>
+        <tr><td><code>tauri-plugin-single-instance</code>, <code>-window-state</code></td><td>One running app; restore window geometry (desktop targets)</td></tr>
+        <tr><td><code>tauri-plugin-liquid-glass</code> (optional)</td><td>macOS glass effect with a vibrancy fallback</td></tr>
+        <tr><td><code>tokio</code>, <code>serde</code>, <code>thiserror</code>, <code>getrandom</code>, <code>log</code></td><td>Async supervision, IPC payloads, typed errors, launch tokens</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="why" class="doc-section">
+    <h2>Why these choices</h2>
+    <ul>
+      <li><strong>Bun</strong> runs the tests, the scripts and the sidecar, and compiles the sidecar into one native binary, so the desktop ships without a separate JavaScript runtime.</li>
+      <li><strong>Effect</strong> gives every service typed errors, scoped resources (the database handle and child processes are released on shutdown) and one HttpApi definition used by server, clients, generated SDKs and the API reference.</li>
+      <li><strong>SQLite</strong> keeps each installation self-contained: one file plus a WAL, backed up before each schema upgrade.</li>
+      <li><strong>Tauri</strong> uses the system webview and a small Rust shell, which owns the sidecar process, native menus, the updater and the keychain.</li>
+      <li><strong>three.js</strong> renders the viewport; the same library draws the 3D previews on these documentation pages.</li>
+    </ul>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="The stack by dependency depth" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps. core is the base the rest builds on." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
+  </DocsLayout>

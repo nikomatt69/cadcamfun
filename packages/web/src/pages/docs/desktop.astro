@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -20,6 +21,10 @@ const toc = [
   { title: "Preferences and settings", href: "#preferences" },
   { title: "Save and reopen a CAM program", href: "#save-workflow" },
   { title: "Keyboard and failure diagnosis", href: "#desktop-diagnostics" },
+  { title: "Native event payloads", href: "#event-payloads" },
+  { title: "Keyboard shortcuts", href: "#shortcut-table" },
+  { title: "Every screen route", href: "#route-table" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -81,14 +86,14 @@ const toc = [
   <section id="shell" class="doc-section">
     <h2>Native shell</h2>
     <p>The production window is 1440 × 900 by default, with a 960 × 600 minimum. Tauri stages the frontend from <code>apps/desktop/dist</code>, a target-specific sidecar from <code>src-tauri/binaries</code>, and generated migrations as resources. It registers <code>.cadcam</code>, <code>.nc</code>, and <code>.gcode</code> file associations. Opening a supported file or launching a second instance forwards file paths to the existing window.</p>
-    <p><code>src-tauri/src/sidecar.rs</code> supervises the child process. Closing the app sends a shutdown event; the child also observes stdin closure. Logs are separate from stdout, which carries the ready/error handshake. Native secrets are accessed through <code>src-tauri/src/secrets.rs</code> using the operating-system keychain.</p>
+    <p><code>src-tauri/src/sidecar.rs</code> supervises the child process. Closing the app writes a <code>{`{"event":"shutdown"}`}</code> line to the child's stdin and waits briefly before reaping it; the child also observes stdin closure. The launch token is 32 random bytes, hex-encoded as 64 characters, and sidecar log lines that may contain credentials are redacted. Logs are separate from stdout, which carries the ready/error handshake. Native secrets are accessed through <code>src-tauri/src/secrets.rs</code> using the operating-system keychain.</p>
     <p>On macOS, the shell registers the Liquid Glass plugin. The webview follows the glass setting and falls back when the effect is unavailable. The App Store configuration disables the private API option; the regular configuration enables it. These are separate build configurations.</p>
   </section>
 
   <section id="boundaries" class="doc-section">
     <h2>Security and persistence boundaries</h2>
     <p>The production content policy permits local assets, loopback API connections, data/blob images, and WebAssembly evaluation. It does not grant arbitrary remote script execution. Native permissions are scoped in <code>src-tauri/capabilities</code>; the development policy additionally permits Vite and its websocket.</p>
-    <p><code>open_path</code> canonicalizes paths, limits them to allowed user/application directories, and rejects executable extensions. File picking and saving use native dialogs and validation. A launch token grants access to the local application API; treat it separately from a companion token or a project-scoped AI bridge token.</p>
+    <p><code>open_path</code> canonicalizes paths, limits them to allowed user/application directories, and rejects executable extensions such as <code>.exe</code>, <code>.app</code>, <code>.sh</code>, <code>.bat</code>, <code>.msi</code>, and <code>.jar</code>. <code>..</code> segments and symlinks cannot escape the allowed folders because both sides are canonicalized. File picking and saving use native dialogs and validation. A launch token grants access to the local application API; treat it separately from a companion token or a project-scoped AI bridge token.</p>
     <p>UI settings, API query state, editor commands, stored project versions, and native secrets have different owners. Diagnose each through its actual service rather than assuming all application state is stored in SQLite.</p>
   </section>
 
@@ -109,15 +114,15 @@ const toc = [
     <table>
       <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td><code>get_sidecar_endpoint</code></td><td>Wait for the supervised sidecar and return its base URL and launch token.</td></tr>
-        <tr><td><code>get_logs_dir</code>, <code>open_path</code></td><td>Resolve the log directory and open a validated local path.</td></tr>
-        <tr><td><code>secret_get</code>, <code>secret_set</code>, <code>secret_delete</code></td><td>Access native keychain entries.</td></tr>
-        <tr><td><code>pick_file</code>, <code>save_file</code></td><td>Show native file dialogs and return or write the selected file.</td></tr>
+        <tr><td><code>get_sidecar_endpoint</code></td><td>Wait for the supervised sidecar and return its base URL and launch token. The wait covers one restart: two 60-second ready timeouts plus 5 seconds (125 seconds).</td></tr>
+        <tr><td><code>get_logs_dir</code>, <code>open_path</code></td><td>Resolve the application log directory as a string, and open an existing absolute path with the operating-system opener. Paths must resolve under the app data, log, Documents, Downloads, or Desktop folder.</td></tr>
+        <tr><td><code>secret_get</code>, <code>secret_set</code>, <code>secret_delete</code></td><td>Access native keychain entries under the <code>com.cadcamfun.app</code> service. Keys are 1–128 bytes of ASCII letters, digits, and <code>. _ - :</code> (for example <code>ai.anthropic.apiKey</code>); <code>secret_get</code> returns <code>null</code> for a missing entry.</td></tr>
+        <tr><td><code>pick_file</code>, <code>save_file</code></td><td><code>{"pick_file({ filters: [{ name, extensions }] })"}</code> returns the chosen path or <code>null</code> on cancel. <code>{"save_file({ defaultName, contents })"}</code> writes UTF-8 text to the chosen path and returns it, or <code>null</code> on cancel; directories and executable extensions are rejected.</td></tr>
         <tr><td><code>set_recent_projects</code></td><td>Refresh the tray's recent-project menu.</td></tr>
-        <tr><td><code>check_for_updates</code>, <code>install_update</code></td><td>Request an updater check or install a pending update subject to unsaved-work checks.</td></tr>
+        <tr><td><code>check_for_updates</code>, <code>install_update</code></td><td>Request an updater check, or install a pending update. <code>install_update</code> accepts an optional <code>unsavedWork</code> flag (default <code>false</code>) so an install does not interrupt an open editor.</td></tr>
       </tbody>
     </table>
-    <p>The invoke handler is registered in <code>src-tauri/src/lib.rs</code>. Capabilities and generated command permissions also control availability; command registration alone does not establish webview access.</p>
+    <p>The invoke handler is registered in <code>src-tauri/src/lib.rs</code>. Capabilities and generated command permissions also control availability; command registration alone does not establish webview access. Command errors are serialized as <code>{"{ kind, message }"}</code> with kinds such as <code>sidecar</code>, <code>invalid_path</code>, <code>io</code>, <code>dialog</code>, and <code>path</code>; no command panics.</p>
   </section>
 
   <section id="webview-events" class="doc-section">
@@ -136,6 +141,7 @@ bun test apps/desktop/src
 bun run build:desktop`}
     </DocCode>
     <p>The first command runs a browser preview. <code>desktop:dev</code> compiles the real sidecar and stages migrations before starting Tauri. The desktop package's <code>tauri:dev</code> script instead creates a stub binary only when no binary exists; use it for isolated shell work and check which binary is present before interpreting its API responses.</p>
+    <p>The desktop <code>build</code> script runs <code>vite build</code> only; it does not compile the sidecar or package a Tauri bundle. Use <code>bun scripts/build.ts</code> for the full release pipeline (see <a href="/docs/release">Release</a>).</p>
   </section>
 
   <section id="preferences" class="doc-section">
@@ -189,6 +195,86 @@ bun run build:desktop`}
     <p>Implementation anchors: <code>shared/state/settings.ts</code>, <code>app/shortcuts.ts</code>, <code>features/settings/screens/settings.tsx</code>, and <code>features/cam/components/SaveCamModal.tsx</code>.</p>
   </section>
 
+    <section id="event-payloads" class="doc-section">
+    <h2>Native event payloads</h2>
+    <table>
+      <thead><tr><th>Event</th><th>Payload</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>sidecar-status</code></td><td><code>&#123; state: "starting" &#125;</code>, <code>&#123; state: "ready", port &#125;</code>, <code>&#123; state: "restarting" &#125;</code>, <code>&#123; state: "failed", message &#125;</code></td><td>After <code>restarting</code>, call <code>get_sidecar_endpoint</code> again; the port changes.</td></tr>
+        <tr><td><code>update://status</code></td><td><code>status</code>: <code>checking</code>, <code>upToDate</code> (<code>version</code>), <code>available</code> (<code>version</code>, <code>notes</code>, <code>date</code>, <code>critical</code>), <code>downloading</code> (<code>downloaded</code>, <code>total</code>), <code>ready</code> (<code>version</code>), <code>failed</code> (<code>message</code>); plus <code>dismissible</code></td><td>A critical update and a pending restart are not dismissible. A failed check is never shown as a blocking error.</td></tr>
+        <tr><td><code>menu</code></td><td>Menu item ID, such as <code>file.new</code>, <code>file.open</code>, <code>file.save</code>, <code>view.devtools</code>, <code>help.documentation</code></td><td>Tray items use <code>tray.quit</code> and <code>tray.recent.&lt;projectId&gt;</code>.</td></tr>
+        <tr><td><code>open-file</code></td><td>Paths of <code>.cadcam</code>, <code>.nc</code>, or <code>.gcode</code> files</td><td>Sent when the OS opens a file with the app or a second instance is launched.</td></tr>
+        </tbody>
+    </table>
+    <code>install_update</code> can be refused with a typed reason: <code>unsavedWork</code> ("the editor has unsaved work; apply the update once it is saved"), <code>noneAvailable</code> (nothing pending, or already installed), or <code>failed</code> (download or signature check failed). It installs only the update that the last check announced.
+    <DocCode language="ts" title="Calling native commands from the webview">
+{"import { invoke } from \u0022@tauri-apps/api/core\u0022\nimport { listen } from \u0022@tauri-apps/api/event\u0022\n\nconst { baseUrl, token } = await invoke<{ baseUrl: string; token: string }>(\u0022get_sidecar_endpoint\u0022)\n\nconst path = await invoke<string | null>(\u0022pick_file\u0022, {\n  filters: [{ name: \u0022G-code\u0022, extensions: [\u0022nc\u0022, \u0022gcode\u0022] }],\n})                                    // null when the user cancels\n\nawait invoke(\u0022save_file\u0022, { defaultName: \u0022part.nc\u0022, contents: gcodeText })\n\nconst unlisten = await listen<{ state: string; port?: number }>(\u0022sidecar-status\u0022, (e) => {\n  if (e.payload.state === \u0022ready\u0022) reconnect()\n})\n// later: unlisten()\n\ntry {\n  await invoke(\u0022install_update\u0022, { unsavedWork: editorIsDirty })\n} catch (error) {\n  // { kind, message }: the update variant carries the refusal (unsavedWork | noneAvailable | failed)\n}"}
+    </DocCode>
+    <p><code>get_sidecar_endpoint</code> returns <code>&#123; baseUrl, token &#125;</code> (serialized in camelCase from <code>SidecarEndpoint</code>). Errors from every command arrive as the rejected value of <code>invoke</code>, shaped <code>&#123; kind, message &#125;</code>.</p>
+  </section>
+
+  <section id="shortcut-table" class="doc-section">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <thead><tr><th>Shortcut</th><th>Action</th><th>Group</th></tr></thead>
+      <tbody>
+        <tr><td><code>Cmd/Ctrl+K</code></td><td>Open the command palette</td><td>navigation</td></tr>
+        <tr><td><code>Cmd/Ctrl+Shift+P</code></td><td>New project</td><td>navigation</td></tr>
+        <tr><td><code>Cmd/Ctrl+Z</code> / <code>Cmd/Ctrl+Shift+Z</code></td><td>Undo / redo</td><td>edit</td></tr>
+        <tr><td><code>Cmd/Ctrl+S</code>, <code>Cmd/Ctrl+Shift+E</code></td><td>Save, export (shell placeholders; use the feature's own controls)</td><td>edit</td></tr>
+        <tr><td><code>Cmd/Ctrl+0</code></td><td>Zoom to fit</td><td>view</td></tr>
+        <tr><td><code>Cmd/Ctrl+=</code> / <code>Cmd/Ctrl+-</code></td><td>Zoom in / out</td><td>view</td></tr>
+        <tr><td><code>Cmd/Ctrl+J</code></td><td>Toggle the assistant panel</td><td>ai</td></tr>
+        </tbody>
+    </table>
+    <code>Cmd</code> applies on macOS and <code>Ctrl</code> elsewhere. Each shortcut's ID is also its translation key suffix (for example <code>settings.shortcut.palette</code>), and the Settings screen renders this same table, so the documentation and the app cannot drift apart.
+  </section>
+
+    <section id="route-table" class="doc-section">
+    <h2>Every screen route</h2>
+    <p>The router in <code>apps/desktop/src/app/routes.tsx</code> declares 68 routes, each loaded lazily from <code>apps/desktop/src/pages/</code> (dynamic segments are <code>_id_.tsx</code> files). Grouped by first segment:</p>
+    <table>
+      <thead><tr><th>Area</th><th>Routes</th></tr></thead>
+      <tbody>
+        <tr><td><code>*</code></td><td><code>*</code></td></tr>
+        <tr><td><code>500</code></td><td><code>/500</code></td></tr>
+        <tr><td><code>admin</code></td><td><code>/admin/analytics</code> <code>/admin/feature-flags</code></td></tr>
+        <tr><td><code>ai</code></td><td><code>/ai</code></td></tr>
+        <tr><td><code>analytics</code></td><td><code>/analytics/history</code> <code>/analytics</code></td></tr>
+        <tr><td><code>auth</code></td><td><code>/auth/forgot-password</code> <code>/auth/magic-link</code> <code>/auth/magic-link/verify</code> <code>/auth/reset-password</code> <code>/auth/signin</code> <code>/auth/signup</code> <code>/auth/two-factor</code> <code>/auth/verify-email</code> <code>/auth/verify</code></td></tr>
+        <tr><td><code>cad</code></td><td><code>/cad</code></td></tr>
+        <tr><td><code>cam</code></td><td><code>/cam</code></td></tr>
+        <tr><td><code>costs</code></td><td><code>/costs</code></td></tr>
+        <tr><td><code>components</code></td><td><code>/components/:id</code> <code>/components</code></td></tr>
+        <tr><td><code>drawings</code></td><td><code>/drawings/:id</code></td></tr>
+        <tr><td><code>/</code></td><td><code>/</code></td></tr>
+        <tr><td><code>invitations</code></td><td><code>/invitations/:token</code></td></tr>
+        <tr><td><code>legal</code></td><td><code>/legal/privacy</code> <code>/legal/terms</code> <code>/legal/third-party-licenses</code></td></tr>
+        <tr><td><code>library</code></td><td><code>/library</code></td></tr>
+        <tr><td><code>machine</code></td><td><code>/machine/:id</code> <code>/machine</code></td></tr>
+        <tr><td><code>marketplace</code></td><td><code>/marketplace</code> <code>/marketplace/items/:id</code> <code>/marketplace/purchase/success</code> <code>/marketplace/purchases</code> <code>/marketplace/seller/dashboard</code></td></tr>
+        <tr><td><code>materials</code></td><td><code>/materials/:id</code> <code>/materials</code></td></tr>
+        <tr><td><code>mcp</code></td><td><code>/mcp/directory</code> <code>/mcp/servers/:id</code></td></tr>
+        <tr><td><code>offline</code></td><td><code>/offline</code></td></tr>
+        <tr><td><code>organizations</code></td><td><code>/organizations/:id</code> <code>/organizations/:id/chat/:conversationId</code> <code>/organizations/:id/chat</code> <code>/organizations/:id/chat/new-group</code> <code>/organizations/:id/chat/new</code> <code>/organizations/create</code> <code>/organizations</code></td></tr>
+        <tr><td><code>plugins</code></td><td><code>/plugins/:id</code> <code>/plugins</code></td></tr>
+        <tr><td><code>pricing</code></td><td><code>/pricing</code></td></tr>
+        <tr><td><code>profile</code></td><td><code>/profile</code> <code>/profile/settings</code></td></tr>
+        <tr><td><code>projects</code></td><td><code>/projects/:id/history</code> <code>/projects/:id</code> <code>/projects/create</code> <code>/projects</code></td></tr>
+        <tr><td><code>settings</code></td><td><code>/settings</code> <code>/settings/companion</code> <code>/settings/mcp/config-editor</code> <code>/settings/mcp/edit/:id</code> <code>/settings/mcp</code> <code>/settings/subscription</code></td></tr>
+        <tr><td><code>third-party-licenses</code></td><td><code>/third-party-licenses</code></td></tr>
+        <tr><td><code>toolpaths</code></td><td><code>/toolpaths/:id</code> <code>/toolpaths</code></td></tr>
+        <tr><td><code>tools</code></td><td><code>/tools/:id</code> <code>/tools</code></td></tr>
+        <tr><td><code>waitlist</code></td><td><code>/waitlist</code></td></tr>
+        </tbody>
+    </table>
+    <code>*</code> renders the 404 page and <code>/500</code> the error page. <code>/offline</code> renders the offline screen; like the auth, invitation, 404, 500 and purchase-success pages it uses the standalone layout without the app chrome. Because every page is a lazy import, a screen's code is only loaded on first visit; a failed chunk load surfaces as a route error, not a blank app.
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Desktop process topology" caption="Processes at run time. The Tauri shell spawns the sidecar and waits for its {”event”:”ready”,”port”:N} line on stdout (sidecar.rs); the webview then talks HTTP to 127.0.0.1 on that port with the bearer token. The sidecar owns the SQLite database, the embedded nikcli AI host (CADCAMFUN_AI_HOST=nikcli, the default) and plugins; the mobile app reaches it through companion pairing." solids={[{"kind":"box","size":[20,8,4],"at":[-10.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[-10.0,26.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[30.0,11.0,0],"color":"#e05050"},{"kind":"box","size":[20,8,4],"at":[70.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[20,8,4],"at":[70.0,26.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[70.0,56.0,0],"color":"#9fc88a"},{"kind":"box","size":[20,8,4],"at":[-10.0,66.0,0],"color":"#5fb0c0"}]} paths={[{"points":[[0,0,2.0],[20.0,7.5,5.0],[40,15,2.0]],"color":"#e0a030"},{"points":[[0,30,2.0],[20.0,22.5,5.0],[40,15,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,7.5,5.0],[80,0,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,22.5,5.0],[80,30,2.0]],"color":"#2fbf71"},{"points":[[40,15,2.0],[60.0,37.5,5.0],[80,60,2.0]],"color":"#2fbf71"},{"points":[[0,70,2.0],[20.0,42.5,5.0],[40,15,2.0]],"color":"#5fb0c0"},{"points":[[0,0,2.0],[0.0,15.0,5.0],[0,30,2.0]],"color":"#7a8aa0"}]} labels={[{"text":"Tauri shell (Rust)","at":[0,0,6.4],"size":3.4},{"text":"webview UI","at":[0,30,6.4],"size":3.4},{"text":"sidecar (Bun)","at":[40,15,6.4],"size":3.4},{"text":"SQLite (Drizzle)","at":[80,0,6.4],"size":3.4},{"text":"nikcli AI host","at":[80,30,6.4],"size":3.4},{"text":"plugins","at":[80,60,6.4],"size":3.4},{"text":"mobile app","at":[0,70,6.4],"size":3.4}]} height={400} />
+  </section>
   <DocRelated items={[
       { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },
       { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" },

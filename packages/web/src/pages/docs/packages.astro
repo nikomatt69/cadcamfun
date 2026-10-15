@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -11,7 +12,11 @@ const toc = [
   { title: "Extension packages", href: "#extensions" },
   { title: "HTTP client generator", href: "#codegen" },
   { title: "Application workspaces", href: "#apps" },
-  { title: "Documentation, assistant, and Studio", href: "#web" }
+  { title: "Documentation, assistant, and Studio", href: "#web" },
+  { title: "Workspace at a glance", href: "#package-matrix" },
+  { title: "Dependency graph", href: "#dep-graph" },
+  { title: "Scripts per workspace", href: "#package-scripts" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -42,6 +47,7 @@ const toc = [
     <p>The SDK's <code>src/index.ts</code> is the public application plugin entry point. It defines manifest and capability contracts and plugin authoring helpers. The runtime host lives in <code>apps/sidecar/src/plugins</code>; the SDK itself is not the host process.</p>
     <h3><code>@nikoemme_/cadcamfun-nikcli-plugin</code></h3>
     <p><code>packages/nikcli-plugin/src/index.ts</code> exports the standalone nikcli bridge. Unlike most workspaces, it is configured for public npm publication, currently at version <code>0.1.0</code>. It discovers actions from a running CADCAMFUN application and invokes them over authenticated HTTP. It does not embed the CAD kernel or an independent action catalogue.</p>
+    <p><code>@cadcamfun/plugin-sdk</code> implements plugin API major version <code>1</code>. Plugin identifiers are reverse-DNS names of 3–128 characters, such as <code>com.example.gear-generator</code>, and versions follow <code>major.minor.patch</code> with an optional pre-release suffix (<code>packages/plugin-sdk/src/manifest.ts</code>).</p>
   </section>
 
   <section id="codegen" class="doc-section">
@@ -50,6 +56,7 @@ const toc = [
     <p>Other exports include compatibility emitters, transport error mapping, <code>write</code>, and <code>generate</code>. Unsupported contract shapes raise <code>GenerationError</code>. The application generation script records endpoint exclusions explicitly for shared and Promise-only limitations.</p>
     <p><code>packages/api/scripts/generate-clients.ts</code> writes <code>src/sdk/generated</code> and <code>src/client/generated</code>. Its drift check generates into a temporary directory and compares file names and contents with committed output.</p>    <DocCode language="bash" title="Repository root">{`bun run generate
 bun run generate:check`}</DocCode>
+    <p>The generated output lives in <code>packages/api/src/client/generated</code> and <code>packages/api/src/sdk/generated</code>. Run <code>bun run generate</code> after changing a contract, and <code>bun run generate:check</code> to confirm the committed output is current.</p>
   </section>
 
   <section id="apps" class="doc-section">
@@ -90,4 +97,66 @@ bun run --filter @cadcamfun/web build`}</DocCode>
     <p>Most library packages are private workspaces exporting TypeScript source; their presence in the monorepo does not imply a separately published npm distribution. The nikcli bridge has explicit publication metadata. Use the <a href="/docs/api">HTTP reference</a> for integrations that should remain independent of internal package layout.</p>
   </section>
 
-</DocsLayout>
+  <section id="package-matrix" class="doc-section">
+    <h2>Workspace at a glance</h2>
+    <table>
+      <thead><tr><th>Workspace</th><th>Package</th><th>Internal deps</th><th>Source files</th><th>Lines</th><th>Test files</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td><code>packages/core</code></td><td><code>@cadcamfun/core</code></td><td>—</td><td>307</td><td>70,774</td><td>106</td><td>Geometry kernel: <code>cad/</code> (80 files), <code>cam/</code> (110), <code>drawing/</code> (7)</td></tr>
+        <tr><td><code>packages/ai</code></td><td><code>@cadcamfun/ai</code></td><td>api, core</td><td>196</td><td>22,579</td><td>83</td><td>Assistant: actions, embedded host, prompts, skills, tools</td></tr>
+        <tr><td><code>packages/api</code></td><td><code>@cadcamfun/api</code></td><td>core, httpapi-codegen</td><td>64</td><td>18,388</td><td>9</td><td>HttpApi contract, errors, Effect and Promise clients</td></tr>
+        <tr><td><code>packages/db</code></td><td><code>@cadcamfun/db</code></td><td>—</td><td>7</td><td>1,730</td><td>2</td><td>SQLite + Drizzle, migrations, backups</td></tr>
+        <tr><td><code>packages/vcs</code></td><td><code>@cadcamfun/vcs</code></td><td>—</td><td>10</td><td>1,133</td><td>1</td><td>Content-addressed project history and merge</td></tr>
+        <tr><td><code>packages/workflow</code></td><td><code>@cadcamfun/workflow</code></td><td>—</td><td>5</td><td>320</td><td>1</td><td>Workflow file schema and run semantics</td></tr>
+        <tr><td><code>packages/plugin-sdk</code></td><td><code>@cadcamfun/plugin-sdk</code></td><td>core</td><td>9</td><td>952</td><td>2</td><td>Plugin manifest, capabilities, test host</td></tr>
+        <tr><td><code>packages/httpapi-codegen</code></td><td><code>@cadcamfun/httpapi-codegen</code></td><td>—</td><td>13</td><td>4,330</td><td>2</td><td>Client generator for HttpApi contracts</td></tr>
+        <tr><td><code>packages/nikcli-plugin</code></td><td><code>@nikoemme_/cadcamfun-nikcli-plugin</code></td><td>—</td><td>5</td><td>359</td><td>2</td><td>Plugin that exposes CADCAMFUN to the nikcli agent</td></tr>
+        <tr><td><code>packages/web</code></td><td><code>@cadcamfun/web</code></td><td>db</td><td>84</td><td>12,991</td><td>3</td><td>This documentation site, Studio, docs assistant</td></tr>
+        <tr><td><code>apps/sidecar</code></td><td><code>@cadcamfun/sidecar</code></td><td>ai, api, core, db, plugin-sdk, vcs, workflow</td><td>172</td><td>20,797</td><td>73</td><td>Local HTTP server: <code>http/</code> (34), <code>repos/</code> (24), <code>services/</code> (29)</td></tr>
+        <tr><td><code>apps/desktop</code></td><td><code>@cadcamfun/desktop</code></td><td>api, core</td><td>557</td><td>85,579</td><td>104</td><td>SolidJS webview (<code>features/</code> 280 files) + Rust shell in <code>src-tauri/</code></td></tr>
+        <tr><td><code>apps/mobile</code></td><td><code>@cadcamfun/mobile</code></td><td>api</td><td>79</td><td>7,637</td><td>7</td><td>Expo iOS companion</td></tr>
+        </tbody>
+    </table>
+    <p>Counts are TypeScript, TSX, Rust and Astro files tracked in git, measured on this branch; test files are <code>*.test.ts(x)</code>. Internal dependencies omit the <code>@cadcamfun/</code> prefix.</p>
+  </section>
+
+  <section id="dep-graph" class="doc-section">
+    <h2>Dependency graph</h2>
+    <svg viewBox="0 0 760 300" width="100%" role="img" aria-label="Workspace dependency graph" style="max-width:760px;font:12px system-ui">
+<defs><marker id="pkar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+<g fill="none" stroke="currentColor" stroke-width="1.2">
+<rect x="20" y="20" width="120" height="34" rx="6"/><rect x="320" y="20" width="120" height="34" rx="6"/><rect x="620" y="20" width="120" height="34" rx="6"/>
+<rect x="20" y="130" width="100" height="34" rx="6"/><rect x="140" y="130" width="100" height="34" rx="6"/><rect x="260" y="130" width="100" height="34" rx="6"/><rect x="380" y="130" width="100" height="34" rx="6"/><rect x="500" y="130" width="100" height="34" rx="6"/><rect x="620" y="130" width="120" height="34" rx="6"/>
+<rect x="250" y="240" width="120" height="34" rx="6"/><rect x="430" y="240" width="140" height="34" rx="6"/>
+<g opacity=".7" marker-end="url(#pkar)"><path d="M380 54L70 128"/><path d="M380 54L190 128"/><path d="M380 54L310 128"/><path d="M380 54L430 128"/><path d="M380 54L550 128"/><path d="M380 54L680 128"/><path d="M380 54L310 238"/>
+<path d="M80 54L310 238"/><path d="M80 54L190 128"/><path d="M680 54L190 128"/>
+<path d="M190 164L310 238"/><path d="M310 164L310 238"/><path d="M262 147L242 147"/><path d="M190 164L495 240"/><path d="M680 164L310 240"/><path d="M190 164L250 252"/></g></g>
+<g fill="currentColor" text-anchor="middle"><text x="80" y="42">desktop</text><text x="380" y="42">sidecar</text><text x="680" y="42">mobile</text>
+<text x="70" y="152">db</text><text x="190" y="152">api</text><text x="310" y="152">ai</text><text x="430" y="152">vcs</text><text x="550" y="152">workflow</text><text x="680" y="152">plugin-sdk</text>
+<text x="310" y="262">core</text><text x="500" y="262">httpapi-codegen</text></g></svg>
+    <p>Arrows point from a workspace to what it imports. <code>core</code> has no internal dependencies, so geometry and CAM can be tested and reused without a server. Only the sidecar touches the database; the desktop and mobile apps reach data through <code>api</code>. <code>plugin-sdk</code> also depends on <code>core</code> (not drawn).</p>
+  </section>
+
+  <section id="package-scripts" class="doc-section">
+    <h2>Scripts per workspace</h2>
+    <table>
+      <thead><tr><th>Workspace</th><th>Scripts</th></tr></thead>
+      <tbody>
+        <tr><td>root</td><td><code>typecheck</code>, <code>test</code>, <code>build</code>, <code>build:sidecar</code>, <code>build:desktop</code>, <code>desktop:dev</code>, <code>generate</code>, <code>generate:check</code>, <code>db:generate</code>, <code>db:migrate</code></td></tr>
+        <tr><td><code>packages/api</code></td><td><code>typecheck</code>, <code>coverage</code>, <code>generate</code>, <code>generate:check</code></td></tr>
+        <tr><td><code>packages/db</code></td><td><code>typecheck</code>, <code>generate</code>, <code>migrate</code></td></tr>
+        <tr><td><code>packages/web</code></td><td><code>dev</code>, <code>start</code>, <code>studio</code>, <code>build</code>, <code>preview</code>, <code>deploy</code>, <code>astro</code>, <code>check</code>, <code>check:docs-index</code>, <code>typecheck</code>, <code>generate:api-reference</code>, <code>check:api-reference</code></td></tr>
+        <tr><td><code>apps/desktop</code></td><td><code>typecheck</code>, <code>dev</code>, <code>build</code>, <code>stub-sidecar</code>, <code>tauri</code>, <code>tauri:dev</code>, <code>tauri:build</code></td></tr>
+        <tr><td><code>apps/mobile</code></td><td><code>start</code>, <code>ios</code>, <code>dev</code>, <code>ios:build</code>, <code>ios:release</code>, <code>ios:dev</code>, <code>web</code>, <code>native:generate</code>, <code>typecheck</code>, <code>build</code>, <code>test</code></td></tr>
+        <tr><td><code>apps/sidecar</code></td><td><code>typecheck</code>, <code>start</code></td></tr>
+        <tr><td>other packages</td><td><code>typecheck</code></td></tr>
+        </tbody>
+    </table>
+    <p>The root <code>typecheck</code> runs every workspace's <code>typecheck</code> through turbo and then checks the root project. The root <code>test</code> runs <code>bun test packages apps scripts</code>.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Packages and their workspace dependencies" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
+  </DocsLayout>

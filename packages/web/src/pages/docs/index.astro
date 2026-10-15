@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -11,7 +12,11 @@ const toc = [
   { title: "Design to machining", href: "#workflow" },
   { title: "Runtime components", href: "#layout" },
   { title: "Start development", href: "#commands" },
-  { title: "Contracts and persistence", href: "#boundaries" }
+  { title: "Contracts and persistence", href: "#boundaries" },
+  { title: "CADCAMFUN by the numbers", href: "#by-the-numbers" },
+  { title: "What's new", href: "#whats-new" },
+  { title: "Next steps", href: "#next-steps" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -89,4 +94,54 @@ bun run --filter @cadcamfun/web dev`}</DocCode>
     <p>For extensions and teamwork, use <a href="/docs/guides/plugin-authoring">plugin authoring</a> and <a href="/docs/guides/project-history">branches, reviews, and workflows</a>. These guides document supported module exports, current host behavior, structural merge rules, committed workflow inputs, and service-backed side effects.</p>
   </section>
 
-</DocsLayout>
+  <section id="by-the-numbers" class="doc-section">
+    <h2>CADCAMFUN by the numbers</h2>
+    <table>
+      <thead><tr><th>Measure</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Application version</td><td>6.0.0</td></tr>
+        <tr><td>HTTP operations / resource groups</td><td>270 / 34</td></tr>
+        <tr><td>Database tables / migrations</td><td>60 / 4</td></tr>
+        <tr><td>Workspaces</td><td>10 packages, 3 apps</td></tr>
+        <tr><td>Desktop release targets</td><td>6 (macOS, Windows and Linux, each x64 and ARM64)</td></tr>
+        <tr><td>G-code post dialects</td><td>generic, GRBL, Fanuc, Haas (LinuxCNC name reserved)</td></tr>
+        <tr><td>Native CAM strategies</td><td>face, adaptive, pocket, profile, bore, drill, thread, engrave, chamfer, surface</td></tr>
+        <tr><td>Kernel evidence claims</td><td>10, from cutting data to NC replay and machine clearance</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="whats-new" class="doc-section">
+    <h2>What's new</h2>
+    <p>Recent work on the main branch, summarised from the commit history:</p>
+    <ul>
+      <li><strong>Exact kernel on the sidecar.</strong> A <code>cadExact</code> group (<code>analyze</code>, <code>step</code>, <code>assembly</code>) runs a shared scene analysis from core: per-solid validity, mass, holes, interference, bill of materials and missing fasteners.</li>
+      <li><strong>Exact modelling.</strong> Sweeps and sweep shells, lofts with rational ruled columns, push-pull and mate on exact faces, and fillets about 2.5× faster.</li>
+      <li><strong>NC subprograms.</strong> Repeated toolpaths are written once as an incremental <code>M98</code> subprogram; replay understands <code>O</code>-programs, <code>M98</code>/<code>M99</code> and <code>G91</code>. Wired end to end from the snapshot to the desktop switch.</li>
+      <li><strong>CAM from B-rep.</strong> The planner reads holes, pockets and outlines from exact solids, including STEP parts and rotated parts; volumetric stock removal works along a tilted tool axis.</li>
+      <li><strong>Assistant hardening.</strong> Every action declares its result schema; destructive tools always need a human; each turn is bound to its drawing with compare-and-swap writes; a durable background-task journal; kernel jobs in a worker.</li>
+      <li><strong>Documentation.</strong> This Astro site with a generated API reference for every operation.</li>
+    </ul>
+  </section>
+
+  <section id="next-steps" class="doc-section">
+    <h2>Next steps</h2>
+    <table>
+      <thead><tr><th>If you want to…</th><th>Go to</th></tr></thead>
+      <tbody>
+        <tr><td>Run the app from source</td><td><a href="/docs/guides/quickstart">Quickstart</a>, then <a href="/docs/guides/local-dev">Local development</a></td></tr>
+        <tr><td>Understand the processes</td><td><a href="/docs/architecture">Architecture</a> and <a href="/docs/sidecar">Sidecar</a></td></tr>
+        <tr><td>Model a part</td><td><a href="/docs/cad">CAD</a> and <a href="/docs/viewport">Viewport</a></td></tr>
+        <tr><td>Generate G-code</td><td><a href="/docs/cam">CAM</a> and <a href="/docs/guides/native-manufacturing">Native manufacturing</a></td></tr>
+        <tr><td>Call the API</td><td><a href="/docs/guides/api-tour">API tour</a> and <a href="/docs/guides/api-clients">API clients</a></td></tr>
+        <tr><td>Extend the app</td><td><a href="/docs/guides/plugin-authoring">Plugin authoring</a></td></tr>
+        <tr><td>Contribute</td><td><a href="/docs/guides/contributing">Contributing</a></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="The monorepo at a glance" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
+  </DocsLayout>

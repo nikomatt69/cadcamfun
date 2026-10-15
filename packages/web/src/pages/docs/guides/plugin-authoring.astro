@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -17,6 +18,11 @@ const toc = [
   { title: "Design around the implemented worker lifecycle", href: "#lifecycle" },
   { title: "Keep runtime guarantees in proportion", href: "#runtime-limits" },
   { title: "Update, remove, and diagnose a tool", href: "#maintenance" },
+  { title: "Contract rules at a glance", href: "#contract-rules" },
+  { title: "Pre-release checklist", href: "#release-checklist" },
+  { title: "Troubleshooting matrix", href: "#authoring-troubleshooting" },
+  { title: "Lint a manifest before installing", href: "#manifest-lint" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -186,6 +192,7 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
 <p>The production loader supplies a 10-second host budget for ordinary lifecycle/command RPC. AI tool calls have a separate 30-second deadline. The host limits a plugin to 2,000 calls per minute and 64 pending calls. It passes a 256 MB resource-limit setting to Bun when creating the worker. These are runtime controls, not a separate process or operating-system containment policy.</p>
     <p>The bootstrap starts with an empty environment and attempts to delete selected process/network globals. Deletion is best-effort and some Bun globals remain reachable. Capability checking is therefore meaningful for the APIs the host supplies, but cannot be presented as complete isolation of arbitrary JavaScript.</p>
     <p>Optional signature and dev fields exist in the manifest schema. The current worker installation path records signature text without cryptographic verification. Do not label a publisher verified because that field is present. A self-contained source review and installation policy remain separate decisions from schema acceptance.</p>
+    <p>Plugins that crash three times within ten minutes are disabled automatically, and an assistant tool call is stopped after 30 seconds. Both values are constants in <code>apps/sidecar/src/plugins/host.ts</code>.</p>
   </section>
 
   <section id="maintenance" class="doc-section">
@@ -195,5 +202,77 @@ console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`
     <p>Focused coverage is in <code>apps/sidecar/test/plugins-ai-tools.test.ts</code> for actual workers and <code>ai-plugin-tools.test.ts</code> for production loading, argument validation, read/write exposure, and bridge behavior. Implementation sources are <code>packages/plugin-sdk/src/manifest.ts</code>, <code>packages/ai/src/tools/plugin-tool.ts</code>, <code>apps/sidecar/src/plugins/host.ts</code>, and <code>services/ai-plugins.ts</code>. Use these boundaries to determine what a successful test actually proved.</p>
   </section>
 
+    <section id="contract-rules" class="doc-section">
+    <h2>Contract rules at a glance</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Constraint</th><th>What happens if violated</th></tr></thead>
+      <tbody>
+        <tr><td>Tool <code>id</code></td><td><code>^[a-z][a-z0-9_]&#123;0,39&#125;$</code></td><td>Manifest decode fails; the plugin is not loaded.</td></tr>
+        <tr><td><code>description</code></td><td>10–2,000 characters</td><td>Manifest decode fails.</td></tr>
+        <tr><td><code>kind</code></td><td><code>read</code> or <code>write</code>; there is no destructive kind</td><td>Manifest decode fails.</td></tr>
+        <tr><td><code>parameters</code></td><td>JSON Schema object, at most 20,000 characters when serialized</td><td>Oversized or unconvertible schemas fall back to accepting any object.</td></tr>
+        <tr><td>Capabilities</td><td>Only <code>ai:tool</code> in the assistant host</td><td>The plugin is skipped with a warning.</td></tr>
+        <tr><td>Folder name</td><td>Equal to the manifest <code>id</code></td><td>The plugin is skipped with a warning naming both values.</td></tr>
+        <tr><td>Ordinary call budget</td><td>5 s per call by default</td><td>The worker is stopped like any unresponsive plugin.</td></tr>
+        <tr><td>Assistant tool call budget</td><td>30 s</td><td>The call returns a failure result.</td></tr>
+        <tr><td>Memory</td><td>256 MB heap</td><td>The worker is killed.</td></tr>
+        <tr><td>Rate</td><td>2,000 calls per plugin per minute, 64 pending calls</td><td>Calls over the rate are refused; a full queue fails with <code>plugin RPC queue is full</code>.</td></tr>
+        <tr><td>Crashes and timeouts</td><td>Counted over 10 minutes, limit 3</td><td>Each crash or timeout terminates the worker and marks the plugin faulted.</td></tr>
+        </tbody>
+    </table>
+    <p>Write the description for the model. State what the tool computes, its units, and when to use it; for example, "Returns hole centres of a bolt circle in millimetres. Use when the user asks for evenly spaced holes on a diameter." Vague descriptions lead to tools being called at the wrong time or not at all.</p>
+  </section>
+
+  <section id="release-checklist" class="doc-section">
+    <h2>Pre-release checklist</h2>
+    <ol>
+      <li>Bundle the entry into a single self-contained module. The worker cannot resolve workspace imports at runtime.</li>
+      <li>Run <code>parseManifest</code> on the final <code>plugin.json</code> and fix every reported issue.</li>
+      <li>Call each exported tool function directly with valid, boundary, and invalid arguments, and confirm that invalid input produces a readable error result rather than an exception that escapes.</li>
+      <li>Keep results small and JSON-compatible. The assistant reads them, and large outputs crowd the context.</li>
+      <li>Choose <code>read</code> unless the tool changes something. A <code>write</code> tool prompts the user before every call.</li>
+      <li>Place the folder under <code>&lt;data dir&gt;/plugins/&lt;id&gt;/</code>, add the ID to <code>enabled.json</code>, restart the sidecar, and confirm the derived tool ID from the assistant's tool listing.</li>
+      <li>Bump <code>version</code> for every change you ship, and keep <code>id</code> stable so the derived tool ID does not change.</li>
+    </ol>
+  </section>
+
+  <section id="authoring-troubleshooting" class="doc-section">
+    <h2>Troubleshooting matrix</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Tool never appears</td><td>ID missing from <code>enabled.json</code>, or the JSON is malformed</td><td>Fix the array; malformed or missing JSON enables nothing.</td></tr>
+        <tr><td>Log says the folder is named X but the manifest says Y</td><td>Folder and manifest <code>id</code> differ</td><td>Rename one so they match exactly.</td></tr>
+        <tr><td>Log says it asks for drawing:read, ...</td><td>Unsupported capability in this host</td><td>Declare only <code>ai:tool</code>.</td></tr>
+        <tr><td>Assistant passes unexpected argument shapes</td><td>Schema fell back to any object</td><td>Use an object schema with <code>properties</code> under 20,000 characters, and validate inside the function too.</td></tr>
+        <tr><td>Calls return <code>ok: false</code> after about 30 s</td><td>Tool exceeded its time budget</td><td>Do less work per call or precompute; avoid unbounded loops.</td></tr>
+        <tr><td>Plugin stops answering after an error</td><td>A worker crash or timeout terminates the worker and marks the plugin <code>faulted</code>; crashes are also counted over a 10-minute window with a limit of 3</td><td>Fix the crash, then restart the sidecar to load it again.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+    <section id="manifest-lint" class="doc-section">
+    <h2>Lint a manifest before installing</h2>
+    <DocCode language="ts" title="check-manifest.ts">
+{"import { decodeManifest, requestedCapabilities } from \u0022@cadcamfun/plugin-sdk\u0022\nimport { Effect } from \u0022effect\u0022\n\nconst raw = JSON.parse(await Bun.file(process.argv[2] ?? \u0022plugin.json\u0022).text())\nconst manifest = await Effect.runPromise(decodeManifest(raw))   // throws a SchemaError naming the bad field\nconsole.log(manifest.id, manifest.version, requestedCapabilities(manifest))\nfor (const tool of manifest.contributes?.aiTools ?? [])\n  console.log(`plugin_${manifest.id}_${tool.id}`, tool.kind)"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Common mistake</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>"version": "1.0"</code></td><td>Use three numbers: <code>1.0.0</code></td></tr>
+        <tr><td><code>"apiVersion": 1</code></td><td>It is a string: <code>"1"</code></td></tr>
+        <tr><td>Plugin id <code>gear</code> or <code>My.Plugin</code></td><td>Reverse-DNS, lower case: <code>com.example.gear</code></td></tr>
+        <tr><td>Tool id <code>Lookup-Thread</code></td><td>Lower case, digits and underscores, letter first, ≤ 40 characters</td></tr>
+        <tr><td>Tool description shorter than 10 characters</td><td>Describe what it does and when to use it</td></tr>
+        <tr><td>Declaring both <code>drawing:read</code> and <code>drawing:write</code></td><td>Allowed, but <code>drawing:write</code> alone already implies read</td></tr>
+        <tr><td>Storage key starting with <code>/</code> or containing <code>..</code></td><td>Use relative keys such as <code>presets/m2</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Plugin tables" caption="PluginRegistryEntry and PluginConfiguration from the migrations: configurations reference registry entries." solids={[{"kind":"box","size":[12,5,3],"at":[-6.0,-2.5,10],"color":"#e0a030"},{"kind":"box","size":[12,5,3],"at":[30.0,-2.5,0],"color":"#8aa4c8"},{"kind":"box","size":[12,5,3],"at":[-42.0,-2.4999999999999956,0],"color":"#8aa4c8"}]} paths={[{"points":[[0.0,0,11.5],[-18.0,2.204364238465236e-15,14.5],[-36.0,4.408728476930472e-15,1.5]],"color":"#2fbf71"}]} labels={[{"text":"PluginConfiguration","at":[0.0,0,15.4],"size":3.2},{"text":"MCPServerConfig","at":[36.0,0.0,5.4],"size":3.2},{"text":"PluginRegistryEntry","at":[-36.0,4.408728476930472e-15,5.4],"size":3.2}]} height={340} />
+  </section>
   <DocRelated items={[{ title: "Plugin reference", href: "/docs/plugins" }, { title: "AI action API", href: "/docs/api/ai" }, { title: "Streaming client", href: "/docs/guides/ai-streaming" }, { title: "Browser plugin API", href: "/docs/api/plugins" }]} />
 </DocsLayout>

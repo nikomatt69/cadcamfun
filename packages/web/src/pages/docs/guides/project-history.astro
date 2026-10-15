@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
@@ -16,6 +17,11 @@ const toc = [
   { title: "Open, review, and merge a proposal", href: "#pull-request" },
   { title: "Restore content without rewriting history", href: "#restore" },
   { title: "Mirror committed history and recover conflicts", href: "#remote" },
+  { title: "How reviews decide a merge", href: "#pr-review-rules" },
+  { title: "Restore recipes", href: "#history-recipes" },
+  { title: "A complete review session, captured", href: "#captured-session" },
+  { title: "Review and query fields", href: "#review-fields" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -25,6 +31,7 @@ const toc = [
 <p>Saving a project, drawing, or toolpath updates the SQLite working copy. Creating a project commit snapshots the working resources into Git-compatible objects and moves the current branch ref. Those are separate operations: a saved drawing can be uncommitted, and a committed program can remain local without any remote mirror.</p>
     <p>The sidecar's history service builds one canonical JSON file per resource. The tree includes project.json, drawings, components, toolpaths, referenced materials/tools/machine configurations, and production costs. Workflow YAML and other carried non-entity text live in the repository tree, rather than ordinary drawing records. A change to one entity does not require treating the entire database as an opaque binary diff.</p>
     <p>Choose a disposable or intended project before following the mutating examples. Set <code>PROJECT_ID</code> to its real identifier and use a current connection URL/application bearer. Project history and workflow endpoints are documented in the <a href="/docs/api/history">history API reference</a>; project metadata writes use the <a href="/docs/api/projects">projects API</a>.</p>
+    <p>Objects use git's byte-exact loose-object format, so commit and tree IDs match what <code>git</code> computes for the same content. Branch references live under <code>refs/heads/</code>, and the default branch is <code>main</code>.</p>
   </section>
 
   <section id="access" class="doc-section">
@@ -162,5 +169,74 @@ const encoded = JSON.stringify(body)`}
     <p>Source provenance: <code>packages/vcs/src/repository.ts</code>, <code>json.ts</code>, <code>snapshot.ts</code>, <code>github.ts</code>; <code>apps/sidecar/src/services/project-vcs.ts</code>, <code>repos/project-vcs-repo.ts</code>, and <code>http/vcs.ts</code>; workflow schema/runner in <code>packages/workflow/src</code> and sidecar <code>workflow-runner.ts</code>/<code>workflow-steps.ts</code>.</p>
   </section>
 
+    <section id="pr-review-rules" class="doc-section">
+    <h2>How reviews decide a merge</h2>
+    <ol>
+      <li>Open a pull request from a feature branch (an AI actor must use an <code>ai/*</code> branch) into <code>main</code>.</li>
+      <li>Reviewers submit <code>comment</code>, <code>approve</code>, or <code>request-changes</code>, optionally anchored to a file <code>path</code> and a JSON <code>pointer</code>.</li>
+      <li>At merge time, the service takes each reviewer's latest non-comment verdict. If any of them is <code>request-changes</code>, the merge fails with <code>blocked</code>: "A reviewer requested changes".</li>
+      <li>If the base branch is checked out, its working copy must be clean.</li>
+      <li>The merge is three-way per JSON property. Conflicts are returned with their paths and pointers, and nothing is committed.</li>
+      <li>Workflows with <code>on.pullRequest</code> matching the base branch run when the pull request is opened, so their results are available during review.</li>
+    </ol>
+    <table>
+      <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td><code>blocked</code> for an AI actor on <code>main</code></td><td>Commit on an <code>ai/*</code> branch and open a pull request; a person merges it.</td></tr>
+        <tr><td><code>conflict</code> on <code>/width</code> of <code>drawings/d1.json</code></td><td>Decide the value on one branch, commit, and merge again.</td></tr>
+        <tr><td><code>dirty</code></td><td>Commit or discard local edits first; automated steps never absorb unfinished work.</td></tr>
+        <tr><td><code>nothing-to-commit</code></td><td>The saved resources already match the last commit.</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="history-recipes" class="doc-section">
+    <h2>Restore recipes</h2>
+    <DocCode language="ts" title="Restore without rewriting history">
+{"// Bring back one drawing as it was three commits ago\nconst old = repo.log()[3].oid\nrepo.restorePaths(old, [\u0022drawings/d1.json\u0022], me, \u0022Restore plate outline\u0022)\n\n// Make the whole tree equal to an older commit (a new commit on top)\nrepo.revertTo(old, me)               // message defaults to \u0022Restore <rev>\u0022\n\n// Who changed a toolpath, most recent first\nrepo.fileLog(\u0022toolpaths/op1.json\u0022).map((e) => e.message)"}
+    </DocCode>
+    <p>Both restore operations add a new commit, so the older state can itself be undone and the history stays shareable. Restoring a toolpath file without the material or tool it references can leave dangling references; restore those library files in the same call.</p>
+  </section>
+
+    <section id="captured-session" class="doc-section">
+    <h2>A complete review session, captured</h2>
+    <p>Every response below was captured from a running sidecar on a fresh project (ids shortened). Paths are relative to <code>/api/projects/&#123;id&#125;/</code>.</p>
+    <DocCode language="text" title="branch → change → diff → PR → review → merge">
+{"# fresh project with one drawing\nGET  vcs/status\n{\u0022branch\u0022:\u0022main\u0022,\u0022head\u0022:null,\u0022dirty\u0022:[\u0022drawings/2f315a02-\u2026.json\u0022,\u0022project.json\u0022]}\n\nPOST vcs/commit       {\u0022message\u0022:\u0022Baseline\u0022}\n{\u0022oid\u0022:\u00228bdded63\u2026\u0022,\u0022parents\u0022:[],\u0022message\u0022:\u0022Baseline\\n\u0022,\u0022author\u0022:{\u0022name\u0022:\u0022Local user\u0022,\u2026}}\n\nPOST vcs/branches     {\u0022name\u0022:\u0022thicker\u0022}\n{\u0022current\u0022:\u0022main\u0022,\u0022branches\u0022:{\u0022main\u0022:\u00228bdded63\u2026\u0022,\u0022thicker\u0022:\u00228bdded63\u2026\u0022}}\n\nPOST vcs/checkout     {\u0022branch\u0022:\u0022thicker\u0022}\n{\u0022branch\u0022:\u0022thicker\u0022,\u0022head\u0022:\u00228bdded63\u2026\u0022,\u0022dirty\u0022:[]}\n\nPUT  /api/drawings/{id}  {\u0022name\u0022:\u0022Plate 12mm\u0022}\nGET  vcs/status\n{\u0022branch\u0022:\u0022thicker\u0022,\u0022head\u0022:\u00228bdded63\u2026\u0022,\u0022dirty\u0022:[\u0022drawings/2f315a02-\u2026.json\u0022]}\n\nPOST vcs/commit       {\u0022message\u0022:\u0022Rename plate\u0022}\n{\u0022oid\u0022:\u0022a6869011\u2026\u0022,\u0022parents\u0022:[\u00228bdded63\u2026\u0022],\u2026}\n\nGET  vcs/diff?from=main&to=thicker\n[{\u0022path\u0022:\u0022drawings/2f315a02-\u2026.json\u0022,\u0022kind\u0022:\u0022drawings\u0022,\u0022id\u0022:\u00222f315a02-\u2026\u0022,\u0022name\u0022:\u0022Plate 12mm\u0022,\n  \u0022status\u0022:\u0022modified\u0022,\u0022changes\u0022:[\n    {\u0022pointer\u0022:\u0022/name\u0022,\u0022before\u0022:\u0022Plate\u0022,\u0022after\u0022:\u0022Plate 12mm\u0022},\n    {\u0022pointer\u0022:\u0022/updatedAt\u0022,\u0022before\u0022:\u0022\u202609:20.069Z\u0022,\u0022after\u0022:\u0022\u202609:20.168Z\u0022}]}]\n\nPOST pulls            {\u0022title\u0022:\u0022Thicker plate\u0022,\u0022head\u0022:\u0022thicker\u0022,\u0022base\u0022:\u0022main\u0022}\n{\u0022number\u0022:1,\u0022state\u0022:\u0022open\u0022,\u0022authorKind\u0022:\u0022user\u0022,\u0022mergeCommit\u0022:null,\u2026}\n\nPOST pulls/1/reviews  {\u0022verdict\u0022:\u0022approve\u0022,\u0022body\u0022:\u0022Looks good\u0022}\n{\u0022verdict\u0022:\u0022approve\u0022,\u0022body\u0022:\u0022Looks good\u0022,\u0022path\u0022:null,\u0022pointer\u0022:null,\u2026}\n\nPOST pulls/1/merge\n{\u0022number\u0022:1,\u0022state\u0022:\u0022merged\u0022,\u0022mergeCommit\u0022:\u0022a6869011\u2026\u0022,\u2026}\n\nPOST pulls/1/merge    (again)\n{\u0022_tag\u0022:\u0022BadRequest\u0022,\u0022message\u0022:\u0022Pull request is not open\u0022}"}
+    </DocCode>
+    <table>
+      <thead><tr><th>What you see</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td><code>head: null</code> before the first commit</td><td>The repository exists but has no commits yet; every resource is dirty</td></tr>
+        <tr><td>Dirty paths such as <code>drawings/&lt;id&gt;.json</code>, <code>project.json</code></td><td>The working copy is serialised as one JSON file per resource</td></tr>
+        <tr><td>A new branch points at the current head</td><td>Without <code>from</code>, the branch starts at the current head</td></tr>
+        <tr><td>Diff changes are JSON pointers</td><td>Changes are reported per property (<code>/name</code>), not per line</td></tr>
+        <tr><td><code>updatedAt</code> also changed</td><td>Timestamps are versioned with the resource, so every save shows up</td></tr>
+        <tr><td><code>mergeCommit</code> equals the branch head</td><td><code>main</code> had not moved, so the merge fast-forwarded</td></tr>
+        <tr><td>Merging twice → 400</td><td>Only open pull requests can be merged or closed</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="review-fields" class="doc-section">
+    <h2>Review and query fields</h2>
+    <table>
+      <thead><tr><th>Request</th><th>Fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST pulls/&#123;number&#125;/reviews</code></td><td><code>verdict</code> (required): <code>comment</code>, <code>approve</code> or <code>request-changes</code>; optional <code>body</code>, and <code>path</code> + <code>pointer</code> to anchor the review on one property. Any other verdict is rejected with 400.</td></tr>
+        <tr><td><code>GET pulls/&#123;number&#125;</code></td><td>Returns <code>pullRequest</code>, its <code>reviews</code> and the structural <code>changes</code> between base and head</td></tr>
+        <tr><td><code>GET pulls?state=…</code></td><td>Filter the list by state</td></tr>
+        <tr><td><code>GET vcs/log?rev=&amp;limit=&amp;path=</code></td><td>History from a revision, limited, optionally for one resource path</td></tr>
+        <tr><td><code>GET vcs/diff?from=&amp;to=</code></td><td>Structural diff between two revisions or branches</td></tr>
+        <tr><td><code>POST vcs/restore</code></td><td><code>rev</code> (required), optional <code>paths</code>. An unknown revision answers 404 <code>Unknown revision &lt;rev&gt;</code>.</td></tr>
+        <tr><td><code>GET/PUT vcs/remote</code>, <code>POST vcs/push</code>, <code>POST vcs/pull</code></td><td>Configure the mirror remote and push or pull a branch</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Commits, parents and merges" caption="The last 14 commits of origin/main from git log --format=%h|%p: each pull request branch commit (back lane) is merged into main (front lane, orange merge commits), then the docs commits. A project history in the app is the same kind of graph: commits with parents, refs pointing at them." solids={[{"kind":"box","size":[6,6,3],"at":[-3.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[7.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[17.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[27.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[37.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[47.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[57.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[67.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[77.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[87.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[97.0,13.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[107.0,-3.0,0],"color":"#e0a030"},{"kind":"box","size":[6,6,3],"at":[117.0,-3.0,0],"color":"#8aa4c8"},{"kind":"box","size":[6,6,3],"at":[127.0,-3.0,0],"color":"#8aa4c8"}]} paths={[{"points":[[0,16,1.5],[5.0,8.0,4.5],[10,0,1.5]],"color":"#2fbf71"},{"points":[[10,0,1.5],[15.0,8.0,4.5],[20,16,1.5]],"color":"#2fbf71"},{"points":[[10,0,1.5],[20.0,0.0,4.5],[30,0,1.5]],"color":"#7a8aa0"},{"points":[[20,16,1.5],[25.0,8.0,4.5],[30,0,1.5]],"color":"#2fbf71"},{"points":[[30,0,1.5],[35.0,8.0,4.5],[40,16,1.5]],"color":"#2fbf71"},{"points":[[30,0,1.5],[40.0,0.0,4.5],[50,0,1.5]],"color":"#7a8aa0"},{"points":[[40,16,1.5],[45.0,8.0,4.5],[50,0,1.5]],"color":"#2fbf71"},{"points":[[50,0,1.5],[55.0,8.0,4.5],[60,16,1.5]],"color":"#2fbf71"},{"points":[[50,0,1.5],[60.0,0.0,4.5],[70,0,1.5]],"color":"#7a8aa0"},{"points":[[60,16,1.5],[65.0,8.0,4.5],[70,0,1.5]],"color":"#2fbf71"},{"points":[[70,0,1.5],[75.0,8.0,4.5],[80,16,1.5]],"color":"#2fbf71"},{"points":[[70,0,1.5],[80.0,0.0,4.5],[90,0,1.5]],"color":"#7a8aa0"},{"points":[[80,16,1.5],[85.0,8.0,4.5],[90,0,1.5]],"color":"#2fbf71"},{"points":[[90,0,1.5],[95.0,8.0,4.5],[100,16,1.5]],"color":"#2fbf71"},{"points":[[90,0,1.5],[100.0,0.0,4.5],[110,0,1.5]],"color":"#7a8aa0"},{"points":[[100,16,1.5],[105.0,8.0,4.5],[110,0,1.5]],"color":"#2fbf71"},{"points":[[110,0,1.5],[115.0,0.0,4.5],[120,0,1.5]],"color":"#2fbf71"},{"points":[[120,0,1.5],[125.0,0.0,4.5],[130,0,1.5]],"color":"#2fbf71"}]} labels={[{"text":"fd88a79","at":[0,16,5.4],"size":4},{"text":"b735c65 merge","at":[10,0,5.4],"size":4},{"text":"ccd10d4","at":[20,16,5.4],"size":4},{"text":"db4a937 merge","at":[30,0,5.4],"size":4},{"text":"271bd35","at":[40,16,5.4],"size":4},{"text":"7c69343 merge","at":[50,0,5.4],"size":4},{"text":"9e67ed7","at":[60,16,5.4],"size":4},{"text":"40f6509 merge","at":[70,0,5.4],"size":4},{"text":"427b218","at":[80,16,5.4],"size":4},{"text":"b9c56cd merge","at":[90,0,5.4],"size":4},{"text":"23db23e","at":[100,16,5.4],"size":4},{"text":"43adb8a merge","at":[110,0,5.4],"size":4},{"text":"795925e","at":[120,0,5.4],"size":4},{"text":"00ef0c2","at":[130,0,5.4],"size":4}]} height={360} />
+  </section>
   <DocRelated items={[{ title: "History reference", href: "/docs/history" }, { title: "History endpoints", href: "/docs/api/history" }, { title: "Workflows", href: "/docs/workflows" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />
 </DocsLayout>

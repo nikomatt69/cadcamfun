@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
@@ -15,6 +16,10 @@ const toc = [
   { title: "Local Studio", href: "#studio" },
   { title: "Deployment", href: "#deployment" },
   { title: "Operational diagnosis", href: "#diagnosis" },
+  { title: "Scripts of the docs package", href: "#web-scripts" },
+  { title: "Writing a page", href: "#authoring" },
+  { title: "3D previews", href: "#viewer3d" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 <DocsLayout title="Documentation site operations" subtitle="Run the Astro site, maintain API and search content, export Markdown, configure assistant bindings, and understand the local Studio boundary." description="CADCAMFUN documentation operations: content ownership, API reference generation, Markdown export, Workers AI or nikcli assistant, capability-protected artifacts, Studio database selection, deployment, and troubleshooting." toc={toc}>
@@ -68,6 +73,7 @@ curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
     <p>Retrieval first scores the current question and earlier user questions against titles, routes, keywords, and summaries. The current known page is retained. When a Workers AI binding is available, an optional tool-call planner can select relevant documentation routes; invalid selections or planner failures fall back to lexical retrieval.</p>
     <p>Up to three pages are loaded. Each is condensed to a 5,000-character budget by retaining its introduction and matching sections. A long API resource page is therefore not automatically supplied in full to the model. Link the user to the relevant operation when the excerpt does not contain enough detail.</p>
     <p>Loaded Markdown is cached separately for 30 minutes when the Worker cache is available. A source edit can require cache refresh in an already-running deployment. If no selected page can be loaded, the route returns 502. If no Workers AI binding or complete nikcli backend configuration exists, it returns 503 before generation.</p>
+    <p>A single assistant request may carry at most 12 conversation messages, and a question is limited to 1,200 characters (<code>MAX_MESSAGES</code> and <code>MAX_QUESTION_CHARS</code> in <code>src/lib/docsAssistant.ts</code>).</p>
   </section>
   <section id="bindings" class="doc-section">
     <h2>Models and rate limits</h2>
@@ -118,6 +124,59 @@ curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
       <tr><td>Studio 503 in production</td><td>Expected fallback behavior; the deployed Worker is not the local Bun process.</td></tr>
     </tbody></table>
     <p>Implementation sources: <code>astro.config.mjs</code>, <code>wrangler.toml</code>, <code>script/dev.ts</code>, <code>script/deploy.ts</code>, <code>script/studio-server.ts</code>, <code>src/lib/docsMarkdown.ts</code>, <code>docsRetrieval.ts</code>, <code>nikcliDocsSession.ts</code>, <code>docsArtifact.ts</code>, and the route handlers under <code>src/pages</code>.</p>
+  </section>
+    <section id="web-scripts" class="doc-section">
+    <h2>Scripts of the docs package</h2>
+    <table>
+      <thead><tr><th>Script</th><th>Runs</th><th>Use it to</th></tr></thead>
+      <tbody>
+        <tr><td><code>dev</code></td><td><code>bun script/dev.ts</code></td><td>Start the site for local editing</td></tr>
+        <tr><td><code>start</code></td><td><code>astro dev</code></td><td>Plain Astro dev server</td></tr>
+        <tr><td><code>studio</code></td><td><code>bun script/studio-server.ts</code></td><td>Local Studio against <code>CADCAMFUN_DB</code>, <code>DATABASE_URL</code> or <code>data/cadcamfun.db</code></td></tr>
+        <tr><td><code>build</code> / <code>preview</code></td><td><code>astro build</code> / <code>astro preview</code></td><td>Produce and serve the production build</td></tr>
+        <tr><td><code>deploy</code></td><td><code>bun script/deploy.ts</code></td><td>Publish to Cloudflare</td></tr>
+        <tr><td><code>check</code></td><td><code>check:docs-index</code> then <code>check:api-reference</code></td><td>Fail when the search index or API reference is stale</td></tr>
+        <tr><td><code>typecheck</code></td><td><code>tsc --noEmit</code>, then <code>check</code></td><td>Type errors plus both freshness checks</td></tr>
+        <tr><td><code>generate:api-reference</code></td><td><code>script/generate-api-reference.mjs</code></td><td>Regenerate the reference after a contract change</td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="authoring" class="doc-section">
+    <h2>Writing a page</h2>
+    <ol>
+      <li>Create <code>src/pages/docs/&lt;slug&gt;.astro</code> using <code>DocsLayout</code> with <code>title</code>, <code>subtitle</code>, <code>description</code> and a <code>toc</code> array whose <code>href</code>s match section ids.</li>
+      <li>Write each section as <code>&lt;section id="…" class="doc-section"&gt;</code> with one <code>&lt;h2&gt;</code>.</li>
+      <li>Use <code>DocCode</code> (<code>language</code>, <code>title</code>) for code, <code>DocCallout</code> (<code>type</code> info, warn or note) for warnings, <code>DocCard</code> for link grids, <code>DocRelated</code> at the end, and <code>DocViewer3D</code> for 3D previews.</li>
+      <li>Escape literal braces in text as <code>&amp;#123;</code> and <code>&amp;#125;</code>; put code inside an expression such as <code>&#123;String.raw`…`&#125;</code>.</li>
+      <li>Add the page to the sidebar data and run <code>bun run typecheck</code>, which also rebuilds and checks the search index.</li>
+    </ol>
+    <DocCode language="astro" title="Minimal page">
+{"---\nexport const prerender = true\nimport DocsLayout from \u0022../../layouts/DocsLayout.astro\u0022\nimport DocCode from \u0022../../components/docs/DocCode.astro\u0022\nconst toc = [{ title: \u0022Overview\u0022, href: \u0022#overview\u0022 }]\n---\n<DocsLayout title=\u0022Example\u0022 subtitle=\u0022One line.\u0022 description=\u0022For search engines.\u0022 toc={toc}>\n  <section id=\u0022overview\u0022 class=\u0022doc-section\u0022>\n    <h2>Overview</h2>\n    <p>Text with an escaped brace: &#123;</p>\n    <DocCode language=\u0022bash\u0022 title=\u0022Run\u0022>{`bun run typecheck`}</DocCode>\n  </section>\n</DocsLayout>"}
+    </DocCode>
+    <DocCallout type="note" title="Verify every fact">
+      <p>Only document behaviour you can point to in the code, and run examples before pasting their output. The API reference is generated; hand-written pages are not.</p>
+    </DocCallout>
+  </section>
+
+  <section id="viewer3d" class="doc-section">
+    <h2>3D previews</h2>
+    <table>
+      <thead><tr><th>Prop</th><th>Type</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>title</code>, <code>caption</code></td><td>string</td><td>Heading and explanation under the canvas</td></tr>
+        <tr><td><code>solids</code></td><td>array</td><td><code>box</code> (<code>size</code>), <code>extrude</code> (<code>profile</code>, <code>holes</code>, <code>height</code>) or <code>cylinder</code> (<code>radius</code>, <code>height</code>), each with optional <code>at</code>, <code>color</code>, <code>opacity</code></td></tr>
+        <tr><td><code>paths</code></td><td>array</td><td>Polylines with <code>points</code> as [x, y, z], <code>rapid</code> (dashed) and <code>color</code></td></tr>
+        <tr><td><code>height</code></td><td>number</td><td>Canvas height in pixels</td></tr>
+        <tr><td><code>animate</code></td><td>boolean</td><td>Draw paths progressively and show a replay button</td></tr>
+        </tbody>
+    </table>
+    <p>The component uses three.js with Z up, mounts only when scrolled into view and shows a text fallback without WebGL. Feed it real output, such as kernel moves, rather than hand-drawn coordinates.</p>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Where the docs site sits: web depends only on db" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#e05050"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e0a030"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
   </section>
   <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Runtime configuration", href: "/docs/configuration" }, { title: "Contributing", href: "/docs/guides/contributing" }]} />
 </DocsLayout>

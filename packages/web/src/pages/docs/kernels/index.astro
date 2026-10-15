@@ -1,0 +1,75 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+import DocViewer3D from "../../../components/docs/DocViewer3D.astro"
+
+const toc = [
+  { title: "The kernels and how they depend on each other", href: "#map" },
+  { title: "Kernel pages", href: "#pages" },
+  { title: "Shared rules", href: "#principles" },
+]
+---
+
+<DocsLayout
+  title="Kernels"
+  subtitle="The pure geometry and machining kernels of packages/core, explained from the inside with real outputs and 3D examples."
+  description="Overview of the CADCAMFUN kernels: sketch solver, mesh and CSG, exact B-rep, feature generators, tolerance and tessellation, CAM machining kernel, their import graph and shared rules."
+  toc={toc}
+>
+  <section id="map" class="doc-section">
+    <h2>The kernels and how they depend on each other</h2>
+    <p>The geometry and machining code in <code>packages/core</code> is a set of pure kernels: same input, same output, no I/O. Each page in this section explains one of them from the inside: what it is for, its data structures and algorithms, the real API, limits and constants, output captured by running it, and 3D views built from that output.</p>
+    <DocViewer3D title="Kernel import graph" caption="Boxes are kernels; each line is a real relative import from one kernel’s source files to another’s (tests excluded), counted from packages/core/src. Lower layers sit at the front: tolerance, mesh, sketch and B-rep; history and features above them; CAM on top." solids={[{"kind":"box","size":[18,8,4],"at":[-9.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-39.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#a48ac8"},{"kind":"box","size":[18,8,4],"at":[21.0,26.0,8],"color":"#c8a48a"},{"kind":"box","size":[18,8,4],"at":[-9.0,26.0,8],"color":"#c8a48a"},{"kind":"box","size":[18,8,4],"at":[51.0,26.0,8],"color":"#9fc88a"},{"kind":"box","size":[18,8,4],"at":[-9.0,56.0,16],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[21.0,56.0,16],"color":"#e0a030"}]} paths={[{"points":[[0,60,18.0],[15.0,60.0,21.0],[30,60,18.0]],"color":"#2fbf71"},{"points":[[0,60,18.0],[0.0,45.0,21.0],[0,30,10.0]],"color":"#2fbf71"},{"points":[[0,60,18.0],[15.0,30.0,21.0],[30,0,2.0]],"color":"#2fbf71"},{"points":[[0,60,18.0],[-15.0,30.0,21.0],[-30,0,2.0]],"color":"#2fbf71"},{"points":[[30,60,18.0],[15.0,60.0,21.0],[0,60,18.0]],"color":"#2fbf71"},{"points":[[30,60,18.0],[30.0,30.0,21.0],[30,0,2.0]],"color":"#2fbf71"},{"points":[[60,30,10.0],[60.0,15.0,13.0],[60,0,2.0]],"color":"#2fbf71"},{"points":[[60,30,10.0],[30.0,30.0,13.0],[0,30,10.0]],"color":"#2fbf71"},{"points":[[60,30,10.0],[45.0,15.0,13.0],[30,0,2.0]],"color":"#2fbf71"},{"points":[[30,30,10.0],[30.0,15.0,13.0],[30,0,2.0]],"color":"#2fbf71"},{"points":[[0,30,10.0],[30.0,15.0,13.0],[60,0,2.0]],"color":"#2fbf71"},{"points":[[0,30,10.0],[15.0,30.0,13.0],[30,30,10.0]],"color":"#2fbf71"},{"points":[[0,30,10.0],[15.0,15.0,13.0],[30,0,2.0]],"color":"#2fbf71"},{"points":[[0,30,10.0],[-15.0,15.0,13.0],[-30,0,2.0]],"color":"#2fbf71"},{"points":[[30,0,2.0],[15.0,0.0,5.0],[0,0,2.0]],"color":"#2fbf71"}]} labels={[{"text":"tolerance","at":[0,0,6.4],"size":3.2},{"text":"mesh + CSG","at":[30,0,6.4],"size":3.2},{"text":"sketch solver","at":[-30,0,6.4],"size":3.2},{"text":"exact B-rep","at":[60,0,6.4],"size":3.2},{"text":"features","at":[30,30,14.4],"size":3.2},{"text":"history","at":[0,30,14.4],"size":3.2},{"text":"drawing","at":[60,30,14.4],"size":3.2},{"text":"CAM generator","at":[0,60,22.4],"size":3.2},{"text":"CAM kernel","at":[30,60,22.4],"size":3.2}]} height={400} />
+    <table>
+      <thead><tr><th>From</th><th>Imports from</th><th>Files importing</th></tr></thead>
+      <tbody>
+        <tr><td>cam-generator</td><td>cam-kernel</td><td>2</td></tr>
+        <tr><td>cam-generator</td><td>history</td><td>1</td></tr>
+        <tr><td>cam-generator</td><td>mesh</td><td>2</td></tr>
+        <tr><td>cam-generator</td><td>sketch</td><td>1</td></tr>
+        <tr><td>cam-kernel</td><td>cam-generator</td><td>4</td></tr>
+        <tr><td>cam-kernel</td><td>mesh</td><td>1</td></tr>
+        <tr><td>drawing</td><td>brep</td><td>1</td></tr>
+        <tr><td>drawing</td><td>history</td><td>4</td></tr>
+        <tr><td>drawing</td><td>mesh</td><td>7</td></tr>
+        <tr><td>features</td><td>mesh</td><td>5</td></tr>
+        <tr><td>history</td><td>brep</td><td>1</td></tr>
+        <tr><td>history</td><td>features</td><td>5</td></tr>
+        <tr><td>history</td><td>mesh</td><td>2</td></tr>
+        <tr><td>history</td><td>sketch</td><td>2</td></tr>
+        <tr><td>mesh</td><td>tolerance</td><td>1</td></tr>
+        </tbody>
+    </table>
+    <p>The one cycle, CAM kernel ↔ CAM generator, is deliberate: the kernel reuses the generator&apos;s strategies and element schema, and the generator calls back into the kernel&apos;s cutting data and planner.</p>
+  </section>
+
+  <section id="pages" class="doc-section">
+    <h2>Kernel pages</h2>
+    <table>
+      <thead><tr><th>Page</th><th>What it covers</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/docs/kernels/sketch-solver">Sketch solver</a></td><td>Levenberg–Marquardt on constraint residuals, rank analysis for degrees of freedom, free points and conflicts.</td><td><code>packages/core/src/cad/sketch.ts</code></td></tr>
+        <tr><td><a href="/docs/kernels/mesh">Mesh and CSG</a></td><td>Closed triangle meshes, BSP Booleans with a convex fast path, soup cleanup and topology.</td><td><code>packages/core/src/cad/csg.ts, solid.ts, mesh-clean.ts</code></td></tr>
+        <tr><td><a href="/docs/kernels/brep">Exact B-rep</a></td><td>Analytic and NURBS faces, exact Booleans, fillets, hole recognition, mass properties, STEP.</td><td><code>packages/core/src/cad/brep/</code></td></tr>
+        <tr><td><a href="/docs/kernels/features">Feature generators</a></td><td>Involute gears, ISO threads, helices and sheet metal with flat patterns.</td><td><code>packages/core/src/cad/gear.ts, thread.ts, helix.ts, sheet-metal.ts</code></td></tr>
+        <tr><td><a href="/docs/kernels/tolerance">Tolerance and tessellation</a></td><td>One chord tolerance for segment counts, decimals and entity tessellation.</td><td><code>packages/core/src/cad/tolerance.ts, tessellate.ts</code></td></tr>
+        <tr><td><a href="/docs/kernels/cam">CAM machining kernel</a></td><td>Planning, cutters, voxel stock with a remaining-volume bracket, certified collision checks.</td><td><code>packages/core/src/cam/kernel/</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="principles" class="doc-section">
+    <h2>Shared rules</h2>
+    <ul>
+      <li><strong>Millimetres everywhere</strong>, radians in code (degrees only where a field says so, such as a gear&apos;s pressure angle or a blend angle).</li>
+      <li><strong>Z up</strong>, counter-clockwise outer loops, outward-facing triangles.</li>
+      <li><strong>Plain data.</strong> Meshes are typed arrays, B-reps are index tables, sketches are entity lists; everything serialises to JSON and diffs in the project history.</li>
+      <li><strong>Errors are explicit.</strong> Invalid input throws a <code>RangeError</code> or a kernel error class (<code>SketchError</code>, <code>BooleanError</code>, <code>BudgetExceeded</code>) with a message the assistant can show; results that would be wrong are never returned.</li>
+      <li><strong>Bounded work.</strong> Segment and vertex budgets in the mesh kernel, a time budget in the exact kernel, turn limits in threads, subdivision depth in collision checking.</li>
+    </ul>
+    <p>Every number on these pages was produced by running the kernel with Bun against the source in this repository; re-run the snippets to reproduce them.</p>
+  </section>
+
+  <DocRelated items={[{"title": "Sketch solver", "href": "/docs/kernels/sketch-solver"}, {"title": "Exact B-rep", "href": "/docs/kernels/brep"}, {"title": "CAM machining kernel", "href": "/docs/kernels/cam"}, {"title": "Packages and apps", "href": "/docs/packages"}]} />
+</DocsLayout>

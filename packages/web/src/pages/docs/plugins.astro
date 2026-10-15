@@ -1,5 +1,6 @@
 ---
 export const prerender = true
+import DocViewer3D from "../../components/docs/DocViewer3D.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
@@ -19,6 +20,14 @@ const toc = [
   { title: "Complete the sample assistant module", href: "#assistant-module" },
   { title: "Argument schemas and lifecycle limits", href: "#schema-and-lifecycle" },
   { title: "Diagnose a missing or failing extension", href: "#troubleshooting" },
+  { title: "Manifest reference", href: "#manifest-reference" },
+  { title: "Capabilities and the plugin context", href: "#capability-model" },
+  { title: "Test a plugin with the SDK test host", href: "#sdk-testing" },
+  { title: "How the application loads assistant plugins", href: "#production-loading" },
+  { title: "Identifier and version rules, tested", href: "#id-version-rules" },
+  { title: "Contribution types", href: "#contributions" },
+  { title: "Capability resolution, tested", href: "#capability-resolution" },
+  { title: "In 3D", href: "#in-3d" },
 ]
 ---
 
@@ -84,6 +93,7 @@ const toc = [
     <h2>Runtime limits</h2>
 <p>The host defines a 256 MB worker memory setting, a 2,000-call-per-minute rate limit, and at most 64 pending calls per plugin. Command timeout behavior is supplied by the embedding host; the assistant loader uses 10 seconds. AI tool calls have a separate 30-second deadline. Timeouts, absent tools, worker crashes, capability failures, and queue exhaustion return typed host failures or readable tool results.</p>
     <p>Crash tracking faults a plugin after three crashes within ten minutes. These host controls bound cooperative RPC and lifecycle behavior; the memory setting passed to Bun is not a substitute for a separately isolated executable.</p>
+    <p>The limits are defined in <code>apps/sidecar/src/plugins/host.ts</code>: <code>CALL_TIMEOUT_MS</code> (5,000 ms per ordinary call), <code>AI_TOOL_TIMEOUT_MS</code> (30,000 ms per assistant tool call), <code>MEMORY_LIMIT_MB</code> (256), <code>CALL_RATE_LIMIT</code> (2,000 calls per plugin per minute), <code>MAX_PENDING_CALLS</code> (64), and <code>CRASH_LIMIT</code> (3 crashes within a 10-minute <code>CRASH_WINDOW_MS</code>, after which the plugin is disabled automatically).</p>
   </section>
 
   <section id="http" class="doc-section">
@@ -152,5 +162,143 @@ const toc = [
     <p>Source: <code>apps/sidecar/test/plugins-ai-tools.test.ts</code>, <code>ai-plugin-tools.test.ts</code>, <code>plugins-http.test.ts</code>, and <code>src/plugins/host.ts</code>.</p>
   </section>
 
+    <section id="manifest-reference" class="doc-section">
+    <h2>Manifest reference</h2>
+    <p>Every plugin ships a <code>plugin.json</code>. <code>parseManifest(json)</code> parses and validates it in one step, turning a JSON syntax error into the same error channel as a schema error, so an install screen only needs to handle one failure type.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>Reverse-DNS identifier: 3–128 characters, lowercase letters, digits, and hyphens in at least two dot-separated labels, for example <code>com.example.gear-generator</code>.</td></tr>
+        <tr><td><code>name</code></td><td>Non-empty display name.</td></tr>
+        <tr><td><code>version</code></td><td><code>major.minor.patch</code>, optionally followed by a pre-release suffix such as <code>-beta.1</code>.</td></tr>
+        <tr><td><code>apiVersion</code></td><td>Must be the string <code>"1"</code>; it is the only plugin API version.</td></tr>
+        <tr><td><code>entry</code></td><td>ES module path relative to the plugin folder.</td></tr>
+        <tr><td><code>capabilities</code></td><td>Array of capability strings (see below). Anything outside the closed list is a manifest error.</td></tr>
+        <tr><td><code>contributes</code></td><td>Optional <code>commands</code>, <code>panels</code>, <code>postProcessors</code>, <code>operations</code>, and <code>aiTools</code>.</td></tr>
+        <tr><td><code>signature</code></td><td>Ed25519 signature over the archive hash; required for packaged installs.</td></tr>
+        <tr><td><code>dev</code></td><td><code>true</code> marks a local development plugin: signature checks are skipped and the UI shows a badge.</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Contribution</th><th>Fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>commands[]</code></td><td><code>id</code>, <code>title</code>, optional <code>keybinding</code> such as <code>Mod+Shift+G</code>.</td></tr>
+        <tr><td><code>panels[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported function that returns the panel's declarative tree. There is never DOM access.</td></tr>
+        <tr><td><code>postProcessors[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported <code>(program, options) =&gt; string</code> function.</td></tr>
+        <tr><td><code>operations[]</code></td><td><code>id</code>, <code>title</code>, <code>entry</code>: an exported record with a parameter <code>schema</code> and a pure <code>generate(params, geometry, tool, stock)</code> that returns a toolpath.</td></tr>
+        <tr><td><code>aiTools[]</code></td><td><code>id</code> matching <code>^[a-z][a-z0-9_]&#123;0,39&#125;$</code>, <code>description</code> (10–2,000 characters; the model reads it), <code>kind</code> <code>read</code> or <code>write</code>, <code>parameters</code> (JSON Schema of the arguments), and <code>entry</code>.</td></tr>
+        </tbody>
+    </table>
+    <p>Helpers: <code>manifestKey(m)</code> returns <code>id@version</code>; <code>requestedCapabilities(m)</code> returns the sorted capability list for display; <code>isDevPlugin(m)</code> and <code>isSigned(m)</code> answer the install-policy questions.</p>
+  </section>
+
+  <section id="capability-model" class="doc-section">
+    <h2>Capabilities and the plugin context</h2>
+    <p>Capabilities are the only thing a plugin can act through. The manifest declares what the plugin needs, the user grants a subset, and the host builds a context that contains exactly the granted surfaces. Each surface is optional in the type, so a missing capability is visible both at compile time and at runtime instead of becoming a silent no-op.</p>
+    <table>
+      <thead><tr><th>Capability</th><th>Context surface</th><th>Allows</th><th>Implies</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawing:read</code></td><td><code>ctx.drawing.read()</code></td><td>Read the open drawing (or <code>undefined</code> when none is open).</td><td>—</td></tr>
+        <tr><td><code>drawing:write</code></td><td><code>ctx.drawing.patch(patch)</code></td><td>Apply <code>AddEntity</code>, <code>UpdateEntity</code>, or <code>RemoveEntity</code> patches; returns the new revision.</td><td><code>drawing:read</code></td></tr>
+        <tr><td><code>toolpath:read</code></td><td><code>ctx.toolpath.list()</code>, <code>.program(id)</code></td><td>Read toolpaths and G-code programs.</td><td>—</td></tr>
+        <tr><td><code>storage</code></td><td><code>ctx.storage</code></td><td>Namespaced key-value strings: <code>get</code>, <code>set</code>, <code>delete</code>, <code>keys</code>.</td><td>—</td></tr>
+        <tr><td><code>ui:panel</code></td><td><code>ctx.ui</code></td><td><code>registerCommand</code> and <code>registerPanel</code> (declarative only).</td><td>—</td></tr>
+        <tr><td><code>ai:tool</code></td><td>none (manifest contributions)</td><td>Offer tools to the assistant and, read-only, to a standalone nikcli.</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <code>effectiveCapabilities(granted)</code> resolves implications, so a plugin that declares <code>drawing:write</code> does not need to declare <code>drawing:read</code>. Every context also has <code>pluginId</code>, the resolved <code>capabilities</code>, and a <code>log</code> with <code>debug</code>, <code>info</code>, <code>warn</code>, and <code>error</code>; the host prefixes log lines with the plugin ID. Use <code>requireCapability(ctx, capability, surface)</code> to obtain a surface or fail with a <code>CapabilityError</code> that names the missing grant.
+  </section>
+
+  <section id="sdk-testing" class="doc-section">
+    <h2>Test a plugin with the SDK test host</h2>
+    <code>createTestHost</code> builds an in-memory host with the same capability rules as the sidecar. Only granted capabilities appear on the context, and you can supply a drawing, toolpaths, and programs. The example below is complete and runs with <code>bun</code> in the workspace.
+    <DocCode language="ts" title="frame-plugin.test.ts">
+{"import { cad } from \u0022@cadcamfun/core\u0022\nimport { createTestHost, definePlugin, requireCapability, testManifest } from \u0022@cadcamfun/plugin-sdk\u0022\n\nconst manifest = testManifest({\n  id: \u0022com.example.frame\u0022,\n  capabilities: [\u0022drawing:write\u0022, \u0022storage\u0022, \u0022ui:panel\u0022],\n})\n\nconst plugin = definePlugin({\n  manifest,\n  activate(ctx) {\n    const drawing = requireCapability(ctx, \u0022drawing:write\u0022, \u0022drawing\u0022)\n    ctx.ui?.registerCommand({ id: \u0022frame.add\u0022, title: \u0022Add frame line\u0022 })\n    ctx.storage?.set(\u0022runs\u0022, \u00221\u0022)\n    drawing.patch({\n      _tag: \u0022AddEntity\u0022,\n      entity: { ...cad.baseEntity(\u0022frame-1\u0022), _tag: \u0022Line\u0022,\n                start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },\n    })                                   // returns revision 1\n    return () => ctx.log.info(\u0022teardown\u0022) // runs on deactivation\n  },\n})\n\nconst host = createTestHost({ manifest, drawing: cad.emptyDrawing(\u0022d1\u0022, \u0022Demo\u0022) })\nconst stop = await host.activate(plugin)\nhost.drawing()?.entities.length     // 1\nhost.context.storage?.get(\u0022runs\u0022)   // \u00221\u0022\nhost.ui.commands                    // [{ id: \u0022frame.add\u0022, title: \u0022Add frame line\u0022 }]\nawait stop()\n\n// Without the grant, requireCapability throws:\nconst denied = createTestHost({ manifest, granted: [\u0022storage\u0022] })\nawait denied.activate(plugin)\n// CapabilityError: Plugin com.example.frame may not use \u0022drawing:write\u0022:\n// it was not granted at install time"}
+    </DocCode>
+    <ul>
+      <li><code>testManifest(overrides)</code> starts from a minimal valid manifest (<code>com.example.test-plugin</code>, version 1.0.0, API 1, entry <code>index.js</code>, no capabilities).</li>
+      <li><code>granted</code> defaults to everything the manifest asks for. Pass a smaller list to test the denied paths.</li>
+      <li><code>host.storage</code> is a snapshot taken when the host is created. Read live values through <code>host.context.storage</code>.</li>
+      <li><code>host.on(commandId, handler)</code> and <code>host.invoke(commandId, args)</code> exercise registered commands.</li>
+      <li><code>runPostProcessor</code> runs a contributed post against a program, and <code>keyOf(pluginId, key)</code> shows the namespaced storage key so tests can assert isolation.</li>
+    </ul>
+  </section>
+
+  <section id="production-loading" class="doc-section">
+    <h2>How the application loads assistant plugins</h2>
+    <ol>
+      <li>At startup the sidecar reads <code>&lt;data dir&gt;/plugins/enabled.json</code>, a JSON array of plugin IDs. Nothing is loaded unless it is listed there.</li>
+      <li>For each ID it reads <code>&lt;data dir&gt;/plugins/&lt;id&gt;/plugin.json</code> and parses it. The folder name must equal the manifest <code>id</code>.</li>
+      <li>Only <code>ai:tool</code> is wired in this host. A manifest that asks for drawing, toolpath, storage, or UI access is skipped with a warning rather than loaded with surfaces that would silently do nothing.</li>
+      <li>The plugin is installed into a worker host and enabled. A plugin that fails to load logs <code>Plugin &lt;id&gt; was not loaded: ...</code> and never stops the application from starting.</li>
+      <li>Each contributed tool is offered to the assistant as <code>plugin_&lt;slug of plugin id&gt;_&lt;tool id&gt;</code>, at most 80 characters, where the slug lowercases the ID and replaces other characters with underscores. <code>com.example.bolt-circle</code> with tool <code>bolt_circle</code> becomes <code>plugin_com_example_bolt_circle_bolt_circle</code>.</li>
+      <li>Arguments are validated against the tool's JSON Schema before the worker sees them. If the schema exceeds 20,000 characters, is not an object schema, or cannot be converted, the host accepts any object and the plugin must validate.</li>
+      <li>A call that throws, times out, or finds the plugin gone returns <code>&#123; ok: false, error &#125;</code> (error text up to 500 characters) to the assistant instead of crashing the turn. A <code>write</code> tool is confirmed with the person before every call, whatever its arguments say.</li>
+    </ol>
+    <DocCallout type="warn" title="Not an operating-system sandbox">
+      <p>The worker has no process, fetch, or file handle of its own, but Bun globals remain reachable inside it. Enable only plugins whose code you trust, and keep write tools to a minimum.</p>
+    </DocCallout>
+  </section>
+
+    <section id="id-version-rules" class="doc-section">
+    <h2>Identifier and version rules, tested</h2>
+    <table>
+      <thead><tr><th>Value</th><th>Valid?</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td><code>com.example.gear-generator</code></td><td>yes</td><td>Reverse-DNS: lower-case segments of letters, digits and <code>-</code>, at least two, 3–128 characters</td></tr>
+        <tr><td><code>a.b</code></td><td>yes</td><td>Two one-letter segments are enough</td></tr>
+        <tr><td><code>gear</code></td><td>no</td><td>Needs at least one dot</td></tr>
+        <tr><td><code>Com.Example.x</code></td><td>no</td><td>Upper case is not allowed</td></tr>
+        <tr><td><code>com.example_x.y</code></td><td>no</td><td>Underscore is not allowed</td></tr>
+        </tbody>
+    </table>
+    <table>
+      <thead><tr><th>Version</th><th>Valid?</th></tr></thead>
+      <tbody>
+        <tr><td><code>1.0.0</code></td><td>yes</td></tr>
+        <tr><td><code>1.2.3-beta.1</code></td><td>yes</td></tr>
+        <tr><td><code>1.0</code></td><td>no: three numbers required</td></tr>
+        <tr><td><code>v1.0.0</code></td><td>no: no prefix</td></tr>
+        </tbody>
+    </table>
+    <code>apiVersion</code> must be the string <code>"1"</code>, the only plugin API major that exists. AI tool ids must match <code>^[a-z][a-z0-9_]&#123;0,39&#125;$</code> and are shown to the assistant as <code>plugin_&lt;plugin&gt;_&lt;id&gt;</code>; descriptions must be 10–2,000 characters because the model reads them.
+  </section>
+
+  <section id="contributions" class="doc-section">
+    <h2>Contribution types</h2>
+    <table>
+      <thead><tr><th>Key</th><th>Fields</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>commands</code></td><td><code>id</code>, <code>title</code>, optional <code>keybinding</code> (e.g. <code>Mod+Shift+G</code>)</td><td>Commands in the palette</td></tr>
+        <tr><td><code>panels</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>A panel rendered from a declarative tree the named function returns; no DOM access</td></tr>
+        <tr><td><code>postProcessors</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>A <code>(program, options) =&gt; string</code> post registered at runtime</td></tr>
+        <tr><td><code>operations</code></td><td><code>id</code>, <code>title</code>, <code>entry</code></td><td>An exported <code>&#123; schema, generate &#125;</code> record</td></tr>
+        <tr><td><code>aiTools</code></td><td><code>id</code>, <code>description</code>, <code>kind</code> read|write, <code>parameters</code> (JSON Schema), <code>entry</code></td><td>Tools offered to the assistant; a write tool is confirmed before every call</td></tr>
+        </tbody>
+    </table>
+    <p>Other manifest fields: <code>signature</code> (Ed25519 over the archive hash, required for packaged installs) and <code>dev</code> (local development plugin: skips signature checks and shows a badge).</p>
+  </section>
+
+  <section id="capability-resolution" class="doc-section">
+    <h2>Capability resolution, tested</h2>
+    <DocCode language="ts" title="Implication, missing grants, storage keys">
+{"import { effectiveCapabilities, missingCapabilities, storageKey, requireCapability } from \u0022@cadcamfun/plugin-sdk\u0022\n\neffectiveCapabilities([\u0022drawing:write\u0022, \u0022storage\u0022])\n// [\u0022drawing:read\u0022, \u0022drawing:write\u0022, \u0022storage\u0022]   (write implies read; sorted)\n\nmissingCapabilities([\u0022drawing:read\u0022, \u0022toolpath:read\u0022, \u0022ai:tool\u0022], [\u0022drawing:write\u0022])\n// [\u0022toolpath:read\u0022, \u0022ai:tool\u0022]\n\nstorageKey(\u0022com.example.gear\u0022, \u0022presets/m2\u0022)   // \u0022plugin:com.example.gear:presets/m2\u0022\nstorageKey(\u0022com.example.gear\u0022, \u0022../x\u0022)\n// RangeError: storage key \u0022../x\u0022 may not escape the plugin namespace   (same for \u0022/abs\u0022)\n\nrequireCapability(ctxWithoutDrawing, \u0022drawing:read\u0022, \u0022drawing\u0022)\n// CapabilityError (_tag \u0022CapabilityDenied\u0022):\n// Plugin com.example.gear may not use \u0022drawing:read\u0022: it was not granted at install time"}
+    </DocCode>
+    <table>
+      <thead><tr><th>Surface on the context</th><th>Present when granted</th><th>Methods</th></tr></thead>
+      <tbody>
+        <tr><td><code>drawing</code></td><td><code>drawing:read</code> or <code>drawing:write</code></td><td><code>read()</code> → drawing or <code>undefined</code>; <code>patch(p)</code> → new revision, with <code>AddEntity</code>, <code>UpdateEntity</code>, <code>RemoveEntity</code> patches</td></tr>
+        <tr><td><code>toolpath</code></td><td><code>toolpath:read</code></td><td><code>list()</code>, <code>program(toolpathId)</code></td></tr>
+        <tr><td><code>storage</code></td><td><code>storage</code></td><td><code>get</code>, <code>set</code>, <code>delete</code>, <code>keys</code>; string values</td></tr>
+        <tr><td><code>ui</code></td><td><code>ui:panel</code></td><td><code>registerCommand</code>, <code>registerPanel</code></td></tr>
+        <tr><td><code>log</code></td><td>always</td><td><code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code></td></tr>
+        </tbody>
+    </table>
+  </section>
+
+  <section id="in-3d" class="doc-section">
+    <h2>In 3D</h2>
+    <DocViewer3D title="Plugin packages in the workspace" caption="All 13 workspace packages from their package.json files; each line is a workspace:* dependency (17 in total). Rows are dependency depth: packages with no workspace dependencies at the front, the sidecar, which depends on 8 of them, at the back. Orange boxes are apps. Highlighted: plugin-sdk (depends on core) and the nikcli plugin, both loaded by the sidecar." solids={[{"kind":"box","size":[18,8,4],"at":[-33.0,40.0,12],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[15.0,40.0,12],"color":"#e0a030"},{"kind":"box","size":[18,8,4],"at":[-33.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-9.0,18.0,6],"color":"#e05050"},{"kind":"box","size":[18,8,4],"at":[15.0,18.0,6],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-69.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-45.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[-21.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[3.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[27.0,-4.0,0],"color":"#8aa4c8"},{"kind":"box","size":[18,8,4],"at":[51.0,-4.0,0],"color":"#e05050"},{"kind":"box","size":[18,8,4],"at":[-9.0,62.0,18],"color":"#e05050"}]} paths={[{"points":[[-24.0,44,14.0],[-24.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[-24.0,44,14.0],[-42.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-42.0,11.0,11.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[-24.0,22,8.0],[-18.0,11.0,11.0],[-12.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,22,8.0],[-30.0,11.0,11.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[24.0,22,8.0],[-6.0,11.0,11.0],[-36.0,0,2.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-12.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,44,14.0],[-30.0,22.0,17.0],[-60.0,0,2.0]],"color":"#2fbf71"},{"points":[[24.0,44,14.0],[0.0,33.0,17.0],[-24.0,22,8.0]],"color":"#2fbf71"},{"points":[[0.0,66,20.0],[-12.0,55.0,23.0],[-24.0,44,14.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[-12.0,44.0,23.0],[-24.0,22,8.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[-30.0,33.0,23.0],[-60.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[-18.0,33.0,23.0],[-36.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[0.0,44.0,23.0],[0.0,22,8.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[6.0,33.0,23.0],[12.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[18.0,33.0,23.0],[36.0,0,2.0]],"color":"#e05050"},{"points":[[0.0,66,20.0],[30.0,33.0,23.0],[60.0,0,2.0]],"color":"#e05050"}]} labels={[{"text":"ai","at":[-24.0,44,18.4],"size":3.4},{"text":"desktop","at":[0.0,44,18.4],"size":3.4},{"text":"mobile","at":[24.0,44,18.4],"size":3.4},{"text":"api","at":[-24.0,22,12.4],"size":3.4},{"text":"plugin-sdk","at":[0.0,22,12.4],"size":3.4},{"text":"web","at":[24.0,22,12.4],"size":3.4},{"text":"core","at":[-60.0,0,6.4],"size":3.4},{"text":"db","at":[-36.0,0,6.4],"size":3.4},{"text":"httpapi-codegen","at":[-12.0,0,6.4],"size":3.4},{"text":"vcs","at":[12.0,0,6.4],"size":3.4},{"text":"workflow","at":[36.0,0,6.4],"size":3.4},{"text":"nikcli-plugin","at":[60.0,0,6.4],"size":3.4},{"text":"sidecar","at":[0.0,66,24.4],"size":3.4}]} height={420} />
+  </section>
   <DocRelated items={[{ title: "AI assistant", href: "/docs/ai" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }]} />
 </DocsLayout>

@@ -1,0 +1,101 @@
+---
+/**
+ * One operation of the HTTP API as a card: method, path and operation id; parameters; request body and responses as typed
+ * schemas; a captured example response when one exists; SDK and curl examples; and a "Try it" form for the playground.
+ */
+import DocCode from "./DocCode.astro"
+import { type ApiEntry, opAnchor, pathHtml, schemaHtml, responseLabel, exampleOf, sdkExample, requestExample, capturedExamples, schemaType } from "../../lib/apiReference"
+interface Props { entry: ApiEntry }
+const { entry } = Astro.props
+const op = entry.operation
+const id = opAnchor(entry)
+const method = entry.method.toLowerCase()
+const params = op.parameters ?? []
+const bodyMedia = op.requestBody ? Object.keys(op.requestBody.content)[0] : undefined
+const bodySchema = bodyMedia ? op.requestBody!.content[bodyMedia]!.schema : undefined
+const statusClass = (status: string) => `api-pill api-pill-status-${status[0]}`
+const captured = capturedExamples[op.operationId]
+const sdk = sdkExample(entry)
+const tryBody = bodyMedia === "application/json" ? JSON.stringify(exampleOf(bodySchema), null, 2) : ""
+const protectedOp = (op.security?.length ?? 0) > 0
+---
+<article id={id} class="api-op not-prose" data-legacy-anchor={entry.anchor}>
+  <span id={entry.anchor} aria-hidden="true"></span>
+  <header class="api-op-head">
+    <span class={`api-method api-method-${method}`}>{method}</span>
+    <span class="api-op-path" set:html={pathHtml(entry.path)} />
+    <a class="api-op-anchor" href={`#${id}`} aria-label={`Link to ${entry.method} ${entry.path}`}>#</a>
+    <code class="api-op-id">{op.operationId}</code>
+  </header>
+  <div class="api-op-body">
+    {(op.summary || op.description) && <p class="api-op-desc">{op.summary}{op.summary && op.description ? " " : ""}{op.description}</p>}
+    {op.deprecated && <p class="api-op-desc api-op-deprecated">Deprecated.</p>}
+    <p class="api-op-desc">{protectedOp ? <>Requires <code>Authorization: Bearer &lt;token&gt;</code>.</> : <>Public: no bearer token is needed.</>}</p>
+    {params.length > 0 && <div>
+      <div class="api-block-title">Parameters</div>
+      <table class="api-params">
+        <thead><tr><th>Name</th><th>In</th><th>Type</th><th><span class="sr-only">Required</span></th></tr></thead>
+        <tbody>{params.map((p) => <tr>
+          <td>{p.name}</td>
+          <td><span class="api-pill">{p.in}</span></td>
+          <td><Fragment set:html={schemaHtml(p.schema)} />{p.description && <div>{p.description}</div>}</td>
+          <td>{p.required ? <span class="api-pill api-pill-required">required</span> : <span class="api-pill">optional</span>}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>}
+    {bodyMedia && <div>
+      <div class="api-block-title">Request body · {op.requestBody!.required ? "required" : "optional"} · {bodyMedia}</div>
+      <pre class="api-schema" set:html={bodySchema === undefined ? "<span class=\"api-t-type\">binary</span>" : schemaHtml(bodySchema, 0, new Set(), false)} />
+    </div>}
+    <div>
+      <div class="api-block-title">Responses</div>
+      {Object.entries(op.responses).map(([status, response]) => {
+        const media = Object.entries(response.content ?? {})
+        const first = media[0]
+        return <details class="api-details api-response" open={status.startsWith("2")}>
+          <summary class="api-response-head">
+            <span class={statusClass(status)}>{status}</span>
+            <span>{first?.[1].schema !== undefined ? responseLabel(first[1].schema) : (response.description ?? "No body")}</span>
+            {first && <span class="api-pill">{first[0]}</span>}
+          </summary>
+          {first?.[1].schema !== undefined && <pre class="api-schema" set:html={schemaHtml(first[1].schema, 0, new Set(), !status.startsWith("2"))} />}
+        </details>
+      })}
+    </div>
+    {captured && <details class="api-details" open>
+      <summary>Example response <span class="api-example-origin">captured · {captured.status}</span></summary>
+      <div class="api-details-body"><DocCode language="json" title={`${entry.method} ${entry.path}`}>{captured.body}</DocCode></div>
+    </details>}
+    <details class="api-details">
+      <summary>{sdk.generated ? "SDK example" : "fetch example"}</summary>
+      <div class="api-details-body"><DocCode language="ts" title={op.operationId}>{sdk.code}</DocCode></div>
+    </details>
+    <details class="api-details">
+      <summary>curl</summary>
+      <div class="api-details-body"><DocCode language="bash" title={`${entry.method} ${entry.path}`}>{requestExample(entry)}</DocCode></div>
+    </details>
+    <details class="api-details api-try" data-api-try data-method={entry.method} data-path={entry.path} data-media={bodyMedia ?? ""}>
+      <summary>Try it</summary>
+      <div class="api-details-body">
+        {params.length > 0 && <div class="api-try-params">{params.map((p) => <label class="api-try-field">
+          <span>{p.name} <em>{p.in}{p.required ? " · required" : ""}</em></span>
+          <input type="text" spellcheck="false" data-try-param={p.name} data-try-in={p.in} placeholder={schemaType(p.schema)} />
+        </label>)}</div>}
+        {bodyMedia === "application/json" && <label class="api-try-field api-try-body">
+          <span>Request body <em>application/json</em></span>
+          <textarea spellcheck="false" rows="7" data-try-body>{tryBody}</textarea>
+        </label>}
+        {bodyMedia && bodyMedia !== "application/json" && <p class="api-try-note api-try-warn">This operation takes {bodyMedia}; use the curl or fetch example.</p>}
+        <div class="api-try-actions">
+          <button type="button" class="api-btn api-btn-primary" data-try-send disabled={!!bodyMedia && bodyMedia !== "application/json"}>Send {entry.method}</button>
+          <button type="button" class="api-btn" data-try-curl>Copy as curl</button>
+          <span class="api-try-note" data-try-note></span>
+        </div>
+        <div class="api-try-result" data-try-result hidden>
+          <div class="api-try-result-head"><span class="api-pill" data-try-status></span> <span data-try-timing></span> <span data-try-url></span></div>
+          <pre class="api-schema" data-try-output></pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</article>
