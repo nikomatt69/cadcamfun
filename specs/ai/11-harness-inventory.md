@@ -17,7 +17,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 - Actions named in their tool prompt: **83/83**.
 - Actions mentioned by at least one test file: **79/83**.
 - Actions with a declared result schema: **83/83**.
-- Prompt files: **40** (base layers 8, modes 5); one-shot workflows: **5**.
+- Prompt files: **54** (base layers 8, modes 5); one-shot workflows: **5**.
 - Built-in skills: **18** (plus user skills from the store); composer commands: **32**.
 
 ## Tools
@@ -54,7 +54,7 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `cad.inspect_search` (was `cad_inspect`) | read | — | query*, layerId, limit | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:404` | yes | declared | inspection-wire.test.ts |
 | `cad.inspect_property` (was `cad_inspect`) | read | — | elementId*, path*, offset, maxChars | handler `cadInspect` → `apps/sidecar/src/services/ai.ts:404` | yes | declared | inspection-wire.test.ts, ai-stock-inspection.test.ts |
 | `cad.drawing` | read | — | elementId, history, options | handler `parametric` → `apps/sidecar/src/services/ai.ts:507` | yes | declared | action-inputs-cad.test.ts, ai-drawing.test.ts |
-| `cad.parametric_validate` (was `cad_parametric`) | read | — | history* | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, parametric-engineering-2.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-fusion-governance.test.ts |
+| `cad.parametric_validate` (was `cad_parametric`) | read | — | history* | local (in-package implementation) — `packages/ai/src/actions/cad.ts` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts, nikcli-host.test.ts, parametric-engineering-2.test.ts, prompt-corpus.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-fusion-governance.test.ts |
 | `cad.parametric_inspect` (was `cad_parametric`) | read | — | elementId* | handler `parametric` → `apps/sidecar/src/services/ai.ts:507` | yes | declared | action-inputs-cad.test.ts, ai-cad-to-gcode-e2e.test.ts, ai-drawing.test.ts |
 | `cad.parametric_test` (was `cad_parametric`) | read | — | elementId*, cases* | handler `parametric` → `apps/sidecar/src/services/ai.ts:507` | yes | declared | action-inputs-cad.test.ts, assistant-controls.test.ts, fusion-modelling.test.ts |
 | `cad.parametric_dfm` (was `cad_parametric`) | read | — | elementId, history, process, toolDiameter, material, minWall, envelope | handler `parametric` → `apps/sidecar/src/services/ai.ts:507` | yes | declared | action-inputs-cad.test.ts, fusion-modelling.test.ts, parametric-engineering.test.ts, ai-cad-to-gcode-e2e.test.ts |
@@ -192,58 +192,72 @@ action a result schema its answers are validated against, `unknown (N)` while it
 
 | File | Role | Loader | Chars | Tests (mentions) |
 | --- | --- | --- | --- | --- |
-| `packages/ai/src/prompts/base/engineering.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 2316 | prompts.test.ts |
-| `packages/ai/src/prompts/base/evidence.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1954 | prompts.test.ts |
-| `packages/ai/src/prompts/base/identity.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1578 | prompts.test.ts |
-| `packages/ai/src/prompts/base/machinability.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 969 | prompts.test.ts |
-| `packages/ai/src/prompts/base/machining.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 2390 | prompts.test.ts |
-| `packages/ai/src/prompts/base/modelling.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1091 | fusion-modelling.test.ts, prompts.test.ts |
-| `packages/ai/src/prompts/base/recovery.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 751 | prompts.test.ts |
-| `packages/ai/src/prompts/base/workflow.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1635 | prompts.test.ts |
-| `packages/ai/src/prompts/modes/cad.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 1023 | fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompts.test.ts, specialists-host.test.ts, ai-specialists.test.ts |
-| `packages/ai/src/prompts/modes/cam.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 1150 | modes.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/prompts/modes/gcode.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 801 | modes.test.ts, prompts.test.ts |
-| `packages/ai/src/prompts/modes/general.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 168 | modes.test.ts, prompts.test.ts |
-| `packages/ai/src/prompts/modes/toolpath.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 781 | modes.test.ts |
-| `packages/ai/src/nikcli/prompts/basics.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2872 | **none** |
-| `packages/ai/src/nikcli/prompts/compaction.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1612 | nikcli-host.test.ts |
-| `packages/ai/src/nikcli/prompts/diagnostician.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3021 | **none** |
-| `packages/ai/src/nikcli/prompts/editor.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1847 | specialists-host.test.ts, tool-definitions.test.ts, ai-specialists.test.ts |
-| `packages/ai/src/nikcli/prompts/machinist.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 5956 | **none** |
-| `packages/ai/src/nikcli/prompts/memory.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 631 | **none** |
-| `packages/ai/src/nikcli/prompts/modeler.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 6270 | fusion-modelling.test.ts |
-| `packages/ai/src/nikcli/prompts/optimizer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2668 | **none** |
-| `packages/ai/src/nikcli/prompts/planner.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3403 | **none** |
-| `packages/ai/src/nikcli/prompts/report.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 541 | **none** |
-| `packages/ai/src/nikcli/prompts/researcher.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1478 | ai-specialists.test.ts |
-| `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | **none** |
-| `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2766 | **none** |
-| `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1639 | specialists-host.test.ts, ai-specialists.test.ts |
-| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3976 | fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompts.test.ts, specialists-host.test.ts, ai-specialists.test.ts |
-| `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3937 | fusion-modelling.test.ts, nikcli-host.test.ts, specialists-host.test.ts |
-| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 2443 | modes.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2845 | prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
-| `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1524 | tool-definitions.test.ts |
-| `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1400 | **none** |
-| `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1807 | **none** |
-| `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 789 | **none** |
-| `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 998 | **none** |
-| `packages/ai/src/tools/prompts/parts.txt` | tool description | tools/prompts/index.ts toolPrompt | 1270 | **none** |
-| `packages/ai/src/tools/prompts/research.txt` | tool description | tools/prompts/index.ts toolPrompt | 1070 | **none** |
-| `packages/ai/src/tools/prompts/vcs.txt` | tool description | tools/prompts/index.ts toolPrompt | 1049 | **none** |
-| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1479 | ai-specialists.test.ts |
+| `packages/ai/src/prompts/base/engineering.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 2316 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/evidence.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1954 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/identity.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1578 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/machinability.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 969 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/machining.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 2390 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/modelling.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1091 | fusion-modelling.test.ts, prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/recovery.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 751 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/base/workflow.txt` | main system prompt layer | prompts/system.ts BASE_LAYERS | 1635 | prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/modes/cad.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 1044 | ai-specialists.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts |
+| `packages/ai/src/prompts/modes/cam.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 1158 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/prompts/modes/gcode.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 801 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/modes/general.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 168 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts |
+| `packages/ai/src/prompts/modes/toolpath.txt` | assistant mode | prompts/modes/index.ts MODE_PROMPTS | 781 | modes.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/basics.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2872 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/compaction.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1612 | nikcli-host.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/diagnostician.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3021 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/editor.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1847 | ai-specialists.test.ts, prompt-corpus.test.ts, specialists-host.test.ts, tool-definitions.test.ts |
+| `packages/ai/src/nikcli/prompts/machinist.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 5910 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/memory.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 631 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/modeler.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 6291 | fusion-modelling.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/optimizer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2668 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/planner.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 3378 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/report.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 541 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/researcher.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1478 | ai-specialists.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/reviewer.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 1739 | prompt-corpus.test.ts |
+| `packages/ai/src/nikcli/prompts/verifier.txt` | specialist / host prompt | nikcli/prompts/index.ts, nikcli/config.ts | 2740 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/agent.txt` | tool description | tools/prompts/index.ts toolPrompt | 1639 | ai-specialists.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
+| `packages/ai/src/tools/prompts/cad.txt` | tool description | tools/prompts/index.ts toolPrompt | 3976 | ai-specialists.test.ts, fusion-modelling.test.ts, modes.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts |
+| `packages/ai/src/tools/prompts/cad_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 3937 | fusion-modelling.test.ts, nikcli-host.test.ts, prompt-corpus.test.ts, specialists-host.test.ts |
+| `packages/ai/src/tools/prompts/cam.txt` | tool description | tools/prompts/index.ts toolPrompt | 2443 | modes.test.ts, prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-definitions.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 2845 | prompt-corpus.test.ts, prompts.test.ts, specialists-host.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/tools/prompts/cam_verify.txt` | tool description | tools/prompts/index.ts toolPrompt | 1524 | prompt-corpus.test.ts, tool-definitions.test.ts |
+| `packages/ai/src/tools/prompts/library.txt` | tool description | tools/prompts/index.ts toolPrompt | 1400 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/library_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1807 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/memory.txt` | tool description | tools/prompts/index.ts toolPrompt | 789 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/memory_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 998 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/parts.txt` | tool description | tools/prompts/index.ts toolPrompt | 1270 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/research.txt` | tool description | tools/prompts/index.ts toolPrompt | 1070 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/vcs.txt` | tool description | tools/prompts/index.ts toolPrompt | 1049 | prompt-corpus.test.ts |
+| `packages/ai/src/tools/prompts/vcs_edit.txt` | tool description | tools/prompts/index.ts toolPrompt | 1479 | ai-specialists.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/prompts/family/autonomous.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 637 | modes.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/prompts/family/codex.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 306 | modes.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/prompts/family/gemini.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 247 | modes.test.ts, prompt-corpus.test.ts |
+| `packages/ai/src/prompts/family/other.txt` | model-family style | prompts/system.ts modelFamilyPrompt | 226 | modes.test.ts, prompt-corpus.test.ts, tool-prompts.test.ts |
+| `packages/ai/src/prompts/workflows/analyze-design.system.txt` | one-shot workflow | prompts/workflows.ts | 832 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/analyze-design.user.txt` | one-shot workflow | prompts/workflows.ts | 504 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/optimize-gcode.system.txt` | one-shot workflow | prompts/workflows.ts | 833 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/optimize-gcode.user.txt` | one-shot workflow | prompts/workflows.ts | 480 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/recommend-machining-parameters.system.txt` | one-shot workflow | prompts/workflows.ts | 575 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/recommend-machining-parameters.user.txt` | one-shot workflow | prompts/workflows.ts | 427 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/summarize-design-suggestions.system.txt` | one-shot workflow | prompts/workflows.ts | 580 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/summarize-design-suggestions.user.txt` | one-shot workflow | prompts/workflows.ts | 328 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/title.system.txt` | one-shot workflow | prompts/workflows.ts | 193 | prompt-corpus.test.ts |
+| `packages/ai/src/prompts/workflows/title.user.txt` | one-shot workflow | prompts/workflows.ts | 59 | prompt-corpus.test.ts |
 
 ## One-shot workflows (`packages/ai/src/prompts/workflows.ts`)
 
-| Template | Source chars |
+| Template | Prompt chars (system + user) |
 | --- | --- |
-| `ANALYZE_DESIGN` | 1036 |
-| `OPTIMIZE_GCODE` | 926 |
-| `RECOMMEND_MACHINING_PARAMETERS` | 846 |
-| `SUMMARIZE_DESIGN_SUGGESTIONS` | 838 |
-| `TITLE_GENERATION` | 3208 |
+| `ANALYZE_DESIGN` | 1336 |
+| `OPTIMIZE_GCODE` | 1313 |
+| `RECOMMEND_MACHINING_PARAMETERS` | 1002 |
+| `SUMMARIZE_DESIGN_SUGGESTIONS` | 908 |
+| `TITLE_GENERATION` | 252 |
 
-## Skills (`packages/ai/src/skills/index.ts`)
+## Skills (`packages/ai/src/skills/text/*.md`, loaded by `skills/index.ts`)
 
 | Skill | Category | Body chars | Tools it names |
 | --- | --- | --- | --- |
@@ -252,13 +266,13 @@ action a result schema its answers are validated against, `unknown (N)` while it
 | `toolpath-verification` | cam | 1797 | cam_edit |
 | `cutting-parameters` | cam | 1108 | cam, library |
 | `drilling-and-holes` | cam | 788 | — |
-| `precision-and-tolerances` | cam | 1894 | cam_edit |
-| `industrial-standards` | cad | 5609 | cad, library, parts |
+| `precision-and-tolerances` | cam | 2197 | cam_edit |
+| `industrial-standards` | cad | 5993 | cad, library, parts |
 | `machines-and-axes` | cam | 2205 | cam, cam_edit, parts |
 | `drawings-and-images` | cad | 2381 | cad, cad_edit, parts |
 | `plugin-authoring` | dev | 1659 | — |
-| `parametric-design` | cad | 6658 | cad, cad_edit, parts, vcs_edit |
-| `fusion-360-modelling` | cad | 8073 | cad, cad_edit, cam |
+| `parametric-design` | cad | 6710 | cad, cad_edit, parts, vcs_edit |
+| `fusion-360-modelling` | cad | 8072 | cad, cad_edit, cam |
 | `composed-cam-programs` | cam | 2514 | cam, cam_edit, library |
 | `version-control-cadcam` | vcs | 1008 | vcs, vcs_edit, agent |
 | `workflows-cadcam` | workflows | 1468 | cam, vcs_edit |

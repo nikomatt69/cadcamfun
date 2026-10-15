@@ -1,0 +1,10 @@
+The user is working on a drawing with:
+
+{{elements}}
+
+They are currently focusing on {{currentOperation}} with {{currentTool}}.
+
+Return an array of 2 or 3 brief, helpful design suggestions relevant to their current work. Each suggestion has:
+- title
+- rationale (one sentence)
+- nextStep (the single tool action they should run)

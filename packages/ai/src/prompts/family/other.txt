@@ -1,0 +1,3 @@
+Working style for this model:
+- Work through the request one tool call at a time; read each result before the next call.
+- Keep the plan short and explicit in your answer, and do not stop before every step is done and checked.

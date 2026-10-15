@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Steps 7–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Steps 8–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -317,20 +317,43 @@ Progress (2026-10-15):
 D: inventory and action contract. WP8 text review; memory/context integrated in their RM steps. Code: `prompts/system.ts`,
 `prompts/workflows.ts`, `prompts/modes/*`, `nikcli/prompts/*`, `tools/prompts/*`, `skills/index.ts`.
 
-- [ ] Move main, provider, workflow and skill texts into separate files.
-- [ ] Keep typed loaders and one composition.
-- [ ] Fix modes that suggest obsolete nested actions.
-- [ ] Replace 2D-only workflows with contracts matching the real capabilities.
-- [ ] Fix every instruction that confuses nominal, limits and target.
-- [ ] Label cutting heuristics and simulation limits.
-- [ ] Attach sources and editions to engineering data.
-- [ ] Validate every JSON example against the catalogue.
-- [ ] Run every significant geometric example against the kernel.
-- [ ] Keep separate budgets for static prompts, descriptions and loaded skills.
+- [x] Move main, provider, workflow and skill texts into separate files.
+- [x] Keep typed loaders and one composition.
+- [x] Fix modes that suggest obsolete nested actions.
+- [x] Replace 2D-only workflows with contracts matching the real capabilities.
+- [x] Fix every instruction that confuses nominal, limits and target.
+- [x] Label cutting heuristics and simulation limits.
+- [x] Attach sources and editions to engineering data.
+- [x] Validate every JSON example against the catalogue.
+- [x] Run every significant geometric example against the kernel.
+- [x] Keep separate budgets for static prompts, descriptions and loaded skills.
 
 Tests: `prompts.test.ts`, `modes.test.ts`, `tool-prompts.test.ts`, `skills.test.ts`, `workflows.test.ts`,
 `fusion-modelling.test.ts`. Gate: every inventory entry reviewed; executable examples work and no text promises an
 unsupported capability.
+
+Progress (2026-10-15):
+
+- **V** One corpus (`prompts/corpus.ts` `promptCorpus`) lists every text the model reads: base system prompt, modes,
+  model-family styles, specialists, tool descriptions, skills and one-shot workflows. `prompt-corpus.test.ts` walks it:
+  every `tool action name`, `tool.name` and `tools.x({ action })` reference resolves in the catalogue; no prose uses the
+  retired nested `action: "..."` form; every quoted parametric history builds through `cad.parametric_validate`; each kind
+  stays inside its own budget (`PROMPT_BUDGETS`). The inventory lists the test against every prompt file.
+- **V** Fixed: the CAD and CAM modes and the planner, machinist, modeler and verifier prompts named retired nested actions
+  (`inspect_elements` + `action: "search"`, `parametric_validate` + `action: "dfm" | "recipe" | "fastener"`,
+  `cam.stock` + `action: "inspect"`) and said `cam.stock` sets the stock (it reads; `cam_edit.stock_set` sets).
+- **V** Skills live in `skills/text/<name>.md` (placeholders `{{elementCatalogue}}`, `{{toolTypes}}`, `{{fusionExample}}` filled
+  from the code; an unknown one throws), workflows in `prompts/workflows/*.txt`, model-family styles in
+  `prompts/family/*.txt`. The migrated skill bodies were compared with the previous ones: identical except one trailing
+  newline.
+- **V** Workflows: the design review and suggestions no longer limit the drawing to 2D; each user prompt names exactly the
+  fields of its output schema (the old ones asked for `estimated_savings`, `depth_of_chi_mm`, `next_step`, which the
+  decoder rejects); G-code optimisation and cutting parameters say they are an unsimulated proposal and heuristic
+  starting values.
+- **V** Engineering data: the standards skill names the edition of each standard it condenses; the precision skill
+  separates nominal, limits and target (the g6 example is now the exact middle of its limits).
+- Limit: semantic review of the prose is by reading; the tests catch names, examples, contracts and budgets, not every
+  wrong sentence.
 
 ### Step 8 — Separate program generation from verification
 
@@ -492,3 +515,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   bridge), compare-and-swap writes with receipts; persisted revision, stored receipts and deduplication left to RM-03.
 - 2026-10-15: Step 6 progress: one context assembly with manifest and aggregate budget, authorised acquisition in the
   sidecar, habits delivered once with the host's automatic reminder disabled, notes by recency, Brain cache invalidation.
+- 2026-10-15: closed Step 7: one prompt corpus checked against the catalogue, the kernel, the workflow schemas and separate
+  budgets; retired nested actions removed; skills, workflows and family styles moved to text files; standards editions.

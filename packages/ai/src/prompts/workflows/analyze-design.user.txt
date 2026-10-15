@@ -1,0 +1,19 @@
+Review the following drawing:
+
+{{description}}
+
+Active layer: {{layer}}
+Machine work volume: {{machine}}
+
+Provide suggestions in these categories:
+1. Structural improvements
+2. Manufacturing optimisations
+3. Material efficiency
+4. Design simplification
+
+Return {"suggestions": [...]}; each suggestion has:
+- title: a short headline
+- description: a one-paragraph explanation, naming any assumption
+- confidence: 0 to 1
+- priority: "low" | "medium" | "high"
+- kind: "optimization" | "warning" | "critical"

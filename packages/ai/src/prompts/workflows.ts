@@ -1,9 +1,10 @@
+/// <reference path="../text.d.ts" />
 /**
  * One-shot AI workflows (legacy `promptTemplates.ts` ported to the new architecture).
  *
- * Each workflow is a (system, user) prompt pair plus an Effect Schema describing
- * the structured output. The renderer (`prompts/system.ts`) substitutes placeholders
- * safely (missing keys -> empty).
+ * Each workflow is a (system, user) prompt pair, one `.txt` file each under `workflows/`, plus an Effect Schema describing
+ * the structured output. The user prompt names exactly the fields of that schema (the tests hold them together). The
+ * renderer (`prompts/system.ts`) substitutes placeholders safely (missing keys -> empty).
  *
  * Flow callers:
  * - `analyzeDesign`: legacy `promptTemplates.designAnalysis`
@@ -14,13 +15,21 @@
  *   completion; nikcli's title agent is disabled by config, so we generate titles
  *   on demand through `DirectModel.generateObject`).
  *
- * The full 3D element vocabulary is intentionally not ported here: CADCAMFUN v6
- * uses 2D entities (line, circle, arc, polyline, rectangle) and the legacy 3D
- * vocabulary (cube/sphere/cone/...) has no counterpart in `core`. The `cad_*`
- * tools cover what the model can actually draw.
+ * The drawing a workflow reviews is whatever the caller describes: 3D solids, parametric parts, components and 2D sketch
+ * entities alike. These workflows give advice only; nothing they return is rebuilt, simulated or stored.
  */
 import { Schema } from "effect"
 import { render } from "./system.ts"
+import analyzeDesignSystem from "./workflows/analyze-design.system.txt" with { type: "text" }
+import analyzeDesignUser from "./workflows/analyze-design.user.txt" with { type: "text" }
+import optimizeGcodeSystem from "./workflows/optimize-gcode.system.txt" with { type: "text" }
+import optimizeGcodeUser from "./workflows/optimize-gcode.user.txt" with { type: "text" }
+import recommendSystem from "./workflows/recommend-machining-parameters.system.txt" with { type: "text" }
+import recommendUser from "./workflows/recommend-machining-parameters.user.txt" with { type: "text" }
+import suggestionsSystem from "./workflows/summarize-design-suggestions.system.txt" with { type: "text" }
+import suggestionsUser from "./workflows/summarize-design-suggestions.user.txt" with { type: "text" }
+import titleSystem from "./workflows/title.system.txt" with { type: "text" }
+import titleUser from "./workflows/title.user.txt" with { type: "text" }
 
 export interface PromptTemplate {
   readonly system: string
@@ -30,139 +39,17 @@ export interface PromptTemplate {
 }
 
 const t = (system: string, user: string, variables: ReadonlyArray<string>): PromptTemplate =>
-  ({ system, user, variables })
+  ({ system: system.trim(), user: user.trim(), variables })
 
-export const ANALYZE_DESIGN = t(
-  `You are a CAD/CAM design expert. Your task is to analyse a 2D drawing (lines, circles, arcs, polylines, rectangles) and surface suggestions for improvement.
+export const ANALYZE_DESIGN = t(analyzeDesignSystem, analyzeDesignUser, ["description", "layer", "machine"])
 
-Focus on:
-- Manufacturability (wall thickness, feature sizes, tolerance feasibility)
-- Design for Manufacturing and Assembly (DFM/DFA)
-- Material efficiency
-- Structural / geometric redundancy
+export const OPTIMIZE_GCODE = t(optimizeGcodeSystem, optimizeGcodeUser, ["machineType", "material", "gcode", "constraints"])
 
-Use technical terminology appropriate for mechanical engineering and manufacturing.
-Output strict JSON only — no prose, no markdown fences.`,
-  `Analyse the following 2D drawing:
+export const RECOMMEND_MACHINING_PARAMETERS = t(recommendSystem, recommendUser, ["material", "tool", "operation", "machine"])
 
-{{description}}
+export const SUMMARIZE_DESIGN_SUGGESTIONS = t(suggestionsSystem, suggestionsUser, ["elements", "currentOperation", "currentTool"])
 
-Active layer: {{layer}}
-Machine work volume: {{machine}}
-
-Provide suggestions in these categories:
-1. Structural improvements
-2. Manufacturing optimisations
-3. Material efficiency
-4. Design simplification
-
-For each suggestion include:
-- title: a short headline
-- description: a one-paragraph explanation
-- confidence: 0–1
-- priority: "low" | "medium" | "high"
-- kind: "optimization" | "warning" | "critical"`,
-  ["description", "layer", "machine"]
-)
-
-export const OPTIMIZE_GCODE = t(
-  `You are a CNC programming expert. Your task is to analyse and improve G-code for {{machineType}} machines.
-
-Focus on:
-- Removing redundant operations
-- Optimising tool paths
-- Improving feed rates and speeds based on the material
-- Enhancing safety and reliability
-- Reducing machining time
-- Extending tool life
-
-Consider:
-- The specified material properties
-- Tool specifications
-- Machine capabilities
-- Manufacturing best practices
-
-Output strict JSON only.`,
-  `Analyse and optimise the following G-code for a {{machineType}} machine working with {{material}}:
-
-{{gcode}}
-
-Constraints and goals:
-{{constraints}}
-
-Provide:
-- gcode: the rewritten G-code as a string
-- changes: array of {line, before, after, reason} describing every edit
-- estimated_savings: {time_pct, tool_life_pct, quality_note}
-- notes: short prose summary`,
-  ["machineType", "material", "gcode", "constraints"]
-)
-
-export const RECOMMEND_MACHINING_PARAMETERS = t(
-  `You are a machining expert. Recommend cutting parameters for a CNC operation.
-
-Consider:
-- Material properties and machining characteristics
-- Tool geometry, material and coating
-- Operation type and requirements
-- Surface finish needs
-- Tool wear and life expectations
-- Machine rigidity and power limitations
-
-Output strict JSON only.`,
-  `Recommend optimal machining parameters for:
-
-Material: {{material}}
-Tool: {{tool}}
-Operation: {{operation}}
-Machine: {{machine}}
-
-Provide:
-- cutting_speed_m_per_min: number
-- feed_rate_mm_per_min: number
-- depth_of_chi_mm: number
-- stepover_pct: number (0–100)
-- coolant: "flood" | "mist" | "none"
-- engagement: "conventional" | "climb"
-- warnings: array of short strings for any unusual combination`,
-  ["material", "tool", "operation", "machine"]
-)
-
-export const SUMMARIZE_DESIGN_SUGGESTIONS = t(
-  `You are an AI design assistant. Provide brief, specific, contextual design suggestions as the user works on their model.
-
-Suggestions must be:
-- Brief and specific
-- Relevant to the current design context
-- Actionable and practical
-- Based on engineering best practices
-
-Focus areas:
-- Design for Manufacturing (DFM)
-- Material efficiency
-- Structural integrity
-- Functional improvements
-
-Output strict JSON only.`,
-  `The user is working on a 2D drawing with:
-
-{{elements}}
-
-They are currently focusing on {{currentOperation}} with {{currentTool}}.
-
-Provide 2–3 brief, helpful design suggestions relevant to their current work. Each suggestion:
-- title
-- rationale (one sentence)
-- next_step (the single tool call they should make)`,
-  ["elements", "currentOperation", "currentTool"]
-)
-
-export const TITLE_GENERATION = t(
-  `You generate a short conversation title (3–6 words) for a CAD/CAM user. The title is shown in a sidebar; it must be specific, lowercase, and end without punctuation. Output strict JSON only.`,
-  `Conversation excerpt:
-{{excerpt}}`,
-  ["excerpt"]
-)
+export const TITLE_GENERATION = t(titleSystem, titleUser, ["excerpt"])
 
 // ── Output Schemas ──────────────────────────────────────────────────────────
 
