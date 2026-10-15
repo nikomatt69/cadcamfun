@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Steps 8–11 pending.**
+Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Steps 9–11 pending.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -360,15 +360,29 @@ Progress (2026-10-15):
 D: revisions/receipts and relevant setup; RM-02/RM-03/RM-09 integration. Code: `apps/sidecar/src/services/ai.ts`
 (`verifyOperation`), `actions/cam-edit.ts`, `operationProgram`, `reviewOperation`, `drawing-context.ts`.
 
-- [ ] Make `verifyOperation` read the persisted NC.
-- [ ] Remove program generation and replacement from the verifier.
-- [ ] Bind reports to the NC hash and to the revisions of the manufacturing inputs.
-- [ ] Record the report through CAS on the checked identities.
-- [ ] Make verifications stale also when the setup changes and the NC text stays identical.
-- [ ] Expose effective resolution, coverage and omissions.
+- [x] Make `verifyOperation` read the persisted NC.
+- [x] Remove program generation and replacement from the verifier.
+- [x] Bind reports to the NC hash and to the revisions of the manufacturing inputs.
+- [x] Record the report through CAS on the checked identities.
+- [x] Make verifications stale also when the setup changes and the NC text stays identical.
+- [x] Expose effective resolution, coverage and omissions.
 
 Tests: `ai-cam-tools.test.ts`, `ai-cad-to-gcode-e2e.test.ts`, `cam-kernel.test.ts`, `cam-verify.test.ts`. Gate: verifying a
 program does not change its bytes; a change of program or inputs invalidates the report.
+
+Progress (2026-10-15):
+
+- **V** Already in place before this step (Steps 2 and 5): `verifyOperation` replays the program stored on the operation and
+  never generates, replaces or rewrites NC; the report carries `programHash`, the identity of the rebuilt manufacturing
+  request (geometry, stock, settings) and the drawing revision, and it is recorded with `toolpaths.updateWhere` only while
+  all three still hold; `coverage` gives the effective and requested resolution and the issues omitted; `cam.review`
+  reports `stale` when any of them moved.
+- **V** New gate test `apps/sidecar/test/ai-verify-binding.test.ts`: verifying leaves the stored bytes identical and the report
+  bound to their hash; a stock change written by another writer, with the NC text byte-for-byte unchanged, makes the review
+  `stale`, makes `operationProgram` refuse the program and makes a new verification refuse to replay it until the program is
+  generated again; an NC change with every input unchanged also makes the report stale.
+- Limit: the machine configuration is not a verification input yet (project defaults store a machine id that no CAM path
+  reads); when RM-09 makes it one, it has to enter the request identity the report is bound to.
 
 ### Step 9 — Durable sessions and tasks
 
@@ -517,3 +531,5 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
   sidecar, habits delivered once with the host's automatic reminder disabled, notes by recency, Brain cache invalidation.
 - 2026-10-15: closed Step 7: one prompt corpus checked against the catalogue, the kernel, the workflow schemas and separate
   budgets; retired nested actions removed; skills, workflows and family styles moved to text files; standards editions.
+- 2026-10-15: closed Step 8: gate test for a report bound to the stored program and its inputs (setup change with identical
+  NC, NC change with identical inputs, verification never writes NC); machine configuration recorded as the open input.
