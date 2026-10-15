@@ -23,6 +23,9 @@ export const makeAiBackgroundLayer = Layer.effect(
     const runner = new BackgroundToolsRunner(host.runtime, { manager })
     void backgroundToolContributions(runner.manager)
     yield* Effect.addFinalizer(() => Effect.promise(() => runner.dispose()))
+    // Tasks a previous process left behind: readers run again, editors are reported for reconciliation, undelivered
+    // outcomes reach their parent. Runner and completion hook are installed above, so nothing recovered is stranded.
+    yield* Effect.promise(() => manager.recover().catch(() => undefined))
     return AiBackground.of({
       runner,
       cancelForParent: (owner) =>
