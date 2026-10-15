@@ -1,0 +1,123 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+const toc = [
+  { title: "Site architecture", href: "#architecture" },
+  { title: "Local commands", href: "#commands" },
+  { title: "Content and API generation", href: "#content" },
+  { title: "Markdown export", href: "#markdown" },
+  { title: "Documentation assistant", href: "#assistant" },
+  { title: "Models and rate limits", href: "#bindings" },
+  { title: "Generated guide artifacts", href: "#artifacts" },
+  { title: "Local Studio", href: "#studio" },
+  { title: "Deployment", href: "#deployment" },
+  { title: "Operational diagnosis", href: "#diagnosis" },
+]
+---
+<DocsLayout title="Documentation site operations" subtitle="Run the Astro site, maintain API and search content, export Markdown, configure assistant bindings, and understand the local Studio boundary." description="CADCAMFUN documentation operations: content ownership, API reference generation, Markdown export, Workers AI or nikcli assistant, capability-protected artifacts, Studio database selection, deployment, and troubleshooting." toc={toc}>
+  <section id="architecture" class="doc-section">
+    <h2>Site architecture</h2>
+    <p><code>packages/web</code> is an Astro server-output application with the Cloudflare adapter. Documentation articles declare prerendering and become static HTML assets. Server routes handle Markdown export, documentation assistant requests, artifact viewing/raw content, and the production Studio fallback. This deployment is separate from the CAD/CAM sidecar.</p>
+    <p>The documentation site describes application behavior and supplies generated reference content. It does not inherit a visitor's projects, local application bearer token, provider credentials, or paired desktop connection. Its assistant uses documentation excerpts rather than silently operating the CAD/CAM workspace.</p>
+    <p>The local Studio is an additional Bun process because it uses <code>bun:sqlite</code>. Vite proxies its development API requests to loopback port 4396. A deployed Cloudflare Worker cannot open that local database; the production Studio API deliberately explains this with HTTP 503.</p>
+  </section>
+  <section id="commands" class="doc-section">
+    <h2>Local commands</h2>
+    <DocCode language="bash" title="From the repository root">{String.raw`bun run --filter @cadcamfun/web start
+bun run --filter @cadcamfun/web dev
+bun run --filter @cadcamfun/web studio
+bun test packages/web/test
+bun run --filter @cadcamfun/web typecheck
+bun run --filter @cadcamfun/web build`}</DocCode>
+    <table><thead><tr><th>Command</th><th>Process or output</th></tr></thead><tbody>
+      <tr><td><code>start</code></td><td>Astro development server only. Use the address printed in the terminal.</td></tr>
+      <tr><td><code>dev</code></td><td>Studio Bun process plus Astro. Its launcher stops the child processes when the main development process exits.</td></tr>
+      <tr><td><code>studio</code></td><td>Only the local Studio API on loopback port 4396.</td></tr>
+      <tr><td><code>typecheck</code></td><td>TypeScript and content integrity checks configured in this workspace.</td></tr>
+      <tr><td><code>build</code></td><td>Production Worker output and prerendered assets under <code>packages/web/dist</code>.</td></tr>
+    </tbody></table>
+    <p>Use Astro alone for article editing when Studio is unnecessary. Production compilation validates template generation and route output but does not call a real model backend, publish artifacts, or verify a deployed Cloudflare account.</p>
+  </section>
+  <section id="content" class="doc-section">
+    <h2>Content and API generation</h2>
+    <p>Articles live in <code>src/pages/docs</code> and share <code>DocsLayout.astro</code>. The sidebar in <code>src/data/docsSidebar.ts</code> is the documentation route inventory. <code>docsIndex.ts</code> adds per-route summaries and keywords for retrieval. A public page should have both a navigation entry and accurate retrieval copy; an unlinked article does not become discoverable merely because its file exists.</p>
+    <p>The API reference combines a generated contract snapshot with curated resource grouping in <code>src/data/apiGroups.ts</code>. <code>src/lib/apiReference.ts</code> selects every operation, resolves named schemas, and supplies the resource templates. The snapshot is generated from the composed application HttpApi using its installed Effect implementation.</p>
+    <DocCode language="bash" title="Inside packages/web">{String.raw`bun run generate:api-reference
+bun run check:api-reference
+bun run check:docs-index
+bun test test`}</DocCode>
+    <p>Regeneration writes the current schema contract; it does not write domain guidance or prove that a remote application is on the same version. Handwritten pages explain business validation, side effects, permissions, recovery, and implementation limits. Keep those explanations tied to the actual handlers and services.</p>
+    <p>Source-reading notes can be prepared under <code>packages/web/.tmp/content</code>. They are temporary editorial material, excluded from publication. Move finished explanations into article pages and update navigation/retrieval; do not use a temporary note as the only documentation for an operation.</p>
+  </section>
+  <section id="markdown" class="doc-section">
+    <h2>Markdown export</h2>
+    <p><code>GET /llm</code> lists known documentation pages as Markdown links. With <code>path</code>, it fetches the corresponding rendered article and converts it to GitHub-flavored Markdown. Adding <code>format=prompt</code> wraps that content in an instruction prompt that includes its canonical source.</p>
+    <DocCode language="bash" title="Replace DOCS_ORIGIN with the running site">{String.raw`curl "$DOCS_ORIGIN/llm"
+curl "$DOCS_ORIGIN/llm?path=/docs/cam"
+curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
+    <p>The pipeline reads only the article marked <code>data-llm-document</code>. It removes excluded content, scripts, styles, SVG decoration, and buttons so navigation and copy controls do not become answer context. It converts code blocks, headings, tables, and links rather than maintain a second handwritten Markdown corpus.</p>
+    <p>Only known documentation paths are admitted. Unknown paths return 404. A page-loading failure returns 502; another conversion failure returns 500. The response is Markdown with permissive read CORS and a public five-minute cache policy with stale-while-revalidate. These exported public articles do not contain local project credentials.</p>
+    <p>On Cloudflare, the helper prefers the ASSETS binding for prerendered pages. This keeps the read within the Worker deployment. Development can fall back to live fetching when the existing asset build does not contain a page. A stale local dist tree and a current source tree can therefore be different inputs while editing.</p>
+  </section>
+  <section id="assistant" class="doc-section">
+    <h2>Documentation assistant</h2>
+    <p><code>POST /api/docs-assistant</code> accepts conversation messages, an optional documentation path, and an optional backend session identifier. It keeps only user/assistant messages, trims each message to 1,200 characters, retains the most recent 12 valid messages, and requires a user question.</p>
+    <p>Retrieval first scores the current question and earlier user questions against titles, routes, keywords, and summaries. The current known page is retained. When a Workers AI binding is available, an optional tool-call planner can select relevant documentation routes; invalid selections or planner failures fall back to lexical retrieval.</p>
+    <p>Up to three pages are loaded. Each is condensed to a 5,000-character budget by retaining its introduction and matching sections. A long API resource page is therefore not automatically supplied in full to the model. Link the user to the relevant operation when the excerpt does not contain enough detail.</p>
+    <p>Loaded Markdown is cached separately for 30 minutes when the Worker cache is available. A source edit can require cache refresh in an already-running deployment. If no selected page can be loaded, the route returns 502. If no Workers AI binding or complete nikcli backend configuration exists, it returns 503 before generation.</p>
+  </section>
+  <section id="bindings" class="doc-section">
+    <h2>Models and rate limits</h2>
+    <table><thead><tr><th>Binding or setting</th><th>Role</th></tr></thead><tbody>
+      <tr><td><code>AI</code></td><td>Workers AI model execution for planning, answers, and optional richer guide rendering.</td></tr>
+      <tr><td><code>DOCS_ASSISTANT_MODEL</code></td><td>Answer/planning model; defaults to <code>@cf/meta/llama-3.1-8b-instruct-fast</code> in the route.</td></tr>
+      <tr><td><code>DOCS_ASSISTANT_ARTIFACT_MODEL</code></td><td>Guide rendering model; defaults to <code>@cf/openai/gpt-oss-20b</code>.</td></tr>
+      <tr><td><code>SESSIONS</code></td><td>Optional KV namespace used for best-effort per-IP hourly counters.</td></tr>
+      <tr><td><code>DOCS_ASSISTANT_RATE_LIMIT</code></td><td>Configured hourly cap; route fallback is 20.</td></tr>
+      <tr><td><code>CADCAMFUN_DOCS_SERVER</code> and <code>CADCAMFUN_DOCS_TOKEN</code></td><td>Both are needed to select the alternative nikcli session backend.</td></tr>
+      <tr><td><code>CADCAMFUN_DOCS_AGENT</code>, <code>CADCAMFUN_DOCS_DIRECTORY</code></td><td>Optional agent and directory for that remote backend.</td></tr>
+    </tbody></table>
+    <p>The nikcli path creates or reuses a remote session, subscribes to its stream before sending the message, and applies a 90-second turn timeout. This is documentation support on a configured backend; its token is separate from the CAD/CAM application's bridge or provider credentials.</p>
+    <p>The rate limiter requires the optional KV binding and a client IP header. Its read/increment/write sequence is best-effort rather than an atomic security quota, and KV failures are allowed through. Without the binding there is no enforced per-IP cap. Do not present it as a guaranteed allocation or rely on historical model pricing claims.</p>
+    <p>Local adapter configuration disables remote bindings. The model has no local implementation in this site. A normal local article preview can work while assistant requests return 503. Configure a reachable backend or validate model behavior in the intended deployment environment.</p>
+  </section>
+  <section id="artifacts" class="doc-section">
+    <h2>Generated guide artifacts</h2>
+    <p>A request for a guide, checklist, reference, or similar reusable page can produce an artifact draft. With <code>ARTIFACTS</code> R2 storage, the helper normalizes it to an HTML document and writes content plus metadata. A normalized empty document or one larger than 256 KiB is not published.</p>
+    <p>The returned link carries a <code>?key=</code> read capability. Anyone with that complete link can read the artifact. The bare identifier is not sufficient; there is no owner-account login gate for these anonymous guides. Treat the key as a share credential and avoid putting private project data into a publicly shared guide.</p>
+    <p>The viewer uses a private, non-cached shell and an iframe sandbox allowing scripts and popups without same-origin permission. The raw HTML route applies a content policy that allows inline scripts/styles and embedded data/blob images but blocks external network fetches and external font/style/script loads. Generated guides must be self-contained; their layout cannot depend on the site's current DOM or local storage.</p>
+    <p>The current publishing helper writes version 1 and a new random capability. The raw route can select a valid stored version with <code>v</code>; an invalid or out-of-range version falls back to the latest stored version. That retrieval support does not establish a public edit/version-management API.</p>
+    <p><code>ARTIFACT_PUBLIC_ORIGIN</code> can select the canonical share-link origin for non-local deployments. Missing storage returns 503 on artifact access. Missing content returns 404, and a rejected read capability returns 401. Keep generated guide storage and public documentation assets separate.</p>
+  </section>
+  <section id="studio" class="doc-section">
+    <h2>Local Studio</h2>
+    <p>Studio chooses <code>CADCAMFUN_DB</code>, then <code>DATABASE_URL</code> after stripping an initial file prefix, then the repository's <code>data/cadcamfun.db</code>. It only opens an existing file. This selection differs from the DB package CLI's process-relative default and the native desktop's application data directory.</p>
+    <p>Login checks an existing user's stored password with Bun's password verifier. It writes a seven-day session to the application Session table and sets an HTTP-only, SameSite=Lax cookie for the local Studio. No user-registration or initial-password bootstrap is implemented by that local server. A native local profile without a password does not acquire a Studio password automatically.</p>
+    <p>Authenticated overview queries count users, projects, drawings, and toolpaths across the selected installation, then return the eight most recently updated projects. It is a local installation overview rather than a per-project ownership-filtered dashboard. Use an appropriate local database and account; opening Studio is not a reason to point it at an unrelated user's file.</p>
+    <p>The production fallback under <code>/studio/api/*</code> is HTTP 503. Deploying the public docs does not upload SQLite contents or turn this local tool into a hosted database service.</p>
+  </section>
+  <section id="deployment" class="doc-section">
+    <h2>Deployment</h2>
+    <p><code>wrangler.toml</code> declares the Worker entry, static asset directory, AI binding, model settings, and commented examples for optional KV and R2 bindings. Configure actual resource IDs and secrets through the target Cloudflare environment. A binding name in a TypeScript interface is not proof the resource exists in the account.</p>
+    <p>The deploy script builds Astro, writes <code>dist/.assetsignore</code> so the Worker entry is excluded from static assets, and invokes Wrangler deployment. Deployment is a publishing operation; normal documentation verification should use build and local checks without running it.</p>
+    <p>Before publishing, validate static routes and API snapshot freshness, confirm intended bindings, verify assistant failure behavior without its backend, and check artifact capability access if storage is enabled. After publishing, inspect the resulting deployment and configured backend rather than treat a local build as evidence of a live service.</p>
+  </section>
+  <section id="diagnosis" class="doc-section">
+    <h2>Operational diagnosis</h2>
+    <table><thead><tr><th>Finding</th><th>Check</th></tr></thead><tbody>
+      <tr><td>Assistant 400</td><td>Valid JSON body and at least one non-empty user message after parsing/trimming.</td></tr>
+      <tr><td>Assistant 429</td><td>The optional configured per-IP counter and current hourly bucket.</td></tr>
+      <tr><td>Assistant 502</td><td>Whether the selected article paths can be loaded and converted in the deployment.</td></tr>
+      <tr><td>Assistant 503</td><td>Workers AI binding or complete nikcli backend URL/token configuration.</td></tr>
+      <tr><td>Markdown 404</td><td>The requested route must be in the navigation inventory, not an arbitrary URL.</td></tr>
+      <tr><td>Artifact 401</td><td>Use the complete capability link including its key.</td></tr>
+      <tr><td>Studio 503 locally</td><td>The selected existing SQLite file and running Bun Studio API.</td></tr>
+      <tr><td>Studio 503 in production</td><td>Expected fallback behavior; the deployed Worker is not the local Bun process.</td></tr>
+    </tbody></table>
+    <p>Implementation sources: <code>astro.config.mjs</code>, <code>wrangler.toml</code>, <code>script/dev.ts</code>, <code>script/deploy.ts</code>, <code>script/studio-server.ts</code>, <code>src/lib/docsMarkdown.ts</code>, <code>docsRetrieval.ts</code>, <code>nikcliDocsSession.ts</code>, <code>docsArtifact.ts</code>, and the route handlers under <code>src/pages</code>.</p>
+  </section>
+  <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Runtime configuration", href: "/docs/configuration" }, { title: "Contributing", href: "/docs/guides/contributing" }]} />
+</DocsLayout>

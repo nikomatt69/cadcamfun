@@ -1,157 +1,67 @@
 ---
 export const prerender = true
 import DocsLayout from "../../layouts/DocsLayout.astro"
-import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
-import DocRelated from "../../components/docs/DocRelated.astro"
-import { stack } from "../../data/architecture"
+import DocCallout from "../../components/docs/DocCallout.astro"
 
 const toc = [
-  { title: "Choices", href: "#choices" },
-  { title: "Pins", href: "#pins" },
-  { title: "Effect shape", href: "#effect" },
-  { title: "Why a sidecar", href: "#sidecar" },
-  { title: "Units", href: "#units" },
-  { title: "Boundaries", href: "#boundaries" },
+  { title: "What runs in each environment", href: "#execution-environments" },
+  { title: "Runtime and service framework", href: "#runtime" },
+  { title: "Database and contracts", href: "#data" },
+  { title: "Desktop and graphics", href: "#desktop" },
+  { title: "AI runtime", href: "#ai" },
+  { title: "Mobile and documentation", href: "#clients" }
 ]
 ---
 
-<DocsLayout
-  title="Stack"
-  subtitle="One Effect pin, one SQLite writer, SolidJS in the webview, Rust around the window."
-  description="CADCAMFUN stack pins: Bun, Effect 4.0.0-rc.112, Drizzle, Tauri v2, SolidJS, nikcli."
-  toc={toc}
->
-  <section id="choices" class="doc-section">
-    <h2>Choices</h2>
-    <p>
-      Spec <code>00-overview.md</code> §1 fixes the stack. The previous Next.js, Prisma, and
-      Stripe codebase stays in <code>.reference/</code>, git-ignored and read-only. Use it for
-      domain knowledge. Do not import from it.
-    </p>
+<DocsLayout title="Technology stack" subtitle="Versions and responsibilities taken from workspace manifests and runtime configuration." description="Versions and responsibilities taken from workspace manifests and runtime configuration." toc={toc}>
+  <section id="runtime" class="doc-section">
+    <h2>Runtime and service framework</h2>
+    <p>The root manifest selects <code>bun@1.4.2</code> as the package manager. Bun installs the workspaces, runs <code>bun:test</code>, serves the sidecar, provides SQLite and password hashing APIs, and compiles the sidecar binary. Desktop frontend development uses Vite, and native packaging uses Rust and Tauri.</p>
+    <p>Application services use <code>effect@4.0.0-rc.112</code>. The same exact release is declared across the workspaces that depend on Effect, including the API, database, core, desktop, workflow, and sidecar. Root overrides align the node platform packages to that release. Effect supplies typed errors, schemas, service context, layers, concurrency, and HTTP APIs.</p>
+    <p>The code uses the v4 service form <code>Context.Service</code> and HTTP modules under <code>effect/unstable</code>. Version-matched documentation is installed at <code>packages/db/node_modules/effect/ai-docs/src/</code>. Keep dependency upgrades coordinated across consumers.</p>
+  </section>
+
+  <section id="data" class="doc-section">
+    <h2>Database and contracts</h2>
+    <p>Persistence uses <code>drizzle-orm@1.0.0-beta.22</code> with <code>bun:sqlite</code>. Database migration generation uses the matching <code>drizzle-kit</code> release. The schema is TypeScript; generated migration directories contain the SQL and migration metadata used during upgrades.</p>
+    <p>Effect HttpApi defines the HTTP contract. The workspace code generator compiles that contract to Promise and Effect client outputs. Zod is also present in API and AI dependencies for integrations that require it; it does not replace HttpApi's boundary schemas.</p>
+  </section>
+
+  <section id="desktop" class="doc-section">
+    <h2>Desktop and graphics</h2>
+    <p>The desktop uses <code>solid-js ^1.9.0</code>, <code>@solidjs/router ^0.15.0</code>, <code>vite ^7.0.0</code>, and Tailwind CSS 3. The workbench uses Kobalte controls, Lucide icons, Monaco editing, and Chart.js where the corresponding features need them.</p>
+    <p>The viewport uses <code>three ^0.180.0</code>. Core geometry is separate from rendering; <code>three-csg-ts</code> and <code>occt-import-js 0.0.23</code> support additional desktop geometry/import paths. Tauri v2 supplies native API access, dialogs, shell operations, logging, OS integration, and updater integration through installed plugins.</p>
+  </section>
+
+  <section id="ai" class="doc-section">
+    <h2>AI runtime</h2>
+    <p><code>@cadcamfun/ai</code> pins <code>@nikcli-ai/sdk-next 1.428.0</code> and <code>ai 7.0.127</code>. Direct model adapters include Anthropic, OpenAI, OpenAI-compatible providers, and the AI SDK gateway. The sidecar selects the embedded nikcli host by default or the direct host through <code>CADCAMFUN_AI_HOST</code>.</p>
+    <p>Application tools and action schemas sit above provider transport. Changing a provider does not create a second action catalogue. Model connectivity, credentials, cancellation, and session behavior are documented in the <a href="/docs/ai">AI reference</a>.</p>
+  </section>
+
+  <section id="clients" class="doc-section">
+    <h2>Mobile and documentation</h2>
+    <p>The mobile manifest uses Expo <code>~57.0.27</code>, React <code>19.2.3</code>, React Native <code>0.86.3</code>, and Expo Router <code>~57.0.25</code>. Its custom companion transport is a native module. NativeWind, Reanimated, Gesture Handler, SecureStore, and local authentication support the mobile application.</p>
+    <p>This site uses Astro <code>^5.14.1</code> with the Cloudflare adapter, MDX and Tailwind integrations. Documentation pages are prerendered; assistant, Markdown, Studio fallback, and artifact routes run on the server. The local Studio API runs in Bun because it uses <code>bun:sqlite</code>.</p>
+    <p>TypeScript tooling includes TypeScript 5.9 and the native preview compiler. Most application workspaces use <code>tsgo</code>; web and mobile use <code>tsc</code>. The manifest ranges describe allowed dependency versions; the lockfile records the installed resolution.</p>
+  </section>
+
+
+  <section id="execution-environments" class="doc-section">
+    <h2>What runs in each environment</h2>
     <table>
-      <thead>
-        <tr><th>Concern</th><th>Choice</th></tr>
-      </thead>
+      <thead><tr><th>Environment</th><th>Code it runs</th><th>Relevant limitation</th></tr></thead>
       <tbody>
-        {stack.map((row) => (
-          <tr><td>{row.concern}</td><td>{row.choice}</td></tr>
-        ))}
+        <tr><td>Bun sidecar</td><td>Effect server/services, Drizzle, <code>bun:sqlite</code>, provider clients, workflow and history orchestration.</td><td>A browser or Cloudflare Worker cannot directly substitute for Bun's SQLite runtime.</td></tr>
+        <tr><td>Desktop webview</td><td>SolidJS state and interaction, core geometry, Three.js, API client.</td><td>Native operations require Tauri commands; browser preview supplies a different integration environment.</td></tr>
+        <tr><td>Rust shell</td><td>Tauri lifecycle, native window/menu/tray, secure commands, updater.</td><td>A successful Vite build does not build or validate the native application bundle.</td></tr>
+        <tr><td>Expo application</td><td>React Native screens and native companion transport.</td><td>Expo Go lacks the custom pinning module; JavaScript export does not produce a native installer.</td></tr>
+        <tr><td>Cloudflare documentation Worker</td><td>Server routes for Markdown, assistant requests, and guide artifacts.</td><td>It has no implicit access to a local sidecar or SQLite file; bindings and backend configuration are explicit.</td></tr>
+        <tr><td>Local Studio process</td><td>Bun HTTP server and direct read access through selected Drizzle tables.</td><td>The configured existing database and account session are independent from desktop discovery.</td></tr>
       </tbody>
     </table>
-    <p>
-      The UI packages are <code>solid-js</code>, <code>@solidjs/router</code>, and
-      <code>vite-plugin-solid</code>. Spec 06 re-implements the legacy React screens in Solid.
-      Three.js draws the viewport. Tailwind is the styling layer. Tests for screens use
-      <code>@solidjs/testing-library</code>.
-    </p>
+    <p>Use the build artifact corresponding to the environment being tested. Frontend output, a compiled sidecar, migration resources, an exported mobile bundle, and signed native installers are distinct outputs even when one command coordinates several stages.</p>
   </section>
 
-  <section id="pins" class="doc-section">
-    <h2>Pins</h2>
-    <table>
-      <thead>
-        <tr><th>Package</th><th>Version in this repo</th><th>Where</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Bun</td><td><code>1.4.2</code> (<code>packageManager</code>)</td><td>root <code>package.json</code></td></tr>
-        <tr><td><code>effect</code></td><td><code>4.0.0-rc.112</code></td><td>workspace-wide; required by nikcli</td></tr>
-        <tr><td><code>drizzle-orm</code> / <code>drizzle-kit</code></td><td><code>1.0.0-beta.22</code></td><td><code>packages/db/package.json</code></td></tr>
-        <tr><td><code>@nikcli-ai/sdk-next</code></td><td><code>1.428.0</code></td><td><code>packages/ai/package.json</code></td></tr>
-        <tr><td>App</td><td><code>6.0.0</code></td><td>root <code>package.json</code></td></tr>
-      </tbody>
-    </table>
-    <DocCallout type="warn" title="Do not bump Effect in one package">
-      <p>
-        <code>@nikcli-ai/sdk-next</code> requires <code>4.0.0-rc.112</code>. One copy keeps
-        <code>Context</code> tags identical across Layers. Version-matched docs are
-        <code>node_modules/effect/ai-docs/src/</code> inside a workspace package (Bun does not hoist).
-        Those docs differ from Effect v3. Read the folder that matches the API you are calling
-        before writing Effect code.
-      </p>
-    </DocCallout>
-    <p>
-      HTTP server examples for this pin live in
-      <code>node_modules/effect/ai-docs/src/51_http-server/</code> (<code>10_basics.ts</code> and
-      <code>fixtures/</code>). Sidecar imports are <code>effect/http</code>,
-      <code>effect/http-api</code>, and <code>@effect/platform-bun</code>.
-    </p>
-  </section>
-
-  <section id="effect" class="doc-section">
-    <h2>Effect shape</h2>
-    <p>
-      Services are classes. The tag string is <code>cadcamfun/X</code>. Traced functions use
-      <code>Effect.fn("Module.name")</code>. Hot paths use <code>Effect.fnUntraced</code>. Errors
-      that cross HTTP are <code>Schema.TaggedError</code>. Internal-only errors may use
-      <code>Data.TaggedError</code>. External input is decoded with
-      <code>Schema.decodeUnknownEffect</code>.
-    </p>
-    <DocCode language="ts" title="Service tag used in this repo">
-{`class Database extends Context.Service<Database, Shape>()("cadcamfun/Database") {
-  static layer = ...
-}`}
-    </DocCode>
-    <p>
-      Tags present in tree include <code>cadcamfun/Database</code>
-      (<code>packages/db/src/index.ts</code>) and <code>cadcamfun/AppConfig</code>
-      (<code>apps/sidecar/src/config.ts</code>). Spec 08 defines
-      <code>cadcamfun/AiCredentials</code> and <code>cadcamfun/AiService</code>.
-    </p>
-    <p>
-      Resources use <code>Effect.acquireRelease</code> inside a Layer. Callers never close the
-      SQLite handle. Tests are plain <code>bun:test</code>. Run an effect with
-      <code>Effect.runPromise</code> and provide layers explicitly. Database tests use
-      <code>:memory:</code> SQLite.
-    </p>
-  </section>
-
-  <section id="sidecar" class="doc-section">
-    <h2>Why a sidecar</h2>
-    <p>
-      Persistence is <code>bun:sqlite</code> plus Drizzle in the same process as Effect. An
-      Electron main process is Node and has no <code>bun:sqlite</code>. Tauri leaves application
-      logic in a compiled Bun binary. The Rust shell stays on window, tray, menus, updater,
-      keychain, and process lifecycle. Rust 1.96 is the toolchain named in spec 07. The CLI is
-      <code>bunx tauri</code> from <code>apps/desktop</code>.
-    </p>
-    <DocCode language="bash" title="Dev window (root package.json)">
-{`bun run desktop:dev
-# build:sidecar, then @cadcamfun/desktop tauri dev`}
-    </DocCode>
-    <p>
-      Packaged builds are <code>bun run build</code>, <code>bun run build:sidecar</code>, and
-      <code>bun run build:desktop</code>. The reproducible pipeline is <code>scripts/build.ts</code>
-      (spec 10).
-    </p>
-  </section>
-
-  <section id="units" class="doc-section">
-    <h2>Units</h2>
-    <p>
-      Internal geometry and CAM use millimetres and radians. Convert at the UI or the G-code
-      boundary. Angles in degrees never cross a module boundary. G-code numbers use a fixed
-      decimal count. The post default is 3 (<code>PostOptions.decimals</code> in
-      <code>packages/core/src/cam/post/types.ts</code>). Display conversion for the viewport lives
-      in <code>apps/desktop/src/viewport/units.ts</code> (<code>toDisplay</code>,
-      <code>fromDisplay</code>, <code>formatLength</code>, <code>formatAngle</code>).
-    </p>
-    <p>
-      AI provider keys are configuration the user supplies, and they are kept out of process
-      environment variables used for the model. Spec 05 and spec 08 put them in the OS keychain
-      and in an owner-only file <code>&lt;data dir&gt;/ai/credentials.json</code> (mode 0600).
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>Hot geometry and CAM loops in <code>packages/core</code> are plain functions. Effect and Schema wrap them at the edges.</li>
-      <li>A single package must not bump <code>effect</code> on its own. The pin moves for the whole workspace when <code>sdk-next</code> moves.</li>
-      <li>The desktop must not open <code>bun:sqlite</code>. The sidecar is the process that does.</li>
-      <li>The Rust shell must not grow toolpath math, solid kernels, or Drizzle queries.</li>
-      <li><code>.env*</code> files at the repo root are legacy. v6 does not read them. Agents must not print their values.</li>
-    </ul>
-  </section>
-  <DocRelated items={[{ title: "Conventions", href: "/docs/conventions" }, { title: "Database", href: "/docs/database" }, { title: "Architecture", href: "/docs/architecture" }]} />
 </DocsLayout>

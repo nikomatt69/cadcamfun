@@ -1,0 +1,30 @@
+---
+import DocCode from "./DocCode.astro"
+import { resolveSchema, schemaType, schemaName, schemaAnchor, schemaRules, type ApiSchema } from "../../lib/apiReference"
+interface Props { schema: ApiSchema; title?: string }
+const { schema, title = "Schema" } = Astro.props
+const resolved = resolveSchema(schema)
+const name = schemaName(schema)
+const fields = typeof resolved === "object" ? Object.entries(resolved.properties ?? {}) : []
+const required = typeof resolved === "object" ? new Set(resolved.required ?? []) : new Set<string>()
+---
+<p><strong>{title}:</strong> {name ? <a href={`#${schemaAnchor(name)}`}><code>{name}</code></a> : <code>{schemaType(schema)}</code>}</p>
+{typeof resolved === "object" && resolved.description && <p>{resolved.description}</p>}
+{fields.length > 0 && <div class="overflow-x-auto"><table>
+  <thead><tr><th>Field</th><th>Presence</th><th>Type and constraints</th></tr></thead>
+  <tbody>{fields.map(([field, value]) => {
+    const ref = schemaName(value)
+    return <tr>
+      <td><code>{field}</code></td>
+      <td>{required.has(field) ? "Required" : "Optional"}</td>
+      <td>{ref ? <a href={`#${schemaAnchor(ref)}`}><code>{schemaType(value)}</code></a> : <code>{schemaType(value)}</code>}
+        {typeof value === "object" && value.description && <p>{value.description}</p>}
+        {schemaRules(value) && <p>{schemaRules(value)}</p>}
+      </td>
+    </tr>
+  })}</tbody>
+</table></div>}
+<details>
+  <summary>Inspect the full {title.toLowerCase()}</summary>
+  <DocCode language="json" title={title}>{JSON.stringify(resolved, null, 2)}</DocCode>
+</details>

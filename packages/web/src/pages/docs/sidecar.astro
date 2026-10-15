@@ -6,382 +6,167 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Process", href: "#process" },
-  { title: "Layout", href: "#layout" },
-  { title: "Configuration", href: "#config" },
-  { title: "What is served", href: "#served" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Ready event", href: "#ready" },
-  { title: "Environment", href: "#environment" },
-  { title: "HTTP files", href: "#http-files" },
-  { title: "Services", href: "#services" },
-  { title: "Repositories", href: "#repos" },
-  { title: "Plugin host", href: "#plugin-host" },
-  { title: "Companion routes", href: "#companion-routes" },
+  { title: "Runtime responsibilities", href: "#status" },
+  { title: "Process and shutdown protocol", href: "#process" },
+  { title: "Required configuration", href: "#config" },
+  { title: "Optional configuration", href: "#environment" },
+  { title: "HTTP access and API discovery", href: "#served" },
+  { title: "Source organization", href: "#layout" },
+  { title: "Handler groups", href: "#http-files" },
+  { title: "Domain service composition", href: "#services" },
+  { title: "Repository boundary", href: "#repos" },
+  { title: "Plugin integration", href: "#plugin-host" },
+  { title: "Companion HTTPS gateway", href: "#companion-routes" },
+  { title: "Readiness and diagnostics", href: "#ready" },
+  { title: "Data ownership", href: "#boundaries" },
+  { title: "Launch a disposable local instance", href: "#development-launch" },
+  { title: "Logs and optional telemetry", href: "#observability" },
+  { title: "Identify the failing boundary", href: "#troubleshooting" },
 ]
 ---
 
 <DocsLayout
   title="Sidecar"
-  subtitle="The Bun process that owns SQLite, HTTP, plugins, and the assistant host."
-  description="CADCAMFUN sidecar: process model, handlers, repositories, configuration, and what is still missing."
+  subtitle="The local Bun service that owns persistence, authenticated HTTP, manufacturing services, project history, and the assistant."
+  description="CADCAMFUN sidecar: startup protocol, loopback API, configuration, service wiring, shutdown, observability, and companion gateway."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP4 on the task board is <strong>in progress</strong>. Every contract group is served
-      (plugins, auth, analytics, waitlist, and files were added). Families without a contract
-      are still missing. See <code>specs/11-api-parity-brief.md</code>. Owner directory:
-      <code>apps/sidecar</code> (<code>@cadcamfun/sidecar</code>). Spec:
-      <code>specs/05-api-sidecar.md</code>.
-    </p>
-    <DocCallout type="note" title="About 15% of legacy route files">
-      <p>
-        Spec 05 records projects, materials, tools, machine configs, drawings, components,
-        toolpaths, library, health, and native system routes as implemented end to end, plus
-        production costs, organizations, notifications, legacy plugin routes, files, analytics,
-        waitlist, and seven auth routes, each with HTTP tests. That is still a minority of the
-        195 legacy route files. Contract coverage and handler coverage are different numbers.
-      </p>
-    </DocCallout>
+    <h2>Runtime responsibilities</h2>
+<p>The sidecar is the Bun backend shared by the desktop and local development integrations. It opens SQLite, supplies repositories and domain services, serves the schema-defined HTTP API, and hosts assistant and workflow integration. The Tauri shell starts the packaged binary and discovers its assigned port from a machine-readable startup event.</p>
+    <p><code>apps/sidecar/src/layers.ts</code> composes the served API, handlers, authorization, repositories, and services. Optional providers such as paid checkout and AI models are configured through their services; their absence does not turn a database record into a working external integration.</p>
   </section>
 
   <section id="process" class="doc-section">
-    <h2>Process</h2>
-    <p>
-      Tauri spawns the compiled binary. The sidecar binds <code>127.0.0.1</code> only, on port
-      <code>0</code> so the OS assigns a port. After migrations succeed and the server is
-      listening it prints one JSON line and nothing else on that channel.
-    </p>
-    <DocCode language="text" title="Stdout">
+    <h2>Process and shutdown protocol</h2>
+<p>The main HTTP server binds only <code>127.0.0.1</code>, with port <code>0</code> so the operating system chooses an available port. HTTP idle timeout is disabled to allow a long assistant call to remain silent between streamed events. Graceful HTTP shutdown is configured for 500 milliseconds before scope finalization continues.</p>
+    <p>After the API's public health probe succeeds, the process prints a ready event on stdout. Startup failure prints an error event and sets a failing exit code. Operational logs go to stderr as JSON; stdout is reserved for the parent process protocol.</p>
+    <DocCode language="text" title="Startup protocol examples">
 {`{"event":"ready","port":53211}
-{"event":"error","message":"…"}`}
+{"event":"error","message":"Startup failure details"}`}
     </DocCode>
-    <p>
-      The shell passes <code>CADCAMFUN_TOKEN</code> (32 random bytes, new every launch) and
-      reads the port. The webview sends <code>Authorization: Bearer</code>. CORS allows
-      <code>tauri://localhost</code>, <code>http://tauri.localhost</code>, and the Vite origin in
-      dev builds. Stdin close and <code>SIGTERM</code> shut the process down: finish requests,
-      checkpoint SQLite, close the handle in the layer finaliser. Spec 07 sends
-      <code>&#123;"event":"shutdown"&#125;</code> on stdin and waits up to 2 seconds.
-      <code>apps/sidecar/test/process.test.ts</code> covers three real-process modes. Driving that
-      drain through the Rust shell with the compiled binary is still an ignored test.
-    </p>
-  </section>
-
-  <section id="layout" class="doc-section">
-    <h2>Layout</h2>
-    <p>Directories under <code>apps/sidecar/src</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>main.ts</code></td><td>Build the layer graph, print the ready line, <code>Layer.launch</code>.</td></tr>
-        <tr><td><code>config.ts</code></td><td>The only module that reads process configuration. Exposes <code>cadcamfun/AppConfig</code>.</td></tr>
-        <tr><td><code>layers.ts</code></td><td>App layer composition.</td></tr>
-        <tr><td><code>startup.ts</code>, <code>shutdown.ts</code>, <code>observability.ts</code></td><td>Boot order, finalisers, log records.</td></tr>
-        <tr><td><code>http/</code></td><td>One handler file per group: <code>HttpApiBuilder.group</code>.</td></tr>
-        <tr><td><code>repos/</code></td><td>The only place that calls <code>Database.query</code>. JSON columns are decoded here.</td></tr>
-        <tr><td><code>services/</code></td><td>Domain services: AI, costs, storage, VCS, workflows, payments, companion gateway.</td></tr>
-        <tr><td><code>plugins/</code></td><td><code>host.ts</code>, <code>repo.ts</code>, <code>bootstrap-script.ts</code>.</td></tr>
-        <tr><td><code>data/</code></td><td>Seed or fixture data used by the server.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Handler files match the contract groups:
-      <code>projects.ts</code>, <code>drawings.ts</code>, <code>components.ts</code>,
-      <code>toolpaths.ts</code>, <code>toolpath-generator.ts</code>, <code>materials.ts</code>,
-      <code>tools.ts</code>, <code>machine-configs.ts</code>, <code>library.ts</code>,
-      <code>files.ts</code>, <code>ai.ts</code>, <code>plugins.ts</code>, <code>auth.ts</code>,
-      <code>analytics.ts</code>, <code>billing.ts</code>, <code>organizations.ts</code>,
-      <code>notifications.ts</code>, <code>waitlist.ts</code>, <code>production-costs.ts</code>,
-      <code>vcs.ts</code>, <code>companion.ts</code>, <code>kv.ts</code>, <code>health.ts</code>,
-      and the storage twins <code>materials-storage.ts</code>, <code>tools-storage.ts</code>,
-      <code>machine-configs-storage.ts</code>. There is no <code>http/cam-setup.ts</code>.
-    </p>
-    <p>
-      Repositories include <code>project-repo.ts</code>, <code>drawing-repo.ts</code>,
-      <code>toolpath-repo.ts</code>, <code>project-vcs-repo.ts</code>,
-      <code>plugin-registry-repo.ts</code>, and one file per aggregate. Each repository test uses
-      <code>Database.layer(&#123; path: ":memory:", migrationsFolder &#125;)</code>. HTTP tests use
-      an in-process web handler (<code>51_http-server/20_testing.ts</code> in the Effect docs).
-    </p>
-    <p>
-      On first start <code>LocalProfile</code> ensures one <code>User</code> row and exposes its
-      id as <code>ownerId</code>. <code>KvStore</code> (<code>services/kv.ts</code>) persists
-      JSON-compatible AI context and preferences. <code>CamProgramDocument</code> validation for
-      native saves lives with the toolpath handlers: the sidecar reruns a captured kernel
-      request before it accepts native evidence.
-    </p>
+    <p>A newline-terminated stdin message with <code>event: "shutdown"</code>, stdin closure, SIGINT, or SIGTERM releases the server scope. Malformed parent messages are ignored, and an oversized incomplete line is discarded. Finalizers stop owned services and checkpoint/close SQLite. Interrupt-only termination is reported as a clean exit.</p>
   </section>
 
   <section id="config" class="doc-section">
-    <h2>Configuration</h2>
-    <p>
-      Read once in <code>config.ts</code>. Other modules take <code>AppConfig</code>. AI model
-      keys are not environment variables. The UI pushes them with <code>PUT /ai/credentials</code>.
-      They are also stored at <code>&lt;data dir&gt;/ai/credentials.json</code>, owner-only.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Variable</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>CADCAMFUN_TOKEN</code></td><td>Required. Per-launch bearer token.</td></tr>
-        <tr><td><code>CADCAMFUN_DATA_DIR</code></td><td>Required. Database at <code>&lt;dir&gt;/cadcamfun.db</code>.</td></tr>
-        <tr><td><code>CADCAMFUN_MIGRATIONS_DIR</code></td><td>Bundled <code>drizzle/</code> SQL.</td></tr>
-        <tr><td><code>CADCAMFUN_LOG_LEVEL</code></td><td>Effect log level.</td></tr>
-        <tr><td><code>CADCAMFUN_APP_URL</code></td><td>Optional base for email links.</td></tr>
-        <tr><td><code>CADCAMFUN_DEBUG_LINKS</code></td><td>Echo reset and magic links in the response. There is no mail transport yet.</td></tr>
-        <tr><td><code>CADCAMFUN_AI_OFFLINE</code></td><td>Tests set this so the models.dev seed does not block boot.</td></tr>
-        <tr><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_PRICE_BASIC|PRO|ENTERPRISE</code></td><td>Optional. Missing key means checkout answers unconfigured.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Auth link JWTs use a per-install secret at <code>&lt;dataDir&gt;/auth-secret</code>.
-      Revoked session ids live in <code>&lt;dataDir&gt;/auth-revoked.json</code> until they
-      expire. Plugin files for the legacy installer live under
-      <code>&lt;dataDir&gt;/storage/plugins/&lt;id&gt;/</code>. The companion certificate lives
-      under <code>&lt;dataDir&gt;/companion/</code>.
-    </p>
-    <p>
-      Build the host binary with <code>bun run --filter @cadcamfun/sidecar build</code>. CI uses
-      <code>build:all</code> for macOS arm64 and x64, Windows x64, and Linux x64. The outfile
-      pattern is <code>apps/desktop/src-tauri/binaries/sidecar-&lt;target-triple&gt;</code>.
-      Effect log lines on stderr are one JSON object per event. Rust keeps the <code>level</code>
-      field and redacts bearer tokens before it publishes the line.
-    </p>
-  </section>
-
-  <section id="served" class="doc-section">
-    <h2>What is served</h2>
-    <p>
-      Use this list when you are wiring a screen. A route outside it needs a contract file, a
-      handler, a repository, and an HTTP test before a UI should call it.
-    </p>
-    <ul>
-      <li>Projects, drawings, components, toolpaths (generate, G-code, verify), materials, tools, machine configs, library.</li>
-      <li>Legacy <code>GET /api/health</code> and authenticated <code>GET /health</code>, <code>GET /version</code>.</li>
-      <li>Production costs, organizations, notifications, files, analytics (<code>system-metrics</code>, <code>track</code>), waitlist.</li>
-      <li>Seven contract-covered auth routes, session revoke on sign-out, magic-link and reset consumption.</li>
-      <li>Legacy <code>/api/plugins/*</code> (zip install, bootstrap script). The SDK worker host is a separate surface and is not the HTTP group. See <a href="/docs/plugins">Plugins</a>.</li>
-      <li>AI chat stream, credentials, models, stateless advice endpoints, and VCS tools used by the assistant.</li>
-      <li>Companion gateway on a separate HTTPS port when Settings turns it on.</li>
-    </ul>
-    <p>
-      <code>PaymentProvider</code> creates Stripe checkout and portal sessions when a secret is
-      configured. Webhook handling stores plan and customer ids. Open question 3 in spec 00 is
-      decided: Stripe, optional, no license-key product.
-    </p>
-    <p>
-      Runtime startup does not prewarm the AI SDK or download model metadata. The first catalogue
-      access owns that request. Scope shutdown aborts it.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>Handlers must not open SQLite themselves. They call a repository, and the repository calls <code>Database.query</code>.</li>
-      <li>Modules other than <code>config.ts</code> must not read <code>process.env</code>.</li>
-      <li>The sidecar must not listen on a public interface for the main API. <code>127.0.0.1</code> only. The companion gateway is the opt-in exception, and it has its own token and route allow-list.</li>
-      <li>The per-launch bearer token must not be written to disk or to logs.</li>
-      <li>Adding a contract group in <code>packages/api</code> does not implement a route. The handler and the HTTP test do.</li>
-      <li>Geometry algorithms stay in <code>packages/core</code>. The sidecar calls them. It does not reimplement offset or posting.</li>
-    </ul>
-  </section>
-  <section id="ready" class="doc-section">
-    <h2>Ready event</h2>
-    <p>
-      Entry is <code>bun src/main.ts</code> (<code>apps/sidecar/src/main.ts</code>). After
-      <code>/api/health</code> succeeds, stdout is one JSON object
-      <code>&#123; event: "ready", port &#125;</code>. Failure is
-      <code>&#123; event: "error", message &#125;</code>.
-    </p>
+    <h2>Required configuration</h2>
+<p><code>AppConfigService</code> reads process configuration once in <code>apps/sidecar/src/config.ts</code>. <code>CADCAMFUN_TOKEN</code> is the required application bearer token and <code>CADCAMFUN_DATA_DIR</code> is the required application data directory. The database path is <code>&lt;dataDir&gt;/cadcamfun.db</code>. <code>CADCAMFUN_MIGRATIONS_DIR</code> supplies the SQL migration folder; without it the database layer does not apply application migrations.</p>
+    <p>The desktop supplies launch configuration. For direct development, provide those configuration names in the launching shell and run the package's start script from the repository root:</p>
+    <DocCode language="bash" title="Start a configured sidecar">
+{`bun run --filter @cadcamfun/sidecar start`}
+    </DocCode>
+    <p>The sidecar package defines <code>start</code> and <code>typecheck</code> scripts. Packaged binary compilation is owned by the repository release scripts, rather than a sidecar-package <code>build</code> command.</p>
   </section>
 
   <section id="environment" class="doc-section">
-    <h2>Environment</h2>
-    <p>
-      Names read by the sidecar. Configuration already lists the required token, data directory,
-      migrations directory, app URL, debug links, and the offline AI flag.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Variable</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>CADCAMFUN_TOKEN</code></td><td>Per-launch bearer token.</td></tr>
-        <tr><td><code>CADCAMFUN_DATA_DIR</code></td><td>Data directory. Database file is under this path.</td></tr>
-        <tr><td><code>CADCAMFUN_MIGRATIONS_DIR</code></td><td>SQL migrations directory.</td></tr>
-        <tr><td><code>CADCAMFUN_APP_URL</code></td><td>Optional link base.</td></tr>
-        <tr><td><code>CADCAMFUN_DEBUG_LINKS</code></td><td>Echo reset and magic links.</td></tr>
-        <tr><td><code>CADCAMFUN_AI_OFFLINE</code></td><td>Skip the models.dev seed.</td></tr>
-        <tr><td><code>CADCAMFUN_AI_HOST</code></td><td><code>nikcli</code> or <code>direct</code>.</td></tr>
-        <tr><td><code>CADCAMFUN_AI_MINIMAX_BASE_URL</code></td><td>Override for the MiniMax base URL.</td></tr>
-        <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>Stripe webhook signature.</td></tr>
-        <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Stripe secret. Absent means checkout is unconfigured.</td></tr>
-        <tr><td><code>STRIPE_PRICE_*</code></td><td>Price ids. Configuration names <code>STRIPE_PRICE_BASIC</code>, <code>STRIPE_PRICE_PRO</code>, and <code>STRIPE_PRICE_ENTERPRISE</code>.</td></tr>
-        <tr><td><code>CRON_SECRET</code></td><td>Cron route secret.</td></tr>
-        <tr><td><code>ADMIN_EMAIL</code></td><td>Admin account email.</td></tr>
-        <tr><td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>OpenTelemetry OTLP endpoint.</td></tr>
-      </tbody>
-    </table>
+    <h2>Optional configuration</h2>
+<ul>
+      <li><code>CADCAMFUN_APP_URL</code> sets the base for authentication links; <code>CADCAMFUN_DEBUG_LINKS</code> enables returning debug reset/magic links and defaults to false.</li>
+      <li><code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> or <code>direct</code>. <code>CADCAMFUN_AI_OFFLINE</code> disables the optional model-catalogue network path. <code>CADCAMFUN_AI_MINIMAX_BASE_URL</code> overrides MiniMax's endpoint.</li>
+      <li><code>STRIPE_SECRET_KEY</code> enables the Stripe provider; <code>STRIPE_PRICE_BASIC</code>, <code>STRIPE_PRICE_PRO</code>, and <code>STRIPE_PRICE_ENTERPRISE</code> supply paid-plan prices. <code>STRIPE_WEBHOOK_SECRET</code> is required for signed webhook verification.</li>
+      <li><code>CRON_SECRET</code> supplies the cron route secret; without it the local application can call that route without an additional cron secret. <code>ADMIN_EMAIL</code> configures the administrator identity check.</li>
+      <li><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> enables the configured OTLP telemetry export. Without an endpoint, external telemetry export is off.</li>
+    </ul>
+    <p>AI provider keys are managed through the credential API and dedicated credential file. They are not read as vendor API-key environment settings by <code>AppConfigService</code>.</p>
+  </section>
+
+  <section id="served" class="doc-section">
+    <h2>HTTP access and API discovery</h2>
+<p>The sidecar publishes <code>/api/openapi.json</code> for its served contract and uses bearer middleware on protected groups. A second optional session header chooses the acting account. The local profile is created or reused under <code>local@cadcamfun.local</code>, keeping the installation usable without account sign-in.</p>
+    <p>CORS admits <code>tauri://localhost</code>, HTTP/HTTPS <code>tauri.localhost</code>, and HTTP localhost or 127.0.0.1 origins with an optional port. Other origins receive no allowed-origin response header. CORS is a browser policy; the bearer middleware remains the access control for protected routes.</p>
+    <p>The served groups cover design resources, manufacturing generation and verification, exact CAD, libraries, costs, AI, VCS/workflows, events, companion controls, identity, organizations, notifications, files, plugins, billing, analytics, waitlist, MCP, and local state. Consult the running OpenAPI document for method and payload details.</p>
+  </section>
+
+  <section id="layout" class="doc-section">
+    <h2>Source organization</h2>
+<p><code>main.ts</code> launches the scoped server and parent protocol. <code>config.ts</code> supplies configuration, <code>layers.ts</code> wires dependencies, <code>startup.ts</code> shares readiness and the loopback port, <code>shutdown.ts</code> reads parent shutdown messages, and <code>observability.ts</code> configures optional telemetry.</p>
+    <p><code>http/</code> maps validated requests to services. <code>repos/</code> maps resources to Drizzle queries and resource access rules. <code>services/</code> coordinates cross-resource behavior, and <code>plugins/</code> contains worker-host and browser bootstrap implementations.</p>
   </section>
 
   <section id="http-files" class="doc-section">
-    <h2>HTTP files</h2>
-    <p>Handler files under <code>apps/sidecar/src/http</code>:</p>
-    <table>
-      <thead>
-        <tr><th>File</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>health.ts</code></td></tr>
-        <tr><td><code>authorization.ts</code></td></tr>
-        <tr><td><code>auth.ts</code></td></tr>
-        <tr><td><code>projects.ts</code></td></tr>
-        <tr><td><code>materials.ts</code></td></tr>
-        <tr><td><code>materials-storage.ts</code></td></tr>
-        <tr><td><code>tools.ts</code></td></tr>
-        <tr><td><code>tools-storage.ts</code></td></tr>
-        <tr><td><code>machine-configs.ts</code></td></tr>
-        <tr><td><code>machine-configs-storage.ts</code></td></tr>
-        <tr><td><code>drawings.ts</code></td></tr>
-        <tr><td><code>components.ts</code></td></tr>
-        <tr><td><code>toolpaths.ts</code></td></tr>
-        <tr><td><code>toolpath-extras.ts</code></td></tr>
-        <tr><td><code>toolpath-generator.ts</code></td></tr>
-        <tr><td><code>cad-exact.ts</code></td></tr>
-        <tr><td><code>library.ts</code></td></tr>
-        <tr><td><code>organizations.ts</code></td></tr>
-        <tr><td><code>notifications.ts</code></td></tr>
-        <tr><td><code>production-costs.ts</code></td></tr>
-        <tr><td><code>analytics.ts</code></td></tr>
-        <tr><td><code>waitlist.ts</code></td></tr>
-        <tr><td><code>files.ts</code></td></tr>
-        <tr><td><code>plugins.ts</code></td></tr>
-        <tr><td><code>user.ts</code></td></tr>
-        <tr><td><code>billing.ts</code></td></tr>
-        <tr><td><code>misc.ts</code></td></tr>
-        <tr><td><code>kv.ts</code></td></tr>
-        <tr><td><code>mcp.ts</code></td></tr>
-        <tr><td><code>ai.ts</code></td></tr>
-        <tr><td><code>vcs.ts</code></td></tr>
-        <tr><td><code>events.ts</code></td></tr>
-        <tr><td><code>companion.ts</code></td></tr>
-        <tr><td><code>entity-io.ts</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Handler groups</h2>
+<p>Handlers are grouped by resource: projects, drawings, components, toolpaths and extras, the toolpath generator, exact CAD, materials/tools/machine configurations and their storage routes, library, costs, files, organizations, notifications, user/auth, billing, analytics, waitlist, MCP, miscellaneous application services, key-value state, AI, VCS, events, and companion management.</p>
+    <p><code>entity-io.ts</code> shares entity import/export helpers. <code>authorization.ts</code> applies application and scoped bridge credentials. A handler's declared payload has already passed schema decoding; service-level validation still checks references, ownership, evidence consistency, and domain constraints.</p>
   </section>
 
   <section id="services" class="doc-section">
-    <h2>Services</h2>
-    <p>Files under <code>apps/sidecar/src/services</code>:</p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Names</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>ai.ts</code></td><td><code>AiLive</code></td></tr>
-        <tr><td><code>cam-program.ts</code></td><td><code>runKernelRequest</code>, <code>prepareCamProgramData</code>, <code>drawingRevision</code>, <code>isPortableProgram</code></td></tr>
-        <tr><td><code>workflow-runner.ts</code></td><td><code>WorkflowRunner</code></td></tr>
-        <tr><td><code>workflow-steps.ts</code></td><td><code>builtinSteps</code></td></tr>
-        <tr><td><code>workflow-service-steps.ts</code></td><td><code>vcsCommitStep</code>, <code>notifyPushStep</code>, <code>aiPromptStep</code></td></tr>
-        <tr><td><code>workflow-service-steps-live.ts</code></td><td>—</td></tr>
-        <tr><td><code>project-vcs.ts</code></td><td>—</td></tr>
-        <tr><td><code>companion.ts</code></td><td>—</td></tr>
-        <tr><td><code>companion-gateway.ts</code></td><td><code>COMPANION_ROUTES</code>, <code>isCompanionRoute</code>, <code>hashToken</code>, <code>newToken</code>, <code>findToken</code>, <code>TokenRecord</code>, <code>generateCertificate</code>, <code>fingerprintOf</code>, <code>startGateway</code></td></tr>
-        <tr><td><code>storage.ts</code></td><td>—</td></tr>
-        <tr><td><code>kv.ts</code></td><td>—</td></tr>
-        <tr><td><code>costs.ts</code></td><td>—</td></tr>
-        <tr><td><code>payments.ts</code></td><td>—</td></tr>
-        <tr><td><code>notifications.ts</code></td><td>—</td></tr>
-        <tr><td><code>live-events.ts</code></td><td>—</td></tr>
-        <tr><td><code>bridge-tokens.ts</code></td><td>—</td></tr>
-        <tr><td><code>auth-tokens.ts</code></td><td>—</td></tr>
-        <tr><td><code>local-profile.ts</code></td><td>—</td></tr>
-        <tr><td><code>acting-user.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-parametric.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-exact.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-vision.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-transform.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-elements.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-plugins.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-vcs-tools.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-context.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-task-journal.ts</code></td><td>—</td></tr>
-        <tr><td><code>ai-inspection.ts</code></td><td>—</td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>apps/sidecar/src/startup.ts</code> and <code>apps/sidecar/src/shutdown.ts</code> are the
-      boot and finaliser modules beside <code>services/</code>.
-    </p>
+    <h2>Domain service composition</h2>
+<p>AI services supply drawing and CAM actions, parametric/exact inspection, project context, memory, worker journals, and plugin tools. <code>cam-program.ts</code> reruns captured manufacturing requests and validates native evidence during saves. History services apply snapshots, protected-branch rules, GitHub transport, and workflow execution.</p>
+    <p>Other services own file storage, cost calculations, local profile and acting-user state, token signing/revocation, bridge credentials, payments, notifications, live events, and companion lifecycle. Effect layers own their resources so shutdown releases them in dependency order.</p>
   </section>
 
   <section id="repos" class="doc-section">
-    <h2>Repositories</h2>
-    <p>Files under <code>apps/sidecar/src/repos</code>:</p>
-    <table>
-      <thead>
-        <tr><th>File</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>access.ts</code></td></tr>
-        <tr><td><code>analytics-repo.ts</code></td></tr>
-        <tr><td><code>auth-repo.ts</code></td></tr>
-        <tr><td><code>billing-repo.ts</code></td></tr>
-        <tr><td><code>cad-surface-repo.ts</code></td></tr>
-        <tr><td><code>component-repo.ts</code></td></tr>
-        <tr><td><code>drawing-repo.ts</code></td></tr>
-        <tr><td><code>file-repo.ts</code></td></tr>
-        <tr><td><code>import-loop.ts</code></td></tr>
-        <tr><td><code>library-repo.ts</code></td></tr>
-        <tr><td><code>machine-config-repo.ts</code></td></tr>
-        <tr><td><code>material-repo.ts</code></td></tr>
-        <tr><td><code>mcp-repo.ts</code></td></tr>
-        <tr><td><code>misc-repo.ts</code></td></tr>
-        <tr><td><code>notification-repo.ts</code></td></tr>
-        <tr><td><code>organization-repo.ts</code></td></tr>
-        <tr><td><code>plugin-registry-repo.ts</code></td></tr>
-        <tr><td><code>production-cost-repo.ts</code></td></tr>
-        <tr><td><code>project-repo.ts</code></td></tr>
-        <tr><td><code>project-vcs-repo.ts</code></td></tr>
-        <tr><td><code>tool-repo.ts</code></td></tr>
-        <tr><td><code>toolpath-library.ts</code></td></tr>
-        <tr><td><code>toolpath-repo.ts</code></td></tr>
-        <tr><td><code>user-repo.ts</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Repository boundary</h2>
+<p>Repositories use the shared <code>Database.query</code> service for persistence and typed storage failures. They decode stored JSON and enforce resource-specific access or provide authorization helpers. HTTP handlers translate domain/storage failures into their declared response errors; geometry calculations stay in <code>@cadcamfun/core</code>.</p>
   </section>
 
   <section id="plugin-host" class="doc-section">
-    <h2>Plugin host</h2>
-    <p>Files under <code>apps/sidecar/src/plugins</code>:</p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>host.ts</code></td><td>Bun <code>Worker</code>, <code>PluginHost</code></td></tr>
-        <tr><td><code>repo.ts</code></td><td>—</td></tr>
-        <tr><td><code>bootstrap-script.ts</code></td><td>—</td></tr>
-      </tbody>
-    </table>
+    <h2>Plugin integration</h2>
+<p>The general worker host is in <code>plugins/host.ts</code>. The production assistant plugin service loads explicitly enabled <code>ai:tool</code> extensions from the application plugin directory. The browser ZIP installer and bootstrap API use their own manifest and storage paths. See <a href="/docs/plugins">Plugins</a> before selecting an extension format or assuming a capability is wired.</p>
   </section>
 
   <section id="companion-routes" class="doc-section">
-    <h2>Companion routes</h2>
-    <p>
-      <code>apps/sidecar/src/services/companion-gateway.ts</code> exports
-      <code>COMPANION_ROUTES</code>, <code>isCompanionRoute</code>, <code>hashToken</code>,
-      <code>newToken</code>, <code>findToken</code>, <code>TokenRecord</code>,
-      <code>generateCertificate</code>, <code>fingerprintOf</code>, and <code>startGateway</code>.
-    </p>
+    <h2>Companion HTTPS gateway</h2>
+<p>The companion gateway is a separate opt-in HTTPS listener that can resume a previously enabled setting. It binds IPv4 for network clients, presents a generated certificate retained under <code>&lt;dataDir&gt;/companion</code>, and uses scoped revocable device tokens. Pairing supplies a certificate fingerprint so the mobile transport can pin the desktop.</p>
+    <p>The gateway checks an explicit route allow-list and forwards admitted requests to the loopback API with the application token. A paired phone never receives that application token. The allow-list excludes credential administration, plugin installation, file management, and billing. Revoking a device or disabling the gateway removes its network access.</p>
   </section>
-  <DocRelated items={[{ title: "API contract", href: "/docs/api" }, { title: "Desktop shell", href: "/docs/desktop" }, { title: "Database", href: "/docs/database" }]} />
+
+  <section id="ready" class="doc-section">
+    <h2>Readiness and diagnostics</h2>
+<p>The ready event means the local HTTP health probe succeeded after server layer construction. It does not mean a model provider has accepted a request, checkout is configured, or every optional network service is reachable. Diagnose those services through their own status and result endpoints.</p>
+    <p>For a startup error, retain the protocol message and relevant stderr events, check configuration and migrations, and inspect the data directory's accessibility. Never paste the launch bearer token or provider credential contents into diagnostic output.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Data ownership</h2>
+<p>Persistent data includes the SQLite database and migration backups, file storage, AI credential/configuration state, authentication secret and revocation records, plugin assets, and companion certificates. Protect the whole application data directory when backing it up or transferring an installation. The sidecar owns connection lifetime; clients own neither the SQLite handle nor the main bearer token's issuance.</p>
+  </section>
+
+  <section id="development-launch" class="doc-section">
+    <h2>Launch a disposable local instance</h2>
+<p>Run these commands at the repository root in a dedicated terminal. The directory is new, the token is generated locally without printing it, migrations are explicit, and direct/offline AI mode avoids importing the embedded conversation host for this startup check. <code>openssl</code> supplies the random launch token in this shell example.</p>
+    <DocCode language="bash" title="Explicit development configuration">
+{String.raw`export CADCAMFUN_DATA_DIR="$(mktemp -d /tmp/cadcamfun-docs.XXXXXX)"
+export CADCAMFUN_TOKEN="$(openssl rand -hex 32)"
+export CADCAMFUN_MIGRATIONS_DIR="$PWD/packages/db/drizzle"
+export CADCAMFUN_AI_HOST=direct
+export CADCAMFUN_AI_OFFLINE=1
+bun run --filter @cadcamfun/sidecar start`}
+    </DocCode>
+    <p>Read the ready event's port rather than assuming a fixed number. Keep stdin open while the service runs; piping from an already-ended input source asks it to shut down. Use SIGTERM or the shutdown protocol to release the database. The disposable directory remains available for inspection after exit.</p>
+    <p>With a connection URL and its token already available in a client shell, compare public liveness with protected access:</p>
+    <DocCode language="bash" title="Probe a running instance">
+{String.raw`curl --fail-with-body "$CADCAMFUN_URL/api/health"
+curl --fail-with-body -H "Authorization: Bearer $CADCAMFUN_TOKEN" "$CADCAMFUN_URL/version"
+curl --fail-with-body -H "Authorization: Bearer $CADCAMFUN_TOKEN" "$CADCAMFUN_URL/api/projects"`}
+    </DocCode>
+    <p>Source: <code>apps/sidecar/src/main.ts</code>, <code>config.ts</code>, <code>shutdown.ts</code>, and <code>test/process.test.ts</code>.</p>
+  </section>
+
+  <section id="observability" class="doc-section">
+    <h2>Logs and optional telemetry</h2>
+<p>Stderr JSON logs and stdout ready/error events have different consumers. A launcher should parse complete stdout lines and forward or retain stderr separately. A request that fails after readiness is an application error, not a second startup event.</p>
+    <p>When <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> is configured, <code>ObservabilityLive</code> sets up batching for spans/logs and periodic metric export. It appends <code>/v1/traces</code>, <code>/v1/metrics</code>, and <code>/v1/logs</code> to the supplied collector base after removing trailing slashes. Supply a collector base such as <code>http://collector:4318</code>, rather than an already suffixed signal URL.</p>
+    <p>The resource service name is <code>cadcamfun-sidecar</code> and its version comes from application configuration. Standard OpenTelemetry resource environment settings are handled by the SDK. Network export is optional, while local stderr remains available when no collector is configured.</p>
+    <p>Source: <code>apps/sidecar/src/observability.ts</code> and <code>main.ts</code>.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Identify the failing boundary</h2>
+<table>
+      <thead><tr><th>Symptom</th><th>Likely boundary and check</th></tr></thead>
+      <tbody>
+        <tr><td>Process exits before ready</td><td>Read the protocol error and stderr. Check required config, directory access, migration identity, and service construction.</td></tr>
+        <tr><td>Health answers but protected routes return 401</td><td>Use the token for this launch, not an account session token or a token from a prior launch. A bridge token opens only its two action routes.</td></tr>
+        <tr><td>A request works in curl but fails in a browser</td><td>Inspect browser origin and preflight response. The allow-list permits the supported Tauri and HTTP loopback origins; bearer access is still required.</td></tr>
+        <tr><td>Ready port is unreachable after launch</td><td>Check whether the parent closed stdin or the shell restarted the child. The main API binds loopback only and is not the phone-facing gateway.</td></tr>
+        <tr><td>Companion gateway fails to enable</td><td>Read certificate, port-bind, and persisted-settings errors. Explicit ports must be integers from 1024 to 65535; failure to save settings stops the new listener.</td></tr>
+        <tr><td>Data appears in one tool but not another</td><td>Compare explicit database paths for the sidecar, web Studio, and migration CLI before assuming resources were lost.</td></tr>
+      </tbody>
+    </table>
+    <p>The real-process lifecycle tests cover EOF, a split shutdown JSON line, and SIGTERM, then restart the same data directory and verify persisted projects. They also inspect the WAL after exit. This establishes the source process's lifecycle behavior; packaged shell and machine-specific delivery still require their own validation.</p>
+    <p>Source: <code>apps/sidecar/test/process.test.ts</code>, <code>src/http/authorization.ts</code>, <code>src/layers.ts</code>, and <code>src/services/companion.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "API contract", href: "/docs/api" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />
 </DocsLayout>

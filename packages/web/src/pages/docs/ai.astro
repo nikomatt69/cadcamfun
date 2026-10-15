@@ -6,405 +6,160 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Paths", href: "#paths" },
-  { title: "Host", href: "#host" },
-  { title: "Credentials", href: "#credentials" },
-  { title: "Tools and skills", href: "#tools" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Host switch", href: "#ai-host" },
-  { title: "Tool ids", href: "#tool-ids" },
-  { title: "Catalogue exports", href: "#catalogue-exports" },
-  { title: "Action ids", href: "#action-ids" },
-  { title: "Nikcli plugin", href: "#nikcli-plugin" },
+  { title: "Assistant services", href: "#status" },
+  { title: "Conversations and session controls", href: "#host" },
+  { title: "Providers and credentials", href: "#credentials" },
+  { title: "Actions and permissions", href: "#tools" },
+  { title: "Registered tool groups", href: "#tool-ids" },
+  { title: "Discover the current catalogue", href: "#action-ids" },
+  { title: "Public integration APIs", href: "#catalogue-exports" },
+  { title: "Background work and evidence", href: "#boundaries" },
+  { title: "Runtime selection", href: "#ai-host" },
+  { title: "Standalone nikcli access", href: "#nikcli-plugin" },
+  { title: "Implementation map", href: "#paths" },
+  { title: "Start and recover a conversation", href: "#streaming-example" },
+  { title: "Handle events without losing state", href: "#event-handling" },
+  { title: "Attachments and user skills", href: "#attachments" },
+  { title: "Diagnose assistant failures", href: "#troubleshooting" },
 ]
 ---
 
 <DocsLayout
   title="AI assistant"
-  subtitle="nikcli is the embedded host. AI SDK v7 is the one-shot path. The package does not store drawings."
-  description="CADCAMFUN AI layer: nikcli host, providers, tools, skills, and safety limits."
+  subtitle="Project-scoped conversations, typed CAD/CAM actions, explicit permissions, and provider credentials managed by the application."
+  description="CADCAMFUN assistant: nikcli sessions, direct model calls, credentials, tools, context, background tasks, and standalone access."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP8 on the task board is <strong>done</strong>. Owner directory: <code>packages/ai</code>
-      (<code>@cadcamfun/ai</code>). Spec: <code>specs/08-ai.md</code>. The pinned host is
-      <code>@nikcli-ai/sdk-next@1.428.0</code>. Effect stays at <code>4.0.0-rc.112</code> because
-      that package requires it. Follow-up contracts in spec 08 (manual compaction wired through
-      HTTP, live policy reload, desktop context occupancy) are integration work. The package
-      being done does not mean every assistant control in spec 24 is on screen.
-    </p>
-    <DocCallout type="note" title="Handlers live in the sidecar">
-      <p>
-        This package registers tools and validates arguments. The sidecar supplies
-        <code>ToolHandlers</code> so <code>packages/ai</code> has no SQLite dependency. Mutations
-        go through those handlers. Stateless HTTP workflows return suggestions and do not write
-        drawings or operations.
-      </p>
-    </DocCallout>
-  </section>
-
-  <section id="paths" class="doc-section">
-    <h2>Paths</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>packages/ai/src/nikcli/</code></td><td>Host runtime, isolation, catalogue, chat, agents, policy, compaction adapter, session controls.</td></tr>
-        <tr><td><code>packages/ai/src/nikcli/prompts/</code></td><td>Host prompt text.</td></tr>
-        <tr><td><code>packages/ai/src/tools/</code></td><td>Tool modules: <code>cad.ts</code>, <code>cam.ts</code>, <code>library.ts</code>, <code>vcs.ts</code>, <code>registry.ts</code>, <code>handlers.ts</code>.</td></tr>
-        <tr><td><code>packages/ai/src/tools/prompts/</code></td><td>Per-tool prompt text.</td></tr>
-        <tr><td><code>packages/ai/src/actions/</code></td><td>Action catalogue the desktop and the nikcli plugin share.</td></tr>
-        <tr><td><code>packages/ai/src/skills/</code></td><td>Playbooks installed into the isolated host config.</td></tr>
-        <tr><td><code>packages/ai/src/prompts/</code></td><td><code>base/</code> and <code>modes/</code> system prompts.</td></tr>
-        <tr><td><code>packages/ai/src/direct-model.ts</code></td><td>AI SDK v7 <code>generateText</code> / <code>streamText</code>.</td></tr>
-        <tr><td><code>packages/ai/test/</code></td><td>Host tests. They set <code>CADCAMFUN_AI_OFFLINE=1</code> and use a scripted local server.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Sidecar adapters that call this package live in <code>apps/sidecar/src/services/ai.ts</code>
-      and the <code>ai-*.ts</code> neighbours (<code>ai-vcs-tools.ts</code>,
-      <code>ai-parametric.ts</code>, <code>ai-inspection.ts</code>). Desktop chat is
-      <code>apps/desktop/src/features/ai</code>.
-    </p>
+    <h2>Assistant services</h2>
+<p><code>@cadcamfun/ai</code> provides model access, conversation events, the action catalogue, prompts, skills, context assembly, and host integration. The default conversation engine is embedded nikcli; AI SDK v7 supplies direct text, streaming, and structured-output calls. The sidecar injects handlers for project mutations, libraries, history, and application storage.</p>
+    <p>Chat can inspect and change a project through registered actions. Stateless title generation, design analysis, parameter recommendations, G-code optimization, and design-suggestion summaries return advice or structured output; those service methods do not save project edits. Review generated machining advice through deterministic CAM and verification before relying on it.</p>
   </section>
 
   <section id="host" class="doc-section">
-    <h2>Host</h2>
-    <p>
-      The primary path is <code>NikCli.create(&#123; directory &#125;)</code>. Conversations are
-      nikcli sessions (<code>session.create</code>, <code>session.prompt</code>,
-      <code>session.abort</code>). The host owns the tool loop and provider routing. The fallback
-      is <code>DirectModel</code>: <code>ai</code> v7 with <code>@ai-sdk/anthropic</code>,
-      <code>@ai-sdk/openai</code>, <code>@ai-sdk/openai-compatible</code> (MiniMax and any
-      compatible base URL), and <code>@ai-sdk/gateway</code>. Use the direct path when the host
-      is down or the call is stateless (titles, structured output, a G-code summary).
-    </p>
-    <DocCode language="ts" title="AiService shape (spec 08 §3)">
-{`chat(input): Stream<AiEvent>
-analyzeGcode(input): Effect<GcodeReport>
-generate(input): Effect<A>
-abort(sessionId): Effect<void>
-models / providers`}
-    </DocCode>
-    <p>
-      <code>AiEvent</code> is <code>delta</code>, <code>tool_call</code>, <code>tool_result</code>,
-      <code>permission_request</code>, <code>done</code>, or <code>error</code>. The same names
-      are the SSE contract. <code>ModelSelector</code> is an optional provider, model, and tier
-      (<code>fast</code>, <code>balanced</code>, <code>best</code>). One module maps tier to a
-      model id. Other files do not hard-code model ids.
-    </p>
-    <p>
-      Safety requirements from spec 08 §1, all tested:
-    </p>
-    <ul>
-      <li>Before create, <code>XDG_DATA_HOME</code>, <code>XDG_CACHE_HOME</code>, <code>XDG_CONFIG_HOME</code>, <code>XDG_STATE_HOME</code>, and <code>NIKCLI_TEST_HOME</code> point under <code>&lt;dataDir&gt;/ai/nikcli/</code>. <code>NIKCLI_DISABLE_PROJECT_CONFIG=1</code>. The host must not read <code>~/.config/nikcli</code>.</li>
-      <li>The <code>cadcam</code> agent allow-list is only the tools this package registers, plus the host <code>skill</code> tool. Built-in <code>bash</code>, <code>edit</code>, <code>write</code>, and <code>webfetch</code> stay off the list.</li>
-      <li>Permission mode is <code>default</code>. The agent does not auto-approve. Destructive tools require <code>confirm: true</code>.</li>
-      <li>Keys pass through <code>Redacted</code>. A sentinel key must not appear in logs.</li>
-      <li><code>directory</code> is a scratch folder inside app data, never the user’s home or project directory.</li>
-    </ul>
-    <p>
-      Background work is capped: at most four active workers and sixteen waiting tasks.
-      Specialists do not delegate, commit, or open pull requests. The host’s unrestricted
-      <code>task</code> tool stays denied. Cancellation holds a slot until the worker stops.
-    </p>
-    <p>
-      <code>sdk-next</code> ships JavaScript without <code>.d.ts</code>. Ambient types for the
-      surface this package calls live in <code>packages/ai/src/nikcli/sdk-next.d.ts</code>.
-      Spec 08 §6 still records the compile-size risk (~20 MB, many dependencies). If
-      <code>bun build --compile</code> cannot carry the host, the fallback is a second Bun
-      process behind the same <code>AiService</code> interface. That split is a recorded risk,
-      not a second architecture you should assume is running.
-    </p>
+    <h2>Conversations and session controls</h2>
+<p><code>POST /api/ai/chat/stream</code> emits typed events for text, reasoning, turn/step state, tool calls and results, diagnostics, questions, permission requests, retries, context changes, goals, completion, and errors. Client session identifiers are bound to host sessions and checked against their project. Retain the session ID to continue the same conversation.</p>
+    <p><code>POST /api/ai/sessions/state</code> recovers busy state, accumulated text, and task information after a disconnected stream. <code>/api/ai/chat/queue</code> admits a follow-up to an active conversation; <code>/api/ai/chat/abort</code> stops the turn and its associated workers. Removing a session cancels and joins its children before removing the host session.</p>
+    <p><code>/api/ai/sessions/control</code> supports status, detailed context inspection, compaction, memory consolidation, task cancellation, permission decisions, and answering or rejecting pending questions. Requests are checked against the parent conversation and its admitted child sessions. A question that is no longer pending cannot be answered by reusing its old identifier.</p>
   </section>
 
   <section id="credentials" class="doc-section">
-    <h2>Credentials</h2>
-    <p>
-      <code>ProviderId</code> is a string. <code>provider.list()</code> is the catalogue (models.dev
-      merged with the isolated <code>nikcli.json</code>). The four providers the app configures
-      are <code>anthropic</code>, <code>openai</code>, <code>minimax</code> (default base
-      <code>https://api.minimax.io/v1</code>), and <code>gateway</code>. Any other id still needs
-      a key before the host will call it. <code>DirectModel</code> only builds clients for those
-      four. Another provider on the one-shot path throws and asks for a base URL.
-    </p>
-    <p>
-      Resolution matches the legacy app: use the vendor when its key is set, otherwise the
-      gateway. <code>forceGateway</code> sends everything through the gateway.
-      <code>PUT</code> and <code>DELETE /ai/credentials</code> check the id against
-      <code>GET /ai/providers</code>. A typo is 400 <code>Unknown provider</code>.
-    </p>
-    <p>
-      Keys live in <code>&lt;data dir&gt;/ai/credentials.json</code> (atomic write, mode 0600)
-      and in the OS keychain via the Tauri <code>secret_*</code> commands. They are not in
-      SQLite and not in <code>LocalKeyValue</code>. The UI reads the keychain at boot and calls
-      <code>PUT /ai/credentials</code>. Shutdown clears the host’s copy and leaves the file.
-      With <code>NIKCLI_DISABLE_MODELS_FETCH=1</code> the host does not download models.dev.
-      <code>makeNikCliRuntime</code> seeds <code>&lt;cache&gt;/models.json</code> once, only when
-      the file is missing and <code>catalogue.network</code> is on. The sidecar enables that
-      unless <code>CADCAMFUN_AI_OFFLINE=1</code>. The seed does not block boot.
-    </p>
-    <p>
-      <code>GET /api/ai/providers</code> is the settings browser. <code>GET /api/ai/models</code>
-      is the flat list for the picker, cached for 60 seconds. Optional
-      <code>configuredOnly=true</code> filters to providers that have a key.
-    </p>
+    <h2>Providers and credentials</h2>
+<p><code>GET /api/ai/providers</code> lists provider metadata and configured state; <code>GET /api/ai/models</code> exposes the model picker catalogue with optional <code>configuredOnly=true</code>. Embedded-host catalogue reads are cached for one minute. Configuration and policy affect which providers are listed and usable.</p>
+    <p>Set credentials with <code>PUT /api/ai/credentials</code> and remove them with <code>DELETE /api/ai/credentials/:provider</code>. Keys must be non-empty, and a supplied base URL must be HTTP or HTTPS. The direct model factory supports Anthropic, OpenAI, MiniMax, and the AI gateway. Other provider IDs require an OpenAI-compatible base URL for direct calls. The embedded host uses its own provider catalogue and routing.</p>
+    <p>The sidecar persists credentials at <code>&lt;dataDir&gt;/ai/credentials.json</code> using a temporary file, owner-only mode 0600, and rename. A missing or damaged file reads as empty. A failed persistence write leaves the key available for the current process but does not guarantee it survives restart. Status responses expose configuration state rather than raw keys.</p>
+    <p>Credentials are represented with <code>Redacted</code> inside services and propagated to the host through a scoped credential sink. Closing the scope clears the host's copy. Credential changes update a revision used to distinguish cached stateless results.</p>
   </section>
 
   <section id="tools" class="doc-section">
-    <h2>Tools and skills</h2>
-    <p>
-      Parameter schemas on the host are zod 4. Every handler re-validates with the matching
-      Effect schema from <code>@cadcamfun/core</code> before it touches data. A test asserts the
-      two schemas accept and reject the same fixtures. Tool results are small JSON. They do not
-      include secrets or filesystem paths.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Tool</th><th>Effect</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>cad_add_entities</code>, <code>cad_modify_entities</code>, <code>cad_delete_entities</code></td><td>2D entities. Delete requires <code>confirm: true</code>.</td></tr>
-        <tr><td><code>cad_add_elements</code></td><td>Solids, extrude, revolve, sweep, loft, booleans. Invalid input adds nothing and lists every problem.</td></tr>
-        <tr><td><code>cad_describe_drawing</code>, <code>cad_component_list</code></td><td>Read-only counts, bounds, canvas instances.</td></tr>
-        <tr><td><code>cad_component_save</code>, <code>cad_component_insert</code>, <code>cad_component_delete</code></td><td>Library round-trip. Insert mints fresh element ids. Delete confirms.</td></tr>
-        <tr><td><code>cam_create_operation</code>, <code>cam_list_operations</code>, <code>cam_update_operation</code></td><td>WP2 parameter schemas. Update drops stale G-code.</td></tr>
-        <tr><td><code>cam_generate_gcode</code>, <code>cam_suggest_parameters</code>, <code>cam_analyze_gcode</code></td><td>Read-only generation, suggestions, and deterministic checks.</td></tr>
-        <tr><td><code>cam_verify_toolpath</code></td><td><code>cam.verify</code>. Holder, fixtures, and target solids are modelled only when the caller passed them.</td></tr>
-        <tr><td><code>lib_lookup_*</code>, <code>lib_upsert_*</code>, <code>lib_delete</code></td><td>Materials, tools, machine configs, components. Delete confirms. Machine-config delete still follows the library HTTP rules.</td></tr>
-        <tr><td><code>vcs_status</code>, <code>vcs_start_change</code>, <code>vcs_commit</code>, <code>vcs_open_pull_request</code></td><td>Companion flow. An AI actor cannot commit or merge on <code>main</code>. See <a href="/docs/history">History</a>.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Skills in <code>packages/ai/src/skills/index.ts</code> are the playbooks the base agent
-      loads: <code>cad-3d-modeling</code>, <code>cam-operation-workflow</code>,
-      <code>toolpath-verification</code>, <code>cutting-parameters</code>,
-      <code>drilling-and-holes</code>, <code>stock-and-fixtures</code>.
-      <code>installSkills</code> writes <code>&lt;config&gt;/skills/&lt;name&gt;/SKILL.md</code>
-      whenever host config is written, replacing those folders and leaving others alone. To
-      change what the assistant knows, edit that file. To add an ability, add
-      <code>tools/&lt;id&gt;.ts</code> and <code>tools/prompts/&lt;id&gt;.txt</code>, list the id
-      in <code>tools/registry.ts</code>, and name it from a skill.
-    </p>
-    <p>
-      Tests do not call real providers. A scripted <code>Bun.serve</code> replays SSE for the
-      host. <code>DirectModel</code> uses <code>MockLanguageModelV4</code> from <code>ai/test</code>.
-      <code>bun run --filter @cadcamfun/ai smoke</code> is the manual real-provider script and is
-      excluded from <code>bun test</code>. Host tests share one data directory because
-      <code>bun test</code> runs files in a single process. <code>loadSdk</code> resets
-      <code>Error.prepareStackTrace</code> around the import so a desktop test cannot break host
-      loading.
-    </p>
-    <p>
-      Workspace context and assistant notes use sidecar <code>KvStore</code> over
-      <code>LocalKeyValue</code>. Successful stateless workflows use a bounded in-memory LRU
-      keyed by normalized input, model selector, and credential revision. Failures are not
-      cached. Session chat is not cached.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li><code>packages/ai</code> must not open the project database. Storage is a handler the sidecar injects.</li>
-      <li>The embedded host must not see the user’s nikcli config, shell tools, or home directory.</li>
-      <li>API keys must not be logged, put in SQLite, or put in <code>LocalKeyValue</code>.</li>
-      <li>G-code optimization and other stateless workflows must not write toolpaths.</li>
-      <li>An AI actor must not commit, restore, or merge on <code>main</code>.</li>
-      <li>Do not bump Effect in this package alone. The workspace pin moves with <code>sdk-next</code>.</li>
-    </ul>
-  </section>
-  <section id="ai-host" class="doc-section">
-    <h2>Host switch</h2>
-    <p>
-      <code>CADCAMFUN_AI_HOST</code> is <code>nikcli</code> by default, or <code>direct</code>.
-      The sidecar layer that owns the service is <code>AiLive</code>.
-    </p>
+    <h2>Actions and permissions</h2>
+<p>The action catalogue declares each action identifier, parameter schema, effect, and execution path. Tools group related actions behind a required <code>action</code> field. The host validates tool input, and sidecar handlers perform domain validation and resource access checks before persisting changes.</p>
+    <p>Permission modes are <code>approve</code>, <code>ask</code>, and <code>auto</code>. They affect how ordinary tool calls are admitted; tools containing destructive actions retain a human approval rule in every mode. An input flag such as <code>confirm: true</code> does not replace that permission request. The host does not expose unrestricted shell or file-editing tools as a substitute for application actions.</p>
+    <p>Policies in <code>&lt;dataDir&gt;/ai/policy.json</code> restrict provider use, tool use, and bridge access. They are loaded by the service configuration; do not assume editing the file updates an already-running service. Project-scoped scratch directories and isolated nikcli configuration keep the embedded host separate from a user's standalone agent state.</p>
+    <p>Skills provide CAD/CAM playbooks and user-authored instructions. They guide use of existing tools; adding a skill does not add a new mutation API. The skills HTTP endpoints list, save, and delete supported user skill content.</p>
   </section>
 
   <section id="tool-ids" class="doc-section">
-    <h2>Tool ids</h2>
-    <table>
-      <thead>
-        <tr><th>Tool id</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>cad</code></td></tr>
-        <tr><td><code>cad_edit</code></td></tr>
-        <tr><td><code>cam</code></td></tr>
-        <tr><td><code>cam_edit</code></td></tr>
-        <tr><td><code>library</code></td></tr>
-        <tr><td><code>parts</code></td></tr>
-        <tr><td><code>library_edit</code></td></tr>
-        <tr><td><code>memory</code></td></tr>
-        <tr><td><code>memory_edit</code></td></tr>
-        <tr><td><code>research</code></td></tr>
-        <tr><td><code>vcs</code></td></tr>
-        <tr><td><code>vcs_edit</code></td></tr>
-        <tr><td><code>agent</code></td></tr>
-        <tr><td><code>cam_verify</code></td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="catalogue-exports" class="doc-section">
-    <h2>Catalogue exports</h2>
-    <p>Names exported from <code>packages/ai</code> for the action catalogue and the host:</p>
-    <table>
-      <thead>
-        <tr><th>Export</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>ACTION_CATALOGUE</code></td></tr>
-        <tr><td><code>ACTION_TOOL_IDS</code></td></tr>
-        <tr><td><code>EXPOSED_TOOL_IDS</code></td></tr>
-        <tr><td><code>runAction</code></td></tr>
-        <tr><td><code>actionById</code></td></tr>
-        <tr><td><code>toolKind</code></td></tr>
-        <tr><td><code>REPLACED_TOOL_IDS</code></td></tr>
-        <tr><td><code>AiService</code></td></tr>
-        <tr><td><code>makeNikCliRuntime</code></td></tr>
-        <tr><td><code>ToolRegistry</code></td></tr>
-        <tr><td><code>makeToolRegistry</code></td></tr>
-        <tr><td><code>assembleContext</code></td></tr>
-        <tr><td><code>CONTEXT_BUDGET</code></td></tr>
-        <tr><td><code>describeBridge</code></td></tr>
-        <tr><td><code>bridgeAllowed</code></td></tr>
-        <tr><td><code>scopeBridge</code></td></tr>
-        <tr><td><code>definePluginTool</code></td></tr>
-        <tr><td><code>makeAiBackgroundLayer</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Registered tool groups</h2>
+<p>The built-in groups are <code>cad</code>, <code>cad_edit</code>, <code>cam</code>, <code>cam_edit</code>, <code>library</code>, <code>parts</code>, <code>library_edit</code>, <code>memory</code>, <code>memory_edit</code>, <code>research</code>, <code>vcs</code>, <code>vcs_edit</code>, and <code>agent</code>. <code>cam_verify</code> exposes the generation and verification subset needed by the verifier role without granting the full CAM editing tool.</p>
+    <p>Tool grouping preserves effect boundaries. Read-only geometry inspection, library lookup, and memory recall are separate from changes to those resources. The injected registry can also admit extension tools; duplicate identifiers are rejected.</p>
   </section>
 
   <section id="action-ids" class="doc-section">
-    <h2>Action ids</h2>
-    <p>
-      Id literals in <code>packages/ai/src/actions</code>. Counts below are the literals in each file.
-    </p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Ids</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>cad.ts</code> (20)</td>
-          <td>
-            <code>cad.describe</code>, <code>cad.check</code>, <code>cad.relations</code>,
-            <code>cad.grep</code>, <code>cad.vision</code>, <code>cad.drawing</code>,
-            <code>cad.exact</code>, <code>cad.assembly</code>.
-            <code>cad.inspect_*</code> is 4 ids:
-            <code>cad.inspect_elements</code>, <code>cad.inspect_layers</code>,
-            <code>cad.inspect_search</code>, <code>cad.inspect_property</code>.
-            <code>cad.parametric_*</code> is 8 ids:
-            <code>cad.parametric_validate</code>, <code>cad.parametric_inspect</code>,
-            <code>cad.parametric_test</code>, <code>cad.parametric_dfm</code>,
-            <code>cad.parametric_exact</code>, <code>cad.parametric_fastener</code>,
-            <code>cad.parametric_recipe</code>, <code>cad.parametric_from_element</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>cad-edit.ts</code> (12)</td>
-          <td>
-            <code>cad_edit.add</code>, <code>cad_edit.add_entities</code>, <code>cad_edit.modify</code>,
-            <code>cad_edit.transform</code>, <code>cad_edit.group</code>, <code>cad_edit.delete</code>,
-            <code>cad_edit.editor</code>, <code>cad_edit.import</code>.
-            <code>cad_edit.parametric_*</code> is 4 ids:
-            <code>cad_edit.parametric_create</code>, <code>cad_edit.parametric_update</code>,
-            <code>cad_edit.parametric_recipe_create</code>, <code>cad_edit.parametric_convert</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>cam.ts</code> (14)</td>
-          <td>
-            <code>cam.plan_check</code>, <code>cam.review</code>, <code>cam.machine</code>,
-            <code>cam.operations</code>, <code>cam.suggest</code>, <code>cam.compare_setups</code>,
-            <code>cam.analyze</code>, <code>cam.stock</code>, <code>cam.vision</code>,
-            <code>cam.chain_suggest</code>, <code>cam.materials</code>, <code>cam.cutting_data</code>,
-            <code>cam.manufacture</code>, <code>cam.chain_status</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>cam-edit.ts</code></td>
-          <td>
-            <code>cam_edit.manufacture</code>, <code>cam_edit.create</code>, <code>cam_edit.update</code>,
-            <code>cam_edit.generate</code>, <code>cam_edit.verify</code>, <code>cam_edit.stock_set</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>library.ts</code></td>
-          <td>
-            Read: <code>library.component_list</code>, <code>library.lookup_component</code>,
-            <code>library.lookup_material</code>, <code>library.lookup_tool</code>,
-            <code>library.lookup_machine_config</code>.
-            Parts: <code>parts.save</code>, <code>parts.insert</code>, <code>parts.delete</code>.
-            Edit: <code>library_edit.upsert_material</code>, <code>library_edit.upsert_tool</code>,
-            <code>library_edit.upsert_machine_config</code>, <code>library_edit.set_default</code>,
-            <code>library_edit.delete</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>memory.ts</code></td>
-          <td>
-            <code>memory.recall</code>, <code>memory.context_read</code>,
-            <code>memory_edit.remember</code>, <code>memory_edit.context_update</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>research.ts</code></td>
-          <td><code>research.search</code>, <code>research.read_attachment</code>.</td>
-        </tr>
-        <tr>
-          <td><code>vcs.ts</code></td>
-          <td>
-            <code>vcs.status</code>, <code>vcs.diff</code>, <code>vcs.list_pull_requests</code>,
-            <code>vcs_edit.start_change</code>, <code>vcs_edit.commit</code>, <code>vcs_edit.restore</code>,
-            <code>vcs_edit.open_pull_request</code>, <code>vcs_edit.run_workflows</code>.
-          </td>
-        </tr>
-        <tr>
-          <td><code>agent.ts</code></td>
-          <td><code>agent.start</code>, <code>agent.list</code>, <code>agent.read</code>, <code>agent.cancel</code>.</td>
-        </tr>
-      </tbody>
-    </table>
+    <h2>Discover the current catalogue</h2>
+<p><code>GET /api/ai/actions</code> returns tool descriptions, action names and kinds, and JSON parameter schemas for outside callers. Use it to discover the running application's actions instead of copying a static list into a client. <code>POST /api/ai/actions/invoke</code> takes a project ID, tool ID, and input containing the action discriminator.</p>
+    <p>Built-in catalogue entries are maintained under <code>packages/ai/src/actions</code>. Examples include CAD inspection and parametric checks, CAD edits, CAM planning and manufacture, library lookup and updates, project memory, research, and VCS proposals. A contribution requiring an application service returns an unavailable result when that host did not supply its handler.</p>
+  </section>
+
+  <section id="catalogue-exports" class="doc-section">
+    <h2>Public integration APIs</h2>
+<p><code>ACTION_CATALOGUE</code>, <code>ACTION_TOOL_IDS</code>, <code>EXPOSED_TOOL_IDS</code>, <code>actionById</code>, <code>toolKind</code>, and <code>runAction</code> support catalogue consumers. <code>ToolHandlers</code> is the sidecar integration contract; <code>ToolRegistry</code> composes built-in and extension tools. <code>AiService</code> supplies conversations, model metadata, one-shot calls, and session operations.</p>
+    <p><code>assembleContext</code> composes turn context with a default aggregate budget of 24,000 characters. It orders standing requirements, current observations, UI snapshots, memory, and supporting references, deduplicates by identity and content, and records omitted or truncated sources. This context budget is separate from the model's full token window and host compaction threshold.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Background work and evidence</h2>
+<p>The runtime scheduler allows four active background tasks and sixteen queued tasks. Tasks are owned by a project and parent session. Cancellation retains active ownership until a worker stops; stopping or deleting the parent also stops its associated work. Read-worker recovery is bounded to two attempts, while interrupted editing work is marked uncertain instead of blindly replayed.</p>
+    <p>Assistant tool success is a result to inspect. CAD operations can return partial geometry diagnostics; CAM artifacts carry their own claims and release levels; history services enforce protected branches. Conversation text, a task marked complete, and a geometric verification result describe different evidence.</p>
+  </section>
+
+  <section id="ai-host" class="doc-section">
+    <h2>Runtime selection</h2>
+<p><code>CADCAMFUN_AI_HOST</code> selects <code>nikcli</code> by default or <code>direct</code>. The direct path uses AI SDK calls without the embedded host's persistent agent tool loop and specialist scheduler. Stateless operations use the direct model service even when the embedded host is enabled.</p>
+    <p>The host's XDG directories and optional home override are rooted under <code>&lt;dataDir&gt;/ai/nikcli</code>. Project configuration loading and unrelated inherited agent settings are disabled or scrubbed before the SDK import. Its workspace is a per-project application scratch directory, rather than the user's source directory.</p>
   </section>
 
   <section id="nikcli-plugin" class="doc-section">
-    <h2>Nikcli plugin</h2>
-    <p>
-      Package <code>@nikoemme_/cadcamfun-nikcli-plugin</code>
-      (<code>packages/nikcli-plugin</code>). Bridge HTTP paths are
-      <code>GET /api/ai/actions</code> and <code>POST /api/ai/actions/invoke</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Export</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>CadcamPlugin</code></td></tr>
-        <tr><td><code>createCadcamTools</code></td></tr>
-        <tr><td><code>BridgeClient</code></td></tr>
-        <tr><td><code>BridgeError</code></td></tr>
-        <tr><td><code>BridgeTool</code></td></tr>
-        <tr><td><code>toolShape</code></td></tr>
-        <tr><td><code>toZod</code></td></tr>
-      </tbody>
-    </table>
-    <table>
-      <thead>
-        <tr><th>Variable</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>CADCAMFUN_URL</code></td><td>Running app base URL.</td></tr>
-        <tr><td><code>CADCAMFUN_TOKEN</code></td><td>Bearer token for the bridge.</td></tr>
-        <tr><td><code>CADCAMFUN_PROJECT</code></td><td>Project the tools act on.</td></tr>
-      </tbody>
-    </table>
+    <h2>Standalone nikcli access</h2>
+<p><code>@nikoemme_/cadcamfun-nikcli-plugin</code> connects a standalone nikcli to a running application. Configure its <code>url</code>, <code>token</code>, and default <code>projectId</code>, or use <code>CADCAMFUN_URL</code>, <code>CADCAMFUN_TOKEN</code>, and <code>CADCAMFUN_PROJECT</code>. Supply a scoped bridge token issued by the application for outside access.</p>
+    <p>Bridge tokens are restricted to one project and read-only or read/write actions. They default to 30 days, allow 1–365 days, can be listed and revoked, and reveal their secret only when issued. They admit only the two action bridge routes. Policy can narrow the visible tools and actions further.</p>
+    <p>The plugin fetches the catalogue from the application and converts its schemas into nikcli tool arguments. Destructive actions are refused even with a confirmation flag, and the in-process <code>agent</code> delegation tool is excluded. Write-capable plugin extension tools are not exposed through this outside bridge. HTTP 401 reports a rejected token; action refusals return readable failure results.</p>
   </section>
-  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "Plugins", href: "/docs/plugins" }, { title: "History", href: "/docs/history" }]} />
+
+  <section id="paths" class="doc-section">
+    <h2>Implementation map</h2>
+<p><code>service.ts</code> owns application-facing AI operations; <code>direct-model.ts</code> owns AI SDK calls; <code>credentials.ts</code> owns key state; <code>nikcli/</code> owns isolation, sessions, policies, context, and workers; <code>actions/</code> and <code>tools/</code> own capability definitions and adapters. Sidecar <code>services/ai.ts</code> wires project handlers and storage. <code>packages/nikcli-plugin</code> owns the outside HTTP client.</p>
+  </section>
+
+  <section id="streaming-example" class="doc-section">
+    <h2>Start and recover a conversation</h2>
+<p>With a running sidecar and a configured model, this request opens a conversation without injecting stored workspace context. Set <code>CADCAMFUN_URL</code> to the discovered loopback base URL and <code>CADCAMFUN_TOKEN</code> to its current application token. The session identifier below is client-selected; keep it for follow-ups.</p>
+    <DocCode language="bash" title="Stream one turn">
+{String.raw`curl --no-buffer --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"message":"Explain the difference between G0 and G1.","sessionId":"inspection-demo","includeContext":false,"mode":"gcode"}' \
+  "$CADCAMFUN_URL/api/ai/chat/stream"`}
+    </DocCode>
+    <p>For a project turn, also supply its real <code>projectId</code>, and optionally a <code>drawingId</code> belonging to that project. The drawing binds the turn's tools to that drawing. Reusing a session under another project or account is refused.</p>
+    <DocCode language="bash" title="Recover state after reconnecting">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"sessionId":"inspection-demo"}' \
+  "$CADCAMFUN_URL/api/ai/sessions/state"`}
+    </DocCode>
+    <p>The returned <code>busy</code>, <code>text</code>, optional <code>events</code>, and <code>tasks</code> reconstruct the view; replaying those stored events does not execute tools again. To stop work, send an explicit abort. Closing the stream alone does not join the conversation's workers.</p>
+    <p>Source: <code>packages/api/src/groups/ai.ts</code>, <code>apps/sidecar/src/http/ai.ts</code>, and <code>packages/ai/src/service.ts</code>.</p>
+  </section>
+
+  <section id="event-handling" class="doc-section">
+    <h2>Handle events without losing state</h2>
+<table>
+      <thead><tr><th>Event</th><th>Consumer behavior</th></tr></thead>
+      <tbody>
+        <tr><td><code>delta</code> / <code>reasoning</code></td><td>Append <code>text</code> to the matching session's text or reasoning channel.</td></tr>
+        <tr><td><code>tool_call</code> / <code>tool_result</code></td><td>Correlate by <code>callId</code>; inspect <code>ok</code> and retain diagnostics independently of assistant text.</td></tr>
+        <tr><td><code>permission_request</code></td><td>Show the request and reply with its request/session IDs and <code>once</code>, <code>always</code>, or <code>reject</code>.</td></tr>
+        <tr><td><code>question_request</code></td><td>Keep its request ID and questions; send one answer array per question through session controls.</td></tr>
+        <tr><td><code>done</code></td><td>Use final <code>text</code> and optional usage as the completed response; do not append the entire final text to already accumulated deltas.</td></tr>
+        <tr><td><code>error</code></td><td>Display <code>message</code> with <code>config</code>, <code>provider</code>, <code>aborted</code>, or <code>internal</code> classification.</td></tr>
+        <tr><td><code>heartbeat</code></td><td>Keep the connection alive without adding content or declaring the turn complete.</td></tr>
+      </tbody>
+    </table>
+    <p>Session controls accept only pending permission/question IDs in that conversation or its child sessions. A question requires non-empty answers; a single-choice question rejects multiple selected values, and a question that disallows custom answers accepts only its listed option labels.</p>
+    <p>Source: <code>packages/api/src/ai-events.ts</code>, <code>packages/ai/src/nikcli/session-controls.ts</code>, and <code>packages/ai/src/heartbeat.ts</code>.</p>
+  </section>
+
+  <section id="attachments" class="doc-section">
+    <h2>Attachments and user skills</h2>
+<p>Each chat request accepts up to five attachments. Supported images are PNG, JPEG, WebP, and GIF, with a 5 MiB limit each; PDFs have a 10 MiB limit. Text attachments accept up to 2,000,000 characters, with texts up to 6,000 characters also included inline. Unsupported files produce a rejection reason rather than silently disappearing.</p>
+    <p>Text attachments are kept in a project-scoped in-memory store for import tools: at most 32 names and 8,000,000 characters per project, and 32,000,000 characters across at most 64 stored projects. Reusing a name replaces its previous text. Restarting the service does not retain this attachment store. A PDF-capability mismatch is reported to the model by the provider transform.</p>
+    <p>User skill names are lowercase letter/digit words joined by hyphens, at most 64 characters. Description and body limits are 300 and 20,000 characters respectively; at most 50 user skills can be loaded. Built-in skills cannot be removed through the user skill API. A saved skill's <code>live</code> result indicates whether host reload took effect.</p>
+    <p>Source: <code>packages/ai/src/attachments.ts</code>, <code>packages/ai/src/skills/user.ts</code>, and <code>apps/sidecar/src/http/ai.ts</code>.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Diagnose assistant failures</h2>
+<ul>
+      <li><strong>No configured model:</strong> inspect <code>/api/ai/status</code> and <code>/api/ai/providers</code>, then set a key for a listed provider. A configured flag proves a stored key exists, not that the vendor accepted it.</li>
+      <li><strong>Unknown provider or invalid URL:</strong> use an advertised provider ID and an HTTP(S) base URL. A non-built-in direct provider needs a compatible endpoint in addition to its key.</li>
+      <li><strong>Session inaccessible:</strong> recover using the original project/account/session identity. Do not invent a replacement project ID for an existing host session.</li>
+      <li><strong>A turn waits indefinitely:</strong> inspect session control state for pending permissions or questions before retrying a duplicate prompt. Use explicit abort to cancel the turn and join its workers.</li>
+      <li><strong>A tool partly changed the model:</strong> inspect its <code>tool_diagnostic</code>, including <code>mutationApplied</code>, then read the current drawing. Retrying an editing action without inspecting its result can duplicate geometry.</li>
+    </ul>
+    <p>Tool results and typed failures preserve the stage that failed. A provider error after successful tools does not roll those project mutations back. Deterministic CAM and history checks remain available separately from the model answer.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "Plugins", href: "/docs/plugins" }, { title: "History", href: "/docs/history" }]} />
 </DocsLayout>

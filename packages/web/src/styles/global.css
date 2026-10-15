@@ -10,6 +10,10 @@
 :root {
   color-scheme: light;
 
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-display: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
   --terminal-bg: 226 234 244;
   --terminal-panel: 255 255 255;
   --terminal-border: 186 198 214;
@@ -182,7 +186,7 @@ body {
   min-width: 320px;
   min-height: 100dvh;
   margin: 0;
-  font-family: "Sofia Pro Soft", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.55;
   color: rgb(var(--terminal-text));
@@ -190,6 +194,7 @@ body {
   background-image: var(--page-wash);
   background-attachment: fixed;
   background-repeat: no-repeat;
+  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -212,7 +217,9 @@ svg {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -243,7 +250,10 @@ textarea:focus-visible,
 
 h1,
 h2,
-h3 {
+h3,
+h4,
+h5,
+h6 {
   text-wrap: balance;
 }
 
@@ -259,15 +269,31 @@ pre {
 }
 
 .font-display {
-  font-family: "CADCAM Rounded", "Sofia Pro Soft", sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Keep emphasis readable and upright throughout articles, quotes and code. */
+em,
+i,
+blockquote,
+cite,
+dfn {
+  font-style: normal;
+}
+
+em,
+i {
+  font-weight: 500;
 }
 
 code,
 pre,
+kbd,
+samp,
 .font-mono {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-family: var(--font-mono);
 }
 
 .pressable {

@@ -2,3 +2,10 @@ dist
 .astro
 .wrangler
 node_modules
+
+# Documentation navigation and retrieval copy are source content.
+!src/data/
+!src/data/**
+
+# Temporary source-reading and content preparation notes.
+.tmp/

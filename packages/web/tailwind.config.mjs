@@ -7,15 +7,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Sofia Pro Soft", "Segoe UI", "sans-serif"],
-        display: ["CADCAM Rounded", "Sofia Pro Soft", "sans-serif"],
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
+        mono: ["var(--font-mono)"],
       },
       fontSize: {
         eyebrow: ["var(--type-eyebrow)", { lineHeight: "1", letterSpacing: "0.08em", fontWeight: "700" }],
         "body-sm": ["var(--type-body-sm)", { lineHeight: "1.55" }],
-        "card-title": ["var(--type-card-title)", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "700" }],
-        "page-title": ["var(--type-page-title)", { lineHeight: "1.05", letterSpacing: "-0.022em", fontWeight: "700" }],
+        "card-title": ["var(--type-card-title)", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "600" }],
+        "page-title": ["var(--type-page-title)", { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "600" }],
         "page-subtitle": ["var(--type-page-subtitle)", { lineHeight: "1.55", fontWeight: "400" }],
       },
       colors: {
@@ -71,7 +71,9 @@ export default {
             "--tw-prose-th-borders": theme("colors.terminal.border"),
             "--tw-prose-td-borders": theme("colors.terminal.border"),
             maxWidth: "none",
-            lineHeight: "1.7",
+            lineHeight: "1.75",
+            blockquote: { fontStyle: "normal" },
+            em: { fontStyle: "normal", fontWeight: "500" },
             a: {
               fontWeight: "500",
               textDecorationColor: theme("colors.terminal.border"),

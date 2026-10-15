@@ -1,175 +1,84 @@
 ---
 export const prerender = true
 import DocsLayout from "../../layouts/DocsLayout.astro"
-import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
-import DocRelated from "../../components/docs/DocRelated.astro"
-import { dependencyNote } from "../../data/architecture"
+import DocCallout from "../../components/docs/DocCallout.astro"
 
 const toc = [
-  { title: "Direction", href: "#direction" },
-  { title: "Work packages", href: "#work-packages" },
-  { title: "Processes", href: "#processes" },
-  { title: "Desktop source", href: "#desktop-source" },
-  { title: "Boundaries", href: "#boundaries" },
+  { title: "Failure isolation", href: "#failure-isolation" },
+  { title: "Connection and credential boundaries", href: "#credentials" },
+  { title: "Processes and trust boundaries", href: "#processes" },
+  { title: "Library dependencies", href: "#dependencies" },
+  { title: "HTTP request lifecycle", href: "#request" },
+  { title: "Service lifecycle and storage", href: "#lifecycle" },
+  { title: "Extension boundaries", href: "#extensions" }
 ]
 ---
 
-<DocsLayout
-  title="Architecture"
-  subtitle="Pure geometry in packages/core. I/O in the sidecar. The window is a client of the HTTP contract."
-  description="CADCAMFUN repository architecture, dependency direction, work-package status, and process boundaries."
-  toc={toc}
->
-  <section id="direction" class="doc-section">
-    <h2>Direction</h2>
-    <p>{dependencyNote}</p>
-    <p>
-      Spec <code>00-overview.md</code> §3 is the layout contract. Libraries live under
-      <code>packages/</code>. Processes live under <code>apps/</code>. Specs in
-      <code>specs/</code> win on contracts. When a task cites the roadmap, sequence comes from
-      <code>specs/roadmap/README.md</code> (RM-00–RM-11). The current step recorded there is RM-01,
-      the action catalogue.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Package</th><th>Path</th><th>May do</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>@cadcamfun/core</code></td><td><code>packages/core</code></td><td>CAD, technical drawing, and CAM algorithms over readonly data</td></tr>
-        <tr><td><code>@cadcamfun/api</code></td><td><code>packages/api</code></td><td>HttpApi groups, shared schemas, generated client</td></tr>
-        <tr><td><code>@cadcamfun/db</code></td><td><code>packages/db</code></td><td>Drizzle schema, migrations, <code>Database</code> service</td></tr>
-        <tr><td><code>@cadcamfun/ai</code></td><td><code>packages/ai</code></td><td>nikcli host and AI SDK v7, as Effect services</td></tr>
-        <tr><td><code>@cadcamfun/plugin-sdk</code></td><td><code>packages/plugin-sdk</code></td><td>Manifest, capabilities, <code>definePlugin</code>, test host</td></tr>
-        <tr><td><code>@cadcamfun/vcs</code></td><td><code>packages/vcs</code></td><td>Git objects, repository, JSON merge, GitHub transport</td></tr>
-        <tr><td><code>@cadcamfun/workflow</code></td><td><code>packages/workflow</code></td><td>Workflow schema, triggers, runner</td></tr>
-        <tr><td><code>@cadcamfun/sidecar</code></td><td><code>apps/sidecar</code></td><td>Handlers, repositories, layers, plugin host</td></tr>
-        <tr><td><code>@cadcamfun/desktop</code></td><td><code>apps/desktop</code></td><td>SolidJS UI and the Rust shell</td></tr>
-        <tr><td><code>@cadcamfun/mobile</code></td><td><code>apps/mobile</code></td><td>Expo client of a paired desktop</td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>packages/core/src/index.ts</code> exports CAD flat and as <code>cad</code>, CAM only as
-      <code>cam</code>, and technical drawings as <code>drawing</code>. CAD and CAM both define
-      names such as <code>Move</code> and <code>Path</code>, so a flat CAM export would collide.
-      Drawing helpers live under <code>packages/core/src/drawing</code>
-      (<code>project.ts</code>, <code>section.ts</code>, <code>dimensions.ts</code>,
-      <code>sheet.ts</code>, <code>svg.ts</code>).
-    </p>
-    <DocCode language="ts" title="Imports a caller actually uses">
-{`import { cad, cam, drawing } from "@cadcamfun/core"
-import { Database, schema } from "@cadcamfun/db"
-import { ApiClient } from "@cadcamfun/api"`}
-    </DocCode>
-  </section>
-
-  <section id="work-packages" class="doc-section">
-    <h2>Work packages</h2>
-    <p>
-      Status text below is the task board in <code>specs/00-overview.md</code> §4. A row marked
-      done still has the limits written in its own spec. HTTP and UI parity with the legacy app
-      are requirements, and they are unfinished.
-    </p>
-    <table>
-      <thead>
-        <tr><th>WP</th><th>Owns</th><th>Board status</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>WP0</td><td><code>packages/db</code></td><td>in progress — adding <code>LocalKeyValue</code></td></tr>
-        <tr><td>WP1</td><td><code>packages/core/src/cad</code></td><td>done (288 core tests incl. WP2)</td></tr>
-        <tr><td>WP2</td><td><code>packages/core/src/cam</code></td><td>done (posts, goldens, legacy-bug regressions)</td></tr>
-        <tr><td>WP3</td><td><code>packages/api</code></td><td>in progress — 67/195 legacy route files in the contract</td></tr>
-        <tr><td>WP4</td><td><code>apps/sidecar</code></td><td>in progress — every contract group is served; families without a contract are still missing</td></tr>
-        <tr><td>WP5</td><td><code>apps/desktop/src-tauri</code></td><td>M1 done (clippy + 32 Rust tests; verified with a stub sidecar)</td></tr>
-        <tr><td>WP6</td><td><code>apps/desktop/src/app</code>, screens</td><td>in progress — core screens exist; the rest of the legacy pages are still stubs</td></tr>
-        <tr><td>WP7</td><td><code>apps/desktop/src/viewport</code></td><td>in progress</td></tr>
-        <tr><td>WP8</td><td><code>packages/ai</code></td><td>done</td></tr>
-        <tr><td>WP9</td><td><code>packages/plugin-sdk</code>, <code>apps/sidecar/src/plugins</code></td><td>done for SDK + host; SDK host is not exposed over HTTP yet</td></tr>
-        <tr><td>WP10</td><td>workflows, <code>scripts/</code>, updater</td><td>done for pipeline + CI + updater; release secrets unset</td></tr>
-        <tr><td>WP11</td><td><code>packages/vcs</code></td><td>done for core + sidecar + API; desktop panels and GitHub routes pending</td></tr>
-        <tr><td>WP12</td><td><code>packages/workflow</code></td><td>done for engine + runner; the board says only <code>project/*</code> steps are registered</td></tr>
-        <tr><td>WP13</td><td><code>apps/mobile</code></td><td>Expo migration integrated; native Release/device validation in progress; TestFlight pending</td></tr>
-        <tr><td>WP14</td><td>multi-operation setups</td><td>in progress — planner contracts claimed on the board; desktop store and persistence pending</td></tr>
-      </tbody>
-    </table>
-    <DocCallout type="warn" title="Parity is a requirement, and it is open">
-      <p>
-        Spec 00 §6 requires the same HTTP API as the legacy app (195 route files in
-        <code>specs/api-inventory.md</code>) and a SolidJS UI that matches the legacy screens.
-        Spec 05 records that about 15% of those route files are served. Do not treat a green
-        package test as finished product parity.
-      </p>
-    </DocCallout>
-  </section>
-
+<DocsLayout title="Architecture" subtitle="Execution boundaries, request flow, persistence, and extension points across the desktop, sidecar, mobile companion, and documentation site." description="Execution boundaries, request flow, persistence, and extension points across the desktop, sidecar, mobile companion, and documentation site." toc={toc}>
   <section id="processes" class="doc-section">
-    <h2>Processes</h2>
-    <p>
-      Tauri’s Rust process does not run <code>bun:sqlite</code>. Spec 00 §2 keeps Effect and Drizzle
-      in a Bun-compiled sidecar (<code>bun build --compile</code>). Rust owns the window, tray,
-      menus, updater, secure storage, and sidecar lifecycle. Spec <code>07-tauri-shell.md</code>
-      records the ready line the sidecar prints after migrations:
-    </p>
-    <DocCode language="text" title="Sidecar stdout after listen">
-{`{"event":"ready","port":N}`}
-    </DocCode>
-    <p>
-      The shell generates a per-launch token, passes <code>CADCAMFUN_TOKEN</code> and
-      <code>CADCAMFUN_DATA_DIR</code>, and the webview calls the sidecar over HTTP on
-      <code>127.0.0.1</code>. Spec 05 requires every request to carry
-      <code>Authorization: Bearer</code>. Failure to start prints
-      <code>&#123;"event":"error","message":"…"&#125;</code> and exits non-zero. The sidecar exits
-      when stdin closes and on <code>SIGTERM</code>.
-    </p>
-    <DocCallout type="note" title="WP5 on the task board">
-      <p>
-        WP5 is M1 done (clippy + 32 Rust tests; verified with a stub sidecar). Spec 07 §7 records
-        later menu, tray, secrets, and lifecycle work on top of that milestone, and a focused
-        check of 60 Rust tests with 2 ignored. Do not read M1 as a finished signed release.
-        Packaged updater verification and signing stay with WP10.
-      </p>
-    </DocCallout>
+    <h2>Processes and trust boundaries</h2>
+    <p>Tauri owns native window integration, secure credential commands, menus, updates, and sidecar lifecycle. Its webview runs the SolidJS application. The compiled Bun sidecar opens the database and serves HTTP on <code>127.0.0.1</code> with an operating-system-assigned port. The frontend does not open SQLite.</p>
+    <p>The sidecar's entry point is <code>apps/sidecar/src/main.ts</code>. It creates the HTTP server, builds the application layers, probes <code>/api/health</code>, and then prints a JSON readiness event containing the chosen port. Logs are routed to stderr so stdout remains available for the shell protocol.</p>
+    <p>The mobile companion reaches an explicitly paired desktop gateway. Its native transport and device credentials are separate from the desktop webview's loopback connection. The documentation Worker is a separate deployment and has no implicit connection to a user's desktop.</p>
   </section>
 
-  <section id="desktop-source" class="doc-section">
-    <h2>Desktop source</h2>
-    <p>
-      <code>apps/desktop/src/app</code> is the shell, the route table, and the API client
-      (<code>App.tsx</code>, <code>Shell.tsx</code>, <code>routes.tsx</code>, <code>client.ts</code>,
-      <code>sidecar.ts</code>). <code>src/pages</code> are one-line adapters. A page re-exports a
-      screen and holds no product logic.
-    </p>
-    <p>
-      Each product area is <code>src/features/&lt;name&gt;</code>. Directories present:
-      <code>admin</code>, <code>ai</code>, <code>analytics</code>, <code>auth</code>,
-      <code>billing</code>, <code>cad</code>, <code>cam</code>, <code>chat</code>,
-      <code>companion</code>, <code>costs</code>, <code>dashboard</code>, <code>legal</code>,
-      <code>library</code>, <code>marketplace</code>, <code>mcp</code>, <code>organizations</code>,
-      <code>plugins</code>, <code>profile</code>, <code>projects</code>, <code>settings</code>,
-      <code>toolpaths</code>. Shared UI is <code>src/shared</code> (<code>ui</code>,
-      <code>components</code>, <code>state</code>). The 2D and 3D engines are
-      <code>src/viewport</code>. Strings go through <code>src/i18n</code>. The fake API used while
-      a group has no live handler is <code>src/testing</code>.
-    </p>
-    <p>
-      Spec 06 says the working end-to-end screens are Projects, CAD, CAM, Library, and Settings.
-      Routes such as <code>/materials</code>, <code>/tools</code>, <code>/machine</code>,
-      <code>/toolpaths</code>, <code>/costs</code>, <code>/ai</code>, and <code>/plugins</code>
-      exist in <code>routes.tsx</code>. The long tail of legacy pages are still stubs.
-    </p>
+  <section id="dependencies" class="doc-section">
+    <h2>Library dependencies</h2>
+    <p><code>@cadcamfun/core</code> contains CAD, drawing, and CAM computation. It depends on Effect for schemas and boundary integration; algorithmic loops are ordinary TypeScript. <code>@cadcamfun/api</code> imports core types and schemas to declare HTTP inputs, outputs, errors, and streams.</p>
+    <p><code>@cadcamfun/db</code> owns the application database service, schema, and migration logic. The sidecar combines it with core, API, AI, plugin SDK, VCS, and workflow packages. Its repositories use the database service; handlers delegate to repositories and services.</p>
+    <p>The desktop imports both <code>@cadcamfun/api</code> and <code>@cadcamfun/core</code>. It uses the API at runtime through an Effect client and uses core geometry in CAD/CAM features and the viewport. Mobile depends on the API package and wraps companion requests in its client. The standalone nikcli plugin discovers the running application's action catalogue over HTTP rather than importing backend implementations.</p>
   </section>
 
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li><code>packages/core</code> must not open SQLite, the network, or the filesystem, and must not import <code>.reference/</code>.</li>
-      <li><code>packages/api</code> must not contain server handlers or a database client.</li>
-      <li><code>apps/desktop</code> must not query Drizzle. It talks to the sidecar through the API contract.</li>
-      <li><code>apps/desktop/src-tauri</code> must not contain toolpath or solid math.</li>
-      <li>Only <code>apps/sidecar/src/config.ts</code> reads process configuration. Other modules receive it through the <code>cadcamfun/AppConfig</code> service.</li>
-      <li>Only <code>packages/db</code> talks to SQLite. Hot geometry stays plain functions.</li>
-      <li>An agent edits the directory its work package owns. Cross-package contract changes go through the spec first.</li>
-    </ul>
+  <section id="request" class="doc-section">
+    <h2>HTTP request lifecycle</h2>
+    <ol>
+      <li>The webview obtains the sidecar connection from the native shell.</li>
+      <li><code>apps/desktop/src/app/client.ts</code> builds an Effect HttpApi client with bearer authorization and an optional account session token. <code>packages/api/src/client.ts</code> supplies a reusable contract client for other consumers.</li>
+      <li><code>apps/sidecar/src/layers.ts</code> assembles <code>ServedApi</code>, handlers, authorization, CORS, and shared service layers.</li>
+      <li>The handler validates contract inputs, resolves services, performs computation or persistence, and returns the declared success or error representation. Streaming endpoints preserve their declared stream protocol.</li>
+    </ol>
+    <p>CORS permits Tauri production origins and HTTP loopback origins used in development. It does not replace authorization. The API exposes several response envelope styles; consumers must follow each endpoint's schema rather than assume every response has the same shape.</p>
   </section>
-  <DocRelated items={[{ title: "Stack", href: "/docs/stack" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "Packages and apps", href: "/docs/packages" }]} />
+
+  <section id="lifecycle" class="doc-section">
+    <h2>Service lifecycle and storage</h2>
+    <p>Effect layers acquire the database and shared services within the application scope. The database layer creates its parent directory, enables WAL and foreign keys, optionally applies migrations, and wraps query failures with an operation name. Finalization attempts a truncating WAL checkpoint and closes the SQLite handle.</p>
+    <p>The <code>DatabaseLive</code> layer selects <code>dataDir/cadcamfun.db</code>. A migration folder must be supplied to apply migrations at startup. AI credentials, plugin state, VCS objects, workflow execution, and file storage are handled through their respective service interfaces; storage details are described on their module pages.</p>
+    <p>The local Studio in <code>packages/web/script/studio-server.ts</code> is an additional Bun process. It opens a configured existing application database directly and serves authenticated overview data on loopback port 4396. Its development proxy and cookie sessions are independent of the Tauri sidecar connection.</p>
+  </section>
+
+  <section id="extensions" class="doc-section">
+    <h2>Extension boundaries</h2>
+    <p>There are two plugin integrations. The application plugin SDK defines manifests, capabilities, activation, and host contracts. The nikcli bridge exposes registered CAD/CAM actions to an external assistant. Installing a plugin through an HTTP registry route is a separate operation from activating a module in the runtime host.</p>
+    <p>Workflow parsing and scheduling live in <code>packages/workflow</code>. Service-backed steps are registered by sidecar layers, while pure project and CAM steps can run with their supplied inputs. VCS computes object hashes, diffs, merges, and GitHub transport operations in its library; sidecar services connect those operations to project persistence.</p>
+    <p>The web documentation assistant retrieves rendered documentation and can publish guide artifacts when storage is configured. It answers documentation questions; it does not inherit the CAD/CAM application's local project access.</p>
+  </section>
+
+
+  <section id="credentials" class="doc-section">
+    <h2>Connection and credential boundaries</h2>
+    <table>
+      <thead><tr><th>Credential</th><th>Purpose</th><th>Boundary</th></tr></thead>
+      <tbody>
+        <tr><td>Application bearer token</td><td>Admit the local application to protected sidecar routes.</td><td>Generated/supplied for the sidecar launch; the webview obtains it through the native connection.</td></tr>
+        <tr><td><code>x-session-token</code></td><td>Select the account acting behind the admitted application.</td><td>An absent, invalid, expired, or orphaned session falls back to the local profile.</td></tr>
+        <tr><td>Companion device token</td><td>Admit an individually paired phone to gateway routes.</td><td>Checked by the separate HTTPS gateway and its method/path allow-list.</td></tr>
+        <tr><td>AI bridge token</td><td>Expose permitted actions for a single project to an external agent.</td><td>Admits the two action bridge endpoints and enforces read or read/write scope.</td></tr>
+        <tr><td>Provider API key</td><td>Authenticate outbound model calls.</td><td>Managed by the sidecar credential service; not a substitute for application authorization.</td></tr>
+        <tr><td>GitHub token</td><td>Perform a requested mirror operation.</td><td>Provided for that call through <code>x-github-token</code>; not project snapshot data.</td></tr>
+      </tbody>
+    </table>
+    <p>Authorization is layered. Passing the bearer middleware does not prove ownership of a particular drawing or project; handlers and repositories check those resources. Pairing similarly does not turn the phone into an unrestricted sidecar client. Consult the specific endpoint and companion policy before choosing a credential.</p>
+    <p>The authorization adapter is <code>apps/sidecar/src/http/authorization.ts</code>. Companion and bridge decisions live in their own services. Keeping those paths separate lets a lost device or an integration token be revoked without replacing an AI provider's secret.</p>
+  </section>
+
+
+  <section id="failure-isolation" class="doc-section">
+    <h2>Failure isolation</h2>
+    <p>Failures before the readiness event belong to sidecar initialization: configuration, database upgrade, service construction, or HTTP startup. Failures after readiness may be specific to a provider, filesystem operation, endpoint, or client session. The shell's lifecycle and the webview's connection-retry budget are distinct; inspect both when a restart changes the listening port.</p>
+    <p>A disconnected AI stream does not necessarily stop its server-side conversation. Recover the session state before resending an editing instruction. A failed workflow does not roll back its triggering commit. An unsuccessful remote push does not erase local history. These distinctions prevent a network failure from being handled as though a persistent operation never occurred.</p>
+    <p>For a failing API request, record its method, path, status, endpoint ID, and relevant non-secret identifiers. Compare the running <code>/api/openapi.json</code> with the <a href="/docs/api/openapi.json">documentation contract snapshot</a> when client and server versions differ. Avoid troubleshooting with a token from a previous sidecar launch.</p>
+  </section>
+
 </DocsLayout>

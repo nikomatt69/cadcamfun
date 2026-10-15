@@ -1,162 +1,84 @@
 ---
 export const prerender = true
 import DocsLayout from "../../layouts/DocsLayout.astro"
-import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
-import DocRelated from "../../components/docs/DocRelated.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
 
 const toc = [
-  { title: "Language and files", href: "#language" },
-  { title: "Effect", href: "#effect" },
-  { title: "Errors and schemas", href: "#errors" },
-  { title: "Database", href: "#database" },
-  { title: "Units and G-code", href: "#units" },
-  { title: "Workflow", href: "#workflow" },
-  { title: "Boundaries", href: "#boundaries" },
+  { title: "Maintain executable documentation", href: "#documentation-contract" },
+  { title: "Optional fields, nulls, and transport values", href: "#optional-null" },
+  { title: "Source structure", href: "#language" },
+  { title: "Geometry and output units", href: "#units" },
+  { title: "Effect services", href: "#effect" },
+  { title: "Validation and errors", href: "#contracts" },
+  { title: "Persistence and configuration", href: "#persistence" },
+  { title: "Verification", href: "#verify" }
 ]
 ---
 
-<DocsLayout
-  title="Conventions"
-  subtitle="Effect 4.0.0-rc.112, millimetres and radians, one SQLite owner, English everywhere."
-  description="CADCAMFUN coding conventions: Effect v4, Drizzle, units, errors, and agent workflow."
-  toc={toc}
->
+<DocsLayout title="Engineering conventions" subtitle="Patterns used for domain computation, schema validation, Effect services, database access, and verification." description="Patterns used for domain computation, schema validation, Effect services, database access, and verification." toc={toc}>
   <section id="language" class="doc-section">
-    <h2>Language and files</h2>
-    <p>
-      Spec <code>01-conventions.md</code> applies to every work package. Identifiers, comments,
-      docs, commit messages, and UI strings are English. UI strings go through the i18n table.
-      The default locale is <code>en</code>. Desktop strings live under
-      <code>apps/desktop/src/i18n</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Rule</th><th>What to do</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>TypeScript</td><td>Strict. No <code>any</code> in exported signatures. Prefer <code>unknown</code> plus Schema at boundaries.</td></tr>
-        <tr><td>Modules</td><td>ES modules. Relative imports include the <code>.ts</code> extension.</td></tr>
-        <tr><td>Files</td><td><code>kebab-case.ts</code>. One concept per file. Tests sit beside source as <code>*.test.ts</code> and use <code>bun:test</code>.</td></tr>
-        <tr><td>Comments</td><td>Explain why. Keep modules small. Keep hot algorithms pure.</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="effect" class="doc-section">
-    <h2>Effect</h2>
-    <p>
-      Effect is pinned to <code>4.0.0-rc.112</code>. The authoritative docs for that pin are
-      <code>packages/db/node_modules/effect/ai-docs/src/</code> (any workspace copy works; Bun does
-      not hoist). Do not write v3 idioms from memory. Do not bump <code>effect</code> in one
-      package. Spec 08 §6.3 records the coupling to <code>@nikcli-ai/sdk-next</code>.
-    </p>
-    <DocCode language="ts" title="Service, traced function, decode">
-{`class ProjectRepo extends Context.Service<ProjectRepo, {
-  readonly list: Effect.Effect<ReadonlyArray<Project>, DatabaseError>
-}>()("cadcamfun/ProjectRepo") {}
-
-const load = Effect.fn("ProjectRepo.list")(function* () {
-  const input = yield* Schema.decodeUnknownEffect(Query)(raw)
-  return input
-})`}
-    </DocCode>
-    <ul>
-      <li>Functions that return an Effect and benefit from tracing use <code>Effect.fn("Module.name")</code>. Hot paths use <code>Effect.fnUntraced</code>.</li>
-      <li>Do not write a function whose only job is to wrap <code>Effect.gen</code> and return it.</li>
-      <li>Never throw inside Effect code. Map foreign exceptions with <code>Effect.try</code> or <code>Effect.tryPromise</code> into a tagged error. Handle with <code>Effect.catchTag</code> or <code>Effect.catchTags</code>.</li>
-      <li>Domain models are <code>Schema.Class</code> or <code>Schema.Struct</code>.</li>
-      <li>Resources use <code>Effect.acquireRelease</code> inside a Layer. The Layer owns the lifecycle.</li>
-      <li>Configuration is read once in <code>apps/sidecar/src/config.ts</code> via Effect <code>Config</code>. Everything else receives a service.</li>
-    </ul>
-    <p>
-      Pure geometry and CAM in <code>packages/core</code> have no Effect runtime in hot loops.
-      Algorithms are plain functions over readonly arrays. Effect and Schema wrap them at
-      validation and error edges.
-    </p>
-  </section>
-
-  <section id="errors" class="doc-section">
-    <h2>Errors and schemas</h2>
-    <p>
-      Errors that cross a process boundary are <code>Schema.TaggedError</code> with a stable
-      <code>_tag</code> and an English message. Internal-only errors may use
-      <code>Data.TaggedError</code>. Spec 05 annotates the shared HTTP errors:
-      <code>NotFound</code> (404), <code>Validation</code> (422), <code>Conflict</code> (409),
-      <code>Unauthorized</code> (401), <code>Internal</code> (500).
-    </p>
-    <p>
-      Log with <code>Effect.log*</code> and <code>Effect.annotateLogs</code>.
-      <code>console.*</code> stays in entrypoints. User-facing errors stay typed.
-    </p>
-  </section>
-
-  <section id="database" class="doc-section">
-    <h2>Database</h2>
-    <p>
-      Only <code>packages/db</code> talks to SQLite. Other packages use repository services in
-      <code>apps/sidecar</code> or the <code>Database</code> service. Every query goes through
-      <code>Database.query(operation, run)</code> so a failure becomes <code>DatabaseError</code>.
-    </p>
-    <DocCode language="bash" title="Schema change, from the repo root">
-{`# 1. edit packages/db/src/schema.ts
-bun run db:generate
-# commit the generated SQL under packages/db/drizzle/
-bun run db:migrate`}
-    </DocCode>
-    <p>
-      Leave generated SQL as drizzle-kit wrote it. Table and column names stay identical to the
-      legacy Prisma SQLite database. A schema change ships with a test in
-      <code>packages/db/src/database.test.ts</code> or a new <code>*.test.ts</code>.
-    </p>
+    <h2>Source structure</h2>
+    <p>Use English identifiers, comments, documentation, and commit messages. TypeScript projects use strict checking; public interfaces should preserve explicit types and decode external values instead of propagating unchecked data. Package manifests expose source entry points, and application modules use relative imports appropriate to their build tool.</p>
+    <p>Desktop features group screens, components, stores, and helpers under <code>apps/desktop/src/features</code>. Route adapters remain in <code>src/pages</code>, while the application shell and client setup live in <code>src/app</code>. Core geometry stays independent from UI state and database access.</p>
   </section>
 
   <section id="units" class="doc-section">
-    <h2>Units and G-code</h2>
-    <table>
-      <thead>
-        <tr><th>Quantity</th><th>Inside modules</th><th>Where conversion happens</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Length</td><td>millimetres</td><td>UI display (<code>viewport/units.ts</code>) and the post-processor</td></tr>
-        <tr><td>Angle</td><td>radians</td><td>UI labels and G-code words that the dialect writes in degrees</td></tr>
-        <tr><td>Feed</td><td>mm/min in the toolpath IR</td><td>post converts when the program units are inch</td></tr>
-        <tr><td>Decimals</td><td>fixed count, default 3</td><td><code>formatNumber</code> in <code>cam/post/emitter.ts</code></td></tr>
-      </tbody>
-    </table>
-    <DocCallout type="note" title="Zero is a real value">
-      <p>
-        CAM defaults use <code>??</code>, never <code>||</code>. An explicit feed or height of
-        <code>0</code> must survive. Spec 04 lists the legacy <code>||</code> defaults as a bug
-        with a regression test.
-      </p>
-    </DocCallout>
+    <h2>Geometry and output units</h2>
+    <p>Core vector and analytic entity geometry uses millimetres and radians. Scene placement, feature controls, and CAM rotary-axis fields have contract-specific angle conventions, including degrees. Follow each schema when adapting between them. UI display conversion belongs at the display boundary. Machining operations additionally use feed, spindle, depth, and clearance parameters with meanings defined by their schemas; a bare number should never acquire an implicit unit from a label alone.</p>
+    <p>G-code posts own controller-specific output conversion and number formatting. The shared emitter exposes <code>formatNumber</code>, rounds to the requested decimal count, normalizes negative zero, and tracks emitted position. Feed formatting may omit a fractional part for integral values. Use the emitter rather than independently formatting motion words in each caller.</p>
+    <p>Keep model evidence and approximate display geometry distinct. A tessellated surface is useful for rendering and analysis but does not itself prove an exact B-rep operation succeeded.</p>
   </section>
 
-  <section id="workflow" class="doc-section">
-    <h2>Workflow</h2>
-    <ul>
-      <li>Do not commit unless asked.</li>
-      <li>Do not edit files outside the work package you own. The task board in spec 00 §4 lists owners.</li>
-      <li>Never read, print, or copy values from <code>.env*</code> files.</li>
-      <li>Before finishing a work package: typecheck, test, and update that spec’s status and change log.</li>
-      <li>Definition of done (spec 00 §5): <code>bun install</code>, <code>bunx tsc -p &lt;package&gt;/tsconfig.json</code>, <code>bun test &lt;package dir&gt;</code>, public surface written in the spec, no <code>.reference/</code> imports, no <code>process.env</code> outside the config module.</li>
-    </ul>
-    <DocCode language="bash" title="Check one package">
-{`bunx tsc -p packages/core/tsconfig.json
-bun test packages/core`}
-    </DocCode>
+  <section id="effect" class="doc-section">
+    <h2>Effect services</h2>
+    <p>Services extend <code>Context.Service</code> and expose typed Effect-returning methods. A layer constructs the implementation and supplies its dependencies. <code>apps/sidecar/src/layers.ts</code> is the integration point for repositories, services, handlers, authorization, and runtime configuration.</p>
+    <p>Resources with a lifetime, such as SQLite handles, are acquired and released inside the owning layer's scope. Use <code>Effect.try</code> or <code>Effect.tryPromise</code> to translate foreign exceptions into meaningful errors. Stable operation names in errors and tracing make failures diagnosable without coupling callers to a storage driver.</p>
+    <p>Layer composition matters: sibling layers merged together do not automatically provide services to each other. Sidecar workflow step registration is layered after the runner it needs; the AI step is registered where the AI service is available.</p>
   </section>
 
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>Hot loops in <code>packages/core</code> must not depend on the Effect runtime.</li>
-      <li>Handlers outside <code>apps/sidecar/src/config.ts</code> must not read process environment variables.</li>
-      <li>Repositories outside <code>packages/db</code> must not open a SQLite connection of their own.</li>
-      <li>Exported signatures must not use <code>any</code>.</li>
-      <li>Degrees must not cross a module boundary. Pass radians.</li>
-    </ul>
+  <section id="contracts" class="doc-section">
+    <h2>Validation and errors</h2>
+    <p>HTTP inputs and outputs are declared in <code>packages/api/src/groups</code>. Validate unknown input at those boundaries. The contract includes plain message errors, success/error envelopes, and some keyed error bodies; preserve the endpoint's declared status and response representation.</p>
+    <p>HTTP-facing errors use Effect schemas and status annotations. For example, <code>BadRequest</code>, <code>Unauthorized</code>, <code>NotFound</code>, and <code>Conflict</code> are declared in <code>packages/api/src/errors.ts</code>. Internal database failures carry an operation and cause in <code>DatabaseError</code>. Map internal failures at the HTTP boundary rather than expose driver details to clients.</p>
+    <p>Regenerate clients after a contract change with <code>bun run generate</code>. Check committed output with <code>bun run generate:check</code>. Generated folders are outputs; generation explicitly excludes endpoints that a target cannot represent.</p>
   </section>
-  <DocRelated items={[{ title: "Stack", href: "/docs/stack" }, { title: "Database", href: "/docs/database" }, { title: "API contract", href: "/docs/api" }]} />
+
+  <section id="persistence" class="doc-section">
+    <h2>Persistence and configuration</h2>
+    <p>Application repositories use the <code>Database</code> service from <code>@cadcamfun/db</code> and its <code>query(operation, run)</code> helper. Change <code>packages/db/src/schema.ts</code> before generating migrations. Review generated SQL and metadata together; do not run a destructive schema experiment against a user's database.</p>
+    <p>The sidecar reads configuration in <code>apps/sidecar/src/config.ts</code> and passes it through <code>AppConfigService</code>. Credentials use redacted values where the service requires them. Keep token and provider secret values out of logs, documentation, and troubleshooting output. The native shell supplies its own launch token and storage paths.</p>
+    <p>The documentation Studio is a separate local tool with its own path selection in <code>packages/web/script/studio-server.ts</code>. Do not assume its database path or login session matches the running desktop.</p>
+  </section>
+
+  <section id="verify" class="doc-section">
+    <h2>Verification</h2>
+    <DocCode language="bash" title="Repository root">{`bun test packages/core
+bun run --filter @cadcamfun/core typecheck
+bun run generate:check
+
+# Documentation content and build
+bun test packages/web/test
+bun run --filter @cadcamfun/web typecheck
+bun run --filter @cadcamfun/web build`}</DocCode>
+    <p>Choose checks that exercise the affected boundary. Pure kernel changes need numerical and geometric regression cases. HTTP changes need handler and schema coverage. Documentation changes need valid routes, anchors, examples, and a successful site build. A full workspace test run is <code>bun run test</code>, which includes packages, apps, and scripts.</p>
+  </section>
+
+
+  <section id="optional-null" class="doc-section">
+    <h2>Optional fields, nulls, and transport values</h2>
+    <p>An optional field may be omitted. A nullable field may explicitly contain <code>null</code>. They are separate properties: the project contract requires <code>description</code> in returned rows while allowing null, and a create request permits omission of that field. Preserve those distinctions when building clients or patching saved documents.</p>
+    <p>Transport validation is also distinct from business validation. The project-create payload permits an omitted name at the schema level, but the handler returns 400 with <code>Project name is required</code> if it is missing or empty. A generated type alone cannot establish that an operation will be admitted for an existing resource or current account.</p>
+    <p>HTTP query parameters are encoded text. Use the client's declared query fields or URL encoding rather than concatenate arbitrary user input into a URL. Encode a key or project identifier as a single path segment, and send bearer tokens in headers rather than in copied links.</p>
+    <p>The <a href="/docs/api/projects">projects API reference</a> shows these fields and status codes; the <a href="/docs/guides/api-tour">captured walkthrough</a> demonstrates the handler's validation result.</p>
+  </section>
+
+
+  <section id="documentation-contract" class="doc-section">
+    <h2>Maintain executable documentation</h2>
+    <p>Write an example against the exact public surface it names. The Promise SDK and the full contract-based Effect client have different method/input shapes and coverage. A settings-driven generator request is different from a native kernel request, and a generated program is different from a saved toolpath record.</p>
+    <p>The API reference snapshot is generated from the application contract. After changing an endpoint, regenerate it inside the web workspace with <code>bun run generate:api-reference</code>. Run <code>bun run check:api-reference</code> to compare it with current source. Resource grouping, article text, navigation, and assistant retrieval must still describe that contract faithfully.</p>
+    <p>When documenting a response captured from an isolated run, identify any normalized IDs, timestamps, or omitted fields. Label request templates as templates. Do not present an invented identifier or an unexecuted schema example as an observed production response.</p>
+  </section>
+
 </DocsLayout>

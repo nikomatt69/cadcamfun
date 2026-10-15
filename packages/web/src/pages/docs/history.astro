@@ -6,112 +6,49 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Model", href: "#model" },
-  { title: "Package", href: "#package" },
-  { title: "Tree", href: "#tree" },
-  { title: "HTTP", href: "#http" },
-  { title: "GitHub", href: "#github" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Module exports", href: "#module-exports" },
-  { title: "Snapshot directories", href: "#snapshot-directories" },
-  { title: "GitHub functions", href: "#github-functions" },
+  { title: "Working copy and history", href: "#status" },
+  { title: "Commit and branch workflow", href: "#model" },
+  { title: "Snapshot contents", href: "#tree" },
+  { title: "Diff and merge semantics", href: "#package" },
+  { title: "Pull requests and permissions", href: "#http" },
+  { title: "Optional GitHub mirror", href: "#github" },
+  { title: "Snapshots and restoration", href: "#snapshot-directories" },
+  { title: "Transport and object APIs", href: "#github-functions" },
+  { title: "Implementation entry points", href: "#module-exports" },
+  { title: "History operations and automation", href: "#boundaries" },
+  { title: "Try the repository without application data", href: "#local-example" },
+  { title: "Review, restore, and synchronize deliberately", href: "#review-sequence" },
+  { title: "Recover from history failures", href: "#troubleshooting" },
 ]
 ---
 
 <DocsLayout
-  title="History"
-  subtitle="Every project is a git repository. SQLite is the working copy. GitHub is an optional mirror."
-  description="CADCAMFUN git-style history: objects, branches, pull requests, and what is still pending."
+  title="Project history"
+  subtitle="Local Git-compatible project snapshots, structural diffs, reviewable branches, and optional GitHub mirroring."
+  description="CADCAMFUN project history: snapshots, branches, restores, pull requests, reviews, conflict handling, and GitHub sync."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP11 on the task board is <strong>done</strong> for core, sidecar, and API. The same
-      sentence says desktop panels and GitHub routes are pending. Owner directory:
-      <code>packages/vcs</code> (<code>@cadcamfun/vcs</code>), plus the
-      <code>GitRepo</code>, <code>GitObject</code>, <code>GitRef</code>, and
-      <code>PullRequest*</code> tables, and the sidecar <code>vcs</code> services. Spec:
-      <code>specs/13-vcs-actions-mobile.md</code>.
-    </p>
-    <DocCallout type="note" title="The history route exists. The graph does not.">
-      <p>
-        <code>/projects/:id/history</code> is in <code>apps/desktop/src/app/routes.tsx</code>.
-        Spec 13 §8 says that Version control screen and the per-item History buttons are built.
-        A drawn commit graph and in-editor CAD/CAM history panels are not. GitHub pull-request
-        mirroring is not built. <code>PullRequest.remoteNumber</code> is reserved. A live check
-        that GitHub’s Git Data API reproduces an oid is not done. Unit tests prove the hash.
-      </p>
-    </DocCallout>
+    <h2>Working copy and history</h2>
+<p>The application's SQLite records are the current project working copy. <code>@cadcamfun/vcs</code> stores Git-compatible blobs, trees, commits, and refs through an injected object backend; the sidecar persists that backend in SQLite. History operations work locally without a Git executable or a GitHub account.</p>
+    <p>A commit snapshots the project and its related design/manufacturing resources. Branches point to commits, while HEAD identifies the checked-out branch. Resource version tables coexist with this project-level history; a drawing version and a project commit have different scopes.</p>
   </section>
 
   <section id="model" class="doc-section">
-    <h2>Model</h2>
-    <p>
-      Blobs, trees, and commits use git’s loose-object format and SHA-1. An oid matches
-      <code>git cat-file</code> and, when the mirror works, GitHub. Tests in
-      <code>packages/vcs/test</code> check that against the real <code>git</code> binary. SQLite
-      holds the checked-out working copy. <code>commit</code> snapshots it into the repository.
-      <code>checkout</code>, <code>merge</code>, and <code>restore</code> write a tree back. A
-      dirty working copy blocks checkout, merge, and restore.
-    </p>
-    <p>
-      Collaboration is internal. Access follows project ownership and organization roles.
-      Members read, commit to branches, and open and review pull requests. The owner or an
-      organization admin or manager moves shared branches and merges. <code>GitRepo.remote</code>
-      (<code>owner/repo</code>) is the optional GitHub link. Legacy <code>*Version</code> tables
-      stay for the old routes. They are not this history.
-    </p>
-    <p>
-      An AI actor cannot commit, restore, or merge on <code>main</code>. The phone’s assistant
-      commits to <code>ai/*</code> branches and opens a pull request. A person merges. A review
-      of <code>request-changes</code> (latest verdict per reviewer) blocks the merge. Conflicts
-      leave the repository untouched and return the conflicting paths and JSON pointers.
-    </p>
-  </section>
-
-  <section id="package" class="doc-section">
-    <h2>Package</h2>
-    <p>
-      <code>packages/vcs</code> is pure aside from <code>node:crypto</code>. It does not open
-      SQLite. The sidecar <code>ProjectVcsRepo</code> implements the <code>Backend</code>
-      interface on the git tables.
-    </p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>src/object.ts</code></td><td>Loose git objects and SHA-1 oids.</td></tr>
-        <tr><td><code>src/store.ts</code></td><td><code>Backend</code> interface and the memory backend.</td></tr>
-        <tr><td><code>src/repository.ts</code></td><td>Commit, log, branch, tag, checkout, merge (fast-forward, 3-way, <code>mergeInto</code>), <code>revertTo</code>, diff.</td></tr>
-        <tr><td><code>src/json.ts</code></td><td>Canonical JSON and <code>mergeJson</code>.</td></tr>
-        <tr><td><code>src/diff.ts</code></td><td><code>describeDiff</code>: entity, property pointer, before and after.</td></tr>
-        <tr><td><code>src/snapshot.ts</code></td><td>Project rows to files and back.</td></tr>
-        <tr><td><code>src/github.ts</code></td><td><code>push</code>, <code>fetchBranch</code>, <code>pull</code> over a <code>GitHubTransport</code>.</td></tr>
-        <tr><td><code>src/transport.ts</code></td><td><code>restTransport</code> for the Git Data API. Tested against an in-memory remote that enforces fast-forward and checks every object hash.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Sidecar pieces: <code>apps/sidecar/src/repos/project-vcs-repo.ts</code>,
-      <code>apps/sidecar/src/services/project-vcs.ts</code>,
-      <code>apps/sidecar/src/http/vcs.ts</code>, and
-      <code>apps/sidecar/src/services/ai-vcs-tools.ts</code>. The API group is
-      <code>packages/api/src/groups/vcs.ts</code>.
-    </p>
+    <h2>Commit and branch workflow</h2>
+<ol>
+      <li>Read <code>GET /api/projects/:id/vcs/status</code> to see the current branch, HEAD, and changed paths.</li>
+      <li>Create a branch with <code>POST /vcs/branches</code>, then check it out with <code>POST /vcs/checkout</code>. Branch paths here are relative to the project's API prefix.</li>
+      <li>Edit project resources and commit with <code>POST /vcs/commit</code> and a non-empty message.</li>
+      <li>Inspect <code>GET /vcs/log</code> and <code>GET /vcs/diff</code>. Log supports a revision, limit, and optional tracked path.</li>
+      <li>Open a project pull request, review its structural changes, and merge after resolving blocking reviews or conflicts.</li>
+    </ol>
+    <p>Checkout, restore, and operations that move the working branch refuse a dirty working copy where required. A restore records a new commit representing the earlier content, optionally limited to selected paths. It preserves subsequent history rather than rewriting it.</p>
   </section>
 
   <section id="tree" class="doc-section">
-    <h2>Tree</h2>
-    <p>
-      Canonical JSON (sorted keys, two-space indent) keeps text diffs stable. Two people editing
-      different properties of one drawing do not conflict. The same property, or any array,
-      conflicts with a JSON pointer. Applying a commit creates missing library rows and updates
-      an existing one only when the current user owns it. Owners and organizations are
-      installation-specific and are not stored in the tree.
-    </p>
-    <DocCode language="text" title="Tracked paths (spec 13 §2)">
+    <h2>Snapshot contents</h2>
+<DocCode language="text" title="Project repository layout">
 {`project.json
 drawings/<id>.json
 components/<id>.json
@@ -122,136 +59,98 @@ machine-configs/<id>.json
 costs/<id>.json
 .cadcamfun/workflows/<name>.yml`}
     </DocCode>
-    <p>
-      Toolpath files include generated G-code. Not tracked: thumbnails, comments, chat, uploaded
-      binaries, and per-user cost settings. Every history-changing action is also appended to
-      <code>ActivityLog</code>. <code>GET …/vcs/log?path=drawings/&lt;id&gt;.json</code> lists
-      commits that touched that file. <code>POST …/vcs/restore</code> with <code>paths</code>
-      restores only those files as a new commit.
-    </p>
-    <p>
-      <code>log</code> is linear in history length. <code>isAncestor</code> walks the graph.
-      Spec 13 says that is fine for thousands of commits. Packfile and delta compression are not
-      implemented. Large STL and DXF blobs are out of this tree.
-    </p>
+    <p>One JSON file per entity keeps unrelated changes separate. The snapshot includes library items referenced by toolpaths and production cost estimates so restored manufacturing data can retain its dependencies. Entity identifiers used as file names are restricted to safe letters, digits, underscores, and hyphens, with a maximum of 128 characters.</p>
+    <p>JSON keys are sorted recursively and files use stable pretty-printing with a final newline. Arrays retain their order. Extra text files can travel with a package-level snapshot; the public commit endpoint accepts extra files only under <code>.cadcamfun/workflows/</code> with a safe YAML file name.</p>
+  </section>
+
+  <section id="package" class="doc-section">
+    <h2>Diff and merge semantics</h2>
+<p>The repository computes a merge base, handles unchanged sides directly, and performs structural three-way merges for changed JSON. Independent object-property edits can merge without conflict. Concurrent incompatible edits to the same scalar or array are reported through JSON pointers; arrays are not merged element by element.</p>
+    <p>Entity diffs include path, resource kind, identifier and name when available, added/modified/deleted status, and property changes with before/after values. Non-JSON files use file-level conflict behavior. A repository merge with conflicts returns their paths and pointers without writing a merged commit.</p>
   </section>
 
   <section id="http" class="doc-section">
-    <h2>HTTP</h2>
-    <p>
-      Routes are under <code>/api/projects/:id</code>. A commit or merge triggers
-      <code>push</code> workflows for that branch. Opening a pull request triggers
-      <code>pullRequest</code> workflows. A trigger failure does not fail the user’s operation.
-      The API accepts non-model files only under <code>.cadcamfun/workflows/*.yml</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Route</th><th>Purpose</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>GET …/vcs/status</code>, <code>/log</code>, <code>/branches</code>, <code>/diff?from&amp;to</code></td><td>Read state.</td></tr>
-        <tr><td><code>POST …/vcs/commit</code>, <code>/branches</code>, <code>/checkout</code>, <code>/restore</code></td><td>Write state. Commit takes <code>message</code> and optional workflow <code>files</code>.</td></tr>
-        <tr><td><code>GET/PUT …/vcs/remote</code>, <code>POST …/vcs/push</code>, <code>/pull</code></td><td>GitHub mirror. Header <code>x-github-token</code>. Desktop only.</td></tr>
-        <tr><td><code>GET/POST …/pulls</code>, reviews, <code>/merge</code>, <code>/close</code></td><td>Pull requests.</td></tr>
-        <tr><td><code>GET …/actions/runs</code>, <code>POST …/actions/dispatch</code></td><td>Workflow runs. See <a href="/docs/workflows">Workflows</a>.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      The companion gateway allow-list includes project, vcs, pulls, and actions reads, and the
-      AI chat routes. It refuses <code>/vcs/push</code> and <code>/vcs/pull</code>. The phone
-      never holds the desktop bearer token or the GitHub token. The desktop keeps the GitHub
-      token in the OS keychain and sends it per request. The sidecar does not store it.
-    </p>
-    <p>
-      Phone flow: <code>vcs_status</code>, <code>vcs_start_change</code> (creates
-      <code>ai/&lt;topic&gt;</code> and refuses a dirty working copy), CAD or CAM edits,
-      <code>vcs_commit</code>, <code>vcs_open_pull_request</code>. After a person merges, the
-      desktop working copy updates when <code>main</code> is checked out, and a configured
-      remote is pushed.
-    </p>
+    <h2>Pull requests and permissions</h2>
+<p>Project pull requests live at <code>/api/projects/:id/pulls</code>. Opening one records a title, body, head, base, and author kind. Detail responses include the pull request, reviews, and changes. Reviews support <code>comment</code>, <code>approve</code>, and <code>request-changes</code>, with optional path and property pointer.</p>
+    <p>The latest non-comment verdict per reviewer controls a request-changes block. A merge is refused while any such verdict requests changes. The implementation does not require a positive approval when there is no blocking verdict. Merged pull-request diffs use the recorded merge commit so later branch movement does not change that review record.</p>
+    <p>Reading history, committing, branching, opening pull requests, and reviewing require project access. Working-copy moves and shared-branch maintenance require the owner or an organization admin/manager as enforced by the handler. Dirty or conflicting operations return 409; protected actions return 403; missing refs or resources return 404; other invalid operations return 400.</p>
+    <p>An AI actor cannot commit, restore, or merge into <code>main</code>. The assistant uses a proposal branch and opens a pull request for a person to review. Audit and notification records identify assistant-originated changes.</p>
   </section>
 
   <section id="github" class="doc-section">
-    <h2>GitHub</h2>
-    <p>
-      <code>restTransport</code> speaks the Git Data API with a fine-grained token.
-      Fast-forward-only updates are what the in-memory test remote enforces. The HTTP routes
-      exist. What spec 13 §7 marks undone: mirroring CADCAMFUN pull requests onto GitHub pull
-      requests, and a live round-trip that proves GitHub stores the same commit oid for a given
-      author and committer date. Treat the mirror as implemented against the transport tests,
-      and treat production GitHub behaviour as unverified.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li><code>packages/vcs</code> must not open SQLite. The sidecar backend does.</li>
-      <li>Checkout, merge, and restore must refuse a dirty working copy.</li>
-      <li>AI tools must not commit or merge on <code>main</code>.</li>
-      <li>The companion gateway must not forward GitHub push, pull, credentials, or plugin routes.</li>
-      <li>Thumbnails, chat, and binaries must not be committed into the tree.</li>
-      <li>Do not hand-edit the git table migration. It was generated from <code>packages/db/src/schema.ts</code>.</li>
-    </ul>
-  </section>
-  <section id="module-exports" class="doc-section">
-    <h2>Module exports</h2>
-    <p>Symbols in <code>packages/vcs/src</code>:</p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Names</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>object.ts</code></td><td><code>ObjectType</code>, <code>Oid</code>, <code>TreeEntry</code>, <code>Commit</code>, <code>hashObject</code>, <code>encodeTree</code>, <code>decodeTree</code>, <code>encodeCommit</code>, <code>decodeCommit</code></td></tr>
-        <tr><td><code>store.ts</code></td><td><code>Backend</code>, <code>putObject</code>, <code>memoryBackend</code>, <code>StoredObject</code></td></tr>
-        <tr><td><code>repository.ts</code></td><td><code>Repository</code>, <code>VcsError</code>, <code>LogEntry</code>, <code>FileChange</code>, <code>MergeResult</code>. Methods: <code>writeTree</code>, <code>commit</code>, <code>log</code>, <code>checkout</code>, <code>createBranch</code>, <code>merge</code>, <code>diff</code>, <code>restorePaths</code>, <code>revertTo</code>.</td></tr>
-        <tr><td><code>snapshot.ts</code></td><td><code>ProjectSnapshot</code>, <code>ENTITY_DIRECTORIES</code>, <code>snapshotToFiles</code>, <code>filesToSnapshot</code></td></tr>
-        <tr><td><code>json.ts</code></td><td><code>canonicalJson</code>, <code>mergeJson</code>, <code>JsonMerge</code></td></tr>
-        <tr><td><code>diff.ts</code></td><td><code>EntityChange</code>, <code>PropertyChange</code>, <code>jsonChanges</code>, <code>describeDiff</code></td></tr>
-        <tr><td><code>transport.ts</code></td><td><code>repositoryTransport</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Optional GitHub mirror</h2>
+<p><code>GET</code> and <code>PUT /api/projects/:id/vcs/remote</code> read or set an <code>owner/repo</code> GitHub mirror; null detaches it. Push and pull use <code>POST /vcs/push</code> and <code>/vcs/pull</code>, with the user's GitHub token in <code>x-github-token</code> for that call.</p>
+    <p>Push transfers reachable objects and updates the remote branch without overwriting unpulled remote commits. Pull fetches the remote branch and merges it locally, refusing a dirty working copy. Divergent incompatible JSON edits return conflicts rather than silently replacing local content.</p>
+    <p>The sidecar transport uses GitHub REST object/ref operations. The GitHub token is supplied per request and is not stored as project data. A local pull request is an application review record; it is not automatically a GitHub pull request.</p>
   </section>
 
   <section id="snapshot-directories" class="doc-section">
-    <h2>Snapshot directories</h2>
-    <p>
-      <code>ENTITY_DIRECTORIES</code> in <code>snapshot.ts</code> names these paths. The tracked
-      file list in Tree uses the same directories.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Directory</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>drawings/</code></td></tr>
-        <tr><td><code>components/</code></td></tr>
-        <tr><td><code>toolpaths/</code></td></tr>
-        <tr><td><code>materials/</code></td></tr>
-        <tr><td><code>tools/</code></td></tr>
-        <tr><td><code>machine-configs/</code></td></tr>
-        <tr><td><code>costs/</code></td></tr>
-        <tr><td><code>.cadcamfun/workflows/</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Snapshots and restoration</h2>
+<p><code>snapshotToFiles</code> converts a project snapshot to canonical file contents; <code>filesToSnapshot</code> reconstructs the domain lists. <code>ProjectVcsRepo</code> reads the current database resources and applies restored snapshots. Whole-project restoration can change multiple related tables, so review its diff and clear the working copy before switching history.</p>
   </section>
 
   <section id="github-functions" class="doc-section">
-    <h2>GitHub functions</h2>
-    <p>Exports of <code>packages/vcs/src/github.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Name</th></tr>
-      </thead>
+    <h2>Transport and object APIs</h2>
+<p>The VCS package exports object encoding and reading, <code>Repository</code>, store adapters, canonical JSON and merge helpers, snapshot conversion, entity diffs, GitHub synchronization, and transport interfaces. Tests can inject an in-memory object backend or fake transport instead of accessing a user's repository.</p>
+  </section>
+
+  <section id="module-exports" class="doc-section">
+    <h2>Implementation entry points</h2>
+<p><code>packages/vcs/src/repository.ts</code> owns commits, refs, traversal, restoration, and merge; <code>json.ts</code> owns structural merging; <code>snapshot.ts</code> defines tracked resources; <code>diff.ts</code> describes entity changes; <code>github.ts</code> and <code>transport.ts</code> implement mirroring. Sidecar <code>project-vcs.ts</code> adds actor policy and persistence, while <code>http/vcs.ts</code> supplies transport authorization and events.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>History operations and automation</h2>
+<p>Workflow definitions are versioned with the project and run against committed files. A commit may trigger those workflows after history has been recorded; a failed workflow does not undo the commit. Keep local resource saves, project commits, workflow results, and remote synchronization distinct when diagnosing the state of a project.</p>
+  </section>
+
+  <section id="local-example" class="doc-section">
+    <h2>Try the repository without application data</h2>
+<p>The object-store seam lets an integration exercise commits and branches entirely in memory. Run this inside a workspace that depends on <code>@cadcamfun/vcs</code>, such as <code>apps/sidecar</code>. It does not touch the desktop's project database.</p>
+    <DocCode language="ts" title="Two commits and a proposal branch">
+{String.raw`import { Repository, memoryBackend, canonicalJson } from "@cadcamfun/vcs"
+
+const repo = new Repository(memoryBackend())
+const author = { name: "Workshop", email: "workshop@example.invalid", time: 0, tz: "+0000" }
+repo.commit({ "project.json": canonicalJson({ name: "Blank", revision: 1 }) }, {
+  message: "Initial blank", author
+})
+repo.createBranch("proposal/wider-blank")
+repo.checkout("proposal/wider-blank")
+repo.commit({ "project.json": canonicalJson({ name: "Blank", revision: 2 }) }, {
+  message: "Record revised blank", author
+})
+console.log(repo.currentBranch()) // proposal/wider-blank
+console.log(repo.log().length) // 2`}
+    </DocCode>
+    <p><code>Repository.commit</code> receives the complete file tree for that commit, not a patch. The sidecar builds this tree from working database records and carried text files. A package-level integration must preserve files it intends to retain. The in-memory example does not apply sidecar ownership or AI actor policy; those are enforced by the project service and HTTP layer.</p>
+    <p>Source: <code>packages/vcs/src/store.ts</code>, <code>repository.ts</code>, and <code>apps/sidecar/src/services/project-vcs.ts</code>.</p>
+  </section>
+
+  <section id="review-sequence" class="doc-section">
+    <h2>Review, restore, and synchronize deliberately</h2>
+<p>Record working-copy changes before switching branches. A new branch requires a resolvable source commit, so initialize an uncommitted project with its first commit before branching. Creating a branch only creates a ref; checkout is a separate operation that applies its snapshot to the working database.</p>
+    <p>For a pull request, compare the head against its merge base and review property-level differences. A later comment does not clear a previous request-changes verdict: the reviewer must submit a subsequent approve verdict. A merged PR can fast-forward or create a merge commit according to repository ancestry; inspect the recorded merge commit instead of assuming a fixed number of parents.</p>
+    <p>When merging into the checked-out base, the service requires a clean working copy and applies the new base snapshot. When another branch is checked out, merging the PR's base updates that branch's ref without replacing the current working database. A subsequent checkout loads that updated base.</p>
+    <p>Push and pull synchronize committed history. Unsaved UI content and uncommitted database state are not remote snapshots. A remote-ahead rejection is a request to fetch/merge first; it is not an instruction to overwrite the remote branch.</p>
+    <p>Source: <code>packages/vcs/src/repository.ts</code>, <code>github.ts</code>, and <code>apps/sidecar/src/services/project-vcs.ts</code>.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Recover from history failures</h2>
+<table>
+      <thead><tr><th>Failure</th><th>Next action</th></tr></thead>
       <tbody>
-        <tr><td><code>GitHubTransport</code></td></tr>
-        <tr><td><code>push</code></td></tr>
-        <tr><td><code>pull</code></td></tr>
-        <tr><td><code>fetchBranch</code></td></tr>
-        <tr><td><code>restTransport</code></td></tr>
-        <tr><td><code>SyncResult</code></td></tr>
+        <tr><td><code>NothingToCommit</code></td><td>Compare database working files with HEAD. Saving the same resource values again does not create a different tree.</td></tr>
+        <tr><td>Invalid or existing branch</td><td>Choose a new safe ref name. Names cannot contain traversal, double slashes, ref-expression fragments, or a trailing slash/.lock suffix.</td></tr>
+        <tr><td>Uncommitted changes</td><td>Commit or deliberately restore/discard the intended resources before checkout, pull, or a protected working-copy operation.</td></tr>
+        <tr><td>Merge conflict with path/pointers</td><td>Inspect those properties in base/head histories, create a reviewed resolution, and retry. The failed repository merge did not create a partial merge commit.</td></tr>
+        <tr><td>A reviewer requested changes</td><td>Resolve the feedback and obtain an updated non-comment verdict from that reviewer.</td></tr>
+        <tr><td>AI actors cannot act on main</td><td>Use an AI proposal branch and a human-reviewed pull request. Changing a confirmation flag does not remove the actor restriction.</td></tr>
       </tbody>
     </table>
+    <p>Source: <code>packages/vcs/src/repository.ts</code>, <code>apps/sidecar/src/services/project-vcs.ts</code>, and <code>http/vcs.ts</code>. The <a href="/docs/api">API reference</a> lists the actual request and response schemas.</p>
   </section>
-  <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Mobile", href: "/docs/mobile" }, { title: "Database", href: "/docs/database" }]} />
+
+  <DocRelated items={[{ title: "Workflows", href: "/docs/workflows" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />
 </DocsLayout>

@@ -1,0 +1,158 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Connect to the running sidecar", href: "#connection" },
+  { title: "Choose project, drawing, and session identity", href: "#identity" },
+  { title: "Submit a streaming turn", href: "#first-turn" },
+  { title: "Read complete SSE data frames", href: "#reader" },
+  { title: "Render progress without duplicating content", href: "#rendering" },
+  { title: "Answer permissions and questions", href: "#permissions" },
+  { title: "Queue, steer, and explicitly stop work", href: "#follow-ups" },
+  { title: "Recover after losing the stream", href: "#recovery" },
+  { title: "Context, attachments, and compaction", href: "#context" },
+  { title: "Separate transport errors from domain outcomes", href: "#failures" },
+]
+---
+
+<DocsLayout title="Build a streaming assistant client" subtitle="Open a turn, render its real events, answer pending requests, and recover the conversation after a dropped connection." description="Practical CADCAMFUN assistant integration with authenticated SSE, session identity, event handling, permissions, questions, cancellation, and recovery." toc={toc}>
+  <section id="connection" class="doc-section">
+    <h2>Connect to the running sidecar</h2>
+<p>A streaming assistant client connects to the same local sidecar as the desktop. Obtain its assigned loopback URL and current application bearer token from the connection you are integrating with. A port saved from yesterday's launch is not a durable address: the sidecar requests an ephemeral port each time it starts. An account session token, companion pairing token, and scoped action-bridge token have different purposes and cannot replace the application bearer on this chat route.</p>
+    <p>Before submitting a turn, read <code>GET /api/ai/status</code>, <code>/api/ai/providers</code>, and optionally <code>/api/ai/models?configuredOnly=true</code>. A configured credential means that a key is present; it does not prove that the provider will accept the request or that an endpoint supports the selected model. The default host is embedded nikcli. Direct mode can stream a model answer but does not supply the embedded host's persistent tool loop or specialist scheduler.</p>
+    <p>This guide uses <code>CADCAMFUN_URL</code> and <code>CADCAMFUN_TOKEN</code> as client-shell variables. Supply them through your existing connection handling. See the <a href="/docs/api/ai">AI API reference</a> for the exact schemas and <a href="/docs/sidecar">Sidecar</a> for launch behavior. The examples do not install credentials or choose a model on your behalf.</p>
+  </section>
+
+  <section id="identity" class="doc-section">
+    <h2>Choose project, drawing, and session identity</h2>
+<p>The client can supply a <code>sessionId</code> on its first turn and reuse it on later turns. The service maps that client identifier to the actual host session and checks the binding before each prompt. Retain the event/session identity as conversation state, rather than creating a different identifier every time the UI reconnects.</p>
+    <p>A real <code>projectId</code> gives the turn access to that project's permitted resources. An optional <code>drawingId</code> must belong to that project; it binds the turn's tools to that drawing. A drawing cannot be named without its project. A session already owned by another account or project is refused. These are admission checks before the model can execute project tools, not hints in a system prompt.</p>
+    <p>For a general explanatory conversation, omit project and drawing. The application uses its default context. For geometry work, carry the actual selected project/drawing IDs through chat, state recovery, queue, abort, and control requests. An account switch should not silently adopt the previous account's active session.</p>
+  </section>
+
+  <section id="first-turn" class="doc-section">
+    <h2>Submit a streaming turn</h2>
+<p><code>POST /api/ai/chat/stream</code> returns an SSE body. It requires a non-blank message even though the transport schema makes several fields optional so handlers can return readable validation messages. The following general question disables stored context injection, making it suitable for checking the transport independently of project geometry.</p>
+    <DocCode language="bash" title="A first streamed request">
+{String.raw`curl --no-buffer --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"message":"Explain the difference between G0 and G1.","sessionId":"inspection-demo","includeContext":false,"mode":"gcode"}' \
+  "$CADCAMFUN_URL/api/ai/chat/stream"`}
+    </DocCode>
+    <p>Add <code>projectId</code> and <code>drawingId</code> to work on a specific drawing. <code>mode</code> accepts general, cad, cam, gcode, or toolpath. A <code>model</code> selector can contain provider, model, tier, and variant; tiers are fast, balanced, or best. Discover provider/model IDs from the running catalogue instead of hard-coding an assumption about which vendor is available.</p>
+    <p><code>permissionMode</code> accepts approve, ask, or auto. Destructive tool groups retain human approval in every mode. The <code>agent</code> field selects a configured assistant role; read <code>GET /api/ai/agents</code> rather than guessing role IDs.</p>
+  </section>
+
+  <section id="reader" class="doc-section">
+    <h2>Read complete SSE data frames</h2>
+<p>The route uses Effect's SSE data mode: each SSE data payload is a JSON event record with a <code>type</code> discriminator. A network chunk is not an event boundary. JSON, line endings, and UTF-8 characters can be split between reads. Accumulate decoded text and parse only complete frames, joining multiple data lines when present.</p>
+    <DocCode language="ts" title="A minimal JSON data-frame reader">
+{String.raw`async function* events(response: Response): AsyncGenerator<Record<string, unknown>> {
+  if (!response.ok) throw new Error(await response.text())
+  if (!response.body) throw new Error("The response has no stream")
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let pending = ""
+  try {
+    while (true) {
+      const next = await reader.read()
+      pending += decoder.decode(next.value, { stream: !next.done })
+      let boundary: RegExpExecArray | null
+      while ((boundary = /\r?\n\r?\n/.exec(pending)) !== null) {
+        const frame = pending.slice(0, boundary.index)
+        pending = pending.slice(boundary.index + boundary[0].length)
+        const data = frame.split(/\r?\n/)
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).replace(/^ /, "")).join("\n")
+        if (!data) continue
+        const event: unknown = JSON.parse(data)
+        if (!event || typeof event !== "object" || !("type" in event)) {
+          throw new Error("Invalid assistant event")
+        }
+        yield event as Record<string, unknown>
+      }
+      if (next.done) break
+    }
+  } finally {
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
+  }
+}`}
+    </DocCode>
+    <p>This reader demonstrates framing; a production client should also validate each event against the shared contract or use the typed generated streaming client. It intentionally ignores SSE comment/control fields because this endpoint's application state lives in JSON data records. Releasing a client stream is transport cleanup, not an explicit request to abort server-side work.</p>
+  </section>
+
+  <section id="rendering" class="doc-section">
+    <h2>Render progress without duplicating content</h2>
+<p>Start the fetch with the same bearer and JSON body shown above, then iterate the reader. Append <code>delta.text</code> to visible answer text and route <code>reasoning.text</code> to its own view. A <code>done</code> event carries the final response text; replace or reconcile the accumulated answer with that final value instead of appending the entire answer again.</p>
+    <table>
+      <thead><tr><th>Events</th><th>State to maintain</th></tr></thead>
+      <tbody>
+        <tr><td><code>turn</code>, <code>session_status</code>, <code>step</code></td><td>Busy/retry state and current step; a step finishing can be followed by another step in the same turn.</td></tr>
+        <tr><td><code>tool_call</code>, <code>tool_progress</code>, <code>tool_result</code></td><td>A record by callId with name, input, argument progress, output, and success; agent identifies a specialist when present.</td></tr>
+        <tr><td><code>tool_diagnostic</code></td><td>Argument/execution/partial/verification findings, severity, recovery text, and optional mutationApplied.</td></tr>
+        <tr><td><code>todo</code>, <code>goal</code></td><td>Replace the current plan/goal snapshot rather than appending repeated copies.</td></tr>
+        <tr><td><code>retry</code>, <code>compaction</code>, <code>compacted</code></td><td>Explain continued work while preserving the conversation's current text and session identity.</td></tr>
+        <tr><td><code>heartbeat</code></td><td>No visible content; the server sends one about every five seconds while the source stream remains active.</td></tr>
+      </tbody>
+    </table>
+    <p>Correlate tool calls and results by <code>callId</code>, not their array position. A failed tool can return useful diagnostics while the assistant continues. A provider error after a successful editing tool does not roll back that geometry change.</p>
+  </section>
+
+  <section id="permissions" class="doc-section">
+    <h2>Answer permissions and questions</h2>
+<p>A <code>permission_request</code> includes sessionId, requestId, permission, and patterns. Present the request to the person and send the selected decision to <code>POST /api/ai/permission/reply</code>. The equivalent session-control action is <code>reply_permission</code>. The server verifies that the request is still pending in the conversation or an admitted child session.</p>
+    <DocCode language="json" title="Permission reply body">
+{String.raw`{
+  "sessionId": "inspection-demo",
+  "requestId": "request-id-from-the-event",
+  "decision": "once"
+}`}
+    </DocCode>
+    <p>Decision is once, always, or reject. It is a server permission decision, distinct from an action argument such as confirm. A pending <code>question_request</code> contains an ordered questions array. Reply through <code>/api/ai/sessions/control</code> with action <code>answer_question</code>, the request ID, and one answer array per question; reject it with <code>reject_question</code>.</p>
+    <DocCode language="json" title="Answer one single-choice question">
+{String.raw`{
+  "sessionId": "inspection-demo",
+  "action": "answer_question",
+  "requestId": "question-id-from-the-event",
+  "answers": [["The selected option label"]]
+}`}
+    </DocCode>
+    <p>Every answer must be non-empty. A single-choice question rejects multiple answers, and custom=false permits only listed labels. Preserve the exact labels and question order. If the server says the request is no longer pending, refresh controls instead of repeatedly posting the old reply.</p>
+  </section>
+
+  <section id="follow-ups" class="doc-section">
+    <h2>Queue, steer, and explicitly stop work</h2>
+<p>Use <code>POST /api/ai/chat/queue</code> for a message submitted while the turn works. It takes sessionId, message, optional projectId, and delivery. <code>queue</code> is the default and waits for the next safe step; <code>steer</code> asks the host to incorporate it promptly. A <code>user_message</code> event signals that the message has entered the conversation.</p>
+    <p>Use <code>POST /api/ai/chat/abort</code> with the conversation identity when the person presses Stop. This stops the turn and joins its associated workers. Do not implement Stop solely by cancelling fetch: losing the HTTP stream is not the same operation. A session can then accept another turn without creating a new project identity.</p>
+    <p><code>POST /api/ai/sessions/remove</code> removes the host session after cancelling and joining its children. It returns a removed flag. Removing a conversation is not a rollback of project edits made by its tools; review or restore those through the project/history APIs when needed.</p>
+  </section>
+
+  <section id="recovery" class="doc-section">
+    <h2>Recover after losing the stream</h2>
+<p>When the reader ends without a final event, treat completion as unknown. Call <code>POST /api/ai/sessions/state</code> with the same sessionId and projectId. The response contains busy and text, with optional recovered tool/todo/diagnostic events, usage, and tasks. Reconstruct the UI from this snapshot; replaying recovered tool events does not execute them again.</p>
+    <p>Then request <code>/api/ai/sessions/control</code> with action status to inspect pending permissions/questions, worker tasks, goal, and context policy. A busy turn waiting for an unanswered question needs a reply, not a second copy of the original prompt. A session reported idle with accumulated text can be displayed as recovered output even though the original TCP connection vanished.</p>
+    <p>Keep a distinction between network failure, a typed provider/config error event, explicit abort, and session removal. Retry the model request only after checking what the first turn actually did. In particular, read the current drawing after a partial mutation diagnostic or interrupted editing worker.</p>
+  </section>
+
+  <section id="context" class="doc-section">
+    <h2>Context, attachments, and compaction</h2>
+<p><code>includeContext: false</code> disables acquisition of stored context; explicit context text can still be supplied for that turn. Normal assembly orders standing requirements, current observations, UI snapshots, memory, and supporting references, deduplicates them, and applies a 24,000-character aggregate budget. Omitted/truncated blocks are reported; this budget is not the provider's token window.</p>
+    <p>Attachments include name, optional MIME, data, and optional text/base64 encoding. There are at most five per request. Images are limited to 5 MiB each, PDFs to 10 MiB, and text to 2,000,000 characters; short text up to 6,000 characters also appears inline. Text retained for tools is project-scoped in memory, so reconnecting is different from restarting the service. Unsupported files are rejected with reasons.</p>
+    <p>Control action context requests a detailed token breakdown; ordinary status polling avoids that tokenizer work. Action compact asks the host to summarize older conversation material. Memory consolidation is a separate host operation. Persist the source drawing and manufacturing requests through their own APIs rather than relying on a compacted conversation to reproduce exact geometry.</p>
+  </section>
+
+  <section id="failures" class="doc-section">
+    <h2>Separate transport errors from domain outcomes</h2>
+<p>HTTP 401 means the request did not pass bearer authorization. A 400 before streaming commonly means an empty message, inaccessible session identity, invalid project/drawing combination, or malformed body. Once a stream is established, the handler can emit an error event with config, provider, aborted, or internal classification; handle that event even when the response status was 200.</p>
+    <p>A tool result with ok=false is a tool outcome, not necessarily a failed stream. Show its output and diagnostic so the assistant or person can recover. A worker queue can also be full: the scheduler permits four active and sixteen waiting tasks. An interrupted reader may be recovered within bounded attempts; editing work is treated as uncertain rather than automatically replayed.</p>
+    <p>Read the executable contracts in <code>packages/api/src/groups/ai.ts</code> and <code>ai-events.ts</code>; admission and wire behavior in <code>apps/sidecar/src/http/ai.ts</code>; session mapping in <code>packages/ai/src/service.ts</code>; question validation in <code>nikcli/session-controls.ts</code>; heartbeat timing in <code>heartbeat.ts</code>. These sources define which outcome the client must present, independently of the assistant's prose.</p>
+  </section>
+
+  <DocRelated items={[{ title: "AI service reference", href: "/docs/ai" }, { title: "AI endpoints", href: "/docs/api/ai" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />
+</DocsLayout>

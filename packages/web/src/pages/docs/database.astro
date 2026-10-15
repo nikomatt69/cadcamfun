@@ -6,255 +6,151 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Files", href: "#files" },
-  { title: "Type mapping", href: "#mapping" },
-  { title: "Querying", href: "#querying" },
-  { title: "Upgrades", href: "#upgrades" },
-  { title: "Tables", href: "#tables" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Service exports", href: "#service-exports" },
-  { title: "Upgrade and migrate", href: "#upgrade-migrate" },
-  { title: "Table exports", href: "#table-exports" },
+  { title: "Persistence model", href: "#status" },
+  { title: "Schema and entry points", href: "#files" },
+  { title: "Stored values", href: "#mapping" },
+  { title: "Query through the service", href: "#querying" },
+  { title: "Upgrade behavior", href: "#upgrades" },
+  { title: "Migration commands", href: "#upgrade-migrate" },
+  { title: "Data domains", href: "#tables" },
+  { title: "Local key-value storage", href: "#table-exports" },
+  { title: "Shutdown and recovery", href: "#service-exports" },
+  { title: "Repository responsibilities", href: "#boundaries" },
+  { title: "Inspect a database without changing it", href: "#operational-checks" },
+  { title: "Use a disposable database in code", href: "#testing-lifecycle" },
+  { title: "Diagnose storage failures", href: "#troubleshooting" },
 ]
 ---
 
 <DocsLayout
   title="Database"
-  subtitle="packages/db is the only package that opens SQLite. Drizzle, WAL, and a scoped Database layer."
-  description="CADCAMFUN database: Drizzle schema, migrations, Database service, upgrades, and LocalKeyValue."
+  subtitle="SQLite persistence with scoped connection ownership, typed query failures, migration backups, and local document storage."
+  description="CADCAMFUN SQLite schema, Database service, migrations, backups, key-value storage, and recovery."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP0 on the task board is <strong>in progress</strong> (adding <code>LocalKeyValue</code> for
-      persistent AI context and preferences). Owner directory: <code>packages/db</code>. Spec:
-      <code>specs/02-database.md</code>. Package name: <code>@cadcamfun/db</code>.
-    </p>
-    <DocCallout type="note" title="LocalKeyValue is the open increment">
-      <p>
-        Spec 02 §4 describes <code>LocalKeyValue</code> for JSON-compatible local state
-        (<code>ai.context.*</code>, <code>ai.memory.*</code>, UI preferences). The sidecar
-        <code>KvStore</code> is the only repository that writes it, through the shared
-        <code>Database</code> service. AI provider credentials stay in the owner-only credentials
-        file and must never be stored in this table.
-      </p>
-    </DocCallout>
+    <h2>Persistence model</h2>
+<p><code>@cadcamfun/db</code> opens SQLite through <code>bun:sqlite</code> and exposes a Drizzle database inside the Effect <code>Database</code> service. The sidecar stores its application database at <code>&lt;dataDir&gt;/cadcamfun.db</code>. The connection enables write-ahead logging and foreign-key enforcement before applying migrations.</p>
+    <p>The database contains the working copy of projects and their related resources. Project version-control objects, pull requests, and workflow runs are also stored locally. AI provider credentials use a separate owner-readable JSON file; the application bearer token is supplied at launch rather than persisted as a preference.</p>
   </section>
 
   <section id="files" class="doc-section">
-    <h2>Files</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>packages/db/src/schema.ts</code></td><td>Legacy tables plus native tables. Names match the old Prisma SQLite database.</td></tr>
-        <tr><td><code>packages/db/src/index.ts</code></td><td><code>Database</code> service, <code>Database.layer</code>, <code>DatabaseError</code>, schema re-export.</td></tr>
-        <tr><td><code>packages/db/src/migrate.ts</code></td><td>CLI behind <code>bun run db:migrate</code>.</td></tr>
-        <tr><td><code>packages/db/src/upgrade.ts</code></td><td>Atomic upgrade runner: snapshot, migrate, roll back the logical schema on failure.</td></tr>
-        <tr><td><code>packages/db/src/database.test.ts</code></td><td>Migrates <code>:memory:</code>, round-trips rows, checks foreign keys.</td></tr>
-        <tr><td><code>packages/db/src/upgrade.test.ts</code></td><td>WAL snapshot, last-five retention, journal rollback, scoped cleanup.</td></tr>
-        <tr><td><code>packages/db/drizzle/</code></td><td>Generated SQL. Do not edit by hand.</td></tr>
-        <tr><td><code>packages/db/drizzle.config.ts</code></td><td>drizzle-kit config.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Generated folders currently under <code>packages/db/drizzle/</code> include
-      <code>20261004223029_careful_monster_badoon</code>,
-      <code>20261008030518_redundant_dagger</code>,
-      <code>20261009012351_moaning_loki</code>, and
-      <code>20261009171602_brown_mad_thinker</code>. A new change adds another folder via
-      <code>bun run db:generate</code>.
-    </p>
+    <h2>Schema and entry points</h2>
+<p><code>packages/db/src/schema.ts</code> defines tables, indexes, relationships, defaults, and inferred select/insert types. <code>src/index.ts</code> exports <code>Database</code>, <code>DatabaseError</code>, the Drizzle <code>Db</code> type, and the schema namespace. <code>src/upgrade.ts</code> owns migration planning, backups, and transactional application; <code>src/migrate.ts</code> is the command-line entry point. Generated SQL and the migration journal live in <code>packages/db/drizzle</code>.</p>
   </section>
 
   <section id="mapping" class="doc-section">
-    <h2>Type mapping</h2>
-    <p>
-      Spec 02 §1 maps Prisma types onto <code>drizzle-orm/sqlite-core</code>. Each table exports
-      <code>xTable</code>, <code>type X</code> (select), and <code>type NewX</code> (insert).
-      Relation objects are not generated up front. Add <code>relations()</code> on a table only
-      when a query needs the relational API.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Prisma</th><th>Drizzle</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>String</code></td><td><code>text</code></td></tr>
-        <tr><td><code>Int</code></td><td><code>integer</code></td></tr>
-        <tr><td><code>Float</code></td><td><code>real</code></td></tr>
-        <tr><td><code>Boolean</code></td><td><code>integer(&#123; mode: "boolean" &#125;)</code></td></tr>
-        <tr><td><code>DateTime</code></td><td><code>integer(&#123; mode: "timestamp_ms" &#125;)</code> (JS <code>Date</code> in and out)</td></tr>
-        <tr><td><code>Json</code></td><td><code>text(&#123; mode: "json" &#125;)</code></td></tr>
-        <tr><td><code>Bytes</code></td><td><code>blob(&#123; mode: "buffer" &#125;)</code></td></tr>
-        <tr><td>enum</td><td><code>text(&#123; enum &#125;)</code> plus an exported <code>XValues</code> const and <code>X</code> union</td></tr>
-        <tr><td><code>@default(cuid())</code></td><td><code>$defaultFn(newId)</code> using <code>crypto.randomUUID()</code></td></tr>
-        <tr><td><code>@updatedAt</code></td><td><code>$defaultFn</code> and <code>$onUpdateFn</code> set to <code>new Date()</code></td></tr>
-        <tr><td><code>onDelete</code></td><td><code>.references(() =&gt; table.col, &#123; onDelete &#125;)</code>. Missing <code>onDelete</code> means restrict.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      JSON columns are <code>unknown</code> until a repository decodes them with a Schema from
-      <code>@cadcamfun/api</code>. Spec 02 lists that as an open follow-up, along with indexes on
-      hot foreign keys (<code>Project.ownerId</code>, <code>Toolpath.projectId</code>,
-      <code>Drawing.projectId</code>).
-    </p>
+    <h2>Stored values</h2>
+<p>Domain identifiers default to UUIDs where configured by the table. Drizzle maps timestamp columns to JavaScript dates and JSON columns to the declared record types. HTTP repositories convert dates into their wire representation and validate JSON at the domain boundary. A TypeScript type annotation on a stored JSON column does not itself prove that imported or older data matches the current domain schema.</p>
+    <p>Projects own drawings, components, and toolpaths. Toolpaths can reference a drawing, material, cutter, and machine configuration; their <code>data</code> field can carry a portable manufacturing document. Separate drawing, component, and toolpath version tables retain resource versions in addition to whole-project Git history.</p>
   </section>
 
   <section id="querying" class="doc-section">
-    <h2>Querying</h2>
-    <p>
-      <code>Database.layer(&#123; path, migrationsFolder? &#125;)</code> is the only way to obtain a
-      connection. It opens <code>bun:sqlite</code>, sets <code>PRAGMA journal_mode = WAL</code> and
-      <code>PRAGMA foreign_keys = ON</code>, creates the parent directory, runs migrations when a
-      folder is given, and closes the handle when the layer scope ends. Optional
-      <code>backupsDirectory</code> defaults to <code>backups</code> beside the database.
-    </p>
-    <DocCode language="ts" title="The contract other packages use">
+    <h2>Query through the service</h2>
+<p><code>Database.layer</code> accepts a file path or <code>:memory:</code>, an optional migrations folder, and an optional backup directory. It acquires the SQLite handle for its Effect scope. Callers use <code>query(operation, run)</code> to execute synchronous or asynchronous Drizzle work; foreign exceptions become <code>DatabaseError</code> with the operation name and original cause.</p>
+    <DocCode language="ts" title="A repository query">
 {`import { Database, schema } from "@cadcamfun/db"
+import { Effect } from "effect"
 
-const { query } = yield* Database
-const projects = yield* query("projects.list", (db) =>
-  db.select().from(schema.projectTable)
-)`}
+const loadProjects = Effect.gen(function* () {
+  const database = yield* Database
+  return yield* database.query("projects.list", (db) =>
+    db.select().from(schema.projectTable).all())
+})`}
     </DocCode>
-    <p>
-      The sidecar builds the layer once. The database file is
-      <code>&lt;appData&gt;/cadcamfun/cadcamfun.db</code> (spec 02) from
-      <code>CADCAMFUN_DATA_DIR</code>, at <code>&lt;dir&gt;/cadcamfun.db</code> (spec 05).
-      Migrations run before the HTTP server listens. The migrations folder ships beside the
-      compiled sidecar; WP5 and WP10 map <code>packages/db/drizzle/</code> to runtime
-      <code>migrations/</code>.
-    </p>
-    <p>
-      The CLI <code>bun run db:migrate</code> reads a path from <code>DATABASE_URL</code> and
-      otherwise uses <code>./data/cadcamfun.db</code>. Spec 02 §3 says the untracked
-      <code>.env*</code> files at the repo root are legacy and must not be used by v6. Do not
-      read them. The local path for the app comes from sidecar config.
-    </p>
+    <p>Repositories own access rules and row interpretation; the shared query helper supplies failure attribution. It does not automatically authorize a query or create a transaction around an arbitrary sequence of service calls.</p>
   </section>
 
   <section id="upgrades" class="doc-section">
-    <h2>Upgrades</h2>
-    <p>
-      Upgrade safety belongs to WP0. Before pending migrations on an existing file, SQLite
-      <code>VACUUM INTO</code> writes a standalone WAL-consistent snapshot. New files and
-      <code>:memory:</code> skip that backup. Names include a UTC timestamp. Only the last five
-      snapshots for that database are kept. A backup or retention failure aborts startup as
-      <code>DatabaseError</code> with operation <code>backup</code>. Migration failures use
-      operation <code>migrate</code>.
-    </p>
-    <p>
-      Pending SQL and journal updates run in one SQLite transaction. Failure preserves the
-      original logical schema, data, and journal. Migration SQL must not contain transaction
-      control or non-transactional statements such as <code>VACUUM</code>. Connection acquisition
-      is scoped before initialization, so a failed start releases the handle. Shutdown attempts
-      <code>wal_checkpoint(TRUNCATE)</code> and always closes SQLite. Other packages must not
-      close the handle. Concurrent upgrades from two sidecars are unsupported.
-    </p>
-  </section>
-
-  <section id="tables" class="doc-section">
-    <h2>Tables</h2>
-    <p>
-      <code>schema.ts</code> exports one <code>*Table</code> constant per SQLite table. Group them
-      by what a caller is looking for. Better Auth tables (<code>Session</code>,
-      <code>Account</code>, <code>Passkey</code>, <code>TwoFactor</code>,
-      <code>Authenticator</code>, <code>VerificationToken</code>) are retained for a later cloud
-      phase and unused by the v6.0 local profile.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Group</th><th>Tables</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Identity</td><td><code>User</code>, <code>Account</code>, <code>Session</code>, <code>Authenticator</code>, <code>VerificationToken</code>, <code>Passkey</code>, <code>TwoFactor</code>, <code>Subscription</code>, <code>ApiKey</code>, <code>Token</code></td></tr>
-        <tr><td>Org and chat</td><td><code>Organization</code>, <code>OrganizationInvitation</code>, <code>UserOrganization</code>, <code>Conversation</code>, <code>ConversationParticipant</code>, <code>Message</code>, <code>Notification</code>, <code>PushSubscription</code></td></tr>
-        <tr><td>Project model</td><td><code>Project</code>, <code>Drawing</code>, <code>DrawingVersion</code>, <code>Component</code>, <code>ComponentVersion</code>, <code>ComponentComment</code>, <code>Toolpath</code>, <code>ToolpathVersion</code>, <code>ToolpathComment</code>, <code>Material</code>, <code>Tool</code>, <code>MachineConfig</code>, <code>LibraryItem</code>, <code>FileUpload</code>, <code>ActivityLog</code>, <code>AIAnalysisLog</code>, <code>MeshAsset</code>, <code>CadOperationLog</code></td></tr>
-        <tr><td>Costs and plugins</td><td><code>CostSettings</code>, <code>ProductionCostEstimate</code>, <code>ToolWearCost</code>, <code>MaterialCost</code>, <code>OperationCost</code>, <code>PluginRegistryEntry</code>, <code>PluginConfiguration</code>, <code>MCPServerConfig</code></td></tr>
-        <tr><td>Marketplace</td><td><code>MarketplaceItem</code>, <code>MarketplaceSeller</code>, <code>MarketplaceOrder</code>, <code>MarketplaceReview</code>, <code>MarketplaceCategory</code>, <code>MarketplaceCollection</code>, <code>MarketplaceCollectionItem</code>, <code>MarketplaceWishlist</code>, <code>MarketplacePayout</code></td></tr>
-        <tr><td>History</td><td><code>GitRepo</code>, <code>GitObject</code>, <code>GitRef</code>, <code>PullRequest</code>, <code>PullRequestReview</code>, <code>WorkflowRun</code></td></tr>
-        <tr><td>Native KV</td><td><code>LocalKeyValue</code></td></tr>
-      </tbody>
-    </table>
-    <p>
-      On first launch the sidecar <code>LocalProfile</code> service creates the single local
-      <code>User</code> row (spec 02 gap, owned by WP4). Native CAM saves reuse
-      <code>Toolpath</code> and <code>ToolpathVersion</code> JSON columns. Spec 02’s change log
-      says that path needs no extra columns.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>No package other than <code>packages/db</code> may import <code>bun:sqlite</code> or construct a Drizzle client.</li>
-      <li>Callers must not close the SQLite handle. They retain the layer scope through shutdown.</li>
-      <li>Generated SQL under <code>packages/db/drizzle/</code> must not be hand-edited.</li>
-      <li>Credentials, GitHub tokens, and the per-launch bearer token must not be written into <code>LocalKeyValue</code> or any other table.</li>
-      <li>v6 must not follow <code>DATABASE_URL</code> values from the legacy <code>.env*</code> files.</li>
-    </ul>
-  </section>
-  <section id="service-exports" class="doc-section">
-    <h2>Service exports</h2>
-    <p><code>packages/db/src/index.ts</code> exports:</p>
-    <table>
-      <thead>
-        <tr><th>Export</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>schema</code></td><td>Namespace of table constants from <code>schema.ts</code>.</td></tr>
-        <tr><td><code>DatabaseError</code></td><td>Tagged failure for open, backup, and migrate.</td></tr>
-        <tr><td><code>Db</code></td><td>Drizzle client type.</td></tr>
-        <tr><td><code>DatabaseConfig</code></td><td>Path and migrations folder for the layer.</td></tr>
-        <tr><td><code>Database</code></td><td>Effect service. Members are <code>db</code> and <code>query</code>.</td></tr>
-        <tr><td><code>Database.layer</code></td><td>Opens SQLite, runs migrations, and closes the handle with the scope.</td></tr>
-      </tbody>
-    </table>
+    <h2>Upgrade behavior</h2>
+<p>Opening a layer with a migrations folder reads the migration files and compares their names with <code>__drizzle_migrations</code>. A journal from the older format is backfilled by matching migration timestamps and hashes. An unmatchable journal fails the upgrade instead of guessing a migration identity.</p>
+    <p>When an existing on-disk database needs an upgrade, the service creates a pre-migration SQLite backup using <code>VACUUM INTO</code>. It writes to a partial file, renames the completed snapshot, and retains the latest five matching pre-migration backups. The default backup directory is <code>backups</code> beside the database. New and in-memory databases do not need this pre-upgrade backup.</p>
+    <p>Journal changes and pending SQL statements run in one immediate transaction. A failed migration rolls the transaction back and fails layer construction. The application should not announce readiness when database initialization fails.</p>
   </section>
 
   <section id="upgrade-migrate" class="doc-section">
-    <h2>Upgrade and migrate</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Names</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>packages/db/src/upgrade.ts</code></td><td><code>planUpgrade</code>, <code>backupDatabase</code>, <code>applyUpgrade</code></td></tr>
-        <tr><td><code>packages/db/src/migrate.ts</code></td><td>CLI. Run <code>bun src/migrate.ts</code> from <code>packages/db</code>. Path is <code>DATABASE_URL</code> or <code>./data/cadcamfun.db</code>. Migrations folder is <code>../drizzle</code>.</td></tr>
-      </tbody>
-    </table>
+    <h2>Migration commands</h2>
+<DocCode language="bash" title="Run from the repository root">
+{`bun run db:generate
+bun run db:migrate`}
+    </DocCode>
+    <p>Generate migrations after changing <code>schema.ts</code>, and keep the generated SQL and journal together. The migration CLI uses <code>DATABASE_URL</code> when supplied, removes an initial <code>file:</code> prefix, and otherwise opens <code>./data/cadcamfun.db</code>. The root wrapper runs this script with <code>packages/db</code> as its working directory, so its default target is <code>packages/db/data/cadcamfun.db</code>. Web Studio uses <code>data/cadcamfun.db</code> at the repository root. The packaged sidecar uses <code>CADCAMFUN_DATA_DIR</code>. Select an explicit database path when running maintenance so these entry points do not operate on different files unintentionally.</p>
+    <p>Without a migrations folder, <code>Database.layer</code> opens the database but does not create application tables. Tests that need the complete schema provide the migration directory with an in-memory database.</p>
+  </section>
+
+  <section id="tables" class="doc-section">
+    <h2>Data domains</h2>
+<ul>
+      <li><strong>Identity and collaboration:</strong> users, accounts, sessions, authenticators, verification tokens, subscriptions, organizations, membership, invitations, conversations, messages, notifications, and push subscriptions.</li>
+      <li><strong>Design and manufacture:</strong> projects, drawings, components, their versions and comments, materials, tools, machine configurations, toolpaths, and production cost records.</li>
+      <li><strong>Application services:</strong> files, library items, plugin registry/configuration, API keys, analytics and activity records, marketplace data, MCP configuration, and local key-value entries.</li>
+      <li><strong>Project history:</strong> Git repositories, objects and refs, pull requests and reviews, and workflow runs.</li>
+    </ul>
+    <p>A table's presence establishes a persistence model. Network integrations and application features depend on their actual handlers and services, rather than on table existence alone.</p>
   </section>
 
   <section id="table-exports" class="doc-section">
-    <h2>Table exports</h2>
-    <p>
-      Every <code>*Table</code> constant exported from <code>packages/db/src/schema.ts</code>.
-      The PascalCase model names in Tables are the SQLite names. These are the TypeScript exports.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Group</th><th>Exports</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Auth</td><td><code>userTable</code>, <code>authenticatorTable</code>, <code>verificationTokenTable</code>, <code>accountTable</code>, <code>sessionTable</code>, <code>passkeyTable</code>, <code>twoFactorTable</code>, <code>tokenTable</code>, <code>apiKeyTable</code></td></tr>
-        <tr><td>Billing</td><td><code>subscriptionTable</code></td></tr>
-        <tr><td>Orgs</td><td><code>organizationTable</code>, <code>organizationInvitationTable</code>, <code>userOrganizationTable</code></td></tr>
-        <tr><td>Projects and CAD-CAM</td><td><code>projectTable</code>, <code>drawingTable</code>, <code>drawingVersionTable</code>, <code>componentTable</code>, <code>componentVersionTable</code>, <code>componentCommentTable</code>, <code>toolpathTable</code>, <code>toolpathVersionTable</code>, <code>toolpathCommentTable</code>, <code>materialTable</code>, <code>toolTable</code>, <code>machineConfigTable</code>, <code>meshAssetTable</code>, <code>cadOperationLogTable</code>, <code>fileUploadTable</code>, <code>libraryItemTable</code></td></tr>
-        <tr><td>Marketplace</td><td><code>marketplaceItemTable</code>, <code>marketplaceSellerTable</code>, <code>marketplaceOrderTable</code>, <code>marketplaceReviewTable</code>, <code>marketplaceCategoryTable</code>, <code>marketplaceCollectionTable</code>, <code>marketplaceCollectionItemTable</code>, <code>marketplaceWishlistTable</code>, <code>marketplacePayoutTable</code></td></tr>
-        <tr><td>VCS</td><td><code>gitRepoTable</code>, <code>gitObjectTable</code>, <code>gitRefTable</code>, <code>pullRequestTable</code>, <code>pullRequestReviewTable</code></td></tr>
-        <tr><td>Workflows</td><td><code>workflowRunTable</code></td></tr>
-        <tr><td>Plugins</td><td><code>pluginRegistryEntryTable</code>, <code>pluginConfigurationTable</code></td></tr>
-        <tr><td>Costs</td><td><code>toolWearCostTable</code>, <code>materialCostTable</code>, <code>operationCostTable</code>, <code>productionCostEstimateTable</code>, <code>costSettingsTable</code></td></tr>
-        <tr><td>AI and chat</td><td><code>aIAnalysisLogTable</code>, <code>conversationTable</code>, <code>conversationParticipantTable</code>, <code>messageTable</code></td></tr>
-        <tr><td>Notifications</td><td><code>notificationTable</code>, <code>pushSubscriptionTable</code>, <code>activityLogTable</code></td></tr>
-        <tr><td>MCP</td><td><code>mCPServerConfigTable</code></td></tr>
-        <tr><td>Other</td><td><code>localKeyValueTable</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Local key-value storage</h2>
+<p><code>LocalKeyValue</code> persists JSON-compatible application state. The sidecar <code>KvStore</code> supports get, upsert, delete, and prefix-filtered listing. Keys must contain non-whitespace text and be at most 512 characters. Values allow null, strings, booleans, finite numbers, arrays, and plain objects; cycles, functions, non-finite numbers, and non-plain objects are rejected.</p>
+    <p>Entries include an update timestamp. Upserts replace the value for the same key. Prefix listing sorts by key and filters in memory. Use this store for preferences and assistant context; credentials belong to their dedicated credential service.</p>
   </section>
-  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }, { title: "Conventions", href: "/docs/conventions" }]} />
+
+  <section id="service-exports" class="doc-section">
+    <h2>Shutdown and recovery</h2>
+<p>The database scope finalizer requests <code>PRAGMA wal_checkpoint(TRUNCATE)</code> before closing the handle. A busy checkpoint or close failure is logged as a warning so remaining finalizers can run. The connection owner, rather than individual HTTP handlers, closes the handle.</p>
+    <p>For a consistent manual backup, stop the application cleanly before copying its data directory, or use SQLite's backup facilities while it is running. A live database can have state in its WAL file. To inspect a pre-migration backup, work on a copy and preserve the original database and backups until recovery is confirmed.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Repository responsibilities</h2>
+<p>Keep SQLite connection creation and migration logic in this package. Sidecar repositories use the provided database service and map storage failures to the HTTP errors of their resource. Keep geometry calculation in the core and secrets in the credential or token services. Database backups contain project and account data and need the same access controls as the active data directory.</p>
+  </section>
+
+  <section id="operational-checks" class="doc-section">
+    <h2>Inspect a database without changing it</h2>
+<p>After a clean shutdown, use the SQLite CLI against an explicit database path. Read-only mode avoids accidentally creating a new empty file when a path is wrong. These checks inspect structure and consistency without exposing account or credential rows.</p>
+    <DocCode language="bash" title="Read-only SQLite inspection">
+{String.raw`sqlite3 -readonly /absolute/path/cadcamfun.db 'PRAGMA quick_check;'
+sqlite3 -readonly /absolute/path/cadcamfun.db 'PRAGMA foreign_key_check;'
+sqlite3 -readonly /absolute/path/cadcamfun.db "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;"
+sqlite3 -readonly /absolute/path/cadcamfun.db 'SELECT name, applied_at FROM __drizzle_migrations ORDER BY id;'`}
+    </DocCode>
+    <p><code>quick_check</code> normally reports <code>ok</code>; <code>foreign_key_check</code> returns rows only for violations. A journal without the <code>name</code>/<code>applied_at</code> columns is an older format, which the application upgrade code must reconcile before using the last query. Check paths and migration identity before attempting repairs.</p>
+    <p>The application sets foreign-key enforcement on its own connection. A separately opened maintenance connection must explicitly enable it before making authorized writes; the PRAGMA is connection-specific.</p>
+    <p>Source: <code>packages/db/src/index.ts</code>, <code>upgrade.ts</code>, and <code>database.test.ts</code>.</p>
+  </section>
+
+  <section id="testing-lifecycle" class="doc-section">
+    <h2>Use a disposable database in code</h2>
+<p>A complete in-memory service scope is useful for repository examples and isolated diagnostics. The scope owns the connection and applies the checked-in migrations before the effect reads the service.</p>
+    <DocCode language="ts" title="Open, migrate, query, and release">
+{String.raw`import { Database, schema } from "@cadcamfun/db"
+import { Effect } from "effect"
+
+const migrationsFolder = new URL("../../packages/db/drizzle", import.meta.url).pathname
+const program = Effect.gen(function* () {
+  const database = yield* Database
+  return yield* database.query("diagnostic.projects", (db) =>
+    db.select({ id: schema.projectTable.id }).from(schema.projectTable).all())
+}).pipe(Effect.provide(Database.layer({ path: ":memory:", migrationsFolder })))
+console.log(await Effect.runPromise(program)) // []`}
+    </DocCode>
+    <p>Save this script as <code>apps/sidecar/diagnostic.ts</code> and run <code>bun apps/sidecar/diagnostic.ts</code> from the repository root. This package supplies the database and Effect dependencies, and the migration URL resolves from that file. A missing or wrong migrations directory is not equivalent to an empty application schema. The Drizzle <code>query</code> callback may run a synchronous query or return a promise; the helper wraps failures under the supplied operation label.</p>
+    <p>Source: <code>packages/db/src/database.test.ts</code> and <code>index.ts</code>.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Diagnose storage failures</h2>
+<ul>
+      <li><strong>No such table:</strong> confirm the exact database file and migrations folder. Opening without migrations is allowed by the service, but querying application tables then fails.</li>
+      <li><strong>Foreign-key constraint failed:</strong> inspect the referenced owner/project/resource. Deletion restrictions are schema-specific: deleting a user with an owned project is restricted, while session rows cascade when their user is deleted.</li>
+      <li><strong>Backup failed during upgrade:</strong> check free space and write access in the database and backup directories. Backup failure stops migration; do not delete the original database to bypass it.</li>
+      <li><strong>Legacy migration journal does not match local migrations:</strong> preserve the database and recover the matching migration set. Renaming or removing journal rows would hide the incompatible upgrade history.</li>
+      <li><strong>Checkpoint busy on shutdown:</strong> inspect other open connections before copying only the database file. Retain WAL/SHM siblings until a clean checkpoint or consistent SQLite backup completes.</li>
+    </ul>
+    <p>Migration backups are pre-upgrade recovery points with a five-file retention policy, not continuous backup of subsequent edits. Back up the complete data directory separately according to the installation's recovery requirements.</p>
+    <p>Source: <code>packages/db/src/index.ts</code>, <code>upgrade.ts</code>, <code>schema.ts</code>, and <code>database.test.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "History", href: "/docs/history" }, { title: "Setups", href: "/docs/setups" }]} />
 </DocsLayout>

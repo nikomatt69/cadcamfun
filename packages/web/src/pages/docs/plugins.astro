@@ -6,250 +6,151 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "SDK", href: "#sdk" },
-  { title: "Capabilities", href: "#capabilities" },
-  { title: "Host", href: "#host" },
-  { title: "HTTP", href: "#http" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Capability symbols", href: "#capability-symbols" },
-  { title: "Manifest fields", href: "#manifest-fields" },
-  { title: "definePlugin", href: "#define-plugin" },
-  { title: "Host limits", href: "#host-limits" },
+  { title: "Choose the extension surface", href: "#status" },
+  { title: "Worker SDK manifest", href: "#sdk" },
+  { title: "Module entry and AI functions", href: "#define-plugin" },
+  { title: "Capability-controlled APIs", href: "#capabilities" },
+  { title: "Loading and worker lifecycle", href: "#host" },
+  { title: "Runtime limits", href: "#host-limits" },
+  { title: "ZIP installation and browser plugin API", href: "#http" },
+  { title: "SDK helpers", href: "#capability-symbols" },
+  { title: "Implementation entry points", href: "#manifest-fields" },
+  { title: "Extension review", href: "#boundaries" },
+  { title: "Complete the sample assistant module", href: "#assistant-module" },
+  { title: "Argument schemas and lifecycle limits", href: "#schema-and-lifecycle" },
+  { title: "Diagnose a missing or failing extension", href: "#troubleshooting" },
 ]
 ---
 
 <DocsLayout
   title="Plugins"
-  subtitle="Untrusted code, a closed capability list, and a legacy HTTP installer that is not the SDK host."
-  description="CADCAMFUN plugins: manifest, capabilities, worker host, and the legacy /api/plugins routes."
+  subtitle="Extension manifests, worker-host APIs, assistant tools, and the separate browser plugin installation contract."
+  description="CADCAMFUN plugin development: SDK manifests, capabilities, worker lifecycle, assistant tool loading, limits, and HTTP installation."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP9 on the task board is <strong>done</strong> for the SDK and the host, with this limit:
-      the legacy <code>/api/plugins/*</code> group is served, and the SDK host is not exposed
-      over HTTP yet. Owner directories: <code>packages/plugin-sdk</code>
-      (<code>@cadcamfun/plugin-sdk</code>) and <code>apps/sidecar/src/plugins</code>. Spec:
-      <code>specs/09-plugins.md</code>.
-    </p>
-    <DocCallout type="warn" title="Two plugin systems share one table">
-      <p>
-        Spec 09’s opening status line still says the host was not started. The tree has
-        <code>host.ts</code>, and the task board counts the host as done. The HTTP handlers in
-        <code>apps/sidecar/src/http/plugins.ts</code> serve the legacy browser plugin (manifest
-        fields <code>main</code> and <code>permissions</code>, zip install, <code>bootstrap.js</code>).
-        That group is independent of the worker host. Both skip registry rows whose manifest
-        they cannot decode. <code>examples/hello-gear</code> is not proven end to end through
-        the sidecar HTTP API. Spec 09 §6 still lists that acceptance item as open.
-      </p>
-    </DocCallout>
+    <h2>Choose the extension surface</h2>
+<p><code>@cadcamfun/plugin-sdk</code> defines the worker plugin contract with a <code>plugin.json</code> manifest and API version <code>1</code>. Its host exposes capability-controlled services and runs plugin functions in Bun workers. The production assistant loader currently accepts plugins that request only <code>ai:tool</code>.</p>
+    <p>The <code>/api/plugins</code> HTTP family uses a different browser-plugin contract: ZIP packages with <code>manifest.json</code>, a <code>main</code> entry, browser permissions, configuration, and JavaScript bootstrap. Installing a package through that API does not make it a worker SDK plugin. Use the manifest and lifecycle matching the intended integration.</p>
   </section>
 
   <section id="sdk" class="doc-section">
-    <h2>SDK</h2>
-    <p>
-      Plugin authors import <code>@cadcamfun/plugin-sdk</code>. It stays dependency-light. A
-      plugin is a folder or archive with <code>plugin.json</code> and an ES module entry.
-    </p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Export</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>src/manifest.ts</code></td><td><code>PluginManifestSchema</code>, <code>parseManifest</code>, <code>decodeManifest</code>. Reverse-DNS id, semver, <code>apiVersion: "1"</code>.</td></tr>
-        <tr><td><code>src/capability.ts</code></td><td><code>CAPABILITIES</code>, <code>effectiveCapabilities</code>, <code>hasCapability</code>.</td></tr>
-        <tr><td><code>src/context.ts</code></td><td><code>PluginContext</code>, <code>requireCapability</code>. Missing surfaces throw <code>CapabilityError</code>.</td></tr>
-        <tr><td><code>src/plugin.ts</code></td><td><code>definePlugin(&#123; activate(ctx) &#125;)</code>.</td></tr>
-        <tr><td><code>src/test-host.ts</code></td><td><code>createTestHost</code>. Enforces capabilities the way the real host does.</td></tr>
-        <tr><td><code>examples/hello-gear/</code></td><td>Sample manifest, command, storage write, and a post-processor. Exercised by SDK tests, not by the HTTP installer.</td></tr>
-      </tbody>
-    </table>
-    <DocCode language="json" title="plugin.json">
+    <h2>Worker SDK manifest</h2>
+<DocCode language="json" title="plugin.json for an assistant extension">
 {`{
-  "id": "com.example.gear-generator",
-  "name": "Gear Generator",
-  "version": "1.2.0",
+  "id": "com.example.shop-helper",
+  "name": "Shop helper",
+  "version": "1.0.0",
   "apiVersion": "1",
-  "entry": "dist/index.js",
-  "capabilities": ["drawing:write", "ui:panel"],
-  "contributes": { "commands": [], "panels": [], "postProcessors": [], "operations": [] }
+  "entry": "index.js",
+  "capabilities": ["ai:tool"],
+  "contributes": {
+    "aiTools": [{
+      "id": "lookup",
+      "description": "Look up the shop's documented inspection checklist.",
+      "kind": "read",
+      "parameters": { "type": "object", "properties": {} },
+      "entry": "lookup"
+    }]
+  }
 }`}
     </DocCode>
-    <p>
-      <code>drawing:write</code> implies <code>drawing:read</code>. The manifest schema does not
-      repeat that implication. <code>effectiveCapabilities</code> adds it when the host
-      activates the plugin. Contributions are declarative: commands, panels, post-processors
-      (<code>(program, options) =&gt; string</code> using WP2 types), and operations
-      (<code>&#123; schema, generate &#125;</code>). <code>ctx.ui</code> registers descriptors.
-      It does not receive a DOM. A post-processor contribution is how a third party adds a
-      dialect without editing <code>packages/core</code>.
-    </p>
-    <p>
-      <code>createTestHost</code> grants only what the test asks for. A mock that grants
-      everything would let a plugin pass locally and fail at install. Storage keys are
-      namespaced per plugin. Drawing patches go through the same command shape as the editor.
-    </p>
-  </section>
-
-  <section id="capabilities" class="doc-section">
-    <h2>Capabilities</h2>
-    <p>
-      The list in <code>capability.ts</code> is closed. Anything else is a manifest error.
-      Enforcement is in the host, not in the plugin.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Capability</th><th>Allows</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>drawing:read</code></td><td>Read geometry through command patches.</td></tr>
-        <tr><td><code>drawing:write</code></td><td>Patch geometry. Implies read.</td></tr>
-        <tr><td><code>toolpath:read</code></td><td>Read toolpaths and programs.</td></tr>
-        <tr><td><code>storage</code></td><td>Namespaced key-value, private to the plugin.</td></tr>
-        <tr><td><code>ui:panel</code></td><td>Register command and panel descriptors.</td></tr>
-        <tr><td><code>ai:tool</code></td><td>Offer a tool to the assistant. A write tool is confirmed before each call.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      The user approves capabilities at install and can revoke them later. The context object
-      only materialises granted surfaces. <code>ctx.drawing</code>, <code>ctx.toolpath</code>,
-      <code>ctx.storage</code>, and <code>ctx.ui</code> are optional. Call
-      <code>requireCapability</code> before use.
-    </p>
-  </section>
-
-  <section id="host" class="doc-section">
-    <h2>Host</h2>
-    <p>
-      Spec 09 §3 isolates each enabled plugin in its own Bun <code>Worker</code>. The worker
-      receives a restricted context over <code>postMessage</code>. No <code>fs</code>, no
-      network, no <code>process</code>, no dynamic import outside the bundle. Default wall-clock
-      timeout is 5 seconds per call, with a worker memory cap and a call-rate limit. The
-      changelog adds a cap of 64 in-flight RPC requests per plugin. Host disposal settles every
-      outstanding request, including a worker that does not emit a crash on termination.
-    </p>
-    <p>
-      Lifecycle is an Effect layer: install, verify, enable, activate, calls, deactivate,
-      disable, uninstall. A crashing plugin is marked <code>faulted</code> and auto-disabled
-      after 3 crashes in 10 minutes. Real worker bootstrap must announce readiness before the
-      host sends activation, because a top-level async plugin can otherwise drop the first
-      message. A post failure is a typed error. The <code>reason</code> is also
-      <code>Error.message</code> so a rejected promise is not empty in the UI.
-    </p>
-    <p>
-      Files in <code>apps/sidecar/src/plugins/</code>: <code>host.ts</code>, <code>repo.ts</code>,
-      <code>bootstrap-script.ts</code>. Registry rows are <code>PluginRegistryEntry</code> and
-      <code>PluginConfiguration</code>. <code>PluginRepo</code> owns them. Local development
-      plugins (<code>dev: true</code>) skip signature checks and show a dev badge. Packaged
-      plugins are specified to carry an Ed25519 signature. Unsigned installs need an explicit
-      confirmation. Marketplace distribution is deferred.
-    </p>
-  </section>
-
-  <section id="http" class="doc-section">
-    <h2>HTTP</h2>
-    <p>
-      <code>apps/sidecar/src/http/plugins.ts</code> implements list, zip install, enable,
-      disable, uninstall, config, and <code>serve</code> for the legacy manifest. Files land in
-      <code>&lt;dataDir&gt;/storage/plugins/&lt;id&gt;/</code>. The registry folder is
-      <code>&lt;dataDir&gt;/plugins-registry</code>. Deviations from the legacy app, recorded in
-      spec 09: unknown plugin is 404, duplicate install is 409, invalid manifest is 400.
-      <code>PUT</code> or <code>PATCH /update</code> applies <code>&#123; manifest, config &#125;</code>.
-    </p>
-    <p>
-      The desktop screens are <code>/plugins</code> and <code>/plugins/:id</code>
-      (<code>features/plugins</code>). Install posts multipart <code>FormData</code>. Those
-      screens talk to this legacy group. They do not activate <code>hello-gear</code> through
-      <code>PluginHost</code>. Hidden CAD plugin panels must not fetch the registry (spec 06).
-    </p>
-    <p>
-      A separate package, <code>packages/nikcli-plugin</code>
-      (<code>@nikoemme_/cadcamfun-nikcli-plugin</code>), exposes the running app’s action
-      catalogue to a standalone nikcli process. It reads the list from the app. It does not keep
-      a second copy, and it is not a CADCAMFUN worker plugin.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>A plugin must not receive <code>fs</code>, network, or <code>process</code>. Capabilities are the only actions.</li>
-      <li>The SDK must not import the sidecar or the database. Authors test with <code>createTestHost</code>.</li>
-      <li>Capability checks belong in the host. A plugin that calls a missing surface gets <code>CapabilityError</code>.</li>
-      <li>The legacy HTTP group must not be described as the SDK worker API. Spec 09 §6’s end-to-end install of <code>hello-gear</code> is still open.</li>
-      <li>Signatures and the trusted key list are specified for packaged plugins. Do not treat a local folder install as a signed marketplace item.</li>
-    </ul>
-  </section>
-  <section id="capability-symbols" class="doc-section">
-    <h2>Capability symbols</h2>
-    <p>
-      The six capability strings are listed under Capabilities.
-      <code>packages/plugin-sdk/src/capability.ts</code> also exports
-      <code>CAPABILITIES</code>, <code>CapabilitySchema</code>, <code>ALL_CAPABILITIES</code>,
-      <code>effectiveCapabilities</code>, <code>hasCapability</code>,
-      <code>missingCapabilities</code>, and <code>storageNamespace</code>.
-    </p>
-  </section>
-
-  <section id="manifest-fields" class="doc-section">
-    <h2>Manifest fields</h2>
-    <p>
-      <code>packages/plugin-sdk/src/manifest.ts</code> exports <code>parseManifest</code> and
-      <code>decodeManifest</code>. Contribution schemas are
-      <code>CommandContributionSchema</code>, <code>PanelContributionSchema</code>, and
-      <code>PostProcessorContributionSchema</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Field</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>id</code></td></tr>
-        <tr><td><code>name</code></td></tr>
-        <tr><td><code>version</code></td></tr>
-        <tr><td><code>apiVersion</code></td></tr>
-        <tr><td><code>entry</code></td></tr>
-        <tr><td><code>capabilities</code></td></tr>
-        <tr><td><code>contributes</code></td></tr>
-        <tr><td><code>signature</code></td></tr>
-        <tr><td><code>dev</code></td></tr>
-      </tbody>
-    </table>
+    <p>Identifiers use a reverse-DNS form, the version is semantic <code>major.minor.patch</code> with an optional prerelease, and <code>apiVersion</code> must be <code>"1"</code>. Entry paths are relative to the plugin directory. Contributions can declare commands, panels, post-processors, operations, and assistant tools; declaring a contribution does not wire that feature into every host.</p>
+    <p>The schema allows optional <code>signature</code> and <code>dev</code> fields. The current worker host records these values but does not perform cryptographic signature verification during install. A signature field alone is not evidence of a verified publisher.</p>
   </section>
 
   <section id="define-plugin" class="doc-section">
-    <h2>definePlugin</h2>
-    <p>
-      <code>packages/plugin-sdk/src/plugin.ts</code> exports <code>definePlugin</code>,
-      <code>PluginModule</code>, <code>PluginOperation</code>, and <code>PluginPostProcessor</code>.
-      <code>packages/plugin-sdk/src/context.ts</code> exports <code>PluginContext</code>,
-      <code>DrawingApi</code>, <code>ToolpathApi</code>, <code>PluginStorage</code>, and
-      <code>PluginLogger</code>. The test host is
-      <code>packages/plugin-sdk/src/test-host.ts</code>.
-    </p>
+    <h2>Module entry and AI functions</h2>
+<p><code>definePlugin</code> is a typed identity helper for a module with a manifest and <code>activate(ctx)</code>. Activation may return a cleanup function, and the module may expose <code>deactivate</code>. The SDK describes these lifecycle hooks; their availability depends on the concrete worker bootstrap, as detailed below.</p>
+    <p>Assistant functions are exported through an <code>aiTools</code> record; the contribution's <code>entry</code> names the function in that record. A tool contribution includes its description, JSON parameter schema, and <code>read</code> or <code>write</code> kind. A write tool is routed through a human approval request in the embedded assistant; an outside bridge receives only permitted read plugin tools.</p>
+    <p>Bundle the worker entry as a self-contained module. The worker host reads the entry source and imports it through a blob module. Treat relative package or file imports as a separate integration concern rather than assuming a Node-style filesystem loader.</p>
+  </section>
+
+  <section id="capabilities" class="doc-section">
+    <h2>Capability-controlled APIs</h2>
+<p>The SDK recognizes <code>drawing:read</code>, <code>drawing:write</code>, <code>toolpath:read</code>, <code>storage</code>, <code>ui:panel</code>, and <code>ai:tool</code>. Drawing write implies drawing read. The general host derives effective capabilities from the installed manifest and checks them on RPC; the embedding application decides which manifests and surfaces it is willing to load.</p>
+    <p>The SDK context can expose drawing reads and Add/Update/RemoveEntity patches, toolpath/program reads, private string key-value storage, and declarative command/panel registration. Missing services are absent from the context. Storage keys use <code>plugin:&lt;id&gt;:</code> namespaces and reject absolute or parent-traversal keys.</p>
+    <p>The production assistant loader supports only <code>ai:tool</code>. A manifest asking for drawing, toolpath, storage, or UI capabilities is skipped with a warning. It does not silently grant those surfaces or load their broader capabilities into the assistant host.</p>
+  </section>
+
+  <section id="host" class="doc-section">
+    <h2>Loading and worker lifecycle</h2>
+<p>To enable an assistant extension, place its <code>plugin.json</code> and bundled entry under <code>&lt;dataDir&gt;/plugins/&lt;id&gt;/</code> and list the identifier in <code>&lt;dataDir&gt;/plugins/enabled.json</code>, a JSON array. The folder identifier must match the manifest. Loading occurs while the assistant plugin service is built; a failed plugin logs a warning without stopping the application.</p>
+    <p>The general host supports installed, enabled, disabled, and faulted states, with install, enable, disable, uninstall, command call, AI-tool call, and configuration operations. Enable creates a worker and completes its bootstrap handshake; disable tears it down. Uninstall removes the registry state and storage namespace through the host's injected dependencies.</p>
+    <p>Workers start with an empty environment and the bootstrap removes selected global APIs. This is an application-level restriction, not an operating-system sandbox: Bun globals remain reachable. Enable only extension code that is appropriate to run inside the application process boundary.</p>
   </section>
 
   <section id="host-limits" class="doc-section">
-    <h2>Host limits</h2>
-    <p>Constants and errors in <code>apps/sidecar/src/plugins/host.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Name</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>PluginHost</code></td></tr>
-        <tr><td><code>CALL_TIMEOUT_MS</code></td></tr>
-        <tr><td><code>AI_TOOL_TIMEOUT_MS</code></td></tr>
-        <tr><td><code>MEMORY_LIMIT_MB</code></td></tr>
-        <tr><td><code>CALL_RATE_LIMIT</code></td></tr>
-        <tr><td><code>CRASH_LIMIT</code></td></tr>
-        <tr><td><code>PluginCapabilityError</code></td></tr>
-        <tr><td><code>PluginTimeoutError</code></td></tr>
-        <tr><td><code>PluginCrashedError</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Runtime limits</h2>
+<p>The host defines a 256 MB worker memory setting, a 2,000-call-per-minute rate limit, and at most 64 pending calls per plugin. Command timeout behavior is supplied by the embedding host; the assistant loader uses 10 seconds. AI tool calls have a separate 30-second deadline. Timeouts, absent tools, worker crashes, capability failures, and queue exhaustion return typed host failures or readable tool results.</p>
+    <p>Crash tracking faults a plugin after three crashes within ten minutes. These host controls bound cooperative RPC and lifecycle behavior; the memory setting passed to Bun is not a substitute for a separately isolated executable.</p>
   </section>
-  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "AI assistant", href: "/docs/ai" }, { title: "API contract", href: "/docs/api" }]} />
+
+  <section id="http" class="doc-section">
+    <h2>ZIP installation and browser plugin API</h2>
+<p><code>POST /api/plugins/install</code> accepts a multipart archive. The installer reads <code>manifest.json</code> from the ZIP root or a single top-level directory, validates the browser-plugin manifest, and stores its files under <code>&lt;dataDir&gt;/storage/plugins/&lt;id&gt;/</code>. Browser manifests use <code>main</code>, <code>engines.cadcam</code>, and a browser permission list, rather than SDK <code>entry</code>, <code>apiVersion</code>, and capabilities.</p>
+    <p><code>GET /api/plugins</code> lists those installed entries; detail, enable/disable, uninstall, update, and configuration endpoints operate on their registry. <code>/api/plugins/bootstrap.js?id=…</code> serves JavaScript; <code>/api/plugins/serve?id=…&amp;file=…</code> serves plugin files. These are text/binary operations with their declared content types.</p>
+    <p>The local registry browser reads package metadata under <code>&lt;dataDir&gt;/plugins-registry</code>. It is a local manifest catalogue. Archive installation, registry listing, and worker assistant extension loading are separate operations.</p>
+  </section>
+
+  <section id="capability-symbols" class="doc-section">
+    <h2>SDK helpers</h2>
+<p><code>effectiveCapabilities</code>, <code>hasCapability</code>, and <code>missingCapabilities</code> support capability inspection. <code>requireCapability</code> raises a capability error when a requested context surface is absent. <code>storageNamespace</code> and <code>storageKey</code> build namespaced keys; <code>parseManifest</code> validates JSON; <code>manifestKey</code> formats an ID/version pair.</p>
+  </section>
+
+  <section id="manifest-fields" class="doc-section">
+    <h2>Implementation entry points</h2>
+<p><code>packages/plugin-sdk/src</code> owns the public manifest, capability, context, plugin, and test-host APIs. <code>apps/sidecar/src/plugins/host.ts</code> owns worker lifecycle and RPC; <code>services/ai-plugins.ts</code> owns consent-file loading and assistant registration. Browser installation is implemented in <code>http/plugins.ts</code> and <code>repos/plugin-registry-repo.ts</code>.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Extension review</h2>
+<p>Keep contribution schemas accurate, return small structured results, and declare read/write behavior honestly. Test against the actual embedding host: SDK availability does not establish production access to drawing, storage, UI, or post registries. The <a href="/docs/ai#nikcli-plugin">standalone nikcli plugin</a> is an HTTP action client and has a different purpose from code loaded into a worker.</p>
+  </section>
+
+  <section id="assistant-module" class="doc-section">
+    <h2>Complete the sample assistant module</h2>
+<p>The <code>plugin.json</code> example above names <code>aiTools.lookup</code>. This is the corresponding self-contained <code>index.js</code>. Top-level module code runs when imported; the declared lookup function runs when called.</p>
+    <DocCode language="js" title="index.js">
+{String.raw`export const aiTools = {
+  lookup: async () => ({
+    ok: true,
+    checklist: [
+      "Compare the drawing revision with the job traveller.",
+      "Record the measuring instrument and its calibration status.",
+      "Record each inspected dimension and the measured value."
+    ]
+  })
+}`}
+    </DocCode>
+    <p>These are sample shop instructions, not a built-in inspection standard. Replace them with the content your extension actually owns. To admit this module at the next service initialization, the enabled file is:</p>
+    <DocCode language="json" title="&lt;dataDir&gt;/plugins/enabled.json">
+{String.raw`["com.example.shop-helper"]`}
+    </DocCode>
+    <p>The running catalogue exposes an identifier derived from plugin and tool IDs. Discover it through <code>GET /api/ai/actions</code>; do not assume the browser ZIP registry is the assistant's enabled list. Reloading the application/service is the reliable way to reread the production consent file; no filesystem watcher is configured by this loader.</p>
+    <p>Source: <code>apps/sidecar/src/services/ai-plugins.ts</code>, <code>packages/ai/src/tools/plugin-tool.ts</code>, and <code>apps/sidecar/test/ai-plugin-tools.test.ts</code>.</p>
+  </section>
+
+  <section id="schema-and-lifecycle" class="doc-section">
+    <h2>Argument schemas and lifecycle limits</h2>
+<p>A tool's local ID must start with a lowercase letter and contain lowercase letters, digits, or underscores, with a 40-character maximum. Descriptions contain 10–2,000 characters. The contribution must name a non-empty entry function and a JSON parameter schema. The application adapter validates arguments before calling the worker; a refusal can return a structured <code>ok: false</code> result without terminating the plugin.</p>
+    <p>The public SDK describes <code>activate</code>, cleanup, and <code>deactivate</code> entry points. The current Bun worker bootstrap's activate/deactivate RPC handlers acknowledge lifecycle messages but do not invoke those exported module functions. Assistant extensions should therefore put their callable behavior in <code>aiTools</code> and avoid depending on SDK activation callbacks for setup or cleanup.</p>
+    <p>The general worker bootstrap also contains placeholder drawing/toolpath/UI handlers. They do not constitute production drawing or UI integration. The assistant loader's restriction to <code>ai:tool</code> prevents these unsupported surfaces from being advertised as working application access.</p>
+    <p>Source: <code>packages/plugin-sdk/src/manifest.ts</code>, <code>plugin.ts</code>, <code>apps/sidecar/src/plugins/host.ts</code> (<code>PLUGIN_BOOTSTRAP</code>), and <code>services/ai-plugins.ts</code>.</p>
+  </section>
+
+  <section id="troubleshooting" class="doc-section">
+    <h2>Diagnose a missing or failing extension</h2>
+<ul>
+      <li><strong>No tools in the catalogue:</strong> check valid enabled JSON, exact folder/manifest ID match, manifest decoding, and the <code>ai:tool</code> capability. Read the startup warning for a skipped plugin.</li>
+      <li><strong>Manifest requests unsupported surfaces:</strong> remove unsupported capabilities only if the code truly does not need them. An assistant plugin cannot acquire drawing-write access merely by declaring it.</li>
+      <li><strong>NoSuchTool:</strong> make <code>contributes.aiTools[].entry</code> match an exported function under <code>aiTools</code>. The contribution ID and entry name serve different purposes.</li>
+      <li><strong>Argument validation failure:</strong> inspect the JSON schema and required fields. Wrong values are refused before execution, as demonstrated by the real-worker and application integration tests.</li>
+      <li><strong>Timeout or faulted state:</strong> investigate blocking work, unresolved promises, or crashes; repeated crashes fault the plugin. Re-enable only after correcting the cause.</li>
+      <li><strong>ZIP installer rejects the manifest:</strong> use the browser-plugin <code>manifest.json</code> contract for that endpoint. Renaming a worker <code>plugin.json</code> does not translate its fields.</li>
+    </ul>
+    <p>Source: <code>apps/sidecar/test/plugins-ai-tools.test.ts</code>, <code>ai-plugin-tools.test.ts</code>, <code>plugins-http.test.ts</code>, and <code>src/plugins/host.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "AI assistant", href: "/docs/ai" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "API contract", href: "/docs/api" }]} />
 </DocsLayout>

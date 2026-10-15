@@ -6,191 +6,132 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Pipeline", href: "#pipeline" },
-  { title: "Toolpath IR", href: "#ir" },
-  { title: "Operations", href: "#operations" },
-  { title: "Posts", href: "#posts" },
-  { title: "Kernel", href: "#kernel" },
-  { title: "Part model", href: "#model" },
-  { title: "Modules", href: "#modules" },
+  { title: "From geometry to a program", href: "#pipeline" },
+  { title: "Toolpath representation", href: "#ir" },
+  { title: "Operations and the generator API", href: "#operations" },
+  { title: "Controller dialects", href: "#posts" },
+  { title: "Native manufacturing and release levels", href: "#kernel" },
+  { title: "Replay verification and its limits", href: "#model" },
+  { title: "Implementation map", href: "#modules" },
+  { title: "Depths, heights, feeds, and defaults", href: "#operation-options" },
+  { title: "Replay a small NC program", href: "#replay-example" },
+  { title: "Read a failed or preview artifact", href: "#diagnostics" },
 ]
 ---
 
 <DocsLayout
   title="CAM and G-code"
-  subtitle="Operations emit a machine-neutral toolpath. A post turns that toolpath into dialect text. Nothing in between writes G-code words."
-  description="How CAM works: toolpath IR, operations, posts, the manufacturing kernel, and the dexel part model."
+  subtitle="Generate toolpaths, post machine programs, replay emitted NC, and inspect the evidence attached to each result."
+  description="CADCAMFUN CAM core: operations, intermediate representation, machine posts, native manufacturing kernel, and verification limits."
   toc={toc}
 >
   <section id="pipeline" class="doc-section">
-    <h2>Pipeline</h2>
-    <p>
-      <code>packages/core/src/cam/index.ts</code> states the order: drawing entities, then an
-      operation, then the toolpath intermediate representation, then a post, then G-code text.
-      An operation does not know Fanuc from GRBL. A post does not recompute a pocket. The public
-      surface is the <code>cam</code> namespace, plus nested namespaces
-      <code>testing</code>, <code>generator</code>, <code>cycles</code>, <code>viewer</code>,
-      <code>verify</code>, <code>model</code>, and <code>kernel</code>.
-    </p>
-    <DocCode language="ts" title="From a program to text">
+    <h2>From geometry to a program</h2>
+<p><code>@cadcamfun/core</code> exposes manufacturing functionality under <code>cam</code>. Operation generators turn geometry and machining parameters into toolpath moves. Posts turn a machine-neutral program into controller text. The generator adapter also supports mill, lathe, and 3D-printer requests used by the application form.</p>
+    <p>The native manufacturing kernel adds an ordered pipeline: prepare the part and resources, plan or accept operations, compute cutting data, generate motion, emit one NC program, replay that NC independently, and attach evidence. Generated text, a parsed program, and a verified manufacturing artifact are different outputs with different guarantees.</p>
+    <DocCode language="ts" title="Emit an existing program">
 {`import { cam } from "@cadcamfun/core"
 
-const post = cam.getPost("grbl")
-const text = post && cam.emitProgram(program, post)`}
+const post = cam.getPost("fanuc")
+if (post === undefined) throw new Error("Post is unavailable")
+const nc = post.emit(program, { decimals: 3, tolerance: 0.01 })`}
     </DocCode>
   </section>
 
   <section id="ir" class="doc-section">
-    <h2>Toolpath IR</h2>
-    <p>
-      <code>ir.ts</code> is the contract shared by operations, posts, the 3D playback, and the
-      simulator. Coordinates are millimetres, feeds are millimetres per minute, times are
-      seconds. Cut depth is negative Z, with the stock top at zero. The operation applies that
-      sign once. A post never flips it.
-    </p>
-    <p>
-      Moves are tagged. <code>Rapid</code> and <code>Linear</code> go to a point, and a linear
-      move carries a feed. <code>Arc</code> stores the true centre in absolute coordinates. The
-      post turns that centre into the relative I and J the dialect wants. An arc whose end has
-      the same XY as its start is a full circle. <code>Dwell</code> waits a number of seconds.
-      <code>Comment</code> is text. <code>Orient</code> indexes a rotary axis between cuts.
-      <code>Cycle</code> is drill, peck, or dwell intent, expanded before some posts emit it.
-    </p>
-    <p>
-      A move may also carry A, B, and C angles that change during the move. That is simultaneous
-      motion, distinct from <code>Orient</code>, which happens between moves. Indexed 3+2 work
-      is <code>indexing.ts</code>: it tilts the work plane onto a trunnion (AC or BC) and
-      transforms the toolpath so ordinary G17 arcs stay valid in machine coordinates.
-    </p>
-    <p>
-      <code>tool.ts</code> is the cutter: diameter, flute length, taper, and the rule that only
-      a drill plunges straight down. <code>params.ts</code> is the shared height stack
-      (clearance, safe, retract), a positive total depth and stepdown, feeds, and coolant. The
-      heights are checked in order. <code>path.ts</code> is the planar path (lines and arcs)
-      kept separate from Z so offsets, ramps, helices, and tabs share one representation.
-    </p>
+    <h2>Toolpath representation</h2>
+<p>A program contains ordered toolpaths, each associated with a tool identifier and move list. Coordinates are millimetres, cutting feeds are millimetres per minute, and durations are seconds. Cutting depth is negative Z relative to stock top in conventional operation coordinates. Posts convert output units without changing the domain convention.</p>
+    <p>Moves are <code>Rapid</code>, <code>Linear</code>, <code>Arc</code>, <code>Dwell</code>, <code>Comment</code>, <code>Cycle</code>, and <code>Orient</code>. Arc centers are absolute XY coordinates; a post computes controller-relative I/J offsets. Matching start and end XY coordinates denote a full circle. A cycle retains drill, dwell, peck, or chip-break intent with its retract plane and feed.</p>
+    <p>Rotary fields on linear and rapid moves express simultaneous axis motion; <code>Orient</code> expresses indexed positioning. These angular fields use degrees. A dialect that cannot support rotary motion rejects such a program instead of discarding its rotary fields.</p>
   </section>
 
   <section id="operations" class="doc-section">
-    <h2>Operations</h2>
-    <p>
-      Each file in <code>cam/operations</code> is a parameter schema plus a pure
-      <code>generate</code> function. <code>common.ts</code> builds the moves. Rapids are not
-      emitted below the stock top. Descent is a ramp or a helix limited by an angle. A closed
-      profile steps down along the path instead of rapiding at depth. An open profile lifts,
-      repositions, and re-enters.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Operation</th><th>What it cuts</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>generateProfile</code></td><td>A contour at a constant offset, in depth passes, with a lead-in and optional tabs. Closed contours: outside, inside, or on the line. Climb milling assumes a clockwise spindle, so an outside contour is travelled counter-clockwise.</td></tr>
-        <tr><td><code>generatePocket</code></td><td>The interior of a closed contour, offset inward until the tool no longer fits.</td></tr>
-        <tr><td><code>generateDrill</code></td><td>Points: a drill cycle or an expanded peck, at the tool diameter.</td></tr>
-        <tr><td><code>generateFace</code></td><td>A raster across the stock top to clean a face.</td></tr>
-        <tr><td><code>generateEngrave</code></td><td>A path followed on the surface at a shallow depth, including text outlines.</td></tr>
-        <tr><td><code>generateSurface</code></td><td>A 3D finish over a height field (raster or similar), not a 2D offset.</td></tr>
-        <tr><td><code>rest</code></td><td>Material the previous cutter could not reach, from a distance field.</td></tr>
-        <tr><td><code>generateThread</code></td><td>A helical thread path from thread parameters.</td></tr>
-        <tr><td><code>generateChamfer</code></td><td>An edge break along a contour with a chamfer tool.</td></tr>
-        <tr><td><code>generateAdaptive</code></td><td>A constant-engagement roughing path.</td></tr>
-        <tr><td><code>generateMultiaxis</code></td><td>Moves that carry rotary angles with the tip motion.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>geometry.ts</code> normalises whatever the caller passed (entities, contours, point
-      rings) into contours, and keeps circular sources so a circle can stay an arc in the IR.
-      Polylines become arcs only when arc fitting is asked for.
-    </p>
+    <h2>Operations and the generator API</h2>
+<p>The operation library includes profile, pocket, drilling, facing, engraving, surface machining, rest machining, threading, chamfering, adaptive machining, and multiaxis generation. Each operation exposes its parameter contract and pure generation function. Tool dimensions, depth limits, clearance, feeds, and geometry must satisfy the operation's validation rules.</p>
+    <p><code>POST /api/toolpaths/generate</code> accepts generator settings, geometry, and printer extras and returns <code>gcode</code>, <code>cycles</code>, <code>warnings</code>, <code>stats</code>, <code>program</code>, and normally generation evidence. A valid request that cannot generate a program returns 400 with the reason; an unexpected computation failure becomes 500. Generation does not save a toolpath.</p>
+    <p><code>/api/toolpaths/suggest</code> derives element-driven parameters, feedback, cutting statistics, operation text, and warnings. <code>/api/toolpaths/parse</code> interprets supplied G-code into program moves and statistics. Suggestions and parsing do not establish that a program is safe or geometrically correct.</p>
   </section>
 
   <section id="posts" class="doc-section">
-    <h2>Posts</h2>
-    <p>
-      One emitter, <code>emitProgram</code> in <code>post/emitter.ts</code>, walks the IR and
-      tracks modal state (motion mode, feed, plane, tool). A dialect is a small table of how
-      that emitter should spell words. Registered dialects are <code>generic</code>,
-      <code>fanuc</code>, <code>grbl</code>, and <code>haas</code>. <code>getPost</code> looks
-      them up. <code>linuxcnc</code> is a reserved id and is not implemented.
-    </p>
-    <p>
-      Post options set the decimal count, whether canned cycles are emitted or expanded, arc
-      mode, tool numbers, and subprograms. <code>formatNumber</code> uses a fixed number of
-      decimals. Numbers are not produced with default string conversion.
-      <code>post/advanced</code> is a second pass over text that already exists: Fanuc cleanup
-      and a Heidenhain conversion. That pass returns an invalid result instead of throwing.
-    </p>
+    <h2>Controller dialects</h2>
+<p>The built-in registry implements <code>generic</code>, <code>fanuc</code>, <code>grbl</code>, and <code>haas</code>. <code>linuxcnc</code> is a recognized post identifier without an implementation in this registry; <code>getPost</code> can return undefined. Resolve and check the post before calling it.</p>
+    <p>Posts share an emitter with fixed-decimal formatting, comment sanitization, tool changes, arc handling, optional line numbering, and cycle expansion. Defaults are three decimal places, canned cycles enabled, IJK arcs, header enabled, and 0.01 mm tolerance. Unsupported arc formats fall back through the dialect's supported forms and linearization.</p>
+    <p><code>toolNumbers</code> maps tool identifiers to explicit positive integer pockets. Unmapped tools use first-use numbering while avoiding occupied numbers. <code>retractBeforeToolChange</code> is opt-in; it raises Z to the program's highest reached position before a tool change. Subprogram emission is also opt-in and depends on dialect support. Review the selected controller's output and machine configuration before production use.</p>
   </section>
 
   <section id="kernel" class="doc-section">
-    <h2>Kernel</h2>
-    <p>
-      <code>cam.kernel</code> is the job that sits above a single operation.
-      <code>planJob</code> reads features (from the parametric history, or from hole recognition
-      on an exact solid) and returns an ordered list: face, rough, drill or thread, finish,
-      deburr, and 3D surface when the part is not 2.5D. The plan assigns cutters. It does not
-      cut yet.
-    </p>
-    <p>
-      <code>prepareJob</code> fills speeds and feeds from the material and the cutter.
-      <code>executeJob</code> runs each operation against a provisional stock, posts the whole
-      program once, then replays the G-code independently onto a voxel stock so the evidence is
-      not the same code that generated the path. <code>runJob</code> is prepare plus execute.
-      The result carries claims and a release level. The functions are pure.
-    </p>
-    <p>
-      Around that pipeline: <code>kinematics.ts</code> solves a trunnion table (forward, inverse
-      candidates, unwrapped C, cheapest travel). <code>head.ts</code> is a tilting head about Y.
-      <code>collision.ts</code> checks a joint move of the tool against the table and the part.
-      <code>motion.ts</code> splits simultaneous five-axis motion into checked blocks.
-      <code>stock.ts</code> is a voxel stock: sure removal, possible removal, and a remaining
-      volume bracket. <code>machine-clearance.ts</code> checks holder and shank against the table
-      on every NC move. <code>convex.ts</code> is the exact distance between convex hulls.
-    </p>
+    <h2>Native manufacturing and release levels</h2>
+<p><code>POST /api/toolpaths/manufacture</code> accepts <code>CamKernelRequest</code>, a version 1 CAD snapshot with identity, material, optional machine, stock, tools, operations, quality controls, and work offset. Missing operations invoke the planner; missing tools use the default cutter crib. Unsupported input, unknown material or tool, empty part geometry, invalid stock, and unplannable work return explicit issues.</p>
+    <p>The kernel computes per-operation feeds, spindle speed, engagement, power and force estimates, warnings, time, and removed volume. It posts one program and independently interprets its emitted NC. The artifact retains the program, cutters, NC text, stock statistics, operation outcomes, identity digests, claims, and issues.</p>
+    <p><code>release</code> is <code>blocked</code>, <code>preview</code>, or <code>verified-program</code>. Hard failures or empty NC block release. Verification requires the relevant claims to pass; the current release rule permits unsupported machine-travel evidence while still marking the program verified. Inspect each claim, including unsupported and unresolved statuses, before deciding whether the evidence covers the intended machine.</p>
+    <p>Claims cover cutting data, machine limits, completed operations, rapid clearance, holder clearance, gouging, material removal, NC replay, machine travel, and machine clearance. Evidence is tied to the artifact's NC and source identity. Editing NC or changing a source setup invalidates that connection unless the job is evaluated again.</p>
   </section>
 
   <section id="model" class="doc-section">
-    <h2>Part model</h2>
-    <p>
-      <code>cam/model</code> builds the solid the 3-axis strategies see.
-      <code>element-mesh.ts</code> makes a closed mesh per scene element, matching the editor’s
-      axis conventions. Parametric histories are united. Booleans go through mesh CSG. A 2D
-      entity or text does not become a mesh.
-    </p>
-    <p>
-      <code>dexel.ts</code> turns those meshes into columns of Z intervals. Boolean elements
-      record which operands they consumed. Strategies read the top height of each column.
-      <code>generator/index.ts</code> is the older panel entry, <code>generateToolpath</code>,
-      which still drives mill, lathe, and printer paths and then runs the same post. The kernel
-      is the path that also plans, verifies, and records evidence.
-      <code>brep-part.ts</code> is the fallback when there is no feature history: it recognises
-      holes and slabs on the exact solid, or it says the job has to be a full 3D surface.
-    </p>
-    <p>
-      <code>verify</code> interprets G-code back into motion and compares it with a height field.
-      <code>viewer</code> turns words and lines into a toolpath the 3D view can play.
-      <code>cycles</code> is the canned-cycle templates the CAM screen offers.
-    </p>
+    <h2>Replay verification and its limits</h2>
+<p><code>POST /api/toolpaths/verify</code> replays either G-code or a program against axis-aligned stock. Supply exactly one motion source, a tool, and stock bounds. Optional fixtures are axis-aligned envelopes; optional target solids or meshes enable gouge and remaining-stock comparisons. Missing flute, shank, stickout, or holder dimensions leave the corresponding checks unmodelled.</p>
+    <p>The verifier samples motion into a height field and returns issues, removal statistics, engagement/air-cut lengths, and a display preview. The default tolerance is 0.05 mm. Resolution defaults from cutter diameter and may be coarsened to fit the compute budget; <code>ResolutionCoarsened</code> reports that change. Grid resolution limits the geometric evidence the result can support.</p>
+    <p>A result with <code>ok: true</code> has no error-severity issue. Without a target it cannot establish finished-part accuracy; without fixtures or holder geometry it cannot establish their clearance. The kernel's integrated replay and machine checks add evidence specific to its captured job, while standalone verification reflects only its supplied request.</p>
   </section>
 
   <section id="modules" class="doc-section">
-    <h2>Modules</h2>
+    <h2>Implementation map</h2>
+<p><code>cam/ir.ts</code> owns moves and program contracts; <code>operations/</code> owns strategy generators; <code>post/</code> owns controller emission; <code>generator/</code> adapts application settings and parses text; <code>model/</code> builds part geometry; <code>verify/</code> owns height-field replay; <code>kernel/</code> owns manufacturing orchestration and evidence. <code>setup.ts</code> and <code>indexing.ts</code> supply work-frame validation and indexed table transforms.</p>
+    <p>Saving documents, checking drawing access, and retaining source evidence belong to sidecar services. See <a href="/docs/setups">Setups</a> for portable operation documents and persistence checks.</p>
+  </section>
+
+  <section id="operation-options" class="doc-section">
+    <h2>Depths, heights, feeds, and defaults</h2>
+<p>Core operation parameters distinguish positive cut depth from absolute Z planes. <code>totalDepth</code> and <code>stepdown</code> are required positive finite lengths; a 5 mm depth with 2 mm stepdown produces passes at 2, 4, and 5 mm below the top. Defaults apply only when a field is missing, so an explicitly allowed zero is retained.</p>
     <table>
-      <thead>
-        <tr><th>Module</th><th>What it does</th></tr>
-      </thead>
+      <thead><tr><th>Field</th><th>Default / unit</th><th>Meaning</th></tr></thead>
       <tbody>
-        <tr><td><code>ir.ts</code></td><td>Tagged moves, programs, time estimate, cycle expansion. Millimetres, negative Z.</td></tr>
-        <tr><td><code>operations/</code></td><td>Pure generators from parameters and geometry to IR.</td></tr>
-        <tr><td><code>post/</code></td><td>Shared emitter and the generic, Fanuc, GRBL, and Haas dialects.</td></tr>
-        <tr><td><code>kernel/</code></td><td>Plan, execute, kinematics, collision, voxel stock, clearance.</td></tr>
-        <tr><td><code>setup.ts</code></td><td>Work frame, stock, fixtures, and tool assemblies. See Setups.</td></tr>
-        <tr><td><code>model/</code></td><td>Element meshes and the dexel grid.</td></tr>
-        <tr><td><code>generator/</code></td><td>Panel-facing <code>generateToolpath</code> and suggestions.</td></tr>
-        <tr><td><code>verify/</code>, <code>viewer/</code></td><td>Replay of posted code, and playback geometry.</td></tr>
+        <tr><td><code>clearanceHeight</code></td><td>10 mm</td><td>Plane used for clear rapid positioning.</td></tr>
+        <tr><td><code>safeHeight</code></td><td>5 mm</td><td>Operation feed entry/exit height.</td></tr>
+        <tr><td><code>retractHeight</code></td><td>2 mm</td><td>Parking height between passes; zero can be valid.</td></tr>
+        <tr><td><code>feed</code> / <code>plungeFeed</code></td><td>800 / 300 mm/min</td><td>Positive cutting and plunge feeds.</td></tr>
+        <tr><td><code>spindleRpm</code> / <code>coolant</code></td><td>10,000 / <code>off</code></td><td>Operation-level spindle and coolant intent.</td></tr>
       </tbody>
     </table>
+    <p>Heights must satisfy clearance ≥ safe ≥ retract. Profile defaults are outside compensation, climb direction, zero finishing allowance, direct lead-in, arc fitting off, and 0.01 mm tolerance. Ramp angle defaults to 3° and accepts 0.1–45°; helix pitch defaults to 1 mm per revolution. A declared side and allowance move the tool-center path, rather than changing the source contour.</p>
+    <p>These are pure operation defaults. The application generator's settings and native kernel's material-derived process data are separate parameter layers; do not assume the same field names or defaults across them.</p>
+    <p>Source: <code>packages/core/src/cam/params.ts</code> and <code>operations/profile.ts</code>.</p>
   </section>
-  <DocRelated items={[{ title: "CAD geometry", href: "/docs/cad" }, { title: "Setups", href: "/docs/setups" }, { title: "Viewport", href: "/docs/viewport" }]} />
+
+  <section id="replay-example" class="doc-section">
+    <h2>Replay a small NC program</h2>
+<p>This in-memory example cuts a 4 mm-wide straight slot 3 mm deep through a 40 × 40 × 10 mm stock model. It exercises the same core verifier used by the HTTP endpoint without saving a toolpath.</p>
+    <DocCode language="ts" title="Inspect stock removal and collisions">
+{String.raw`import { cam } from "@cadcamfun/core"
+
+const report = cam.verify.verifyToolpath({
+  gcode: "G21\nG90\nG0 X-10 Y0 Z5\nG0 Z0\nG1 Z-3 F200\nG1 X10 F400\nG0 Z5\nM30",
+  stock: { minX: -20, maxX: 20, minY: -20, maxY: 20, minZ: -10, maxZ: 0 },
+  tool: { kind: "endmill", diameter: 4 },
+  fixtures: [], tolerance: 0.05, resolution: 0.25
+})
+console.log(report.ok) // true for this stock/tool model
+console.log(report.stats.removedVolume)
+console.log(report.issues)`}
+    </DocCode>
+    <p>Changing the plunge to <code>G0 Z-3</code> produces a <code>RapidInMaterial</code> finding. Adding a short cutting length or holder dimensions can introduce shank/holder findings that the original request could not test. Supplying target geometry adds finished-part comparison; this example makes no claim about a target or fixtures.</p>
+    <p>The verifier budgets at most 2,500,000 grid cells and 3,000,000 path samples, with an 80,000,000 work budget. Requests can be coarsened to meet those limits. Preview stock is downsampled for display, so its pixels are not a second, finer verification result.</p>
+    <p>Source: <code>packages/core/src/cam/verify/verify.ts</code> and <code>verify/verify.test.ts</code>.</p>
+  </section>
+
+  <section id="diagnostics" class="doc-section">
+    <h2>Read a failed or preview artifact</h2>
+<p>A kernel issue includes a <code>tag</code>, severity, stage, message, and optional operation ID, NC line, and point. Follow that stage to the input that caused it: preparation checks stock/material/tools; planning selects strategies; cutting-data checks process limits; generation creates motion; posting writes the controller format; replay/evidence checks the resulting bytes.</p>
+    <ul>
+      <li><code>NoSuitableTool</code> or <code>UnknownTool</code>: inspect the selected cutter ID and geometry limits, including diameter, flute length, stickout, and the supplied cutter library.</li>
+      <li><code>RapidInStock</code> or <code>HolderCollision</code>: locate the reported operation/point and inspect entry, retracts, stock, and holder/table clearance. Increasing cutting feed does not repair an unsafe rapid.</li>
+      <li><code>Gouge</code>: check contour side, top/bottom levels, finishing allowance, and target geometry. The kernel tests an inside profile of the outside part as a real replay failure.</li>
+      <li><code>RemainingStock</code>: inspect inaccessible corners, tool radius, finish strategy, and verification resolution before interpreting the remaining volume.</li>
+      <li><code>ReplayMismatch</code>: treat posted motion and its claimed IR as inconsistent and regenerate from the captured job.</li>
+    </ul>
+    <p>Machine presets represent typical classes, not measured machines. The available snapshot preset IDs are <code>vmc-standard</code>, <code>haas-vf2</code>, <code>hsc-mill</code>, <code>desktop-mill</code>, and <code>cnc-router</code>. The first is the default. Inspect actual machine travel and clearance evidence instead of inferring it from a preset's display name.</p>
+    <p>Source: <code>packages/core/src/cam/kernel/execute.ts</code>, <code>machines.ts</code>, and <code>kernel.test.ts</code>; wire issue fields are in <code>packages/api/src/cam-kernel.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Setups", href: "/docs/setups" }, { title: "CAD geometry", href: "/docs/cad" }, { title: "Workflows", href: "/docs/workflows" }]} />
 </DocsLayout>

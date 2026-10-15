@@ -1,0 +1,161 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Locate the implementation", href: "#ownership" },
+  { title: "Workspace responsibilities", href: "#modules" },
+  { title: "Change shared contracts deliberately", href: "#contracts" },
+  { title: "Implementation conventions", href: "#implementation" },
+  { title: "Verification before review", href: "#done" },
+  { title: "Keep changes reviewable", href: "#leave-alone" },
+  { title: "Useful checks", href: "#commands" },
+  { title: "Example: change project validation", href: "#trace-example" },
+  { title: "Choose a regression at the right depth", href: "#regression-workflow" },
+  { title: "Contribute documentation", href: "#documentation-workflow" },
+]
+---
+
+<DocsLayout
+  title="Contributing code"
+  subtitle="Trace a user action through the real modules, update its contract, and verify the resulting behavior."
+  description="Contribution guide covering workspace ownership, public contracts, implementation boundaries, checks, and documentation."
+  toc={toc}
+>
+  <section id="ownership" class="doc-section">
+    <h2>Locate the implementation</h2>
+    <p>Start with the behavior you are changing. For a desktop action, follow <code>apps/desktop/src/app/routes.tsx</code> to its page adapter and feature screen. Locate the request in its client or feature helper, the endpoint schema in <code>packages/api</code>, the handler in <code>apps/sidecar/src/http</code>, and the service or repository underneath it.</p>
+    <p>For a geometry or NC-output change, begin in <code>packages/core</code> and its adjacent tests. For a persistence issue, inspect the repository query and <code>packages/db/src/schema.ts</code>. For native lifecycle, file-dialog, keychain, or updater behavior, inspect <code>apps/desktop/src-tauri/src</code>. This keeps a change close to its actual responsibility.</p>
+  </section>
+
+  <section id="modules" class="doc-section">
+    <h2>Workspace responsibilities</h2>
+    <table>
+      <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
+      <tbody>
+        <tr><td><code>packages/core</code></td><td>Pure CAD/CAM models and algorithms, posts, program parsing, and verification.</td></tr>
+        <tr><td><code>packages/api</code></td><td>Shared schemas, endpoint contracts, and generated clients.</td></tr>
+        <tr><td><code>packages/db</code></td><td>SQLite connection lifecycle, Drizzle schema, migrations, and upgrade backups.</td></tr>
+        <tr><td><code>packages/ai</code></td><td>Model integration, embedded host, action catalogue, sessions, and AI tools.</td></tr>
+        <tr><td><code>packages/plugin-sdk</code>, <code>packages/nikcli-plugin</code></td><td>Application plugin contract and standalone nikcli action-bridge client.</td></tr>
+        <tr><td><code>packages/vcs</code>, <code>packages/workflow</code></td><td>Project history and workflow definitions/execution.</td></tr>
+        <tr><td><code>apps/sidecar</code></td><td>HTTP adapters, service composition, repositories, gateway, and application integrations.</td></tr>
+        <tr><td><code>apps/desktop</code>, <code>apps/mobile</code></td><td>Desktop UI/native shell and paired iOS client.</td></tr>
+        <tr><td><code>packages/httpapi-codegen</code>, <code>packages/web</code></td><td>API client generation and the documentation/Studio site.</td></tr>
+      </tbody>
+    </table>
+    <p>Use the public entry point of a module when available. Keep SQLite access out of core geometry and clients. Feature screens should not bypass sidecar authorization or embed server credentials. Cross-cutting changes should update each affected boundary explicitly.</p>
+  </section>
+
+  <section id="contracts" class="doc-section">
+    <h2>Change shared contracts deliberately</h2>
+    <ol>
+      <li>Define the request, response, and typed error schemas in the contract package.</li>
+      <li>Implement the handler and its service/repository behavior, including ownership checks.</li>
+      <li>Regenerate clients and check that the generated output is current.</li>
+      <li>Update desktop, companion, plugin, or external client consumers that use the changed surface.</li>
+      <li>Document the supported input, output, failure behavior, and operational limits.</li>
+    </ol>
+    <DocCode language="bash" title="After changing API contracts">
+{`bun run generate
+bun run generate:check
+bun run --filter @cadcamfun/api typecheck
+bun run --filter @cadcamfun/sidecar typecheck`}
+    </DocCode>
+    <p>Generated clients are outputs of the contract generator. Fix the contract or generator when their shapes are wrong; a handwritten correction to generated output will be lost on regeneration. Preserve existing client semantics or identify the compatibility impact of a deliberate API change.</p>
+  </section>
+
+  <section id="implementation" class="doc-section">
+    <h2>Implementation conventions</h2>
+    <p>Write code, comments, and documentation in English. Keep exported TypeScript interfaces explicit and use <code>unknown</code> plus schema validation for untrusted values. Relative TypeScript imports use <code>.ts</code> extensions. CAD distances use millimetres and drawing angles use radians; honor explicitly degree-valued feature and CAM rotary inputs. Format NC numbers at the post boundary.</p>
+    <p>Effect code uses the pinned version's service/layer/error APIs. Services own external dependencies; scoped layers own resources. Avoid adding hidden process configuration reads inside a domain module. Keep geometry calculations pure and isolate filesystem, network, and database operations behind their adapters.</p>
+    <p>For a schema change, modify <code>schema.ts</code>, generate a migration, and exercise both fresh creation and upgrade of an existing database. For a UI change, keep route adapters small and place interaction logic in the relevant feature. For native work, keep geometry and repository logic in the sidecar/core rather than moving it into Rust.</p>
+  </section>
+
+  <section id="done" class="doc-section">
+    <h2>Verification before review</h2>
+    <ul>
+      <li>Run the affected package's typecheck and meaningful tests for the changed behavior.</li>
+      <li>For a bug fix, demonstrate the failing condition and its corrected result.</li>
+      <li>For shared contracts, check generated clients and affected consumers.</li>
+      <li>For persistence, verify migration behavior and data integrity using isolated databases.</li>
+      <li>For native or rendered interactions, exercise the actual target runtime in addition to logic tests.</li>
+      <li>Update user/developer documentation and explain operational limitations that remain.</li>
+    </ul>
+    <p>The root checks are <code>bun run typecheck</code> and <code>bun run test</code>. CI also has Rust and companion-specific jobs. Report what was run and any failures or unavailable runtime coverage; distinguish a configured workflow from a successful run.</p>
+  </section>
+
+  <section id="leave-alone" class="doc-section">
+    <h2>Keep changes reviewable</h2>
+    <p>Keep generated artifacts, dependency updates, behavior changes, and documentation changes traceable to the same concrete purpose. Avoid reformatting unrelated modules. Preserve existing user work and use disposable data directories for experiments.</p>
+    <p>Do not include launch tokens, device pairing links, model keys, database contents, or signing credentials in patches or screenshots. Examples should use placeholders. A local fixture or mocked provider can validate a deterministic flow; document where real provider or native integration remains necessary.</p>
+  </section>
+
+  <section id="commands" class="doc-section">
+    <h2>Useful checks</h2>
+    <DocCode language="bash" title="Select the checks relevant to your change">
+{`bun run --filter @cadcamfun/core typecheck
+bun test packages/core
+bun test apps/sidecar/test
+bun test apps/desktop/src
+bun run --cwd apps/mobile typecheck
+bun run --cwd apps/mobile test
+bun run --cwd packages/web check
+bun run --cwd packages/web build`}
+    </DocCode>
+    <p>Native packaging uses <code>scripts/build.ts</code>; use <code>--help</code> or <code>--dry-run</code> to inspect its stages. Unit tests are separate from the build pipeline's typecheck stage. Consult the release guide for signing, target architecture, and updater validation.</p>
+  </section>
+
+  <section id="trace-example" class="doc-section">
+    <h2>Example: change project validation</h2>
+    <p>Suppose a project create/update rule changes. The request schema is <code>packages/api/src/projects.ts</code>, the HTTP adapter is <code>apps/sidecar/src/http/projects.ts</code>, and persistence is implemented by <code>ProjectRepo</code>. The schema currently makes <code>name</code> optional, while handlers require it for creation and update. Inspect both levels before promising that a schema-valid request will succeed.</p>
+    <ol>
+      <li>Define the intended input cases: missing name, invalid type, empty text, accessible organization, and inaccessible organization.</li>
+      <li>Decide which condition is a decoding error and which is business validation. Preserve the endpoint's documented status/error shape.</li>
+      <li>Add assertions at the relevant handler/service boundary and verify unauthorized or non-member callers cannot bypass the rule.</li>
+      <li>If the public schema changed, regenerate both client families and typecheck consumers.</li>
+      <li>Exercise the desktop form and document any changed request requirements.</li>
+    </ol>
+    <p>Creation currently returns a bare project row with HTTP 201. List/get return relation-enriched rows. Do not impose a generic success envelope on this family without updating its contract and consumers. Other endpoint families intentionally use different envelopes.</p>
+    <p>The generator entry point is <code>packages/api/scripts/generate-clients.ts</code>. Its outputs live under <code>src/client/generated</code> and <code>src/sdk/generated</code>. Changes to the contract surface belong in the source contract; generated output should be reproducible.</p>
+  </section>
+
+  <section id="regression-workflow" class="doc-section">
+    <h2>Choose a regression at the right depth</h2>
+    <p>A geometry regression should assert geometry, not only repeat the calculation being changed. Existing collision tests provide useful patterns: a stationary overlap is a collision at time zero; an intermediate rotational sweep can collide even when an endpoint is clear; an insufficient bound is unresolved; and a certified clearance is compared against a dense independent reference.</p>
+    <DocCode language="bash" title="Run a focused existing geometry test and its package checks">
+{`bun test packages/core/src/cam/kernel/collision.test.ts
+bun run --filter @cadcamfun/core typecheck
+bun test packages/core`}
+    </DocCode>
+    <p>Choose the analogous boundary for other work. A database migration needs fresh/upgrade cases and backup failure behavior. A stream parser needs split frames and cancellation. A UI save change needs destination selection, request failure, retry, and reopening saved state. A native command needs validation and lifecycle behavior in addition to a frontend typecheck.</p>
+    <p>Keep checks proportional to the change. Content edits need navigation/template verification; they do not require inventing new domain tests. A passing narrow test supports only its asserted behavior, so include the package or integration checks required by the changed public surface.</p>
+  </section>
+
+  <section id="documentation-workflow" class="doc-section">
+    <h2>Contribute documentation</h2>
+    <p>The website is in <code>packages/web</code>. Documentation pages use <code>DocsLayout</code>, a table of contents, section identifiers, and shared code/callout/related-link components. Preserve those page conventions and the existing visual design while improving the content.</p>
+    <ol>
+      <li>Read the implementation, manifest, and configuration for every behavior you document.</li>
+      <li>Use a supported command or request shape and state the necessary working directory, credentials, data path, and native prerequisites.</li>
+      <li>Describe the result and its failure modes. Label examples as examples; call a response captured only when it was actually captured.</li>
+      <li>Update navigation and retrieval metadata when adding or renaming a route, and fix every local link to the old location.</li>
+      <li>Run index checks and the Astro build, then inspect the rendered page and its anchors.</li>
+    </ol>
+    <DocCode language="bash" title="Documentation checks">
+{`bun run --cwd packages/web check
+bun run --cwd packages/web typecheck
+bun run --cwd packages/web build`}
+    </DocCode>
+    <p>Claims about configured CI should say what the workflow does. Claims about successful publication or runtime acceptance need the particular run/artifact as evidence. Documentation should distinguish implemented behavior, defaults, and limits without turning internal planning notes into product instructions.</p>
+  </section>
+
+  <DocRelated items={[
+      { title: "Conventions", href: "/docs/conventions" },
+      { title: "API", href: "/docs/api" },
+      { title: "Local development", href: "/docs/guides/local-dev" }
+  ]} />
+</DocsLayout>

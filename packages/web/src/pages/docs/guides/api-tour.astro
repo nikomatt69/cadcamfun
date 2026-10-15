@@ -1,0 +1,116 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+import captured from "../../../data/api-tour.json"
+const capture = (name: string) => captured.find((entry) => entry.name === name)!
+const toc = [
+  { title: "Environment and captured responses", href: "#environment" },
+  { title: "Check health", href: "#health" },
+  { title: "Understand authorization", href: "#authorization" },
+  { title: "Read and create a project", href: "#projects" },
+  { title: "Read back related data", href: "#relations" },
+  { title: "Persist a preference", href: "#preferences" },
+  { title: "Handle failures and retries", href: "#retries" },
+  { title: "Next integration steps", href: "#next" },
+]
+---
+<DocsLayout title="API walkthrough with captured responses" subtitle="Exercise health, authorization, project creation, and preference persistence with real handler responses from an isolated database." description="Hands-on CADCAMFUN API walkthrough with captured success and failure responses, disposable startup, project CRUD, key-value persistence, and retry guidance." toc={toc}>
+  <section id="environment" class="doc-section">
+    <h2>Environment and captured responses</h2>
+    <p>The responses on this page were captured from the actual sidecar routes on 15 October 2026 using <code>apps/sidecar/test/helpers.ts</code>. That harness builds the application handlers with a migrated in-memory SQLite database, a disposable file directory, the direct AI host, and no provider calls. The requests go through the HTTP router in-process; this run does not exercise the Tauri launcher, network sockets, TLS, or a paired phone.</p>
+    <p>The response bodies below are unedited. Identifiers and timestamps therefore belong to that disposable run. Your instance returns its own values. Use the project identifier returned by your create request rather than reuse the captured identifier.</p>
+    <DocCode language="bash" title="Start a disposable real HTTP instance from the repository root">{String.raw`CADCAMFUN_TOKEN=local-development-token \
+CADCAMFUN_DATA_DIR=/tmp/cadcamfun-api-walkthrough \
+CADCAMFUN_MIGRATIONS_DIR="$PWD/packages/db/drizzle" \
+CADCAMFUN_AI_HOST=direct \
+CADCAMFUN_AI_OFFLINE=1 \
+bun --no-env-file apps/sidecar/src/main.ts`}</DocCode>
+    <p>This example token is only for an isolated development process. Choose your own value, keep the terminal open, and read the port from the JSON ready event. In a second terminal, set the connection variables below after replacing <code>READY_PORT</code>. The sidecar chooses a new port on another launch.</p>
+    <DocCode language="bash" title="Connection variables in the second terminal">{String.raw`export CADCAMFUN_URL="http://127.0.0.1:READY_PORT"
+export CADCAMFUN_TOKEN="local-development-token"`}</DocCode>
+    <p>The on-disk development database differs from the capture's in-memory database. If you reuse that data directory, previously created projects and preferences remain. Use a separate disposable directory for a fresh run. The packaged desktop uses its native application data directory instead.</p>
+  </section>
+  <section id="health" class="doc-section">
+    <h2>Check health</h2>
+    <p><code>/api/health</code> is the public probe. It confirms that this route answers; it does not test credentials, a model provider, or manufacturing resources.</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error "$CADCAMFUN_URL/api/health"`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 200">{JSON.stringify(capture("Public health").body, null, 2)}</DocCode>
+    <p>The native <code>/health</code> and <code>/version</code> operations require the application bearer token. Read their exact contracts in the <a href="/docs/api/system">system reference</a>.</p>
+  </section>
+  <section id="authorization" class="doc-section">
+    <h2>Understand authorization</h2>
+    <p>A project request without a bearer token is rejected before project data is returned.</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error --include "$CADCAMFUN_URL/api/projects"`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 401">{JSON.stringify(capture("Missing bearer").body, null, 2)}</DocCode>
+    <p>The error contains its tagged error name and a readable message. Do not parse the message as a stable error code. HTTP status, the endpoint's schema, and its declared tag together describe the failure.</p>
+    <p>Use <code>Authorization: Bearer …</code> for admitted application calls. An optional <code>x-session-token</code> selects an account session after bearer admission. AI bridge tokens can call only the two action bridge routes; they cannot substitute for an application token in this walkthrough. Companion tokens are accepted by the paired gateway with its own route policy.</p>
+  </section>
+  <section id="projects" class="doc-section">
+    <h2>Read and create a project</h2>
+    <DocCode language="bash">{String.raw`curl --silent --show-error "$CADCAMFUN_URL/api/projects" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN"`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 200 on an empty working copy">{JSON.stringify(capture("Empty projects").body, null, 2)}</DocCode>
+    <p>The response is a plain array, without a <code>data</code> or <code>success</code> wrapper. A structurally valid but incomplete create request is rejected by business validation:</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error --request POST "$CADCAMFUN_URL/api/projects" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{}'`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 400">{JSON.stringify(capture("Missing project name").body, null, 2)}</DocCode>
+    <p>The transport schema makes <code>name</code> optional, but the handler requires a non-empty value. To create the project:</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error --request POST "$CADCAMFUN_URL/api/projects" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"name":"API walkthrough","description":"Disposable documentation example"}'`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 201">{JSON.stringify(capture("Create project").body, null, 2)}</DocCode>
+    <p>The create result is the new project row. Omitted <code>isPublic</code> becomes false in this run; no organization is selected. The owner is the acting local profile. Assigning an organization requires membership; updating an existing project also checks its owner or organization role.</p>
+  </section>
+  <section id="relations" class="doc-section">
+    <h2>Read back related data</h2>
+    <p>Copy the identifier returned by your create request into <code>PROJECT_ID</code>, then read the detail route:</p>
+    <DocCode language="bash">{String.raw`export PROJECT_ID="your-returned-project-id"
+curl --silent --show-error "$CADCAMFUN_URL/api/projects/$PROJECT_ID" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN"`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 200">{JSON.stringify(capture("Read project").body, null, 2)}</DocCode>
+    <p>Detail includes the owner, nullable organization, and drawing/component counts. Creation and retrieval have related but different response schemas. A missing or inaccessible project returns 404 with <code>Project not found or access denied</code>; callers should not infer a private project's existence from that result.</p>
+    <p><a href="/docs/api/projects">Projects API</a> also documents update and deletion. Updating requires a non-empty name; deleting requires the owner or an organization administrator. Do not implement update as an arbitrary JSON patch without following its payload contract.</p>
+  </section>
+  <section id="preferences" class="doc-section">
+    <h2>Persist a preference</h2>
+    <p>The key-value API demonstrates a second response shape and missing-resource behavior. A key that has not been saved returns 404:</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error "$CADCAMFUN_URL/api/kv/docs.walkthrough.units" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN"`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 404">{JSON.stringify(capture("Missing preference").body, null, 2)}</DocCode>
+    <p>Save a JSON-compatible value with PUT. This is a preference example; it does not globally change the geometry kernel's units.</p>
+    <DocCode language="bash">{String.raw`curl --silent --show-error --request PUT "$CADCAMFUN_URL/api/kv/docs.walkthrough.units" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"value":"mm"}'`}</DocCode>
+    <DocCode language="json" title="Captured HTTP 200">{JSON.stringify(capture("Save preference").body, null, 2)}</DocCode>
+    <p>Reading the same key returns the stored entry, including its update timestamp. The response does not wrap the value in a project record or success envelope.</p>
+    <DocCode language="json" title="Captured subsequent GET, HTTP 200">{JSON.stringify(capture("Read preference").body, null, 2)}</DocCode>
+    <p>Use <code>GET /api/kv?prefix=docs.walkthrough.</code> to list matching entries, or DELETE the encoded key to remove it. The store rejects blank keys, overlong keys, and values outside its JSON-compatible domain. It is not a credential vault.</p>
+  </section>
+  <section id="retries" class="doc-section">
+    <h2>Handle failures and retries</h2>
+    <table>
+      <thead><tr><th>Result</th><th>Next action</th></tr></thead>
+      <tbody>
+        <tr><td>401 on a protected call</td><td>Verify the current launch token and its type; use the newly announced URL after a restart.</td></tr>
+        <tr><td>400 on project creation</td><td>Read the business error and correct the request; resending the same missing name will fail again.</td></tr>
+        <tr><td>404 on a project or preference</td><td>Check the identifier/key and acting account; apply the resource's missing/access policy.</td></tr>
+        <tr><td>Connection loss during a write</td><td>Read back the resulting resource or state before repeating the write. These create endpoints do not declare an idempotency-key contract.</td></tr>
+        <tr><td>5xx</td><td>Inspect the sidecar logs and failed service. Do not assume a response error proves that no earlier persistent operation took effect.</td></tr>
+      </tbody>
+    </table>
+    <p>In production clients, check <code>response.ok</code> and decode the appropriate success or error body. Avoid relying on a uniform envelope: this walkthrough alone includes an array, plain records, and tagged failures.</p>
+  </section>
+  <section id="next" class="doc-section">
+    <h2>Next integration steps</h2>
+    <p>Use the <a href="/docs/api">full reference</a> to select a resource. The <a href="/docs/api/machining">machining endpoints</a> distinguish computation from saving a toolpath; the <a href="/docs/api/history">history endpoints</a> distinguish working-copy changes from commits and remote synchronization. The <a href="/docs/api/ai">AI resource</a> covers session identifiers and streaming controls.</p>
+    <p>Read the running sidecar's <code>/api/openapi.json</code> when integrating a different build. The downloadable documentation snapshot describes the checked-out contract; it cannot establish which binary another machine is running.</p>
+  </section>
+  <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Local development", href: "/docs/guides/local-dev" }, { title: "Database", href: "/docs/database" }]} />
+</DocsLayout>

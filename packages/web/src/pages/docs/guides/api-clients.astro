@@ -1,0 +1,145 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+const toc = [
+  { title: "Choose a client", href: "#choose" },
+  { title: "Resolve the connection", href: "#connection" },
+  { title: "Promise SDK", href: "#promise" },
+  { title: "Declared and transport errors", href: "#errors" },
+  { title: "Cancellation and headers", href: "#cancellation" },
+  { title: "Full Effect client", href: "#effect" },
+  { title: "Generated Effect adapters", href: "#generated-effect" },
+  { title: "Streaming", href: "#streams" },
+  { title: "Coverage and regeneration", href: "#coverage" },
+  { title: "Integration verification", href: "#verification" },
+]
+---
+<DocsLayout title="Build an API client integration" subtitle="Use the Promise SDK, full Effect contract client, or generated Effect adapters with their actual inputs and error behavior." description="CADCAMFUN client guide covering CadCam.make, ApiClient.layer, authentication, direct results, thrown errors, abort signals, stream consumption, generated coverage, and verification." toc={toc}>
+  <section id="choose" class="doc-section">
+    <h2>Choose a client</h2>
+    <p>The repository has three related client surfaces. They share endpoint declarations, but their construction, input shapes, runtime dependencies, and error channels differ. Choose one deliberately and keep examples from that surface together.</p>
+    <table><thead><tr><th>Surface</th><th>Entry point</th><th>Execution</th></tr></thead><tbody>
+      <tr><td>Promise SDK</td><td><code>@cadcamfun/api/sdk</code>, exported <code>CadCam.make</code></td><td>Promises for ordinary results; async iterables for SSE. Uses a supplied or global fetch.</td></tr>
+      <tr><td>Full contract client</td><td><code>ApiClient</code> from <code>@cadcamfun/api</code></td><td>Effect service with transport and bearer middleware supplied by its layer.</td></tr>
+      <tr><td>Generated Effect adapters</td><td><code>packages/api/src/client/generated/index.ts</code></td><td>Flattened methods around the contract client; caller supplies the required transport and middleware.</td></tr>
+    </tbody></table>
+    <p>The API package is a private workspace with source exports. The imports below are intended for this monorepo or a distribution that actually provides those exports; this page does not claim a separately available public npm package. Independent clients can use the <a href="/docs/api/openapi.json">OpenAPI document</a> or plain HTTP.</p>
+    <p>For a first request without client-library setup, start with the <a href="/docs/guides/api-tour">captured HTTP walkthrough</a>. It establishes how success and failure bodies differ between operations.</p>
+  </section>
+  <section id="connection" class="doc-section">
+    <h2>Resolve the connection</h2>
+    <p>Use the URL and application bearer token belonging to the current sidecar launch. Tauri obtains them through <code>get_sidecar_endpoint</code>. A manual development process prints its assigned port in a ready event. The origin must point at the sidecar or admitted companion gateway, rather than the documentation site or Vite assets.</p>
+    <p>After a sidecar restart, resolve the connection again. Reusing the previous port can produce connection refusal or accidentally address another process. Reusing a stale launch token produces an authorization failure. A successful public health response does not prove that a protected request will be admitted.</p>
+    <p>Account selection, application admission, device admission, and external agent access are distinct. The optional <code>x-session-token</code> selects an account after application admission. A project-scoped bridge token is limited to its action bridge endpoints. A phone token works through the gateway's allow-list. Follow the <a href="/docs/api#authorization">authentication reference</a> before choosing the connection for an integration.</p>
+  </section>
+  <section id="promise" class="doc-section">
+    <h2>Promise SDK</h2>
+    <p>The exported namespace is <code>CadCam</code>, and its constructor is <code>make</code>. Supply a base URL and default headers. The create and get methods below use flattened fields rather than a nested <code>payload</code> or <code>params</code> object.</p>
+    <DocCode language="ts" title="Inside a workspace consuming @cadcamfun/api">{String.raw`import { CadCam } from "@cadcamfun/api/sdk"
+
+const client = CadCam.make({
+  baseUrl,
+  headers: { Authorization: "Bearer " + token },
+})
+
+const projects = await client.projects.list()
+const created = await client.projects.create({
+  name: "Fixture plate",
+  description: "An integration-created project",
+})
+const detail = await client.projects.get({ id: created.id })
+console.log(projects.length, detail.name, detail._count.drawings)`}</DocCode>
+    <p>Each call resolves to that endpoint's success payload directly. <code>projects.list()</code> returns an array; <code>projects.create()</code> returns a project row. There is no universal <code>&#123; data, error &#125;</code> wrapper and no <code>throwOnError</code> constructor option in this SDK. Some endpoint payloads themselves contain <code>data</code> or <code>success</code> because that is their HTTP contract.</p>
+    <p>The SDK prepares a URL from the endpoint path and configured base URL, encodes path identifiers, serializes declared JSON input, and checks the operation's exact declared success status. It then parses JSON and returns its typed value. The Promise runtime does not apply an Effect schema decoder to every returned payload; TypeScript output types do not validate an arbitrary server implementation.</p>
+  </section>
+  <section id="errors" class="doc-section">
+    <h2>Declared and transport errors</h2>
+    <p>Declared HTTP failures reject with the decoded response body. That value can be a tagged plain object rather than an instance of JavaScript Error. Transport and protocol failures use the SDK's <code>ClientError</code>.</p>
+    <DocCode language="ts" title="Handle both error channels">{String.raw`import { ClientError } from "@cadcamfun/api/sdk"
+
+try {
+  await client.projects.create({})
+} catch (error) {
+  if (error instanceof ClientError) {
+    console.error(error.reason, error.message)
+  } else if (error && typeof error === "object" && "message" in error) {
+    console.error(String(error.message))
+  } else {
+    console.error("Unrecognized API failure", error)
+  }
+}`}</DocCode>
+    <table><thead><tr><th>ClientError reason</th><th>Interpretation</th></tr></thead><tbody>
+      <tr><td><code>Transport</code></td><td>Fetch setup, connection, abort, or stream-read failure. Inspect its cause and the current connection.</td></tr>
+      <tr><td><code>UnexpectedStatus</code></td><td>The server returned a status outside the operation's declared success and failure statuses.</td></tr>
+      <tr><td><code>UnsupportedContentType</code></td><td>A stream response did not have its expected event-stream content type.</td></tr>
+      <tr><td><code>MalformedResponse</code></td><td>JSON or an expected response stream could not be decoded.</td></tr>
+      <tr><td><code>SseEventTooLarge</code></td><td>The event-stream buffer exceeded the generated runtime's frame guard.</td></tr>
+    </tbody></table>
+    <p>For example, a missing project name is an HTTP 400 business failure even though the create input type permits omission. A connection reset while creating a project is different: it leaves the client uncertain whether the write completed. Read the resource state before repeating a mutation. The SDK does not add an application-wide idempotency protocol or automatically retry every rejected call.</p>
+  </section>
+  <section id="cancellation" class="doc-section">
+    <h2>Cancellation and headers</h2>
+    <p><code>ClientOptions</code> accepts <code>baseUrl</code>, an optional fetch implementation, and default headers. Per-call <code>RequestOptions</code> accepts a signal and extra headers. For methods without endpoint input, request options are the first argument; methods with input take request options after it.</p>
+    <DocCode language="ts" title="Per-call cancellation and account selection">{String.raw`const controller = new AbortController()
+const pending = client.projects.get(
+  { id: projectId },
+  {
+    signal: controller.signal,
+    headers: { "x-session-token": accountSessionToken },
+  },
+)
+// Call controller.abort() when the operation is no longer needed.
+const project = await pending`}</DocCode>
+    <p>The request builder applies default headers, endpoint-declared headers, and then per-call headers. A per-call value can override a default; avoid accidentally replacing Authorization when adding account or tracing headers. Do not put credentials into endpoint URLs copied into logs.</p>
+    <p>Injecting <code>fetch</code> supports an in-process test transport or a controlled adapter. The adapter must still honor request headers, body, cancellation, content types, and response status semantics. The desktop's own Effect integration and the phone's pinned native transport do additional work; substituting an arbitrary fetch does not reproduce those native boundaries.</p>
+  </section>
+  <section id="effect" class="doc-section">
+    <h2>Full Effect client</h2>
+    <p><code>ApiClient.layer</code> constructs the full HttpApi client, fetch transport, and bearer middleware. It exposes endpoint methods with the underlying HttpApi request shape. A mutation's payload goes under <code>payload</code>, and path values go under <code>params</code>.</p>
+    <DocCode language="ts" title="Full contract client">{String.raw`import { ApiClient } from "@cadcamfun/api"
+import { Effect } from "effect"
+
+const createProject = Effect.gen(function* () {
+  const api = yield* ApiClient
+  return yield* api.projects.create({
+    payload: { name: "Fixture plate" },
+  })
+}).pipe(Effect.provide(ApiClient.layer({ baseUrl, token })))
+
+const project = await Effect.runPromise(createProject)`}</DocCode>
+    <p>This client derives from the whole Api declaration and is the option for endpoints omitted from generated targets. It preserves Effect's typed error channel and schema-aware transport. Resource lifetime, stream interruption, and layer provision belong to the calling Effect program; creating an Effect does not execute it.</p>
+    <p>The reusable layer supplies the application token. The desktop builds its own layer in <code>apps/desktop/src/app/client.ts</code> to attach optional account session state and injected transport. Reuse that integration when working inside the desktop instead of creating a second connection/runtime per component.</p>
+  </section>
+  <section id="generated-effect" class="doc-section">
+    <h2>Generated Effect adapters</h2>
+    <p>The generated Effect client imports the real schemas and adapts methods into flattened fields. Its <code>CadCam.make</code> returns an Effect that constructs the adapted client. It does not provide its own fetch transport or application authorization layer, so the caller must provide the corresponding services and middleware.</p>
+    <p>The generated error adapter maps transport/schema/SSE failures into a tagged <code>ClientError</code> while retaining declared domain failures. This error class is separate from the Promise SDK's JavaScript error class with a <code>reason</code> string. Name similarity does not make their handling interchangeable.</p>
+    <p>Keep input examples explicit. The Promise and generated Effect forms use <code>projects.get(&#123; id &#125;)</code>; the raw contract form uses <code>projects.get(&#123; params: &#123; id &#125; &#125;)</code>. Avoid passing one surface's input object to another through an unchecked type assertion.</p>
+  </section>
+  <section id="streams" class="doc-section">
+    <h2>Streaming</h2>
+    <p>Promise SSE operations return async iterables. Network setup occurs when iteration begins. The runtime checks the success status and event-stream content type, reads incremental UTF-8 data, normalizes frame boundaries, and JSON-decodes data frames. A malformed frame fails the iteration; reader cleanup runs when iteration ends or exits.</p>
+    <p>The runtime's guard is <code>16 * 1024 * 1024</code> buffered JavaScript string units. It limits accumulation before a frame boundary; it is not a promise that every arbitrary 16 MB payload is useful or valid for the application's event schemas.</p>
+    <p>Consume AI events according to their discriminators and preserve the session identifier. An ended transport is not proof of a terminal conversation event. Use <a href="/docs/guides/ai-streaming">AI streaming and recovery</a> for queue, abort, permission, question, and state recovery behavior. <code>EventSource</code> is not a drop-in replacement for a POST request with authorization headers and a JSON body.</p>
+  </section>
+  <section id="coverage" class="doc-section">
+    <h2>Coverage and regeneration</h2>
+    <p>The generator has explicit omission lists for shapes it cannot represent. Shared omissions include multipart profile/plugin uploads, MCP creation with multiple success schemas, colliding input names, and plugin serving with response headers on its stream. Additional Promise omissions include raw signed webhooks, JavaScript plugin bootstrap, binary download, and free-form generator requests.</p>
+    <p>Read the exact current lists in <code>packages/api/scripts/generate-clients.ts</code> and the <a href="/docs/api#codegen">API overview</a>. An absent generated method does not establish that the server endpoint is unavailable. Use the full contract client or suitable raw transport for that operation.</p>
+    <DocCode language="bash" title="Repository root">{String.raw`bun run generate
+bun run generate:check
+bun run --filter @cadcamfun/web generate:api-reference
+bun run --filter @cadcamfun/web check:api-reference`}</DocCode>
+    <p>Client regeneration and documentation regeneration are separate outputs from the same contract. Keep both current after endpoint changes. Do not edit generated method bodies to change the server's input requirements.</p>
+  </section>
+  <section id="verification" class="doc-section">
+    <h2>Integration verification</h2>
+    <p>The Promise create/read/plain-result behavior and thrown declared failure shown here were exercised against the real sidecar handler stack using a migrated disposable database. The HTTP walkthrough contains the corresponding observed responses. Repeat focused checks when changing the generator, authentication, or endpoint schemas.</p>
+    <p>For an integration acceptance check, verify public health; a protected request without a token; the same request with the current token; a valid create/read cycle; a declared validation failure; a cancelled request; and a stream whose terminal state is checked. Use a disposable project and never infer successful persistence from a frontend fixture alone.</p>
+    <p>Implementation sources are <code>packages/api/src/sdk/generated/client.ts</code>, its <code>client-error.ts</code>, <code>packages/api/src/client.ts</code>, <code>packages/api/src/client/generated</code>, and <code>packages/httpapi-codegen/src/index.ts</code>. The generator and committed outputs together establish the actual client behavior.</p>
+  </section>
+  <DocRelated items={[{ title: "API reference", href: "/docs/api" }, { title: "Captured walkthrough", href: "/docs/guides/api-tour" }, { title: "AI streaming", href: "/docs/guides/ai-streaming" }]} />
+</DocsLayout>

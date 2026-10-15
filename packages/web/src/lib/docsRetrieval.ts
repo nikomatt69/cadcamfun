@@ -107,7 +107,7 @@ function scoreEntry(entry: DocsIndexEntry, query: string, tokens: string[]) {
 
   let score = 0
 
-  // Multi-word keywords ("work packages") only match on the raw query.
+  // Multi-word keywords ("machine configuration") only match on the raw query.
   for (const keyword of keywords) {
     if (keyword.includes(" ") && query.includes(keyword)) score += 8
   }

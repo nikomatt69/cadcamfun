@@ -1,269 +1,152 @@
 ---
 export const prerender = true
-import DocsLayout from "../../../layouts/DocsLayout.astro"
+import { guidePages } from "../../../data/guidePages"
 import DocCard from "../../../components/docs/DocCard.astro"
+import DocsLayout from "../../../layouts/DocsLayout.astro"
 import DocCallout from "../../../components/docs/DocCallout.astro"
 import DocCode from "../../../components/docs/DocCode.astro"
 import DocRelated from "../../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "The guides", href: "#guides" },
-  { title: "Read first", href: "#read-first" },
-  { title: "Which command", href: "#commands" },
-  { title: "Open one", href: "#open" },
-  { title: "Leave these alone", href: "#leave-alone" },
+  { title: "Practical guides", href: "#practical-guides" },
+  { title: "Work through a complete task", href: "#complete-tasks" },
+  { title: "Choose a guide", href: "#guides" },
+  { title: "Understand the runtime", href: "#read-first" },
+  { title: "Common commands", href: "#commands" },
+  { title: "Start with a concrete flow", href: "#open" },
+  { title: "Maintain clear boundaries", href: "#leave-alone" },
+  { title: "Find the right workflow", href: "#task-directory" },
+  { title: "Know what a check establishes", href: "#verification-evidence" },
 ]
 ---
 
 <DocsLayout
-  title="Guides"
-  subtitle="Install the workspace, run the window, and stay inside the directory a work package owns."
-  description="CADCAMFUN guides: what to read first, which command to run, quickstart, local development, and work packages."
+  title="Guides and workflows"
+  subtitle="Complete procedures for designing parts, generating machining programs, building integrations, reviewing changes, and operating the desktop."
+  description="Practical CADCAMFUN guides for project saves, native manufacturing, typed API clients, streaming AI, plugins, branches and workflows, companion pairing, configuration, and recovery."
   toc={toc}
 >
   <section id="guides" class="doc-section">
-    <h2>The guides</h2>
-    <p>
-      Three procedures plus this index. Each one is written so you can work from that page without
-      opening the others, but the specs still win. <code>specs/</code> is the contract.
-      <code>specs/roadmap/</code> is the sequence. The current step is RM-01, the action catalogue
-      (<code>specs/roadmap/01-action-catalogue.md</code>).
-    </p>
-    <table>
-      <thead>
-        <tr><th>Page</th><th>Use it when</th><th>You will run</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><a href="/docs/guides/quickstart">Quickstart</a></td>
-          <td>A clean checkout should install, test, migrate, and open a window.</td>
-          <td><code>bun install</code>, <code>bun test packages apps</code>, <code>bun run db:migrate</code>, <code>bun run desktop:dev</code></td>
-        </tr>
-        <tr>
-          <td><a href="/docs/guides/local-dev">Local development</a></td>
-          <td>You need the sidecar, the Vite webview, and the SQLite file as three different processes.</td>
-          <td><code>bun test packages/&lt;name&gt;</code>, <code>bunx tsc -p …</code>, sidecar on <code>127.0.0.1</code></td>
-        </tr>
-        <tr>
-          <td><a href="/docs/guides/work-packages">Work packages</a></td>
-          <td>You are about to edit, and you need the directory you are allowed to touch.</td>
-          <td>None until the owner directory and the current RM step are clear.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>
-      Topic pages (CAD, CAM, database, sidecar, desktop) describe subsystems. These guides describe
-      the loop you use every day. If a guide and a spec disagree on a contract, follow the spec. If
-      they disagree on what to do next, follow <code>specs/roadmap/README.md</code>.
-    </p>
+    <h2>Choose a guide</h2>
+    <ul>
+      <li><a href="/docs/guides/quickstart">Quickstart</a>: install dependencies, start the desktop, and locate its database.</li>
+      <li><a href="/docs/guides/local-dev">Local development</a>: run a browser preview or real sidecar, configure processes, and diagnose startup.</li>
+      <li><a href="/docs/guides/contributing">Contributing code</a>: locate modules, change shared contracts, and select checks.</li>
+      <li><a href="/docs/packages">Packages</a>: navigate workspace responsibilities and public entry points.</li>
+    </ul>
+    <p>The desktop, sidecar, companion, and documentation site have different launch commands and persistence models. Choose the runtime that exercises the behavior you are changing. A browser fixture is useful for screen work; database, streaming, and authorization changes need the real server.</p>
   </section>
 
   <section id="read-first" class="doc-section">
-    <h2>Read first</h2>
-    <p>
-      Order from <code>README.md</code> and <code>AGENTS.md</code>. Stop at the file that answers
-      the question you actually have.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Order</th><th>Path</th><th>Stop here if</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>1</td>
-          <td><code>README.md</code></td>
-          <td>You only need the stack, the layout, and the root commands.</td>
-        </tr>
-        <tr>
-          <td>2</td>
-          <td><code>specs/00-overview.md</code></td>
-          <td>You need the task board (WP0–WP14), the definition of done, or the parity rule.</td>
-        </tr>
-        <tr>
-          <td>3</td>
-          <td><code>specs/01-conventions.md</code></td>
-          <td>You are about to write Effect, a migration, or a public function.</td>
-        </tr>
-        <tr>
-          <td>4</td>
-          <td><code>specs/roadmap/README.md</code></td>
-          <td>Someone cited the roadmap, an <code>RM-NN</code> id, or “what’s next”.</td>
-        </tr>
-        <tr>
-          <td>5</td>
-          <td>The current step spec</td>
-          <td>Today that is <code>specs/roadmap/01-action-catalogue.md</code>. Edit only its owner directories.</td>
-        </tr>
-        <tr>
-          <td>6</td>
-          <td>The design spec for the area</td>
-          <td><code>specs/02</code> through <code>specs/14</code> (and later design specs) own the contract you must not break.</td>
-        </tr>
-      </tbody>
-    </table>
-    <DocCallout title="Effect docs are in the repo" type="note">
-      <p>
-        Effect is pinned to <code>4.0.0-rc.112</code>. Before writing Effect code, open
-        <code>packages/db/node_modules/effect/ai-docs/src/</code>. That tree matches the pin. Stable
-        4.0.0 pages and v3 snippets are the wrong API.
-      </p>
+    <h2>Understand the runtime</h2>
+    <p>The core package implements geometry, toolpaths, posts, and verification. The API package defines shared schemas, endpoints, and generated clients. The sidecar combines those contracts with repositories, SQLite, AI, plugins, version control, and workflow services. The desktop renders those services through a local API connection and native shell.</p>
+    <p>The iOS companion connects through a separate pinned HTTPS gateway. The web package runs the Astro documentation site and local Studio integration. These are separate clients and must not be assumed to share a database path or security context.</p>
+    <DocCallout type="note" title="Use the installed Effect API documentation">
+      <p>Effect is pinned to <code>4.0.0-rc.112</code>. Its version-matched documentation is included under an installed workspace copy, such as <code>packages/db/node_modules/effect/ai-docs/src/</code>. Consult it before changing services, layers, error handling, or HTTP code.</p>
     </DocCallout>
   </section>
 
   <section id="commands" class="doc-section">
-    <h2>Which command</h2>
-    <p>
-      Every command is from the repository root unless the page says otherwise. Replace the package
-      name with the directory you are changing. There is no <code>&lt;name&gt;</code> package.
-    </p>
-    <DocCode language="bash" title="First hour, from the repo root">
+    <h2>Common commands</h2>
+    <DocCode language="bash" title="From the repository root">
 {`bun install
-bun test packages apps
-bunx tsc -p packages/db/tsconfig.json
-bun run db:generate
-bun run db:migrate
-bun run desktop:dev`}
+bun run desktop:dev
+bun run --filter @cadcamfun/desktop dev
+bun run --cwd packages/web start`}
     </DocCode>
+    <p><code>desktop:dev</code> builds the real sidecar and stages migrations before opening Tauri. The desktop <code>dev</code> script starts Vite on port 1420; without a sidecar URL it uses an in-memory preview API. The web <code>start</code> script starts Astro only; its <code>dev</code> script also starts the local Studio API.</p>
     <table>
-      <thead>
-        <tr><th>You want</th><th>Command</th><th>Guide</th></tr>
-      </thead>
+      <thead><tr><th>Task</th><th>Command</th></tr></thead>
       <tbody>
-        <tr>
-          <td>All package and app tests</td>
-          <td><code>bun test packages apps</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>Tests plus <code>scripts/</code></td>
-          <td><code>bun run test</code></td>
-          <td>Local development</td>
-        </tr>
-        <tr>
-          <td>One package, the README typecheck</td>
-          <td><code>bunx tsc -p packages/core/tsconfig.json</code></td>
-          <td>Local development</td>
-        </tr>
-        <tr>
-          <td>The turbo typecheck the CI script uses</td>
-          <td><code>bun run typecheck</code></td>
-          <td>Local development</td>
-        </tr>
-        <tr>
-          <td>A new migration</td>
-          <td><code>bun run db:generate</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>Apply migrations to the CLI database file</td>
-          <td><code>bun run db:migrate</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>Real sidecar, then the window</td>
-          <td><code>bun run desktop:dev</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>Sidecar binary and bundled migrations only</td>
-          <td><code>bun run build:sidecar</code></td>
-          <td>Local development</td>
-        </tr>
-        <tr>
-          <td>Vite production assets only</td>
-          <td><code>bun run build:desktop</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>Install, check, compile, bundle, checksums</td>
-          <td><code>bun run build</code></td>
-          <td>Quickstart</td>
-        </tr>
-        <tr>
-          <td>This docs site</td>
-          <td><code>bun run --filter @cadcamfun/web dev</code></td>
-          <td>Local development</td>
-        </tr>
+        <tr><td>Workspace tests</td><td><code>bun run test</code></td></tr>
+        <tr><td>Workspace typecheck</td><td><code>bun run typecheck</code></td></tr>
+        <tr><td>Desktop typecheck</td><td><code>bun run --filter @cadcamfun/desktop typecheck</code></td></tr>
+        <tr><td>Regenerate API clients</td><td><code>bun run generate</code>, then <code>bun run generate:check</code></td></tr>
+        <tr><td>Generate/apply database migrations</td><td><code>bun run db:generate</code>, <code>bun run db:migrate</code></td></tr>
+        <tr><td>Compile sidecar and stage resources</td><td><code>bun run build:sidecar</code></td></tr>
+        <tr><td>Build desktop frontend</td><td><code>bun run build:desktop</code></td></tr>
+        <tr><td>Check documentation navigation</td><td><code>bun run --cwd packages/web check</code></td></tr>
       </tbody>
     </table>
+    <p>Migration generation is for schema changes, not an installation prerequisite. The database layer creates a new database and applies available migrations when opened. Consult the quickstart before choosing a CLI database path.</p>
   </section>
 
   <section id="open" class="doc-section">
-    <h2>Open one</h2>
-    <div class="doc-grid not-prose">
-      <DocCard title="Quickstart" eyebrow="Run" href="/docs/guides/quickstart">
-        <p>From a clean checkout to the Tauri window, including the two different SQLite files.</p>
-      </DocCard>
-      <DocCard title="Local development" eyebrow="Processes" href="/docs/guides/local-dev">
-        <p>Sidecar on loopback, Vite on port 1420, and how to test one package.</p>
-      </DocCard>
-      <DocCard title="Work packages" eyebrow="Ownership" href="/docs/guides/work-packages">
-        <p>WP0–WP14 directories, RM-00–RM-11, and the definition of done.</p>
-      </DocCard>
-      <DocCard title="Packages" eyebrow="Workspace" href="/docs/packages">
-        <p>Npm names, paths, and the dependency arrows from each package.json.</p>
-      </DocCard>
-    </div>
+    <h2>Start with a concrete flow</h2>
+    <p>For desktop development, open a project, create or load a drawing, and inspect the CAD/CAM flow you intend to modify. Follow its route adapter into the feature screen and locate the API call and handler. For server work, use the schema, handler, service, and repository chain to identify where validation, ownership, and persistence happen.</p>
+    <p>For companion work, install a native iOS build, enable the desktop gateway, and pair through its QR code. For documentation work, start Astro, open the changed route, and run the web build to catch template and prerender errors.</p>
   </section>
 
   <section id="leave-alone" class="doc-section">
-    <h2>Leave these alone</h2>
-    <p>
-      These rules are in <code>specs/01-conventions.md</code> and the README. They apply on every
-      guide below.
-    </p>
+    <h2>Maintain clear boundaries</h2>
+    <p>Keep credentials out of source, examples, logs, and browser screenshots. Use placeholders in documentation and provide runtime configuration through the supported process or application settings. Keep generated clients synchronized with their contract, and generate SQL migrations from the schema rather than editing generated migration files.</p>
+    <p>Use a separate disposable data directory for integration tests and local experiments. A preview fixture, CLI migration database, packaged application database, and companion gateway have distinct purposes; selecting one should be explicit.</p>
+  </section>
+
+  <section id="task-directory" class="doc-section">
+    <h2>Find the right workflow</h2>
     <table>
-      <thead>
-        <tr><th>Do not</th><th>Do this instead</th></tr>
-      </thead>
+      <thead><tr><th>I want to…</th><th>Start here</th><th>Successful result</th></tr></thead>
       <tbody>
-        <tr>
-          <td>Import from <code>.reference/</code>.</td>
-          <td>Read it for domain behaviour, then write new code in the owning package.</td>
-        </tr>
-        <tr>
-          <td>Open, print, or copy <code>.env*</code> files.</td>
-          <td>Configuration for the running app is Effect <code>Config</code> in <code>apps/sidecar/src/config.ts</code>, filled by the Tauri shell.</td>
-        </tr>
-        <tr>
-          <td>Edit generated SQL under <code>packages/db/drizzle/</code> by hand.</td>
-          <td>Change <code>packages/db/src/schema.ts</code>, then <code>bun run db:generate</code>.</td>
-        </tr>
-        <tr>
-          <td>Bump <code>effect</code> in one package, or write v3 services.</td>
-          <td>Stay on <code>4.0.0-rc.112</code> and the <code>ai-docs</code> tree next to that install.</td>
-        </tr>
-        <tr>
-          <td>Import <code>@cadcamfun/db</code> from <code>packages/core</code> or <code>packages/api</code>.</td>
-          <td>Keep those packages pure. The sidecar is the package that opens SQLite.</td>
-        </tr>
-        <tr>
-          <td>Pass degrees across a module boundary, or <code>toString()</code> a G-code number.</td>
-          <td>Millimetres and radians inside. Fixed decimals (default 3) at the post.</td>
-        </tr>
-        <tr>
-          <td>Start RM-02 or a later step because it looks related.</td>
-          <td>RM-01 is the current step. A later row waits until every <code>depends on</code> row is <code>done</code>.</td>
-        </tr>
-        <tr>
-          <td>Edit a directory your WP or RM step does not own.</td>
-          <td>Change the spec first, note it in that spec’s change log, then edit.</td>
-        </tr>
-        <tr>
-          <td>Commit, or amend, unless you were asked.</td>
-          <td>Leave the working tree for the person who asked for the change.</td>
-        </tr>
-        <tr>
-          <td><code>cargo install tauri-cli</code>.</td>
-          <td>The CLI is <code>@tauri-apps/cli</code> on <code>@cadcamfun/desktop</code>. <code>bun run desktop:dev</code> uses it.</td>
-        </tr>
+        <tr><td>Run a native desktop checkout</td><td><a href="/docs/guides/quickstart#desktop">Open the desktop</a></td><td>Tauri opens and a real sidecar answers health; saved data can be reopened.</td></tr>
+        <tr><td>Edit a screen without compiling Rust</td><td><a href="/docs/guides/local-dev#processes">Choose development processes</a></td><td>Vite serves the screen with either a fixture or explicitly selected API.</td></tr>
+        <tr><td>Connect a phone</td><td><a href="/docs/mobile#pairing">Pair the iOS companion</a></td><td>A named desktop device authenticates through pinned HTTPS.</td></tr>
+        <tr><td>Add or change a request</td><td><a href="/docs/guides/contributing#contracts">Change shared contracts</a></td><td>Schema, handler, clients, tests, and documentation agree.</td></tr>
+        <tr><td>Embed the viewport</td><td><a href="/docs/viewport#paths">Integrate a drawing editor</a> and <a href="/docs/viewport#playback-example">control playback</a></td><td>Drawing changes echo through props and parent controls own playback time.</td></tr>
+        <tr><td>Build installers</td><td><a href="/docs/release#build-options">Inspect build options</a></td><td>Correct target assets, migrations, signatures, and release index are produced and verified.</td></tr>
+        <tr><td>Investigate missing local data</td><td><a href="/docs/guides/local-dev#databases">Select the data directory</a></td><td>The client, sidecar, and inspection tool point at the intended database.</td></tr>
       </tbody>
     </table>
+    <p>Use a guide for a sequence of actions and the linked reference pages for field and behavior details. Keep the runtime choice explicit throughout the workflow: changing from a browser fixture to a native sidecar changes persistence, credentials, native capabilities, and error behavior.</p>
   </section>
-  <DocRelated
-    items={[
+
+  <section id="verification-evidence" class="doc-section">
+    <h2>Know what a check establishes</h2>
+    <p>Different checks answer different questions. A TypeScript compiler can prove that a client call matches its generated signature. A handler test can prove the expected response under supplied layers. A native simulator run can exercise certificate pinning and app startup. None of these independently proves that a signed installer runs on every supported device or that a toolpath is safe for a specific machine.</p>
+    <ol>
+      <li>Record the exact runtime and data directory used for the check.</li>
+      <li>Perform the operation through the boundary the user will use.</li>
+      <li>Inspect the resulting persisted state or exported artifact, not only a success toast.</li>
+      <li>Exercise the failure or cancellation path affected by the change.</li>
+      <li>Report any external service, signing, native-device, or graphics coverage still missing.</li>
+    </ol>
+    <p>For deterministic integration work, use isolated SQLite directories and scripted/offline AI fixtures. For provider-specific behavior, separately exercise the configured provider with appropriate credentials. Example requests in these guides describe supported shapes; timestamps, identifiers, ports, and credentials vary per run.</p>
+  </section>
+
+
+  <section id="practical-guides" class="doc-section">
+    <h2>Practical guides</h2>
+    <p>These guides follow complete operations through the application and its API. Each includes the required inputs, the relevant state changes, and the failure cases to inspect. Use the subsystem references for underlying models and the API resource pages for exact field and response contracts.</p>
+    {["Design and manufacture", "Clients and extensions", "Operations and recovery"].map((category) => <>
+      <h3>{category}</h3>
+      <div class="doc-grid not-prose">
+        {guidePages.filter((guide) => guide.category === category).map((guide) => <DocCard title={guide.title} href={`/docs/guides/${guide.slug}`}><p>{guide.summary}</p></DocCard>)}
+      </div>
+    </>)}
+    <p>New to the checkout? Begin with <a href="/docs/guides/quickstart">Quickstart</a>. New to its HTTP behavior? Use the <a href="/docs/guides/api-tour">walkthrough with captured responses</a>, then choose a typed client or a resource in the <a href="/docs/api">complete API reference</a>.</p>
+  </section>
+  <section id="complete-tasks" class="doc-section">
+    <h2>Work through a complete task</h2>
+    <h3>Create a saved design</h3>
+    <p>Create a project and retain the returned identifier. Create its drawing or component through the appropriate project-scoped collection. Edit geometry in the CAD workspace, save through that resource's actual feature action, and reopen the saved resource to establish that the intended document was persisted. The editor's current selection and command history are not a substitute for the stored drawing.</p>
+    <p>When two clients edit the same data, follow the endpoint's current update semantics rather than assume every resource has compare-and-swap protection. Read the <a href="/docs/guides/project-lifecycle">project lifecycle guide</a> for drawing/component differences, resource associations, access checks, and restore limits.</p>
+    <h3>Produce a manufacturing result</h3>
+    <p>Capture the geometry, placement, stock, material, machine, tools, and operation order. Run generation with those explicit inputs. Inspect the result's issues and applicable evidence; verify that the program and NC correspond to the intended snapshot. Saving is a separate operation and must retain a portable document consistent with the exact bytes being saved.</p>
+    <p>A changed cutter, stock, model, or work frame changes the job being evaluated. Reusing an earlier artifact after editing NC does not transfer its evidence to the new text. The <a href="/docs/guides/native-manufacturing">native manufacturing guide</a> explains preparation, generation, claims, persistence validation, and the difference between one integrated posted program and concatenated operation sections.</p>
+    <h3>Integrate an assistant</h3>
+    <p>Configure a provider on the desktop and verify its status before starting a conversation. Preserve the project and session identity, consume events incrementally, and implement permission and question replies through the admitted session controls. On disconnection, recover current state before resending a request that may have edited the project.</p>
+    <p>The <a href="/docs/guides/ai-streaming">streaming guide</a> covers recovery, cancellation, and follow-up admission. The <a href="/docs/guides/api-clients">client guide</a> explains why Promise result values, thrown HTTP bodies, Effect errors, and stream completion cannot be handled as one universal envelope.</p>
+    <h3>Record and review a change</h3>
+    <p>Save the working resource, inspect project status, and commit the intended state on the intended branch. Review the structural diff and open a local pull request when the change should be proposed rather than directly adopted. Resolve blocking review verdicts and conflicts before merging.</p>
+    <p>Version workflow definitions with the project, then inspect each run's selected commit and individual check outputs. A successful run that skipped its machining checks does not supply machining evidence. Read the <a href="/docs/guides/project-history">branches and workflow guide</a> before automating a writing step or configuring a remote mirror.</p>
+    <h3>Operate a second client</h3>
+    <p>Enable the companion gateway intentionally, create an individually named device pairing, and connect a native build that includes certificate pinning. Retain the full desktop address, fingerprint, and device token as the paired connection. Read the current route policy before assuming a phone is read-only or unrestricted.</p>
+    <p>When access should end, revoke the device from the desktop; removing the connection on the phone alone does not revoke the server-side token. The <a href="/docs/guides/companion-pairing">pairing guide</a> separates network diagnosis, native transport availability, certificate identity, and token revocation.</p>
+  </section>
+
+  <DocRelated items={[
       { title: "Quickstart", href: "/docs/guides/quickstart" },
       { title: "Local development", href: "/docs/guides/local-dev" },
-    ]}
-  />
+      { title: "Contributing code", href: "/docs/guides/contributing" }
+  ]} />
 </DocsLayout>

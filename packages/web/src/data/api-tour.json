@@ -1,0 +1,104 @@
+[
+  {
+    "name": "Public health",
+    "path": "/api/health",
+    "status": 200,
+    "body": {
+      "status": "ok",
+      "timestamp": "2026-10-15T02:43:50.682Z"
+    }
+  },
+  {
+    "name": "Missing bearer",
+    "path": "/api/projects",
+    "status": 401,
+    "body": {
+      "_tag": "Unauthorized",
+      "message": "Unauthorized"
+    }
+  },
+  {
+    "name": "Empty projects",
+    "path": "/api/projects",
+    "status": 200,
+    "body": []
+  },
+  {
+    "name": "Missing project name",
+    "path": "/api/projects",
+    "status": 400,
+    "body": {
+      "_tag": "BadRequest",
+      "message": "Project name is required"
+    }
+  },
+  {
+    "name": "Create project",
+    "path": "/api/projects",
+    "status": 201,
+    "body": {
+      "id": "ccaff34c-49f3-4a23-a6b6-427745f9641a",
+      "name": "API walkthrough",
+      "description": "Disposable documentation example",
+      "createdAt": "2026-10-15T02:43:50.741Z",
+      "updatedAt": "2026-10-15T02:43:50.741Z",
+      "ownerId": "894c5064-576e-4e43-b7f0-79c6120e8345",
+      "organizationId": null,
+      "isPublic": false
+    }
+  },
+  {
+    "name": "Read project",
+    "path": "/api/projects/ccaff34c-49f3-4a23-a6b6-427745f9641a",
+    "status": 200,
+    "body": {
+      "id": "ccaff34c-49f3-4a23-a6b6-427745f9641a",
+      "name": "API walkthrough",
+      "description": "Disposable documentation example",
+      "createdAt": "2026-10-15T02:43:50.741Z",
+      "updatedAt": "2026-10-15T02:43:50.741Z",
+      "ownerId": "894c5064-576e-4e43-b7f0-79c6120e8345",
+      "organizationId": null,
+      "isPublic": false,
+      "owner": {
+        "id": "894c5064-576e-4e43-b7f0-79c6120e8345",
+        "name": "Local user",
+        "email": "local@cadcamfun.local"
+      },
+      "organization": null,
+      "_count": {
+        "drawings": 0,
+        "components": 0
+      }
+    }
+  },
+  {
+    "name": "Missing preference",
+    "path": "/api/kv/docs.walkthrough.units",
+    "status": 404,
+    "body": {
+      "_tag": "NotFound",
+      "message": "Key not found"
+    }
+  },
+  {
+    "name": "Save preference",
+    "path": "/api/kv/docs.walkthrough.units",
+    "status": 200,
+    "body": {
+      "key": "docs.walkthrough.units",
+      "value": "mm",
+      "updatedAt": "2026-10-15T02:43:50.755Z"
+    }
+  },
+  {
+    "name": "Read preference",
+    "path": "/api/kv/docs.walkthrough.units",
+    "status": 200,
+    "body": {
+      "key": "docs.walkthrough.units",
+      "value": "mm",
+      "updatedAt": "2026-10-15T02:43:50.755Z"
+    }
+  }
+]

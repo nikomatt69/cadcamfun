@@ -6,261 +6,147 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "The model", href: "#model" },
-  { title: "What is on disk", href: "#disk" },
-  { title: "Contracts", href: "#contracts" },
-  { title: "API", href: "#api" },
-  { title: "Work frames", href: "#frames" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Setup symbols", href: "#setup-symbols" },
-  { title: "Indexing and IR", href: "#indexing" },
-  { title: "Sidecar program service", href: "#sidecar-program" },
-  { title: "Desktop saved programs", href: "#desktop-programs" },
+  { title: "A setup is manufacturing context", href: "#status" },
+  { title: "Portable document contract", href: "#model" },
+  { title: "Operation order and composition", href: "#contracts" },
+  { title: "Generate and save", href: "#api" },
+  { title: "Persistence validation", href: "#disk" },
+  { title: "Editing NC and retaining evidence", href: "#sidecar-program" },
+  { title: "Rigid work frames", href: "#frames" },
+  { title: "Indexed table machining", href: "#indexing" },
+  { title: "Shared setup types", href: "#setup-symbols" },
+  { title: "Reopening in the desktop", href: "#desktop-programs" },
+  { title: "Keep source and result together", href: "#boundaries" },
+  { title: "Evaluate a captured setup", href: "#snapshot-example" },
+  { title: "Snapshot options and bounds", href: "#request-limits" },
+  { title: "Resolve rejected saves", href: "#save-errors" },
 ]
 ---
 
 <DocsLayout
-  title="Setups"
-  subtitle="One setup, many operations, one emit per program. WP14 is in progress."
-  description="Multi-operation CAM setups: plan, tool table, generate, and what is still missing on disk."
+  title="Setups and saved programs"
+  subtitle="Capture the stock, work frame, cutter assignments, ordered operations, and source evidence used to produce a program."
+  description="CADCAMFUN work frames, multi-operation documents, manufacturing requests, portable CAM files, and evidence validation."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP14 on the task board is <strong>in progress</strong>. The board text says
-      <code>cam.program</code> contracts, plan/generate, the post tool-number override, and
-      multi-tool parsing are done, and that the desktop setup store and persistence are pending.
-      Spec: <code>specs/14-multi-op-setup.md</code>. Owner directories named by that spec:
-      <code>packages/core/src/cam/program</code>, post and analysis, 
-      <code>packages/api/src/groups/cam-setup.ts</code>,
-      <code>apps/sidecar/src/http/cam-setup.ts</code>, and
-      <code>apps/desktop/src/features/cam/&#123;lib,store&#125;/setup*</code>.
-    </p>
-    <DocCallout type="warn" title="The planner directory is not in the tree">
-      <p>
-        <code>packages/core/src/cam/program/</code> is absent.
-        <code>packages/api/src/groups/cam-setup.ts</code> is absent.
-        <code>apps/sidecar/src/http/cam-setup.ts</code> is absent. Spec 14 §5 says those program
-        modules are built and that the desktop store and database persistence follow in later
-        steps. Trust the files you can open. The contracts below are the spec you implement
-        against. They are not a claim that <code>planPrograms</code> is importable today.
-      </p>
-    </DocCallout>
+    <h2>A setup is manufacturing context</h2>
+<p>A manufacturing setup defines how a part sits relative to stock, fixtures, and tools. <code>cam.ManufacturingSetup</code> records an identifier, revision, rigid work frame, world-coordinate stock and fixture envelopes, and tool assemblies. The native kernel accepts a CAD snapshot and resources and produces ordered operation results and one posted program.</p>
+    <p>Saved application programs use <code>CamProgramDocument</code>, the portable document also stored in <code>Toolpath.data</code>. This contract retains NC and its program representation together with the settings, stock, and drawing snapshot needed to reopen the workspace. Optional operations preserve separate operation identities; optional kernel data retains native source evidence.</p>
   </section>
 
   <section id="model" class="doc-section">
-    <h2>The model</h2>
-    <p>
-      The v6 generator takes one operation per request
-      (<code>POST /api/toolpaths/generate</code>). The desktop multi-toolpath panel stitches texts
-      with <code>combineGCode</code> in
-      <code>apps/desktop/src/features/cam/lib/multiToolpath.ts</code>. Concatenating full programs
-      leaves each block with its own header, <code>G21</code>, <code>M30</code>, and
-      <code>%</code>. No tool change is emitted. A machine cannot run that as one job.
-    </p>
-    <DocCode language="text" title="Spec 14 §2">
-{`Setup      = stock + machine + post + grouping + ordered Operations
-Operation  = element ids + parameters + one Tool
-ToolTable  = pocket T1..Tn -> Tool, derived from the operations
-Program    = one emitted .nc; tool changes between operations
-
-Operations -> planPrograms -> PlannedProgram[] -> generateSetup -> GeneratedProgram[]`}
-    </DocCode>
-    <p>
-      Grouping is <code>single</code> (one program, tool changes inside it), <code>perTool</code>,
-      or <code>perOperation</code>. All three come from the same planner.
-      <code>planPrograms</code> is pure: no geometry and no clock.
-      <code>generateSetup</code> calls the existing generator per operation, then emits each
-      program once. There is no string concatenation.
-    </p>
-  </section>
-
-  <section id="disk" class="doc-section">
-    <h2>What is on disk</h2>
-    <table>
-      <thead>
-        <tr><th>Spec names</th><th>In the tree</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>cam/program/op.ts</code>, <code>setup.ts</code>, <code>tooltable.ts</code>, <code>plan.ts</code>, <code>programs.ts</code></td><td>Directory missing. <code>cam/index.ts</code> does not export a <code>program</code> namespace.</td></tr>
-        <tr><td><code>PostOptions.toolNumbers</code>, <code>retractBeforeToolChange</code></td><td>Present in <code>packages/core/src/cam/post/types.ts</code>. <code>post/emitter.ts</code> applies both. Defaults keep prior output byte-identical.</td></tr>
-        <tr><td><code>analyseGcode</code> splitting a multi-tool file</td><td><code>packages/core/src/cam/generator/analysis.ts</code> exports <code>analyseGcode</code>. Spec 14 says a tool change becomes its own toolpath so the viewport and verifier keep the tools.</td></tr>
-        <tr><td><code>kernel/execute.ts</code> tool-number map</td><td>Present. It passes <code>toolNumbers</code> into <code>post.emit</code>.</td></tr>
-        <tr><td>API group <code>camSetup</code></td><td>Group file not present. <code>packages/api/src/cam-program.ts</code> is the portable saved-program schema, a different contract.</td></tr>
-        <tr><td>Sidecar <code>http/cam-setup.ts</code></td><td>Not present. Toolpath handlers live in <code>apps/sidecar/src/http/toolpaths.ts</code> and <code>toolpath-generator.ts</code>.</td></tr>
-        <tr><td>Desktop <code>setupStore</code></td><td>Spec 14 §5 says this follows later. Do not document a store that is not in <code>features/cam</code>.</td></tr>
-        <tr><td><code>cam/setup.ts</code></td><td>Present, and it is a different type: <code>ManufacturingSetup</code> (work frame, stock box, fixtures, tool assemblies) from spec 04, not the WP14 operation list.</td></tr>
-      </tbody>
-    </table>
+    <h2>Portable document contract</h2>
+<p>A document identifies itself with <code>format: "cadcamfun-cam"</code> and <code>version: 1</code>. Required fields are <code>gcode</code>, <code>program</code>, generator <code>settings</code>, <code>printer</code> extras, <code>stock</code>, and a free-form <code>drawing</code> snapshot. Optional fields are <code>operations</code>, <code>kernelArtifact</code>, and <code>kernelRequest</code>.</p>
+    <p>Each stored operation has a unique <code>id</code>, <code>name</code>, <code>gcode</code>, and <code>program</code>, with optional tool, settings, and source element identifiers. Keeping its NC and identity makes an operation round-trip independently of its display label.</p>
   </section>
 
   <section id="contracts" class="doc-section">
-    <h2>Contracts</h2>
-    <p>
-      When the program module lands, these are the types spec 14 §3 requires. Geometry resolution
-      stays outside core. <code>generateSetup(setup, geometryOf)</code> receives a function from
-      operation to <code>GeometryInput</code> because core has no I/O.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Symbol</th><th>Meaning</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>Operation</code></td><td><code>id</code>, <code>name</code>, <code>elementIds</code>, <code>params</code>, <code>tool</code>, optional <code>pocket</code>, <code>enabled</code>, <code>fromPreviousStock</code>.</td></tr>
-        <tr><td><code>Setup</code></td><td>Stock, machine type, work offset, <code>PostConfig</code>, grouping, <code>retractBeforeToolChange</code>, ordered operations.</td></tr>
-        <tr><td><code>PostConfig</code></td><td><code>postId</code> of <code>generic</code>, <code>fanuc</code>, or <code>grbl</code>, decimals, canned cycles, arc mode, header, tolerance, optional line numbers, stamp, <code>programNumberBase</code>.</td></tr>
-        <tr><td><code>buildToolTable</code></td><td>Pocket to tool, plus warnings. <code>assignPockets</code> keeps an explicit pocket, otherwise first use.</td></tr>
-        <tr><td><code>planPrograms</code></td><td><code>SetupPlan</code>: programs, tool table, tool loads, tool changes, warnings. Warns when a tool appears in non-adjacent operations. <code>reorderByTool</code> is the UI fix.</td></tr>
-        <tr><td><code>generateSetup</code></td><td><code>GeneratedSetup</code>: per-program G-code and IR, totals for cut length, rapid length, and estimated seconds.</td></tr>
-        <tr><td><code>validateSetup</code></td><td>Issues, not throws: duplicate pocket, operation without elements, rpm above <code>tool.maxRpm</code>, a group with no enabled operation.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>toolId</code> is the tool identity. <code>validate(program, machine)</code> already
-      reports <code>MissingTool</code> by id. The pocket number is emission metadata via
-      <code>PostOptions.toolNumbers</code>. Program numbers start at
-      <code>post.programNumberBase</code> (default 1000) plus the index, and the fanuc
-      <code>O</code> number reads <code>metadata.programNumber</code>.
-      <code>fromPreviousStock</code> feeds the previous tool’s diameter into a rest
-      <code>3d_surface</code> pass. Spec 04 §12’s limit still applies: the previous operation is
-      assumed to have cut the same Z levels with the same allowance.
-    </p>
-    <p>
-      Retract before a tool change is opt-in. Turning it on for existing single-tool goldens
-      would move those files. Leave the default off unless the setup asked for it.
-    </p>
+    <h2>Operation order and composition</h2>
+<p><code>combineCamOperations</code> preserves operation order. It namespaces toolpath identifiers with the operation identifier, uses an explicit operation tool when supplied, and prefixes display names when there is more than one operation. The combined program takes units and work offset from the first operation.</p>
+    <p>For a single operation, combined NC is the original text. For multiple operations, the helper joins their existing NC sections with operation comments. This helper does not re-post all sections into a single controller program. The native kernel is the route that generates ordered operations and emits one integrated program.</p>
+    <p>Callers composing pre-generated sections must ensure compatible units, work offsets, tool numbering, headers, and program endings. A successful document composition proves ordering and consistency with its stored sections; it does not add machine-clearance evidence.</p>
   </section>
 
   <section id="api" class="doc-section">
-    <h2>API</h2>
-    <p>
-      Spec 14 §4 adds a group <code>camSetup</code>. The legacy routes in spec 05 stay as they
-      are. <code>generate</code> carries resolved elements because core does not load drawings.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Route</th><th>Body</th><th>Result</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>POST /api/cam/setups/plan</code></td><td><code>&#123; setup &#125;</code></td><td><code>SetupPlan</code>. Dry run. No geometry.</td></tr>
-        <tr><td><code>POST /api/cam/setups/generate</code></td><td><code>&#123; setup &#125;</code></td><td><code>GeneratedSetup</code></td></tr>
-        <tr><td><code>POST /api/cam/setups/validate</code></td><td><code>&#123; setup &#125;</code></td><td><code>&#123; issues &#125;</code></td></tr>
-      </tbody>
-    </table>
-    <p>
-      Those three routes are specified. The group file and the sidecar handler file are not in
-      the repository. Do not call them against a running sidecar until both exist and an HTTP
-      test covers them. Saved multi-operation documents are a related, separate path: spec 05’s
-      change log says a portable <code>CamProgramDocument</code> may carry an optional ordered
-      <code>operations</code> array inside <code>Toolpath.data</code>. That persistence reuses
-      the toolpath tables. It is not the setup planner.
-    </p>
+    <h2>Generate and save</h2>
+<ol>
+      <li>Capture the drawing elements and stock to be machined. Choose a material, machine, tools, work offset, and quality controls.</li>
+      <li>Call <code>POST /api/toolpaths/manufacture</code> with <code>schemaVersion: 1</code>, job identity, name, and the captured elements. Supply operations explicitly in machining order or allow the kernel to plan them.</li>
+      <li>Inspect the returned result, issues, individual claims, and <code>release</code>. An artifact can be a preview or blocked; receiving a result does not imply verified output.</li>
+      <li>Build a <code>CamProgramDocument</code> whose G-code, program, artifact, and captured request describe the same result. Save it through a toolpath create or update endpoint, together with that G-code.</li>
+    </ol>
+    <p>The manufacture endpoint evaluates the supplied snapshot without writing the drawing or creating a toolpath. Generator <code>/generate</code> is a separate settings-driven route and can also supply NC for a portable document.</p>
   </section>
 
-  <section id="frames" class="doc-section">
-    <h2>Work frames</h2>
-    <p>
-      <code>packages/core/src/cam/setup.ts</code> is already exported from the CAM barrel. It
-      defines a rigid right-handed <code>WorkFrame</code>, a revisioned
-      <code>ManufacturingSetup</code> (stock and fixture envelopes in world coordinates, tool
-      assemblies), and <code>validateSetup</code> for finite geometry, an orthonormal frame,
-      unique tool and fixture ids, and clearance-envelope errors. Spec 04’s change log calls this
-      setup validation, not collision certification. Use it when you are placing a work coordinate
-      system. Use spec 14 when you are ordering operations into programs.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>The planner must not read the database or the clock. Geometry is an argument.</li>
-      <li>Callers must not concatenate finished G-code strings to simulate a tool change.</li>
-      <li>The setup HTTP group must not replace <code>POST /api/toolpaths/generate</code>. Spec 14 says the legacy routes stay.</li>
-      <li>Enabling <code>retractBeforeToolChange</code> by default would change goldens. The post leaves it off unless the setup asks.</li>
-      <li>Desktop persistence of setups is pending. Do not invent a second toolpath table for it.</li>
-    </ul>
-  </section>
-  <section id="setup-symbols" class="doc-section">
-    <h2>Setup symbols</h2>
-    <p>Exports of <code>packages/core/src/cam/setup.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Symbol</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>WorkFrame</code></td></tr>
-        <tr><td><code>ToolAssembly</code></td></tr>
-        <tr><td><code>ManufacturingSetup</code></td></tr>
-        <tr><td><code>SetupIssue</code></td></tr>
-        <tr><td><code>validateWorkFrame</code></td></tr>
-        <tr><td><code>validateSetup</code></td></tr>
-        <tr><td><code>workToWorld</code></td></tr>
-        <tr><td><code>worldToWork</code></td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="indexing" class="doc-section">
-    <h2>Indexing and IR</h2>
-    <p><code>packages/core/src/cam/indexing.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Symbol</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>RotaryLayout</code></td></tr>
-        <tr><td><code>indexToolpath</code></td></tr>
-        <tr><td><code>frameFromNormal</code></td></tr>
-        <tr><td><code>anglesFor</code></td></tr>
-      </tbody>
-    </table>
-    <p><code>packages/core/src/cam/ir.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Symbol</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>ProgramSchema</code></td></tr>
-        <tr><td><code>Program</code></td></tr>
-        <tr><td><code>WorkOffsetSchema</code></td></tr>
-      </tbody>
-    </table>
-    <p>
-      Work offsets on that schema are <code>G54</code> through <code>G59</code>.
-      Subprogram text is <code>packages/core/src/cam/subprogram-text.ts</code>.
-      The portable saved-program schema is <code>packages/api/src/cam-program.ts</code>.
-    </p>
+  <section id="disk" class="doc-section">
+    <h2>Persistence validation</h2>
+<p>The sidecar recognizes portable documents by their format and decodes the full schema before saving. The document's G-code must match the toolpath row's G-code. Operation identifiers must be unique, and their ordered composition must reproduce the saved text. The sidecar reparses operation NC to reconstruct program moves rather than trusting client-provided move data.</p>
+    <p>For a new native artifact with a captured request, the sidecar reruns that request and compares the resulting artifact, program, and original NC. Failed or blocked results, altered artifacts, and mismatched text are rejected. A newly supplied artifact without its captured request is removed unless it is an unchanged artifact already retained on the row.</p>
+    <p>When the supplied source elements and stock match the associated stored drawing, the service computes a drawing revision digest. Clients cannot provide a trusted <code>sourceRevision</code> or arbitrary verification claim. The saved revision is derived by the service or retained only for the same existing artifact.</p>
   </section>
 
   <section id="sidecar-program" class="doc-section">
-    <h2>Sidecar program service</h2>
-    <p>Symbols in <code>apps/sidecar/src/services/cam-program.ts</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Symbol</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>runKernelRequest</code></td></tr>
-        <tr><td><code>prepareCamProgramData</code></td></tr>
-        <tr><td><code>drawingRevision</code></td></tr>
-        <tr><td><code>isPortableProgram</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Editing NC and retaining evidence</h2>
+<p>An update can replace NC while sending the unchanged prior portable document. The service recognizes that case, rebuilds the parsed program from the new text, and removes operations and native source evidence that no longer match. An inconsistent new document is rejected instead of silently combining unrelated programs.</p>
+    <p>Ordinary free-form toolpath data remains supported. A change to NC removes stale native artifact metadata where it no longer matches. Client-supplied <code>verification</code> and <code>response</code> fields do not become trusted native evidence.</p>
+    <p>The validation implementation is <code>apps/sidecar/src/services/cam-program.ts</code>; <code>runKernelRequest</code>, <code>prepareCamProgramData</code>, and <code>drawingRevision</code> share the same request adapter and identity logic used by generation and saves.</p>
+  </section>
+
+  <section id="frames" class="doc-section">
+    <h2>Rigid work frames</h2>
+<p>A <code>WorkFrame</code> has an origin and X/Y/Z axes. <code>validateWorkFrame</code> requires finite coordinates, unit axes, pairwise orthogonality, and right-handed orientation within its numerical tolerance. <code>workToWorld</code> applies the frame; <code>worldToWork</code> projects back. Invalid frames, invalid points, and numeric overflow produce a range error.</p>
+    <p><code>validateSetup</code> also checks a non-empty setup identifier, non-negative safe-integer revision, positive-volume finite envelopes, unique fixture/tool identifiers, and positive finite cutter and holder dimensions. Cutting length must not exceed stickout. Validation returns field-specific issues so the caller can identify the value that needs correction.</p>
+  </section>
+
+  <section id="indexing" class="doc-section">
+    <h2>Indexed table machining</h2>
+<p><code>cam/indexing.ts</code> solves indexed orientations for <code>table-AC</code> and <code>table-BC</code> layouts. It rotates the selected work-plane normal onto machine +Z, respects rotary limits, and prefers the smaller reachable tilt. Program points pass through the work frame and table rotation about the machine pivot.</p>
+    <p>This adapter models table indexing with a fixed tool axis. Tilting heads, controller tilted-plane cycles, and simultaneous five-axis motion are separate capabilities. Rotary positions are degrees; frame axes remain unit vectors.</p>
+  </section>
+
+  <section id="setup-symbols" class="doc-section">
+    <h2>Shared setup types</h2>
+<p><code>ManufacturingSetup</code>, <code>WorkFrame</code>, <code>ToolAssembly</code>, <code>validateSetup</code>, <code>validateWorkFrame</code>, <code>workToWorld</code>, and <code>worldToWork</code> are exported through <code>cam</code>. Portable operation and document schemas are exported from <code>@cadcamfun/api</code>, which makes them available to both sidecar persistence and desktop restore logic.</p>
   </section>
 
   <section id="desktop-programs" class="doc-section">
-    <h2>Desktop saved programs</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th></tr>
-      </thead>
+    <h2>Reopening in the desktop</h2>
+<p><code>saved-program.ts</code> captures current settings, stock, drawing, and the exact NC being saved. It retains a kernel artifact only when its NC and hash match those bytes. On restore, it checks the stored artifact and release, restores compatible operation results, resets replay verification, loads the editor, and restores generator and stock controls from the snapshot.</p>
+    <p>When only ordinary G-code is available, the desktop parses it for display. Opening text successfully does not recreate a missing generation request or upgrade the program's evidence level.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Keep source and result together</h2>
+<p>Regenerate after changing geometry, stock, tool dimensions, work frame, machine, material, or operation order. Preserve source snapshots for reproducibility, and treat a changed NC file as new output requiring its own analysis. Source revision checks and artifact replay prevent an earlier result from being presented as evidence for different program bytes.</p>
+  </section>
+
+  <section id="snapshot-example" class="doc-section">
+    <h2>Evaluate a captured setup</h2>
+<p>The snapshot adapter is the common boundary for the native manufacture request. This self-contained example captures a polymer blank and a slightly larger stock box, then returns the artifact's actual release level. It writes neither a drawing nor a toolpath.</p>
+    <DocCode language="ts" title="From editor coordinates to a native job">
+{String.raw`import { cam } from "@cadcamfun/core"
+
+const prepared = cam.kernel.jobOfSnapshot({
+  schemaVersion: 1, id: "blank-job", name: "Blank", material: "POM",
+  elements: [{ id: "blank", type: "cube", x: 20, y: 20, z: 5,
+    width: 40, height: 40, depth: 10 }],
+  stock: { x: 20, y: 20, width: 44, height: 44, depth: 11 },
+  resolution: 0.5
+})
+if (prepared.status === "failed") throw new Error(JSON.stringify(prepared.issues))
+const result = cam.kernel.runJob(prepared.value)
+if (result.status === "failed") throw new Error(JSON.stringify(result.issues))
+console.log(result.value.release)
+console.log(result.value.claims)
+console.log(result.value.identity.nc)`}
+    </DocCode>
+    <p>The cube position is its center; its bottom is Z0. Snapshot stock X/Y are its center and width/height are full dimensions. The adapter places the stock bottom at the selected part's lowest Z, then adds the declared depth. Kernel work origin defaults to stock-center at the stock top; stock-corner selects its minimum X/Y and top Z instead.</p>
+    <p>Source: <code>packages/core/src/cam/kernel/snapshot.ts</code>, <code>execute.ts</code>, and <code>kernel.test.ts</code>.</p>
+  </section>
+
+  <section id="request-limits" class="doc-section">
+    <h2>Snapshot options and bounds</h2>
+<p>The HTTP native request requires 1–2,000 elements, a version of 1, non-empty job ID/name, and a material name up to 80 characters. It accepts up to 500 explicit operations and, when supplied, 1–200 cutters. Omitting operations invokes the planner; an explicit empty operation list is not a request to invent operations.</p>
+    <p><code>finishAllowance</code> accepts 0–5 mm; <code>scallop</code> is positive and at most 1 mm; <code>deburr</code> is positive and at most 5 mm. Native defaults use the material's finish allowance, 0.01 mm scallop, and 0.01 mm path tolerance. Replay resolution can be supplied separately. Optional <code>subprograms: true</code> requests translated repeat emission only where the selected dialect supports it.</p>
+    <p>A snapshot machine field names a registered preset. The lower-level <code>ManufacturingJob</code> can carry a full machine record, including explicit travel and table geometry; the public snapshot machine string does not itself accept an arbitrary machine record.</p>
+    <p>Source: <code>packages/api/src/cam-kernel.ts</code>, <code>ai-cam.ts</code>, and <code>packages/core/src/cam/kernel/contracts.ts</code>.</p>
+  </section>
+
+  <section id="save-errors" class="doc-section">
+    <h2>Resolve rejected saves</h2>
+<table>
+      <thead><tr><th>Response message</th><th>Cause and remedy</th></tr></thead>
       <tbody>
-        <tr><td><code>apps/desktop/src/features/cam/lib/saved-program.ts</code></td></tr>
-        <tr><td><code>apps/desktop/src/features/cam/store/multiToolpathStore.ts</code></td></tr>
+        <tr><td>Invalid CADCAMFUN toolpath document</td><td>The recognized portable format failed its schema. Preserve all required settings, printer, stock, drawing, program, and G-code fields.</td></tr>
+        <tr><td>Toolpath document and G-code must contain the same program</td><td>The row NC and new document NC differ. Rebuild the snapshot from the exact bytes being saved.</td></tr>
+        <tr><td>Saved operations must have unique IDs and compose the stored G-code in order</td><td>Operation identity or ordering no longer reproduces the document. Recompose after editing, reordering, or deleting operations.</td></tr>
+        <tr><td>The saved kernel artifact does not match its source request and original NC</td><td>Replaying the captured request failed, returned blocked output, or differed from the claimed artifact/program/NC. Regenerate rather than editing the evidence fields.</td></tr>
       </tbody>
     </table>
+    <p>A valid native artifact may be retained without a source drawing revision when its source selection/stock does not match the associated stored drawing. That absence does not imply the saved NC was regenerated against the current drawing. Read the drawing revision and source snapshot independently when reporting freshness.</p>
+    <p>Source: <code>apps/sidecar/src/services/cam-program.ts</code> and <code>apps/sidecar/test/cam-program.test.ts</code>.</p>
   </section>
-  <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "API contract", href: "/docs/api" }, { title: "Desktop UI", href: "/docs/desktop" }]} />
+
+  <DocRelated items={[{ title: "CAM and G-code", href: "/docs/cam" }, { title: "Database", href: "/docs/database" }, { title: "History", href: "/docs/history" }]} />
 </DocsLayout>

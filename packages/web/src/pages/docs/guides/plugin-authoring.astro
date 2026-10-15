@@ -1,0 +1,199 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Choose the assistant extension format", href: "#surface" },
+  { title: "Create the directory and consent record", href: "#directory" },
+  { title: "Declare a precise tool contract", href: "#manifest" },
+  { title: "Implement the self-contained module", href: "#implementation" },
+  { title: "Validate the manifest and both argument paths", href: "#validation" },
+  { title: "Enable and discover the actual tool identifier", href: "#enable" },
+  { title: "Call a read tool through scoped outside access", href: "#bridge" },
+  { title: "Understand schema conversion and capability limits", href: "#schema-limits" },
+  { title: "Design around the implemented worker lifecycle", href: "#lifecycle" },
+  { title: "Keep runtime guarantees in proportion", href: "#runtime-limits" },
+  { title: "Update, remove, and diagnose a tool", href: "#maintenance" },
+]
+---
+
+<DocsLayout title="Write an assistant tool plugin" subtitle="Build a self-contained read tool, validate its manifest and arguments, enable it deliberately, and test the worker boundary you actually receive." description="Practical CADCAMFUN plugin authoring guide with a complete aiTools module, manifest, consent loading, validation, scoped bridge calls, limits, and recovery." toc={toc}>
+  <section id="surface" class="doc-section">
+    <h2>Choose the assistant extension format</h2>
+<p>The production assistant extension loader accepts a directory containing plugin.json and a bundled JavaScript entry. It imports the module into a Bun worker and exposes declared functions from its aiTools record to the assistant. The currently supported capability is ai:tool. This guide builds a read-only bolt-circle calculator that returns coordinates; it does not insert geometry into a drawing.</p>
+    <p>There is also a browser-plugin ZIP API under /api/plugins with manifest.json, main, browser permissions, and bootstrap assets. That installer does not enable the worker plugin described here. The <a href="/docs/api/plugins">plugin HTTP reference</a> documents that separate format; <a href="/docs/plugins">Plugins</a> explains both surfaces. Do not translate between them by merely renaming a manifest.</p>
+    <p>An assistant tool is code executed inside the application runtime boundary. Host capability checks limit access through host RPC, but the current worker is not an operating-system sandbox. Use extension code whose execution is appropriate for that environment, and make its declared read/write behavior agree with what the function actually does.</p>
+  </section>
+
+  <section id="directory" class="doc-section">
+    <h2>Create the directory and consent record</h2>
+<p>Use the exact application data directory of the sidecar you intend to extend. Create this structure, keeping the directory ID identical to the manifest's reverse-DNS ID:</p>
+    <DocCode language="text" title="Application plugin directory">
+{String.raw`<dataDir>/plugins/
+  enabled.json
+  com.example.bolt-circle/
+    plugin.json
+    index.js`}
+    </DocCode>
+    <p>The production loader reads enabled.json as a JSON array of safe identifiers. It ignores duplicate/invalid entries, and malformed or missing JSON means no plugins are enabled. An unlisted folder is not loaded. The loader also rejects a folder/manifest ID mismatch and manifests that request unsupported capabilities.</p>
+    <p>Loading occurs when the assistant plugin service initializes. It does not configure a filesystem watcher for hot reload. Prepare and validate files first, then enable/restart that instance. A failed plugin logs a warning while other plugins and application startup continue; inspect those warnings instead of assuming an enabled-file entry guarantees a running tool.</p>
+  </section>
+
+  <section id="manifest" class="doc-section">
+    <h2>Declare a precise tool contract</h2>
+<p>This complete manifest names a single read tool. The contribution ID is the model-facing local identifier; entry names the function exported by the module. Those strings may differ, as bolt_circle and boltCircle do here.</p>
+    <DocCode language="json" title="plugin.json">
+{String.raw`{
+  "id": "com.example.bolt-circle",
+  "name": "Bolt circle calculator",
+  "version": "1.0.0",
+  "apiVersion": "1",
+  "entry": "index.js",
+  "capabilities": ["ai:tool"],
+  "contributes": {
+    "aiTools": [{
+      "id": "bolt_circle",
+      "description": "Calculate equally spaced XY hole centers around the origin for a bolt circle. Returns coordinates without changing a drawing.",
+      "kind": "read",
+      "entry": "boltCircle",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "minimum": 1, "maximum": 64 },
+          "radius": { "type": "number", "exclusiveMinimum": 0 }
+        },
+        "required": ["count", "radius"],
+        "additionalProperties": false
+      }
+    }]
+  }
+}`}
+    </DocCode>
+    <p>The SDK requires reverse-DNS IDs of 3–128 characters, a semantic major.minor.patch version with optional prerelease, API version "1", non-empty name/entry, and recognized capabilities. Tool IDs start with a lowercase letter and use lowercase letters, digits, or underscores up to 40 characters. Descriptions contain 10–2,000 characters. Tool kind is read or write; there is no destructive extension kind.</p>
+    <p>Keep the parameter schema small and descriptive. Its role is to help the model produce valid arguments and let the adapter reject ordinary mistakes before execution. It does not replace validation inside code.</p>
+  </section>
+
+  <section id="implementation" class="doc-section">
+    <h2>Implement the self-contained module</h2>
+<p>The entry exports aiTools with the entry function named in the manifest. It validates runtime arguments again and returns a small JSON-compatible result. Finite coordinate arithmetic and bounded count keep malformed input from producing an unbounded list or meaningless output.</p>
+    <DocCode language="js" title="index.js">
+{String.raw`export const aiTools = {
+  boltCircle: async (args) => {
+    if (!args || typeof args !== "object") {
+      return { ok: false, error: "Expected count and radius" }
+    }
+    const { count, radius } = args
+    if (!Number.isInteger(count) || count < 1 || count > 64) {
+      return { ok: false, error: "count must be an integer from 1 to 64" }
+    }
+    if (typeof radius !== "number" || !Number.isFinite(radius) || radius <= 0) {
+      return { ok: false, error: "radius must be a positive finite number" }
+    }
+    const holes = Array.from({ length: count }, (_, index) => {
+      const angle = 2 * Math.PI * index / count
+      return {
+        x: Number((radius * Math.cos(angle)).toFixed(4)),
+        y: Number((radius * Math.sin(angle)).toFixed(4))
+      }
+    })
+    return { ok: true, units: "mm", holes }
+  }
+}`}
+    </DocCode>
+    <p>Count 4 and radius 10 return centers at approximately (10,0), (0,10), (−10,0), and (0,−10), in counter-clockwise order around the origin. The result deliberately contains no database mutation or drawing identifier. A client wanting to insert holes must use a separate supported application action with its own access and permission behavior.</p>
+    <p>Bundle dependencies into the entry rather than assuming Node-style relative imports resolve. The host reads the entry text and imports it through a blob module. Module top-level code runs on import, so avoid side effects merely from loading a calculator.</p>
+  </section>
+
+  <section id="validation" class="doc-section">
+    <h2>Validate the manifest and both argument paths</h2>
+<p>Validate before adding the plugin to enabled.json. This development check uses the same SDK manifest parser and AI schema adapter as the application. Place the script in a workspace with those dependencies, such as apps/sidecar, and pass the absolute plugin directory as its argument.</p>
+    <DocCode language="ts" title="Development validation script">
+{String.raw`import { join } from "node:path"
+import { Effect } from "effect"
+import { parseManifest } from "@cadcamfun/plugin-sdk"
+import { pluginParameters } from "@cadcamfun/ai"
+
+const directory = process.argv[2]
+if (!directory) throw new Error("Pass the absolute plugin directory")
+const manifest = await Effect.runPromise(parseManifest(
+  await Bun.file(join(directory, "plugin.json")).text()))
+if (manifest.capabilities.some((capability) => capability !== "ai:tool")) {
+  throw new Error("This production loader accepts only ai:tool")
+}
+const contribution = manifest.contributes?.aiTools?.[0]
+if (!contribution) throw new Error("No tool contribution")
+const parameters = pluginParameters(contribution.parameters)
+console.log(parameters.safeParse({ count: 4, radius: 10 }).success) // true
+console.log(parameters.safeParse({ count: 0, radius: 10 }).success) // false
+const module = await import(join(directory, manifest.entry))
+console.log(await module.aiTools[contribution.entry]({ count: 4, radius: 10 }))
+console.log(await module.aiTools[contribution.entry]({ count: 0, radius: 10 }))`}
+    </DocCode>
+    <p>The last two calls test function-level behavior independently of adapter rejection. The SDK validates the manifest structure, but the production loader adds its own capability and folder-ID rules. Test all three boundaries: declaration, argument adapter, and actual module function.</p>
+  </section>
+
+  <section id="enable" class="doc-section">
+    <h2>Enable and discover the actual tool identifier</h2>
+<p>After validation, enable the ID in the application data directory:</p>
+    <DocCode language="json" title="enabled.json">
+{String.raw`["com.example.bolt-circle"]`}
+    </DocCode>
+    <p>Restart/reinitialize the intended sidecar service and inspect logs for load warnings. Then list <code>GET /api/ai/actions</code>. Read plugin tools are exposed there as well as to the embedded assistant; policy can narrow the catalogue. The tool identifier is generated from plugin ID and local tool ID, normalized and bounded to the host's identifier size.</p>
+    <p>For this manifest, the current derived ID is <code>plugin_com_example_bolt_circle_bolt_circle</code>. Discover it rather than reimplementing the naming rule in every client. A long plugin ID may be truncated to leave room for the tool suffix. The catalogue's description includes the plugin name so the user can identify the source.</p>
+    <p>A write tool is marked for human approval in the embedded assistant, regardless of ordinary permission mode. The outside bridge exposes only read plugin tools and refuses write extension calls even with a read/write token. Keep kind accurate; the application cannot infer arbitrary module side effects from a JSON schema.</p>
+  </section>
+
+  <section id="bridge" class="doc-section">
+    <h2>Call a read tool through scoped outside access</h2>
+<p>Use a bridge token issued by the application for a real project. Its bearer opens only GET /api/ai/actions and POST /api/ai/actions/invoke. It does not permit callers to install plugins, edit credentials, or enumerate unrelated projects. The token's project/mode is checked by the action handler; an application-wide token is unnecessary for a standalone calculator client.</p>
+    <DocCode language="json" title="bridge-call.json, with a real project ID">
+{String.raw`{
+  "projectId": "replace-with-your-project-id",
+  "tool": "plugin_com_example_bolt_circle_bolt_circle",
+  "input": { "count": 4, "radius": 10 }
+}`}
+    </DocCode>
+    <DocCode language="bash" title="Invoke the running plugin tool">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_BRIDGE_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @bridge-call.json \
+  "$CADCAMFUN_URL/api/ai/actions/invoke"`}
+    </DocCode>
+    <p>Plugin inputs are the declared argument object; unlike built-in grouped tools, this read plugin does not require an action discriminator inside input. The bridge wraps the returned value with tool/action metadata; the action is run. Function-level ok=false remains a readable result rather than an HTTP transport success proving a useful coordinate list.</p>
+    <p>Bridge policy checks tool.use and bridge.use. A missing, expired, revoked, or wrong-kind token yields authorization failure. A token bound to another project is not a way to widen this call's scope.</p>
+  </section>
+
+  <section id="schema-limits" class="doc-section">
+    <h2>Understand schema conversion and capability limits</h2>
+<p>The adapter converts the contribution's JSON schema to zod when representable. If conversion fails, the schema exceeds 20,000 serialized characters, or it does not describe an object, it falls back to an arbitrary-object schema. This is why the example function checks count and radius itself. A supported schema's negative fixture passing locally does not prove every schema feature will remain representable.</p>
+    <p>The SDK recognizes drawing:read, drawing:write, toolpath:read, storage, ui:panel, and ai:tool; drawing write implies drawing read. The production assistant loader currently accepts only ai:tool. Adding drawing:write to this manifest causes it to be skipped, not granted a drawing editor context.</p>
+    <p>The general worker bootstrap contains placeholder drawing/toolpath/UI handlers. Those handlers are not a production geometry integration. Likewise, declaring post-processor or operation contributions does not make the assistant loader wire them into manufacturing registries. Choose a supported application action when the feature needs to change real CAD/CAM data.</p>
+  </section>
+
+  <section id="lifecycle" class="doc-section">
+    <h2>Design around the implemented worker lifecycle</h2>
+<p>The SDK describes a module with manifest, activate, optional cleanup, and deactivate hooks. The current production AI path imports the entry and calls exported aiTools functions. Its worker activate/deactivate RPC handlers acknowledge lifecycle messages but do not invoke exported module hooks. A calculator can therefore use the minimal module shown here without depending on activation callbacks.</p>
+    <p>The host starts one worker per enabled plugin, correlates replies with RPC IDs, and tracks pending calls. A function exception fails that call; focused real-worker tests show that later calls can still succeed. Return structured refusals for expected invalid input, and reserve thrown failures for unexpected computation errors.</p>
+    <p>A call timeout terminates its worker and faults the plugin immediately. Worker crashes and posting failures also remove the running instance and mark it faulted. Crash history has a ten-minute window, but the current handler faults on a first crash; it does not wait for three successful restart attempts. Correct the source and deliberately reload/re-enable instead of assuming automatic restart.</p>
+  </section>
+
+  <section id="runtime-limits" class="doc-section">
+    <h2>Keep runtime guarantees in proportion</h2>
+<p>The production loader supplies a 10-second host budget for ordinary lifecycle/command RPC. AI tool calls have a separate 30-second deadline. The host limits a plugin to 2,000 calls per minute and 64 pending calls. It passes a 256 MB resource-limit setting to Bun when creating the worker. These are runtime controls, not a separate process or operating-system containment policy.</p>
+    <p>The bootstrap starts with an empty environment and attempts to delete selected process/network globals. Deletion is best-effort and some Bun globals remain reachable. Capability checking is therefore meaningful for the APIs the host supplies, but cannot be presented as complete isolation of arbitrary JavaScript.</p>
+    <p>Optional signature and dev fields exist in the manifest schema. The current worker installation path records signature text without cryptographic verification. Do not label a publisher verified because that field is present. A self-contained source review and installation policy remain separate decisions from schema acceptance.</p>
+  </section>
+
+  <section id="maintenance" class="doc-section">
+    <h2>Update, remove, and diagnose a tool</h2>
+<p>For an update, edit and validate the bundled module/manifest before restarting the target service. Keep its ID stable when it is the same extension and increase the version to identify what was loaded. To stop loading it on future initialization, remove its ID from enabled.json and restart/reinitialize. Changing the file alone does not dispose an already running worker.</p>
+    <p>If the tool is missing, check the enabled array, exact folder/manifest ID equality, supported capability list, and manifest decode error in logs. NoSuchTool usually means entry does not name an exported aiTools function. An argument refusal points to the schema or function guard. A timeout points to blocking work or an unresolved promise. The browser ZIP enable/config endpoints do not manage this worker consent file.</p>
+    <p>Focused coverage is in <code>apps/sidecar/test/plugins-ai-tools.test.ts</code> for actual workers and <code>ai-plugin-tools.test.ts</code> for production loading, argument validation, read/write exposure, and bridge behavior. Implementation sources are <code>packages/plugin-sdk/src/manifest.ts</code>, <code>packages/ai/src/tools/plugin-tool.ts</code>, <code>apps/sidecar/src/plugins/host.ts</code>, and <code>services/ai-plugins.ts</code>. Use these boundaries to determine what a successful test actually proved.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Plugin reference", href: "/docs/plugins" }, { title: "AI action API", href: "/docs/api/ai" }, { title: "Streaming client", href: "/docs/guides/ai-streaming" }, { title: "Browser plugin API", href: "/docs/api/plugins" }]} />
+</DocsLayout>

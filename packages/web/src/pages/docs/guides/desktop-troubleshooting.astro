@@ -1,0 +1,165 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Identify the runtime before changing it", href: "#identify" },
+  { title: "Understand startup timing", href: "#startup" },
+  { title: "Check ports and health separately", href: "#ports" },
+  { title: "Reproduce with an isolated sidecar", href: "#manual" },
+  { title: "Resolve the actual database path", href: "#data" },
+  { title: "Read protocol output and logs", href: "#logs" },
+  { title: "Distinguish authentication from empty data", href: "#auth" },
+  { title: "Recognize preview and native limitations", href: "#preview" },
+  { title: "Recover preference and display issues", href: "#preferences" },
+  { title: "Separate UI recovery from machining evidence", href: "#machining" },
+  { title: "Triage one failure at a time", href: "#triage" },
+]
+---
+
+<DocsLayout title="Desktop troubleshooting" subtitle="Identify the failing process, inspect the real endpoint and data directory, and recover without confusing preview with persistence." description="Source-grounded diagnostics for Tauri startup, Vite ports, sidecar readiness, authentication, SQLite paths, logs, preferences, and machining evidence." toc={toc}>
+  <section id="identify" class="doc-section">
+    <h2>Identify the runtime before changing it</h2>
+    <p>A desktop session has separate failure boundaries: Vite supplies frontend assets during development; the Tauri Rust process owns native integration; the Bun sidecar serves application requests and persistence; the SolidJS webview connects to that API. A blank window, a boot timeout, a 401 response, and an empty project list can have different causes.</p>
+    <table>
+      <thead><tr><th>Launch mode</th><th>Backend</th><th>What it can establish</th></tr></thead>
+      <tbody>
+        <tr><td>Desktop package <code>dev</code> with no sidecar URL</td><td>In-memory fake client</td><td>Supported fixture-based screen behavior, not durable application storage.</td></tr>
+        <tr><td>Vite with URL and token</td><td>Selected running sidecar</td><td>Browser-to-server requests and persistence in that server's directory.</td></tr>
+        <tr><td>Root <code>desktop:dev</code></td><td>Compiled supervised sidecar</td><td>Native shell, webview, bundled server/resources, and application flow.</td></tr>
+        <tr><td>Desktop <code>tauri:dev</code> with no existing binary</td><td>Generated stub sidecar</td><td>Isolated shell behavior; the stub is not the full application API.</td></tr>
+      </tbody>
+    </table>
+    <p>Record the launch command and whether the endpoint came from Tauri or Vite variables. Do not delete a database or reinstall dependencies merely because a different runtime shows different data.</p>
+  </section>
+
+  <section id="startup" class="doc-section">
+    <h2>Understand startup timing</h2>
+    <p>The Rust shell generates a launch token, resolves application data and migration directories, and spawns the target sidecar. The child binds <code>127.0.0.1</code> on an ephemeral port. It waits until its public <code>/api/health</code> answers, then writes a JSON ready event with that port. The webview invokes <code>get_sidecar_endpoint</code> and creates its managed API runtime.</p>
+    <table>
+      <thead><tr><th>Budget</th><th>Current value</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Shell ready handshake</td><td>60 seconds per start</td><td>Maximum wait for the child's usable ready event.</td></tr>
+        <tr><td>Automatic supervisor restart</td><td>One</td><td>A failed child is not restarted indefinitely.</td></tr>
+        <tr><td>Native endpoint wait</td><td>125 seconds</td><td>Two ready budgets plus slack.</td></tr>
+        <tr><td>Webview connection attempt</td><td>30 seconds</td><td>Health/connection timeout for an attempt.</td></tr>
+        <tr><td>Webview retry loop</td><td>150 seconds, 750 ms pauses</td><td>Re-resolves endpoints before offering a timed-out failure.</td></tr>
+      </tbody>
+    </table>
+    <p>Retry restarts webview connection attempts; it does not replenish an exhausted Rust supervision budget. Fix the startup cause and relaunch the app when the supervisor has reached its terminal failed state. A port from before a child restart can be stale.</p>
+  </section>
+
+  <section id="ports" class="doc-section">
+    <h2>Check ports and health separately</h2>
+    <p>Vite uses <code>localhost:1420</code> with strict port selection, matching Tauri's configured development URL. It fails instead of silently moving to another port. The sidecar port is unrelated and changes between launches. The companion HTTPS port is a third listener, default 8443, and Studio uses loopback 4396.</p>
+    <DocCode language="bash" title="Probe an isolated development sidecar; replace the example port/token">
+{`CADCAM_URL=http://127.0.0.1:43111
+CADCAM_TOKEN=local-development-token
+
+curl --max-time 5 --fail-with-body "$CADCAM_URL/api/health"
+curl --max-time 5 --fail-with-body "$CADCAM_URL/health" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"
+curl --max-time 5 --fail-with-body "$CADCAM_URL/version" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>The public health route returns status and timestamp. Authenticated system routes expose readiness and the application version. A healthy process does not prove all providers, database queries, or native dialogs work. Compare the <a href="/docs/api/health">Health API</a> and <a href="/docs/api/system">System API</a> when selecting probes.</p>
+    <p>If port 1420 is occupied, identify and stop the existing development server deliberately. If a remembered API port refuses connections, read the current ready event or re-resolve the Tauri endpoint rather than guessing neighboring ports.</p>
+  </section>
+
+  <section id="manual" class="doc-section">
+    <h2>Reproduce with an isolated sidecar</h2>
+    <p>A source process is useful for separating native-bundle issues from server behavior. Run this from the repository root in an interactive terminal; it creates a fresh data directory and uses the generated migration folder explicitly.</p>
+    <DocCode language="bash" title="Keep this terminal and stdin open">
+{`CADCAM_DIAGNOSTIC_DIR=$(mktemp -d /tmp/cadcamfun-desktop-guide.XXXXXX)
+CADCAMFUN_TOKEN=local-development-token \
+CADCAMFUN_DATA_DIR="$CADCAM_DIAGNOSTIC_DIR/data" \
+CADCAMFUN_MIGRATIONS_DIR="$PWD/packages/db/drizzle" \
+CADCAMFUN_AI_OFFLINE=true \
+bun --no-env-file apps/sidecar/src/main.ts`}
+    </DocCode>
+    <p>Copy the announced port into the probe variables in a second terminal. Offline AI mode avoids depending on a configured remote model for basic startup diagnostics; it does not run an alternative local model. The server observes stdin EOF, an explicit shutdown event, and normal runtime interrupts.</p>
+    <p>A source process uses current files. A native process uses the compiled executable already staged under <code>src-tauri/binaries</code>. If only the compiled run fails, rebuild through <code>bun run build:sidecar</code> and inspect bundling/migration resources. Editing TypeScript does not replace an already running executable.</p>
+  </section>
+
+  <section id="data" class="doc-section">
+    <h2>Resolve the actual database path</h2>
+    <table>
+      <thead><tr><th>Process/tool</th><th>Path selection</th></tr></thead>
+      <tbody>
+        <tr><td>Tauri-launched sidecar</td><td>Tauri <code>app_data_dir()</code>, then <code>cadcamfun.db</code>.</td></tr>
+        <tr><td>Manual sidecar</td><td><code>CADCAMFUN_DATA_DIR/cadcamfun.db</code>.</td></tr>
+        <tr><td>Migration CLI</td><td><code>DATABASE_URL</code>, otherwise <code>./data/cadcamfun.db</code> relative to its process directory.</td></tr>
+        <tr><td>Root <code>db:migrate</code> wrapper</td><td>Runs in the database package, normally giving <code>packages/db/data/cadcamfun.db</code> by default.</td></tr>
+        <tr><td>Local Studio API</td><td><code>CADCAMFUN_DB</code>, then <code>DATABASE_URL</code>, then repository-root <code>data/cadcamfun.db</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>These files are not aliases. Match the selected process path before investigating missing drawings. Browser fixtures never open these SQLite files. The sidecar applies migrations only when its configuration supplies a migration folder; omitting it does not automatically discover the source-tree folder.</p>
+    <p>The database layer enables WAL and foreign keys. Before an existing database upgrade it writes an automatic pre-migration backup and retains five matching backups. It does not create such a backup on every save, unchanged startup, first creation, or in-memory test. Preserve a consistent backup through the database/recovery procedure; copying only the main file of a running WAL database can omit committed WAL content.</p>
+  </section>
+
+  <section id="logs" class="doc-section">
+    <h2>Read protocol output and logs</h2>
+    <p>In a source sidecar terminal, stdout is reserved for ready/error protocol events and JSON application logs go to stderr. In the native app, the Rust logging plugin captures shell-side events, including supervised child output. The shell redacts lines that may contain its launch credentials.</p>
+    <p>The native <code>get_logs_dir</code> command resolves the operating-system application log directory. It is more reliable than assuming one universal path across systems. A developer diagnostic inside the webview can invoke it through the existing Tauri command interface; native path opening is constrained to permitted folders and refuses executable file types.</p>
+    <p>The reusable boot-screen component supports an optional View logs callback, but the current <code>App.tsx</code> does not pass that callback. Do not assume a View logs button will be visible during a startup failure. Keep the development launching terminal available or use the native log directory through an appropriate diagnostic surface.</p>
+    <p>For a report, include the launch mode, non-secret data/migration paths, elapsed wait, current API version, exact error tag/message, and last relevant startup events. Redact launch/session/device tokens, pairing links, model keys, and signing material.</p>
+  </section>
+
+  <section id="auth" class="doc-section">
+    <h2>Distinguish authentication from empty data</h2>
+    <p>The browser real-client mode requires both <code>VITE_SIDECAR_URL</code> and <code>VITE_SIDECAR_TOKEN</code>. A URL without a token does not activate the fake fallback; endpoint resolution fails. Variables must be supplied before Vite starts. Updating a parent shell does not reconfigure a server already running.</p>
+    <DocCode language="bash" title="Browser connected to the isolated source process">
+{`VITE_SIDECAR_URL=http://127.0.0.1:43111 \
+VITE_SIDECAR_TOKEN=local-development-token \
+bun run --filter @cadcamfun/desktop dev`}
+    </DocCode>
+    <p>Protected calls can use account session context in addition to the application token. Companion and standalone bridge tokens have narrower scopes and are not substitutes for a launch token. A 401 needs credential diagnosis; a 403 needs operation/access diagnosis; an absent or inaccessible project can be reported as 404.</p>
+    <p>Some screens, including project child-resource tabs, currently turn individual list errors into empty arrays. A blank tab is not sufficient evidence that records were deleted. Read the corresponding <a href="/docs/api/projects">project</a>, <a href="/docs/api/drawings">drawing</a>, or <a href="/docs/api/toolpaths">toolpath</a> endpoint before recreating work.</p>
+  </section>
+
+  <section id="preview" class="doc-section">
+    <h2>Recognize preview and native limitations</h2>
+    <p>The fake API handles selected projects, drawings, materials, tools, machines, toolpaths, KV, and generator paths. Unsupported collections return HTTP 501 with a preview-specific message. Fixture data belongs to the running page. A successful preview action cannot demonstrate persisted organization, plugin, billing, or live provider behavior.</p>
+    <p>Native dialogs, keychain operations, tray, updater, and macOS materials require the Tauri host and the correct capabilities. A registered command can still be unavailable to the webview under its capability configuration. For file opening, the shell registers supported associations and forwards paths; that alone does not prove a particular editor imported the contents.</p>
+    <p>Graphics failures are another boundary. A non-zero container size, visible entities/layers, unlocked selection, and supported WebGL are prerequisites for the relevant viewport interactions. A rendered mesh is evidence of rendering, not a successful save or CAM verification. Use the <a href="/docs/viewport#rendering-failures">viewport diagnostics</a> for worker capacity, timeout, and four-view behavior.</p>
+  </section>
+
+  <section id="preferences" class="doc-section">
+    <h2>Recover preference and display issues</h2>
+    <p>The shared webview preference record is <code>cadcamfun.settings</code>. Defaults include millimetres, system theme, three decimals, GRBL preference, snap enabled, tolerance 0.01 mm, and glass enabled. Stored fields are validated independently; invalid values fall back without making the shell fail. Full/blocked local storage can prevent persistence.</p>
+    <p>Changing display units does not rescale the stored CAD geometry. Document tolerance is propagated through the shared CAD/generator/verification settings helper. Some feature/rotary values explicitly use degrees; drawing angles use radians. Verify the field contract before diagnosing a numerical mismatch as corrupt geometry.</p>
+    <p>Glass behavior depends on Tauri/macOS support. The implementation uses Liquid Glass where supported, vibrancy on older macOS through the plugin, and an opaque fallback when unavailable or disabled. Theme/material changes do not alter geometry, project ownership, or machining evidence.</p>
+    <p>Prefer the relevant settings or feature control over clearing all webview storage. That storage can also contain session/editor handoffs. A visual preference reset is not a database repair procedure.</p>
+  </section>
+
+  <section id="machining" class="doc-section">
+    <h2>Separate UI recovery from machining evidence</h2>
+    <p>A loaded project, successful HTTP save, animated toolpath, and generated NC are different observations. Before relying on a saved machining result, inspect the exact NC, source drawing/stock, tool assemblies, machine envelope, selected post, and verification release/issues for that result.</p>
+    <p>The CAM snapshot code preserves kernel evidence only when the current NC text and its hash match. Portable program writes validate document consistency and may re-evaluate captured kernel requests. Editing NC or changing stock can invalidate previous evidence. Reopening plain NC can parse a program without restoring the same manufacturing proof.</p>
+    <p>After a crash or interrupted save, first inspect the saved row and its versions. The CAM save modal records the previous program before an update, while toolpath detail manual save records the updated revision. Project history is separate again. Use <a href="/docs/guides/project-lifecycle#history">the history comparison</a> to choose a recovery path.</p>
+    <p>Do not convert an unresolved check into an accepted operation because the UI recovered. Re-run the appropriate verification against the actual resources and NC; an application health probe has no authority over machine safety.</p>
+  </section>
+
+  <section id="triage" class="doc-section">
+    <h2>Triage one failure at a time</h2>
+    <ol>
+      <li>Record launch mode, process versions, ports, and actual data directory.</li>
+      <li>Probe health, then one protected read. Separate connectivity from authorization.</li>
+      <li>Inspect structured startup/migration errors before resetting or deleting anything.</li>
+      <li>Reproduce against an isolated source process when a compiled/native issue is suspected.</li>
+      <li>Fix the identified cause, restart the appropriate process, and update stale endpoint variables.</li>
+      <li>Reopen the saved document/program and inspect persisted state, versions, exports, and current verification.</li>
+    </ol>
+    <p>Implementation anchors are <code>app/App.tsx</code>, <code>app/sidecar.ts</code>, <code>src-tauri/src/&#123;sidecar,commands,lib&#125;.rs</code>, sidecar <code>main.ts</code>/<code>config.ts</code>/<code>shutdown.ts</code>, and the database lifecycle. <a href="/docs/guides/local-dev">Local development</a> supplies configuration details; <a href="/docs/guides/companion-pairing">companion pairing</a> handles its separate network boundary.</p>
+  </section>
+
+  <DocRelated items={[
+    { title: "Local development", href: "/docs/guides/local-dev" },
+    { title: "System API", href: "/docs/api/system" },
+    { title: "Health API", href: "/docs/api/health" },
+    { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" }
+  ]} />
+</DocsLayout>

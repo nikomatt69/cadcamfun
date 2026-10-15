@@ -12,9 +12,11 @@
     "preview": "astro preview",
     "deploy": "bun script/deploy.ts",
     "astro": "astro",
-    "check": "bun run check:docs-index",
+    "check": "bun run check:docs-index && bun run check:api-reference",
     "check:docs-index": "bun run script/check-docs-index.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && bun run check:docs-index"
+    "typecheck": "tsc -p tsconfig.json --noEmit && bun run check",
+    "generate:api-reference": "bun script/generate-api-reference.mjs",
+    "check:api-reference": "bun script/generate-api-reference.mjs --check"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.0.0",

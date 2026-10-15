@@ -6,382 +6,194 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Boot", href: "#boot" },
-  { title: "Routes", href: "#routes" },
-  { title: "Folders", href: "#folders" },
-  { title: "Shell", href: "#shell" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Feature folders", href: "#feature-folders" },
-  { title: "Route paths", href: "#route-paths" },
-  { title: "Tauri commands", href: "#tauri-commands" },
-  { title: "Webview events", href: "#webview-events" },
-  { title: "Activities", href: "#activities" },
+  { title: "Application architecture", href: "#status" },
+  { title: "Startup and connection recovery", href: "#boot" },
+  { title: "Screen routes", href: "#routes" },
+  { title: "Source organization", href: "#folders" },
+  { title: "Native shell", href: "#shell" },
+  { title: "Security and persistence boundaries", href: "#boundaries" },
+  { title: "Feature integration", href: "#feature-folders" },
+  { title: "Route loading and errors", href: "#route-paths" },
+  { title: "Native command interface", href: "#tauri-commands" },
+  { title: "Native events", href: "#webview-events" },
+  { title: "Development and verification", href: "#activities" },
+  { title: "Preferences and settings", href: "#preferences" },
+  { title: "Save and reopen a CAM program", href: "#save-workflow" },
+  { title: "Keyboard and failure diagnosis", href: "#desktop-diagnostics" },
 ]
 ---
 
 <DocsLayout
   title="Desktop UI"
-  subtitle="SolidJS in the webview. Projects, CAD, CAM, Library, and Settings work end to end. The long tail is still stubs."
-  description="CADCAMFUN desktop UI: routes, feature folders, the Tauri shell, and which screens are real."
+  subtitle="SolidJS workspaces, a local API client, and a Tauri shell that owns native integration."
+  description="Desktop application architecture, startup, screen routes, state, native commands, and development modes."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP6 on the task board is <strong>in progress</strong>. The board says the Solid and
-      Tailwind v3 foundation is in place, with core screens plus plugins, costs, organizations,
-      waitlist, auth, and analytics, and that the rest of the legacy pages are still stubs.
-      Spec 06 is more specific about what is proven: the Projects, CAD, CAM, Library, and
-      Settings screens work end to end against the contract. The 3D viewport plays back
-      toolpaths. The 2D editor drives the tool state machines. Owner paths:
-      <code>apps/desktop/src/app</code>, <code>features/*/screens</code>,
-      <code>shared/components</code>, <code>shared/state</code>, and <code>src/i18n</code>.
-      Spec: <code>specs/06-desktop-ui.md</code>.
-    </p>
-    <DocCallout type="warn" title="Do not treat a registered route as a finished screen">
-      <p>
-        <code>apps/desktop/src/app/routes.tsx</code> lists the legacy URL table, including
-        marketplace, chat, billing, and MCP. <code>src/pages</code> holds one adapter per path.
-        Many of those adapters still render a stub. Spec 06 says the long tail of legacy pages
-        are generated stubs rather than implemented screens.
-      </p>
-    </DocCallout>
+    <h2>Application architecture</h2>
+    <p>The desktop application combines a SolidJS webview, Vite, Three.js, and a Tauri v2 Rust shell. The webview owns screens and interaction state. The Bun sidecar owns API handlers, database access, AI sessions, and project services. The Rust process owns the window, menus, tray, operating-system dialogs, keychain access, updates, and sidecar lifecycle.</p>
+    <p><code>apps/desktop/src/main.tsx</code> mounts the application. <code>app/App.tsx</code> establishes the API connection and supplies shared state; <code>app/routes.tsx</code> maps URLs to lazy page modules. Feature screens live in <code>features/</code>. The presence of a route does not establish the availability of its external services: billing needs Stripe configuration and AI needs a configured provider.</p>
   </section>
 
   <section id="boot" class="doc-section">
-    <h2>Boot</h2>
-    <p>
-      The webview asks the shell for <code>get_sidecar_endpoint</code>, receives
-      <code>&#123; baseUrl, token &#125;</code>, builds <code>ApiClient.layer</code>, and calls
-      <code>GET /health</code>. Effects run on one app <code>ManagedRuntime</code>. Server data
-      stays in the API, with a lightweight query cache keyed by endpoint and params. The editor
-      undo stack is client state: a command pattern over drawing patches, capped at 200 steps
-      (<code>shared/state/history.ts</code>).
-    </p>
-    <p>
-      The splash shows Retry and View logs only after the sidecar has stayed unreachable for
-      150 seconds. Until then it keeps resolving the endpoint. The shell waits up to 60 seconds
-      for each start. The splash shows the seconds waited and a readable reason.
-    </p>
-    <DocCode language="bash" title="Browser with the fake API, or the Tauri window">
-{`bun run --filter @cadcamfun/desktop dev
-bun run desktop:dev`}
-    </DocCode>
-    <p>
-      The fake client is <code>apps/desktop/src/testing/fake-api.ts</code>. Spec 06’s change log
-      says that fake still answers 501 for groups added after the first core screens, so plugins,
-      costs, organizations, auth, and analytics screens need a live sidecar. There is no DOM
-      component test for those screens yet.
-    </p>
+    <h2>Startup and connection recovery</h2>
+    <ol>
+      <li>The shell starts the bundled sidecar with a generated launch token and application data and migration directories.</li>
+      <li>The sidecar binds an ephemeral port on <code>127.0.0.1</code>, waits for its health route to answer, and writes a JSON <code>ready</code> event containing the port.</li>
+      <li>The webview invokes <code>get_sidecar_endpoint</code> and creates an API client and managed Effect runtime.</li>
+      <li>A successful health request creates application state and mounts the router and shell.</li>
+    </ol>
+    <p>The webview allows 150 seconds for connection recovery, with a 30-second timeout per attempt and a 750-millisecond retry pause. Failed attempts discard the cached endpoint so a restarted sidecar can supply a new port. The Rust supervisor waits 60 seconds for each ready handshake and permits one automatic restart. Retry becomes available when the webview connection budget expires.</p>
+    <DocCallout type="note" title="Browser preview uses an in-memory API">
+      <p>Outside Tauri, a browser without <code>VITE_SIDECAR_URL</code> uses <code>src/testing/fake-api.ts</code>. Preview data is local to the running page; unsupported collections return HTTP 501. To connect a browser to a real sidecar, provide both <code>VITE_SIDECAR_URL</code> and <code>VITE_SIDECAR_TOKEN</code> when starting Vite.</p>
+    </DocCallout>
   </section>
 
   <section id="routes" class="doc-section">
-    <h2>Routes</h2>
-    <p>
-      Paths below exist in <code>routes.tsx</code>. Spec 06 names Projects, CAD, CAM, Library,
-      and Settings as the working end-to-end screens. The activity bar also links Costs, AI,
-      and Plugins. Materials, tools, machine, and toolpaths are in the route table. Treat
-      anything past that working set as a stub until you open the screen module and see a real
-      feature page.
-    </p>
+    <h2>Screen routes</h2>
     <table>
-      <thead>
-        <tr><th>Path</th><th>What to expect</th></tr>
-      </thead>
+      <thead><tr><th>Area</th><th>Routes and modules</th></tr></thead>
       <tbody>
-        <tr><td><code>/projects</code>, <code>/projects/:id</code>, <code>/projects/create</code></td><td>Working project list and open flow (spec 06).</td></tr>
-        <tr><td><code>/projects/:id/history</code></td><td>Version-control route. Spec 13 says the screen and per-item History buttons are built. A commit graph and in-editor history panels are not.</td></tr>
-        <tr><td><code>/cad</code></td><td>Working CAD editor. Page file re-exports <code>features/cad</code>.</td></tr>
-        <tr><td><code>/cam</code></td><td>Working CAM workspace: operations, generator, G-code, verify tab, toolpath preview.</td></tr>
-        <tr><td><code>/library</code></td><td>Working library screen.</td></tr>
-        <tr><td><code>/settings</code>, <code>/settings/companion</code></td><td>Working settings. Companion pairing UI lives on the companion route.</td></tr>
-        <tr><td><code>/materials</code>, <code>/tools</code>, <code>/machine</code></td><td>Registered. Detail routes exist (<code>/materials/:id</code> and the same shape for tools and machine).</td></tr>
-        <tr><td><code>/toolpaths</code>, <code>/toolpaths/:id</code></td><td>Registered. Spec 06 notes both still mount the CAM workspace screen.</td></tr>
-        <tr><td><code>/costs</code></td><td>Registered. Estimate screen exists and needs a live sidecar for the groups the fake rejects.</td></tr>
-        <tr><td><code>/ai</code></td><td>Registered assistant page. Docked chat also exists inside CAD and CAM.</td></tr>
-        <tr><td><code>/plugins</code>, <code>/plugins/:id</code></td><td>Registered. List, enable, and zip install go through the legacy plugin HTTP group.</td></tr>
-        <tr><td><code>/auth/*</code>, <code>/organizations</code>, <code>/analytics</code>, <code>/waitlist</code></td><td>Screens added in the integration pass. Still part of the unfinished parity tail relative to the full legacy app.</td></tr>
-        <tr><td><code>/marketplace</code>, <code>/mcp</code>, chat under organizations</td><td>Routes exist. Spec 06 calls the long tail stubs.</td></tr>
+        <tr><td>Projects</td><td><code>/projects</code>, <code>/projects/create</code>, <code>/projects/:id</code>, and <code>/projects/:id/history</code>; screens in <code>features/projects/screens</code>.</td></tr>
+        <tr><td>Design and manufacturing</td><td><code>/cad</code> mounts <code>CadPage</code>; <code>/cam</code> mounts <code>CamPage</code>. Saved drawings and toolpaths have separate detail routes.</td></tr>
+        <tr><td>Resources</td><td><code>/library</code>, <code>/materials</code>, <code>/tools</code>, <code>/machine</code>, and their detail pages use library feature modules. Components have list and detail routes.</td></tr>
+        <tr><td>Assistant</td><td><code>/ai</code> and the docked assistant panel share AI feature state. The AI activity toggles the panel.</td></tr>
+        <tr><td>Settings</td><td><code>/settings</code>, <code>/settings/companion</code>, MCP settings, and subscription settings.</td></tr>
+        <tr><td>Account and collaboration</td><td>Auth, profile, organization, invitation, chat, marketplace, plugin, costs, analytics, and administration routes each load feature modules.</td></tr>
       </tbody>
     </table>
-    <p>
-      Layout: title bar (native menus, in-window fallback on Windows and Linux), left activity
-      bar, main area, bottom status bar (units, snap, cursor, sidecar status). Command palette
-      is <code>Cmd/Ctrl+K</code>. Theme is light, dark, or system through CSS variables. Locale
-      file for v6.0 is <code>src/i18n/en.json</code> plus feature files such as
-      <code>en.cad.json</code>. Interactive controls are keyboard reachable.
-    </p>
+    <p>Use <code>app/routes.tsx</code> for exact parameter names and <code>pages/</code> to locate the screen mounted at a URL. Route adapters are intentionally small; read the screen and its API calls when diagnosing an empty view or a failed action.</p>
   </section>
 
   <section id="folders" class="doc-section">
-    <h2>Folders</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Put this here</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>src/app/</code></td><td><code>App.tsx</code>, <code>Shell.tsx</code>, <code>routes.tsx</code>, <code>client.ts</code>, <code>sidecar.ts</code>, <code>queries.ts</code>. Nothing feature-specific.</td></tr>
-        <tr><td><code>src/pages/</code></td><td>One-line adapters. A page re-exports a screen. No product logic. <code>PageStub</code> is the placeholder.</td></tr>
-        <tr><td><code>src/features/&lt;name&gt;/</code></td><td><code>screens/</code>, <code>components/</code>, <code>hooks/</code>, <code>lib/</code>, <code>store/</code>, <code>types/</code>. Present areas: admin, ai, analytics, auth, billing, cad, cam, chat, companion, costs, dashboard, legal, library, marketplace, mcp, organizations, plugins, profile, projects, settings, toolpaths.</td></tr>
-        <tr><td><code>src/shared/ui/</code></td><td>Button, modal, card.</td></tr>
-        <tr><td><code>src/shared/components/</code></td><td>Title bar, status bar, workspace navigation.</td></tr>
-        <tr><td><code>src/shared/state/</code></td><td>Session, settings, query cache, editor commands and history.</td></tr>
-        <tr><td><code>src/styles/</code></td><td>Global stylesheets. Feature CSS stays in <code>features/&lt;name&gt;/styles/</code>.</td></tr>
-        <tr><td><code>src/viewport/</code></td><td>WP7. See <a href="/docs/viewport">Viewport</a>.</td></tr>
-        <tr><td><code>src/i18n/</code></td><td>Translation tables.</td></tr>
-        <tr><td><code>src/testing/</code></td><td>Fake API and core-flow tests.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      New logic goes in a feature folder, or in <code>shared/</code> when two features use it.
-      It does not go in <code>pages/</code>. Forms that mirror CAM parameters should derive from
-      the Effect schema (<code>shared/components/schema-form.ts</code>) so the UI cannot drift
-      from <code>packages/core</code>. <code>Schema.optional(X)</code> is a union of <code>X</code>
-      and <code>undefined</code>. The form description unwraps that.
-    </p>
-    <p>
-      CAD and CAM share a browser (<code>features/cad/lib/browser.ts</code> and
-      <code>features/cad/components/browser/</code>). Document units and tolerance change in one
-      place, <code>state/document-settings.ts</code>. Request bodies go through
-      <code>state/json-safe.ts</code> so <code>undefined</code>, NaN, and typed arrays do not
-      break JSON encoding. Session tokens live in <code>shared/state/session.ts</code> (a ref
-      mirrored to <code>localStorage</code>). Sign-out drops the query cache.
-    </p>
-    <p>
-      CAM Save opens one dialog from the toolbar and from the generator. It can export G-code
-      and a portable JSON toolpath. Reopening a saved program uses the toolpath version API.
-      Editing NC drops obsolete kernel and verification evidence. Undo and redo for CAM are a
-      session snapshot (NC, IR, settings, stock), separate from database versions.
-    </p>
+    <h2>Source organization</h2>
+    <ul>
+      <li><code>app/</code>: startup, router, global API client, native integration, shell, and keyboard shortcuts.</li>
+      <li><code>pages/</code>: route adapters importing or re-exporting screens.</li>
+      <li><code>features/</code>: product areas with screens, components, hooks, state, and domain-specific helpers.</li>
+      <li><code>shared/</code>: reusable controls, shell components, application state, query caching, and command history.</li>
+      <li><code>viewport/</code>: canvas drawing, snapping, tool gestures, Three.js rendering, meshing, and playback.</li>
+      <li><code>i18n/</code>, <code>styles/</code>, and <code>testing/</code>: translations, global styles, and test fixtures.</li>
+    </ul>
+    <p>The desktop depends on <code>@cadcamfun/api</code> for the HTTP contract and on <code>@cadcamfun/core</code> for geometry and CAM operations. Database persistence remains behind the sidecar API. Local editor history is distinct from persisted drawing or toolpath versions and from project version control.</p>
   </section>
 
   <section id="shell" class="doc-section">
-    <h2>Shell</h2>
-    <p>
-      WP5 owns <code>apps/desktop/src-tauri</code>. The task board marks M1 done: clippy and 32
-      Rust tests, verified with a stub sidecar. Spec 07 §7 records menus, tray, secrets, and
-      lifecycle code beyond that milestone, and a later run of 60 tests with 2 ignored (OS
-      keychain and the real-binary parent contract). A signed <code>.app</code> is WP10 and is
-      not verified.
-    </p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>src/sidecar.rs</code></td><td>Spawn, token, ready-line decoder, restart once, stdin shutdown.</td></tr>
-        <tr><td><code>src/commands.rs</code></td><td><code>get_sidecar_endpoint</code>, <code>get_logs_dir</code>, <code>open_path</code>, <code>pick_file</code>, <code>save_file</code>, secret get/set/delete.</td></tr>
-        <tr><td><code>src/secrets.rs</code></td><td>OS keychain, service <code>com.cadcamfun.app</code>. <code>keyring</code> 3.6.</td></tr>
-        <tr><td><code>src/menu.rs</code>, <code>src/tray.rs</code></td><td>Menu ids such as <code>file.new</code>, <code>view.preset_top</code>. Tray recent projects emit <code>tray.recent.&lt;projectId&gt;</code>.</td></tr>
-        <tr><td><code>src/updater.rs</code></td><td>WP10 updater plugin. Packaged verification is outstanding.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Commands the webview can call are listed in spec 07 §1. New commands need an
-      <code>allow-&lt;name&gt;</code> entry in <code>capabilities/main.json</code>. The CSP has
-      no <code>unsafe-eval</code> and no remote hosts in the production policy.
-      <code>open_path</code> refuses executables and only opens files under app data, logs,
-      documents, downloads, and desktop. File associations mentioned in the spec are
-      <code>.cadcam</code>, <code>.nc</code>, and <code>.gcode</code>. The single-instance plugin
-      focuses the existing window.
-    </p>
-    <p>
-      macOS glass uses <code>tauri-plugin-liquid-glass</code> and a transparent window. The UI
-      sets <code>data-glass</code> from <code>app/glass.ts</code> after the plugin accepts the
-      effect. An App Store build turns private API off via <code>tauri.appstore.conf.json</code>.
-      Direct distribution is the current release channel.
-    </p>
+    <h2>Native shell</h2>
+    <p>The production window is 1440 × 900 by default, with a 960 × 600 minimum. Tauri stages the frontend from <code>apps/desktop/dist</code>, a target-specific sidecar from <code>src-tauri/binaries</code>, and generated migrations as resources. It registers <code>.cadcam</code>, <code>.nc</code>, and <code>.gcode</code> file associations. Opening a supported file or launching a second instance forwards file paths to the existing window.</p>
+    <p><code>src-tauri/src/sidecar.rs</code> supervises the child process. Closing the app sends a shutdown event; the child also observes stdin closure. Logs are separate from stdout, which carries the ready/error handshake. Native secrets are accessed through <code>src-tauri/src/secrets.rs</code> using the operating-system keychain.</p>
+    <p>On macOS, the shell registers the Liquid Glass plugin. The webview follows the glass setting and falls back when the effect is unavailable. The App Store configuration disables the private API option; the regular configuration enables it. These are separate build configurations.</p>
   </section>
 
   <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>The webview must not import Drizzle or open SQLite. Data access goes through <code>ApiClient</code>.</li>
-      <li><code>src/pages</code> must not grow logic. Put it in <code>features/</code> or <code>shared/</code>.</li>
-      <li>The Rust shell must not contain toolpath math, solid kernels, or repository queries.</li>
-      <li>Secrets must not be stored in SQLite or in plain files. The keychain and the sidecar credentials file are the two stores, and they are different keys.</li>
-      <li>The per-launch token must not be written to disk or to logs.</li>
-      <li>A stub route must not be documented as a working end-to-end screen. Spec 06 names five: Projects, CAD, CAM, Library, Settings.</li>
-    </ul>
+    <h2>Security and persistence boundaries</h2>
+    <p>The production content policy permits local assets, loopback API connections, data/blob images, and WebAssembly evaluation. It does not grant arbitrary remote script execution. Native permissions are scoped in <code>src-tauri/capabilities</code>; the development policy additionally permits Vite and its websocket.</p>
+    <p><code>open_path</code> canonicalizes paths, limits them to allowed user/application directories, and rejects executable extensions. File picking and saving use native dialogs and validation. A launch token grants access to the local application API; treat it separately from a companion token or a project-scoped AI bridge token.</p>
+    <p>UI settings, API query state, editor commands, stored project versions, and native secrets have different owners. Diagnose each through its actual service rather than assuming all application state is stored in SQLite.</p>
   </section>
+
   <section id="feature-folders" class="doc-section">
-    <h2>Feature folders</h2>
-    <p>Directories under <code>apps/desktop/src/features</code>:</p>
-    <table>
-      <thead>
-        <tr><th>Folder</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>admin</code></td></tr>
-        <tr><td><code>ai</code></td></tr>
-        <tr><td><code>analytics</code></td></tr>
-        <tr><td><code>auth</code></td></tr>
-        <tr><td><code>billing</code></td></tr>
-        <tr><td><code>cad</code></td></tr>
-        <tr><td><code>cam</code></td></tr>
-        <tr><td><code>chat</code></td></tr>
-        <tr><td><code>companion</code></td></tr>
-        <tr><td><code>costs</code></td></tr>
-        <tr><td><code>dashboard</code></td></tr>
-        <tr><td><code>legal</code></td></tr>
-        <tr><td><code>library</code></td></tr>
-        <tr><td><code>marketplace</code></td></tr>
-        <tr><td><code>mcp</code></td></tr>
-        <tr><td><code>organizations</code></td></tr>
-        <tr><td><code>plugins</code></td></tr>
-        <tr><td><code>profile</code></td></tr>
-        <tr><td><code>projects</code></td></tr>
-        <tr><td><code>settings</code></td></tr>
-        <tr><td><code>toolpaths</code></td></tr>
-      </tbody>
-    </table>
-    <p>
-      Workspace dependencies of <code>@cadcamfun/desktop</code> include
-      <code>@cadcamfun/api</code> and <code>@cadcamfun/core</code>.
-    </p>
+    <h2>Feature integration</h2>
+    <p>CAD and CAM feature modules compose reusable viewport components with their own panels, stores, and save flows. The assistant panel receives project and editor context and streams tool events through AI feature state. Resource screens use the API client instead of reaching directly into the database.</p>
+    <p>For a UI change, follow the route adapter to its feature screen, then inspect the feature store or hook that sends the request. Reuse shared components only when their existing contract matches the interaction. Keep pure geometry in the core package and native operating-system behavior in the Rust shell.</p>
   </section>
 
   <section id="route-paths" class="doc-section">
-    <h2>Route paths</h2>
-    <p>
-      Every <code>path</code> string in <code>apps/desktop/src/app/routes.tsx</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Path</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>*</code></td></tr>
-        <tr><td><code>/500</code></td></tr>
-        <tr><td><code>/admin/analytics</code></td></tr>
-        <tr><td><code>/admin/feature-flags</code></td></tr>
-        <tr><td><code>/ai</code></td></tr>
-        <tr><td><code>/analytics/history</code></td></tr>
-        <tr><td><code>/analytics</code></td></tr>
-        <tr><td><code>/auth/forgot-password</code></td></tr>
-        <tr><td><code>/auth/magic-link</code></td></tr>
-        <tr><td><code>/auth/magic-link/verify</code></td></tr>
-        <tr><td><code>/auth/reset-password</code></td></tr>
-        <tr><td><code>/auth/signin</code></td></tr>
-        <tr><td><code>/auth/signup</code></td></tr>
-        <tr><td><code>/auth/two-factor</code></td></tr>
-        <tr><td><code>/auth/verify-email</code></td></tr>
-        <tr><td><code>/auth/verify</code></td></tr>
-        <tr><td><code>/cad</code></td></tr>
-        <tr><td><code>/cam</code></td></tr>
-        <tr><td><code>/costs</code></td></tr>
-        <tr><td><code>/components/:id</code></td></tr>
-        <tr><td><code>/components</code></td></tr>
-        <tr><td><code>/drawings/:id</code></td></tr>
-        <tr><td><code>/</code></td></tr>
-        <tr><td><code>/invitations/:token</code></td></tr>
-        <tr><td><code>/legal/privacy</code></td></tr>
-        <tr><td><code>/legal/terms</code></td></tr>
-        <tr><td><code>/legal/third-party-licenses</code></td></tr>
-        <tr><td><code>/library</code></td></tr>
-        <tr><td><code>/machine/:id</code></td></tr>
-        <tr><td><code>/machine</code></td></tr>
-        <tr><td><code>/marketplace</code></td></tr>
-        <tr><td><code>/marketplace/items/:id</code></td></tr>
-        <tr><td><code>/marketplace/purchase/success</code></td></tr>
-        <tr><td><code>/marketplace/purchases</code></td></tr>
-        <tr><td><code>/marketplace/seller/dashboard</code></td></tr>
-        <tr><td><code>/materials/:id</code></td></tr>
-        <tr><td><code>/materials</code></td></tr>
-        <tr><td><code>/mcp/directory</code></td></tr>
-        <tr><td><code>/mcp/servers/:id</code></td></tr>
-        <tr><td><code>/offline</code></td></tr>
-        <tr><td><code>/organizations/:id</code></td></tr>
-        <tr><td><code>/organizations/:id/chat/:conversationId</code></td></tr>
-        <tr><td><code>/organizations/:id/chat</code></td></tr>
-        <tr><td><code>/organizations/:id/chat/new-group</code></td></tr>
-        <tr><td><code>/organizations/:id/chat/new</code></td></tr>
-        <tr><td><code>/organizations/create</code></td></tr>
-        <tr><td><code>/organizations</code></td></tr>
-        <tr><td><code>/plugins/:id</code></td></tr>
-        <tr><td><code>/plugins</code></td></tr>
-        <tr><td><code>/pricing</code></td></tr>
-        <tr><td><code>/profile</code></td></tr>
-        <tr><td><code>/profile/settings</code></td></tr>
-        <tr><td><code>/projects/:id/history</code></td></tr>
-        <tr><td><code>/projects/:id</code></td></tr>
-        <tr><td><code>/projects/create</code></td></tr>
-        <tr><td><code>/projects</code></td></tr>
-        <tr><td><code>/settings</code></td></tr>
-        <tr><td><code>/settings/companion</code></td></tr>
-        <tr><td><code>/settings/mcp/config-editor</code></td></tr>
-        <tr><td><code>/settings/mcp/edit/:id</code></td></tr>
-        <tr><td><code>/settings/mcp</code></td></tr>
-        <tr><td><code>/settings/subscription</code></td></tr>
-        <tr><td><code>/third-party-licenses</code></td></tr>
-        <tr><td><code>/toolpaths/:id</code></td></tr>
-        <tr><td><code>/toolpaths</code></td></tr>
-        <tr><td><code>/tools/:id</code></td></tr>
-        <tr><td><code>/tools</code></td></tr>
-        <tr><td><code>/waitlist</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Route loading and errors</h2>
+    <p>Each route uses Solid's lazy import boundary. The table includes a catch-all page, <code>/500</code>, <code>/offline</code>, and legal routes. A direct browser navigation must be served through the Vite development server or the packaged webview so the client router can resolve the URL.</p>
+    <p>The preview API implements a limited set of collections and can deliberately inject request failures in tests. A successful preview render demonstrates UI behavior against those fixtures; verify persistence, permissions, streaming, and external integrations with the live sidecar.</p>
   </section>
 
   <section id="tauri-commands" class="doc-section">
-    <h2>Tauri commands</h2>
-    <p>Commands the webview can invoke:</p>
+    <h2>Native command interface</h2>
     <table>
-      <thead>
-        <tr><th>Command</th></tr>
-      </thead>
+      <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td><code>get_sidecar_endpoint</code></td></tr>
-        <tr><td><code>get_logs_dir</code></td></tr>
-        <tr><td><code>open_path</code></td></tr>
-        <tr><td><code>secret_get</code></td></tr>
-        <tr><td><code>secret_set</code></td></tr>
-        <tr><td><code>secret_delete</code></td></tr>
-        <tr><td><code>pick_file</code></td></tr>
-        <tr><td><code>save_file</code></td></tr>
-        <tr><td><code>set_recent_projects</code></td></tr>
-        <tr><td><code>check_for_updates</code></td></tr>
-        <tr><td><code>install_update</code></td></tr>
+        <tr><td><code>get_sidecar_endpoint</code></td><td>Wait for the supervised sidecar and return its base URL and launch token.</td></tr>
+        <tr><td><code>get_logs_dir</code>, <code>open_path</code></td><td>Resolve the log directory and open a validated local path.</td></tr>
+        <tr><td><code>secret_get</code>, <code>secret_set</code>, <code>secret_delete</code></td><td>Access native keychain entries.</td></tr>
+        <tr><td><code>pick_file</code>, <code>save_file</code></td><td>Show native file dialogs and return or write the selected file.</td></tr>
+        <tr><td><code>set_recent_projects</code></td><td>Refresh the tray's recent-project menu.</td></tr>
+        <tr><td><code>check_for_updates</code>, <code>install_update</code></td><td>Request an updater check or install a pending update subject to unsaved-work checks.</td></tr>
       </tbody>
     </table>
+    <p>The invoke handler is registered in <code>src-tauri/src/lib.rs</code>. Capabilities and generated command permissions also control availability; command registration alone does not establish webview access.</p>
   </section>
 
   <section id="webview-events" class="doc-section">
-    <h2>Webview events</h2>
-    <table>
-      <thead>
-        <tr><th>Event</th><th>Source</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>menu</code></td><td><code>menu.rs</code> <code>MENU_EVENT</code>. <code>tray.rs</code> emits the same channel.</td></tr>
-        <tr><td><code>sidecar-status</code></td><td><code>sidecar.rs</code> <code>STATUS_EVENT</code>.</td></tr>
-      </tbody>
-    </table>
+    <h2>Native events</h2>
+    <p>The shell emits <code>sidecar-status</code> for lifecycle changes, <code>open-file</code> with supported paths, <code>menu</code> for menu selection, and <code>update://status</code> for updater progress. Tray recent-project selections are represented by <code>tray.recent.&lt;projectId&gt;</code> menu identifiers. The shell's menu and tray modules define their complete identifier sets.</p>
+    <p>Listeners should be scoped to their component or application lifecycle and removed on cleanup. The webview must re-resolve the endpoint after a sidecar restart rather than continuing to use the previous port.</p>
   </section>
 
   <section id="activities" class="doc-section">
-    <h2>Activities</h2>
-    <p>
-      <code>apps/desktop/src/app/layout.ts</code> exports <code>ActivityId</code>,
-      <code>ACTIVITIES</code>, <code>routeOf</code>, <code>activeActivity</code>, and
-      <code>isPanelRoute</code>.
-    </p>
+    <h2>Development and verification</h2>
+    <DocCode language="bash" title="Run from the repository root">
+{`bun run --filter @cadcamfun/desktop dev
+bun run desktop:dev
+bun run --filter @cadcamfun/desktop typecheck
+bun test apps/desktop/src
+bun run build:desktop`}
+    </DocCode>
+    <p>The first command runs a browser preview. <code>desktop:dev</code> compiles the real sidecar and stages migrations before starting Tauri. The desktop package's <code>tauri:dev</code> script instead creates a stub binary only when no binary exists; use it for isolated shell work and check which binary is present before interpreting its API responses.</p>
+  </section>
+
+  <section id="preferences" class="doc-section">
+    <h2>Preferences and settings</h2>
+    <p>The shared settings store persists a validated record under <code>cadcamfun.settings</code> in webview local storage. Missing, invalid, or unreadable fields fall back independently. A full or blocked storage area does not stop editing, but preference changes may fail to persist. Browser preview preferences belong to the browser origin and are separate from native webview preferences.</p>
     <table>
-      <thead>
-        <tr><th><code>ActivityId</code></th></tr>
-      </thead>
+      <thead><tr><th>Setting</th><th>Accepted values/default</th><th>Operational effect</th></tr></thead>
       <tbody>
-        <tr><td><code>projects</code></td></tr>
-        <tr><td><code>cad</code></td></tr>
-        <tr><td><code>cam</code></td></tr>
-        <tr><td><code>library</code></td></tr>
-        <tr><td><code>costs</code></td></tr>
-        <tr><td><code>ai</code></td></tr>
-        <tr><td><code>plugins</code></td></tr>
-        <tr><td><code>settings</code></td></tr>
+        <tr><td>Theme</td><td><code>light</code>, <code>dark</code>, <code>system</code>; default system</td><td>System mode follows operating-system color-scheme changes.</td></tr>
+        <tr><td>Display units</td><td><code>mm</code> or <code>in</code>; default mm</td><td>Controls presentation; core drawing coordinates remain millimetres.</td></tr>
+        <tr><td>Decimals</td><td>Integer 0–6; default 3</td><td>Length presentation precision.</td></tr>
+        <tr><td>Default post</td><td><code>grbl</code>, <code>linuxcnc</code>, <code>smoothwb</code>, <code>gcode</code>, <code>fanuc</code>; default grbl</td><td>A selected output grammar is a preference, not proof that the machine is configured or verified.</td></tr>
+        <tr><td>Drawing tolerance</td><td>Validated core tolerance; default 0.01 mm</td><td>Shared precision preference used by drawing/toolpath consumers.</td></tr>
+        <tr><td>Snap state</td><td>Boolean; default enabled</td><td>Shared status preference. Individual editors own their snapping behavior; the standalone <code>Editor2D</code> currently enables its grid snap internally.</td></tr>
+        <tr><td>Glass</td><td>Boolean; default enabled</td><td>Requests macOS window material when the native host supports it.</td></tr>
       </tbody>
     </table>
+    <p>The Settings screen has Profile, Account, Security, Subscription, Notifications, AI, Devices, and Language tabs. The Devices tab embeds the companion gateway panel. Language settings include the glass toggle. The common locale store currently validates the default locale; do not infer additional translation coverage from a list of display labels.</p>
   </section>
-  <DocRelated items={[{ title: "Viewport", href: "/docs/viewport" }, { title: "Sidecar", href: "/docs/sidecar" }, { title: "Release", href: "/docs/release" }]} />
+
+  <section id="save-workflow" class="doc-section">
+    <h2>Save and reopen a CAM program</h2>
+    <ol>
+      <li>Generate or load NC code in CAM and open the save/export dialog from its existing entry point.</li>
+      <li>For a file export, choose G-code or the portable toolpath format. G-code downloads the current NC text; the toolpath choice writes a structured <code>.cam.json</code> snapshot.</li>
+      <li>For application persistence, choose an existing project, a new project, or update the already saved program. Provide the program name and the required destination fields.</li>
+      <li>When updating, the save flow records the previous complete program as a toolpath version before replacing the current data.</li>
+      <li>Open the saved item at its toolpath detail route to inspect or restore versions.</li>
+    </ol>
+    <p>The save summary includes NC lines, bytes, moves, tool identifiers, operation names, stock, units, work offset, and verification identity when that evidence belongs to the current NC. A modified NC text can make previously computed evidence stale. Review the current code/evidence relationship before relying on the summary.</p>
+    <p>If creating a new project succeeds but a later save step fails, the modal retains the created destination for retries and includes its identifier in the error. Retrying within that modal avoids creating the same project again. Do not assume the save flow is one atomic cross-resource transaction.</p>
+    <DocCallout type="note" title="File export and project persistence are different operations">
+      <p>A downloaded G-code file does not create a project toolpath row. A portable snapshot carries richer state than plain NC. Verify a saved program by reopening it from the application, and verify an export by inspecting the downloaded file.</p>
+    </DocCallout>
+  </section>
+
+  <section id="desktop-diagnostics" class="doc-section">
+    <h2>Keyboard and failure diagnosis</h2>
+    <p><code>Cmd/Ctrl+K</code> opens the command palette and <code>Cmd/Ctrl+J</code> toggles the assistant panel. Shell shortcuts are ignored when focus is in an input, textarea, select, or content-editable element. Editor canvases have their own keyboard handling. Several shell command callbacks, including Save/Export in the generic shortcut table, are placeholders; use the feature's actual save/export controls instead of assuming every listed accelerator performs a document operation.</p>
+    <table>
+      <thead><tr><th>Observed behavior</th><th>Check</th></tr></thead>
+      <tbody>
+        <tr><td>Startup waits, then Retry appears</td><td>Sidecar error/ready output, target binary, migration resource, and application logs. A cached port may belong to a prior process.</td></tr>
+        <tr><td>A screen renders but requests return 501</td><td>Browser fixture mode. Start the real sidecar and pass both Vite endpoint variables.</td></tr>
+        <tr><td>Desktop data differs from a manual script</td><td>The data directory and token of each process; a filename alone does not identify the database.</td></tr>
+        <tr><td>A native command is unavailable</td><td>Invoke registration, capability permissions, operating-system support, and whether the code runs inside Tauri.</td></tr>
+        <tr><td>Settings revert after relaunch</td><td>Storage availability and validation. Invalid stored fields fall back to defaults.</td></tr>
+        <tr><td>Saved program evidence differs from NC</td><td>Whether NC was edited after generation. Recompute the appropriate verification for the actual text/program.</td></tr>
+      </tbody>
+    </table>
+    <p>Implementation anchors: <code>shared/state/settings.ts</code>, <code>app/shortcuts.ts</code>, <code>features/settings/screens/settings.tsx</code>, and <code>features/cam/components/SaveCamModal.tsx</code>.</p>
+  </section>
+
+  <DocRelated items={[
+      { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },
+      { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" },
+      { title: "Viewport", href: "/docs/viewport" },
+      { title: "Local development", href: "/docs/guides/local-dev" },
+      { title: "Release", href: "/docs/release" }
+  ]} />
 </DocsLayout>

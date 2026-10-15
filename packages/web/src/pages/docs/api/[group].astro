@@ -1,0 +1,80 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+import ApiSchema from "../../../components/docs/ApiSchema.astro"
+import { apiGroups } from "../../../data/apiGroups"
+import { operationsFor, referencedSchemas, apiDocument, schemaAnchor, schemaType, schemaRules, requestExample } from "../../../lib/apiReference"
+export function getStaticPaths() {
+  return apiGroups.map((group) => ({ params: { group: group.slug }, props: { group } }))
+}
+const { group } = Astro.props
+const entries = operationsFor(group)
+const schemas = referencedSchemas(entries)
+const toc = [
+  { title: "Resource contract", href: "#overview" },
+  { title: "Operations", href: "#operations" },
+  ...entries.map((entry) => ({ title: entry.operation.operationId, href: `#${entry.anchor}`, depth: 3 })),
+  ...(schemas.length ? [{ title: "Referenced schemas", href: "#schemas" }] : []),
+]
+---
+<DocsLayout title={`${group.title} API`} subtitle={group.summary} description={`CADCAMFUN ${group.title.toLowerCase()} API: methods, paths, authentication, request fields, responses, errors, and schemas.`} toc={toc}>
+  <section id="overview" class="doc-section">
+    <h2>Resource contract</h2>
+    <p>{entries.length} operations in the <code>{group.tag}</code> HttpApi group. Methods, paths, parameters, payload schemas, response status codes, and media types below come directly from the application's composed contract.</p>
+    <p>Use the sidecar URL announced at startup as <code>CADCAMFUN_URL</code>. Protected operations take the application launch token in the <code>Authorization</code> header. Companion tokens and AI bridge tokens have narrower access; their presence does not grant access to this entire resource.</p>
+    <p><a href={group.guide}>Read the related subsystem guide</a> for behavior and operational limits. <a href="/docs/api#authorization">API authentication</a> explains the account-session distinction. <a href="/docs/api/openapi.json">Download the complete OpenAPI document</a> for nested schemas and client generation.</p>
+    <p>Request examples are templates: replace path and query placeholders, set the actual connection variables, and create a payload file matching the indicated media type and schema before submitting a write. Optional fields may still be required by a business rule; the contract describes transport validation.</p>
+  </section>
+  <section id="operations" class="doc-section">
+    <h2>Operations</h2>
+    <div class="overflow-x-auto"><table>
+      <thead><tr><th>Method</th><th>Path</th><th>Operation ID</th></tr></thead>
+      <tbody>{entries.map((entry) => <tr><td><strong>{entry.method}</strong></td><td><a href={`#${entry.anchor}`}><code>{entry.path}</code></a></td><td><code>{entry.operation.operationId}</code></td></tr>)}</tbody>
+    </table></div>
+  </section>
+  {entries.map((entry) => <section id={entry.anchor} class="doc-section">
+    <h2><code>{entry.operation.operationId}</code></h2>
+    <p><strong>{entry.method}</strong> <code>{entry.path}</code></p>
+    {entry.operation.summary && <p>{entry.operation.summary}</p>}
+    {entry.operation.description && <p>{entry.operation.description}</p>}
+    <p><strong>Authentication:</strong> {entry.operation.security?.length ? "Bearer token required." : "No bearer middleware declared."} {entry.operation.deprecated && "This operation is marked deprecated."}</p>
+    <h3>Parameters</h3>
+    {(entry.operation.parameters?.length ?? 0) > 0 ? <div class="overflow-x-auto"><table>
+      <thead><tr><th>Name</th><th>Location</th><th>Presence</th><th>Type and constraints</th></tr></thead>
+      <tbody>{entry.operation.parameters!.map((parameter) => <tr>
+        <td><code>{parameter.name}</code></td><td>{parameter.in}</td><td>{parameter.required ? "Required" : "Optional"}</td>
+        <td><code>{schemaType(parameter.schema)}</code>{parameter.description && <p>{parameter.description}</p>}{schemaRules(parameter.schema) && <p>{schemaRules(parameter.schema)}</p>}</td>
+      </tr>)}</tbody>
+    </table></div> : <p>No path, query, or endpoint-specific header parameters are declared.</p>}
+    <h3>Request body</h3>
+    {entry.operation.requestBody ? <>
+      <p>{entry.operation.requestBody.required ? "Required" : "Optional"} request body. Use one of the declared encodings.</p>
+      {Object.entries(entry.operation.requestBody.content).map(([media, value]) => <>
+        <h4><code>{media}</code></h4>
+        {value.schema !== undefined ? <ApiSchema schema={value.schema} title="Request schema" /> : <p>No body schema is declared for this encoding.</p>}
+      </>)}
+    </> : <p>No request body is declared.</p>}
+    <h3>Responses</h3>
+    {Object.entries(entry.operation.responses).map(([status, response]) => <>
+      <h4><code>{status}</code> — {response.description ?? "Response"}</h4>
+      {response.headers && <p>Response headers: {Object.keys(response.headers).map((header) => <code>{header} </code>)}</p>}
+      {Object.keys(response.content ?? {}).length ? Object.entries(response.content!).map(([media, value]) => <>
+        <p><strong>Content type:</strong> <code>{media}</code></p>
+        {value.schema !== undefined ? <ApiSchema schema={value.schema} title={`Response ${status} schema`} /> : <p>This media type has no declared JSON schema.</p>}
+      </>) : <p>No response body schema is declared.</p>}
+    </>)}
+    <h3>Request template</h3>
+    {entry.operation.requestBody?.content["multipart/form-data"] ? <p>This operation uses multipart form data. Construct form parts according to its schema using the client upload API or <code>curl --form</code>; do not set a multipart boundary manually.</p> : <DocCode language="bash" title="Connection and payload placeholders">{requestExample(entry)}</DocCode>}
+  </section>)}
+  {schemas.length > 0 && <section id="schemas" class="doc-section">
+    <h2>Referenced schemas</h2>
+    <p>These named schemas are reachable from this resource's parameters, payloads, and responses. Optional presence and nullable values are different: a required field can explicitly accept <code>null</code>.</p>
+    {schemas.map((name) => <section id={schemaAnchor(name)}>
+      <h3><code>{name}</code></h3>
+      <ApiSchema schema={apiDocument.components.schemas[name]!} title={name} />
+    </section>)}
+  </section>}
+  <DocRelated items={[{ title: "API overview", href: "/docs/api" }, { title: "Subsystem guide", href: group.guide }, { title: "Local development", href: "/docs/guides/local-dev" }]} />
+</DocsLayout>

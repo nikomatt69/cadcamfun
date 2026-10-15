@@ -223,7 +223,7 @@ function htmlDocument(title: string, body: string, source: string) {
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 16px/1.6 ui-rounded, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; font: 16px/1.6 "IBM Plex Sans", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
   img, svg, video, canvas { max-width: 100%; height: auto; }
   pre { overflow-x: auto; }
 </style>
@@ -248,7 +248,7 @@ ${body}
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 2.5rem 1.25rem 4rem; background: var(--bg); color: var(--text);
-    font: 16px/1.7 ui-rounded, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 16px/1.7 "IBM Plex Sans", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   main { max-width: 46rem; margin: 0 auto; }
@@ -259,7 +259,7 @@ ${body}
   ul, ol { padding-left: 1.25rem; }
   li { margin: 0.35rem 0; }
   code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: "IBM Plex Mono", SFMono-Regular, Consolas, monospace;
     font-size: 0.875em; background: var(--code); border-radius: 4px; padding: 0.1rem 0.35rem;
     box-shadow: var(--shadow);
   }
@@ -291,7 +291,9 @@ ${body}
  * on a phone.
  */
 const RESPONSIVE_GUARD = `<style>
-  html, body { max-width: 100%; overflow-x: hidden; }
+  html, body { max-width: 100%; overflow-x: hidden; font-synthesis: none; }
+  em, i, cite, dfn, blockquote { font-style: normal; }
+  em, i { font-weight: 500; }
   table { display: block; width: 100%; max-width: 100%; overflow-x: auto; }
   pre, .scroll { max-width: 100%; overflow-x: auto; }
   img, svg, video, canvas, iframe { max-width: 100%; height: auto; }

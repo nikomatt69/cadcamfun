@@ -1,0 +1,154 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Know which result you are requesting", href: "#outcome" },
+  { title: "Send a complete, validated snapshot", href: "#minimal-job" },
+  { title: "Resolve stock and work coordinates", href: "#coordinates" },
+  { title: "Select material, machine, and cutters", href: "#resources" },
+  { title: "Plan automatically or specify machining order", href: "#operations" },
+  { title: "Set quality controls and understand their cost", href: "#quality" },
+  { title: "Interpret status, claims, and release", href: "#evidence" },
+  { title: "Create a portable document from the exact result", href: "#portable" },
+  { title: "Save against a real drawing", href: "#save" },
+  { title: "Regenerate after changes and diagnose rejection", href: "#recovery" },
+]
+---
+
+<DocsLayout title="Generate a native manufacturing program" subtitle="Capture a real part, evaluate its manufacturing job, inspect the posted NC evidence, and save a document that can be checked again." description="Practical native CADCAMFUN manufacturing guide with a validated job payload, stock coordinates, tools, operations, evidence, saving, and recovery." toc={toc}>
+  <section id="outcome" class="doc-section">
+    <h2>Know which result you are requesting</h2>
+<p>Native manufacture is a deterministic CAD/CAM computation, independent of a language model. <code>POST /api/toolpaths/manufacture</code> accepts an explicit CAD snapshot, prepares manufacturing resources, plans or accepts ordered operations, computes cutting data, generates toolpaths, posts one NC program, and independently replays that text. The response includes the evidence supporting its release level.</p>
+    <p>This endpoint does not create a drawing, save a toolpath, or update the editor. A successful response is a value to inspect and persist deliberately. It is different from <code>/api/toolpaths/generate</code>, which adapts the application generator settings for mill/lathe/printer output, and from <code>/api/toolpaths/verify</code>, which replays a supplied NC/program against explicitly modelled stock and a tool.</p>
+    <p>Use the <a href="/docs/api/machining">machining endpoints</a> for request/response schemas, <a href="/docs/cam">CAM reference</a> for the core representations, and <a href="/docs/setups">saved program reference</a> for persistence behavior. The following job is deliberately small enough to reproduce and inspect without editing an existing project.</p>
+  </section>
+
+  <section id="minimal-job" class="doc-section">
+    <h2>Send a complete, validated snapshot</h2>
+<p>Save this JSON as <code>native-job.json</code>. It describes a 40 × 40 × 10 mm POM blank centered at (20,20,5), surrounded by 2 mm of stock on each X/Y side and 1 mm above. The payload was decoded by the real <code>CamKernelRequest</code> schema and evaluated by the kernel; its baseline result contains three planned operations. Always inspect the returned claims rather than hard-coding an expected release in a client.</p>
+    <DocCode language="json" title="native-job.json">
+{String.raw`{
+  "schemaVersion": 1,
+  "id": "blank-job",
+  "name": "POM blank",
+  "material": "POM",
+  "elements": [{
+    "id": "blank",
+    "type": "cube",
+    "x": 20, "y": 20, "z": 5,
+    "width": 40, "height": 40, "depth": 10
+  }],
+  "stock": { "x": 20, "y": 20, "width": 44, "height": 44, "depth": 11 },
+  "resolution": 0.5
+}`}
+    </DocCode>
+    <DocCode language="bash" title="Evaluate without saving a project resource">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @native-job.json \
+  "$CADCAMFUN_URL/api/toolpaths/manufacture" > native-result.json`}
+    </DocCode>
+    <p>The shell file captures the exact response for inspection. Supplying the same captured request yields deterministic native output; using a new part position, cutter, operation, or quality control is a different job. Request identity labels are useful for tracking, but the artifact's digests bind its actual source and NC content.</p>
+  </section>
+
+  <section id="coordinates" class="doc-section">
+    <h2>Resolve stock and work coordinates</h2>
+<p>Snapshot stock uses center X/Y and full width/height/depth. The snapshot adapter first builds the selected part geometry, finds its lowest Z, and places the stock bottom there; its top is that bottom plus the declared depth. In the example, the part extends from Z0 to Z10 and the stock from Z0 to Z11. Stock bounds in X/Y are −2 to 42.</p>
+    <p>The adapter uses the explicit dimensions for those bounds. It does not add the stock record's display allowance again, and a stock <code>topZ</code> field does not replace the lowest-part anchoring in this native snapshot adapter. Keep the distinction between editor metadata and the fields actually consumed to construct a manufacturing job.</p>
+    <p>Work origin defaults to <code>stock-center</code>: the stock center X/Y at its top Z. <code>stock-corner</code> chooses minimum X/Y at the same top. Input operation geometry is in CAD world millimetres, while resulting program moves/NC are in work coordinates. Conventional cutting goes below work Z0. <code>workOffset</code> is optional; the program default is G54.</p>
+    <p>Without supplied stock, the lower-level job preparation encloses part bounds with 2 mm extra on each X/Y side and 1 mm above. A part outside explicit stock is rejected; increasing requested cutting depth does not make incompatible stock contain the part.</p>
+  </section>
+
+  <section id="resources" class="doc-section">
+    <h2>Select material, machine, and cutters</h2>
+<p>Material is a lookup string resolved against the kernel's material library, including supported IDs, names, and aliases. Unknown material returns a typed preparation issue. The HTTP snapshot's optional machine is a registered preset ID: vmc-standard, haas-vf2, hsc-mill, desktop-mill, or cnc-router. Omitting it uses vmc-standard. Presets describe typical machine classes and limits, not a qualified model of an individual installation.</p>
+    <p>Omitting tools uses the default cutter crib. Supplying tools replaces that crib and requires 1–200 cutter records. A cutter identifies its kind, diameter, flute count, material/coating, flute length, shank diameter, and stickout. Optional holder dimensions, maximum RPM, pocket number, and kind-specific geometry refine generation and clearance. Flutes must be an integer from 1 to 24; explicit pocket numbers are 1–999.</p>
+    <p>Operation tool IDs must name cutters in that supplied library. Duplicate cutter IDs, invalid dimensions, and unreachable strategy/tool combinations produce issues rather than guessed substitutions. The schema accepts flat, ball, bull, chamfer, spot, drill, facemill, threadmill, and engraver kinds.</p>
+    <p>The public snapshot machine string does not accept a custom machine record. A code integration calling the lower-level <code>ManufacturingJob</code> API can provide machine limits, travel, and table geometry explicitly. Do not send that record where the HTTP schema expects a preset string.</p>
+  </section>
+
+  <section id="operations" class="doc-section">
+    <h2>Plan automatically or specify machining order</h2>
+<p>When operations are absent, the planner derives them from the part. An explicit operations array is authoritative machining order, not a list of suggestions to be reordered silently. Each operation has a unique ID and a tool reference. Supported strategy records cover face, adaptive, pocket, profile, bore, drill, thread, engrave, chamfer, and surface work, with geometry appropriate to each.</p>
+    <p>A profile uses a loop, inside/outside side, and world-coordinate top/bottom. A pocket/adaptive cut uses a closed boundary with optional island rings. Drilling uses points plus top/bottom. A thread-mill record includes center, diameter, pitch, internal flag, top, and length. A surface record chooses roughing, parallel, waterline, or steep-shallow behavior; a rest reference must identify appropriate previous work.</p>
+    <p>Per-operation process overrides can include RPM, feed, plunge feed, stepdown, stepover, coolant, and radial engagement. Missing values come from material/cutter/machine cutting data. Stepover is a percentage from 1 to 100; stepdown and feeds are positive. The artifact records overridden fields separately from computed parameters so a reviewer can see where process choices came from.</p>
+    <p>The native kernel carries provisional stock between operations and posts their combined IR once. By contrast, <code>combineCamOperations</code> for saved generic operation sections joins already generated NC text; it does not transform those sections into an integrated controller program. Use the native artifact when that integrated generation and replay is required.</p>
+  </section>
+
+  <section id="quality" class="doc-section">
+    <h2>Set quality controls and understand their cost</h2>
+<table>
+      <thead><tr><th>Input</th><th>Meaning and bounds</th></tr></thead>
+      <tbody>
+        <tr><td><code>finishAllowance</code></td><td>0–5 mm roughing allowance; omitted uses the material's default.</td></tr>
+        <tr><td><code>scallop</code></td><td>Positive, at most 1 mm; default 0.01 mm for native finishing.</td></tr>
+        <tr><td><code>tolerance</code></td><td>Positive path tolerance; native default 0.01 mm.</td></tr>
+        <tr><td><code>resolution</code></td><td>Positive replay cell size; controls the stock evidence's spatial resolution.</td></tr>
+        <tr><td><code>deburr</code></td><td>Positive, at most 5 mm; asks the planner to add supported top-edge chamfer work.</td></tr>
+        <tr><td><code>subprograms</code></td><td>Optional translated-repeat emission where the dialect supports it, such as Fanuc/Haas M98 subprograms.</td></tr>
+      </tbody>
+    </table>
+    <p>The request supports 1–2,000 CAD elements and at most 500 explicit operations. Smaller tolerances and replay cells increase computational work and do not automatically prove unsupported geometry. Preserve the reported resolution with the result. A viewport mesh and a downsampled stock preview are display outputs, not an independent finer simulation.</p>
+    <p>Native posting sets tool numbers from the cutter assignments and requests retract-before-tool-change. The posts format coordinates with fixed decimals. Inspect the actual NC and selected dialect; a controller name does not eliminate the need to validate the installation's post behavior.</p>
+  </section>
+
+  <section id="evidence" class="doc-section">
+    <h2>Interpret status, claims, and release</h2>
+<p>The result is a union: <code>status: "failed"</code> with issues, or <code>status: "ok"</code> with an artifact. An ok artifact can still have <code>release: "blocked"</code>. Read both layers; checking HTTP status or the outer status alone is insufficient.</p>
+    <p>The artifact retains ordered operation outcomes, cutting data, program IR, used cutters, NC, stock statistics, cycle-time estimates, issues, and identity digests. Claims have passed, failed, unsupported, or unresolved status. They cover cutting data, machine limits, operation completion, rapid/holder clearance, gouging, material removal, independent NC replay, machine travel, and machine/table clearance.</p>
+    <p>Hard error issues or empty NC block release. With no hard failure, incomplete evidence produces preview unless the release rule is satisfied. The current rule allows an unsupported machine-travel claim while still returning verified-program; the built-in presets do not all provide explicit axis travel. Check that claim when deciding whether the result covers a particular machine.</p>
+    <DocCallout title="Evidence has a model boundary">
+      <p>The native stock/holder replay is a three-axis height-field check. The public native snapshot has no fixture-envelope field. Standalone verification accepts fixture envelopes, but they are not added to native evidence by implication. A verified-program label is evidence about its captured model and checks, not a machine certification.</p>
+    </DocCallout>
+  </section>
+
+  <section id="portable" class="doc-section">
+    <h2>Create a portable document from the exact result</h2>
+<p>A <code>CamProgramDocument</code> preserves NC, program, generator/printer settings, stock, and drawing snapshot. Optional kernelRequest/kernelArtifact retain native source evidence. This example converts the captured request and result into that document without saving it; run it in a workspace depending on core, API, and Effect, such as apps/sidecar.</p>
+    <DocCode language="ts" title="Validate a portable document before saving">
+{String.raw`import { Schema } from "effect"
+import { cam } from "@cadcamfun/core"
+import { CamKernelRequest, CamKernelResult, CamProgramDocument } from "@cadcamfun/api"
+
+const request = Schema.decodeUnknownSync(CamKernelRequest)(await Bun.file("native-job.json").json())
+const result = Schema.decodeUnknownSync(CamKernelResult)(await Bun.file("native-result.json").json())
+if (result.status !== "ok" || result.value.release === "blocked") {
+  throw new Error("The captured job has no releasable artifact")
+}
+const document = Schema.decodeUnknownSync(CamProgramDocument)({
+  format: "cadcamfun-cam", version: 1,
+  gcode: result.value.nc, program: result.value.program,
+  settings: cam.generator.DEFAULT_SETTINGS,
+  printer: cam.generator.DEFAULT_PRINTER_EXTRAS,
+  stock: request.stock,
+  drawing: { elements: request.elements, stock: request.stock },
+  kernelRequest: request, kernelArtifact: result.value
+})
+await Bun.write("portable-program.json", JSON.stringify(document, null, 2))`}
+    </DocCode>
+    <p>The example requires explicit stock, as the supplied minimal request has. Its generic editor settings are reopening controls, while the captured kernelRequest is the native source of truth. Preserve all actual editor settings when capturing from an application workspace.</p>
+  </section>
+
+  <section id="save" class="doc-section">
+    <h2>Save against a real drawing</h2>
+<p>Save the document separately through <code>POST /api/drawings/:id/toolpaths</code>, with name, G-code, and data containing the complete portable document. Use a real drawing ID accessible to the caller. Portable saves require project-owner or organization ADMIN/MANAGER write access; a successful calculation alone grants no persistence permission.</p>
+    <p>The sidecar decodes the document, checks row NC equals document NC, and reruns a captured kernel request before trusting a new native artifact. It compares the resulting artifact, program, and original NC. Edited evidence, a blocked rerun, or inconsistent bytes are refused. Client-provided verification/sourceRevision fields do not establish trust.</p>
+    <p>When captured selected elements and stock match the associated drawing, the service derives a drawing revision digest. A saved native artifact can lack that revision when the source does not match the current drawing. Keep that distinction visible: valid captured output is not necessarily fresh output for the latest stored model.</p>
+    <p>See <a href="/docs/api/toolpaths">toolpath persistence endpoints</a> and <a href="/docs/api/cad-exact">exact CAD analysis</a> when assembling a richer capture/save flow. Avoid the project toolpath variant unless its distinct query-parameter contract is intended.</p>
+  </section>
+
+  <section id="recovery" class="doc-section">
+    <h2>Regenerate after changes and diagnose rejection</h2>
+<p>Changing geometry, stock, origin, tools, material, machine, operation order, or NC changes the evidence relationship. Regenerate from the updated captured request. A plain NC edit can remain useful ordinary text, but it must not carry an earlier native artifact as proof for new bytes. The save service strips incompatible native metadata or rejects an inconsistent new document.</p>
+    <p>Unknown machine preset is an adapter validation error. Unknown material/tool, invalid stock containment, empty geometry, and unsupported machining produce preparation/planning issues. Gouge, rapid-in-stock, holder/table collision, and replay mismatch point to generated motion/evidence. Locate the operation ID, stage, line, and point in the issue before changing process controls.</p>
+    <p>A source payload can pass JSON schema decoding and still fail to produce a valid job. Conversely, an artifact can exist with a blocked release. Keep the original request/result pair when diagnosing either condition, rather than overwriting it with a speculative settings change.</p>
+    <p>Implementation provenance: <code>packages/api/src/cam-kernel.ts</code>, <code>cam-program.ts</code>, core <code>cam/kernel/snapshot.ts</code>, <code>execute.ts</code>, <code>schema.ts</code>, and sidecar <code>services/cam-program.ts</code>. Focused evidence tests are <code>packages/core/src/cam/kernel/kernel.test.ts</code> and <code>apps/sidecar/test/cam-program.test.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Native API", href: "/docs/api/machining" }, { title: "Saved programs", href: "/docs/setups" }, { title: "CAM verification", href: "/docs/cam" }, { title: "Project history", href: "/docs/guides/project-history" }]} />
+</DocsLayout>

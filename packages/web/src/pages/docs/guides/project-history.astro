@@ -1,0 +1,166 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Separate saved resources from committed history", href: "#model" },
+  { title: "Inspect identity and working state", href: "#access" },
+  { title: "Create a baseline or record intended edits", href: "#commit" },
+  { title: "Create and check out a proposal", href: "#branch" },
+  { title: "Read the exact changes under review", href: "#diff" },
+  { title: "Commit executable checks with the project", href: "#workflow-files" },
+  { title: "Dispatch checks and interpret their evidence", href: "#workflow-results" },
+  { title: "Open, review, and merge a proposal", href: "#pull-request" },
+  { title: "Restore content without rewriting history", href: "#restore" },
+  { title: "Mirror committed history and recover conflicts", href: "#remote" },
+]
+---
+
+<DocsLayout title="Review and restore a project change" subtitle="Record the working database, isolate a proposal branch, review the diff, run committed checks, and merge or restore with clear side effects." description="Practical CADCAMFUN project history guide with commits, branches, safe workflow files, pull requests, reviews, restore, GitHub synchronization, and failure recovery." toc={toc}>
+  <section id="model" class="doc-section">
+    <h2>Separate saved resources from committed history</h2>
+<p>Saving a project, drawing, or toolpath updates the SQLite working copy. Creating a project commit snapshots the working resources into Git-compatible objects and moves the current branch ref. Those are separate operations: a saved drawing can be uncommitted, and a committed program can remain local without any remote mirror.</p>
+    <p>The sidecar's history service builds one canonical JSON file per resource. The tree includes project.json, drawings, components, toolpaths, referenced materials/tools/machine configurations, and production costs. Workflow YAML and other carried non-entity text live in the repository tree, rather than ordinary drawing records. A change to one entity does not require treating the entire database as an opaque binary diff.</p>
+    <p>Choose a disposable or intended project before following the mutating examples. Set <code>PROJECT_ID</code> to its real identifier and use a current connection URL/application bearer. Project history and workflow endpoints are documented in the <a href="/docs/api/history">history API reference</a>; project metadata writes use the <a href="/docs/api/projects">projects API</a>.</p>
+  </section>
+
+  <section id="access" class="doc-section">
+    <h2>Inspect identity and working state</h2>
+<p>Read access, commits, branch creation, opening pull requests, reviews, and workflow dispatch require access to the project. Checkout, restore, remote configuration, push/pull, and merging require maintainer access: the project owner or organization ADMIN/MANAGER. An optional account session header selects the acting user; without a valid account session the application uses its local profile.</p>
+    <DocCode language="bash" title="Read status before changing branches">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/vcs/status"`}
+    </DocCode>
+    <p>The response names the branch, nullable HEAD, and dirty paths. Dirty means that current resource files differ from HEAD. A non-empty list is useful review information, not a storage failure. Before moving the working copy, decide whether those changes belong in a commit or should be deliberately restored/discarded.</p>
+    <p>If HEAD is null, record the first project commit before creating a branch from HEAD. The branch API resolves a real source commit; there is no placeholder commit to branch from in a new project.</p>
+  </section>
+
+  <section id="commit" class="doc-section">
+    <h2>Create a baseline or record intended edits</h2>
+<p>A commit requires a non-empty message and captures the current database-backed resources. Review dirty paths first: the API does not stage individual entity files. The optional files field adds safe workflow definitions, described later; it does not select which drawing edits to include.</p>
+    <DocCode language="bash" title="Record the current working copy">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"message":"Record baseline blank"}' \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/vcs/commit"`}
+    </DocCode>
+    <p>The response is a 201 commit record with object ID, parent IDs, message, and author information. Record its OID for a later comparison or restore. An unchanged tree is rejected with NothingToCommit rather than manufacturing another revision from the same content.</p>
+    <p><code>authorKind</code> defaults to user. Assistant-originated commits use ai and cannot commit on main. Actor policy is enforced by the project service; a different display message does not bypass it. Creating a commit can trigger workflows after the commit is recorded. A subsequent failed workflow does not undo that commit.</p>
+  </section>
+
+  <section id="branch" class="doc-section">
+    <h2>Create and check out a proposal</h2>
+<p>Creating a branch writes a ref; it does not switch the working database. Checkout is explicit and refuses uncommitted working changes. The following calls create a branch from the current HEAD and load it as the checked-out branch.</p>
+    <DocCode language="bash" title="Branch creation and checkout are separate">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" -H "Content-Type: application/json" \
+  --data '{"name":"proposal/blank-label"}' \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/vcs/branches"
+
+curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" -H "Content-Type: application/json" \
+  --data '{"branch":"proposal/blank-label"}' \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/vcs/checkout"`}
+    </DocCode>
+    <p>To start elsewhere, add a from revision to branch creation. Names must be safe refs: traversal, repeated slashes, a trailing slash/.lock suffix, and ref-expression fragments are rejected. Reusing an existing name is also refused.</p>
+    <p>After checkout, save the intended project changes through their resource APIs. For a small demonstration, update project metadata with PUT /api/projects/:id and a new name, then commit it. The resulting diff changes project.json; it does not imply a geometry change. In a real part revision, save the drawing and any regenerated toolpaths before committing.</p>
+  </section>
+
+  <section id="diff" class="doc-section">
+    <h2>Read the exact changes under review</h2>
+<p><code>GET /vcs/log</code> supports rev, limit, and an optional tracked path. <code>GET /vcs/diff</code> requires to and accepts an optional from. Use explicit OIDs for a reproducible comparison. Encode branch names and JSON paths as query values rather than splicing unescaped punctuation into URLs.</p>
+    <DocCode language="bash" title="Compare the proposal with main">
+{String.raw`curl --fail-with-body --get \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" \
+  --data-urlencode "from=main" \
+  --data-urlencode "to=proposal/blank-label" \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/vcs/diff"`}
+    </DocCode>
+    <p>Entity changes include path, resource kind, added/modified/deleted status, optional ID/name, and property changes described by JSON pointers. Canonical JSON sorts object keys recursively while preserving array order. Non-overlapping object-property edits can merge structurally; incompatible concurrent array edits are atomic conflicts, not element-by-element reconciliations.</p>
+    <p>Review manufacturing evidence as part of the toolpath record: matching G-code and artifact identity matters more than a familiar filename. A project commit captures saved data; it does not run a missing native manufacturing request just because the tree contains NC text.</p>
+  </section>
+
+  <section id="workflow-files" class="doc-section">
+    <h2>Commit executable checks with the project</h2>
+<p>The public commit endpoint's extra files are restricted to <code>.cadcamfun/workflows/&lt;safe-name&gt;.yml</code> or yaml. It accepts text values, not arbitrary filesystem patches. You cannot use this field to replace drawing JSON, write shell scripts, or delete a file by sending null.</p>
+    <p>A definition is committed as YAML text, then the runner loads it from that committed ref. The example below validates structural files, requires NC for existing toolpaths, checks operation sequencing, and attempts replay for toolpaths carrying a stored generator request.</p>
+    <DocCode language="yaml" title=".cadcamfun/workflows/review.yml">
+{String.raw`name: Review checks
+on:
+  manual: true
+  pullRequest:
+    branches: [main]
+jobs:
+  inspect:
+    steps:
+      - id: structure
+        uses: project/validate
+      - uses: project/require-gcode
+      - uses: cam/sequence
+      - id: replay
+        uses: cam/verify`}
+    </DocCode>
+    <p>To commit it from a script, construct the JSON body with a serializer rather than hand-escaping YAML:</p>
+    <DocCode language="ts" title="Body for POST /api/projects/:id/vcs/commit">
+{String.raw`const body = {
+  message: "Add committed review checks",
+  files: { ".cadcamfun/workflows/review.yml": await Bun.file("review.yml").text() }
+}
+const encoded = JSON.stringify(body)`}
+    </DocCode>
+    <p>The commit still snapshots all current working resources. Validate the YAML before recording it: the history commit can succeed while the resulting invalid workflow is later recorded as a failed run. The production engine checks schema, dependencies, cycles, duplicate step IDs, and registered uses identifiers.</p>
+  </section>
+
+  <section id="workflow-results" class="doc-section">
+    <h2>Dispatch checks and interpret their evidence</h2>
+<p><code>POST /api/projects/:id/actions/dispatch</code> accepts an optional ref and runs every manual workflow matching that committed ref. It is not a single-workflow-name selector. Read definitions at actions/workflows and persisted outcomes at actions/runs. The service returns the latest 50 runs by default.</p>
+    <p>A run records workflow, trigger, ref, SHA, timestamps, status, and events. Jobs follow dependency levels; independent jobs can run concurrently, while steps within a job are sequential. Unknown uses identifiers fail before execution. An if value is success, failure, or always, not an arbitrary expression. A failed dependency skips its downstream job entirely.</p>
+    <p>Interpret CAM outputs carefully. <code>cam/verify</code> and <code>cam/gcode</code> inspect committed <code>Toolpath.data.request</code>. Missing requests, unsupported toolpaths, or missing NC may be reported in skipped outputs. A successful run with verified=0 is not verification evidence. project/require-gcode checks existing toolpaths; a project with no toolpaths can satisfy it vacuously.</p>
+    <p>Automatic HTTP push-trigger integration currently supplies no changed paths, so a push paths filter does not match those events. Use branch-only filters or explicit manual dispatch for this integration. HTTP live started/finished events are published after the synchronous run returns; use saved runs for durable results.</p>
+    <DocCallout title="The writing workflow step reads current state">
+      <p>The current vcs/commit step delegates to project commit without a clean-working-copy guard. It commits current working database resources on the checked-out branch, which can differ from the run's ref. Its allowed extra files do not prevent that broader snapshot side effect. Use it only when that current branch and working state are intended to be committed.</p>
+    </DocCallout>
+  </section>
+
+  <section id="pull-request" class="doc-section">
+    <h2>Open, review, and merge a proposal</h2>
+<p>Open a local pull request with title, head, optional body, and base (main by default). Head and base must differ, and a base already containing the head has nothing to merge. The response includes a project-local number used by review and merge endpoints.</p>
+    <DocCode language="bash" title="Propose the committed branch">
+{String.raw`curl --fail-with-body \
+  -H "Authorization: Bearer $CADCAMFUN_TOKEN" -H "Content-Type: application/json" \
+  --data '{"title":"Review blank label","head":"proposal/blank-label","base":"main","body":"Metadata change and committed checks."}' \
+  "$CADCAMFUN_URL/api/projects/$PROJECT_ID/pulls"`}
+    </DocCode>
+    <p>GET /pulls/:number returns the request, reviews, and changes. Reviews accept comment, approve, or request-changes, with optional path/pointer. The latest non-comment verdict per reviewer controls the request-changes block. A later comment does not clear it; that reviewer must submit an updated approve verdict. The implementation has no positive approval-count requirement when no blocking verdict remains.</p>
+    <p>POST /pulls/:number/merge requires maintainer access. AI actors cannot merge into main. If the base is checked out, the service requires a clean working copy and applies the merged snapshot to the database. If another branch is checked out, it updates the base ref without replacing that current working database. Merges may fast-forward or create a merge commit; inspect ancestry rather than assuming two parents.</p>
+    <p>Merged pull-request diffs use the recorded merge commit, preserving the review view after refs move. Local pull requests are application review records, not automatically GitHub pull requests.</p>
+  </section>
+
+  <section id="restore" class="doc-section">
+    <h2>Restore content without rewriting history</h2>
+<p>POST /vcs/restore takes a rev and optional paths. It requires maintainer access and a clean working copy, and creates a new commit containing the earlier content. It does not reset the branch backward and erase intervening commits. The service then applies the new HEAD to the working database.</p>
+    <DocCode language="json" title="Restore one saved drawing from an earlier commit">
+{String.raw`{
+  "rev": "earlier-commit-oid",
+  "paths": ["drawings/actual-drawing-id.json"]
+}`}
+    </DocCode>
+    <p>Replace the path with a real tracked resource and inspect its diff first. Omitting paths restores the full earlier tree; that can replace or remove multiple related resources. Whole-project snapshots also carry referenced library items and costs so restored toolpaths can retain dependencies. Resource-version restore and project-history restore have different scopes.</p>
+    <p>After restoring manufacturing source, inspect whether saved native output still matches the intended drawing revision. A history operation preserves the earlier artifact; it does not transform that artifact into evidence for a newly modified drawing.</p>
+  </section>
+
+  <section id="remote" class="doc-section">
+    <h2>Mirror committed history and recover conflicts</h2>
+<p>A GitHub mirror is optional. Set remote to an owner/repo string with PUT /vcs/remote, or null to detach. Push and pull use the user's GitHub token in x-github-token for that call; it is not saved in project JSON. Maintainer access is required for these HTTP operations.</p>
+    <p>Push uploads reachable objects and refuses to overwrite unpulled remote commits. Pull requires a clean working copy, fetches the remote branch, and merges. A structural JSON conflict identifies paths and pointers without writing a partial repository merge commit. Inspect both sides, create a deliberate resolution, and retry instead of forcing one side over the other.</p>
+    <p>HTTP 409 usually means dirty state or merge conflict; 403 can mean a maintainer or AI-main restriction; 404 can mean inaccessible project or unknown revision; 400 covers invalid names, empty messages, or no changes. A database failure maps to a server storage error. Preserve the OIDs and failure message when diagnosing a mismatch.</p>
+    <p>Source provenance: <code>packages/vcs/src/repository.ts</code>, <code>json.ts</code>, <code>snapshot.ts</code>, <code>github.ts</code>; <code>apps/sidecar/src/services/project-vcs.ts</code>, <code>repos/project-vcs-repo.ts</code>, and <code>http/vcs.ts</code>; workflow schema/runner in <code>packages/workflow/src</code> and sidecar <code>workflow-runner.ts</code>/<code>workflow-steps.ts</code>.</p>
+  </section>
+
+  <DocRelated items={[{ title: "History reference", href: "/docs/history" }, { title: "History endpoints", href: "/docs/api/history" }, { title: "Workflows", href: "/docs/workflows" }, { title: "Native manufacturing", href: "/docs/guides/native-manufacturing" }]} />
+</DocsLayout>

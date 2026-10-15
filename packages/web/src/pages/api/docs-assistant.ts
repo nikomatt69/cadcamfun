@@ -135,14 +135,16 @@ Start from this design system and keep its tokens and class names — fill it wi
 <style>
 ${ARTIFACT_TOKENS}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
-  font:16px/1.65 ui-rounded,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  font:16px/1.65 "IBM Plex Sans","Segoe UI",sans-serif;font-synthesis:none;-webkit-font-smoothing:antialiased}
+em,i,cite,dfn,blockquote{font-style:normal}
+em,i{font-weight:500}
 .wrap{max-width:52rem;margin:0 auto;padding:2rem 1.1rem 4rem}
 .plate{background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow)}
 .hero{background:linear-gradient(180deg,var(--accent-soft),transparent),var(--panel);box-shadow:var(--shadow);
   border-radius:var(--radius);padding:1.6rem 1.4rem;margin-bottom:1.5rem}
 .hero h1{margin:0 0 .4rem;font-size:clamp(1.6rem,4vw,2.2rem);letter-spacing:-.025em;line-height:1.1;text-wrap:balance}
 .hero p{margin:0;color:var(--muted)}
-.badge{display:inline-block;padding:.2rem .55rem;border-radius:4px;font:700 .68rem/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+.badge{display:inline-block;padding:.2rem .55rem;border-radius:4px;font:700 .68rem/1.4 "IBM Plex Mono",SFMono-Regular,Consolas,monospace;
   letter-spacing:.12em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);margin-bottom:.7rem}
 .progress{height:4px;border-radius:2px;background:var(--border);overflow:hidden;margin:1rem 0 1.5rem}
 .progress > i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s cubic-bezier(.23,1,.32,1)}
@@ -154,16 +156,16 @@ ${ARTIFACT_TOKENS}
 .card{background:var(--raised);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin-bottom:1rem}
 .step{display:flex;gap:.9rem;align-items:flex-start}
 .step-n{flex:0 0 1.75rem;height:1.75rem;border-radius:4px;background:var(--accent);color:var(--on-accent);
-  display:grid;place-items:center;font:700 .8rem ui-monospace,SFMono-Regular,Menlo,monospace}
+  display:grid;place-items:center;font:700 .8rem "IBM Plex Mono",SFMono-Regular,Consolas,monospace}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:.5rem 0}
 .grid{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
 .check{display:flex;gap:.6rem;align-items:flex-start;padding:.5rem 0;cursor:pointer}
 .check input{margin-top:.35rem;accent-color:var(--accent)}
 pre{position:relative;background:var(--code);border-radius:var(--radius);box-shadow:var(--shadow);
   padding:.85rem 1rem;overflow-x:auto;font-size:.85rem;font-variant-numeric:tabular-nums}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+code{font-family:"IBM Plex Mono",SFMono-Regular,Consolas,monospace}
 .copy{position:absolute;top:.45rem;right:.45rem;border:0;background:var(--panel);box-shadow:var(--shadow);
-  color:var(--muted);border-radius:4px;padding:.2rem .5rem;font:600 .68rem ui-monospace,SFMono-Regular,Menlo,monospace;
+  color:var(--muted);border-radius:4px;padding:.2rem .5rem;font:600 .68rem "IBM Plex Mono",SFMono-Regular,Consolas,monospace;
   letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:transform .1s,color .16s}
 .copy:hover{color:var(--text)}
 .ok{color:var(--ok)} .warn{color:var(--warn)} .danger{color:var(--danger)}

@@ -1,3 +1,5 @@
+import { guidePages } from "../src/data/guidePages"
+import { apiGroups } from "../src/data/apiGroups"
 import { describe, expect, test } from "bun:test"
 import { apps, dependencyNote, packages, stack } from "../src/data/architecture"
 import { docsIndex, docsIndexGaps } from "../src/data/docsIndex"
@@ -8,6 +10,7 @@ const sidebarContract = [
   "/docs/architecture",
   "/docs/stack",
   "/docs/conventions",
+  "/docs/configuration",
   "/docs/cad",
   "/docs/cam",
   "/docs/setups",
@@ -24,10 +27,14 @@ const sidebarContract = [
   "/docs/workflows",
   "/docs/guides",
   "/docs/guides/quickstart",
+  "/docs/guides/api-tour",
   "/docs/guides/local-dev",
-  "/docs/guides/work-packages",
+  "/docs/guides/contributing",
+  ...guidePages.map((guide) => `/docs/guides/${guide.slug}`),
   "/docs/packages",
   "/docs/source-map",
+  "/docs/documentation",
+  ...apiGroups.map((group) => `/docs/api/${group.slug}`),
 ]
 
 describe("docs index", () => {
@@ -52,7 +59,7 @@ describe("docs index", () => {
     expect(activeDocsSection("/docs/guides/quickstart").id).toBe("guides")
     expect(activeDocsSection("/docs/guides/quickstart/").id).toBe("guides")
     expect(activeDocsSection("/docs/guides/local-dev").id).toBe("guides")
-    expect(activeDocsSection("/docs/guides/work-packages").id).toBe("guides")
+    expect(activeDocsSection("/docs/guides/contributing").id).toBe("guides")
     expect(activeDocsSection("/docs/guides").id).toBe("guides")
   })
 

@@ -1,0 +1,111 @@
+---
+export const prerender = true
+import DocsLayout from "../../layouts/DocsLayout.astro"
+import DocCode from "../../components/docs/DocCode.astro"
+import DocCallout from "../../components/docs/DocCallout.astro"
+import DocRelated from "../../components/docs/DocRelated.astro"
+const toc = [
+  { title: "Configuration owners", href: "#owners" },
+  { title: "Start an isolated sidecar", href: "#launch" },
+  { title: "Required connection and storage settings", href: "#required" },
+  { title: "AI host and connectivity", href: "#ai" },
+  { title: "Account and billing integrations", href: "#integrations" },
+  { title: "Logs and telemetry", href: "#telemetry" },
+  { title: "Client configuration", href: "#clients" },
+  { title: "Database path selection", href: "#database-paths" },
+  { title: "Apply and verify a change", href: "#change" },
+  { title: "Configuration diagnosis", href: "#diagnosis" },
+]
+---
+<DocsLayout title="Runtime configuration" subtitle="Choose the process, data directory, credential type, and integration settings that actually control each runtime." description="CADCAMFUN configuration reference with sidecar environment settings, defaults, storage paths, AI connectivity, billing integration, telemetry, desktop/mobile client settings, and diagnosis." toc={toc}>
+  <section id="owners" class="doc-section">
+    <h2>Configuration owners</h2>
+    <p>The sidecar reads environment configuration through <code>AppConfigService</code> in <code>apps/sidecar/src/config.ts</code>. A layer reads those values when it is constructed and passes an AppConfig value to the services that need it. Changing a parent shell variable does not mutate an already-running service.</p>
+    <p>Tauri supplies its own launch token and application data/migration paths when starting the child. Browser preview uses Vite-side connection variables. Mobile stores a paired desktop connection and device credentials. The documentation site has separate Worker bindings and an independent local Studio process. They do not share a universal configuration file.</p>
+    <p>Configure the owner of the behavior you intend to change. For example, setting the CLI migration URL does not redirect the native desktop database, and configuring the documentation assistant does not supply the desktop AI provider credentials.</p>
+  </section>
+  <section id="launch" class="doc-section">
+    <h2>Start an isolated sidecar</h2>
+    <DocCode language="bash" title="Interactive terminal at the repository root">{String.raw`CADCAMFUN_TOKEN=local-development-token \
+CADCAMFUN_DATA_DIR=/tmp/cadcamfun-config-example \
+CADCAMFUN_MIGRATIONS_DIR="$PWD/packages/db/drizzle" \
+CADCAMFUN_AI_HOST=direct \
+CADCAMFUN_AI_OFFLINE=1 \
+bun --no-env-file apps/sidecar/src/main.ts`}</DocCode>
+    <p>This uses a disposable directory and an example development token. Choose an appropriate token for your own process. The server binds loopback on an assigned port; read that port from its ready event. Keep stdin open because closing it signals shutdown. The command deliberately passes settings explicitly and disables Bun's automatic environment-file loading.</p>
+    <p>For the normal native loop, use <code>bun run desktop:dev</code>. It prepares the sidecar binary and migrations before launching Tauri, which owns the resulting process connection. Do not start a second manual sidecar and assume the native webview will attach to it.</p>
+  </section>
+  <section id="required" class="doc-section">
+    <h2>Required connection and storage settings</h2>
+    <table><thead><tr><th>Setting</th><th>Default</th><th>Behavior</th></tr></thead><tbody>
+      <tr><td><code>CADCAMFUN_TOKEN</code></td><td>Required</td><td>Redacted application bearer credential for protected local API routes.</td></tr>
+      <tr><td><code>CADCAMFUN_DATA_DIR</code></td><td>Required</td><td>Root of sidecar-managed local state. The database is <code>cadcamfun.db</code> beneath it.</td></tr>
+      <tr><td><code>CADCAMFUN_MIGRATIONS_DIR</code></td><td>Absent</td><td>Migration directory passed to the database layer. Without it, opening the database does not create or upgrade application tables.</td></tr>
+      <tr><td><code>CADCAMFUN_APP_URL</code></td><td>Absent in config</td><td>Base URL supplied to account link integrations. The relevant service decides its fallback.</td></tr>
+      <tr><td><code>CADCAMFUN_DEBUG_LINKS</code></td><td>False</td><td>Enables development response fields for account links in handlers that support them.</td></tr>
+    </tbody></table>
+    <p>The data directory is a storage root, not an HTTP bind address. The main server's listener is fixed to <code>127.0.0.1</code> with an ephemeral port. Companion networking uses its own explicitly enabled HTTPS gateway; changing a URL setting does not make the loopback listener public.</p>
+    <p>Keep the configured migration directory aligned with the binary. Startup can fail before readiness when a migration cannot be planned, backed up, or applied. The database reference explains transaction and backup behavior; a missing table after omitting migrations is a configuration issue rather than proof that the project was deleted.</p>
+  </section>
+  <section id="ai" class="doc-section">
+    <h2>AI host and connectivity</h2>
+    <table><thead><tr><th>Setting</th><th>Default</th><th>Behavior</th></tr></thead><tbody>
+      <tr><td><code>CADCAMFUN_AI_HOST</code></td><td><code>nikcli</code></td><td>Select <code>nikcli</code> or <code>direct</code>. The direct host does not add the embedded persistent tool loop and specialist scheduler.</td></tr>
+      <tr><td><code>CADCAMFUN_AI_OFFLINE</code></td><td>False</td><td>Disables network provider-catalogue loading and the live web-search handler. It is not a local model implementation.</td></tr>
+      <tr><td><code>CADCAMFUN_AI_MINIMAX_BASE_URL</code></td><td>Absent</td><td>Optional trimmed endpoint override for the embedded MiniMax configuration.</td></tr>
+    </tbody></table>
+    <p>Provider keys are managed by the credential API and persisted by the AI service at <code>&lt;dataDir&gt;/ai/credentials.json</code>. They are not supplied by inventing an undocumented environment variable for every provider. Use the provider/model status endpoints to establish what is configured and the <a href="/docs/ai">AI guide</a> for supported direct-model routing.</p>
+    <p>Offline mode does not turn a cloud provider call into an offline answer. A configured direct or embedded model can still require its provider connection for inference. The local-first product retains local projects without a model connection; that storage property is distinct from offline AI inference.</p>
+    <p>Operator policy is loaded from <code>&lt;dataDir&gt;/ai/policy.json</code>. The embedded host isolates its own working/configuration directories below the application's AI storage. Policy, credentials, session context, and provider-catalogue cache have different purposes; copying one file does not reconstruct a conversation's entire runtime.</p>
+  </section>
+  <section id="integrations" class="doc-section">
+    <h2>Account and billing integrations</h2>
+    <table><thead><tr><th>Setting</th><th>Use</th><th>When absent</th></tr></thead><tbody>
+      <tr><td><code>STRIPE_SECRET_KEY</code></td><td>Outbound Stripe API authentication.</td><td>Paid checkout and billing portal integration are unavailable.</td></tr>
+      <tr><td><code>STRIPE_WEBHOOK_SECRET</code></td><td>Verify signed Stripe webhook payloads.</td><td>The webhook handler refuses ingestion without verification configuration.</td></tr>
+      <tr><td><code>STRIPE_PRICE_BASIC</code>, <code>STRIPE_PRICE_PRO</code>, <code>STRIPE_PRICE_ENTERPRISE</code></td><td>Price IDs for paid plans. Blank values are ignored.</td><td>A missing mapping cannot identify a configured checkout price for that plan.</td></tr>
+      <tr><td><code>CRON_SECRET</code></td><td>Additional shared credential for cron maintenance.</td><td>No extra cron secret is required by that guard; application bearer admission still applies.</td></tr>
+      <tr><td><code>ADMIN_EMAIL</code></td><td>Administrator identity used by account/service policy.</td><td>The local installation's profile retains the local administrative behavior implemented by its services.</td></tr>
+    </tbody></table>
+    <p>These settings configure integrations; they do not establish that a remote account, price, subscription, or webhook delivery exists. Check the operation's actual failure and running service status. Do not infer that a table's presence means the related hosted feature is fully configured.</p>
+    <p>The AppConfig interface also contains test-injection hooks such as a replacement model factory and Stripe API base. They are not environment variables read by this production configuration layer. Keep test hooks out of deployment instructions unless the running host explicitly exposes them.</p>
+  </section>
+  <section id="telemetry" class="doc-section">
+    <h2>Logs and telemetry</h2>
+    <p><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> enables the sidecar's OTLP/HTTP trace, metric, and log exporters. Without a non-blank endpoint, this optional telemetry layer is disabled. The exporter code builds the signal-specific endpoints; configure a collector that supports those signals.</p>
+    <p>Normal sidecar logging is separate from telemetry export. Stdout carries the JSON readiness/error protocol consumed by the shell, while logs are directed to stderr. When diagnosing startup, retain the first relevant error and its operation context rather than expect the application window to contain every initialization detail.</p>
+    <p>Do not include launch tokens, provider keys, session tokens, or full credential files in diagnostic bundles. Source paths, method/status, endpoint IDs, non-secret project IDs, and the failed database operation usually provide a safer and more useful starting point.</p>
+  </section>
+  <section id="clients" class="doc-section">
+    <h2>Client configuration</h2>
+    <p>A browser-only desktop preview uses the fake in-memory API when <code>VITE_SIDECAR_URL</code> is absent. To connect it to a manually started sidecar, set that URL and <code>VITE_SIDECAR_TOKEN</code> before starting Vite. The packaged Tauri path obtains its connection from the shell instead.</p>
+    <DocCode language="bash" title="Browser using the manually started sidecar">{String.raw`VITE_SIDECAR_URL=http://127.0.0.1:READY_PORT \
+VITE_SIDECAR_TOKEN=local-development-token \
+bun run --filter @cadcamfun/desktop dev`}</DocCode>
+    <p>Replace the port placeholder. Vite settings belong to the frontend development process; changing them does not restart or reconfigure the sidecar. Browser access is subject to the sidecar's loopback/Tauri CORS policy and normal bearer admission.</p>
+    <p>Mobile pairing stores its desktop address, certificate fingerprint, and device token through the mobile application. Changing the desktop's launch token is not a normal way to pair a phone. Use the <a href="/docs/guides/companion-pairing">pairing procedure</a> and revoke individual devices when needed.</p>
+  </section>
+  <section id="database-paths" class="doc-section">
+    <h2>Database path selection</h2>
+    <table><thead><tr><th>Process</th><th>Selection rule</th></tr></thead><tbody>
+      <tr><td>Native desktop sidecar</td><td>Tauri-supplied application data directory, then <code>cadcamfun.db</code>.</td></tr>
+      <tr><td>Manual sidecar</td><td><code>CADCAMFUN_DATA_DIR/cadcamfun.db</code>.</td></tr>
+      <tr><td>Database migration CLI</td><td><code>DATABASE_URL</code>, removing an initial <code>file:</code>; otherwise process-relative <code>./data/cadcamfun.db</code>.</td></tr>
+      <tr><td>Root <code>db:migrate</code> wrapper</td><td>Runs the DB package script, so the default resolves within <code>packages/db</code>.</td></tr>
+      <tr><td>Documentation Studio</td><td><code>CADCAMFUN_DB</code>, then <code>DATABASE_URL</code>, then repository-root <code>data/cadcamfun.db</code>. The file must exist.</td></tr>
+    </tbody></table>
+    <p>An empty project list can therefore mean that you opened another valid database. Record the process and absolute selected path before changing migrations or copying data. An account session can also change which resources are visible without changing the file.</p>
+  </section>
+  <section id="change" class="doc-section">
+    <h2>Apply and verify a change</h2>
+    <ol><li>Identify the owner process and current storage path. Preserve needed data before changing storage or migrations.</li><li>Stop that process cleanly and update its explicit launch configuration or native setting.</li><li>Start it again and wait for its actual readiness result. Resolve the new connection instead of reusing an old port.</li><li>Check a public health call and an admitted protected call.</li><li>Verify the specific behavior: the intended project appears, the provider status changes, the gateway becomes reachable, or the configured telemetry collector receives the expected signal.</li></ol>
+    <p>Presence of a configured value is not the same as a working external integration. Read the service result after making a change. Configuration values with a default should be distinguished from optional values for which the receiving service decides its fallback.</p>
+  </section>
+  <section id="diagnosis" class="doc-section">
+    <h2>Configuration diagnosis</h2>
+    <p>If initialization fails before ready, inspect required settings, migration availability, directory access, and the first layer-construction error. If health succeeds but a protected call fails, check the token type and current process. If a provider fails while projects work, inspect AI configuration rather than reset the database.</p>
+    <p>If Studio is unavailable on the hosted site, its production API intentionally returns 503; start its local Bun process against the selected existing file. If the documentation assistant is unavailable, inspect Worker bindings or its configured nikcli backend. Neither diagnosis requires replacing desktop credentials.</p>
+    <p>Source evidence: <code>apps/sidecar/src/config.ts</code>, <code>layers.ts</code>, <code>main.ts</code>, <code>observability.ts</code>, <code>services/ai.ts</code>, <code>packages/db/src/migrate.ts</code>, and <code>packages/web/script/studio-server.ts</code>.</p>
+  </section>
+  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "Local development", href: "/docs/guides/local-dev" }, { title: "Documentation operations", href: "/docs/documentation" }]} />
+</DocsLayout>

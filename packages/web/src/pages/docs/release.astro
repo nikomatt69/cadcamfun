@@ -6,184 +6,164 @@ import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Pipeline", href: "#pipeline" },
-  { title: "CI", href: "#ci" },
-  { title: "Updater", href: "#updater" },
-  { title: "Data safety", href: "#data" },
-  { title: "Boundaries", href: "#boundaries" },
+  { title: "Distribution model", href: "#status" },
+  { title: "Build pipeline", href: "#pipeline" },
+  { title: "CI and publication", href: "#ci" },
+  { title: "Updater behavior", href: "#updater" },
+  { title: "Database compatibility", href: "#data" },
+  { title: "Release verification", href: "#boundaries" },
+  { title: "Target and asset reference", href: "#targets" },
+  { title: "Local build options and signing inputs", href: "#build-options" },
+  { title: "Release failure diagnosis", href: "#release-diagnostics" },
 ]
 ---
 
 <DocsLayout
-  title="Release"
-  subtitle="The pipeline and the updater plugin exist. Signed installers and a published feed do not."
-  description="CADCAMFUN packaging, CI, auto-update, and the limits of the current release acceptance."
+  title="Builds and releases"
+  subtitle="Target-specific sidecars, signed updater assets, and a release index published after platform installers."
+  description="Desktop build pipeline, six-platform release workflow, signing requirements, updater behavior, and database compatibility."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP10 on the task board is <strong>done</strong> for the pipeline, CI, and the updater, with
-      release secrets unset. Owner paths: <code>.github/workflows</code>, <code>scripts/</code>,
-      and the updater section of <code>apps/desktop/src-tauri</code>
-      (<code>updater.rs</code> and the updater block in <code>tauri.conf.json</code>). Spec:
-      <code>specs/10-release-sync.md</code>.
-    </p>
-    <DocCallout type="warn" title="Signed release acceptance is unverified">
-      <p>
-        Spec 10 says packaging scripts and workflow validation are implemented, and that signed
-        cross-platform release acceptance remains unverified and blocked on owner-supplied
-        signing configuration. At the recorded checkpoint, notarization, GitHub publication,
-        updater signature verification against a real installer, the runtime update flow, and
-        backup/rollback acceptance on a packaged app had not run. A local updater key pair can
-        exist in an ignored <code>tauri-signing.json</code>. That file is not a published
-        release. Apple and Windows certificates are separate and still required for
-        platform-signed builds.
-      </p>
-    </DocCallout>
+    <h2>Distribution model</h2>
+    <p>The desktop build packages a Vite frontend, a Bun-compiled sidecar, and generated SQLite migrations in a Tauri application. The repository defines macOS Apple Silicon and Intel, Windows x64 and ARM64, and Linux x64 and ARM64 builds. Release automation is configured in <code>.github/workflows/release.yml</code>; platform build checks also run independently through <code>build-platforms.yml</code>.</p>
+    <p>A workflow definition describes the publication process. The availability and validity of an installer must be established from its particular run and release assets. Source code alone does not prove signing credentials, notarization results, or successful installation on a target machine.</p>
   </section>
 
   <section id="pipeline" class="doc-section">
-    <h2>Pipeline</h2>
-    <p>
-      <code>scripts/build.ts</code> is the reproducible script (Bun, not a shell script). It
-      runs locally and in CI. It fails fast, prints each step, and does not read
-      <code>.env*</code> files.
-    </p>
-    <DocCode language="text" title="Order in scripts/build.ts">
-{`bun install --frozen-lockfile --os=* --cpu=*
-bun run typecheck && bun test packages apps
-compile sidecar -> apps/desktop/src-tauri/binaries/sidecar-<triple>
-copy packages/db/drizzle/ -> src-tauri/resources/migrations/
-bun run --filter @cadcamfun/desktop build
-bunx tauri build
-SHA-256 checksums and release notes since the last tag`}
+    <h2>Build pipeline</h2>
+    <p><code>scripts/build.ts</code> runs six ordered stages and aborts when a stage fails:</p>
+    <ol>
+      <li><strong>Install:</strong> frozen-lockfile installation, including optional dependencies for all operating systems and CPU architectures.</li>
+      <li><strong>Check:</strong> workspace typechecking. Unit tests are a separate CI command.</li>
+      <li><strong>Compile:</strong> build the sidecar with <code>scripts/compile-sidecar.ts</code> for the Rust target triple.</li>
+      <li><strong>Resources:</strong> stage <code>packages/db/drizzle</code> as bundled migrations.</li>
+      <li><strong>Bundle:</strong> build the frontend, then invoke Tauri with target, bundle, signing, and updater settings.</li>
+      <li><strong>Artifacts:</strong> index installer assets, write SHA-256 checksums, and generate release notes from Git history.</li>
+    </ol>
+    <DocCode language="bash" title="From the repository root">
+{`bun scripts/build.ts --help
+bun scripts/build.ts --dry-run
+bun run build:sidecar
+bun scripts/build.ts --only=resources
+bun scripts/build.ts --no-updater`}
     </DocCode>
-    <p>
-      Rust <code>x86_64</code> maps to Bun <code>x64</code>. Rust <code>aarch64</code> maps to
-      Bun <code>arm64</code>. Bundles are collected only from
-      <code>&lt;cargo-target-dir&gt;/&lt;triple&gt;/release/bundle</code>. The output directory
-      must be empty and outside that tree. Copied names are
-      <code>&lt;triple&gt;--&lt;original-basename&gt;</code>. Checksums use those copied names.
-      Migration resources map <code>resources/migrations/</code> to runtime
-      <code>migrations/</code>.
-    </p>
-    <p>
-      Linux packages are <code>.deb</code>, <code>.rpm</code>, and <code>.AppImage</code>. macOS
-      builds a separate <code>.app</code> and <code>.dmg</code> per architecture, plus the
-      updater <code>.app.tar.gz</code>. There is no universal macOS binary. Windows packages are
-      <code>.msi</code> and NSIS <code>.exe</code>. Modern updater assets are
-      <code>.app.tar.gz</code>, <code>.AppImage</code>, and NSIS <code>.exe</code>, each with a
-      sibling <code>.sig</code>.
-    </p>
+    <p><code>--only</code> and <code>--skip</code> accept stage names; <code>--target</code>, <code>--bundles</code>, and <code>--out-dir</code> select outputs. The default target is the host reported by <code>rustc -vV</code>. Sidecar binaries are written to <code>apps/desktop/src-tauri/binaries/sidecar-&lt;triple&gt;</code>, with <code>.exe</code> on Windows. Identical binaries and migration trees are kept unchanged to avoid unnecessary development restarts.</p>
+    <p>Use <code>compile-sidecar.ts</code> through the pipeline: it applies the embedded-host bundling adaptations. A direct generic compile command does not represent the same build procedure. The default artifact directory is <code>apps/desktop/src-tauri/target/release-artifacts</code>.</p>
   </section>
 
   <section id="ci" class="doc-section">
-    <h2>CI</h2>
+    <h2>CI and publication</h2>
     <table>
-      <thead>
-        <tr><th>Workflow</th><th>When</th><th>What</th></tr>
-      </thead>
+      <thead><tr><th>Workflow</th><th>Configured responsibilities</th></tr></thead>
       <tbody>
-        <tr><td><code>.github/workflows/ci.yml</code></td><td>Pull request and push</td><td>Ubuntu install, typecheck, tests, <code>cargo clippy</code>, <code>cargo test</code> for <code>src-tauri</code>. Caches Bun and Cargo.</td></tr>
-        <tr><td><code>.github/workflows/release.yml</code></td><td>Tag <code>v*</code></td><td>Six-target matrix. Draft GitHub Release and updater manifest. Stays a draft until the owner publishes it.</td></tr>
-        <tr><td><code>.github/workflows/build-platforms.yml</code></td><td><code>build/**</code> or manual dispatch</td><td>The same six targets as downloadable artifacts, without release signing credentials.</td></tr>
-        <tr><td><code>.github/workflows/ios.yml</code></td><td>Mobile</td><td>Expo iOS project and an unsigned simulator build. See <a href="/docs/mobile">Mobile</a>.</td></tr>
+        <tr><td><code>ci.yml</code></td><td>Frozen install, workspace typecheck/tests, sidecar/resource staging, Rust clippy/tests, and companion JavaScript checks.</td></tr>
+        <tr><td><code>build-platforms.yml</code></td><td>Manual or <code>build/**</code> branch builds for six target architectures. Bundles use <code>--no-updater</code> and upload indexed artifacts without publishing a release.</td></tr>
+        <tr><td><code>release.yml</code></td><td>Version-tag validation, signed platform builds, per-platform manifests, six-platform manifest merge, installer publication, and final index publication.</td></tr>
+        <tr><td><code>ios.yml</code></td><td>Unsigned simulator build and pairing round trip; no App Store or TestFlight publication.</td></tr>
       </tbody>
     </table>
-    <p>
-      The six targets: macOS arm64 and x64 on <code>macos-14</code> (Intel is cross-compiled),
-      Windows ARM on <code>windows-11-arm</code>, Windows x64, Linux x64, and Linux ARM on
-      <code>ubuntu-22.04-arm</code>. The sidecar is prepared for the explicit Rust target before
-      Tauri bundles on the matching runner.
-    </p>
-    <p>
-      Manual releases require an existing <code>v</code>-prefixed tag. The gate checks out that
-      tag, installs Bun, and checks the commit and the app version. Secret-bearing builds depend
-      on that gate. Branch pushes and fork release workflows are excluded. Windows imports the
-      owner certificate, passes the thumbprint, and removes the certificate even on failure. No
-      secret appears in an <code>if</code> expression.
-    </p>
-    <p>
-      <code>updater-manifest.ts</code> rejects duplicate platforms and requires all six platform
-      keys when merging. <code>stage-release.ts</code> checks checksums, notes, and signatures,
-      and stages one flat draft asset set with a combined <code>SHA256SUMS</code>. A rerun does
-      not modify a published release. Draft assets are not an active updater feed.
-    </p>
-    <p>
-      Secret names the owner sets in GitHub, and only the names belong in docs:
-      <code>TAURI_SIGNING_PRIVATE_KEY</code>,
-      <code>TAURI_SIGNING_PRIVATE_KEY_PASSWORD</code>, <code>APPLE_CERTIFICATE</code>,
-      <code>APPLE_CERTIFICATE_PASSWORD</code>, <code>APPLE_ID</code>, <code>APPLE_PASSWORD</code>,
-      <code>APPLE_TEAM_ID</code>, <code>WINDOWS_CERTIFICATE</code>,
-      <code>WINDOWS_CERTIFICATE_PASSWORD</code>. Workflows must not echo them.
-    </p>
-    <p>
-      Spec 10 records <code>bun test scripts</code> at 19 passing tests, a clean root
-      typecheck, <code>actionlint</code> on <code>ci.yml</code> and <code>release.yml</code>, and
-      a full build dry-run for <code>x86_64-apple-darwin</code> that selects
-      <code>bun-darwin-x64</code> without signing credentials. That dry-run is not an installer
-      you can ship.
-    </p>
+    <p>The release workflow runs for <code>v*</code> tags or a manually selected existing version tag on the non-fork repository. <code>release-ref.ts</code> checks the tag and application version and resolves the commit. Each build creates a platform release, such as a version tag suffixed with <code>macos-arm64</code> or <code>linux-x64</code>. Only after all platform releases publish does the version index publish the merged <code>latest.json</code>.</p>
+    <p><code>stage-release.ts</code> checks the selected artifacts, checksum/signature relationships, and manifest links before publication. Already published releases are not overwritten. The index release is eligible to become latest for stable versions; prereleases remain marked as prereleases.</p>
+    <p>Updater builds require the Tauri signing private key and password configuration corresponding to the public key in <code>tauri.conf.json</code>. macOS release signing/notarization uses Apple certificate and account settings; Windows imports a signing certificate and passes its thumbprint to the bundler. Missing required release signing inputs fail the release build. Configure these through the CI secret store.</p>
+    <p>A separate release job publishes the nikcli plugin package when an npm token is available. It skips an already published version and can use the configured fallback package name when the primary scope cannot be published. This package job does not establish desktop installer availability.</p>
   </section>
 
   <section id="updater" class="doc-section">
-    <h2>Updater</h2>
-    <p>
-      <code>tauri-plugin-updater</code> reads a static <code>latest.json</code> on GitHub
-      Releases. There is no custom update server in v6.0. Signature verification is mandatory.
-      The public key is committed in <code>tauri.conf.json</code>. The private key stays in CI
-      secrets, or in the ignored local signing file when the owner bundles on a machine. Explicit
-      environment credentials win over the local file when both are present as a pair.
-    </p>
-    <p>
-      Behaviour specified in spec 10 §3: check at launch and every 4 hours, show a non-blocking
-      prompt with release notes, forward download progress to the webview, and treat a
-      <code>critical</code> flag as a prompt that cannot be dismissed until it is applied. The
-      UI defers install while the editor has unsaved work. The sidecar’s migrations are
-      forward-only, so every release states whether a downgrade is safe. Rollback keeps the
-      previous installer link in the notes.
-    </p>
-    <p>
-      The Rust follow-up in spec 10 bounds and coalesces check requests, runs checks serially,
-      stops the task on exit, and keeps the pending announcement when installation fails so the
-      user can retry. Spec 07 says updater runtime was not integration-verified during the
-      lifecycle pass. <code>updater.rs</code> is present. A packaged update on a real install is
-      not.
-    </p>
+    <h2>Updater behavior</h2>
+    <p>The configured updater endpoint is the repository's latest GitHub release download at <code>latest.json</code>. The Rust updater checks at launch and every four hours, with manual checks queued through its service. Each request uses a 30-second timeout. The manifest identifies platform-specific assets and signatures; the public key is part of the application configuration.</p>
+    <p><code>update://status</code> carries checking, up-to-date, available, downloading, ready, and failed states. Release notes containing <code>[critical]</code> mark the available update as non-dismissible. A ready-to-restart state is also non-dismissible. This affects the prompt; installation still respects the unsaved-work guard.</p>
+    <p><code>install_update</code> consumes a recorded pending version, rechecks the available update, and refuses installation if the version changed or the caller reports unsaved work. Download progress includes bytes and an optional total. Failures preserve pending update information for a later attempt.</p>
+    <DocCallout type="note" title="Keep release keys stable">
+      <p>The application verifies update signatures using its embedded public key. A release signed with a different private key is not interchangeable. Verify the produced installer and updater asset on the target platform before declaring a release ready for users.</p>
+    </DocCallout>
   </section>
 
   <section id="data" class="doc-section">
-    <h2>Data safety</h2>
-    <p>
-      Before pending migrations, WP0 copies the database with <code>VACUUM INTO</code> into the
-      backups directory and keeps the last five snapshots. A backup failure aborts startup as
-      <code>DatabaseError</code> with operation <code>backup</code>. Migration SQL runs in one
-      transaction. Failure leaves the original logical schema. Details are on the
-      <a href="/docs/database">Database</a> page. Spec 10 §4 describes the same contract from the
-      release side: the shell shows the typed error, and a broken migration must not destroy the
-      file.
-    </p>
-    <p>
-      Cloud sync of rows is out of scope for v6.0. Project history syncs through the optional
-      GitHub mirror in <a href="/docs/history">History</a>, not through a custom server. Soft
-      delete (<code>deletedAt</code>) is not in the schema yet. Writes already go through
-      repositories, which is where a later change-log hook would sit. Spec 13 says git history
-      supersedes that change-log idea for project model state.
-    </p>
+    <h2>Database compatibility</h2>
+    <p>Packaged applications open <code>cadcamfun.db</code> under their application data directory. Pending migrations are applied by the database layer at startup using the migrations included in the bundle. Schema upgrades and binary updates are therefore related even though they are separate artifacts.</p>
+    <p>Generated release notes compare tracked migration trees with the previous release tag. A changed tree is reported as unsafe for downgrade; an unchanged tree is reported as migration-compatible; unavailable history is reported as unknown. This automated comparison does not validate every possible application-level compatibility issue.</p>
+    <p>Before replacing a binary with an older version, preserve the current data and inspect the release's compatibility notes. Forward migration code does not imply reverse migrations. Follow the database backup and recovery procedures for the actual data directory.</p>
   </section>
 
   <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li>Scripts must not read <code>.env*</code> files or print signing secrets.</li>
-      <li>The updater must not install over an unsaved editor session.</li>
-      <li>Draft release assets must not be treated as the live update feed.</li>
-      <li>Migration SQL must stay forward-only inside a transaction, and must not contain <code>VACUUM</code>.</li>
-      <li>WP10 edits the updater configuration and <code>updater.rs</code>. It does not take over sidecar lifecycle or the database backup runner.</li>
-      <li>A green <code>scripts</code> test and a dry-run are not a notarized, published release.</li>
-    </ul>
+    <h2>Release verification</h2>
+    <DocCode language="bash" title="Release helper tests, from the repository root">
+{`bun test scripts
+bun scripts/build.ts --only=artifacts --dry-run`}
+    </DocCode>
+    <p>Helper tests validate target mapping, signing requirements, artifact naming, manifest handling, and staging rules. A dry run prints planned operations without compiling or signing. Neither substitutes for an actual native bundle, updater download/install test, nor physical-device acceptance for the companion.</p>
+    <p>For an operational release, retain the exact tag/commit, workflow result, target-specific installer and update asset, checksum/signature files, and published manifest. Validate that the installed app starts its bundled sidecar and migrations and that the updater selects the intended platform asset.</p>
   </section>
-  <DocRelated items={[{ title: "Desktop UI", href: "/docs/desktop" }, { title: "Database", href: "/docs/database" }, { title: "Sidecar", href: "/docs/sidecar" }]} />
+
+  <section id="targets" class="doc-section">
+    <h2>Target and asset reference</h2>
+    <table>
+      <thead><tr><th>Platform</th><th>Rust target</th><th>Manifest key</th><th>Updater asset</th></tr></thead>
+      <tbody>
+        <tr><td>macOS Apple Silicon</td><td><code>aarch64-apple-darwin</code></td><td><code>darwin-aarch64</code></td><td><code>.app.tar.gz</code></td></tr>
+        <tr><td>macOS Intel</td><td><code>x86_64-apple-darwin</code></td><td><code>darwin-x86_64</code></td><td><code>.app.tar.gz</code></td></tr>
+        <tr><td>Windows ARM64</td><td><code>aarch64-pc-windows-msvc</code></td><td><code>windows-aarch64</code></td><td><code>.exe</code></td></tr>
+        <tr><td>Windows x64</td><td><code>x86_64-pc-windows-msvc</code></td><td><code>windows-x86_64</code></td><td><code>.exe</code></td></tr>
+        <tr><td>Linux ARM64</td><td><code>aarch64-unknown-linux-gnu</code></td><td><code>linux-aarch64</code></td><td><code>.AppImage</code></td></tr>
+        <tr><td>Linux x64</td><td><code>x86_64-unknown-linux-gnu</code></td><td><code>linux-x86_64</code></td><td><code>.AppImage</code></td></tr>
+      </tbody>
+    </table>
+    <p>The manifest generator requires exactly one matching updater asset for the selected target, its adjacent <code>.sig</code> file, and release notes. Installer indexing prefixes asset names with <code>&lt;triple&gt;--</code>, rejects duplicate names, and rejects signatures without a matching asset. A DMG, MSI, DEB, or RPM installer does not replace the updater asset listed above.</p>
+    <p>Merged platform manifests must agree on version, publication date, and release notes. The release job requires all six expected manifest keys. URLs must be HTTPS with no embedded credentials, query string, or fragment. Staging checks that the target prefix, suffix, signature, and release URL match the platform.</p>
+  </section>
+
+  <section id="build-options" class="doc-section">
+    <h2>Local build options and signing inputs</h2>
+    <DocCode language="bash" title="Inspect a target plan without writing build outputs">
+{`bun --no-env-file scripts/build.ts \
+  --only=compile,resources \
+  --target=aarch64-apple-darwin \
+  --dry-run
+
+bun --no-env-file scripts/build.ts \
+  --skip=install,check \
+  --target=x86_64-unknown-linux-gnu \
+  --bundles=deb,appimage \
+  --no-updater \
+  --dry-run`}
+    </DocCode>
+    <p>Remove <code>--dry-run</code> only when the selected target toolchain and native prerequisites are installed. Cross-compiling the Bun executable does not by itself provide a cross-platform Tauri linker and bundler. <code>--only</code> and <code>--skip</code> are mutually exclusive; <code>--skip-install</code> is a convenience alias. <code>--no-updater</code> omits updater archive/signature creation and its signing gate.</p>
+    <table>
+      <thead><tr><th>Input</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>TAURI_SIGNING_PRIVATE_KEY</code>, <code>TAURI_SIGNING_PRIVATE_KEY_PASSWORD</code></td><td>Updater signatures. Environment-supplied keys take precedence over local signing configuration.</td></tr>
+        <tr><td>Ignored local <code>tauri-signing.json</code></td><td>Local updater-key fallback when no environment key is supplied. Its declared public key must equal the configured updater public key.</td></tr>
+        <tr><td><code>CADCAM_RELEASE=1</code></td><td>Enables platform release-signing requirements in the build validation.</td></tr>
+        <tr><td><code>APPLE_CERTIFICATE</code>, <code>APPLE_CERTIFICATE_PASSWORD</code>, <code>APPLE_ID</code>, <code>APPLE_PASSWORD</code>, <code>APPLE_TEAM_ID</code></td><td>macOS release certificate and notarization configuration.</td></tr>
+        <tr><td><code>WINDOWS_CERTIFICATE</code>, <code>WINDOWS_CERTIFICATE_PASSWORD</code>, imported certificate thumbprint</td><td>Windows release signing; CI imports and later removes the certificate.</td></tr>
+      </tbody>
+    </table>
+    <p>The build loads local updater credentials only for the bundling step, and passes signing values through the environment to that child process. Do not print local signing files or place real key material in a documentation example. A private key that does not match an installed app's public key cannot produce an accepted update for that app.</p>
+  </section>
+
+  <section id="release-diagnostics" class="doc-section">
+    <h2>Release failure diagnosis</h2>
+    <table>
+      <thead><tr><th>Failure</th><th>Interpretation and next check</th></tr></thead>
+      <tbody>
+        <tr><td>Tag/application version disagree</td><td>The selected <code>v</code>-prefixed tag does not match the version in Tauri configuration. Release validation stops before platform builds.</td></tr>
+        <tr><td>Unsupported target</td><td>Use a supported architecture/platform mapping and installed Rust target; manifest publication supports the six keys above.</td></tr>
+        <tr><td>Missing updater signing key</td><td>Provide the signing input through the secret store/local configuration or select a deliberate <code>--no-updater</code> development build.</td></tr>
+        <tr><td>Zero or multiple updater assets</td><td>Inspect the indexed target directory; stale or mismatched archives make selection ambiguous.</td></tr>
+        <tr><td>Manifest metadata disagree</td><td>All platform jobs must use the same resolved version/date/notes and commit.</td></tr>
+        <tr><td>Release already published</td><td>The workflow refuses to modify it. Re-running is not an overwrite mechanism.</td></tr>
+        <tr><td>Updater check fails on the installed app</td><td>Inspect endpoint reachability, manifest target key, download URL, asset signature, and embedded public key.</td></tr>
+        <tr><td>Install refused with unsaved work</td><td>Save or discard the active work through the editor, then retry the pending update.</td></tr>
+      </tbody>
+    </table>
+    <p>A useful release report records which stage failed and which target it was building. Include non-secret artifact names, validation errors, and workflow identifiers. Keep the previous installed version and a verified data backup available during an updater exercise; migration compatibility is checked separately from signature validity.</p>
+    <p>Implementation anchors: <code>scripts/release-helpers.ts</code>, <code>signing-config.ts</code>, <code>updater-manifest.ts</code>, <code>stage-release.ts</code>, and <code>apps/desktop/src-tauri/src/updater.rs</code>.</p>
+  </section>
+
+  <DocRelated items={[
+      { title: "Quickstart", href: "/docs/guides/quickstart" },
+      { title: "Database", href: "/docs/database" },
+      { title: "Mobile companion", href: "/docs/mobile" }
+  ]} />
 </DocsLayout>

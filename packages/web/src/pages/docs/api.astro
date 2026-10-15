@@ -1,309 +1,169 @@
 ---
 export const prerender = true
+import { apiGroups } from "../../data/apiGroups"
+import { apiStats } from "../../lib/apiReference"
+import DocCard from "../../components/docs/DocCard.astro"
 import DocsLayout from "../../layouts/DocsLayout.astro"
 import DocCallout from "../../components/docs/DocCallout.astro"
 import DocCode from "../../components/docs/DocCode.astro"
 import DocRelated from "../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Status", href: "#status" },
-  { title: "Layout", href: "#layout" },
-  { title: "Groups on disk", href: "#groups" },
-  { title: "Errors and concurrency", href: "#errors" },
-  { title: "Client", href: "#client" },
-  { title: "Core routes", href: "#routes" },
-  { title: "Boundaries", href: "#boundaries" },
-  { title: "Authorization", href: "#authorization" },
-  { title: "Endpoint ids", href: "#endpoints" },
-  { title: "Codegen", href: "#codegen" },
+  { title: "Integration recipes", href: "#integration-recipes" },
+  { title: "Resource reference", href: "#resource-reference" },
+  { title: "Connection and request conventions", href: "#connection" },
+  { title: "Generated reference maintenance", href: "#reference-maintenance" },
+  { title: "Contract and server", href: "#status" },
+  { title: "Authentication and identity", href: "#authorization" },
+  { title: "Resource families", href: "#groups" },
+  { title: "Responses and failures", href: "#errors" },
+  { title: "Use the shared client", href: "#client" },
+  { title: "Design and manufacturing requests", href: "#routes" },
+  { title: "Streaming and recovery", href: "#endpoints" },
+  { title: "Generated SDKs", href: "#codegen" },
+  { title: "Source organization", href: "#layout" },
+  { title: "Integration rules", href: "#boundaries" },
 ]
 ---
 
 <DocsLayout
-  title="API contract"
-  subtitle="packages/api is schemas and HttpApi groups. No handlers. No database. Parity is unfinished."
-  description="CADCAMFUN HTTP contract: groups, errors, the generated client, and the 67 of 195 coverage."
+  title="API reference"
+  subtitle="The complete HTTP resource reference, authenticated local access, streaming contracts, and clients generated from shared schemas."
+  description="Complete CADCAMFUN HTTP API reference with every resource, parameter, request and response schema, authentication, client examples, and captured request walkthrough."
   toc={toc}
 >
   <section id="status" class="doc-section">
-    <h2>Status</h2>
-    <p>
-      WP3 on the task board is <strong>in progress</strong> — 67/195 legacy route files are in
-      the contract (<code>bun run --filter @cadcamfun/api coverage</code>). Owner directory:
-      <code>packages/api</code> (<code>@cadcamfun/api</code>). Spec:
-      <code>specs/05-api-sidecar.md</code>. The inventory of all 195 files is
-      <code>specs/api-inventory.md</code>.
-    </p>
-    <DocCallout type="warn" title="Contract coverage is not handler coverage">
-      <p>
-        The coverage script measures the contract only. Declaring a route does not mean the
-        sidecar serves it. Spec 05 says about 15% of the 195 legacy route files are served, and
-        that handler parity needs its own HTTP tests. Families without a contract are still
-        missing. See <code>specs/11-api-parity-brief.md</code>. Do not describe the API as
-        finished parity.
-      </p>
-    </DocCallout>
+    <h2>Contract and server</h2>
+<p><code>@cadcamfun/api</code> defines request and response schemas with Effect HttpApi. It exports the root <code>Api</code>, domain records, tagged errors, and clients. Request handlers, authorization decisions, database queries, and provider calls run in the sidecar. Importing a schema does not start a server.</p>
+    <p>The sidecar publishes its served contract at <code>GET /api/openapi.json</code>. Use that running document to inspect methods, path parameters, payloads, and status codes for the application you are connected to. The server assembles its groups in <code>apps/sidecar/src/layers.ts</code>; the shared contract is assembled in <code>packages/api/src/index.ts</code>.</p>
   </section>
 
-  <section id="layout" class="doc-section">
-    <h2>Layout</h2>
-    <table>
-      <thead>
-        <tr><th>Path</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>packages/api/src/groups/</code></td><td>One file per HttpApi group.</td></tr>
-        <tr><td><code>packages/api/src/index.ts</code></td><td>The composed <code>Api</code> value.</td></tr>
-        <tr><td><code>packages/api/src/errors.ts</code></td><td>Shared tagged HTTP errors.</td></tr>
-        <tr><td><code>packages/api/src/client.ts</code></td><td><code>ApiClient</code> service. <code>layer(&#123; baseUrl, token &#125;)</code>.</td></tr>
-        <tr><td><code>packages/api/src/client/generated/</code></td><td>Generated client. Generator-owned.</td></tr>
-        <tr><td><code>packages/api/src/sdk/generated/</code></td><td>Generated SDK. Generator-owned.</td></tr>
-        <tr><td><code>packages/api/src/projects.ts</code>, <code>cost.ts</code>, <code>system.ts</code>, <code>auth.ts</code></td><td>Domain schemas shared by handlers and the UI.</td></tr>
-        <tr><td><code>packages/api/src/ai-*.ts</code>, <code>ai-actions.ts</code></td><td>Assistant events, CAD/CAM action inputs, inspection, parametric reports.</td></tr>
-        <tr><td><code>packages/api/src/cam-program.ts</code>, <code>cam-kernel.ts</code>, <code>cad-exact.ts</code></td><td>Portable program document, kernel request, exact CAD snapshot.</td></tr>
-        <tr><td><code>packages/httpapi-codegen</code></td><td>Emits the client and SDK from the contract. JSON request bodies use a recursive <code>JsonValue</code> alias.</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Effect HTTP docs for this pin:
-      <code>node_modules/effect/ai-docs/src/51_http-server/</code>. Imports used by the contract
-      are <code>effect/http-api</code>. The sidecar is the package that imports the server.
-    </p>
+  <section id="authorization" class="doc-section">
+    <h2>Authentication and identity</h2>
+<p>Protected routes require <code>Authorization: Bearer &lt;token&gt;</code>. The desktop receives a new application token when its sidecar starts. <code>GET /api/health</code> is the public health probe; native <code>/health</code> and <code>/version</code> are protected. Application bearer tokens are compared with a timing-safe comparison.</p>
+    <p>An optional <code>x-session-token</code> carries an account session JWT. The bearer token admits the local application; the session selects its acting account. An absent, expired, invalid, or orphaned session falls back to the installation's local profile. Resource handlers then check ownership or organization access through repository authorization helpers.</p>
+    <p>A scoped bridge token admits only <code>GET /api/ai/actions</code> and <code>POST /api/ai/actions/invoke</code>. It does not grant access to project CRUD, credential settings, or other HTTP routes. Its project and read/write scope are checked again by the action bridge.</p>
   </section>
 
   <section id="groups" class="doc-section">
-    <h2>Groups on disk</h2>
-    <p>
-      Files in <code>packages/api/src/groups/</code>. A name here means the contract file exists.
-      It does not mean every legacy path inside that family is implemented.
-    </p>
-    <table>
-      <thead>
-        <tr><th>File</th><th>Family</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>ai.ts</code></td><td>Chat stream, credentials, models, skills, analysis</td></tr>
-        <tr><td><code>analytics.ts</code></td><td><code>system-metrics</code>, <code>track</code></td></tr>
-        <tr><td><code>auth.ts</code></td><td>The contract-covered auth routes (spec 05: seven)</td></tr>
-        <tr><td><code>billing.ts</code></td><td>Subscriptions and portal</td></tr>
-        <tr><td><code>cad-exact.ts</code></td><td>Exact solid snapshot routes</td></tr>
-        <tr><td><code>companion.ts</code></td><td>Phone pairing and gateway admin</td></tr>
-        <tr><td><code>components.ts</code>, <code>drawings.ts</code></td><td>CRUD and versions</td></tr>
-        <tr><td><code>events.ts</code></td><td>Live events</td></tr>
-        <tr><td><code>files.ts</code></td><td>Import and export metadata</td></tr>
-        <tr><td><code>kv.ts</code></td><td>Local key-value</td></tr>
-        <tr><td><code>library.ts</code>, <code>materials.ts</code>, <code>tools.ts</code>, <code>machine-configs.ts</code></td><td>Library CRUD</td></tr>
-        <tr><td><code>mcp.ts</code></td><td>MCP server configs</td></tr>
-        <tr><td><code>misc.ts</code></td><td>Routes that do not fit a larger group</td></tr>
-        <tr><td><code>notifications.ts</code>, <code>organizations.ts</code>, <code>waitlist.ts</code></td><td>Org, notices, waitlist</td></tr>
-        <tr><td><code>plugins.ts</code></td><td>Legacy browser-plugin HTTP group</td></tr>
-        <tr><td><code>production-costs.ts</code></td><td>Estimates and settings</td></tr>
-        <tr><td><code>toolpaths.ts</code>, <code>toolpath-generator.ts</code></td><td>Stored toolpaths, generate, G-code, verify</td></tr>
-        <tr><td><code>user.ts</code></td><td>Profile</td></tr>
-        <tr><td><code>vcs.ts</code></td><td>History, pull requests, Actions dispatch</td></tr>
-      </tbody>
-    </table>
-    <p>
-      There is no <code>groups/cam-setup.ts</code>. The three setup routes in spec 14 are
-      specified and not present as a group file. Marketplace, chat, and several cron or webhook
-      families from the inventory are still outside this list where no file exists.
-    </p>
+    <h2>Resource families</h2>
+<ul>
+      <li><strong>Design:</strong> projects, drawings, components, drawing versions, entity import/export, and exact CAD analysis, STEP export, and assembly analysis.</li>
+      <li><strong>Manufacturing:</strong> toolpaths and versions, comments, generator suggestions, parsing, replay verification, native manufacture jobs, materials, tools, machine configurations, library items, and production costs.</li>
+      <li><strong>Assistant:</strong> providers, credentials, models, sessions, streaming turns, session controls, actions, project memory, workspace context, and stateless advice.</li>
+      <li><strong>Collaboration:</strong> branches, commits, diffs, pull requests, reviews, GitHub mirrors, workflow files and runs, live events, and companion pairing.</li>
+      <li><strong>Application services:</strong> users, authentication, organizations, notifications, files, plugins, billing, analytics, waitlist, MCP configuration, and local key-value storage.</li>
+    </ul>
+    <p>The contract groups retain their endpoint-specific response shapes. A client should decode the schema of the operation it calls instead of assuming a single application-wide JSON envelope.</p>
   </section>
 
   <section id="errors" class="doc-section">
-    <h2>Errors and concurrency</h2>
-    <p>
-      Payloads are Schemas. Errors are <code>Schema.TaggedError</code> with HTTP status
-      annotations.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Tag</th><th>Status</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>NotFound</code></td><td>404</td></tr>
-        <tr><td><code>Validation</code></td><td>422</td></tr>
-        <tr><td><code>Conflict</code></td><td>409</td></tr>
-        <tr><td><code>Unauthorized</code></td><td>401</td></tr>
-        <tr><td><code>Internal</code></td><td>500</td></tr>
-      </tbody>
-    </table>
-    <p>
-      Collection endpoints take <code>?limit&amp;cursor&amp;q</code> with opaque cursors. Updates
-      send <code>If-Match: &lt;updatedAt ISO&gt;</code>. A mismatch is <code>Conflict</code>.
-      Drawing and toolpath JSON is validated by the WP1 and WP2 schemas, carries
-      <code>schemaVersion</code>, and writes a version snapshot. Spec 05 caps snapshots at the 50
-      most recent per entity.
-    </p>
-    <p>
-      Streaming chat is Server-Sent Events. Typed events are <code>delta</code>,
-      <code>tool_call</code>, <code>tool_result</code>, <code>done</code>, and <code>error</code>.
-      Spec 08 also names <code>permission_request</code> on <code>AiEvent</code>. Stateless
-      workflow endpoints (title, design analysis, machining parameters, G-code optimization,
-      design suggestions) return advice and do not mutate drawings or operations.
-    </p>
-    <p>
-      Every request needs <code>Authorization: Bearer</code> for the per-launch shell token.
-      Auth routes may also send <code>x-session-token</code>. A valid session token selects that
-      account. A missing, expired, or forged token falls back to the local profile. Auth
-      <code>set-cookie</code> headers are optional in the contract because webview
-      <code>fetch</code> hides them.
-    </p>
+    <h2>Responses and failures</h2>
+<p>Common tagged errors map to HTTP 400 (<code>BadRequest</code>), 401 (<code>Unauthorized</code>), 403 (<code>Forbidden</code>), 404 (<code>NotFound</code>), 405 (<code>MethodNotAllowed</code>), 409 (<code>Conflict</code>), and 500 (<code>InternalError</code>). Their declared schemas carry a human-readable <code>message</code>. Some groups use an envelope with <code>success: false</code>, <code>message</code>, and <code>errors</code>; a small number use an <code>error</code> field.</p>
+    <p>Success responses can be a record, an array, a nullable value, or an envelope. <code>Envelope</code> includes <code>success</code>, <code>message</code>, and <code>data</code>; <code>EnvelopeOpt</code> makes the message optional. Creation endpoints explicitly declare 201 where appropriate. Do not infer success solely from a JSON field without checking the HTTP status and endpoint schema.</p>
+    <p>Schema decoding validates transport input before the handler executes. Business validation still runs in the service: a structurally valid request may refer to an inaccessible drawing, contain a stale manufacturing artifact, or request a conflicting branch operation.</p>
   </section>
 
   <section id="client" class="doc-section">
-    <h2>Client</h2>
-    <p>
-      The desktop and tests construct <code>ApiClient.layer(&#123; baseUrl, token &#125;)</code>.
-      Client middleware attaches the bearer token and does not persist it. After a contract
-      change, regenerate both clients. Spec 05’s change log says generated files stay
-      generator-owned.
-    </p>
-    <DocCode language="ts" title="Layer the UI provides once">
-{`ApiClient.layer({
-  baseUrl, // http://127.0.0.1:<port>
-  token    // per-launch, from the Tauri command
-})`}
+    <h2>Use the shared client</h2>
+<p><code>ApiClient.layer</code> takes a <code>baseUrl</code> and application <code>token</code>. It supplies the fetch transport and the client authorization middleware. Its methods are derived directly from <code>Api</code>, so this client also covers operations omitted by code generation.</p>
+    <DocCode language="ts" title="Read projects with the Effect client">
+{`import { ApiClient } from "@cadcamfun/api"
+import { Effect } from "effect"
+
+const projects = Effect.gen(function* () {
+  const api = yield* ApiClient
+  return yield* api.projects.list()
+}).pipe(Effect.provide(ApiClient.layer({ baseUrl, token })))`}
     </DocCode>
-    <p>
-      Contract tests encode and decode every schema and serialise <code>Api</code> to an OpenAPI
-      snapshot. <code>apps/sidecar/test/typed-client.test.ts</code> runs the generated client
-      against real handlers, including multipart plugin install, so a drift fails a test.
-    </p>
+    <p>The base URL is the sidecar's loopback address and assigned port. Resolve it from the desktop connection, rather than persisting a port across launches. Keep tokens out of URLs and logs.</p>
   </section>
 
   <section id="routes" class="doc-section">
-    <h2>Core routes</h2>
-    <p>
-      Spec 05 §2’s table is the v6.0 minimum. The inventory wins where they differ. Paths below
-      are the native contract. Legacy handlers often live under <code>/api/...</code> and the
-      sidecar keeps those paths for parity.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Group</th><th>Examples</th><th>Tables</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>system</td><td><code>GET /health</code>, <code>GET /version</code>, legacy <code>GET /api/health</code></td><td>—</td></tr>
-        <tr><td>projects, drawings, components</td><td>CRUD, versions</td><td><code>Project</code>, <code>Drawing</code>, <code>Component</code> and version tables</td></tr>
-        <tr><td>toolpaths</td><td><code>POST /toolpaths/:id/generate</code>, <code>POST /toolpaths/:id/gcode</code>, <code>POST /api/toolpaths/verify</code></td><td><code>Toolpath</code>, <code>ToolpathVersion</code></td></tr>
-        <tr><td>library</td><td>materials, tools, machine configs, import/export JSON</td><td><code>Material</code>, <code>Tool</code>, <code>MachineConfig</code>, <code>LibraryItem</code></td></tr>
-        <tr><td>costs</td><td><code>POST /costs/estimate</code></td><td><code>CostSettings</code>, <code>ProductionCostEstimate</code></td></tr>
-        <tr><td>files</td><td><code>POST /files/import</code>, <code>POST /files/export</code></td><td><code>FileUpload</code> metadata; blobs under <code>&lt;dataDir&gt;/files/</code></td></tr>
-        <tr><td>ai</td><td><code>PUT /ai/credentials</code>, <code>POST /ai/chat</code> (SSE), <code>GET /api/ai/models</code></td><td><code>AIAnalysisLog</code>; context in <code>LocalKeyValue</code></td></tr>
-        <tr><td>plugins</td><td>list, install, enable, disable, config</td><td><code>PluginRegistryEntry</code>, <code>PluginConfiguration</code></td></tr>
-        <tr><td>vcs</td><td>status, commit, pulls, <code>POST …/actions/dispatch</code></td><td><code>GitRepo</code>, <code>GitObject</code>, <code>PullRequest</code>, <code>WorkflowRun</code></td></tr>
-      </tbody>
-    </table>
-    <p>
-      <code>GET /api/ai/models</code> accepts optional <code>configuredOnly</code>
-      (<code>true</code> or <code>false</code>). The default remains the full list.
-      <code>POST /api/toolpaths/manufacture</code> is a stateless kernel call: it takes a
-      versioned CAD snapshot and returns NC plus evidence. It does not mutate a saved toolpath.
-      G-code optimization proposals never write an operation.
-    </p>
-    <p>
-      Stripe checkout is optional. Without <code>STRIPE_SECRET_KEY</code> the payment service
-      fails with <code>PaymentError &#123; reason: "unconfigured" &#125;</code> and the routes
-      keep their legacy 500 answers. There is no license-key path.
-    </p>
-  </section>
-
-  <section id="boundaries" class="doc-section">
-    <h2>Boundaries</h2>
-    <ul>
-      <li><code>packages/api</code> must not contain server handlers, a database client, or filesystem access.</li>
-      <li>The UI must import this package for types and the client. It must not import <code>apps/sidecar</code>.</li>
-      <li>Generated files under <code>client/generated</code> and <code>sdk/generated</code> must not be hand-edited.</li>
-      <li>A new route family is not implemented until an in-process HTTP test calls the handler.</li>
-      <li>Webhooks and cron routes that need a cloud signature stay behind an Effect service with a local default. They must keep the legacy HTTP shape.</li>
-    </ul>
-  </section>
-  <section id="authorization" class="doc-section">
-    <h2>Authorization</h2>
-    <p>
-      <code>Api</code> extends <code>HttpApi.make("cadcamfun")</code> in
-      <code>packages/api/src/index.ts</code>. The middleware key is
-      <code>cadcamfun/api/Authorization</code> in <code>packages/api/src/auth.ts</code>.
-      <code>HealthGroup</code> is the only group without that middleware. Every other group uses it:
-      <code>system</code>, <code>auth</code>, <code>waitlist</code>, <code>analytics</code>,
-      <code>user</code>, <code>ai</code>, <code>mcp</code>, <code>billing</code>, <code>misc</code>,
-      <code>kv</code>, <code>production-costs</code>, <code>plugins</code>, <code>files</code>,
-      <code>organizations</code>, <code>notifications</code>, <code>projects</code>,
-      <code>materials</code>, <code>materialsStorage</code>, <code>tools</code>,
-      <code>toolsStorage</code>, <code>machineConfigs</code>, <code>machineConfigsStorage</code>,
-      <code>drawings</code>, <code>components</code>, <code>toolpaths</code>,
-      <code>toolpathExtras</code>, <code>toolpathGenerator</code>, <code>cadExact</code>,
-      <code>library</code>, <code>projectToolpaths</code>, <code>vcs</code>, <code>events</code>,
-      and <code>companion</code>.
-    </p>
+    <h2>Design and manufacturing requests</h2>
+<p>Project operations use <code>/api/projects</code>; drawings and toolpaths have their own collections and detail routes. <code>POST /api/toolpaths/generate</code> produces G-code, parsed program data, warnings, and statistics from generator settings and geometry. <code>/suggest</code>, <code>/parse</code>, and <code>/verify</code> expose parameter advice, G-code interpretation, and stock replay. These computations do not create a saved toolpath.</p>
+    <p><code>POST /api/toolpaths/manufacture</code> accepts a versioned CAD snapshot and returns a kernel result with NC, tool assignments, cutting data, claims, issues, and a release level. Save a resulting document separately through a toolpath create or update operation. See <a href="/docs/setups">Setups</a> for evidence validation during persistence.</p>
+    <p><code>POST /api/cad/exact/analyze</code>, <code>/step</code>, and <code>/assembly</code> accept explicit elements or a stored drawing identifier. Reading a stored drawing applies the caller's normal drawing access checks.</p>
   </section>
 
   <section id="endpoints" class="doc-section">
-    <h2>Endpoint ids</h2>
-    <p>
-      Ids below are the HttpApi endpoint ids on each group. A file name is the module the group
-      is declared in.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Group</th><th>Module</th><th>Endpoint ids</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><code>health</code></td><td><code>system.ts</code></td><td><code>check</code></td></tr>
-        <tr><td><code>system</code></td><td><code>system.ts</code></td><td><code>ready</code>, <code>version</code></td></tr>
-        <tr><td><code>projects</code></td><td><code>projects.ts</code></td><td><code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>remove</code></td></tr>
-        <tr><td><code>auth</code></td><td><code>groups/auth.ts</code></td><td><code>getSession</code>, <code>signinDirect</code>, <code>signout</code>, <code>signup</code>, <code>forgotPassword</code>, <code>resetPassword</code>, <code>sendMagicLink</code>, <code>verifyMagicLink</code>, <code>sendVerificationEmail</code>, <code>verifyEmail</code>, <code>registerPasskey</code>, <code>testDirectCreate</code></td></tr>
-        <tr><td><code>waitlist</code></td><td></td><td><code>join</code></td></tr>
-        <tr><td><code>analytics</code></td><td></td><td><code>index</code>, <code>dashboardData</code>, <code>track</code>, <code>logView</code>, <code>recentActivity</code>, <code>systemMetrics</code>, <code>userMetrics</code>, <code>userUsage</code>, <code>userHistory</code>, <code>clearUserUsage</code></td></tr>
-        <tr><td><code>user</code></td><td></td><td><code>profile</code>, <code>updateProfile</code>, <code>stats</code>, <code>components</code>, <code>projects</code>, <code>toolpaths</code>, <code>organizations</code>, <code>apiKeys</code>, <code>createApiKey</code>, <code>revokeApiKey</code>, <code>deleteAccount</code>, <code>password</code>, <code>tokens</code>, <code>createToken</code>, <code>verifyChange</code>, <code>byId</code></td></tr>
-        <tr><td><code>ai</code></td><td><code>groups/ai.ts</code></td><td><code>actions</code>, <code>invokeAction</code>, <code>issueBridgeToken</code>, <code>bridgeTokens</code>, <code>revokeBridgeToken</code>, <code>agents</code>, <code>sessionControl</code>, <code>sessionState</code>, <code>removeSession</code>, <code>skills</code>, <code>saveSkill</code>, <code>deleteSkill</code>, <code>setCredentials</code>, <code>clearCredentials</code>, <code>status</code>, <code>models</code>, <code>providers</code>, <code>prompts</code>, <code>title</code>, <code>designAnalysis</code>, <code>machiningParameters</code>, <code>gcodeOptimization</code>, <code>designSuggestions</code>, <code>chat</code>, <code>chatStream</code>, <code>chatQueue</code>, <code>chatAbort</code>, <code>permissionReply</code>, <code>completion</code>, <code>analyzeGcode</code>, <code>gcode</code>, <code>toolpathAnalysis</code>, <code>feedback</code>, <code>proxy</code></td></tr>
-        <tr><td><code>mcp</code></td><td></td><td><code>listConfig</code>, <code>getConfig</code>, <code>createConfig</code>, <code>updateConfig</code>, <code>updateConfigById</code>, <code>removeConfig</code>, <code>removeConfigById</code>, <code>serverInfo</code></td></tr>
-        <tr><td><code>billing</code></td><td></td><td><code>info</code>, <code>current</code>, <code>subscribe</code>, <code>portal</code>, <code>baGet</code>, <code>baCheckout</code>, <code>baUpdate</code>, <code>baCancel</code>, <code>baPortal</code>, <code>baFeature</code>, <code>baSync</code>, <code>cronGet</code>, <code>cronPost</code>, <code>stripeHealth</code>, <code>stripeWebhook</code></td></tr>
-        <tr><td><code>misc</code></td><td></td><td><code>desktopSignin</code>, <code>desktopUserByEmail</code>, <code>desktopProjects</code>, <code>desktopCreateProject</code>, <code>notify</code>, <code>pushSubscribe</code>, <code>pushUnsubscribe</code>, <code>trackedGet</code>, <code>trackedUpdate</code>, <code>trackedRemove</code></td></tr>
-        <tr><td><code>kv</code></td><td></td><td><code>list</code>, <code>get</code>, <code>set</code>, <code>remove</code></td></tr>
-        <tr><td><code>production-costs</code></td><td></td><td><code>listEstimates</code>, <code>getEstimate</code>, <code>createEstimate</code>, <code>updateEstimate</code>, <code>deleteEstimate</code>, <code>listMaterialCosts</code>, <code>getMaterialCost</code>, <code>createMaterialCost</code>, <code>updateMaterialCost</code>, <code>deleteMaterialCost</code>, <code>listOperationCosts</code>, <code>getOperationCost</code>, <code>createOperationCost</code>, <code>updateOperationCost</code>, <code>deleteOperationCost</code>, <code>listToolWear</code>, <code>getToolWear</code>, <code>createToolWear</code>, <code>updateToolWear</code>, <code>deleteToolWear</code>, <code>calculateEstimate</code></td></tr>
-        <tr><td><code>plugins</code></td><td></td><td><code>install</code>, <code>bootstrap</code>, <code>serve</code>, <code>list</code>, <code>get</code>, <code>uninstall</code>, <code>getConfig</code>, <code>setConfig</code>, <code>updateConfig</code>, <code>enable</code>, <code>disable</code>, <code>update</code>, <code>patch</code>, <code>registry</code>, <code>registryGet</code>, <code>registrySearch</code></td></tr>
-        <tr><td><code>files</code></td><td></td><td><code>upload</code>, <code>download</code></td></tr>
-        <tr><td><code>organizations</code></td><td></td><td><code>list</code>, <code>get</code>, <code>create</code>, <code>update</code>, <code>remove</code></td></tr>
-        <tr><td><code>notifications</code></td><td></td><td><code>list</code>, <code>update</code>, <code>remove</code>, <code>markAllRead</code></td></tr>
-        <tr><td><code>materials</code></td><td></td><td><code>list</code>, <code>create</code>, <code>get</code>, <code>update</code>, <code>remove</code></td></tr>
-        <tr><td><code>materialsStorage</code></td><td></td><td><code>save</code>, <code>read</code>, <code>remove</code>, <code>export</code>, <code>import</code></td></tr>
-        <tr><td><code>tools</code></td><td></td><td><code>list</code>, <code>create</code>, <code>get</code>, <code>update</code>, <code>remove</code>, <code>export</code>, <code>exportById</code>, <code>import</code>, <code>importById</code></td></tr>
-        <tr><td><code>toolsStorage</code></td><td></td><td><code>save</code>, <code>read</code>, <code>remove</code></td></tr>
-        <tr><td><code>machineConfigs</code></td><td></td><td><code>list</code>, <code>create</code>, <code>get</code>, <code>update</code>, <code>remove</code>, <code>clone</code></td></tr>
-        <tr><td><code>machineConfigsStorage</code></td><td></td><td><code>save</code>, <code>read</code>, <code>remove</code>, <code>export</code>, <code>import</code></td></tr>
-        <tr><td><code>drawings</code></td><td></td><td><code>listForProject</code>, <code>createForProject</code>, <code>get</code>, <code>update</code>, <code>remove</code></td></tr>
-        <tr><td><code>components</code></td><td></td><td><code>listForProject</code>, <code>createForProject</code>, <code>get</code>, <code>update</code>, <code>remove</code></td></tr>
-        <tr><td><code>toolpaths</code></td><td></td><td><code>list</code>, <code>create</code>, <code>get</code>, <code>update</code>, <code>remove</code>, <code>listForDrawing</code>, <code>createForDrawing</code></td></tr>
-        <tr><td><code>projectToolpaths</code></td><td></td><td><code>list</code>, <code>create</code></td></tr>
-        <tr><td><code>toolpathExtras</code></td><td></td><td><code>library</code>, <code>listVersions</code>, <code>createVersion</code>, <code>restoreVersion</code>, <code>listComments</code>, <code>createComment</code>, <code>updateComment</code>, <code>removeComment</code></td></tr>
-        <tr><td><code>toolpathGenerator</code></td><td></td><td><code>generate</code>, <code>suggest</code>, <code>parse</code>, <code>verify</code>, <code>manufacture</code></td></tr>
-        <tr><td><code>cadExact</code></td><td></td><td><code>step</code>, <code>analyze</code>, <code>assembly</code></td></tr>
-        <tr><td><code>library</code></td><td></td><td><code>list</code>, <code>create</code>, <code>get</code>, <code>update</code>, <code>remove</code>, <code>components</code>, <code>materials</code>, <code>tools</code></td></tr>
-        <tr><td><code>vcs</code></td><td></td><td><code>status</code>, <code>log</code>, <code>branches</code>, <code>createBranch</code>, <code>checkout</code>, <code>commit</code>, <code>restore</code>, <code>diff</code>, <code>remote</code>, <code>setRemote</code>, <code>push</code>, <code>pull</code>, <code>listPullRequests</code>, <code>pullRequest</code>, <code>openPullRequest</code>, <code>review</code>, <code>mergePullRequest</code>, <code>closePullRequest</code>, <code>listWorkflows</code>, <code>workflow</code>, <code>runs</code>, <code>dispatch</code></td></tr>
-        <tr><td><code>events</code></td><td></td><td><code>subscribe</code></td></tr>
-        <tr><td><code>companion</code></td><td></td><td><code>status</code>, <code>enable</code>, <code>disable</code>, <code>pair</code>, <code>revoke</code></td></tr>
-      </tbody>
-    </table>
+    <h2>Streaming and recovery</h2>
+<p>The AI stream carries typed events for text, reasoning, tool calls and results, permission and question requests, retries, turn state, context, and completion. Clients must consume events incrementally and retain the session identifier. An HTTP connection ending is not sufficient evidence that a model turn finished: session state can be read again after reconnecting.</p>
+    <p>AI event schemas live in <code>packages/api/src/ai-events.ts</code> and <code>packages/ai/src/events.ts</code>. General live events use the events group. Binary downloads, JavaScript plugin bootstrap responses, and signed raw webhook bodies require their own transport handling.</p>
   </section>
 
   <section id="codegen" class="doc-section">
-    <h2>Codegen</h2>
-    <p>
-      Public functions in <code>packages/httpapi-codegen</code> are <code>compile</code>,
-      <code>emitEffect</code>, <code>emitEffectImported</code>, <code>emitEffectShape</code>,
-      <code>emitPromise</code>, <code>emitPromiseCompat</code>, <code>write</code>, and
-      <code>generate</code>.
-    </p>
-    <p>
-      <code>packages/api/scripts/generate-clients.ts</code> calls <code>compile</code> on
-      <code>Api</code> with <code>clientPathsFromEndpointNames: true</code> and
-      <code>clientMiddleware</code> set to <code>cadcamfun/api/Authorization</code>.
-      <code>emitPromise</code> writes <code>packages/api/src/sdk/generated</code>.
-      <code>emitEffectImported</code> writes <code>packages/api/src/client/generated</code>.
-      The scripts are <code>bun run generate</code> and <code>generate:check</code>.
-    </p>
+    <h2>Generated SDKs</h2>
+<p><code>@cadcamfun/httpapi-codegen</code> reflects HttpApi groups into operation metadata and generated clients. The API generator writes a Promise SDK to <code>packages/api/src/sdk/generated</code> and Effect clients to <code>packages/api/src/client/generated</code>. The public Promise SDK is exported as <code>@cadcamfun/api/sdk</code>.</p>
+    <DocCode language="bash" title="Regenerate or check client drift">
+{`bun run --filter @cadcamfun/api generate
+bun run --filter @cadcamfun/api generate:check`}
+    </DocCode>
+    <p>Both generated targets omit profile multipart upload, plugin multipart installation, MCP creation with multiple success schemas, MCP update with colliding identifiers, project toolpath creation with duplicate input names, and plugin file serving with stream headers. The Promise target also omits Stripe raw webhooks, plugin JavaScript bootstrap, binary file download, and the generator's generate/suggest requests. These omissions are explicit in <code>packages/api/scripts/generate-clients.ts</code>; use the contract client or the appropriate raw transport for those operations.</p>
   </section>
-  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "Database", href: "/docs/database" }, { title: "AI assistant", href: "/docs/ai" }]} />
+
+  <section id="layout" class="doc-section">
+    <h2>Source organization</h2>
+<p><code>groups/</code> contains resource contracts. Shared geometry and CAM schemas come from <code>@cadcamfun/core</code>; <code>cad-exact.ts</code>, <code>cam-kernel.ts</code>, and <code>cam-program.ts</code> describe rich CAD/CAM results and portable documents. <code>client.ts</code> builds the contract client, while the generation script owns generated targets and omission lists.</p>
+  </section>
+
+  <section id="boundaries" class="doc-section">
+    <h2>Integration rules</h2>
+<p>Reuse contract schemas at transport boundaries and keep database dependencies in the sidecar. Introduce an endpoint through its contract, handler, service or repository, and focused HTTP coverage together. Generated files are outputs: edit their contract or generator and regenerate them. An API schema version, a portable file version, and a plugin API version describe separate contracts.</p>
+  </section>
+
+
+  <section id="resource-reference" class="doc-section">
+    <h2>Resource reference</h2>
+    <p><strong>{apiStats.operations} operations</strong> across <strong>{apiStats.paths} paths</strong> and <strong>{apiStats.groups} resource groups</strong>, with {apiStats.schemas} named schemas. Each resource page lists its operations and shows declared path/query/header parameters, required and optional fields, nullable values, content types, success and error statuses, and full schemas.</p>
+    <p>The data is emitted from <code>packages/api/src/index.ts</code>, the same composed HttpApi contract used by the clients and sidecar. The pages describe the checked-out contract; inspect the running server's <code>/api/openapi.json</code> if you connect to another version.</p>
+    <div class="doc-grid not-prose">
+      {apiGroups.map((group) => <DocCard title={group.title} href={`/docs/api/${group.slug}`} eyebrow="HTTP resource"><p>{group.summary}</p></DocCard>)}
+    </div>
+    <p><a href="/docs/api/openapi.json">Download OpenAPI JSON</a> · <a href="/docs/guides/api-tour">Follow requests with captured responses</a></p>
+  </section>
+  <section id="connection" class="doc-section">
+    <h2>Connection and request conventions</h2>
+    <p>The API is supplied by the local sidecar rather than a fixed hosted endpoint. Tauri obtains its dynamically selected loopback URL and launch token. A manually started sidecar announces its port in a JSON ready event. A paired mobile client connects through its configured HTTPS gateway instead.</p>
+    <DocCode language="bash" title="Read with your current sidecar connection">{String.raw`curl --silent --show-error "$CADCAMFUN_URL/api/projects" \
+  --header "Authorization: Bearer $CADCAMFUN_TOKEN"`}</DocCode>
+    <p>Set both variables from the actual connection. Request templates on resource pages deliberately use placeholders and payload files. Optional transport fields are not promises that every business operation can omit them: project creation, for example, rejects a missing name in its handler.</p>
+    <table>
+      <thead><tr><th>Convention</th><th>Client behavior</th></tr></thead>
+      <tbody>
+        <tr><td>Path parameters</td><td>Replace the named segment and URL-encode its value. Treat an identifier as a single segment.</td></tr>
+        <tr><td>Query parameters</td><td>Encode declared values. Pagination and filtering are per-endpoint; there is no universal page-size contract.</td></tr>
+        <tr><td>JSON payload</td><td>Send the declared object with <code>Content-Type: application/json</code>. Required presence and accepting null are independent.</td></tr>
+        <tr><td>Multipart payload</td><td>Build form parts with the upload client or FormData; let the transport choose its boundary.</td></tr>
+        <tr><td>Binary, JavaScript, or stream response</td><td>Consume the declared media type. Do not call <code>response.json()</code> unconditionally.</td></tr>
+        <tr><td>Errors</td><td>Check HTTP status and decode the endpoint's declared failure shape. Error envelopes differ across resource families.</td></tr>
+        <tr><td>Retried writes</td><td>Read state after an interrupted operation before resubmitting a mutation. The contract does not provide a universal idempotency-key mechanism.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section id="reference-maintenance" class="doc-section">
+    <h2>Generated reference maintenance</h2>
+    <p><code>packages/web/script/generate-api-reference.mjs</code> reads the composed contract using the API package's installed Effect implementation and writes the reference JSON. The documentation Worker consumes the generated content; it does not initialize the application server to answer documentation requests.</p>
+    <DocCode language="bash" title="From packages/web">{`bun run generate:api-reference
+bun run check:api-reference
+bun run check:docs-index`}</DocCode>
+    <p>Resource coverage is checked against every declared operation. A newly added group must receive reader-facing metadata and navigation, and a changed request or response must be regenerated. Handwritten guides still explain authorization rules, side effects, service configuration, and limits that an HTTP schema alone cannot express.</p>
+  </section>
+
+
+  <section id="integration-recipes" class="doc-section">
+    <h2>Integration recipes</h2>
+    <p>Start with <a href="/docs/guides/api-tour">captured HTTP requests</a> to see how project creation, business validation, bearer rejection, related records, and key-value persistence actually respond. Use <a href="/docs/guides/api-clients">typed client integration</a> to reproduce those operations with the Promise SDK or Effect client and handle their distinct failure channels.</p>
+    <table><thead><tr><th>Integration</th><th>Procedure</th><th>Key state to retain</th></tr></thead><tbody>
+      <tr><td>Project editor</td><td><a href="/docs/guides/project-lifecycle">Create, save, and reopen work</a></td><td>Project/resource identity, saved data, actual update semantics.</td></tr>
+      <tr><td>Manufacturing pipeline</td><td><a href="/docs/guides/native-manufacturing">Generate and persist a native job</a></td><td>Captured request, exact NC/program, release claims, matching portable document.</td></tr>
+      <tr><td>Assistant UI</td><td><a href="/docs/guides/ai-streaming">Consume events and recover sessions</a></td><td>Project/session identity, pending permissions/questions, terminal turn state.</td></tr>
+      <tr><td>External capability</td><td><a href="/docs/guides/plugin-authoring">Author a supported plugin</a></td><td>Manifest, module exports, capability grant, argument validation and tool result.</td></tr>
+      <tr><td>Review automation</td><td><a href="/docs/guides/project-history">Version and review project work</a></td><td>Commit/ref, structural diff, reviews, committed workflow, individual check outputs.</td></tr>
+      <tr><td>Paired client</td><td><a href="/docs/guides/companion-pairing">Enable and manage device access</a></td><td>Gateway address, certificate fingerprint, individually revocable device token.</td></tr>
+    </tbody></table>
+    <p>These recipes connect HTTP contracts to real service behavior. A schema can describe required presence, encoding, and a returned shape; its linked guide explains access rules, persistence effects, supported recovery, and limits that cannot be inferred from those types alone.</p>
+  </section>
+
+  <DocRelated items={[{ title: "Sidecar", href: "/docs/sidecar" }, { title: "AI assistant", href: "/docs/ai" }, { title: "Setups", href: "/docs/setups" }]} />
 </DocsLayout>

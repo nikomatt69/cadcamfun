@@ -1,0 +1,172 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "What a project contains", href: "#scope" },
+  { title: "Select the real API", href: "#connect" },
+  { title: "Create and inspect a project", href: "#create-project" },
+  { title: "Create and open a drawing", href: "#drawing" },
+  { title: "Save, duplicate, and export design data", href: "#save-drawing" },
+  { title: "Store a reusable component", href: "#components" },
+  { title: "Prepare machining resources", href: "#resources" },
+  { title: "Save and reopen a CAM program", href: "#cam-save" },
+  { title: "Choose the history you need", href: "#history" },
+  { title: "Verify persistence and resolve failures", href: "#verify" },
+]
+---
+
+<DocsLayout title="Project lifecycle" subtitle="Create a project, save its design data, reopen it, and choose the right kind of history." description="Practical project, drawing, component, resource, CAM save, export, and version workflows grounded in the desktop and HTTP implementation." toc={toc}>
+  <section id="scope" class="doc-section">
+    <h2>What a project contains</h2>
+    <p>A project groups drawings, reusable components, and saved toolpaths. A drawing stores a JSON document; a component stores reusable design data; a toolpath can hold plain NC and metadata or a validated portable CAM document. Materials, cutters, and machine configurations are separate resource records that machining workflows can reference. A project identifier does not replace any of those resource identifiers.</p>
+    <p>This guide follows the same families used by the desktop. It separates saving application state, downloading a file, recording a toolpath version, and committing project history. Those operations preserve different information. Start with a disposable development project before applying the sequence to production work.</p>
+    <p>The examples are request templates whose JSON bodies match the current schemas. They are not captured server responses. For every field and declared status, use the <a href="/docs/api/projects">Projects</a>, <a href="/docs/api/drawings">Drawings</a>, <a href="/docs/api/components">Components</a>, and <a href="/docs/api/toolpaths">Toolpaths</a> API references.</p>
+  </section>
+
+  <section id="connect" class="doc-section">
+    <h2>Select the real API</h2>
+    <p>Run the desktop with <code>bun run desktop:dev</code>, or start an isolated manual sidecar using the <a href="/docs/guides/local-dev#processes">local development recipe</a>. The manual process announces an ephemeral port. Browser preview without an endpoint uses in-memory fixtures; it cannot establish that a project survives restarting the server.</p>
+    <DocCode language="bash" title="Second terminal: replace the example port and token">
+{`CADCAM_URL=http://127.0.0.1:43111
+CADCAM_TOKEN=local-development-token
+CADCAM_DEMO_DIR=$(mktemp -d /tmp/cadcamfun-project-guide.XXXXXX)
+
+curl --fail-with-body "$CADCAM_URL/api/health"
+curl --fail-with-body "$CADCAM_URL/api/projects" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>Health is public, so it can succeed while a protected project request fails authorization. Use the token supplied to this process. Keep the same shell for the following examples so the URL, token, temporary directory, and extracted identifiers remain available. Keep the sidecar's stdin open in its launching terminal.</p>
+  </section>
+
+  <section id="create-project" class="doc-section">
+    <h2>Create and inspect a project</h2>
+    <DocCode language="bash" title="Create one private personal project">
+{`curl --fail-with-body -X POST "$CADCAM_URL/api/projects" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bracket study","description":"Disposable guide project","organizationId":null,"isPublic":false}' \
+  -o "$CADCAM_DEMO_DIR/project.json"
+
+CADCAM_PROJECT_ID=$(bun --no-env-file -e \
+  'console.write((await Bun.file(process.argv[1]).json()).id)' \
+  "$CADCAM_DEMO_DIR/project.json")
+curl --fail-with-body "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>Creation returns HTTP 201 with a project row. The handler requires a truthy name even though the transport schema declares that field optional. A supplied organization must be one the caller belongs to. Reading the project returns owner/organization information and drawing/component counts; it is a different response shape from creation.</p>
+    <p>In the desktop, use <code>/projects</code> to browse and <code>/projects/:id</code> to open the dashboard. It has Drawings, Components, and Toolpaths tabs, plus Edit, Delete, and Version control actions. Project update requires the name again; owner or organization ADMIN/MANAGER can update, while deletion is restricted to the owner or ADMIN.</p>
+  </section>
+
+  <section id="drawing" class="doc-section">
+    <h2>Create and open a drawing</h2>
+    <DocCode language="bash" title="Create an empty editor document and keep its identifier">
+{`curl --fail-with-body -X POST "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID/drawings" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Main drawing","description":null,"data":{"elements":[],"version":"1.0"}}' \
+  -o "$CADCAM_DEMO_DIR/drawing.json"
+
+CADCAM_DRAWING_ID=$(bun --no-env-file -e \
+  'console.write((await Bun.file(process.argv[1]).json()).id)' \
+  "$CADCAM_DEMO_DIR/drawing.json")
+curl --fail-with-body "$CADCAM_URL/api/drawings/$CADCAM_DRAWING_ID" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>The same empty document shape is used by the project dashboard's create-drawing flow. It creates a row, not geometry. Open <code>/cad?drawingId=&lt;id&gt;</code> or <code>/drawings/&lt;id&gt;</code> to edit it. With <code>/cad?projectId=&lt;id&gt;</code>, CAD selects the project's newest drawing; a named drawing takes precedence.</p>
+    <p>Drawing creation needs project access and a name. An individual drawing read/update requires the project owner or an organization member; deletion adds an owner/organization-ADMIN check. JSON <code>data</code> is not validated as a complete drawable geometry document by the generic endpoint. A successful write therefore does not prove every supplied element can render.</p>
+  </section>
+
+  <section id="save-drawing" class="doc-section">
+    <h2>Save, duplicate, and export design data</h2>
+    <p>On an already opened stored drawing, the CAD save action updates that drawing and adds missing local-library components to its project. The CAD page implements its own <code>Cmd/Ctrl+S</code> handler. A document without a stored destination opens the export/save flow; Save as Project requires geometry or a selected element and creates a new project and drawing.</p>
+    <p>The drawing snapshot includes elements, layers, selected-element identifier, measuring settings, and a format version. The current load path restores elements and valid units/tolerance settings, maps unknown layer identifiers to the active layer, and clears selection. Do not infer complete layer restoration from the fields present in an export.</p>
+    <p>Project component synchronization matches trimmed, case-insensitive names and adds missing names; it does not overwrite a same-name definition. Component creation is best effort and can fail independently. A saved drawing does not prove every local component was copied, and the multi-request save flow is not one database transaction.</p>
+    <p>From a drawing card, Duplicate loads its stored data and creates a new identifier. Download exports that drawing's data as JSON; it does not export an entire project. Generic drawing updates apply truthy name/data/thumbnail values and allow an explicit null description. They do not expose the repository's compare-and-swap hash parameter.</p>
+  </section>
+
+  <section id="components" class="doc-section">
+    <h2>Store a reusable component</h2>
+    <DocCode language="bash" title="Create a component, then validate its reusable data on update">
+{`curl --fail-with-body -X POST "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID/components" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Bracket insert","description":"Reusable empty template","data":{"name":"Bracket insert","type":"custom","elements":[]}}' \
+  -o "$CADCAM_DEMO_DIR/component.json"
+
+CADCAM_COMPONENT_ID=$(bun --no-env-file -e \
+  'console.write((await Bun.file(process.argv[1]).json()).id)' \
+  "$CADCAM_DEMO_DIR/component.json")
+curl --fail-with-body -X PUT "$CADCAM_URL/api/components/$CADCAM_COMPONENT_ID" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"custom","isPublic":false,"data":{"name":"Bracket insert","type":"custom","elements":[]}}'`}
+    </DocCode>
+    <p>Creation returns HTTP 201. The current repository create operation stores name, description, data, and project association; it does not persist top-level type/public/thumbnail options at creation. The explicit update above sets the intended top-level type and visibility. Update validates truthy component data, normalizes missing optional fields, and rejects an empty patch.</p>
+    <p>Open <code>/components/:id</code> for the detail screen or browse <code>/components</code> with a project filter. Visibility currently includes project owners, organization members, and public components. The component handlers do not enforce an additional owner-only gate for visible-component edits/deletion; do not treat public visibility as a protected read-only share.</p>
+  </section>
+
+  <section id="resources" class="doc-section">
+    <h2>Prepare machining resources</h2>
+    <p>The resource screens are <code>/materials</code>, <code>/tools</code>, and <code>/machine</code>, with individual detail routes. Materials require a name and a properties value. Tools require name, type, nonzero diameter, and material. The UI supplies positive diameter constraints, but integrations should validate engineering dimensions explicitly rather than relying on truthiness checks.</p>
+    <DocCode language="json" title="Example cutter body for POST /api/tools">
+{`{
+  "name": "6 mm end mill",
+  "type": "endmill",
+  "diameter": 6,
+  "material": "carbide",
+  "numberOfFlutes": 3,
+  "cuttingLength": 18,
+  "shankDiameter": 6,
+  "isPublic": false
+}`}
+    </DocCode>
+    <p>A machine configuration needs type <code>mill</code>, <code>lathe</code>, <code>printer</code>, or <code>laser</code>; positive work-volume dimensions, maximum spindle speed, and maximum feed rate; and optional controller/axes data. Four/five-axis configurations require compatible rotary configuration checked by the handler. These records describe equipment; their existence does not verify a particular generated program.</p>
+    <p>Use <a href="/docs/api/materials">Materials</a>, <a href="/docs/api/tools">Tools</a>, and <a href="/docs/api/machines">Machines</a> for exact bodies. Material/tool lists return arrays; machine routes use a success envelope. Read the selected endpoint's response instead of assuming one universal collection shape.</p>
+  </section>
+
+  <section id="cam-save" class="doc-section">
+    <h2>Save and reopen a CAM program</h2>
+    <p>A toolpath can be created under a project with <code>POST /api/toolpaths</code> using name and projectId, or attached to a drawing with <code>POST /api/drawings/:id/toolpaths</code> using name and data. The project dashboard uses the top-level family and opens the result through <code>/cam?loadToolpath=&lt;id&gt;</code>. The CAM page reads the saved original through the API.</p>
+    <p>The CAM save modal offers existing project, new project, or update of the saved program. G-code export downloads text. Portable export downloads <code>.cam.json</code> with <code>format: cadcamfun-cam</code>, settings, program, stock, drawing context, and matching evidence where available. Application save persists that document in the toolpath record.</p>
+    <p>Portable documents are validated and matched to their NC. Editing code can remove stale evidence or require reparsing. New kernel artifacts are rechecked against captured source requests; arbitrary client-supplied verification claims are not accepted as proof. Owner/ADMIN/MANAGER restrictions also apply to saving portable programs into a project.</p>
+    <p>When a new-project save partially succeeds, the modal retains its created destination for retry. Inspect that identifier before restarting the flow and creating another project. See <a href="/docs/api/toolpaths">Toolpaths</a> and <a href="/docs/setups">saved program documents</a>.</p>
+  </section>
+
+  <section id="history" class="doc-section">
+    <h2>Choose the history you need</h2>
+    <table>
+      <thead><tr><th>Mechanism</th><th>Preserves</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>Editor undo/redo</td><td>Local interaction/session snapshots</td><td>Undo the current editing action.</td></tr>
+        <tr><td>Toolpath versions</td><td>Recorded data, NC, author, and change message for one program</td><td>Review or restore a program revision.</td></tr>
+        <tr><td>Project history</td><td>Committed project snapshots and changed entity files</td><td>Compare, branch, review, or restore project state.</td></tr>
+        <tr><td>Downloaded JSON/NC</td><td>The particular exported content</td><td>Keep or transfer an external artifact.</td></tr>
+      </tbody>
+    </table>
+    <p>Updating through the CAM save modal records the previous program first. Manual save on the toolpath detail screen records the updated state as a version. Version restore records the current state before replacing it, so a restore can be reversed through another version operation. These are distinct flows; a generic PUT is not automatically a project commit.</p>
+    <p>Open <code>/toolpaths/:id</code> for Details, G-code, Versions, and Comments. Open <code>/projects/:id/history</code> for project history; per-item buttons filter by paths such as <code>drawings/&lt;id&gt;.json</code>. The <a href="/docs/api/toolpath-history">toolpath history API</a> accepts <code>versionId</code> for restoration.</p>
+  </section>
+
+  <section id="verify" class="doc-section">
+    <h2>Verify persistence and resolve failures</h2>
+    <ol>
+      <li>Read the created project, drawing, and component through their identifier endpoints.</li>
+      <li>Open the corresponding desktop routes and confirm the actual design/program contents.</li>
+      <li>Restart the same sidecar data directory, update the ephemeral URL, and repeat the reads.</li>
+      <li>Download an export separately and inspect its fields; a database row does not prove a file was exported.</li>
+    </ol>
+    <p>A 400 usually points to missing required business fields or invalid document data; a 403 indicates a refused operation; a 404 can mean absent or inaccessible data. The project dashboard currently turns individual resource-list failures into empty arrays, so an empty tab alone is insufficient evidence of deletion. Inspect the direct API result before creating duplicates.</p>
+    <p>Implementation anchors are <code>projects.ts</code> and <code>groups/&#123;drawings,components,toolpaths&#125;.ts</code> in the API package; the corresponding sidecar handlers/repositories; <code>projectSnapshot.ts</code>, <code>CadPage.tsx</code>, <code>SaveCamModal.tsx</code>, and <code>ToolpathDetailScreen.tsx</code>. Use an isolated project for deletion tests and preserve user work before restoration.</p>
+  </section>
+
+  <DocRelated items={[
+    { title: "Projects API", href: "/docs/api/projects" },
+    { title: "Drawing API", href: "/docs/api/drawings" },
+    { title: "Toolpath API", href: "/docs/api/toolpaths" },
+    { title: "Project history", href: "/docs/history" }
+  ]} />
+</DocsLayout>

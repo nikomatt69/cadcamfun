@@ -6,392 +6,157 @@ import DocCode from "../../../components/docs/DocCode.astro"
 import DocRelated from "../../../components/docs/DocRelated.astro"
 
 const toc = [
-  { title: "Before you install", href: "#before" },
-  { title: "Install and test", href: "#install" },
-  { title: "Migrate", href: "#migrate" },
-  { title: "Desktop window", href: "#desktop" },
-  { title: "After the window opens", href: "#after" },
-  { title: "Other commands", href: "#other-commands" },
+  { title: "Requirements", href: "#before" },
+  { title: "Install dependencies", href: "#install" },
+  { title: "Database setup", href: "#migrate" },
+  { title: "Open the desktop", href: "#desktop" },
+  { title: "Verify the first session", href: "#after" },
+  { title: "Next commands", href: "#other-commands" },
+  { title: "Verify a real API without a model", href: "#project-smoke" },
+  { title: "Interpret first-run failures", href: "#first-run-errors" },
 ]
 ---
 
 <DocsLayout
   title="Quickstart"
-  subtitle="From a clean checkout to a Tauri window. Every command is run at the repository root."
-  description="Install CADCAMFUN with Bun, run tests, generate and apply Drizzle migrations, and start the desktop dev window."
+  subtitle="From workspace dependencies to a desktop window backed by the real local sidecar."
+  description="Install and run CADCAMFUN desktop, distinguish preview mode, locate data, and verify a checkout."
   toc={toc}
 >
   <section id="before" class="doc-section">
-    <h2>Before you install</h2>
-    <p>
-      You need Bun and a Rust toolchain. The repo root <code>package.json</code> sets
-      <code>packageManager</code> to <code>bun@1.4.2</code>. <code>specs/00-overview.md</code> names
-      Rust 1.96 as the installed toolchain. The Tauri CLI is not installed with Cargo. It is the
-      devDependency <code>@tauri-apps/cli</code> on <code>@cadcamfun/desktop</code>, and
-      <code>bun install</code> at the root brings it in.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Check</th><th>Command</th><th>You are looking for</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Bun</td>
-          <td><code>bun --version</code></td>
-          <td>A Bun that can install this lockfile. The pin in package.json is 1.4.2.</td>
-        </tr>
-        <tr>
-          <td>Rust</td>
-          <td><code>rustc --version</code></td>
-          <td>A toolchain that can compile <code>apps/desktop/src-tauri</code>. The overview names 1.96.</td>
-        </tr>
-        <tr>
-          <td>Host triple</td>
-          <td><code>rustc -vV</code></td>
-          <td>The <code>host:</code> line. The sidecar binary is named <code>sidecar-&lt;that-triple&gt;</code>.</td>
-        </tr>
-      </tbody>
-    </table>
-    <DocCallout title="Do not cargo-install Tauri" type="warn">
-      <p>
-        <code>cargo install tauri-cli</code> is the wrong CLI for this repo. <code>desktop:dev</code>
-        calls <code>tauri</code> through the desktop package. A globally installed CLI will not match
-        <code>@tauri-apps/cli</code> ^2 that <code>apps/desktop/package.json</code> declares.
-      </p>
-    </DocCallout>
-    <p>
-      Clone the repo and <code>cd</code> to its root (the directory that contains the root
-      <code>package.json</code>, <code>packages/</code>, <code>apps/</code>, and <code>specs/</code>).
-      Do not run <code>bun install</code> inside a single package. Workspaces are declared only at
-      the root: <code>"workspaces": ["packages/*", "apps/*"]</code>.
-    </p>
+    <h2>Requirements</h2>
+    <p>The workspace declares Bun <code>1.4.2</code> as its package manager. Use the repository lockfile for dependency installation. Native desktop development also requires a Rust toolchain, the platform's Tauri build dependencies, and an installed system webview. The Tauri CLI is already a desktop development dependency.</p>
+    <ul>
+      <li><strong>macOS:</strong> Xcode command-line tools for Rust/native linking and packaging.</li>
+      <li><strong>Windows:</strong> the MSVC toolchain and WebView2 runtime/build prerequisites.</li>
+      <li><strong>Linux:</strong> WebKitGTK 4.1, application-indicator, librsvg, OpenSSL, and bundler tools. The CI workflow records the packages used on Ubuntu.</li>
+      <li><strong>iOS companion:</strong> macOS, Xcode, CocoaPods, and a native Expo build containing the local pinning module.</li>
+    </ul>
+    <p>A browser preview requires Bun and workspace dependencies but does not compile the Rust shell. A release installer additionally requires signing configuration; that is separate from local UI development.</p>
   </section>
 
   <section id="install" class="doc-section">
-    <h2>Install and test</h2>
-    <p>
-      Bun is the package manager, the test runner, and the sidecar runtime. Effect is pinned to
-      <code>4.0.0-rc.112</code> in every package that depends on it, because
-      <code>@nikcli-ai/sdk-next</code> requires that release. One copy of Effect keeps
-      <code>Context</code> service tags identical across packages.
-    </p>
-    <DocCode language="bash" title="From the repo root">
+    <h2>Install dependencies</h2>
+    <DocCode language="bash" title="From the repository root">
 {`bun install
-bun test packages apps
-bunx tsc -p packages/core/tsconfig.json
-bunx tsc -p apps/sidecar/tsconfig.json`}
+bun run --filter @cadcamfun/desktop typecheck
+bun test packages/core`}
     </DocCode>
-    <p>
-      <code>bun test packages apps</code> is the README suite: every <code>*.test.ts</code> under
-      <code>packages/</code> and <code>apps/</code>. The root script <code>bun run test</code> is
-      wider. It runs <code>bun test packages apps scripts</code>, so it also runs the tests under
-      <code>scripts/</code>. Use the README command for the first pass. Use <code>bun run test</code>
-      before you touch the release scripts.
-    </p>
-    <p>
-      The README typecheck takes one tsconfig. There is no package named <code>&lt;name&gt;</code>.
-      Use the directory you changed:
-    </p>
-    <table>
-      <thead>
-        <tr><th>You changed</th><th>Typecheck</th><th>Tests</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>packages/db</code></td>
-          <td><code>bunx tsc -p packages/db/tsconfig.json</code></td>
-          <td><code>bun test packages/db</code></td>
-        </tr>
-        <tr>
-          <td><code>packages/core</code></td>
-          <td><code>bunx tsc -p packages/core/tsconfig.json</code></td>
-          <td><code>bun test packages/core</code></td>
-        </tr>
-        <tr>
-          <td><code>packages/api</code></td>
-          <td><code>bunx tsc -p packages/api/tsconfig.json</code></td>
-          <td><code>bun test packages/api</code></td>
-        </tr>
-        <tr>
-          <td><code>packages/ai</code></td>
-          <td><code>bunx tsc -p packages/ai/tsconfig.json</code></td>
-          <td><code>bun test packages/ai</code></td>
-        </tr>
-        <tr>
-          <td><code>apps/sidecar</code></td>
-          <td><code>bunx tsc -p apps/sidecar/tsconfig.json</code></td>
-          <td><code>bun test apps/sidecar</code></td>
-        </tr>
-        <tr>
-          <td><code>apps/desktop</code></td>
-          <td><code>bunx tsc -p apps/desktop/tsconfig.json</code></td>
-          <td><code>bun test apps/desktop</code></td>
-        </tr>
-        <tr>
-          <td><code>apps/mobile</code></td>
-          <td><code>bunx tsc -p apps/mobile/tsconfig.json</code></td>
-          <td><code>bun test apps/mobile</code></td>
-        </tr>
-      </tbody>
-    </table>
-    <p>
-      <code>tsconfig.base.json</code> is strict, with <code>noUncheckedIndexedAccess</code> and
-      <code>allowImportingTsExtensions</code>. The definition of done in
-      <code>specs/00-overview.md</code> §5 is: <code>bun install</code> succeeds, that
-      <code>tsc -p</code> exits 0, and <code>bun test &lt;package dir&gt;</code> passes. Most
-      package <code>typecheck</code> scripts call <code>tsgo -p tsconfig.json --noEmit</code> rather
-      than <code>tsc</code>. <code>bun run typecheck</code> runs those scripts through Turbo, then
-      <code>tsgo -p tsconfig.json --noEmit</code> at the root. Mobile and this docs site
-      (<code>@cadcamfun/web</code>) use <code>tsc</code> in their own scripts.
-    </p>
-    <DocCallout title="A failing install is a root-workspace problem" type="note">
-      <p>
-        If <code>bun install</code> fails, stay at the repo root. Do not delete
-        <code>bun.lock</code> and regenerate it to “fix” a pin. Effect must stay
-        <code>4.0.0-rc.112</code>. The only shared files an integrating change may edit are the root
-        <code>package.json</code> workspaces, <code>tsconfig.base.json</code>, and
-        <code>bun.lock</code>. Adding a new package’s own <code>package.json</code> is allowed.
-        Editing those shared files is not part of a normal quickstart.
-      </p>
-    </DocCallout>
+    <p>Install once at the workspace root so local <code>workspace:*</code> dependencies resolve together. CI uses <code>bun install --frozen-lockfile</code> to reject lockfile drift. Use the package scripts to select the repository's configured compiler rather than assuming every package uses the same TypeScript executable.</p>
+    <p>The targeted commands above provide a quick source check. The full workspace checks are <code>bun run typecheck</code> and <code>bun run test</code>; they cover more modules and may take longer. An individual passing package does not prove all runtime integrations are configured.</p>
   </section>
 
   <section id="migrate" class="doc-section">
-    <h2>Migrate</h2>
-    <p>
-      Schema changes belong to <code>packages/db</code> (WP0). Other packages do not talk to SQLite.
-      You only generate a migration when <code>packages/db/src/schema.ts</code> changed. On a fresh
-      clone you apply the SQL that is already committed.
-    </p>
-    <DocCode language="bash" title="From the repo root">
+    <h2>Database setup</h2>
+    <p>The real desktop does not require a separate CLI migration command. Its launcher supplies the application data directory and staged migrations to the sidecar; opening the database applies pending migrations. <code>bun run desktop:dev</code> stages the migration resource as part of preparing the sidecar.</p>
+    <p>The database command-line tool is separate. <code>bun run db:migrate</code> delegates to the database package and defaults to <code>./data/cadcamfun.db</code> relative to that package's process directory, normally <code>packages/db/data/cadcamfun.db</code> when invoked through the root script. Set an absolute <code>DATABASE_URL</code> when you need to target a specific database.</p>
+    <DocCode language="bash" title="Only when changing the database schema">
 {`bun run db:generate
 bun run db:migrate`}
     </DocCode>
-    <table>
-      <thead>
-        <tr><th></th><th><code>db:generate</code></th><th><code>db:migrate</code></th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Root script</td>
-          <td><code>bun run --filter @cadcamfun/db generate</code></td>
-          <td><code>bun run --filter @cadcamfun/db migrate</code></td>
-        </tr>
-        <tr>
-          <td>Package script</td>
-          <td><code>drizzle-kit generate</code></td>
-          <td><code>bun src/migrate.ts</code></td>
-        </tr>
-        <tr>
-          <td>Config / entry</td>
-          <td><code>packages/db/drizzle.config.ts</code></td>
-          <td><code>packages/db/src/migrate.ts</code></td>
-        </tr>
-        <tr>
-          <td>Reads</td>
-          <td><code>packages/db/src/schema.ts</code> and the existing snapshot in <code>packages/db/drizzle/</code></td>
-          <td>The SQL folders under <code>packages/db/drizzle/</code></td>
-        </tr>
-        <tr>
-          <td>Writes</td>
-          <td>A new folder of generated SQL. Do not hand-edit it.</td>
-          <td>The SQLite file named below. Creates the parent directory.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>
-      <code>drizzle.config.ts</code> sets <code>dialect: "sqlite"</code>,
-      <code>schema: "./src/schema.ts"</code>, <code>out: "./drizzle"</code>, and a credential URL of
-      <code>file:./data/cadcamfun.db</code> unless <code>DATABASE_URL</code> is already set in the
-      environment. <code>migrate.ts</code> uses the same default after stripping a <code>file:</code>
-      prefix: <code>./data/cadcamfun.db</code>.
-    </p>
-    <p>
-      Bun runs a <code>--filter</code> script with the package directory as the working directory.
-      The root command <code>bun run db:migrate</code> therefore resolves that relative path from
-      <code>packages/db</code>, which is <code>packages/db/data/cadcamfun.db</code>. README and
-      <code>specs/02-database.md</code> write the default as <code>./data/cadcamfun.db</code>. The
-      script logs <code>migrated</code> plus the path it opened. That log line is the file you have.
-      If your shell already exports <code>DATABASE_URL</code>, unset it when you want this default.
-      Do not create a <code>.env</code> file to hold it, and do not open <code>.env*</code> files to
-      discover a path.
-    </p>
-    <p>
-      Committed migration folders today (each contains <code>migration.sql</code>):
-    </p>
-    <ul>
-      <li><code>packages/db/drizzle/20261004223029_careful_monster_badoon/</code></li>
-      <li><code>packages/db/drizzle/20261008030518_redundant_dagger/</code></li>
-      <li><code>packages/db/drizzle/20261009012351_moaning_loki/</code></li>
-      <li><code>packages/db/drizzle/20261009171602_brown_mad_thinker/</code></li>
-    </ul>
-    <DocCallout title="This file is not the window’s database" type="warn">
-      <p>
-        <code>bun run db:migrate</code> updates the CLI file above. The Tauri window’s sidecar opens
-        <code>$CADCAMFUN_DATA_DIR/cadcamfun.db</code>. The shell sets <code>CADCAMFUN_DATA_DIR</code>
-        to Tauri’s <code>app_data_dir()</code> (<code>apps/desktop/src-tauri/src/lib.rs</code>) and
-        applies the bundled migrations itself on startup. Migrating the CLI file does not migrate
-        the running app. Details are on <a href="/docs/guides/local-dev">Local development</a>.
-      </p>
+    <p>Generation reads <code>packages/db/src/schema.ts</code> and writes migrations under <code>packages/db/drizzle</code>. Applying migrations updates the selected CLI database, not every application database. Native desktop data lives in the Tauri application data directory; a manually started sidecar uses <code>CADCAMFUN_DATA_DIR</code>.</p>
+    <DocCallout type="note" title="Choose the database deliberately">
+      <p>A successful CLI migration does not change which database the desktop opens. Locate the sidecar data directory before investigating missing projects or applying a manual data operation.</p>
     </DocCallout>
-    <p>
-      To change the schema: edit <code>packages/db/src/schema.ts</code>, run
-      <code>bun run db:generate</code>, and keep the generated SQL. Table and column names stay
-      identical to the legacy Prisma SQLite database. Migration SQL must not contain transaction
-      control or non-transactional statements such as <code>VACUUM</code>
-      (<code>specs/02-database.md</code>). Commit the new folder only when you were asked to commit.
-      Database tests do not use this file. They open <code>:memory:</code>, as in
-      <code>packages/db/src/database.test.ts</code>.
-    </p>
   </section>
 
   <section id="desktop" class="doc-section">
-    <h2>Desktop window</h2>
-    <DocCode language="bash" title="From the repo root">
+    <h2>Open the desktop</h2>
+    <DocCode language="bash" title="From the repository root">
 {`bun run desktop:dev`}
     </DocCode>
-    <p>
-      The root script is <code>bun run build:sidecar &amp;&amp; bun run --filter @cadcamfun/desktop tauri dev</code>.
-      It always compiles the real sidecar before Tauri starts. Tauri’s
-      <code>beforeDevCommand</code> in <code>apps/desktop/src-tauri/tauri.conf.json</code> is
-      <code>bun run dev</code>, which is Vite. <code>devUrl</code> is
-      <code>http://localhost:1420</code>. The window is 1440×900, minimum 960×600, title
-      “CADCAM FUN”, identifier <code>com.cadcamfun.app</code>.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Step inside <code>build:sidecar</code></th><th>Result</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>bun scripts/build.ts --only=compile,resources</code></td>
-          <td>Two of the six pipeline steps, in that order.</td>
-        </tr>
-        <tr>
-          <td>compile</td>
-          <td>Bun-compiles <code>apps/sidecar/src/main.ts</code> to <code>apps/desktop/src-tauri/binaries/sidecar-&lt;triple&gt;</code>.</td>
-        </tr>
-        <tr>
-          <td>resources</td>
-          <td>Copies <code>packages/db/drizzle/</code> to <code>apps/desktop/src-tauri/resources/migrations/</code>.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>
-      The shell then spawns that binary, generates a token, and sets
-      <code>CADCAMFUN_TOKEN</code>, <code>CADCAMFUN_DATA_DIR</code>, and
-      <code>CADCAMFUN_MIGRATIONS_DIR</code>. The sidecar listens on <code>127.0.0.1</code> with port
-      <code>0</code> (the OS picks the port). When <code>GET /api/health</code> succeeds it prints
-      one JSON line on stdout. Stdout is reserved for that ready event. Effect logs go to stderr.
-      Do not add other <code>console.log</code> calls on the sidecar’s stdout.
-    </p>
-    <p>
-      The ready line is one JSON object,
-      <code>&#123;&quot;event&quot;:&quot;ready&quot;,&quot;port&quot;:N&#125;</code>,
-      where <code>N</code> is the port the OS assigned. The shell waits for that line
-      (<code>specs/07-tauri-shell.md</code>, timeout 15 seconds).
-    </p>
-    <DocCallout title="Do not replace the binary with the stub" type="warn">
-      <p>
-        <code>apps/desktop/scripts/build-stub-sidecar.ts</code> writes the same
-        <code>binaries/sidecar-&lt;triple&gt;</code> path. Without <code>--if-missing</code> it
-        overwrites a real sidecar you just compiled. The desktop script
-        <code>tauri:dev</code> is <code>bun scripts/build-stub-sidecar.ts --if-missing &amp;&amp; tauri dev</code>.
-        That is the shell-only loop (WP5 was verified with a stub). For the real HttpApi, use
-        <code>bun run desktop:dev</code> from the root, which runs <code>build:sidecar</code> first.
-        <code>--if-missing</code> leaves an existing binary in place, including a real one.
-      </p>
-    </DocCallout>
-    <p>
-      Packaged builds, still from the root:
-    </p>
-    <DocCode language="bash" title="Build scripts in scripts/build.ts and the desktop package">
-{`bun run build:sidecar
-bun run build:desktop
-bun run build
-bun scripts/build.ts --help`}
+    <p>This compiles the real Bun sidecar and stages migrations, then runs Tauri. Tauri starts Vite at <code>http://localhost:1420</code> and opens the webview. The Rust shell waits for the sidecar's ready handshake; the webview checks health before showing routed screens.</p>
+    <p>Keep the launching terminal open. The shell owns the sidecar lifecycle and supplies its launch token and paths. If startup fails, inspect the boot reason and application logs. The webview retries endpoint discovery for up to 150 seconds; the shell permits one automatic sidecar restart.</p>
+    <DocCode language="bash" title="Browser-only UI preview">
+{`bun run --filter @cadcamfun/desktop dev`}
     </DocCode>
-    <p>
-      <code>bun run build:desktop</code> is <code>vite build</code> for <code>@cadcamfun/desktop</code>.
-      It produces webview assets. It does not produce a <code>.app</code> or a sidecar.
-      <code>bun run build</code> is the full pipeline in <code>scripts/build.ts</code>, always in
-      this order: install (<code>bun install --frozen-lockfile</code>), check
-      (<code>bun run typecheck</code>), compile, resources, bundle (Vite, then
-      <code>tauri build</code>), artifacts (SHA-256 and notes). The script does not read
-      <code>.env*</code> files. A non-zero exit stops the run. Subsets:
-      <code>--only=compile,resources</code> is what <code>build:sidecar</code> already passes;
-      <code>--only=notes --dry-run</code> and <code>--target=aarch64-apple-darwin</code> are the
-      examples in the script header.
-    </p>
-    <p>
-      CI workflows that call this pipeline live in <code>.github/workflows/</code>:
-      <code>ci.yml</code>, <code>build-platforms.yml</code>, <code>release.yml</code>, and
-      <code>ios.yml</code>. WP10’s status in the overview is “pipeline + CI + updater; release
-      secrets unset”. Do not invent signing keys to make a release locally.
-    </p>
+    <p>Open <code>http://localhost:1420</code>. With no <code>VITE_SIDECAR_URL</code>, this uses the in-memory fake API. It supports a subset of requests and does not provide persistent projects, provider sessions, or native dialogs. Connect to a live sidecar by setting both Vite sidecar URL and token process variables.</p>
+    <p>The desktop package's <code>tauri:dev</code> script creates a stub sidecar when the binary is missing. The stub supports shell isolation. Prefer the root <code>desktop:dev</code> command when exercising application services.</p>
   </section>
 
   <section id="after" class="doc-section">
-    <h2>After the window opens</h2>
-    <p>
-      The UI is SolidJS under <code>apps/desktop/src</code>. Routes are one-line adapters in
-      <code>pages/</code>. Product code is in <code>features/&lt;name&gt;/</code>. The viewport is
-      <code>apps/desktop/src/viewport</code> (Three.js in <code>view3d/</code>, the 2D editor in
-      <code>editor2d/</code>). The window talks to the sidecar over HTTP. It does not open the
-      SQLite file.
-    </p>
-    <p>
-      Geometry inside <code>packages/core</code> is millimetres and radians. Degrees stay in the UI
-      or in the G-code post. If a dimension looks 57 times too large, a degree value crossed into
-      core.
-    </p>
-    <p>
-      Read <code>specs/00-overview.md</code> and <code>specs/01-conventions.md</code> before editing.
-      Remaining work is ordered in <code>specs/roadmap/README.md</code> (RM-00–RM-11). The current
-      step is RM-01, <code>specs/roadmap/01-action-catalogue.md</code>. The roadmap wins on sequence.
-      Design specs win on contracts. Do not treat <code>specs/20-integral-roadmap.md</code> or
-      <code>specs/21-integration-master-plan.md</code> as the queue.
-    </p>
-    <p>
-      A work package edits its own directory. Cross-package work starts with a spec change and a
-      change-log line. Code, comments, docs, and commit messages are English. Do not commit unless
-      asked. Do not import <code>.reference/</code>.
-    </p>
-    <p>
-      This docs site, from the same root:
-    </p>
-    <DocCode language="bash" title="Astro docs (packages/web)">
-{`bun run --filter @cadcamfun/web dev
-bun run --filter @cadcamfun/web check`}
+    <h2>Verify the first session</h2>
+    <ol>
+      <li>Wait for the application to leave the boot screen and confirm it is connected to the intended API.</li>
+      <li>Create or open a project and enter CAD or CAM.</li>
+      <li>Save the work and reopen it through the project/resource UI to verify persistence.</li>
+      <li>If using the assistant, configure a supported model provider in desktop settings before starting a conversation.</li>
+      <li>If using the iOS companion, enable its gateway and create a device pairing on the desktop.</li>
+    </ol>
+    <p>Testing a visible path does not validate machining safety. Inspect stock, tooling, machine limits, post output, and verification results for the actual operation before transferring NC output to a machine.</p>
+    <DocCode language="bash" title="Run the documentation site">
+{`bun run --cwd packages/web start
+bun run --cwd packages/web check
+bun run --cwd packages/web build`}
     </DocCode>
-    <p>
-      <code>check</code> runs <code>packages/web/script/check-docs-index.ts</code>, which fails when
-      a sidebar href has no index entry. It does not typecheck the desktop app.
-    </p>
+    <p>The web <code>start</code> command runs Astro. Use its printed local address. The web <code>dev</code> script additionally starts the Studio API, which can open the selected local database; use it when working on Studio rather than static documentation alone.</p>
   </section>
+
   <section id="other-commands" class="doc-section">
-    <h2>Other commands</h2>
-    <p>Commands that are not in the blocks above.</p>
+    <h2>Next commands</h2>
     <table>
-      <thead>
-        <tr><th>Command</th><th>Where</th></tr>
-      </thead>
+      <thead><tr><th>Goal</th><th>Command</th></tr></thead>
       <tbody>
-        <tr><td><code>bun run generate</code></td><td>Regenerate API clients.</td></tr>
-        <tr><td><code>generate:check</code></td><td>Fail when generated clients are stale.</td></tr>
-        <tr><td><code>bun run --filter @cadcamfun/desktop dev</code></td><td>Vite webview without the Tauri shell.</td></tr>
-        <tr><td><code>bun src/main.ts</code></td><td>Sidecar start from <code>apps/sidecar</code>. Entry is <code>apps/sidecar/src/main.ts</code>.</td></tr>
-        <tr><td><code>expo start --dev-client</code></td><td>Metro for the mobile development client.</td></tr>
-        <tr><td><code>expo run:ios</code></td><td>Native iOS build from <code>apps/mobile</code>.</td></tr>
-        <tr><td><code>bun test test</code></td><td>Mobile unit tests, run in <code>apps/mobile</code>.</td></tr>
+        <tr><td>Compile sidecar only and stage migrations</td><td><code>bun run build:sidecar</code></td></tr>
+        <tr><td>Build frontend without installers</td><td><code>bun run build:desktop</code></td></tr>
+        <tr><td>Review native build plan</td><td><code>bun scripts/build.ts --dry-run</code></td></tr>
+        <tr><td>Regenerate API clients</td><td><code>bun run generate</code></td></tr>
+        <tr><td>Check generated clients</td><td><code>bun run generate:check</code></td></tr>
+        <tr><td>Run companion transport tests</td><td><code>bun run --cwd apps/mobile test</code></td></tr>
       </tbody>
     </table>
-    <p>The webview entry is <code>apps/desktop/src/main.tsx</code>.</p>
   </section>
-  <DocRelated
-    items={[
+
+  <section id="project-smoke" class="doc-section">
+    <h2>Verify a real API without a model</h2>
+    <p>Start the manual sidecar described in the local development guide, or use the endpoint/token of a development process you control. The following recipe creates one disposable project and lists it. It needs curl; the optional identifier extraction uses Bun. Replace the example port and token with those of your isolated sidecar.</p>
+    <DocCode language="bash" title="Second terminal: health, create, list, read">
+{`CADCAM_URL=http://127.0.0.1:43111
+CADCAM_TOKEN=local-development-token
+
+curl --fail-with-body "$CADCAM_URL/api/health"
+
+curl --fail-with-body -X POST "$CADCAM_URL/api/projects" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Documentation smoke","description":"Disposable local check","isPublic":false}' \
+  -o /tmp/cadcamfun-project-smoke.json
+
+curl --fail-with-body "$CADCAM_URL/api/projects" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"
+
+CADCAM_PROJECT_ID=$(bun --no-env-file -e \
+  'const row = await Bun.file("/tmp/cadcamfun-project-smoke.json").json(); console.write(row.id)')
+curl --fail-with-body "$CADCAM_URL/api/projects/$CADCAM_PROJECT_ID" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>Health returns a status/timestamp object. Project creation returns HTTP 201 and a project row with its identifier. Listing returns an array of projects with owner/organization relations and counts; reading by identifier returns one such related project. The example does not call a model or generate machine output.</p>
+    <p>Close the manual sidecar cleanly, restart it with the same data directory, update the ephemeral URL, and list projects again to check persistence. A new launch may choose a different port. If this project is absent, first compare the data directory, client endpoint, and authorization context.</p>
+    <p>Cleanup is optional and destructive for this one disposable project: send <code>DELETE /api/projects/&lt;id&gt;</code> only after confirming the returned identifier. Creation/list/read exercise application persistence without requiring cleanup to succeed.</p>
+  </section>
+
+  <section id="first-run-errors" class="doc-section">
+    <h2>Interpret first-run failures</h2>
+    <table>
+      <thead><tr><th>Failure</th><th>Likely boundary</th><th>Next action</th></tr></thead>
+      <tbody>
+        <tr><td>Dependency install cannot resolve a local package</td><td>Workspace installation</td><td>Run from the repository root with the declared Bun version and lockfile.</td></tr>
+        <tr><td>Native linking or WebKit error</td><td>Tauri prerequisites</td><td>Install the toolchain/platform libraries used by the matching CI target.</td></tr>
+        <tr><td>No ready event</td><td>Sidecar configuration, migration, or startup</td><td>Inspect stderr and the structured error event. Keep stdin open.</td></tr>
+        <tr><td>Health works, project call returns 401</td><td>Authorization</td><td>Health is public; protected API calls still need the current process token.</td></tr>
+        <tr><td>Create returns 400</td><td>Request validation/business validation</td><td>Send JSON with a nonempty name and inspect the returned message.</td></tr>
+        <tr><td>Create returns 403 with organization data</td><td>Organization membership</td><td>Use an accessible organization or omit the organization field for a local check.</td></tr>
+        <tr><td>Native companion says pinning is unavailable</td><td>Missing local Expo module</td><td>Use a custom iOS build, not Expo Go.</td></tr>
+      </tbody>
+    </table>
+    <p>Keep the first verification small: health, one project, one persisted drawing/program, then optional integrations. A successful base application launch does not configure Stripe, AI providers, a remote GitHub repository, or mobile routing automatically.</p>
+  </section>
+
+  <DocRelated items={[
+      { title: "Project lifecycle", href: "/docs/guides/project-lifecycle" },
+      { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" },
       { title: "Local development", href: "/docs/guides/local-dev" },
-      { title: "Work packages", href: "/docs/guides/work-packages" },
-    ]}
-  />
+      { title: "Desktop UI", href: "/docs/desktop" },
+      { title: "Mobile companion", href: "/docs/mobile" }
+  ]} />
 </DocsLayout>

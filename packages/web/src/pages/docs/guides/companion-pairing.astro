@@ -1,0 +1,166 @@
+---
+export const prerender = true
+import DocsLayout from "../../../layouts/DocsLayout.astro"
+import DocCallout from "../../../components/docs/DocCallout.astro"
+import DocCode from "../../../components/docs/DocCode.astro"
+import DocRelated from "../../../components/docs/DocRelated.astro"
+
+const toc = [
+  { title: "Check the two ends of the connection", href: "#requirements" },
+  { title: "Enable the desktop gateway", href: "#enable-ui" },
+  { title: "Inspect and enable through the desktop API", href: "#enable-api" },
+  { title: "Create one named pairing", href: "#create-pair" },
+  { title: "Load the pairing on iOS", href: "#load-phone" },
+  { title: "What certificate pinning checks", href: "#pinning" },
+  { title: "Understand the device token scope", href: "#scope" },
+  { title: "Use sessions and recover connectivity", href: "#operate" },
+  { title: "Revoke or unpair deliberately", href: "#revoke" },
+  { title: "Diagnose failures by layer", href: "#errors" },
+  { title: "Implementation map", href: "#sources" },
+]
+---
+
+<DocsLayout title="Pair the iOS companion" subtitle="Connect a native iOS build to a running desktop, verify the certificate, and control device access." description="End-to-end gateway setup, device pairing, native certificate pinning, route scope, revocation, troubleshooting, and platform limits." toc={toc}>
+  <section id="requirements" class="doc-section">
+    <h2>Check the two ends of the connection</h2>
+    <p>The companion is a client of a running desktop sidecar. It does not host the project database, geometry kernel, model provider, or workflow runner. Before pairing, confirm that the desktop opens its projects and that the phone can route to the desktop through Wi-Fi, Personal Hotspot, or an already configured overlay/VPN network.</p>
+    <p>Use a native iOS build containing <code>modules/companion-net</code>. Expo Go lacks this module and cannot make the pinned connection. The package also has a browser development fallback, but browser fetch does not implement the native pinning policy. Android configuration in the manifest does not supply an Android equivalent of the Swift module.</p>
+    <DocCode language="bash" title="Native development entry points, from the repository root">
+{`bun install
+bun run --cwd apps/mobile typecheck
+bun run --cwd apps/mobile test
+bun run --cwd apps/mobile ios`}
+    </DocCode>
+    <p>The iOS run command requires macOS, Xcode, and CocoaPods. A physical-device build requires a trusted device and signing team. <code>bun run --cwd apps/mobile build</code> exports JavaScript; it does not create an installable IPA. See the <a href="/docs/mobile">mobile reference</a> for layout and transport implementation.</p>
+  </section>
+
+  <section id="enable-ui" class="doc-section">
+    <h2>Enable the desktop gateway</h2>
+    <p>Open desktop Settings → Devices and its Mobile companion panel, or use <code>/settings/companion</code>. Turn the gateway on, then create a named pairing and show its QR code. This is a separate listener from the ordinary loopback API: HTTPS on IPv4 <code>0.0.0.0</code>, port 8443 by default.</p>
+    <p>The service accepts integer ports 1024–65535. If another application occupies the selected port, enabling fails; choose a free port and create a link with the resulting address. Allow the connection through the desktop firewall for the network you intend to use. The application does not create a public relay, port forwarding, or a VPN.</p>
+    <p>Enabled state and port are persisted. After a sidecar restart, the gateway attempts to resume once the local API is ready. Certificate and private key files live under the sidecar data directory's <code>companion/</code> subdirectory; the private key is written with owner-only permissions. The native app trusts the certificate from pairing, not a generic promise that every local certificate is safe.</p>
+  </section>
+
+  <section id="enable-api" class="doc-section">
+    <h2>Inspect and enable through the desktop API</h2>
+    <p>For a reproducible development setup, use the launch token of an isolated sidecar you control. Replace port 43111 with its ready-event port. These are desktop-management calls; the phone token is not allowed to administer its own gateway.</p>
+    <DocCode language="bash" title="Status and enable requests">
+{`CADCAM_URL=http://127.0.0.1:43111
+CADCAM_TOKEN=local-development-token
+CADCAM_PAIR_DIR=$(mktemp -d /tmp/cadcamfun-pair-guide.XXXXXX)
+
+curl --fail-with-body "$CADCAM_URL/api/companion" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"
+
+curl --fail-with-body -X POST "$CADCAM_URL/api/companion/enable" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"port":18443}'`}
+    </DocCode>
+    <p>Status contains enabled state, nullable port/fingerprint, suggested host, and device entries. The fingerprint can be null before a certificate exists. A public <a href="/docs/api/health">health probe</a> establishes loopback process health; it does not prove that the HTTPS gateway is enabled, reachable, or accepting a device token. Use the <a href="/docs/api/companion">Companion API</a> for exact management schemas.</p>
+  </section>
+
+  <section id="create-pair" class="doc-section">
+    <h2>Create one named pairing</h2>
+    <DocCode language="bash" title="Save the credential-bearing result in a private temporary directory">
+{`curl --fail-with-body -X POST "$CADCAM_URL/api/companion/pair" \
+  -H "Authorization: Bearer $CADCAM_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Workshop iPhone","host":"192.168.1.20"}' \
+  -o "$CADCAM_PAIR_DIR/pairing.json"
+
+CADCAM_DEVICE_ID=$(bun --no-env-file -e \
+  'console.write((await Bun.file(process.argv[1]).json()).id)' \
+  "$CADCAM_PAIR_DIR/pairing.json")`}
+    </DocCode>
+    <p>Replace the example host with an address the phone can reach, or omit the optional host to use discovery. The name is trimmed and must contain 1–60 characters. Success is HTTP 201 with <code>id</code> and <code>link</code>. Creating a token does not enable the listener; enable it separately.</p>
+    <p>The link carries the device token, certificate fingerprint, primary HTTPS origin, name, and optional alternate hosts. Display or transfer it privately to the phone; it is a credential. The desktop stores the token hash rather than its plaintext. The record has no expiry field in this implementation, so revoke an obsolete device explicitly rather than assuming it will expire.</p>
+  </section>
+
+  <section id="load-phone" class="doc-section">
+    <h2>Load the pairing on iOS</h2>
+    <ol>
+      <li>Open the installed CADCAMFUN app's Connect screen.</li>
+      <li>Choose Scan the pairing QR code and grant camera access, or use Paste a pairing link.</li>
+      <li>For manual entry, provide the desktop address, token, and complete certificate fingerprint through the connection form.</li>
+      <li>Allow local-network access when iOS prompts. Camera access and network access are separate permissions.</li>
+      <li>Wait for the health/bootstrap probe to succeed and the app to open Projects.</li>
+    </ol>
+    <p>The parser requires an HTTPS origin without user information, path content, query, or fragment. Tokens must be 16–4096 characters without whitespace/control characters; fingerprints are exactly 64 hexadecimal characters. Invalid links are refused before requests start.</p>
+    <p>Discovered alternate origins are deduplicated. The client races candidates, uses the first successful connection, aborts the others, and saves the successful origin. Discovery advertises up to six suitable private IPv4 addresses, including Wi-Fi, hotspot, and Tailscale-style IPv4 ranges; the current IPv4 listener does not advertise discovered IPv6 hosts.</p>
+  </section>
+
+  <section id="pinning" class="doc-section">
+    <h2>What certificate pinning checks</h2>
+    <p>The Swift transport uses ephemeral <code>URLSession</code> instances and a custom trust delegate. It obtains the leaf certificate's DER bytes, calculates SHA-256, and accepts the connection only when that hash equals the paired fingerprint. HTTPS is required and redirects are refused. Native callers do not fall back silently to unpinned fetch if the module is missing.</p>
+    <p>This supports the desktop's self-signed certificate without accepting arbitrary self-signed servers. The trust decision comes from the pairing QR/link. Replacing the desktop certificate changes that decision; create a fresh trusted pairing instead of suppressing the mismatch.</p>
+    <p>Ordinary browser/curl trust errors are not equivalent to testing the app's native delegate. A browser may reject a correctly pinned self-signed server because it uses a different trust store. Verify through the installed app and inspect the actual failure rather than disabling certificate validation globally.</p>
+    <p>After successful device authentication, the gateway records a last-seen timestamp for its current service state. Refresh desktop device status to confirm authenticated traffic. This indicates token use; it is not proof that every project action succeeded or a durable security audit trail.</p>
+  </section>
+
+  <section id="scope" class="doc-section">
+    <h2>Understand the device token scope</h2>
+    <table>
+      <thead><tr><th>Allowed through the gateway</th><th>Kept on the desktop API</th></tr></thead>
+      <tbody>
+        <tr><td>Project list/detail; project events</td><td>Direct filesystem, file uploads, and credential management</td></tr>
+        <tr><td>VCS history/status and currently commit/branch/checkout/restore</td><td>GitHub remote configuration, push, and pull endpoints</td></tr>
+        <tr><td>Pull-request review/merge/close and workflow operations</td><td>Plugin and billing administration</td></tr>
+        <tr><td>Notifications and assistant status/models/agents</td><td>Companion enable/pair/revoke administration</td></tr>
+        <tr><td>Streaming chat, queue/abort, permission replies, session state/control</td><td>Other methods/paths absent from the allow-list</td></tr>
+      </tbody>
+    </table>
+    <p>The device token is limited by the method/path allow-list. It is not inherently read-only and does not select one project. Accepted requests are forwarded under the desktop's application identity and remain subject to endpoint authorization. Never describe pairing as merely granting passive monitoring.</p>
+    <p>Assistant permissions and pending questions are separate session interactions. Answer them in the mobile UI when requested. A token that can reach the reply endpoint does not mean every tool action has already been approved.</p>
+  </section>
+
+  <section id="operate" class="doc-section">
+    <h2>Use sessions and recover connectivity</h2>
+    <p>Choose a project to inspect its overview, history, pulls, and workflow runs. Assistant sessions execute on the desktop with its provider settings. Configure the provider there first. The phone remembers a selected project and last session per project for the paired desktop; changing desktop identity clears that mapping.</p>
+    <p>Foreground checks probe with a 15-second budget. Failed checks back off up to 30 seconds, and bringing the app forward triggers another probe. Background state is tracked separately from offline state. Tap the desktop row in phone Settings to recheck manually.</p>
+    <p>Queued assistant messages are persisted with a maximum of 50 entries, dropping the oldest beyond that limit. They retry later and may retain their session identifier. This is bounded message delivery support, not offline CAD computation or exactly-once execution. After an interrupted write/turn, inspect the desktop session and project before repeating the same change.</p>
+  </section>
+
+  <section id="revoke" class="doc-section">
+    <h2>Revoke or unpair deliberately</h2>
+    <DocCode language="bash" title="Revoke this development device, then inspect status">
+{`curl --fail-with-body -X DELETE \
+  "$CADCAM_URL/api/companion/devices/$CADCAM_DEVICE_ID" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"
+
+curl --fail-with-body "$CADCAM_URL/api/companion" \
+  -H "Authorization: Bearer $CADCAM_TOKEN"`}
+    </DocCode>
+    <p>Tokens are checked on every new request, so subsequent requests using the revoked token fail. Revocation does not explicitly terminate an already forwarded stream. Disabling the gateway stops the listener; <code>POST /api/companion/disable</code> is the administrative endpoint.</p>
+    <p>Phone Settings → Unpair this phone deletes the local saved pairing and returns to Connect. It does not call the desktop revoke endpoint. Use both actions when retiring a device. To rotate only the device credential, revoke it and issue a new pairing; replacing the whole certificate also changes every phone's pin.</p>
+  </section>
+
+  <section id="errors" class="doc-section">
+    <h2>Diagnose failures by layer</h2>
+    <table>
+      <thead><tr><th>Result</th><th>Next check</th></tr></thead>
+      <tbody>
+        <tr><td>No native pinning module</td><td>Open a custom native iOS build instead of Expo Go or an unsupported native platform.</td></tr>
+        <tr><td>Desktop did not answer</td><td>Gateway enabled, host/port correct, desktop awake, firewall, local-network permission, and Wi-Fi/VPN route.</td></tr>
+        <tr><td>Certificate mismatch</td><td>Verify the current desktop identity and create a new trusted pairing after certificate replacement.</td></tr>
+        <tr><td>401</td><td>Missing, incorrect, or revoked device token.</td></tr>
+        <tr><td>403</td><td>Method/path outside the route allow-list; an endpoint's own authorization can also refuse work.</td></tr>
+        <tr><td>429</td><td>Repeated failed authentication from the same address; the gateway tracks ten failures within a 60-second window.</td></tr>
+        <tr><td>502</td><td>The HTTPS listener could not reach its local upstream API.</td></tr>
+      </tbody>
+    </table>
+    <p>Native CI builds an unsigned simulator app and checks real gateway pairing/project listing. Separate CI checks typecheck, logic tests, and JavaScript export. These do not prove physical-device signing, TestFlight distribution, remote-network routing, or a real model provider.</p>
+  </section>
+
+  <section id="sources" class="doc-section">
+    <h2>Implementation map</h2>
+    <p>The management contract is <code>packages/api/src/groups/companion.ts</code>. Sidecar lifecycle and route policy are in <code>services/companion.ts</code> and <code>companion-gateway.ts</code>. Phone parsing, connection recovery, storage, and UI are in <code>lib/pairing.ts</code>, <code>server.tsx</code>, <code>storage.ts</code>, and <code>app/connect.tsx</code>. The native trust delegate is <code>modules/companion-net/ios/CompanionNetModule.swift</code>.</p>
+    <p>For a support report, retain the app version, connection method, non-secret gateway host/port, exact error/status, and whether the native module is present. Redact tokens, pairing links, model credentials, and private keys. Add the <a href="/docs/api/system">System API</a> version result when comparing two development processes.</p>
+  </section>
+
+  <DocRelated items={[
+    { title: "Companion API", href: "/docs/api/companion" },
+    { title: "Mobile reference", href: "/docs/mobile" },
+    { title: "Desktop troubleshooting", href: "/docs/guides/desktop-troubleshooting" }
+  ]} />
+</DocsLayout>
