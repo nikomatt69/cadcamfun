@@ -105,3 +105,4 @@ Agents in the same wave never touch the same directory, so they can run concurre
 - v2: WP13–WP13 done; WP11/WP12 core + sidecar + API in place.
 - v3: added WP14 (multi-operation setups: one setup → many operations → many programs, with a tool table and tool changes) and its spec `14-multi-op-setup.md`.
 - v4: remaining work sequenced in `specs/roadmap/` (RM-00–RM-11); `AGENTS.md` requires following it when the roadmap is cited.
+- v5: `31-machine-aware-toolpath-view.md`: the CAM preview shows each machine as it runs (mill in a vise, lathe part turning in the chuck, printer depositing on a bed), with the AI aware of the same setup.
