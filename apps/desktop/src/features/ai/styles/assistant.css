@@ -2044,16 +2044,42 @@
   max-height: 180px;
   resize: none;
   border: 0;
+  border-radius: 12px;
   outline: none;
   background: transparent;
   padding: 4px 4px;
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--assistant-ink);
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .assistant-prompt::placeholder {
   color: var(--assistant-muted);
+}
+
+/* The legacy form palette in globals.css (`html.dark textarea`, `html.dark input[type=…]`)
+   outranks a bare class and used to repaint these controls as slate boxes; these win them back. */
+html.dark .assistant-surface .assistant-prompt {
+  border: 0;
+  background: transparent;
+  color: var(--assistant-ink);
+}
+
+html.dark .assistant-surface .assistant-prompt::placeholder,
+html.dark .assistant-surface .assistant-field::placeholder {
+  color: var(--assistant-muted);
+}
+
+html.dark .assistant-surface .assistant-field {
+  border-color: var(--assistant-line);
+  background: var(--assistant-bg);
+  color: var(--assistant-ink);
+}
+
+html.dark .assistant-surface .assistant-field:focus {
+  border-color: var(--assistant-line-strong);
 }
 
 .assistant-compose-inline-actions {

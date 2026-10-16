@@ -23,11 +23,25 @@ export function ExtensionsSettings(): JSX.Element {
   const [source, setSource] = createSignal(SOURCE)
   const [busy, setBusy] = createSignal(false)
   const [problem, setProblem] = createSignal<string>()
+  const [serverProblem, setServerProblem] = createSignal<string>()
+  const [pluginProblem, setPluginProblem] = createSignal<string>()
   const controller = new AbortController()
   onCleanup(() => controller.abort())
   const run = <A, E>(effect: import("effect").Effect.Effect<A, E>) => app.runtime.run(effect, { signal: controller.signal })
-  const [servers, serverActions] = createResource(() => ai.projectId() || false, async (projectId) => ({ projectId, ...await run(app.client.ai.mcpServers({ query: { projectId } })) }))
-  const [plugins, pluginActions] = createResource(() => run(app.client.ai.extensionPlugins()))
+  const [servers, serverActions] = createResource(() => ai.projectId() || false, async (projectId) => {
+    setServerProblem(undefined)
+    try { return { projectId, ...await run(app.client.ai.mcpServers({ query: { projectId } })) } } catch {
+      if (!controller.signal.aborted && ai.projectId() === projectId) setServerProblem(t("ai.extensions.failed"))
+      return { projectId, servers: [] }
+    }
+  })
+  const [plugins, pluginActions] = createResource(async () => {
+    setPluginProblem(undefined)
+    try { return await run(app.client.ai.extensionPlugins()) } catch {
+      if (!controller.signal.aborted) setPluginProblem(t("ai.extensions.failed"))
+      return { plugins: [] }
+    }
+  })
   createEffect(() => { ai.projectId(); setName(""); setConfig(REMOTE); setProblem(undefined) })
   const mutate = async (work: () => Promise<unknown>): Promise<void> => {
     if (busy()) return
@@ -46,7 +60,7 @@ export function ExtensionsSettings(): JSX.Element {
       await refreshServers()
     })
   }
-  const error = () => problem() ?? (servers.error || plugins.error ? t("ai.extensions.failed") : undefined)
+  const error = () => problem() ?? serverProblem() ?? pluginProblem()
   return (
     <div class="space-y-4" data-testid="ai-extensions">
       <Show when={error()}>{(message) => <p class="assistant-attachment-problem" role="alert">{message()}</p>}</Show>

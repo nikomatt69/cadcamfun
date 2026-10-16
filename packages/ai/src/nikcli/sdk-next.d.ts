@@ -230,6 +230,7 @@ declare module "@nikcli-ai/sdk-next" {
     }
     readonly mcp: {
       status(options?: RequestOptions): Promise<Readonly<Record<string, { readonly status: string; readonly error?: string }>>>
+      connect(input: { name: string }, options?: RequestOptions): Promise<unknown>
       disconnect(input: { name: string }, options?: RequestOptions): Promise<unknown>
     }
     readonly config: {

@@ -427,6 +427,8 @@ export const makeNikCliRuntime = (
               const host = await existing
               await host.client["config-management"].reload()
               for (const [id, key] of pendingKeys) await host.client.provider.api({ providerID: id, key })
+              // Reload preserves the MCP service's live clients; a newly enabled entry needs an explicit connection.
+              if (config?.enabled) await host.client.mcp.connect({ name: mcpHostName(name) })
             }
           })
           publishing = next
