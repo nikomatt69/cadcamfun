@@ -11,7 +11,8 @@
  * The bar remains in the document flow so opening a panel or reading a long
  * answer never changes the user's wayfinding anchor.
  */
-import { For, Show, createEffect, createSignal, onCleanup, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
+import ChevronDown from "lucide-solid/icons/chevron-down"
 import Ellipsis from "lucide-solid/icons/ellipsis"
 import X from "lucide-solid/icons/x"
 import Terminal from "lucide-solid/icons/terminal"
@@ -47,6 +48,8 @@ export interface AssistantHeaderProps {
   /** Controls the shell injects (open full screen, close). */
   readonly headerActions?: JSX.Element
   readonly onClose?: () => void
+  /** Opens the context dialog from the header ring. */
+  readonly onOpenContext?: () => void
 }
 
 export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
@@ -54,6 +57,11 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
   const [menuOpen, setMenuOpen] = createSignal(false)
   const status = (): "idle" | "connecting" | "streaming" | "error" => ai.status()
   const closeMenu = (): void => { setMenuOpen(false) }
+  const activeSession = createMemo(() => {
+    const id = ai.sessionId()
+    return id ? ai.sessions().find((s) => s.id === id) : undefined
+  })
+  const sessionsAction = createMemo(() => props.quick.find((item) => item.id === "sessions"))
 
   // The menu is a transient layer: a click anywhere else or an Escape closes it.
   createEffect(() => {
@@ -81,10 +89,16 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
     >
       <div class="assistant-bar-row">
         <div class="assistant-bar-identity">
-          <span class="assistant-bar-mark" aria-hidden="true"><Terminal size={14} /></span>
-          <span class="assistant-bar-heading">
+          <span class="assistant-bar-mark" aria-hidden="true"><Terminal size={13} /></span>
+          <button
+            type="button"
+            class="assistant-bar-heading assistant-bar-title-trigger"
+            title={activeSession()?.title ?? props.meta}
+            onClick={() => sessionsAction()?.run()}
+          >
             <span class="assistant-bar-title-line">
-              <h2 class="assistant-bar-title">{t("ai.title")}</h2>
+              <h2 class="assistant-bar-title">{activeSession()?.title ?? t("ai.title")}</h2>
+              <ChevronDown size={13} class="assistant-bar-title-chevron" aria-hidden="true" />
               <span class="assistant-orb" data-status={status()} aria-hidden="true">
                 <span class="assistant-orb-core" />
               </span>
@@ -92,7 +106,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
             <Show when={props.meta.length > 0}>
               <span class="assistant-bar-meta" title={props.meta}>{props.meta}</span>
             </Show>
-          </span>
+          </button>
         </div>
 
         <div class="assistant-bar-actions">
@@ -103,7 +117,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
             </span>
           </Show>
           <ProviderBadge />
-          <ContextGauge />
+          <ContextGauge onOpen={props.onOpenContext} />
           <span role="status" class="sr-only" aria-live="polite">{t(`ai.runtime.${status()}`)}</span>
 
           {/* The two things worth a permanent slot: change conversation, inspect context. */}
@@ -130,6 +144,8 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
             )}
           </For>
 
+          <span class="assistant-bar-divider" aria-hidden="true" />
+
           <div class="assistant-bar-menu-root">
             <button
               type="button"
@@ -141,7 +157,7 @@ export function AssistantHeader(props: AssistantHeaderProps): JSX.Element {
               data-testid="ai-more-toggle"
               onClick={() => setMenuOpen(!menuOpen())}
             >
-              <Ellipsis size={16} aria-hidden="true" />
+              <Ellipsis size={15} aria-hidden="true" />
             </button>
             <Show when={menuOpen()}>
               <div class="assistant-menu" role="menu" aria-label={t("ai.header.more")} data-testid="ai-more-menu">

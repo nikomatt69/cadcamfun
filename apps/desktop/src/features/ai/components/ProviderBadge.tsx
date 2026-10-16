@@ -24,20 +24,20 @@ export function ProviderBadge(): JSX.Element {
   const shown = (): ReadonlyArray<string> => providers().slice(0, 3)
   const extra = (): number => Math.max(0, providers().length - 3)
   return (
-    <div class="flex items-center gap-1" data-testid="ai-provider-badge">
+    <div class="assistant-provider-badge" data-testid="ai-provider-badge">
       <Show when={host() === "nikcli"} fallback={
-        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400" title={t("ai.header.fallback")}>
+        <span class="assistant-provider-pill" data-host="direct" title={t("ai.header.fallback")}>
           <Cloud size={10} aria-hidden="true" />
           {t("ai.status.host.direct")}
         </span>
       }>
-        <span class="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-950/40 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400" title={t("ai.status.host.nikcli")}>
+        <span class="assistant-provider-pill" data-host="nikcli" title={t("ai.status.host.nikcli")}>
           <Cpu size={10} aria-hidden="true" />
           {t("ai.status.host.nikcli")}
         </span>
       </Show>
       <Show when={providers().length > 0}>
-        <span class="text-[10px] text-gray-500" data-testid="ai-providers">
+        <span class="assistant-providers-list" data-testid="ai-providers">
           {/* A catalogue provider set can be huge: the pill summarises instead of listing. */}
           {shown().join(" · ")}
           <Show when={extra() > 0}> · +{extra()}</Show>

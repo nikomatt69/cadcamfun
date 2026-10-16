@@ -1,6 +1,26 @@
 import { expect, test } from "bun:test"
-import { timelineOf } from "../src/features/ai/lib/timeline.ts"
+import { appendTextEvent, timelineOf } from "../src/features/ai/lib/timeline.ts"
 import type { AiEvent } from "../src/features/ai/lib/types.ts"
+
+test("token bursts retain exact text and event boundaries without growing one entry per token", () => {
+  let events: ReadonlyArray<AiEvent> = []
+  for (let i = 0; i < 10_000; i++) events = appendTextEvent(events, { type: "delta", sessionId: "s", text: "x" })
+  expect(events).toEqual([{ type: "delta", sessionId: "s", text: "x".repeat(10_000) }])
+  const firstRun = events
+  const tool: AiEvent = { type: "tool_call", sessionId: "s", callId: "c", tool: "cad", input: { action: "describe" } }
+  events = appendTextEvent([...events, tool], { type: "delta", sessionId: "s", text: "After the tool." })
+  events = appendTextEvent(events, { type: "reasoning", sessionId: "s", text: "Think" })
+  events = appendTextEvent(events, { type: "reasoning", sessionId: "s", text: " again." })
+  events = appendTextEvent(events, { type: "reasoning", sessionId: "other", text: "Separate session." })
+  expect(firstRun).toHaveLength(1)
+  expect(events).toHaveLength(5)
+  expect(timelineOf({ events, text: "x".repeat(10_000) + "After the tool." })).toEqual([
+    { kind: "text", text: "x".repeat(10_000) },
+    { kind: "tool", callId: "c", tool: "cad" },
+    { kind: "text", text: "After the tool." },
+    { kind: "reasoning", text: "Think again.Separate session." }
+  ])
+})
 
 test("recovered final text extends streamed text without losing tool order", () => {
   const events: AiEvent[] = [

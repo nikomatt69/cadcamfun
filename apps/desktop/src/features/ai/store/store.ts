@@ -25,6 +25,7 @@ import { appProjectId, persistDrawingContext, prepareWorkspace, verificationStat
 import { loadTranscripts, saveTranscripts, toStored, type StoredMessage } from "./persisted.ts"
 import type { ChatAttachment } from "../lib/attachments.ts"
 import { contextTokensOf } from "../lib/context-metrics.ts"
+import { appendTextEvent } from "../lib/timeline.ts"
 import { mirrorCamResult } from "../lib/cam-sync.ts"
 import { actionKey, captureEditorOwner, mirrorToolResult, reconcileCoalesced, reconcileFromStored, type EditorOwner } from "../lib/editor-sync.ts"
 import type { AiActivity, AiEvent, AiGoal, AiMessage, AiPermission, AiSession, AiTask, AiTodo, AiToolCalls, ChatModel, AiAgent, AiPendingQuestion, AiContextState } from "../lib/types.ts"
@@ -320,7 +321,7 @@ export const createAiStore = (): AiStore => {
     if (event.type === "reasoning") {
       const id = idForEvent
       if (!messages().some((m) => m.id === id)) appendMessage({ id, role: "assistant", text: "", createdAt: new Date().toISOString(), events: [event], status: "streaming", thinking: event.text })
-      else patchMessage(id, (prev) => ({ ...prev, thinking: (prev.thinking ?? "") + event.text, events: [...prev.events, event] }))
+      else patchMessage(id, (prev) => ({ ...prev, thinking: (prev.thinking ?? "") + event.text, events: appendTextEvent(prev.events, event) }))
       // One thinking step per step of the turn, however many deltas it arrives in.
       if (!thinkingCounted.has(activity().step)) { thinkingCounted.add(activity().step); setStats((s) => ({ ...s, thinkingSteps: s.thinkingSteps + 1 })) }
       return
@@ -373,9 +374,9 @@ export const createAiStore = (): AiStore => {
       const id = idForEvent
       const exists = messages().some((m) => m.id === id)
       if (!exists) {
-        appendMessage({ id, role: "assistant", text: event.text, createdAt: new Date().toISOString(), events: [], status: "streaming" })
+        appendMessage({ id, role: "assistant", text: event.text, createdAt: new Date().toISOString(), events: [event], status: "streaming" })
       } else {
-        patchMessage(id, (prev) => ({ ...prev, text: prev.text + event.text, events: [...prev.events, event] }))
+        patchMessage(id, (prev) => ({ ...prev, text: prev.text + event.text, events: appendTextEvent(prev.events, event) }))
       }
       return
     }

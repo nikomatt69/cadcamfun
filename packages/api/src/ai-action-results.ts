@@ -282,7 +282,7 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   "cam_edit.create": write(["operation"], operationCreated),
   "cam_edit.update": write(["operation"], operationUpdated),
   "cam_edit.generate": write(["program"], generated),
-  // Regenerates and stores the program with its report today; AI-11 Step 8 makes it read the stored program.
+  // Replays the stored program and persists only a report bound to its hash and manufacturing inputs.
   "cam_edit.verify": write(["report"], verified),
   "cam_edit.stock_set": write(["stock"], stockSet),
 

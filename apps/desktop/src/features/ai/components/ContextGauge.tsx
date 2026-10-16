@@ -14,7 +14,7 @@ const categoryLabel = (category: string): string => ((CATEGORIES as ReadonlyArra
 const RADIUS = 7
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-export function ContextGauge(): JSX.Element {
+export function ContextGauge(props: { readonly alwaysShow?: boolean; readonly compact?: boolean; readonly onOpen?: () => void } = {}): JSX.Element {
   const ai = useAiStore()
   const metrics = createMemo(() => {
     const host = ai.hostContext()
@@ -39,31 +39,62 @@ export function ContextGauge(): JSX.Element {
     }
     return parts.join(" · ")
   }
+  /** One gauge, two lives: a readout by default, the context dialog's trigger when the shell wires one up. */
+  const gauge = (): JSX.Element => (
+    <>
+      <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={RADIUS} fill="none" stroke="currentColor" stroke-opacity="0.28" stroke-width="2" />
+        <circle
+          cx="9" cy="9" r={RADIUS} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-dasharray={String(CIRCUMFERENCE)}
+          // Unknown usage shows the track only; a full ring would claim a full window.
+          stroke-dashoffset={String(CIRCUMFERENCE * (1 - Math.min(Math.max(metrics().percent ?? 0, 0), 100) / 100))}
+          transform="rotate(-90 9 9)"
+        />
+      </svg>
+      <Show when={!props.compact && metrics().percent !== undefined && ai.contextTokens() > 0}><span>{metrics().percent}%</span></Show>
+    </>
+  )
   return (
-    <Show when={ai.contextTokens() > 0}>
-      <span
-        class="assistant-context-gauge"
-        data-testid="ai-context-gauge"
-        data-level={metrics().level}
-        role="img"
-        aria-label={`${t("ai.context.gauge.label")}: ${title()}`}
-        title={title()}
-        // The breakdown costs a tokenizer pass in the host, so it is asked for when someone looks, not on every poll.
-        onMouseEnter={() => void ai.loadContextBreakdown()}
-        onFocus={() => void ai.loadContextBreakdown()}
-        tabindex="0"
+    <Show when={props.alwaysShow === true || ai.contextTokens() > 0}>
+      <Show
+        when={props.onOpen}
+        fallback={
+          <span
+            class="assistant-context-gauge"
+            classList={{ "is-compact": props.compact === true }}
+            data-testid={props.compact ? undefined : "ai-context-gauge"}
+            data-level={metrics().level}
+            role="img"
+            aria-label={`${t("ai.context.gauge.label")}: ${title()}`}
+            title={title()}
+            // The breakdown costs a tokenizer pass in the host, so it is asked for when someone looks, not on every poll.
+            onMouseEnter={() => void ai.loadContextBreakdown()}
+            onFocus={() => void ai.loadContextBreakdown()}
+            tabindex="0"
+          >
+            {gauge()}
+          </span>
+        }
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-          <circle cx="9" cy="9" r={RADIUS} fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="2" />
-          <circle
-            cx="9" cy="9" r={RADIUS} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-            stroke-dasharray={String(CIRCUMFERENCE)}
-            stroke-dashoffset={String(CIRCUMFERENCE * (1 - (metrics().percent ?? 0) / 100))}
-            transform="rotate(-90 9 9)"
-          />
-        </svg>
-        <Show when={metrics().percent !== undefined}><span>{metrics().percent}%</span></Show>
-      </span>
+        {(open) => (
+          <button
+            type="button"
+            class="assistant-context-gauge is-button"
+            classList={{ "is-compact": props.compact === true }}
+            data-testid={props.compact ? undefined : "ai-context-gauge"}
+            data-level={metrics().level}
+            aria-haspopup="dialog"
+            aria-label={`${t("ai.context.gauge.label")}: ${title()} · ${t("ai.context.dialog.open")}`}
+            title={title()}
+            onMouseEnter={() => void ai.loadContextBreakdown()}
+            onFocus={() => void ai.loadContextBreakdown()}
+            onClick={() => open()()}
+          >
+            {gauge()}
+          </button>
+        )}
+      </Show>
     </Show>
   )
 }

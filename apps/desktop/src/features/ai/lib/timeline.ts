@@ -5,6 +5,15 @@
  */
 import type { AiEvent, AiMessage } from "./types.ts"
 
+/** Keep token bursts as one text run so deriving the transcript does not rescan thousands of deltas. */
+export const appendTextEvent = (events: ReadonlyArray<AiEvent>, event: Extract<AiEvent, { type: "delta" | "reasoning" }>): ReadonlyArray<AiEvent> => {
+  const last = events.at(-1)
+  if (last !== undefined && last.type === event.type && last.sessionId === event.sessionId && (last.type === "delta" || last.type === "reasoning")) {
+    return [...events.slice(0, -1), { ...event, text: last.text + event.text }]
+  }
+  return [...events, event]
+}
+
 export type TimelineSegment =
   | { readonly kind: "reasoning"; readonly text: string }
   | { readonly kind: "text"; readonly text: string }

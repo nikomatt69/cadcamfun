@@ -78,6 +78,19 @@ import type {
   AiSessionStateOutput,
   AiRemoveSessionInput,
   AiRemoveSessionOutput,
+  AiMcpServersInput,
+  AiMcpServersOutput,
+  AiSaveMcpServerInput,
+  AiSaveMcpServerOutput,
+  AiDeleteMcpServerInput,
+  AiDeleteMcpServerOutput,
+  AiRemoveExtensionPluginInput,
+  AiRemoveExtensionPluginOutput,
+  AiExtensionPluginsOutput,
+  AiInstallExtensionPluginInput,
+  AiInstallExtensionPluginOutput,
+  AiToggleExtensionPluginInput,
+  AiToggleExtensionPluginOutput,
   AiSkillsOutput,
   AiSaveSkillInput,
   AiSaveSkillOutput,
@@ -1227,6 +1240,88 @@ export function make(options: ClientOptions) {
             method: "POST",
             path: `/api/ai/sessions/remove`,
             body: { sessionId: input["sessionId"], projectId: input["projectId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      mcpServers: (input: AiMcpServersInput, requestOptions?: RequestOptions) =>
+        request<AiMcpServersOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/extensions/mcp`,
+            query: { projectId: input["projectId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      saveMcpServer: (input: AiSaveMcpServerInput, requestOptions?: RequestOptions) =>
+        request<AiSaveMcpServerOutput>(
+          {
+            method: "PUT",
+            path: `/api/ai/extensions/mcp`,
+            body: { projectId: input["projectId"], name: input["name"], config: input["config"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      deleteMcpServer: (input: AiDeleteMcpServerInput, requestOptions?: RequestOptions) =>
+        request<AiDeleteMcpServerOutput>(
+          {
+            method: "DELETE",
+            path: `/api/ai/extensions/mcp/${encodeURIComponent(input.name)}`,
+            query: { projectId: input["projectId"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeExtensionPlugin: (input: AiRemoveExtensionPluginInput, requestOptions?: RequestOptions) =>
+        request<AiRemoveExtensionPluginOutput>(
+          {
+            method: "DELETE",
+            path: `/api/ai/extensions/plugins/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      extensionPlugins: (requestOptions?: RequestOptions) =>
+        request<AiExtensionPluginsOutput>(
+          {
+            method: "GET",
+            path: `/api/ai/extensions/plugins`,
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      installExtensionPlugin: (input: AiInstallExtensionPluginInput, requestOptions?: RequestOptions) =>
+        request<AiInstallExtensionPluginOutput>(
+          {
+            method: "POST",
+            path: `/api/ai/extensions/plugins`,
+            body: { manifest: input["manifest"], source: input["source"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      toggleExtensionPlugin: (input: AiToggleExtensionPluginInput, requestOptions?: RequestOptions) =>
+        request<AiToggleExtensionPluginOutput>(
+          {
+            method: "PUT",
+            path: `/api/ai/extensions/plugins/${encodeURIComponent(input.id)}`,
+            body: { enabled: input["enabled"] },
             successStatus: 200,
             declaredStatuses: [400, 500, 401],
             empty: false,

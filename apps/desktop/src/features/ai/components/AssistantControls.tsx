@@ -8,12 +8,14 @@
  * the height back to the conversation. Each keeps its label as an accessible
  * name and the agent description as a tooltip, so nothing was lost.
  */
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import Bot from "lucide-solid/icons/bot"
 import Compass from "lucide-solid/icons/compass"
 import ShieldCheck from "lucide-solid/icons/shield-check"
 import Brain from "lucide-solid/icons/brain"
 import Check from "lucide-solid/icons/check"
+import ChevronDown from "lucide-solid/icons/chevron-down"
+import CircleGauge from "lucide-solid/icons/circle-gauge"
 import { t } from "../../../i18n/index.ts"
 import { useAiStore } from "../store/context.tsx"
 import type { AiPendingQuestion } from "../lib/types.ts"
@@ -25,15 +27,15 @@ interface ControlOption {
 }
 
 /**
- * An icon stays visible in the composer; its complete, keyboard-reachable menu
- * opens above the control. This avoids native selects escaping below the app
- * window and keeps four run settings on one calm line at every panel width.
+ * An icon + quiet label stays visible in the composer rail; its complete,
+ * keyboard-reachable menu opens above the control.
  */
 function ControlMenu(props: {
   readonly id: string
   readonly icon: JSX.Element
   readonly label: string
   readonly value: string
+  readonly showValue?: boolean
   readonly title?: string
   readonly disabled?: boolean
   readonly open: boolean
@@ -48,7 +50,7 @@ function ControlMenu(props: {
       <button
         type="button"
         class="assistant-control-icon"
-        classList={{ "is-open": props.open }}
+        classList={{ "is-open": props.open, "has-label": props.showValue === true }}
         disabled={props.disabled}
         aria-label={`${props.label}: ${selected()?.label ?? props.value}`}
         aria-haspopup="listbox"
@@ -57,8 +59,14 @@ function ControlMenu(props: {
         data-control={props.id}
         onClick={props.onToggle}
       >
-        <span aria-hidden="true">{props.icon}</span>
-        <span class="assistant-control-dot" aria-hidden="true" />
+        <span class="assistant-control-glyph" aria-hidden="true">{props.icon}</span>
+        <Show when={props.showValue}>
+          <span class="assistant-control-label">{selected()?.label ?? props.value}</span>
+          <ChevronDown size={11} class="assistant-control-chevron" aria-hidden="true" />
+        </Show>
+        <Show when={!props.showValue}>
+          <span class="assistant-control-dot" aria-hidden="true" />
+        </Show>
       </button>
       <Show when={props.open}>
         <div class="assistant-control-popover" role="listbox" aria-label={props.label}>
@@ -109,14 +117,45 @@ export function AssistantControls(): JSX.Element {
     return variant ? { ...model, variant } : model
   })
 
+  createEffect(() => {
+    if (!open()) return
+    const away = (event: PointerEvent): void => {
+      if (!(event.target as Element | null)?.closest?.(".assistant-control-menu-root")) setOpen(undefined)
+    }
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setOpen(undefined)
+    }
+    document.addEventListener("pointerdown", away, true)
+    document.addEventListener("keydown", escape)
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", away, true)
+      document.removeEventListener("keydown", escape)
+    })
+  })
+
   return (
     <div class="assistant-chips" data-testid="ai-controls" aria-label={t("ai.controls.label")}>
       <ControlMenu
+        id="permissions"
+        icon={<ShieldCheck size={12} aria-hidden="true" />}
+        label={t("ai.controls.permissions")}
+        value={ai.permissionMode()}
+        showValue={true}
+        disabled={running()}
+        open={open() === "permissions"}
+        onToggle={() => setOpen((current) => current === "permissions" ? undefined : "permissions")}
+        onClose={() => setOpen(undefined)}
+        onChange={(value) => ai.setPermissionMode(value as ReturnType<typeof ai.permissionMode>)}
+        options={(["auto", "ask", "approve"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.permissions.${mode}`) }))}
+      />
+
+      <ControlMenu
         id="agent"
-        icon={<Bot size={13} aria-hidden="true" />}
+        icon={<Bot size={12} aria-hidden="true" />}
         label={t("ai.controls.agent")}
         title={agent()?.description}
         value={ai.agent()}
+        showValue={true}
         disabled={running()}
         open={open() === "agent"}
         onToggle={() => setOpen((current) => current === "agent" ? undefined : "agent")}
@@ -130,9 +169,10 @@ export function AssistantControls(): JSX.Element {
 
       <ControlMenu
         id="mode"
-        icon={<Compass size={13} aria-hidden="true" />}
+        icon={<Compass size={12} aria-hidden="true" />}
         label={t("ai.controls.mode")}
         value={ai.mode()}
+        showValue={true}
         disabled={running()}
         open={open() === "mode"}
         onToggle={() => setOpen((current) => current === "mode" ? undefined : "mode")}
@@ -141,25 +181,13 @@ export function AssistantControls(): JSX.Element {
         options={(["general", "cad", "cam", "gcode", "toolpath"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.mode.${mode}`) }))}
       />
 
-      <ControlMenu
-        id="permissions"
-        icon={<ShieldCheck size={13} aria-hidden="true" />}
-        label={t("ai.controls.permissions")}
-        value={ai.permissionMode()}
-        disabled={running()}
-        open={open() === "permissions"}
-        onToggle={() => setOpen((current) => current === "permissions" ? undefined : "permissions")}
-        onClose={() => setOpen(undefined)}
-        onChange={(value) => ai.setPermissionMode(value as ReturnType<typeof ai.permissionMode>)}
-        options={(["auto", "ask", "approve"] as const).map((mode) => ({ value: mode, label: t(`ai.controls.permissions.${mode}`) }))}
-      />
-
       <Show when={variants().length > 0}>
         <ControlMenu
           id="thinking"
-          icon={<Brain size={13} aria-hidden="true" />}
+          icon={<Brain size={12} aria-hidden="true" />}
           label={t("ai.controls.thinking")}
           value={ai.model()?.variant ?? ""}
+          showValue={true}
           disabled={running()}
           open={open() === "thinking"}
           onToggle={() => setOpen((current) => current === "thinking" ? undefined : "thinking")}
@@ -177,13 +205,21 @@ export function AssistantControls(): JSX.Element {
 
 /**
  * The control error is the one thing that must never be hidden behind a chip:
- * it renders as a strip above the composer for as long as it stands.
+ * it renders as an enterprise alert banner above the composer for as long as it stands.
  */
 export function AssistantControlError(): JSX.Element {
   const ai = useAiStore()
   return (
     <Show when={ai.controlError()}>
-      {(error) => <p class="assistant-control-error" role="alert">{error()}</p>}
+      {(error) => (
+        <div class="assistant-control-error" role="alert">
+          <div class="assistant-control-error-head">
+            <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
+            <span>{t("ai.runtime.error")}</span>
+          </div>
+          <p class="assistant-control-error-body">{error()}</p>
+        </div>
+      )}
     </Show>
   )
 }
@@ -194,25 +230,80 @@ function QuestionCard(props: { readonly request: AiPendingQuestion }): JSX.Eleme
   const [custom, setCustom] = createSignal<ReadonlyArray<string>>(props.request.questions.map(() => ""))
   const ready = () => answers().every((answer) => answer.length > 0 && answer.every((value) => value.trim()))
   const setAnswer = (index: number, answer: ReadonlyArray<string>) => setAnswers((current) => current.map((value, i) => i === index ? answer : value))
-  return <section class="assistant-disclosure assistant-settings" data-testid="ai-question" aria-label={t("ai.controls.questions")}>
-    <For each={props.request.questions}>{(question, index) => <fieldset class="mb-3">
-      <legend class="text-sm font-semibold">{question.header}</legend>
-      <p class="mb-2 text-xs">{question.question}</p>
-      <For each={question.options}>{(option) => <label class="mb-1 flex items-start gap-2 text-xs">
-        <input type={question.multiple ? "checkbox" : "radio"} name={`${props.request.requestId}-${index()}`} disabled={ai.controlBusy()} checked={answers()[index()]?.includes(option.label) ?? false}
-          onChange={(e) => { setCustom((current) => current.map((value, i) => i === index() ? "" : value)); setAnswer(index(), question.multiple ? e.currentTarget.checked ? [...(answers()[index()] ?? []), option.label] : (answers()[index()] ?? []).filter((value) => value !== option.label) : [option.label]) }} />
-        <span><strong>{option.label}</strong><br />{option.description}</span>
-      </label>}</For>
-      <Show when={question.custom !== false}>
-        <input class="mt-1 w-full rounded border bg-transparent px-2 py-1 text-xs" aria-label={`${question.header}: ${t("ai.controls.customAnswer")}`} placeholder={t("ai.controls.customAnswer")} maxLength={4000} disabled={ai.controlBusy()} value={custom()[index()] ?? ""}
-          onInput={(e) => { const value = e.currentTarget.value; setCustom((current) => current.map((previous, i) => i === index() ? value : previous)); setAnswer(index(), value.trim() ? [value.trim()] : []) }} />
-      </Show>
-    </fieldset>}</For>
-    <div class="flex gap-2">
-      <button type="button" class="rounded border px-3 py-1 text-xs" disabled={!ready() || ai.controlBusy()} onClick={() => void ai.replyQuestion(props.request.requestId, answers())}>{t("ai.controls.answer")}</button>
-      <button type="button" class="rounded border px-3 py-1 text-xs" disabled={ai.controlBusy()} onClick={() => void ai.replyQuestion(props.request.requestId)}>{t("ai.controls.dismissQuestion")}</button>
-    </div>
-  </section>
+  return (
+    <section class="assistant-disclosure assistant-settings assistant-question-card" data-testid="ai-question" aria-label={t("ai.controls.questions")}>
+      <For each={props.request.questions}>
+        {(question, index) => (
+          <fieldset class="assistant-question-group">
+            <legend class="assistant-question-legend">{question.header}</legend>
+            <p class="assistant-question-prompt">{question.question}</p>
+            <div class="assistant-question-options">
+              <For each={question.options}>
+                {(option) => (
+                  <label class="assistant-question-option">
+                    <input
+                      type={question.multiple ? "checkbox" : "radio"}
+                      name={`${props.request.requestId}-${index()}`}
+                      disabled={ai.controlBusy()}
+                      checked={answers()[index()]?.includes(option.label) ?? false}
+                      onChange={(e) => {
+                        setCustom((current) => current.map((value, i) => i === index() ? "" : value))
+                        setAnswer(
+                          index(),
+                          question.multiple
+                            ? e.currentTarget.checked
+                              ? [...(answers()[index()] ?? []), option.label]
+                              : (answers()[index()] ?? []).filter((value) => value !== option.label)
+                            : [option.label]
+                        )
+                      }}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                  </label>
+                )}
+              </For>
+            </div>
+            <Show when={question.custom !== false}>
+              <input
+                class="assistant-field mt-2"
+                aria-label={`${question.header}: ${t("ai.controls.customAnswer")}`}
+                placeholder={t("ai.controls.customAnswer")}
+                maxLength={4000}
+                disabled={ai.controlBusy()}
+                value={custom()[index()] ?? ""}
+                onInput={(e) => {
+                  const value = e.currentTarget.value
+                  setCustom((current) => current.map((previous, i) => i === index() ? value : previous))
+                  setAnswer(index(), value.trim() ? [value.trim()] : [])
+                }}
+              />
+            </Show>
+          </fieldset>
+        )}
+      </For>
+      <div class="assistant-card-actions">
+        <button
+          type="button"
+          class="assistant-btn assistant-btn-primary"
+          disabled={!ready() || ai.controlBusy()}
+          onClick={() => void ai.replyQuestion(props.request.requestId, answers())}
+        >
+          {t("ai.controls.answer")}
+        </button>
+        <button
+          type="button"
+          class="assistant-btn assistant-btn-secondary"
+          disabled={ai.controlBusy()}
+          onClick={() => void ai.replyQuestion(props.request.requestId)}
+        >
+          {t("ai.controls.dismissQuestion")}
+        </button>
+      </div>
+    </section>
+  )
 }
 
 export function AssistantQuestions(): JSX.Element {

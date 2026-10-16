@@ -84,6 +84,12 @@ const str = (value: unknown): string | undefined => (typeof value === "string" ?
 const rec = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
 
+/** Both primary and specialist calls reconcile from the full stored answer, never the model's bounded preview. */
+const toolOutput = (state: Record<string, unknown> | undefined, status: string | undefined): string => {
+  const stored = status === "completed" ? rec(state?.["metadata"])?.["value"] : undefined
+  return (stored !== undefined ? JSON.stringify(stored) : status === "completed" ? str(state?.["output"]) : str(state?.["error"])) ?? ""
+}
+
 const STATUSES = ["pending", "in_progress", "completed", "cancelled"] as const
 
 /** Partial mutations are successful writes with unfinished items, even without an explicit error flag. */
@@ -216,7 +222,7 @@ const mapChildTool = (sessionId: string, childId: string, agent: string, part: R
   else if (status === "completed" || status === "error") forgetProgramCalls(hostCallId)
   if ((status === "completed" || status === "error") && !state.finishedCalls.has(callId)) {
     state.finishedCalls.add(callId)
-    const output = (status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
+    const output = toolOutput(toolState, status)
     const failure = toolFailure(status, output)
     out.push({ type: "tool_result", sessionId, agent, callId, tool, ok: status === "completed" && failure === undefined, output, ...toolImages(tool, toolState) })
     out.push(...toolDiagnostics(sessionId, callId, tool, output, failure, agent))
@@ -357,9 +363,7 @@ const mapHostEventParts = (sessionId: string, event: HostEvent, state: EventMapp
             state.toolCalls += 1
             out.push({ type: "tool_call", sessionId, callId, tool, input: toolState?.["input"] ?? {} })
           }
-          // A bounded answer stores its whole value in the metadata: the editor mirrors that, never the model's shortened text.
-          const stored = status === "completed" ? rec(toolState?.["metadata"])?.["value"] : undefined
-          const finalOutput = (stored !== undefined ? JSON.stringify(stored) : status === "completed" ? str(toolState?.["output"]) : str(toolState?.["error"])) ?? ""
+          const finalOutput = toolOutput(toolState, status)
           const failure = toolFailure(status, finalOutput)
           const unresolved = failure ?? partialProblem(outputRecord(finalOutput))
           if (unresolved !== undefined) state.toolErrors.set(tool, unresolved)

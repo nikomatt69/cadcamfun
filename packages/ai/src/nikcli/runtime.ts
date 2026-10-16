@@ -1,5 +1,6 @@
 /// <reference path="./sdk-next.d.ts" />
 import type { FilePart } from "../attachments.ts"
+import { mcpStore, mcpHostName, validateMcpName, validateMcpConfig, type McpConfig } from "./mcp.ts"
 import { z } from "zod"
 import { Effect, Scope, Semaphore } from "effect"
 import { mkdirSync, realpathSync } from "node:fs"
@@ -88,6 +89,8 @@ export interface ProjectHost {
 export interface NikCliRuntime {
   /** Actual host registrations plus permitted native discovery/control tools; no executor is invoked. */
   readonly toolCatalogue: () => ReadonlyArray<{ id: string; description: string }>
+  mcpServers(projectId: string): Effect.Effect<ReadonlyArray<{ name: string; config: McpConfig; status: string }>, AiConfigError>
+  saveMcpServer(projectId: string, name: string, config: McpConfig | undefined): Effect.Effect<void, AiConfigError>
   readonly paths: IsolatedPaths
   /**
    * The runtime is the application's *long-lived* connection to nikcli: every
@@ -222,7 +225,7 @@ export const makeNikCliRuntime = (
     const writeAtomically = async (file: string, text: string): Promise<void> => {
       const temporary = `${file}.${crypto.randomUUID()}.tmp`
       try {
-        await writeFile(temporary, text)
+        await writeFile(temporary, text, { mode: 0o600 })
         await rename(temporary, file)
       } finally {
         await rm(temporary, { force: true }).catch(() => undefined)
@@ -243,6 +246,7 @@ export const makeNikCliRuntime = (
           }
           const { shared, instance } = splitHostConfig(buildHostConfig({
             providers,
+            mcp: await mcpStore(projectScratchDir(paths, projectId)).read(),
             toolIds: toolIdsOf(projectId),
             askToolIds: toolRegistry.approvalIds(projectId),
             systemPrompt: options.systemPrompt,
@@ -392,6 +396,44 @@ export const makeNikCliRuntime = (
         assertOpen()
         return ensureCatalogue()
       },
+      mcpServers: (projectId) => Effect.tryPromise({
+        try: async () => {
+          assertOpen()
+          const entries = await mcpStore(projectScratchDir(paths, projectId)).read()
+          if (Object.keys(entries).length === 0) return []
+          const host = await getHost(projectId)
+          const statuses = await host.client.mcp.status()
+          return Object.entries(entries).map(([name, config]) => ({ name, config, status: statuses[mcpHostName(name)]?.status ?? (config.enabled ? "disconnected" : "disabled") }))
+        },
+        catch: toConfigError("Unable to read MCP connections")
+      }),
+      saveMcpServer: (projectId, name, config) => Effect.tryPromise({
+        try: async () => {
+          assertOpen()
+          validateMcpName(name)
+          if (config) validateMcpConfig(config)
+          // Serialize read-modify-write and reload, including concurrent changes to the same project.
+          const next = publishing.catch(() => undefined).then(async () => {
+            assertOpen()
+            const store = mcpStore(projectScratchDir(paths, projectId))
+            const entries = await store.read()
+            if (config) entries[name] = config
+            else delete entries[name]
+            const existing = hosts.get(projectId)
+            if (existing) await (await existing).client.mcp.disconnect({ name: mcpHostName(name) })
+            await store.write(entries)
+            await writeConfig(projectId)
+            if (existing) {
+              const host = await existing
+              await host.client["config-management"].reload()
+              for (const [id, key] of pendingKeys) await host.client.provider.api({ providerID: id, key })
+            }
+          })
+          publishing = next
+          await next
+        },
+        catch: toConfigError("Unable to save MCP connection")
+      }),
       host: (projectId) =>
         Effect.tryPromise({
           try: () => getHost(projectId),

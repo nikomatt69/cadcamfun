@@ -14,7 +14,7 @@
  * `validated: false`, and the harness inventory counts it.
  */
 import { Exit, Schema } from "effect"
-import type { ActionContract, ActionOutcomeKind } from "@cadcamfun/api"
+import { ActionCommitted, actionOutcome, type ActionContract, type ActionOutcomeKind } from "@cadcamfun/api"
 import { ToolMediaResult } from "../tools/define.ts"
 import type { FilePart } from "../attachments.ts"
 import type { ActionKind } from "./action.ts"
@@ -38,25 +38,18 @@ const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 export const failure = (actionId: string, tag: string, error: string, rest: Record<string, unknown> = {}) =>
   ({ ...rest, ok: false as const, _tag: tag, actionId, error })
 
-const FAILURE_KINDS: Readonly<Record<string, ActionOutcomeKind>> = {
-  ActionConflict: "conflict",
-  ActionStale: "conflict",
-  ActionInterrupted: "cancelled",
-  ActionUncertain: "uncertain",
-  ActionResultInvalid: "uncertain"
-}
-
 const issueText = (exit: Exit.Exit<unknown, Schema.SchemaError>): string =>
   Exit.isFailure(exit) ? String(exit.cause).replace(/^Cause\(\[Fail\(SchemaError\(/, "").replace(/\)\)\]\)$/, "").replace(/\s+/g, " ").slice(0, 300) : ""
 
 const classifyRefusal = (spec: Classified, value: Record<string, unknown>): ActionOutcome => {
   const { ok: _ok, _tag, actionId, error, ...rest } = value
   // Already a typed failure (`ActionConflict`, `ActionDenied`, ...): its shape is a shared contract, passed on unchanged.
-  if (typeof _tag === "string" && _tag !== "" && typeof actionId === "string") return { kind: FAILURE_KINDS[_tag] ?? "refused", value, validated: true }
+  if (typeof _tag === "string" && _tag !== "" && typeof actionId === "string") return { kind: actionOutcome(value), value, validated: true }
   // A stale-revision answer is the document changing under the call, whatever the implementation called it.
   const tag = typeof _tag === "string" && _tag !== "" ? _tag : value["status"] === "stale" ? "ActionStale" : "ActionRefused"
   const message = typeof error === "string" && error !== "" ? error : typeof value["message"] === "string" ? value["message"] : "The action was refused."
-  return { kind: FAILURE_KINDS[tag] ?? "refused", value: failure(spec.id, tag, message, rest), validated: true }
+  const normalized = failure(spec.id, tag, message, rest)
+  return { kind: actionOutcome(normalized), value: normalized, validated: true }
 }
 
 /** Classifies one answer of `spec`'s implementation. */
@@ -64,8 +57,12 @@ export const classifyOutcome = (spec: Classified, raw: unknown): ActionOutcome =
   const files = raw instanceof ToolMediaResult ? raw.files : undefined
   const value = raw instanceof ToolMediaResult ? raw.value : raw
   const object = asRecord(value)
-  // A committed receipt (RM-03) is a success whatever the action's own result is.
-  if (object?.["_tag"] === "ActionCommitted" && object["ok"] === true) return { kind: "succeeded", value, ...(files ? { files } : {}), validated: true }
+  // Receipts have their own shared contract; a tag alone cannot certify a commit or a different action's result.
+  if (object?.["_tag"] === "ActionCommitted") {
+    const committed = Schema.decodeUnknownExit(ActionCommitted)(value)
+    if (Exit.isSuccess(committed) && committed.value.receipt.actionId === spec.id) return { kind: "succeeded", value, ...(files ? { files } : {}), validated: true }
+    return { kind: "uncertain", value: failure(spec.id, "ActionResultInvalid", "The implementation returned an invalid or mismatched commit receipt. Inspect the document before retrying."), validated: true }
+  }
   const schema = spec.contract.result
   if (schema === undefined) {
     if (object?.["ok"] === false) return classifyRefusal(spec, object)
@@ -88,7 +85,8 @@ export const classifyOutcome = (spec: Classified, raw: unknown): ActionOutcome =
   const partialField = spec.contract.partialWhen
   const left = partialField !== undefined ? object?.[partialField] : undefined
   const partial = Array.isArray(left) ? left.length > 0 : left !== undefined && left !== null && left !== false && left !== 0
-  return { kind: partial ? "partial" : "succeeded", value, ...(files ? { files } : {}), validated: true }
+  const kind = actionOutcome(value)
+  return { kind: kind === "succeeded" && partial ? "partial" : kind, value, ...(files ? { files } : {}), validated: true }
 }
 
 /** The wire form an adapter hands on: the value, with its media when it has any. */

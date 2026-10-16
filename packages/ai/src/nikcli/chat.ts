@@ -270,7 +270,7 @@ export const readHostSessionState = (host: ProjectHost, sessionId: string): Effe
           if (part.type !== "tool" || !part.tool || !part.callID) continue
           for (const event of mapHostEvent(sessionId, { type: "message.part.updated", properties: { part: { ...part, sessionID: sessionId, messageID: message.info.id } } }, mapper)) {
             if (event.type === "tool_call" || event.type === "todo" || event.type === "tool_diagnostic") recovered.push(event)
-            if (event.type === "tool_result") recovered.push({ type: "tool_result", sessionId, callId: event.callId, tool: event.tool, ok: event.ok, output: event.output.slice(0, 16_000) })
+            if (event.type === "tool_result") recovered.push(event)
           }
         }
       }

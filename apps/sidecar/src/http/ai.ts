@@ -11,6 +11,8 @@ import { AppConfigService } from "../config.ts"
 import { KvStore } from "../services/kv.ts"
 import { ActingUser } from "../services/acting-user.ts"
 import { AiActions } from "../services/ai.ts"
+import { ToolRegistry } from "@cadcamfun/ai"
+import { AiPlugins } from "../services/ai-plugins.ts"
 import { BridgeTokens } from "../services/bridge-tokens.ts"
 import { HttpServerRequest } from "effect/unstable/http"
 import { ProjectRepo } from "../repos/project-repo.ts"
@@ -37,6 +39,8 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
   const credentials = yield* AiCredentials
   const actingUser = yield* ActingUser
   const host = yield* Effect.serviceOption(AiHost)
+  const plugins = yield* AiPlugins
+  const registry = yield* ToolRegistry
   const actions = yield* AiActions
   const bridgeTokens = yield* BridgeTokens
   /** The scoped grant of the bearer on this request, or undefined for the application's own token. */
@@ -88,6 +92,22 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
     ? host.value.runtime.reloadSkills().pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
     : Effect.succeed(false)
 
+  const extensionAccess = Effect.gen(function*() {
+    if (yield* bridgeGrant) return yield* new BadRequest({ message: "Extension management requires the application connection" })
+  })
+  const extensionProject = Effect.fn("AiHttp.extensionProject")(function*(projectId: string) {
+    yield* extensionAccess
+    const actor = yield* CurrentUser
+    const access = yield* projects.find(actor.id, projectId).pipe(Effect.mapError(() => new InternalError({ message: "Unable to verify project access" })))
+    if (!access || access.project.ownerId !== actor.id) return yield* new BadRequest({ message: "Only the project owner can configure MCP connections" })
+    if (Option.isNone(host)) return yield* new BadRequest({ message: "MCP connections require the nikcli host" })
+    return host.value.runtime
+  })
+  const pluginList = plugins.installed.pipe(Effect.map((plugins) => ({ plugins })), Effect.mapError((error) => new InternalError({ message: error.message })))
+  const refreshPluginTools = Effect.gen(function*() {
+    yield* registry.reload
+    if (Option.isSome(host)) yield* host.value.runtime.reloadTools().pipe(Effect.mapError((error) => new InternalError({ message: error.message })))
+  })
   const status = Effect.gen(function*() {
     const providers = yield* credentials.status
     return { providers, configured: Object.values(providers).includes("configured"), host: Option.isSome(host) ? "nikcli" as const : "direct" as const, ...(Option.isSome(host) ? { tools: host.value.runtime.toolCatalogue() } : {}) }
@@ -283,6 +303,39 @@ export const AiHandlers = HttpApiBuilder.group(Api, "ai", Effect.fn(function*(ha
       const removed = yield* ai.removeSession(payload.sessionId, projectId)
       if (removed) yield* Effect.tryPromise({ try: () => actingUser.forget(payload.sessionId), catch: () => new InternalError({ message: "Unable to remove session owner" }) })
       return { removed }
+    }))
+    .handle("mcpServers", ({ query }) => Effect.gen(function*() {
+      const runtime = yield* extensionProject(query.projectId)
+      const servers = yield* runtime.mcpServers(query.projectId).pipe(Effect.mapError((error) => new InternalError({ message: error.message })))
+      return { servers }
+    }))
+    .handle("saveMcpServer", ({ payload }) => Effect.gen(function*() {
+      const runtime = yield* extensionProject(payload.projectId)
+      yield* runtime.saveMcpServer(payload.projectId, payload.name, payload.config).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      return { servers: yield* runtime.mcpServers(payload.projectId).pipe(Effect.mapError((error) => new InternalError({ message: error.message }))) }
+    }))
+    .handle("deleteMcpServer", ({ params, query }) => Effect.gen(function*() {
+      const runtime = yield* extensionProject(query.projectId)
+      yield* runtime.saveMcpServer(query.projectId, params.name, undefined).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      return { servers: yield* runtime.mcpServers(query.projectId).pipe(Effect.mapError((error) => new InternalError({ message: error.message }))) }
+    }))
+    .handle("removeExtensionPlugin", ({ params }) => Effect.gen(function*() {
+      yield* extensionAccess
+      yield* plugins.remove(params.id).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      yield* refreshPluginTools
+      return yield* pluginList
+    }))
+    .handle("extensionPlugins", () => Effect.gen(function*() { yield* extensionAccess; return yield* pluginList }))
+    .handle("installExtensionPlugin", ({ payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      yield* plugins.install(payload.manifest, payload.source).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      return yield* pluginList
+    }))
+    .handle("toggleExtensionPlugin", ({ params, payload }) => Effect.gen(function*() {
+      yield* extensionAccess
+      yield* plugins.toggle(params.id, payload.enabled).pipe(Effect.mapError((error) => new BadRequest({ message: error.message })))
+      yield* refreshPluginTools
+      return yield* pluginList
     }))
     .handle("skills", () => skillInfos.pipe(Effect.map((skills) => ({ skills, max: MAX_USER_SKILLS }))))
     .handle("saveSkill", ({ payload }) => Effect.gen(function*() {

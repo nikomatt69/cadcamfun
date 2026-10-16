@@ -44,6 +44,12 @@ The interface is the test surface; no duplicate public dispatcher or in-process 
 
 ## Precise contracts
 
+- Integration follow-up (2026-10-15): every adapter uses the shared outcome classification after result validation,
+  including incomplete reads, stale results and invalid-result uncertainty. A committed envelope must satisfy
+  `ActionCommitted` and name the executing action before it can be reported as success. The HTTP bridge and specialist
+  event mapper consume the complete structured answer; desktop wire decoding preserves result JSON without character
+  slicing. Transcript text budgets must not corrupt the result used for editor reconciliation. This amends existing
+  adapter/result-consumer scopes only; durable receipts, resync and new lifecycle work remain roadmap-gated.
 - `ActionSpec`: stable `tool.action`, input/result schema, LLM documentation, effect set, capabilities, exposure and transport mapping.
 - Authoritative Effect wire schemas live in `packages/api`; they import neither AI execution, nikcli nor DB.
 - nikcli's zod representation is derived or equivalence-tested, never independently authoritative; test defaults, bounds, unions, unknown keys and encode/decode failures.

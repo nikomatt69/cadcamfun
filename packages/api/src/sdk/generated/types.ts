@@ -402,6 +402,31 @@ export type AiSessionStatePayload = { readonly sessionId: string; readonly proje
 
 export type AiRemoveSessionPayload = { readonly sessionId: string; readonly projectId?: string | undefined }
 
+export type AiSaveMcpServerPayload = {
+  readonly projectId: string
+  readonly name: string
+  readonly config:
+    | {
+        readonly type: "local"
+        readonly command: ReadonlyArray<string>
+        readonly environment?: { readonly [x: string]: string } | undefined
+        readonly enabled: boolean
+        readonly timeout?: number | undefined
+      }
+    | {
+        readonly type: "remote"
+        readonly url: string
+        readonly headers?: { readonly [x: string]: string } | undefined
+        readonly oauth?: false | undefined
+        readonly enabled: boolean
+        readonly timeout?: number | undefined
+      }
+}
+
+export type AiInstallExtensionPluginPayload = { readonly manifest: string; readonly source: string }
+
+export type AiToggleExtensionPluginPayload = { readonly enabled: boolean }
+
 export type AiSaveSkillPayload = {
   readonly markdown?: string | undefined
   readonly name?: string | undefined
@@ -2287,6 +2312,116 @@ export type AiRemoveSessionInput = {
 }
 
 export type AiRemoveSessionOutput = { removed: boolean }
+
+export type AiMcpServersInput = { readonly projectId: { readonly projectId: string }["projectId"] }
+
+export type AiMcpServersOutput = {
+  servers: Array<{
+    name: string
+    config:
+      | {
+          type: "local"
+          command: Array<string>
+          environment?: { [x: string]: string } | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+      | {
+          type: "remote"
+          url: string
+          headers?: { [x: string]: string } | undefined
+          oauth?: false | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+    status: string
+  }>
+}
+
+export type AiSaveMcpServerInput = {
+  readonly projectId: AiSaveMcpServerPayload["projectId"]
+  readonly name: AiSaveMcpServerPayload["name"]
+  readonly config: AiSaveMcpServerPayload["config"]
+}
+
+export type AiSaveMcpServerOutput = {
+  servers: Array<{
+    name: string
+    config:
+      | {
+          type: "local"
+          command: Array<string>
+          environment?: { [x: string]: string } | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+      | {
+          type: "remote"
+          url: string
+          headers?: { [x: string]: string } | undefined
+          oauth?: false | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+    status: string
+  }>
+}
+
+export type AiDeleteMcpServerInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly projectId: { readonly projectId: string }["projectId"]
+}
+
+export type AiDeleteMcpServerOutput = {
+  servers: Array<{
+    name: string
+    config:
+      | {
+          type: "local"
+          command: Array<string>
+          environment?: { [x: string]: string } | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+      | {
+          type: "remote"
+          url: string
+          headers?: { [x: string]: string } | undefined
+          oauth?: false | undefined
+          enabled: boolean
+          timeout?: number | undefined
+        }
+    status: string
+  }>
+}
+
+export type AiRemoveExtensionPluginInput = { readonly id: { readonly id: string }["id"] }
+
+export type AiRemoveExtensionPluginOutput = {
+  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+}
+
+export type AiExtensionPluginsOutput = {
+  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+}
+
+export type AiInstallExtensionPluginInput = {
+  readonly manifest: AiInstallExtensionPluginPayload["manifest"]
+  readonly source: AiInstallExtensionPluginPayload["source"]
+}
+
+export type AiInstallExtensionPluginOutput = {
+  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+}
+
+export type AiToggleExtensionPluginInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly enabled: AiToggleExtensionPluginPayload["enabled"]
+}
+
+export type AiToggleExtensionPluginOutput = {
+  plugins: Array<{ id: string; name: string; version: string; enabled: boolean; tools: number }>
+}
 
 export type AiSkillsOutput = {
   skills: Array<{ name: string; description: string; builtIn: boolean; category: string }>

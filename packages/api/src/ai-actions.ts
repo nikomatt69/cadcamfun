@@ -102,8 +102,8 @@ export const actionOutcome = (value: unknown): ActionOutcomeStatus => {
   if (result === undefined) return "succeeded"
   const tag = result["_tag"]
   if (tag === "ActionInterrupted") return "cancelled"
-  if (tag === "ActionUncertain") return "uncertain"
-  if (tag === "ActionConflict" || result["status"] === "stale" || result["status"] === "conflict") return "conflict"
+  if (tag === "ActionUncertain" || tag === "ActionResultInvalid") return "uncertain"
+  if (tag === "ActionConflict" || tag === "ActionStale" || result["status"] === "stale" || result["status"] === "conflict") return "conflict"
   if (result["ok"] === false && (typeof result["error"] === "string" || typeof tag === "string")) return "refused"
   const skipped = result["skipped"]
   if (result["complete"] === false || (typeof result["omitted"] === "number" && result["omitted"] > 0) || (Array.isArray(skipped) && skipped.length > 0)) return "partial"

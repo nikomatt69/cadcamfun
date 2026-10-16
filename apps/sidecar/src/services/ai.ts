@@ -1148,12 +1148,17 @@ export const AiActionsLive = Layer.effect(AiActions, Effect.gen(function*() {
       const sessionId = drawingId === undefined ? `bridge:${projectId}:${user.id}` : `bridge:${projectId}:${user.id}:${drawingId}`
       const bound = yield* Effect.promise(() => acting.bind(projectId, sessionId, user, `${tool}.${admission.action} (standalone nikcli)`, drawingId))
       if (!bound) return yield* Effect.fail({ message: "This project's bridge session belongs to another account." })
-      const output = yield* Effect.promise((abort) => {
+      const result = yield* Effect.promise((abort) => {
         const cancel = signal ?? abort
-        return acting.invoke(projectId, sessionId, () => spec.execute(input, { sessionId, projectId, signal: cancel }), cancel)
+        return acting.invoke(projectId, sessionId, async () => {
+          const call = { sessionId, projectId, signal: cancel }
+          // The HTTP caller consumes data, not the model's bounded preview. Text-only extensions retain their codec.
+          const answer = spec.executeWithFiles ? await spec.executeWithFiles(input, call) : { output: await spec.execute(input, call) }
+          // Match the JSON wire encoding (omit optional undefined fields) without going through the bounded model text.
+          if ("value" in answer && answer.value !== undefined) return JSON.parse(JSON.stringify(answer.value)) as unknown
+          try { return JSON.parse(answer.output) as unknown } catch { return answer.output }
+        }, cancel)
       }).pipe(Effect.catchDefect(() => Effect.fail({ message: "The call was denied or interrupted." })))
-      let result: unknown
-      try { result = JSON.parse(output) } catch { result = output }
       return { tool, action: admission.action, result }
     })
   })

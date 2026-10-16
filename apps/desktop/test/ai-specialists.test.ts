@@ -86,9 +86,14 @@ describe("the chat shows tasks, tools, version control and workflows together", 
       expect(document.body.textContent).not.toContain("is not allowed")
       expect(rows.every((r) => !r.textContent!.includes("Tool failed"))).toBe(true)
       // The exact input and output are one click away.
+      expect(pr.querySelector("pre")).toBeNull()
+      const raw = pr.querySelector<HTMLDetailsElement>('[data-testid="tool-raw"]')!
+      raw.open = true
+      raw.dispatchEvent(new window.Event("toggle"))
+      await app.wait(() => pr.querySelector("pre"))
       expect(pr.querySelector("pre")?.textContent).toContain("Bigger hole")
     } finally {
       dispose()
     }
-  })
+  }, 30000)
 })

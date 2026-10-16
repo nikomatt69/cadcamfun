@@ -1,5 +1,9 @@
 # WP9 — Plugin system (`packages/plugin-sdk`, `apps/sidecar/src/plugins`)
 
+## Assistant extensions (2026-10-16)
+
+Owner-requested assistant plugin management extends apps/sidecar/src/services/ai-plugins.ts and its tests: install a validated local manifest/source bundle, list installed Worker plugins and persist enable/disable with live tool refresh. Only ai:tool is currently wired; unsupported capabilities are refused explicitly. Existing browser CAD/CAM plugin installation and management remain available. Worker code is user-trusted and is not an OS sandbox. Status: in progress.
+
 ## Worker RPC lifecycle alignment (2026-10-09)
 
 WP9 follow-up: correlate requests and replies, clean timeout/listener resources on interruption, settle all pending calls when a worker closes, guard admission after disposal, and scope Worker termination to the host layer. A post failure is a typed error. Real Worker bootstrap must announce readiness before host sends activation, because top-level asynchronous plugin loading can otherwise drop messages.

@@ -1,6 +1,6 @@
 # AI-11 - Enterprise harness execution guide
 
-Status: **Step 0 done (inventory, baseline, spec corrections); Step 1 done (every action declares its input in Effect and its result); Step 2 done (whole value for Code Mode, bounded text for the model); Step 3 done (role limits and approval enforced in every mode); Step 4 done (per-Instance configuration, registration handles, mandatory host patches); Step 5 gate passed (turn bound to its drawing, compare-and-swap writes; persisted revision, stored receipts and deduplication wait for RM-03); Step 6 partial (one context assembly, habits once, native injection off; propagation to queue/goal/tasks and specialist briefings open); Step 7 gate passed (every text in one corpus checked against the catalogue and the kernel); Step 8 gate passed (verification replays the stored program, report bound to program and inputs); Step 9 partial (task journal: durable enqueue, report and outcome, bounded recovery, editors never replayed; event sequences, leases and session lifecycle open); Step 10 gate passed (dimensional acceptance; kernel jobs in a worker with a deadline); Step 11 pending.**
+Status: **partial implementation. Action contracts, structured output, role restrictions, host isolation, the prompt corpus, stored-program verification and worker-based dimensional acceptance have recorded evidence. Remaining work includes Effect handler migration, durable revisions/receipts, complete context propagation, durable session lifecycle, remaining heavy kernel paths and observability. The integration follow-up below records current checks; roadmap statuses are unchanged.**
 Stack: Effect **4.0.0-rc.112** and nikcli **@nikcli-ai/sdk-next 1.428.0** throughout.
 
 ## Authority
@@ -163,7 +163,8 @@ Progress (2026-10-15):
   `operationId` (the full program is read back with `cam.analyze` by `operationId`); the contract pins them
   (`action-outcome.test.ts`, `action-contracts.test.ts`).
 - Open (C): two outcome classifiers exist, `actions/outcome.ts` (contract-aware, Step 1) and `actionOutcome` in
-  `@cadcamfun/api` (used for the tool text); unify them in Step 6 or earlier if they disagree.
+  `@cadcamfun/api` (used for the tool text). Resolved by the integration follow-up below: schema validation stays in the
+  catalogue, while outcome classification delegates to the shared function.
 
 ### Step 3 — Enforce role limits in code
 
@@ -519,6 +520,39 @@ only after a contract change.
 Final gate: every TODO has recorded evidence; every action, tool, prompt and skill is covered; no conflict, partial result,
 stale verification or unsupported capability can be presented as completed work.
 
+## Integration follow-up (2026-10-15)
+
+The owner requested continuing the partially integrated harness without adding regression tests. The worktree was clean
+at admission. This pass deepens the existing RM-01 adapters and result consumers; it does not start later roadmap work or
+close RM-01 on the strength of AI refinements alone.
+
+- **C → V** The HTTP bridge called `HostToolSpec.execute`, which returns the model's bounded text. It now consumes
+  `executeWithFiles().value`, with the same complete JSON encoding used by the wire (optional `undefined` fields omitted),
+  and keeps a fallback for text-only extensions. Large reads no longer become preview objects at the HTTP adapter.
+- **C → V** The primary event mapper read complete stored values, but the specialist mapper read preview text; both now use
+  the same full-answer extraction. Session recovery no longer slices each result at 16,000 characters, and desktop wire
+  decoding no longer slices result JSON at 256,000 characters. Model preview budgets remain separate from these consumers.
+- **C → V** The catalogue and tool text disagreed on invalid-result uncertainty, stale tags and incomplete reads. Validated
+  results and normalised failures now use shared `actionOutcome`; `ActionResultInvalid` is uncertain and `ActionStale` is a
+  conflict. A committed envelope must decode against `ActionCommitted` and its receipt must name the executing action.
+- **V** A temporary runtime probe outside the repository checked four shared/catalogue outcome pairs, two invalid or
+  mismatched receipts, and an unshortened 300,000-character result through specialist → desktop, session recovery and the
+  HTTP bridge backed by the real in-memory repositories. No regression file was added or edited.
+- **V** Existing targeted suites: 65 tests passed across nine files (action outcomes, CAM wire, event mapping, Code Mode,
+  tool output, shared contracts, bridge/governance and desktop recovery).
+- **V** Existing compiled-sidecar smoke ran on macOS arm64 and exited 0: dimensional acceptance ran in the embedded worker;
+  ready 8,017.5 ms, health p50/p95 1.0/1.7 ms, `cad.describe` p50/p95 8.6/326.3 ms, acceptance job 1,719.9 ms, maximum health
+  response during the job 180.7 ms over 1,792 samples, shutdown 74.5 ms. RSS is unavailable (`/proc` is absent on macOS).
+  This run overlapped the suite and is not directly comparable to the earlier Linux baseline. No model was called.
+
+Remaining integration limits are explicit: Promise domain handlers, the absent project-machine handler (analysis and cutting
+data still use their documented default limits), durable revisions/receipts/deduplication (RM-03),
+`includeContext` propagation and actor-scoped context (RM-06), task leases/event resync/session lifecycle (RM-07), remaining
+exact/validation workloads outside workers and dimensional coverage (RM-09), and bounded provenance traces (RM-10).
+Drawing targeting is guaranteed when the caller supplies `drawingId`; legacy calls without it still resolve the editor
+snapshot or an unambiguous project, and a later turn may rebind a conversation. These paths are not a claim of complete
+immutable turn ownership or crash-safe write recovery.
+
 ## Step 0 results
 
 ### Inventory
@@ -580,6 +614,9 @@ was added): **V** 1741 pass, 1 fail, 1742 tests in 237 files, 324 s.
 
 ## Change log
 
+- 2026-10-15: integration follow-up without new regression files: complete HTTP/specialist/recovery/desktop results,
+  shared outcome classification, validated commit envelopes, existing-suite verification and compiled-sidecar execution.
+  Later roadmap dependencies and open TODOs remain open.
 - 2026-10-14: published the guide (Steps 0–11, legend, discipline, closing commands) and closed Step 0: generated inventory
   with a staleness/execution-path test, baseline typechecks, spec corrections for B-rep/STEP and `start_session`/`settle_session`.
   No RM row status changed.

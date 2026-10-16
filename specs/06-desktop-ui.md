@@ -1,5 +1,9 @@
 # WP6 + WP7 — Desktop UI (`apps/desktop`)
 
+## Assistant extensions (2026-10-16)
+
+Owner-requested assistant extensions: WP6 owns a compact MCP/plugin settings disclosure in the existing assistant, project-local connection management, Worker plugin installation/enablement and links to existing CAD/CAM plugin pages. AI locale and desktop tests are included. Status: in progress.
+
 ## Component creation and library round-trip (2026-10-13)
 
 Status: in progress. WP6 owns this editor increment in `features/cad/{components,lib,store,screens}`, `features/library/hooks`, locale entries and desktop tests. Create Component from the toolbar or canvas opens one in-editor dialog for the complete selection: name, description, tags, target layer, original retention and optional library saving (enabled by default), with local or project destination and project visibility. All descendant components and groups remain nested, with geometry, poses and metadata preserved. Preview the included hierarchy and counts. Persistence failures keep the dialog and original scene intact; creation is one undo step. Library placement and preview must use the complete stored geometry with fresh instance IDs, including legacy single-element records and project documents. Existing typed API contracts are reused.
@@ -8,6 +12,10 @@ Status: in progress. WP6 owns this editor increment in `features/cad/{components
 ## Assistant controls (2026-10-10)
 
 See `24-assistant-control-flow.md`: WP6 adds role/domain/thinking selectors, manual context compaction, interactive native question replies and background task cancellation in the existing assistant. Controls remain bound to the active session/project and generated API; context follows host limits, with unknown values explicit. Status: in progress. Change log: 2026-10-10 — registered assistant control UI ownership before implementation.
+
+## Assistant streaming responsiveness (2026-10-15)
+
+Status: implemented and regression-checked. WP6 owns the assistant transcript components, timeline derivation, store and desktop regression tests. Streaming updates preserve mounted message and timeline rows, including disclosure state, while updating text, tool status and recovered answers. Adjacent text/reasoning deltas are retained as one exact text run, preserving tool and session boundaries. Format raw tool evidence only when its disclosure is open; retain complete results for editor reconciliation. Coalesce follow-latest scrolling per animation frame and cancel pending scroll work on teardown. Scripted streams and DOM identity assertions verify behavior without requiring a live provider; native runtime profiling remains outstanding.
 
 ## Bootstrap and graphics performance alignment (2026-10-09)
 
@@ -70,6 +78,16 @@ Performance budget: first interactive paint < 1.5 s after sidecar ready on a 202
 
 ## 5. Change log
 
+- 2026-10-16: minor assistant composer spacing refinement (WP6): narrow docks use icon-only agent, mode, thinking and drawing triggers with accessible names and tooltips. The model name can shrink with ellipsis, secondary effort text collapses at narrow widths, and fixed icons retain their spacing. Layout and assistant behavior are preserved. Validation: desktop typecheck, production build and all 5 targeted assistant panel/agent tests pass; no native visual verification was performed.
+- 2026-10-15: assistant streaming retains message/segment DOM nodes, memoizes unchanged Markdown and tool facts,
+  defers raw JSON formatting until disclosure, coalesces scrolling per frame and compacts adjacent token events.
+  Regression coverage includes 400 streamed fragments with 300 KB tool output, preserved disclosure state and unchanged
+  Markdown descendants, plus exact text/order preservation for a 10,000-token burst. Desktop typecheck and production build pass.
+  The full desktop run passes 707 tests; one specialist integration test exceeds its original 5-second cold-load timeout.
+  Its timeout now matches the integration waits (30 seconds), and the specialist/streaming targeted rerun passes both tests.
+- 2026-10-15: AI wire decoding preserves complete tool-result JSON for editor reconciliation instead of character slicing.
+  Model preview and transcript-text budgets are separate. A temporary runtime probe verified an unshortened 300,000-character
+  specialist result through the production decoder; no regression files were added or edited.
 - 2026-10-14: composite CAM resource follow-up owns optional ordered operation snapshots in save/export/reopen, the toolpath details operation list and 3D component/toolpath preview, and a reusable read-only component preview/structure in component resource details. Follow the legacy component Preview/Structure and toolpath Details/G-code/Versions/Comments layout. Reuse CAD geometry factories and CAM playback, preserve nested component poses, and read saved geometry independently of the active workspace. Status: in progress.
 
 - 2026-10-11: the WP6 assistant surface now owns a stable, context-aware header and a compact Codex-style composer. Project/drawing and companion-device disclosures use real typed API data; slash commands are keyboard-operable; proactive suggestions use dismissible toast cards; agent, domain, permission and thinking controls remain visible as a spaced icon rail whose custom menus open upward; and the model menu is right-anchored so it grows left inside narrow docks. Composer popovers sit above transcript toasts without clipping, while light/dark text fields and menus share the assistant surface tokens. The empty state and responsive layout were refined for both the full AI page and the docked CAD/CAM panel.

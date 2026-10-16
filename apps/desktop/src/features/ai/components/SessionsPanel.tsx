@@ -27,36 +27,35 @@ export function SessionsPanel(): JSX.Element {
   }
 
   return (
-    <section class="border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-800" data-testid="ai-sessions">
-      <div class="mb-1 flex items-center justify-between">
-        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{t("ai.sessions.title")} ({ai.sessions().length})</p>
-        <button type="button" class="btn btn-outline text-[11px]" onClick={() => ai.newSession()} data-testid="ai-session-new">
+    <section class="assistant-sessions-panel" data-testid="ai-sessions">
+      <div class="assistant-panel-header">
+        <p class="assistant-section-label mb-0">{t("ai.sessions.title")} ({ai.sessions().length})</p>
+        <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => ai.newSession()} data-testid="ai-session-new">
           <Plus size={11} aria-hidden="true" />
           {t("ai.sessions.new")}
         </button>
       </div>
-      <Show when={ai.sessions().length > 0} fallback={<p class="text-xs text-gray-500">{t("ai.sessions.empty")}</p>}>
-        <ul class="max-h-48 space-y-1 overflow-y-auto">
+      <Show when={ai.sessions().length > 0} fallback={<p class="assistant-meta-text">{t("ai.sessions.empty")}</p>}>
+        <ul class="assistant-sessions-list">
           <For each={ai.sessions()}>{(session) => (
             <li
-              class="assistant-session-row flex items-center gap-2 rounded border px-2 py-1 text-xs"
+              class="assistant-session-row"
               classList={{
-                "border-blue-400 bg-blue-50 dark:bg-blue-950/30": session.id === ai.sessionId(),
-                "border-gray-200 dark:border-gray-700": session.id !== ai.sessionId()
+                "is-active": session.id === ai.sessionId()
               }}
               data-testid={`ai-session-${session.id}`}
             >
               <Show
                 when={editing() === session.id}
                 fallback={
-                  <button type="button" class="min-w-0 flex-1 text-left" onClick={() => ai.openSession(session.id)} data-testid="ai-session-open">
-                    <span class="block truncate font-medium">{session.title}</span>
-                    <span class="text-[10px] text-gray-500">{when(session.updatedAt)} · {t("ai.sessions.exchanges", { count: session.exchanges })}</span>
+                  <button type="button" class="assistant-session-open" onClick={() => ai.openSession(session.id)} data-testid="ai-session-open">
+                    <span class="assistant-session-title">{session.title}</span>
+                    <span class="assistant-session-meta">{when(session.updatedAt)} · {t("ai.sessions.exchanges", { count: session.exchanges })}</span>
                   </button>
                 }
               >
                 <input
-                  class="min-w-0 flex-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-900"
+                  class="assistant-field flex-1"
                   value={title()}
                   maxLength={80}
                   aria-label={t("ai.sessions.rename")}
@@ -68,24 +67,24 @@ export function SessionsPanel(): JSX.Element {
                   }}
                   ref={(el) => queueMicrotask(() => el.focus())}
                 />
-                <button type="button" class="rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-700" aria-label={t("ai.sessions.save")} onClick={() => commit(session.id)}>
+                <button type="button" class="assistant-icon-action" aria-label={t("ai.sessions.save")} onClick={() => commit(session.id)}>
                   <Check size={12} aria-hidden="true" />
                 </button>
               </Show>
               <Show when={editing() !== session.id}>
-                <button type="button" class="rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-700" aria-label={t("ai.sessions.rename")} data-testid="ai-session-rename"
+                <button type="button" class="assistant-icon-action" aria-label={t("ai.sessions.rename")} data-testid="ai-session-rename"
                   onClick={() => { setTitle(session.title); setEditing(session.id) }}>
                   <Pencil size={12} aria-hidden="true" />
                 </button>
                 <Show
                   when={confirming() === session.id}
                   fallback={
-                    <button type="button" class="rounded p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30" aria-label={t("ai.sessions.delete")} data-testid="ai-session-delete" onClick={() => setConfirming(session.id)}>
+                    <button type="button" class="assistant-icon-action is-danger" aria-label={t("ai.sessions.delete")} data-testid="ai-session-delete" onClick={() => setConfirming(session.id)}>
                       <Trash2 size={12} aria-hidden="true" />
                     </button>
                   }
                 >
-                  <button type="button" class="rounded bg-red-600 px-1.5 py-0.5 text-[10px] text-white" data-testid="ai-session-confirm-delete"
+                  <button type="button" class="assistant-btn-xs is-danger" data-testid="ai-session-confirm-delete"
                     onClick={() => { setConfirming(undefined); ai.deleteSession(session.id) }}>
                     {t("ai.sessions.confirmDelete")}
                   </button>

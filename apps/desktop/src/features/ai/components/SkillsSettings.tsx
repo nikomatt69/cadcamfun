@@ -18,8 +18,7 @@ interface SkillInfo {
   readonly category: string
 }
 
-const FIELD =
-  "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+const FIELD = "assistant-field"
 
 const TEMPLATE = `---
 name: my-skill
@@ -102,16 +101,16 @@ export function SkillsSettings(): JSX.Element {
       </div>
       <p class="text-xs text-gray-500">{t("ai.skills.hint")}</p>
 
-      <ul class="space-y-1" data-testid="ai-skills-list">
+      <ul class="space-y-1.5" data-testid="ai-skills-list">
         <For each={skills()}>{(skill) => (
-          <li class="flex items-start gap-2 rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700" data-testid={`ai-skill-${skill.name}`}>
+          <li class="assistant-list-card" data-testid={`ai-skill-${skill.name}`}>
             <div class="min-w-0 flex-1">
               <span class="font-mono font-medium">{skill.name}</span>
-              <span class="ml-2 rounded bg-gray-100 px-1 text-[10px] text-gray-600 dark:bg-gray-800 dark:text-gray-400">{skill.builtIn ? t("ai.skills.builtIn") : t("ai.skills.yours")}</span>
-              <p class="truncate text-gray-500" title={skill.description}>{skill.description}</p>
+              <span class="ml-2 assistant-pill">{skill.builtIn ? t("ai.skills.builtIn") : t("ai.skills.yours")}</span>
+              <p class="truncate assistant-meta-text mt-0.5" title={skill.description}>{skill.description}</p>
             </div>
             <Show when={!skill.builtIn}>
-              <button type="button" class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label={t("ai.skills.remove", { name: skill.name })} disabled={busy()} onClick={() => void remove(skill.name)}>
+              <button type="button" class="assistant-icon-action is-danger" aria-label={t("ai.skills.remove", { name: skill.name })} disabled={busy()} onClick={() => void remove(skill.name)}>
                 <Trash2 size={12} aria-hidden="true" />
               </button>
             </Show>
@@ -129,16 +128,16 @@ export function SkillsSettings(): JSX.Element {
         data-testid="ai-skill-markdown"
       />
       <Show when={problem()}>
-        <p role="alert" class="text-xs text-red-600 dark:text-red-400" data-testid="ai-skill-problem">{problem()}</p>
+        <p role="alert" class="assistant-status-error text-xs" data-testid="ai-skill-problem">{problem()}</p>
       </Show>
       <div class="flex gap-2">
         <input ref={picker} type="file" accept=".md,text/markdown,text/plain" class="hidden" onChange={(event) => { void readFile(event.currentTarget.files); event.currentTarget.value = "" }} />
-        <button type="button" class="btn btn-outline" onClick={() => picker?.click()}>
+        <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => picker?.click()}>
           <Upload size={12} aria-hidden="true" />
           {t("ai.skills.open")}
         </button>
-        <button type="button" class="btn btn-outline" onClick={() => setMarkdown(TEMPLATE)}>{t("ai.skills.template")}</button>
-        <button type="button" class="btn btn-primary" disabled={busy() || markdown().trim().length === 0} onClick={() => void save()} data-testid="ai-skill-save">
+        <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => setMarkdown(TEMPLATE)}>{t("ai.skills.template")}</button>
+        <button type="button" class="assistant-btn assistant-btn-primary" disabled={busy() || markdown().trim().length === 0} onClick={() => void save()} data-testid="ai-skill-save">
           {t("ai.skills.load")}
         </button>
       </div>

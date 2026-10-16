@@ -152,6 +152,18 @@ export const AnthropicMessage = Schema.Struct({
 export const SkillInfo = Schema.Struct({
   name: Schema.String, description: Schema.String, builtIn: Schema.Boolean, category: Schema.String
 })
+/** Outbound MCP connections belong to one owned project, never the host's shared config. */
+const McpOptions = { enabled: Schema.Boolean, timeout: opt(Schema.Number) }
+export const AiMcpConfig = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("local"), command: Schema.Array(Schema.String), environment: opt(Schema.Record(Schema.String, Schema.String)), ...McpOptions }),
+  Schema.Struct({ type: Schema.Literal("remote"), url: Schema.String, headers: opt(Schema.Record(Schema.String, Schema.String)), oauth: opt(Schema.Literal(false)), ...McpOptions })
+])
+export const AiMcpEntry = Schema.Struct({ name: Schema.String, config: AiMcpConfig, status: Schema.String })
+export const AiMcpList = Schema.Struct({ servers: Schema.Array(AiMcpEntry) })
+export const AiMcpSave = Schema.Struct({ projectId: Schema.String, name: Schema.String, config: AiMcpConfig })
+export const AiExtensionPlugin = Schema.Struct({ id: Schema.String, name: Schema.String, version: Schema.String, enabled: Schema.Boolean, tools: Schema.Number })
+export const AiExtensionPlugins = Schema.Struct({ plugins: Schema.Array(AiExtensionPlugin) })
+export const AiPluginBundle = Schema.Struct({ manifest: Schema.String, source: Schema.String })
 export const SkillList = Schema.Struct({ skills: Schema.Array(SkillInfo), max: Schema.Number })
 /** Either `markdown` (a whole SKILL.md) or `name` + `description` + `body`. */
 export const SkillBody = Schema.Struct({
@@ -229,6 +241,13 @@ export class AiGroup extends HttpApiGroup.make("ai")
     HttpApiEndpoint.post("sessionControl", "/api/ai/sessions/control", { payload: SessionControlBody, success: SessionControlReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("sessionState", "/api/ai/sessions/state", { payload: SessionStateBody, success: SessionStateReply, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.post("removeSession", "/api/ai/sessions/remove", { payload: RemoveSessionBody, success: RemoveSessionReply, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("mcpServers", "/api/ai/extensions/mcp", { query: { projectId: Schema.String }, success: AiMcpList, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.put("saveMcpServer", "/api/ai/extensions/mcp", { payload: AiMcpSave, success: AiMcpList, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.delete("deleteMcpServer", "/api/ai/extensions/mcp/:name", { params: { name: Schema.String }, query: { projectId: Schema.String }, success: AiMcpList, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.delete("removeExtensionPlugin", "/api/ai/extensions/plugins/:id", { params: { id: Schema.String }, success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.get("extensionPlugins", "/api/ai/extensions/plugins", { success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.post("installExtensionPlugin", "/api/ai/extensions/plugins", { payload: AiPluginBundle, success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
+    HttpApiEndpoint.put("toggleExtensionPlugin", "/api/ai/extensions/plugins/:id", { params: { id: Schema.String }, payload: Schema.Struct({ enabled: Schema.Boolean }), success: AiExtensionPlugins, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.get("skills", "/api/ai/skills", { success: SkillList, error: [InternalError] }),
     HttpApiEndpoint.put("saveSkill", "/api/ai/skills", { payload: SkillBody, success: SkillSaved, error: [BadRequest, InternalError] }),
     HttpApiEndpoint.delete("deleteSkill", "/api/ai/skills/:name", { params: skillParam, success: SkillList, error: [BadRequest, InternalError] }),

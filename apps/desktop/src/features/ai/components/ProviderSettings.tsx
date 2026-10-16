@@ -15,8 +15,7 @@ import { toast } from "../../../shared/ui/toast.tsx"
 import { useAiStore } from "../store/context.tsx"
 import type { ProviderInfo } from "../lib/types.ts"
 
-const FIELD =
-  "w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+const FIELD = "assistant-field"
 
 /** Only the endpoints we (or the user) may override carry an editable base URL. */
 const needsBaseUrl = (id: string): boolean => id === "gateway" || id === "openai"
@@ -54,27 +53,27 @@ function ProviderRow(props: {
   }
 
   return (
-    <li class="rounded-md border border-gray-200 dark:border-gray-700" data-testid={`ai-provider-${props.provider.id}`}>
+    <li class="assistant-provider-row" classList={{ "is-open": props.open, "is-configured": configured() }} data-testid={`ai-provider-${props.provider.id}`}>
       <button
         type="button"
-        class="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs"
+        class="assistant-provider-summary"
         aria-expanded={props.open}
         onClick={props.onToggle}
       >
-        <KeyRound size={12} aria-hidden="true" />
-        <span class="flex-1 font-medium">{props.provider.name}</span>
-        <span class="text-[10px] text-gray-400">
+        <KeyRound size={12} aria-hidden="true" class="assistant-meta-text" />
+        <span class="assistant-provider-name">{props.provider.name}</span>
+        <span class="assistant-meta-text">
           {t("ai.catalogue.modelCount", { count: props.provider.models.length })}
         </span>
-        <span class={configured() ? "text-green-600" : "text-gray-400"}>
+        <span class="assistant-pill" data-status={configured() ? "completed" : "idle"}>
           {configured() ? t("ai.status.configured") : t("ai.status.missing")}
         </span>
-        {props.open ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+        {props.open ? <ChevronDown size={12} aria-hidden="true" class="assistant-meta-text" /> : <ChevronRight size={12} aria-hidden="true" class="assistant-meta-text" />}
       </button>
       <Show when={props.open}>
-        <div class="space-y-2 border-t border-gray-200 dark:border-gray-700 p-2" data-testid="ai-provider-detail">
+        <div class="assistant-provider-detail" data-testid="ai-provider-detail">
           <form
-            class="space-y-1"
+            class="space-y-1.5"
             onSubmit={(event) => {
               event.preventDefault()
               const value = key().trim()
@@ -103,11 +102,11 @@ function ProviderRow(props: {
                 onInput={(event) => setBaseUrl(event.currentTarget.value)}
               />
             </Show>
-            <div class="flex gap-1">
+            <div class="flex gap-1.5 pt-0.5">
               <button
                 type="submit"
                 disabled={busy() || key().trim().length === 0}
-                class="rounded bg-blue-600 px-2 py-1 text-xs text-white disabled:opacity-40"
+                class="assistant-btn assistant-btn-primary"
               >
                 {t("ai.providers.save")}
               </button>
@@ -115,7 +114,7 @@ function ProviderRow(props: {
                 <button
                   type="button"
                   disabled={busy()}
-                  class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  class="assistant-btn assistant-btn-secondary is-danger"
                   onClick={() => void run(() => ai.removeCredentials(props.provider.id), t("ai.providers.removed"))}
                 >
                   <Trash2 size={12} aria-hidden="true" />
@@ -126,12 +125,12 @@ function ProviderRow(props: {
           </form>
           <Show
             when={props.provider.models.length > 0}
-            fallback={<p class="text-[11px] text-gray-400">{t("ai.catalogue.noProviderModels")}</p>}
+            fallback={<p class="assistant-meta-text">{t("ai.catalogue.noProviderModels")}</p>}
           >
-            <div class="space-y-1">
-              <div class="text-[10px] uppercase tracking-wide text-gray-400">{t("ai.catalogue.modelsLabel")}</div>
+            <div class="space-y-1.5 pt-1">
+              <div class="assistant-section-label">{t("ai.catalogue.modelsLabel")}</div>
               <input type="search" class={FIELD} aria-label="Search provider models" placeholder="Search provider models" value={modelSearch()} onInput={(event) => { setModelSearch(event.currentTarget.value); setModelLimit(50) }} />
-              <ul class="max-h-48 space-y-0.5 overflow-y-auto">
+              <ul class="assistant-model-list">
                 <For each={matchingModels().slice(0, modelLimit())}>
                   {(model) => (
                     <li>
@@ -139,19 +138,19 @@ function ProviderRow(props: {
                         type="button"
                         data-testid="ai-model-option"
                         disabled={!configured()}
-                        class="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11px] hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        class="assistant-model-option"
                         onClick={() => ai.setModel({ provider: props.provider.id, model: model.id })}
                       >
-                        <span class="flex-1">
+                        <span class="flex-1 min-w-0">
                           <span class="font-mono">{model.id}</span>
-                          <span class="block text-[10px] text-gray-500">{model.name}</span>
+                          <span class="block assistant-meta-text">{model.name}</span>
                         </span>
                       </button>
                     </li>
                   )}
                 </For>
               </ul>
-              <Show when={matchingModels().length > modelLimit()}><button type="button" class="text-xs text-blue-600" onClick={() => setModelLimit((value) => value + 50)}>{t("ai.model.showMore", { count: matchingModels().length - modelLimit() })}</button></Show>
+              <Show when={matchingModels().length > modelLimit()}><button type="button" class="assistant-link-btn" onClick={() => setModelLimit((value) => value + 50)}>{t("ai.model.showMore", { count: matchingModels().length - modelLimit() })}</button></Show>
             </div>
           </Show>
         </div>

@@ -1,3 +1,4 @@
+import { mcpHostName, type McpConfig } from "./mcp.ts"
 import { HUMAN_APPROVAL, NATIVE_APPROVAL_TOOL_IDS, permissionAgents, type PermissionRule } from "./permission-modes.ts"
 import memoryPrompt from "./prompts/memory.txt" with { type: "text" }
 import { BUILTIN_PROVIDER_IDS, DEFAULT_MINIMAX_BASE_URL, allModels, type BuiltinProviderId } from "../models.ts"
@@ -61,6 +62,7 @@ export const defaultProviderSpecs = (baseUrls: Partial<Record<BuiltinProviderId,
   })
 
 export interface HostConfigInput {
+  readonly mcp?: Readonly<Record<string, McpConfig>>
   readonly providers: ReadonlyArray<HostProviderSpec>
   /** Ids of the tools registered by this package; the only ones the agent may use. */
   readonly toolIds: ReadonlyArray<string>
@@ -123,8 +125,8 @@ const withoutDeniedTools = (permission: Record<string, PermissionRule>, policies
  * permission maps. A project's allow-list therefore never reaches another project's host.
  */
 export const splitHostConfig = (config: Record<string, unknown>): { readonly shared: Record<string, unknown>; readonly instance: Record<string, unknown> } => {
-  const { agent, ...shared } = config
-  return { shared, instance: { agent } }
+  const { agent, mcp, ...shared } = config
+  return { shared, instance: { agent, ...(mcp ? { mcp } : {}) } }
 }
 
 export const buildHostConfig = (input: HostConfigInput): Record<string, unknown> => {
@@ -143,6 +145,22 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   }
   for (const id of input.askToolIds ?? []) if (toolIds.includes(id)) permission[id] = HUMAN_APPROVAL
   for (const tool of NATIVE_TOOLS) if (toolAllowed(policies, tool.id)) permission[tool.id] = "allow"
+  for (const [name, config] of Object.entries(input.mcp ?? {})) {
+    if (!config.enabled) continue
+    const prefix = `${mcpHostName(name)}_`
+    const pattern = `${prefix}*`
+    permission[pattern] = HUMAN_APPROVAL
+    for (const policy of policies) {
+      const matchesAction = policy.action === "*" || policy.action === "tool.use" || (policy.action.endsWith("*") && "tool.use".startsWith(policy.action.slice(0, -1)))
+      if (!matchesAction) continue
+      const key = policy.resource === "*" || (policy.resource.endsWith("*") && prefix.startsWith(policy.resource.slice(0, -1)))
+        ? pattern : policy.resource.startsWith(prefix) ? policy.resource : undefined
+      if (!key) continue
+      // Native rules are ordered too; replacing a key must move it after narrower previous rules.
+      delete permission[key]
+      permission[key] = policy.effect === "deny" ? "deny" : HUMAN_APPROVAL
+    }
+  }
   permission["task"] = "deny" // All delegation uses the registered CAD/CAM scheduler.
   // One agent per specialist of the roster (`agents.ts`), each with only its own tools.
   const specialists = Object.fromEntries(
@@ -187,6 +205,7 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
   }
 
   return {
+    mcp: Object.fromEntries(Object.entries(input.mcp ?? {}).map(([name, config]) => [mcpHostName(name), config])),
     share: "disabled",
     autoupdate: false,
     snapshot: false,

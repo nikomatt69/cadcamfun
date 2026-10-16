@@ -2,8 +2,8 @@
  * `cam` — reading the machining side of the project: the machine, the operations, the stock, the chain, static
  * analysis of a program and what the verifier says about geometry it can model.
  *
- * Verification persists the regenerated program and the report on the operation, so it is a write (`cam_edit.verify`),
- * not a read: a read-only specialist may inspect what a report already says, never regenerate and store NC.
+ * Verification replays the stored program and persists its bound report, so it is a write (`cam_edit.verify`),
+ * not a read: a read-only specialist may inspect what a report already says, never persist a new report.
  */
 import { cam } from "@cadcamfun/core"
 import { CAM_ACTION_INPUTS, VisionInput as CAM_VISION_INPUT, CamSetupCandidate, CamMachiningPlan, CamManufactureInput } from "@cadcamfun/api"

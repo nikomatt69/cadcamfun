@@ -80,40 +80,36 @@ interface View {
 type ViewFn = (args: Args) => View
 
 const Chips = (props: { readonly items: ReadonlyArray<string> }): JSX.Element => (
-  <p class="flex flex-wrap gap-1">
-    <For each={props.items}>{(item) => <span class="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] dark:bg-gray-700">{item}</span>}</For>
+  <p class="assistant-tool-chips">
+    <For each={props.items}>{(item) => <span class="assistant-tool-chip">{item}</span>}</For>
   </p>
 )
 const Lines = (props: { readonly lines: ReadonlyArray<string>; readonly max?: number }): JSX.Element => {
   const max = props.max ?? 12
   return (
-    <ul class="space-y-0.5">
+    <ul class="assistant-tool-lines">
       <For each={props.lines.slice(0, max)}>{(line) => <li class="break-words">{line}</li>}</For>
-      <Show when={props.lines.length > max}><li class="text-gray-500">… {props.lines.length - max} more</li></Show>
+      <Show when={props.lines.length > max}><li class="assistant-meta-text">… {props.lines.length - max} more</li></Show>
     </ul>
   )
 }
 const Issues = (props: { readonly issues: ReadonlyArray<Rec> }): JSX.Element => (
-  <ul class="space-y-0.5" data-testid="tool-issues">
+  <ul class="assistant-tool-issues" data-testid="tool-issues">
     <For each={props.issues.slice(0, 20)}>{(issue) => {
       const severity = str(issue["severity"]) ?? "info"
       return (
-        <li class="flex gap-1.5">
-          <span class="shrink-0 rounded px-1 text-[10px] font-semibold uppercase" classList={{
-            "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200": severity === "error",
-            "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200": severity === "warning",
-            "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200": severity !== "error" && severity !== "warning"
-          }}>{severity}</span>
-          <span class="break-words"><Show when={str(issue["code"])}>{(code) => <code class="mr-1 text-[10px]">{code()}</code>}</Show>{str(issue["message"])}<Show when={num(issue["line"])}>{(line) => <span class="text-gray-500"> · line {line()}</span>}</Show></span>
+        <li class="assistant-tool-issue">
+          <span class="assistant-issue-badge" data-severity={severity}>{severity}</span>
+          <span class="break-words"><Show when={str(issue["code"])}>{(code) => <code class="mr-1 text-[10px]">{code()}</code>}</Show>{str(issue["message"])}<Show when={num(issue["line"])}>{(line) => <span class="assistant-meta-text"> · line {line()}</span>}</Show></span>
         </li>
       )
     }}</For>
-    <Show when={props.issues.length > 20}><li class="text-gray-500">… {props.issues.length - 20} more</li></Show>
+    <Show when={props.issues.length > 20}><li class="assistant-meta-text">… {props.issues.length - 20} more</li></Show>
   </ul>
 )
 const Pair = (props: { readonly rows: ReadonlyArray<readonly [string, string | undefined]> }): JSX.Element => (
-  <dl class="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5">
-    <For each={props.rows.filter((row) => row[1] !== undefined && row[1] !== "")}>{(row) => <><dt class="text-gray-500">{row[0]}</dt><dd class="break-words">{row[1]}</dd></>}</For>
+  <dl class="assistant-tool-pair">
+    <For each={props.rows.filter((row) => row[1] !== undefined && row[1] !== "")}>{(row) => <><dt class="assistant-meta-text">{row[0]}</dt><dd class="break-words">{row[1]}</dd></>}</For>
   </dl>
 )
 const Code = (props: { readonly text: string; readonly lines?: number; readonly numbered?: boolean }): JSX.Element => {
@@ -123,11 +119,11 @@ const Code = (props: { readonly text: string; readonly lines?: number; readonly 
   const shown = createMemo(() => (all() ? lines() : lines().slice(0, limit)))
   return (
     <div>
-      <pre class="max-h-72 overflow-auto rounded bg-gray-100 p-1.5 text-[10px] dark:bg-gray-800" data-testid="tool-code">
-        <For each={shown()}>{(line, index) => <div>{props.numbered ? <span class="mr-2 select-none text-gray-400">{String(index() + 1).padStart(3, " ")}</span> : null}{line}</div>}</For>
+      <pre class="assistant-code-block max-h-72" data-testid="tool-code">
+        <For each={shown()}>{(line, index) => <div>{props.numbered ? <span class="assistant-code-lineno">{String(index() + 1).padStart(3, " ")}</span> : null}{line}</div>}</For>
       </pre>
       <Show when={lines().length > limit}>
-        <button type="button" class="mt-0.5 text-[10px] text-blue-700 underline dark:text-blue-300" onClick={() => setAll(!all())}>{all() ? "Show less" : `Show ${lines().length - limit} more lines`}</button>
+        <button type="button" class="assistant-link-btn mt-1" onClick={() => setAll(!all())}>{all() ? "Show less" : `Show ${lines().length - limit} more lines`}</button>
       </Show>
     </div>
   )
@@ -361,6 +357,7 @@ export interface ToolRowProps {
 
 export function ToolRow(props: ToolRowProps): JSX.Element {
   const navigate = useMaybeNavigate()
+  const [rawOpen, setRawOpen] = createSignal(false)
   const status = (): AiToolCall["status"] | undefined => props.call?.status
   const input = (): Rec => rec(props.call?.input) ?? {}
   const data = createMemo(() => parse(props.call?.output))
@@ -380,53 +377,64 @@ export function ToolRow(props: ToolRowProps): JSX.Element {
   const done = (): boolean => status() === "ok" || status() === "error"
   const tone = (): Tone => (failure() !== undefined ? "error" : view().tone ?? "ok")
   const agent = (): string | undefined => props.call?.agent
-  const facts = (): ReadonlyArray<string> => toolFacts(props.tool, props.call?.input, props.call?.output)
+  const facts = createMemo(() => toolFacts(props.tool, props.call?.input, props.call?.output))
   const block = (): boolean => done() && failure() === undefined && view().detail !== undefined
   const pendingText = (): string => (status() === "preparing" && props.call?.chars !== undefined ? `${view().pending} (${kb(props.call.chars)})` : view().pending)
 
   const Header = (): JSX.Element => (
-    <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+    <span class="assistant-tool-call-head">
       <Show when={agent()}>
-        {(name) => <span class="rounded bg-blue-100 px-1.5 text-[10px] font-semibold text-blue-800 dark:bg-blue-900/50 dark:text-blue-200" data-testid="tool-agent">{agentLabel(name())}</span>}
+        {(name) => <span class="assistant-agent-pill" data-testid="tool-agent">{agentLabel(name())}</span>}
       </Show>
-      <Show when={done()} fallback={<><LoaderCircle size={11} aria-hidden="true" class="animate-spin" /><span class="text-gray-500">~ {pendingText()}</span></>}>
-        <span aria-hidden="true" classList={{ "text-green-600": tone() === "ok", "text-amber-600": tone() === "warn", "text-red-600": tone() === "error" }}>{tone() === "error" ? "✕" : view().icon}</span>
-        <span class="font-medium" classList={{ "text-red-700 dark:text-red-300": tone() === "error" }}>{view().title}</span>
+      <Show when={done()} fallback={<><LoaderCircle size={11} aria-hidden="true" class="animate-spin assistant-status-active" /><span class="assistant-meta-text">~ {pendingText()}</span></>}>
+        <span aria-hidden="true" class="assistant-tool-glyph" data-tone={tone()}>{tone() === "error" ? "✕" : view().icon}</span>
+        <span class="assistant-tool-title" data-tone={tone()}>{view().title}</span>
       </Show>
-      <code class="text-[10px] font-mono text-gray-500" title={toolTitle(props.tool, actionOf(props.call?.input))}>{props.tool}</code>
+      <code class="assistant-tool-id" title={toolTitle(props.tool, actionOf(props.call?.input))}>{props.tool}</code>
       <Show when={status() === "ok" && failure() === undefined}><span class="sr-only">{t("ai.message.tool.ok", { tool: props.tool })}</span></Show>
-      <Show when={status() === "error" || failure() !== undefined}><span class="text-red-600">{t("ai.message.tool.error", { tool: props.tool })}</span></Show>
+      <Show when={status() === "error" || failure() !== undefined}><span class="assistant-status-error">{t("ai.message.tool.error", { tool: props.tool })}</span></Show>
     </span>
   )
 
   return (
-    <li class="assistant-tool-call text-xs text-gray-700 dark:text-gray-300" data-testid="tool-call" data-tool={props.tool} data-action={str(input()["action"]) ?? ""} data-agent={agent() ?? ""} data-status={status() ?? ""} data-shape={block() ? "block" : "inline"}>
-      <div class={block() ? "border-l-2 pl-2" : "pl-1"} classList={{ "border-green-500": block() && tone() === "ok", "border-amber-500": block() && tone() === "warn", "border-red-500": block() && tone() === "error" }}>
+    <li
+      class="assistant-tool-call"
+      data-testid="tool-call"
+      data-tool={props.tool}
+      data-action={str(input()["action"]) ?? ""}
+      data-agent={agent() ?? ""}
+      data-status={status() ?? ""}
+      data-shape={block() ? "block" : "inline"}
+      data-tone={tone()}
+    >
+      <div class="assistant-tool-call-inner">
         <Header />
-        <For each={props.call?.images ?? []}>{(url) => <figure class="mt-2"><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${toolTitle(props.tool, actionOf(props.call?.input))} captured viewport for review`} class="max-h-80 rounded border object-contain" loading="lazy" /></a><figcaption>Captured viewport · {agent() ?? "CAD/CAM assistant"}</figcaption></figure>}</For>
+        <For each={props.call?.images ?? []}>{(url) => <figure class="assistant-tool-figure"><a href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt={`${toolTitle(props.tool, actionOf(props.call?.input))} captured viewport for review`} class="max-h-80 rounded border object-contain" loading="lazy" /></a><figcaption>Captured viewport · {agent() ?? "CAD/CAM assistant"}</figcaption></figure>}</For>
         <Show when={failure()}>
-          {(message) => <p class="mt-0.5 break-words text-red-600 dark:text-red-400" data-testid="tool-error">{message().slice(0, 600)}</p>}
+          {(message) => <p class="assistant-tool-error" data-testid="tool-error">{message().slice(0, 600)}</p>}
         </Show>
         <Show when={block()}>
-          <div class="mt-1 space-y-1 text-[11px]" data-testid="tool-detail">{view().detail!()}</div>
+          <div class="assistant-tool-detail" data-testid="tool-detail">{view().detail!()}</div>
         </Show>
         <Show when={facts().length > 0}>
-          <ul class="mt-1 pl-4" data-testid="tool-facts"><For each={facts()}>{(line) => <li>{line}</li>}</For></ul>
+          <ul class="assistant-tool-facts" data-testid="tool-facts"><For each={facts()}>{(line) => <li>{line}</li>}</For></ul>
         </Show>
         <Show when={isVcsTool(props.tool) && props.projectId !== undefined && navigate !== undefined}>
-          <button type="button" class="mt-1 ml-4 text-blue-700 underline dark:text-blue-300" data-testid="tool-open-vcs" onClick={() => navigate!(`/projects/${props.projectId}/history`)}>{t("ai.tool.openVcs")}</button>
+          <button type="button" class="assistant-link-btn mt-1" data-testid="tool-open-vcs" onClick={() => navigate!(`/projects/${props.projectId}/history`)}>{t("ai.tool.openVcs")}</button>
         </Show>
         <Show when={props.call !== undefined}>
-          <details class="mt-1" data-testid="tool-raw">
-            <summary class="cursor-pointer text-[10px] text-gray-500">{t("ai.tool.input")} / {t("ai.tool.output")}</summary>
-            <div class="mt-1 space-y-1">
-              <p class="text-[10px] uppercase text-gray-500">{t("ai.tool.input")}</p>
-              <pre class="max-h-40 overflow-auto rounded bg-gray-100 p-1.5 text-[10px] dark:bg-gray-800">{clip(pretty(props.call!.input))}</pre>
-              <Show when={props.call!.output !== undefined}>
-                <p class="text-[10px] uppercase text-gray-500">{t("ai.tool.output")}</p>
-                <pre class="max-h-56 overflow-auto rounded bg-gray-100 p-1.5 text-[10px] dark:bg-gray-800">{clip(pretty(props.call!.output))}</pre>
-              </Show>
-            </div>
+          <details class="assistant-tool-raw" data-testid="tool-raw" onToggle={(event) => setRawOpen(event.currentTarget.open)}>
+            <summary class="assistant-tool-raw-summary">{t("ai.tool.input")} / {t("ai.tool.output")}</summary>
+            <Show when={rawOpen()}>
+              <div class="assistant-tool-raw-body">
+                <p class="assistant-raw-label">{t("ai.tool.input")}</p>
+                <pre class="assistant-code-block max-h-40">{clip(pretty(props.call!.input))}</pre>
+                <Show when={props.call!.output !== undefined}>
+                  <p class="assistant-raw-label">{t("ai.tool.output")}</p>
+                  <pre class="assistant-code-block max-h-56">{clip(pretty(props.call!.output))}</pre>
+                </Show>
+              </div>
+            </Show>
           </details>
         </Show>
       </div>

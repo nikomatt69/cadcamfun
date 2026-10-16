@@ -17,8 +17,9 @@
 import { definePluginTool, type PluginToolListing } from "@cadcamfun/ai"
 import type { ToolDefinition } from "@cadcamfun/ai"
 import { parseManifest } from "@cadcamfun/plugin-sdk"
-import { Cause, Context, Effect, Layer } from "effect"
+import { Cause, Context, Data, Effect, Layer, Semaphore } from "effect"
 import { existsSync, readFileSync } from "node:fs"
+import { mkdir, readdir, readFile, writeFile, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { AppConfigService } from "../config.ts"
 import { makeHost, spawnBunWorker, type PluginHostService } from "../plugins/host.ts"
@@ -26,8 +27,14 @@ import { makeHost, spawnBunWorker, type PluginHostService } from "../plugins/hos
 /** The only capability a plugin can hold in this host; see the module note. */
 export const SUPPORTED_PLUGIN_CAPABILITIES: ReadonlyArray<string> = ["ai:tool"]
 
+export class AiPluginError extends Data.TaggedError("AiPluginError")<{ readonly message: string }> {}
+
 export class AiPlugins extends Context.Service<AiPlugins, {
   /** The tools of the plugins that are running now, as host tools; read on every call, so a plugin switched on later shows. */
+  readonly installed: Effect.Effect<ReadonlyArray<{ id: string; name: string; version: string; enabled: boolean; tools: number }>, AiPluginError>
+  readonly remove: (id: string) => Effect.Effect<void, AiPluginError>
+  readonly install: (manifest: string, source: string) => Effect.Effect<void, AiPluginError>
+  readonly toggle: (id: string, enabled: boolean) => Effect.Effect<void, AiPluginError>
   readonly tools: () => ReadonlyArray<ToolDefinition>
   readonly listing: () => ReadonlyArray<PluginToolListing & { readonly toolId: string }>
 }>()("cadcamfun/AiPlugins") {}
@@ -80,8 +87,81 @@ export const AiPluginsLive = Layer.effect(AiPlugins, Effect.gen(function*() {
     (instance) => instance.dispose
   )
   yield* loadPlugins(host, join(config.dataDir, "plugins"))
+  const root = join(config.dataDir, "plugins")
+  const lock = yield* Semaphore.make(1)
+  const attempt = <A>(run: () => Promise<A>) => Effect.tryPromise({ try: run, catch: (cause) => new AiPluginError({ message: toolFailure(cause).error }) })
+  const manifestFor = async (text: string) => {
+    const manifest = await Effect.runPromise(parseManifest(text))
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(manifest.id)) throw new Error("Invalid plugin id")
+    if (manifest.capabilities.some((capability) => !SUPPORTED_PLUGIN_CAPABILITIES.includes(capability))) throw new Error("This host currently supports only the ai:tool capability")
+    return manifest
+  }
+  const installed = attempt(async () => {
+    await mkdir(root, { recursive: true })
+    const live = await Effect.runPromise(host.list())
+    const plugins = []
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(entry.name)) continue
+      try {
+        const manifest = await manifestFor(await readFile(join(root, entry.name, "plugin.json"), "utf8"))
+        if (manifest.id !== entry.name) continue
+        plugins.push({ id: manifest.id, name: manifest.name, version: manifest.version, enabled: live.some((record) => record.id === manifest.id && record.state === "enabled"), tools: manifest.contributes?.aiTools?.length ?? 0 })
+      } catch { /* unrelated or invalid folders are never loaded */ }
+    }
+    return plugins.sort((a, b) => a.name.localeCompare(b.name))
+  })
   const listing = () => host.aiTools().map((tool) => ({ pluginId: tool.pluginId, pluginName: tool.pluginName, id: tool.id, toolId: tool.id, description: tool.description, kind: tool.kind, parameters: tool.parameters }))
   return AiPlugins.of({
+    installed,
+    remove: (id) => lock.withPermit(attempt(async () => {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(id)) throw new Error("Invalid plugin id")
+      const records = await Effect.runPromise(host.list())
+      if (records.some((record) => record.id === id)) await Effect.runPromise(host.uninstall(id))
+      const ids = readEnabledPlugins(join(root, "enabled.json")).filter((candidate) => candidate !== id)
+      const temp = join(root, `.enabled-${crypto.randomUUID()}.tmp`)
+      try {
+        await writeFile(temp, JSON.stringify(ids), { mode: 0o600 })
+        await rename(temp, join(root, "enabled.json"))
+      } finally { await rm(temp, { force: true }) }
+      await rm(join(root, id), { recursive: true, force: true })
+    })),
+    install: (text, source) => lock.withPermit(attempt(async () => {
+      if (!source.trim() || source.length > 500_000 || text.length > 64_000) throw new Error("Provide a manifest (up to 64 KB) and JavaScript source (up to 500 KB)")
+      const manifest = await manifestFor(text)
+      if (manifest.entry !== "index.js") throw new Error("Uploaded plugins must use index.js as their entry")
+      const directory = join(root, manifest.id)
+      if (existsSync(directory)) throw new Error("This plugin is already installed")
+      await mkdir(root, { recursive: true })
+      const temp = join(root, `.${crypto.randomUUID()}.tmp`)
+      await mkdir(temp, { mode: 0o700 })
+      try {
+        await writeFile(join(temp, "plugin.json"), text, { mode: 0o600 })
+        await writeFile(join(temp, "index.js"), source, { mode: 0o600 })
+        await rename(temp, directory)
+      } finally { await rm(temp, { recursive: true, force: true }) }
+    })),
+    toggle: (id, enabled) => lock.withPermit(attempt(async () => {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/.test(id)) throw new Error("Invalid plugin id")
+      const directory = join(root, id)
+      const manifest = await manifestFor(await readFile(join(directory, "plugin.json"), "utf8"))
+      if (manifest.id !== id) throw new Error("Plugin id does not match its folder")
+      const records = await Effect.runPromise(host.list())
+      if (enabled) {
+        if (!records.some((record) => record.id === id)) await Effect.runPromise(host.install({ manifest, directory }))
+        await Effect.runPromise(host.enable(id))
+      } else if (records.some((record) => record.id === id)) await Effect.runPromise(host.disable(id))
+      const ids = new Set(readEnabledPlugins(join(root, "enabled.json")))
+      if (enabled) ids.add(id)
+      else ids.delete(id)
+      const temp = join(root, `.enabled-${crypto.randomUUID()}.tmp`)
+      try {
+        await writeFile(temp, JSON.stringify([...ids]), { mode: 0o600 })
+        await rename(temp, join(root, "enabled.json"))
+      } catch (cause) {
+        if (enabled) await Effect.runPromise(host.disable(id))
+        throw cause
+      } finally { await rm(temp, { force: true }) }
+    })),
     listing,
     tools: () => listing().map((entry) => definePluginTool(entry, async (args) => {
       // A call that throws, times out or finds the plugin gone is a result the assistant can read, not a crash of the turn.

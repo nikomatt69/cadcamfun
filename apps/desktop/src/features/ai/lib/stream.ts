@@ -26,8 +26,6 @@ export class AiStreamError extends Schema.TaggedError<AiStreamError>()("AiStream
 const MAX_INPUT_BYTES = 256_000
 /** Cap individual text/output payloads to keep the transcript sane. */
 const MAX_TEXT_BYTES = 64_000
-/** Cap tool_result output the same way: tool answers tend to be bounded. */
-const MAX_OUTPUT_BYTES = 256_000
 const EVENT_TYPES = new Set<string>(AiStreamEventSchema.members.map((member) => member.fields.type.literal))
 
 const viewportImages = (value: unknown): ReadonlyArray<string> => (Array.isArray(value) ? value : []).filter((url): url is string => typeof url === "string" && url.length <= 4_000_100 && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(url)).slice(0, 2)
@@ -41,7 +39,9 @@ const decodeWireEvent = (raw: unknown): AiEvent => {
     case "delta": case "user_message": case "reasoning": case "done":
       return { ...event, text: cap(event.text, MAX_TEXT_BYTES, "<truncated>") }
     case "tool_result":
-      return { ...event, output: cap(event.output, MAX_OUTPUT_BYTES, "<truncated>"), ...(event.images ? { images: viewportImages(event.images) } : {}) }
+      // This is the complete result used for reconciliation, including identities and receipts. The host bounds the
+      // model's preview separately; slicing here would corrupt JSON and silently discard confirmed editor changes.
+      return { ...event, ...(event.images ? { images: viewportImages(event.images) } : {}) }
     case "error": case "retry": case "tool_diagnostic":
       return { ...event, message: sanitizeError(cap(event.message, MAX_TEXT_BYTES, "<truncated>")) }
     default: return event

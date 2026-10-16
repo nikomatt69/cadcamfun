@@ -1,5 +1,9 @@
 # WP3 + WP4 — Shared API contract and sidecar server
 
+## Assistant extensions (2026-10-16)
+
+Owner-requested assistant extensions: add typed AI endpoints for project-owned MCP configuration/status and local Worker plugin installation/enablement. Reuse the native nikcli MCP client and existing AiPlugins host; reject external bridge grants for extension management. Regenerate clients. Status: in progress.
+
 ## Assistant control integration (2026-10-10)
 
 See `24-assistant-control-flow.md`: WP3 adds schema-first agents/session-control endpoints and optional chat role/mode/model variant; WP4 delegates controls to WP8's session-bound service. Generate both clients after changes. Status: in progress. Change log: 2026-10-10 — registered the assistant control contract before implementation.
@@ -91,6 +95,9 @@ apps/sidecar/src/
 
 ## 5. Change log
 
+- 2026-10-15: the existing AI bridge returns the complete structured tool value with normal JSON wire encoding, retaining
+  text-only extension compatibility. Preview truncation is reserved for the model text. Shared outcome tags now preserve
+  invalid-result uncertainty and stale conflicts; no HTTP schema changed and generated clients remain current.
 - 2026-10-14: generated-client integration additionally scopes the existing `packages/httpapi-codegen` Promise type emitter and its regression test: JSON-valued request payloads must emit the recursive `JsonValue` alias even when no response uses it. Generated files remain generator-owned.
 - 2026-10-14: owner-requested additive kernel integration: authenticated `POST /api/toolpaths/manufacture` takes a versioned explicit CAD snapshot with material, machine preset, stock/world origin and quality settings, returning a schema-validated kernel result with exact emitted NC, program, claims and identity. This stateless endpoint enriches the existing generator group and does not mutate saved drawings or toolpaths.
 - 2026-10-14: RM-01 contract amendment: shared CAM action input schemas live in `ai-cam.ts`, reusing core stock/fixture/solid contracts. G-code generation may return a shared tagged action failure or mutation outcome alongside its existing program result. These envelopes must survive the action and desktop adapters unchanged; revision/receipt storage remains RM-03.

@@ -12,7 +12,7 @@
  * events this component renders. `cadcamfun/AiCatalog` (Effect v4 service)
  * owns the typed client calls for status, models, and credentials.
  */
-import { For, Show, batch, createEffect, createMemo, createResource, createSignal, createUniqueId, onCleanup, onMount, type JSX } from "solid-js"
+import { For, Index, Show, batch, createEffect, createMemo, createResource, createSignal, createUniqueId, onCleanup, onMount, type JSX } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import BookOpen from "lucide-solid/icons/book-open"
 import Layers from "lucide-solid/icons/layers"
@@ -38,6 +38,10 @@ import FolderOpen from "lucide-solid/icons/folder-open"
 import Monitor from "lucide-solid/icons/monitor"
 import Smartphone from "lucide-solid/icons/smartphone"
 import Settings2 from "lucide-solid/icons/settings-2"
+import CircleGauge from "lucide-solid/icons/circle-gauge"
+import ArrowUp from "lucide-solid/icons/arrow-up"
+import { ContextGauge } from "./ContextGauge.tsx"
+import { ContextDialog } from "./ContextDialog.tsx"
 import { t } from "../../../i18n/index.ts"
 import { toast } from "../../../shared/ui/toast.tsx"
 import { ACCEPT, MAX_ATTACHMENTS, readAttachment, type ChatAttachment } from "../lib/attachments.ts"
@@ -49,13 +53,15 @@ import { useDocumentStore } from "../../cad/store/documentStore.ts"
 import { AgentActivity } from "./AgentActivity.tsx"
 import { SessionsPanel } from "./SessionsPanel.tsx"
 import { ProviderSettings } from "./ProviderSettings.tsx"
+import Plug from "lucide-solid/icons/plug"
+import { ExtensionsSettings } from "./ExtensionsSettings.tsx"
 import { SkillsSettings } from "./SkillsSettings.tsx"
 import "../styles/assistant.css"
 import { toolTitle } from "../lib/tools.ts"
 import { ToolRow } from "./ToolRow.tsx"
 import { TaskCard } from "./TaskCard.tsx"
 import { isTaskStart } from "../lib/task-card.ts"
-import { groupExploration, timelineOf } from "../lib/timeline.ts"
+import { groupExploration, timelineOf, type GroupedSegment } from "../lib/timeline.ts"
 import { renderAssistantMarkdown } from "../lib/markdown.ts"
 import { useElementsStore } from "../../cad/store/elementsStore.ts"
 import { CommandHelp } from "./CommandHelp.tsx"
@@ -97,6 +103,14 @@ const formatTokens = (input: number, output: number): string => {
   return `${(total / 1000000).toFixed(2)}M`
 }
 
+/** Turn-footer token counts: exact while small, compact once they grow ("14k tok"). */
+const compactTokens = (value: number): string => {
+  if (value < 1000) return `${value}`
+  if (value < 10000) return `${(value / 1000).toFixed(1)}k`
+  if (value < 1000000) return `${Math.round(value / 1000)}k`
+  return `${(value / 1000000).toFixed(1)}M`
+}
+
 export function EnhancedAssistant(props: Props): JSX.Element {
   const ai = useAiStore()
   const registeredTools = createMemo(() => ai.aiStatus()?.tools ?? [])
@@ -110,6 +124,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   const [showStats, setShowStats] = createSignal(false)
   const [showTools, setShowTools] = createSignal(false)
   const [showSessions, setShowSessions] = createSignal(false)
+  const [showExtensions, setShowExtensions] = createSignal(false)
   const [showSkills, setShowSkills] = createSignal(false)
   const [showContext, setShowContext] = createSignal(false)
   const [showProviders, setShowProviders] = createSignal(false)
@@ -138,10 +153,6 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     const name = document.name ?? drawing.name
      return t("ai.header.meta", { name, count: elements.elements.length })
   }
-  const elementCount = (): number => {
-     return elements.elements.length
-  }
-
   const scrollToLatest = (): void => {
     if (transcript === undefined) return
     transcript.scrollTop = transcript.scrollHeight
@@ -151,9 +162,16 @@ export function EnhancedAssistant(props: Props): JSX.Element {
     setFollowLatest(el.scrollHeight - el.scrollTop - el.clientHeight < 64)
   }
 
+  let scrollFrame: number | undefined
+  onCleanup(() => { if (scrollFrame !== undefined) cancelAnimationFrame(scrollFrame) })
   createEffect(() => {
     const last = ai.messages().at(-1)
-    if (last && followLatest()) queueMicrotask(scrollToLatest)
+    if (last && followLatest() && scrollFrame === undefined) {
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = undefined
+        if (followLatest()) scrollToLatest()
+      })
+    }
   })
 
   /** Conversations and context: reachable in one click, without opening a menu. */
@@ -184,6 +202,7 @@ export function EnhancedAssistant(props: Props): JSX.Element {
   ])
 
   const headerItems = createMemo((): ReadonlyArray<HeaderItem> => [
+    { id: "extensions", label: t("ai.extensions.title"), icon: <Plug size={15} aria-hidden="true" />, active: showExtensions(), run: () => setShowExtensions(!showExtensions()) },
     {
       id: "tools",
       label: t("ai.tool.tools"),
@@ -426,22 +445,23 @@ export function EnhancedAssistant(props: Props): JSX.Element {
         items={headerItems()}
         headerActions={props.headerActions}
         onClose={props.onClose}
+        onOpenContext={() => setShowContext(true)}
       />
       <Show when={showStats()}>
         <section id={`${promptId}-stats`} class="assistant-disclosure assistant-settings">
-          <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">{t("ai.stats.title")}</p>
-          <div class="grid grid-cols-3 gap-2 text-center text-xs">
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">{ai.stats().exchanges}</p>
-              <p class="text-gray-500">{t("ai.stats.exchanges")}</p>
+          <p class="assistant-section-label">{t("ai.stats.title")}</p>
+          <div class="assistant-stats-grid">
+            <div class="assistant-stat-card">
+              <p class="assistant-stat-value">{ai.stats().exchanges}</p>
+              <p class="assistant-stat-label">{t("ai.stats.exchanges")}</p>
             </div>
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">{toolCallCount()}</p>
-              <p class="text-gray-500">{t("ai.stats.toolCalls")}</p>
+            <div class="assistant-stat-card">
+              <p class="assistant-stat-value">{toolCallCount()}</p>
+              <p class="assistant-stat-label">{t("ai.stats.toolCalls")}</p>
             </div>
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</p>
-              <p class="text-gray-500">{t("ai.stats.usage")}</p>
+            <div class="assistant-stat-card">
+              <p class="assistant-stat-value">{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</p>
+              <p class="assistant-stat-label">{t("ai.stats.usage")}</p>
             </div>
           </div>
         </section>
@@ -455,34 +475,20 @@ export function EnhancedAssistant(props: Props): JSX.Element {
           <ProviderSettings />
         </section>
       </Show>
+      <Show when={showExtensions()}>
+        <section class="assistant-disclosure assistant-settings"><ExtensionsSettings /></section>
+      </Show>
       <Show when={showSkills()}>
         <section id={`${promptId}-skills`} class="assistant-disclosure assistant-settings"><SkillsSettings /></section>
       </Show>
       <Show when={showTools()}>
         <details id={`${promptId}-tools`} open class="assistant-disclosure assistant-settings">
-          <summary class="font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">{t("ai.tool.tools")} ({registeredTools().length})</summary>
-          <p class="text-gray-500 mt-1">{t("ai.tool.toolsHint")}</p>
+          <summary class="assistant-activity-summary">{t("ai.tool.tools")} ({registeredTools().length})</summary>
+          <p class="assistant-meta-text mt-1">{t("ai.tool.toolsHint")}</p>
           <ul class="assistant-tool-catalogue">
             <For each={registeredTools()}>{(tool) => <li><span>{toolTitle(tool.id)}</span><code>{tool.id}</code><p>{tool.description}</p></li>}</For>
           </ul>
         </details>
-      </Show>
-      <Show when={showContext()}>
-        <section id={`${promptId}-context`} class="assistant-disclosure assistant-settings" data-testid="ai-context-details">
-          <h3>{t("ai.context.title")}</h3>
-          <p>{t("ai.context.hint")}</p>
-          <dl class="assistant-context-facts">
-            <div><dt>{t("ai.context.workspace")}</dt><dd>{document.name ?? app.drawing()?.name ?? t("ai.header.noProject")}</dd></div>
-            <div><dt>{t("ai.header.elements")}</dt><dd>{elementCount()}</dd></div>
-            <div><dt>{t("ai.context.messages")}</dt><dd>{ai.messages().length}</dd></div>
-            <div><dt>{t("ai.stats.usage")}</dt><dd>{formatTokens(ai.stats().totalInputTokens, ai.stats().totalOutputTokens)}</dd></div>
-          </dl>
-          <p>{t("ai.context.usageHint")}</p>
-          <button data-testid="ai-compact" type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !ai.sessionId()} onClick={() => void ai.compact()}>{t(ai.controlBusy() ? "ai.controls.compacting" : "ai.controls.compact")}</button>
-          <Show when={ai.tasks().filter((task) => task.status === "queued" || task.status === "running").length}>{(count) => <p class="mt-1 text-xs" data-testid="ai-compact-hint">{t("ai.controls.compactStopsTasks", { count: count() })}</p>}</Show>
-          <Show when={ai.hostContext()}>{(context) => <p class="mt-2 text-xs">{t("ai.controls.contextPolicy", { threshold: context().compactAt?.toLocaleString() ?? t("ai.context.gauge.unknown"), output: context().requestOutput?.toLocaleString() ?? t("ai.context.gauge.unknown") })}</p>}</Show>
-          <Show when={ai.hostContext()?.memory}>{(memory) => <div class="mt-2"><p class="text-xs">{t("ai.controls.memoryPolicy", { hours: memory().minHours, sessions: memory().minSessions, count: memory().sessionsSinceLastBrain })}</p><button type="button" class="rounded border px-3 py-1 text-xs" disabled={running() || ai.controlBusy() || !memory().enabled} onClick={() => void ai.consolidateMemory()}>{t("ai.controls.learnMemory")}</button></div>}</Show>
-        </section>
       </Show>
       <Show when={showHelp()}>
         <section id={`${promptId}-help`} class="assistant-disclosure assistant-settings">
@@ -506,16 +512,16 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             fallback={
               /* --- Empty state: the mark, the promise, then the lede. --- */
               <div class="assistant-empty flex h-full flex-col items-center justify-center text-center">
-                <div class="relative mb-6">
+                <div class="relative mb-5">
                   <div class="assistant-emblem" aria-hidden="true">
-                    <Terminal size={20} />
+                    <Terminal size={19} />
                   </div>
                 </div>
                 <div class="assistant-empty-copy">
-                  <h3 class="mb-2 text-base font-bold text-gray-700 dark:text-gray-200">
+                  <h3 class="mb-2">
                     {t("ai.empty.title")}
                   </h3>
-                  <p class="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                  <p>
                     {t("ai.empty.lede")}
                   </p>
                 </div>
@@ -555,44 +561,73 @@ export function EnhancedAssistant(props: Props): JSX.Element {
               </div>
             }
           >
-            <div class="space-y-3">
-              <For each={ai.messages()}>
-                {(message) => <MessageBubble message={message} onCopy={handleCopy} copiedId={copiedId()} />}
-              </For>
+            <div class="assistant-thread-meta">
+              <span>{t("ai.composer.thisComputer")} · {headerMeta()} · </span>
+              <button
+                type="button"
+                class="assistant-thread-meta-link"
+                onClick={() => setShowContext(true)}
+              >
+                {t("ai.context.title")}
+              </button>
+            </div>
+            <div class="assistant-messages-stack">
+              <Index each={ai.messages()}>
+                {(message) => (
+                  <MessageBubble
+                    message={message()}
+                    onCopy={handleCopy}
+                    copiedId={copiedId()}
+                    onOpenProviders={() => setShowProviders(true)}
+                  />
+                )}
+              </Index>
               <For each={ai.pending()}>
                 {(item) => (
-                  <article class="assistant-message ml-auto max-w-[90%] rounded border border-dashed border-blue-300 px-2 py-1.5 text-sm dark:border-blue-700" data-testid="ai-pending" data-delivery={item.delivery}>
-                    <p class="mb-0.5 text-[10px] font-semibold uppercase text-blue-700 dark:text-blue-300">{item.delivery === "steer" ? t("ai.pending.steer") : t("ai.pending.queue")}</p>
+                  <article class="assistant-message assistant-pending-bubble ml-auto max-w-[85%]" data-testid="ai-pending" data-delivery={item.delivery}>
+                    <p class="assistant-pending-badge">{item.delivery === "steer" ? t("ai.pending.steer") : t("ai.pending.queue")}</p>
                     <p class="whitespace-pre-wrap break-words">{item.text}</p>
                   </article>
                 )}
               </For>
             </div>
             <Show when={running()}>
-              {/* --- Bouncing-dots processing card (Apple-spring feel: blue →
-                    indigo → purple dots with staggered phases). --- */}
               <div class="assistant-thinking-card">
                 <div class="ui-dots" aria-label={t("ai.thinking")}>
                   <span /><span /><span />
                 </div>
                 <div class="flex flex-col">
-                  <span class="text-xs font-medium text-gray-700 dark:text-gray-200">
+                  <span class="assistant-thinking-title">
                     {t("ai.thinking.processing")}
                   </span>
-                  <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                  <span class="assistant-thinking-subtitle">
                     {t("ai.runtime.streaming")}
                   </span>
                 </div>
               </div>
             </Show>
-           <Show when={ai.error() && !ai.messages().some((message) => message.error === ai.error())}>
-            {(error) => (
-              <div class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/40">
-                <p class="text-sm text-red-700 dark:text-red-300">{error()}</p>
-              </div>
-            )}
+            <Show when={ai.error() && !ai.messages().some((message) => message.error === ai.error())}>
+              {(error) => (
+                <div class="assistant-enterprise-card mt-4" role="alert">
+                  <div class="assistant-enterprise-card-head">
+                    <CircleGauge size={15} class="assistant-coral-icon" aria-hidden="true" />
+                    <span class="assistant-enterprise-card-title">{t("ai.runtime.error")}</span>
+                  </div>
+                  <div class="assistant-enterprise-card-body">
+                    <p>{error()}</p>
+                    <div class="assistant-card-actions">
+                      <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => ai.refresh()}>
+                        {t("ai.toolbar.refresh")}
+                      </button>
+                      <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => setShowProviders(true)}>
+                        {t("ai.providers.title")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Show>
           </Show>
-        </Show>
         </div>
         <Show when={!followLatest() && ai.messages().length > 0}>
           <button
@@ -684,42 +719,42 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             }}
           />
         </Show>
+
+        <Show when={ai.error()}>
+          {(error) => (
+            <div class="assistant-composer-banner" role="status">
+              <div class="assistant-composer-banner-head">
+                <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
+                <span>{t("ai.runtime.error")}</span>
+              </div>
+              <p class="assistant-composer-banner-copy">{error()}</p>
+              <button
+                type="button"
+                class="assistant-btn assistant-btn-secondary"
+                onClick={() => setShowProviders(true)}
+              >
+                {t("ai.providers.title")}
+              </button>
+            </div>
+          )}
+        </Show>
+
         <div class="assistant-compose-frame" data-command={paletteOpen() ? "true" : undefined}>
-          <AssistantScopeBar />
           <Show when={files().length > 0 || fileProblems().length > 0}>
-            <ul class="mb-1 flex flex-wrap gap-1 text-[11px]" data-testid="ai-attachments">
+            <ul class="assistant-attachments-row" data-testid="ai-attachments">
               <For each={files()}>{(file) => (
-                <li class="assistant-attachment inline-flex items-center gap-1">
-                  <Paperclip size={10} aria-hidden="true" />
-                   <span class="truncate" title={file.name}>{file.name}</span>
+                <li class="assistant-attachment inline-flex items-center gap-1.5">
+                  <Paperclip size={11} aria-hidden="true" />
+                  <span class="truncate" title={file.name}>{file.name}</span>
                   <button type="button" aria-label={t("ai.attach.remove", { name: file.name })} onClick={() => setFiles(files().filter((f) => f !== file))}>
                     <X size={10} aria-hidden="true" />
                   </button>
                 </li>
               )}</For>
-              <For each={fileProblems()}>{(problem) => <li class="rounded bg-red-100 px-2 py-0.5 text-red-700 dark:bg-red-950 dark:text-red-300">{problem}</li>}</For>
+              <For each={fileProblems()}>{(problem) => <li class="assistant-attachment-problem">{problem}</li>}</For>
             </ul>
           </Show>
-          <textarea
-            ref={composer}
-            id={promptId}
-            class="assistant-prompt"
-            rows={2}
-            maxLength={MAX_PROMPT}
-            placeholder={t("ai.input.placeholder")}
-            value={draft()}
-            onInput={(event) => {
-              const next = event.currentTarget.value
-              setDraft(next)
-              setPaletteOpen(isCommandDraft(next))
-              setCommandIndex(0)
-              event.currentTarget.style.height = "auto"
-              event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 180)}px`
-            }}
-            onKeyDown={handleKeyDown}
-            aria-describedby={`${promptId}-hint`}
-          />
-          <div class="assistant-compose-actions">
+          <div class="assistant-compose-input-row">
             <button
               type="button"
               class="assistant-icon-button assistant-attach"
@@ -730,24 +765,40 @@ export function EnhancedAssistant(props: Props): JSX.Element {
             >
               <Plus size={16} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              class="assistant-icon-button assistant-command-button"
-              title={t("ai.commands.hint")}
-              aria-label={t("ai.commands.open")}
-              aria-expanded={paletteOpen()}
-              data-testid="ai-command-toggle"
-              onClick={() => {
-                if (paletteOpen()) closePalette()
-                else insertSlash()
+            <textarea
+              ref={composer}
+              id={promptId}
+              class="assistant-prompt"
+              rows={1}
+              maxLength={MAX_PROMPT}
+              placeholder={t("ai.input.placeholder")}
+              value={draft()}
+              onInput={(event) => {
+                const next = event.currentTarget.value
+                setDraft(next)
+                setPaletteOpen(isCommandDraft(next))
+                setCommandIndex(0)
+                event.currentTarget.style.height = "auto"
+                event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 180)}px`
               }}
-            >
-              <Terminal size={15} aria-hidden="true" />
-              <span aria-hidden="true">/</span>
-            </button>
-            <AssistantControls />
-            <div class="assistant-compose-tail">
-              <ModelChip />
+              onKeyDown={handleKeyDown}
+              aria-describedby={`${promptId}-hint`}
+            />
+            <div class="assistant-compose-inline-actions">
+              <button
+                type="button"
+                class="assistant-icon-button assistant-command-button"
+                title={t("ai.commands.hint")}
+                aria-label={t("ai.commands.open")}
+                aria-expanded={paletteOpen()}
+                data-testid="ai-command-toggle"
+                onClick={() => {
+                  if (paletteOpen()) closePalette()
+                  else insertSlash()
+                }}
+              >
+                <span aria-hidden="true">/</span>
+              </button>
               <button
                 type="button"
                 class="assistant-context-chip"
@@ -772,11 +823,11 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                   title={t("ai.stop")}
                   aria-label={t("ai.stop")}
                 >
-                  <Square size={12} aria-hidden="true" />
+                  <Square size={11} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  class="assistant-send"
+                  class="assistant-send assistant-send-steer"
                   disabled={draft().trim().length === 0 || draft().length > MAX_PROMPT}
                   onClick={() => void handleSend("steer")}
                   title={t("ai.steer.title")}
@@ -793,21 +844,37 @@ export function EnhancedAssistant(props: Props): JSX.Element {
                 title={running() ? t("ai.queue") : t("ai.send")}
                 aria-label={running() ? t("ai.queue") : t("ai.send")}
               >
-                <Send size={14} aria-hidden="true" />
+                <ArrowUp size={15} aria-hidden="true" />
               </button>
             </div>
           </div>
         </div>
-        <div id={`${promptId}-hint`} class="assistant-composer-hint">
+
+        <div class="assistant-composer-bar">
+          <div class="assistant-composer-bar-left">
+            <AssistantControls />
+            <AssistantScopeBar />
+          </div>
+          <div class="assistant-compose-tail">
+            <ModelChip />
+            <ContextGauge alwaysShow compact onOpen={() => setShowContext(true)} />
+          </div>
+        </div>
+
+        <div id={`${promptId}-hint`} class="assistant-composer-hint sr-only">
           <span>{running() ? t("ai.input.stopHint") : t("ai.input.shortcut.hint")}</span>
           <span>{t("ai.composer.brand")}</span>
         </div>
       </form>
+
+      <Show when={showContext()}>
+        <ContextDialog onClose={() => setShowContext(false)} />
+      </Show>
     </div>
   )
 }
 
-/** The model picker, as a composer chip: the name is the label, the chevron the affordance. */
+/** The model picker, as a quiet footer trigger: model name + tier/variant, with the menu opening upward. */
 function ModelChip(): JSX.Element {
   const ai = useAiStore()
   const [open, setOpen] = createSignal(false)
@@ -816,6 +883,33 @@ function ModelChip(): JSX.Element {
     if (m === undefined) return t("ai.model.label")
     return `${m.provider}/${m.model}`
   }
+  const shortModel = (): string => {
+    const m = ai.model()
+    if (m === undefined) return t("ai.model.label")
+    return m.model
+  }
+  const effortLabel = (): string | undefined => {
+    const m = ai.model()
+    if (m?.variant) return m.variant
+    if (m?.tier) return t(`ai.model.tier.${m.tier}` as never)
+    return undefined
+  }
+
+  createEffect(() => {
+    if (!open()) return
+    const away = (event: PointerEvent): void => {
+      if (!(event.target as Element | null)?.closest?.(".assistant-chip-root")) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("pointerdown", away, true)
+    document.addEventListener("keydown", escape)
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", away, true)
+      document.removeEventListener("keydown", escape)
+    })
+  })
 
   return (
     <div class="assistant-chip-root">
@@ -824,12 +918,14 @@ function ModelChip(): JSX.Element {
         class="assistant-chip assistant-chip-model"
         aria-label={t("ai.model.label")}
         aria-expanded={open()}
-        title={currentLabel()}
+        title={[currentLabel(), effortLabel()].filter(Boolean).join(" · ")}
         onClick={() => setOpen(!open())}
       >
-        <span class="assistant-chip-icon" aria-hidden="true"><Sparkles size={13} /></span>
-        <span class="assistant-chip-value">{currentLabel()}</span>
-        <ChevronDown size={12} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
+        <span class="assistant-chip-value">{shortModel()}</span>
+        <Show when={effortLabel()}>
+          {(effort) => <span class="assistant-chip-effort">{effort()}</span>}
+        </Show>
+        <ChevronDown size={11} aria-hidden="true" class={open() ? "rotate-180 transition" : "transition"} />
       </button>
       <Show when={open()}>
         <ModelMenu onSelect={() => setOpen(false)} />
@@ -851,9 +947,9 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
   })
   return (
     <div class="assistant-popover" onKeyDown={(event) => { if (event.key === "Escape") props.onSelect() }}>
-      <div class="sticky top-0 z-10 space-y-1 bg-white p-2 dark:bg-gray-900">
-        <input type="search" aria-label={t("ai.model.search")} placeholder={t("ai.model.search")} class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
-        <select aria-label={t("ai.model.provider")} class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
+      <div class="assistant-popover-head space-y-1.5 p-2">
+        <input type="search" aria-label={t("ai.model.search")} placeholder={t("ai.model.search")} class="assistant-field" value={search()} onInput={(event) => { setSearch(event.currentTarget.value); setLimit(50) }} />
+        <select aria-label={t("ai.model.provider")} class="assistant-field" value={provider()} onChange={(event) => { setProvider(event.currentTarget.value); setLimit(50) }}>
           <option value="">{t("ai.model.allProviders")}</option>
           <For each={providers()}>{(id) => <option value={id}>{id}</option>}</For>
         </select>
@@ -861,16 +957,16 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
       <Show
         when={filtered().length > 0}
         fallback={
-          <p class="px-3 py-2 text-xs text-gray-500">{t("ai.model.noModels")}</p>
+          <p class="px-3 py-2 text-xs assistant-meta-text">{t("ai.model.noModels")}</p>
         }
       >
-        <ul class="divide-y divide-gray-100 dark:divide-gray-800">
+        <ul class="assistant-popover-list">
           <For each={filtered().slice(0, limit())}>
             {(model) => (
               <li>
                 <button
                   type="button"
-                  class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40"
+                  class="assistant-popover-item"
                   disabled={!model.configured}
                   onClick={() => {
                     ai.setModel({ provider: model.provider, model: model.id, ...(model.tier === undefined ? {} : { tier: model.tier }) })
@@ -878,14 +974,14 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
                   }}
                 >
                   <span class="flex-1 min-w-0">
-                    <div class="truncate text-xs font-medium text-gray-900 dark:text-gray-100" title={model.id}>{model.id}</div>
-                    <div class="text-[10px] text-gray-500">
+                    <div class="truncate text-xs font-medium" title={model.id}>{model.id}</div>
+                    <div class="assistant-meta-text">
                       {model.provider}
                       <Show when={model.tier !== undefined}> · {t(`ai.model.tier.${model.tier}` as never)}</Show>
                     </div>
                   </span>
                   <Show when={!model.configured}>
-                    <span class="text-[10px] text-amber-600">{t("ai.model.unconfigured")}</span>
+                    <span class="assistant-status-warn text-[10px]">{t("ai.model.unconfigured")}</span>
                   </Show>
                 </button>
               </li>
@@ -893,7 +989,7 @@ function ModelMenu(props: { readonly onSelect: () => void }): JSX.Element {
           </For>
         </ul>
         <Show when={filtered().length > limit()}>
-          <button type="button" class="w-full px-3 py-2 text-xs text-blue-600" onClick={() => setLimit((value) => value + 50)}>{t("ai.model.showMore", { count: filtered().length - limit() })}</button>
+          <button type="button" class="assistant-link-btn w-full px-3 py-2" onClick={() => setLimit((value) => value + 50)}>{t("ai.model.showMore", { count: filtered().length - limit() })}</button>
         </Show>
       </Show>
     </div>
@@ -976,8 +1072,8 @@ function AssistantScopeBar(): JSX.Element {
         <button
           type="button"
           class="assistant-scope-control"
-          title={t("ai.composer.drawingTitle")}
-          aria-label={t("ai.composer.drawing")}
+          title={`${t("ai.composer.drawingTitle")}: ${scopeLabel()}`}
+          aria-label={`${t("ai.composer.drawing")}: ${scopeLabel()}`}
           aria-haspopup="listbox"
           aria-expanded={scopeOpen()}
           onClick={() => setScopeOpen((open) => !open)}
@@ -1077,11 +1173,13 @@ interface MessageBubbleProps {
   readonly message: AiMessage
   readonly onCopy: (text: string, id: string) => void
   readonly copiedId: string | undefined
+  readonly onOpenProviders: () => void
 }
 
 function MessageBubble(props: MessageBubbleProps): JSX.Element {
   const ai = useAiStore()
-  const segments = createMemo(() => groupExploration(timelineOf(props.message), (callId) => ai.toolCalls()[callId]?.status === "ok"))
+  const timeline = createMemo(() => timelineOf(props.message))
+  const segments = createMemo(() => groupExploration(timeline(), (callId) => ai.toolCalls()[callId]?.status === "ok"))
   const duration = (): string | undefined => {
     const end = props.message.finishedAt
     if (end === undefined) return undefined
@@ -1092,123 +1190,162 @@ function MessageBubble(props: MessageBubbleProps): JSX.Element {
   const isUser = (): boolean => props.message.role === "user"
 
   return (
-    <article class="assistant-message space-y-1.5" data-role={props.message.role}>
-      <div class="flex items-center justify-between text-[10px] text-gray-500 uppercase">
+    <article class="assistant-message" data-role={props.message.role}>
+      <div class="assistant-message-header">
         <span class="font-semibold">
           {props.message.role === "user" ? t("ai.message.user") : t("ai.message.assistant")}
         </span>
         <span>{formatTimestamp(props.message.createdAt)}</span>
       </div>
-      <div class="space-y-1.5" classList={{ "ml-auto max-w-[90%]": isUser(), "mr-auto w-full": !isUser() }} data-testid="ai-timeline">
-        <For each={segments()}>
+      <div class="assistant-timeline" classList={{ "is-user": isUser(), "is-assistant": !isUser() }} data-testid="ai-timeline">
+        <Index each={segments()}>
           {(segment, index) => {
-            const last = (): boolean => index() === segments().length - 1
+            const last = (): boolean => index === segments().length - 1
             const streaming = (): boolean => props.message.status === "streaming"
-            if (segment.kind === "reasoning") {
-              return (
-                <details class="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-500 dark:border-gray-700" open={streaming() && last()} data-testid="ai-thinking">
-                  <summary class="cursor-pointer">{t("ai.thinking")}</summary>
-                  <p class="mt-1 whitespace-pre-wrap italic">{segment.text}</p>
-                </details>
-              )
-            }
-            if (segment.kind === "text") {
-              return (
-                 <div class="assistant-message-body text-sm break-words" classList={{ "whitespace-pre-wrap": isUser() }}>
-                   <Show when={!isUser()} fallback={segment.text}>
-                     <div class="assistant-markdown" data-testid="ai-markdown" innerHTML={renderAssistantMarkdown(segment.text)} />
-                   </Show>
-                  <Show when={streaming() && last()}>
-                    <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
-                  </Show>
-                </div>
-              )
-            }
-            if (segment.kind === "retry") {
-              return <p class="text-xs text-amber-700 dark:text-amber-300" data-testid="ai-retry-row">↻ {t("ai.agent.retry", { n: segment.attempt })} · {segment.message}</p>
-            }
-            if (segment.kind === "diagnostic") {
-              return <div class="rounded border border-current/20 px-2 py-1 text-xs" classList={{ "text-red-700 dark:text-red-300": segment.severity === "error", "text-amber-700 dark:text-amber-300": segment.severity === "warning" }} data-testid="ai-tool-diagnostic" data-tool={segment.tool} data-severity={segment.severity}>
-                <p class="font-medium">{segment.tool}</p><p class="whitespace-pre-wrap">{segment.message}</p>
-                <Show when={segment.recovery}><p class="mt-1 whitespace-pre-wrap">{segment.recovery}</p></Show>
-              </div>
-            }
-            if (segment.kind === "group") {
-              const titles = (): string => {
-                const counts = new Map<string, number>()
-                for (const c of segment.calls) counts.set(c.tool, (counts.get(c.tool) ?? 0) + 1)
-                return [...counts].map(([tool, n]) => (n > 1 ? `${toolTitle(tool)} ×${n}` : toolTitle(tool))).join(", ")
+            // Immutable deltas replace segment values. Keep the row mounted until its kind changes.
+            return <Show when={segment().kind} keyed>{(kind) => {
+              if (kind === "reasoning") {
+                const current = () => segment() as Extract<GroupedSegment, { kind: "reasoning" }>
+                return (
+                  <details class="assistant-reasoning" open={streaming() && last()} data-testid="ai-thinking">
+                    <summary class="assistant-reasoning-summary">{t("ai.thinking")}</summary>
+                    <p class="assistant-reasoning-body">{current().text}</p>
+                  </details>
+                )
               }
+              if (kind === "text") {
+                const current = () => segment() as Extract<GroupedSegment, { kind: "text" }>
+                const text = createMemo(() => current().text)
+                return (
+                  <div class="assistant-message-body break-words" classList={{ "whitespace-pre-wrap": isUser() }}>
+                    <Show when={!isUser()} fallback={text()}>
+                      <div class="assistant-markdown" data-testid="ai-markdown" innerHTML={renderAssistantMarkdown(text())} />
+                    </Show>
+                    <Show when={streaming() && last()}>
+                      <span class="ml-0.5 inline-block animate-pulse" aria-hidden="true">▍</span>
+                    </Show>
+                  </div>
+                )
+              }
+              if (kind === "retry") {
+                const current = () => segment() as Extract<GroupedSegment, { kind: "retry" }>
+                return <p class="assistant-retry-row" data-testid="ai-retry-row">↻ {t("ai.agent.retry", { n: current().attempt })} · {current().message}</p>
+              }
+              if (kind === "diagnostic") {
+                const current = () => segment() as Extract<GroupedSegment, { kind: "diagnostic" }>
+                return (
+                  <div class="assistant-diagnostic-card" data-testid="ai-tool-diagnostic" data-tool={current().tool} data-severity={current().severity}>
+                    <p class="font-medium">{current().tool}</p>
+                    <p class="whitespace-pre-wrap">{current().message}</p>
+                    <Show when={current().recovery}><p class="mt-1 whitespace-pre-wrap assistant-meta-text">{current().recovery}</p></Show>
+                  </div>
+                )
+              }
+              if (kind === "group") {
+                const current = () => segment() as Extract<GroupedSegment, { kind: "group" }>
+                const titles = (): string => {
+                  const counts = new Map<string, number>()
+                  for (const c of current().calls) counts.set(c.tool, (counts.get(c.tool) ?? 0) + 1)
+                  return [...counts].map(([tool, n]) => (n > 1 ? `${toolTitle(tool)} ×${n}` : toolTitle(tool))).join(", ")
+                }
+                return (
+                  <details class="assistant-tool-group" data-testid="ai-tool-group">
+                    <summary class="assistant-tool-group-summary">{t("ai.tool.explored", { count: current().calls.length })}: {titles()}</summary>
+                    <ul class="assistant-tool-group-list"><Index each={current().calls}>{(c) => {
+                      const call = createMemo(() => ai.toolCalls()[c().callId])
+                      return <ToolRow tool={c().tool} call={call()} projectId={ai.projectId()} />
+                    }}</Index></ul>
+                  </details>
+                )
+              }
+              const current = () => segment() as Extract<GroupedSegment, { kind: "tool" }>
+              const call = createMemo(() => ai.toolCalls()[current().callId])
+              // A delegated task is a card that follows the host's record of it, not a one-line tool row.
               return (
-                <details class="pl-2 text-xs text-gray-600 dark:text-gray-400" data-testid="ai-tool-group">
-                  <summary class="cursor-pointer">{t("ai.tool.explored", { count: segment.calls.length })}: {titles()}</summary>
-                  <ul class="mt-1 space-y-1"><For each={segment.calls}>{(c) => <ToolRow tool={c.tool} call={ai.toolCalls()[c.callId]} projectId={ai.projectId()} />}</For></ul>
-                </details>
+                <ul class="assistant-tool-list">
+                  <Show when={isTaskStart(call())} fallback={<ToolRow tool={current().tool} call={call()} projectId={ai.projectId()} />}>
+                    <TaskCard call={call()!} />
+                  </Show>
+                </ul>
               )
-            }
-            const call = createMemo(() => ai.toolCalls()[segment.callId])
-            // A delegated task is a card that follows the host's record of it, not a one-line tool row.
-            return (
-              <ul class="space-y-1 pl-2">
-                <Show when={isTaskStart(call())} fallback={<ToolRow tool={segment.tool} call={call()} projectId={ai.projectId()} />}>
-                  <TaskCard call={call()!} />
-                </Show>
-              </ul>
-            )
+            }}</Show>
           }}
-        </For>
+        </Index>
         <Show when={!isUser() && props.message.status !== "streaming" && (props.message.model || duration() || props.message.interrupted || props.message.usage)}>
-          <p class="flex flex-wrap items-center gap-x-1 text-[10px] text-gray-500" data-testid="ai-turn-footer">
-            <Bot size={10} aria-hidden="true" />{t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model?.replace(/^~/, "")}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {usage().outputTokens} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
+          <p class="assistant-turn-footer" data-testid="ai-turn-footer">
+            <Bot size={10} aria-hidden="true" />{t("ai.message.assistant")}<Show when={props.message.model}> · {props.message.model?.replace(/^~/, "")}</Show><Show when={duration()}> · {duration()}</Show><Show when={props.message.usage}>{(usage) => <> · {compactTokens(usage().outputTokens)} tok</>}</Show><Show when={props.message.interrupted}> · {t("ai.interrupted")}</Show>
           </p>
         </Show>
         <Show when={props.message.status === "streaming" && segments().length === 0}>
           <span class="inline-block animate-pulse text-sm" aria-hidden="true">▍</span>
         </Show>
         <Show when={(props.message.attachments?.length ?? 0) > 0}>
-          <p class="mt-1 flex flex-wrap gap-1 text-[11px] text-blue-700 dark:text-blue-300" data-testid="message-attachments">
-            <For each={props.message.attachments}>{(name) => <span class="inline-flex items-center gap-1"><Paperclip size={10} aria-hidden="true" />{name}</span>}</For>
+          <p class="assistant-message-attachments" data-testid="message-attachments">
+            <For each={props.message.attachments}>{(name) => <span class="assistant-attachment-pill"><Paperclip size={10} aria-hidden="true" />{name}</span>}</For>
           </p>
         </Show>
         <Show when={props.message.status === "error" && props.message.error && props.message.error !== props.message.text}>
-          <p class="mt-1 text-xs text-red-600 dark:text-red-400">{props.message.error}</p>
+          <div class="assistant-enterprise-card mt-2" role="alert">
+            <div class="assistant-enterprise-card-head">
+              <CircleGauge size={15} class="assistant-coral-icon" aria-hidden="true" />
+              <span class="assistant-enterprise-card-title">{t("ai.runtime.error")}</span>
+            </div>
+            <div class="assistant-enterprise-card-body">
+              <p>{props.message.error}</p>
+              <div class="assistant-card-actions">
+                <button type="button" class="assistant-btn assistant-btn-secondary" onClick={() => ai.refresh()}>
+                  {t("ai.toolbar.refresh")}
+                </button>
+                <button type="button" class="assistant-btn assistant-btn-primary" onClick={() => props.onOpenProviders()}>
+                  {t("ai.providers.title")}
+                </button>
+              </div>
+            </div>
+          </div>
         </Show>
       </div>
 
       <Show when={permissions().length > 0}>
-        <ul class="space-y-1 pl-2">
+        <ul class="space-y-1.5 mt-2">
           <For each={permissions()}>
             {(event) => {
-               if (event.type !== "permission_request") return null
-               const pending = () => ai.permissions().some((permission) => permission.requestId === event.requestId)
-               return (
-                 <Show when={pending()}><li class="assistant-permission flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400" data-testid="permission">
-                  <span>{t("ai.message.permission", { permission: event.permission })}</span>
-                  <button
-                    type="button"
-                    class="rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 hover:bg-amber-200"
-                    onClick={() => ai.replyPermission(event.requestId, "once")}
-                  >
-                    {t("ai.message.permission.grant")}
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 hover:bg-gray-200"
-                    onClick={() => ai.replyPermission(event.requestId, "reject")}
-                  >
-                    {t("ai.message.permission.deny")}
-                  </button>
-                 </li></Show>
+              if (event.type !== "permission_request") return null
+              const pending = () => ai.permissions().some((permission) => permission.requestId === event.requestId)
+              return (
+                <Show when={pending()}>
+                  <li class="assistant-permission" data-testid="permission">
+                    <div class="assistant-permission-copy">
+                      <CircleGauge size={14} class="assistant-coral-icon" aria-hidden="true" />
+                      <span>{t("ai.message.permission", { permission: event.permission })}</span>
+                    </div>
+                    <div class="assistant-card-actions mt-0">
+                      <button
+                        type="button"
+                        class="assistant-btn assistant-btn-secondary"
+                        onClick={() => ai.replyPermission(event.requestId, "reject")}
+                      >
+                        {t("ai.message.permission.deny")}
+                      </button>
+                      <button
+                        type="button"
+                        class="assistant-btn assistant-btn-primary"
+                        onClick={() => ai.replyPermission(event.requestId, "once")}
+                      >
+                        {t("ai.message.permission.grant")}
+                      </button>
+                    </div>
+                  </li>
+                </Show>
               )
             }}
           </For>
         </ul>
       </Show>
 
-      <div class="flex items-center gap-1 pl-2">
+      <div class="assistant-message-actions" classList={{ "is-user": isUser() }}>
         <button
           type="button"
-          class="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700"
+          class="assistant-copy-btn"
           disabled={props.message.text.length === 0}
           title={t("ai.message.copyTitle")}
           onClick={() => props.onCopy(props.message.text, props.message.id)}
