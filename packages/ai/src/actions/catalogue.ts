@@ -19,6 +19,7 @@ import { CAM_ACTIONS } from "./cam.ts"
 import { CAM_EDIT_ACTIONS } from "./cam-edit.ts"
 import { LIBRARY_ACTIONS, LIBRARY_EDIT_ACTIONS, PARTS_ACTIONS } from "./library.ts"
 import { MEMORY_ACTIONS, MEMORY_EDIT_ACTIONS } from "./memory.ts"
+import { MOD_ACTIONS, MOD_EDIT_ACTIONS } from "./mods.ts"
 import { RESEARCH_ACTIONS } from "./research.ts"
 import { VCS_ACTIONS, VCS_EDIT_ACTIONS } from "./vcs.ts"
 import { AGENT_ACTIONS } from "./agent.ts"
@@ -27,7 +28,8 @@ import { AGENT_ACTIONS } from "./agent.ts"
 export const ACTION_CATALOGUE: ReadonlyArray<ActionSpec> = [
   ...CAD_ACTIONS, ...CAD_EDIT_ACTIONS, ...CAM_ACTIONS, ...CAM_EDIT_ACTIONS,
   ...LIBRARY_ACTIONS, ...PARTS_ACTIONS, ...LIBRARY_EDIT_ACTIONS,
-  ...MEMORY_ACTIONS, ...MEMORY_EDIT_ACTIONS, ...RESEARCH_ACTIONS, ...VCS_ACTIONS, ...VCS_EDIT_ACTIONS, ...AGENT_ACTIONS
+  ...MEMORY_ACTIONS, ...MEMORY_EDIT_ACTIONS, ...RESEARCH_ACTIONS, ...VCS_ACTIONS, ...VCS_EDIT_ACTIONS, ...AGENT_ACTIONS,
+  ...MOD_ACTIONS, ...MOD_EDIT_ACTIONS
 ]
 
 export const actionId = (spec: ActionSpec): string => spec.id

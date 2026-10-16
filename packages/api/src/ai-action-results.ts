@@ -210,6 +210,25 @@ const task = Schema.StructWithRest(Schema.Struct({
 }), [record])
 const tasks = Schema.Array(task)
 
+// ---------------------------------------------------------------- `mods`, `mods_edit`
+
+/** One mod as `mods.list` answers it: the store's record plus the events the live host reports when it has it loaded. */
+const modSummary = Schema.Struct({
+  id: str, name: str, description: str, enabled: Schema.Boolean,
+  origin: Schema.Literals(["assistant", "user", "plugin"]),
+  createdAt: str, updatedAt: str,
+  events: strings
+})
+const modList = Schema.Struct({ ok: Schema.Literal(true), mods: Schema.Array(modSummary) })
+/** `mods.read` adds the source and the tool names, so a mod can be reviewed before it is armed. */
+const modDetail = Schema.Struct({
+  ok: Schema.Literal(true), id: str, name: str, description: str, enabled: Schema.Boolean,
+  origin: Schema.Literals(["assistant", "user", "plugin"]),
+  createdAt: str, updatedAt: str, source: str, events: strings, tools: strings
+})
+const modSaved = Schema.Struct({ ok: Schema.Literal(true), id: str, enabled: Schema.Boolean, events: strings })
+const modRemoved = Schema.Struct({ ok: Schema.Literal(true), id: str, removed: Schema.Literal(true) })
+
 // ---------------------------------------------------------------- the table
 
 export interface ActionContract {
@@ -323,5 +342,12 @@ export const ACTION_CONTRACTS: Readonly<Record<string, ActionContract>> = {
   // Kind `write` in the catalogue so no read-only role holds the tool, but listing and reading change nothing.
   "agent.list": read(tasks),
   "agent.read": read(task),
-  "agent.cancel": write(["task"], task)
+  "agent.cancel": write(["task"], task),
+
+  // A mod is app-wide extension code the host imports; `mods_edit.remove` is destructive because the source is gone.
+  "mods.list": read(modList),
+  "mods.read": read(modDetail),
+  "mods_edit.save": write(["mod"], modSaved),
+  "mods_edit.set_enabled": write(["mod"], modSaved),
+  "mods_edit.remove": write(["mod"], modRemoved)
 }

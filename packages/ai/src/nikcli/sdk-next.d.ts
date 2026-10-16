@@ -239,6 +239,10 @@ declare module "@nikcli-ai/sdk-next" {
     readonly "config-management": {
       reload(options?: RequestOptions): Promise<unknown>
     }
+    readonly mod: {
+      /** The mods the live host actually loaded, with the events each one hooks (spec 27 §4.3). */
+      list(options?: RequestOptions): Promise<ReadonlyArray<HostModInfo>>
+    }
     readonly "top-level": {
       agent(options?: RequestOptions): Promise<ReadonlyArray<Record<string, unknown>>>
       dispose(options?: RequestOptions): Promise<unknown>
@@ -255,6 +259,20 @@ declare module "@nikcli-ai/sdk-next" {
 
   export interface HostRegistration {
     readonly close: () => Promise<void>
+  }
+
+  /** One entry of `mod.list`: a mod the live host loaded, as the host itself reports it. */
+  export interface HostModInfo {
+    /** For a mod declared by configuration, the `file://` spec it was loaded from. */
+    readonly id: string
+    readonly name: string
+    readonly tier: string
+    readonly rank: number
+    /** The event names this mod registered a hook on; empty means it loaded but hooks nothing. */
+    readonly events: ReadonlyArray<string>
+    /** Names of the tools the mod registered. */
+    readonly tools: ReadonlyArray<string>
+    readonly commands: ReadonlyArray<string>
   }
 
   export interface NikCliHostInstance extends HostClient {

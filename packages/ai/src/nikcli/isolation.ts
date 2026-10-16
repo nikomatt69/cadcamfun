@@ -98,6 +98,13 @@ export interface IsolationOptions {
    * top of the documented variables; on by default. Process-wide side effect.
    */
   readonly overrideHome?: boolean
+  /**
+   * Load the mods the app itself declares in its isolated `nikcli.json` (spec 27 §4.3). Off by default, because the
+   * pinned host bundle must first prove — `packages/ai/test/pinned-mod-compatibility.test.ts` — that with the flag off
+   * it loads exactly those and nothing from the user's home or the project. While off, `NIKCLI_DISABLE_MODS` keeps the
+   * host from loading any mod from anywhere. Process-wide side effect: set it on the first `applyIsolation` call.
+   */
+  readonly mods?: boolean
 }
 
 export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): Record<string, string> => ({
@@ -115,7 +122,10 @@ export const isolationEnv = (paths: IsolatedPaths, options?: IsolationOptions): 
   NIKCLI_SKIP_PLUGIN_INSTALL: "1",
   NIKCLI_DISABLE_LSP_DOWNLOAD: "1",
   NIKCLI_DISABLE_DEFAULT_PLUGINS: "1",
-  NIKCLI_DISABLE_MODS: "1",
+  // Mods are the app's own extension modules (`<root>/mods/*.js`, declared as `file://` entries in the isolated
+  // `nikcli.json`). The pinned bundle refuses every non-builtin mod while this flag is set, and the gate test proves
+  // the loader accepts the app's own and only those once it is cleared (spec 27 §4.3).
+  ...(options?.mods === true ? {} : { NIKCLI_DISABLE_MODS: "1" }),
   NIKCLI_DISABLE_HOT_RELOAD: "1",
   NIKCLI_DISABLE_PLUGIN_RELOAD: "1",
   NIKCLI_EXPERIMENTAL_DISABLE_FILEWATCHER: "1",

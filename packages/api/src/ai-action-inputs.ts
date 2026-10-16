@@ -152,3 +152,28 @@ export const VCS_ACTION_INPUTS = {
   "agent.read": taskId,
   "agent.cancel": taskId
 } as const
+
+// ---------------------------------------------------------------- `mods`, `mods_edit`
+
+/**
+ * A mod id names the file the host imports, so it is lower case and short; the AI package's store enforces the same
+ * shape and the source limit, declared here so the schema and the store cannot disagree.
+ */
+export const MOD_ID_PATTERN = /^[a-z][a-z0-9_-]{0,39}$/
+export const MOD_SOURCE_MAX_CHARS = 20_000
+
+/** What the assistant may say about the mods it authors: the same fields the store keeps, plus the enable decision. */
+export const MOD_ACTION_INPUTS = {
+  "mods.list": empty,
+  "mods.read": Schema.Struct({ id: Schema.String.check(Schema.isPattern(MOD_ID_PATTERN)) }),
+  "mods_edit.save": Schema.Struct({
+    id: Schema.String.check(Schema.isPattern(MOD_ID_PATTERN)),
+    name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(60))),
+    description: trimmed(200),
+    source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MOD_SOURCE_MAX_CHARS)),
+    /** Absent keeps the current state: a replacement of a running mod neither arms nor stops it by itself. */
+    enable: Schema.optionalKey(flag)
+  }),
+  "mods_edit.set_enabled": Schema.Struct({ id: Schema.String.check(Schema.isPattern(MOD_ID_PATTERN)), enabled: flag }),
+  "mods_edit.remove": Schema.Struct({ id: Schema.String.check(Schema.isPattern(MOD_ID_PATTERN)) })
+} as const

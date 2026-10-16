@@ -82,6 +82,12 @@ export interface HostConfigInput {
    * here into the deny-by-default permission map, so a forbidden tool is denied for the agent and every specialist.
    */
   readonly policies?: ReadonlyArray<PolicyStatement>
+  /**
+   * `file://` specs of the mods the host loads (`plugin` of the isolated `nikcli.json`, spec 27 §4.3). Only the app's
+   * own modules ever appear here: the isolated store (`mods.ts`) and the plugin host materialize them, and user or
+   * project directories are never read. The host imports them when it starts.
+   */
+  readonly mods?: ReadonlyArray<string>
 }
 
 /** Settings supported by the pinned host, not a client-side token budget. */
@@ -209,6 +215,8 @@ export const buildHostConfig = (input: HostConfigInput): Record<string, unknown>
     share: "disabled",
     autoupdate: false,
     snapshot: false,
+    // The mods the host imports at startup; absent entirely while none is enabled.
+    ...(input.mods !== undefined && input.mods.length > 0 ? { plugin: [...input.mods] } : {}),
     experimental: {
       brain: true,
       memory: true,

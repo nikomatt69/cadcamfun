@@ -66,6 +66,12 @@ export interface NikCliRuntimeOptions {
    */
   readonly toolChanges?: (listener: () => void) => () => void
   readonly isolation?: IsolationOptions
+  /**
+   * `file://` specs of the mods the host loads, read again for every configuration publication: the app-owned store
+   * (`mods.ts`) and the plugin host own the files, the runtime only declares them. Changes reach live hosts through
+   * `reloadMods` (spec 27 §4.3).
+   */
+  readonly mods?: () => ReadonlyArray<string>
   /** Whether the one-shot models.dev seed may touch the network. Default: never (tests stay offline). */
   readonly catalogue?: { readonly network?: boolean }
   /** Receives the host's own log lines. Default: warnings and errors only, dropped otherwise. */
@@ -115,6 +121,12 @@ export interface NikCliRuntime {
   updateProviders(providers: ReadonlyArray<HostProviderSpec>): Effect.Effect<void, AiConfigError>
   /** Rewrite the skills (built-in + the user's) into the host config and make live hosts see them. */
   reloadSkills(): Effect.Effect<void, AiConfigError>
+  /**
+   * Rewrite the mod declarations (`plugin` of the isolated config — the store and the plugin host already wrote the
+   * files) and reload live hosts: the pinned bundle re-runs its plugin pass on `config-management.reload`, so a mod
+   * created, edited, enabled or removed here applies to running conversations too (spec 27 §4.3).
+   */
+  reloadMods(): Effect.Effect<void, AiConfigError>
   /** Publish the current tool set to every live host (what `toolChanges` triggers): permission map, registrations, reload. */
   reloadTools(): Effect.Effect<void, AiConfigError>
   /**
@@ -250,6 +262,7 @@ export const makeNikCliRuntime = (
             toolIds: toolIdsOf(projectId),
             askToolIds: toolRegistry.approvalIds(projectId),
             systemPrompt: options.systemPrompt,
+            ...(options.mods ? { mods: [...new Set(options.mods())] } : {}),
             ...(options.compaction ? { compaction: options.compaction } : {}),
             ...(options.timeouts ? { timeouts: options.timeouts } : {}),
             ...(options.policies ? { policies: options.policies } : {})
@@ -478,6 +491,19 @@ export const makeNikCliRuntime = (
             }
           },
           catch: toConfigError("Failed to reload the skills")
+        }),
+      reloadMods: () =>
+        Effect.tryPromise({
+          try: async () => {
+            assertOpen()
+            for (const [projectId, promise] of hosts) {
+              const host = await promise
+              await writeConfig(projectId)
+              await host.client["config-management"].reload()
+              for (const [providerId, key] of pendingKeys) await host.client.provider.api({ providerID: providerId, key })
+            }
+          },
+          catch: toConfigError("Failed to reload the mods")
         }),
       reloadTools: () =>
         Effect.tryPromise({
