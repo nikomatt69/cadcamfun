@@ -16,23 +16,35 @@ const Endpoint1_1 = (raw: RawClient["system"]) => () => raw["version"]({}).pipe(
 
 const adaptGroup1 = (raw: RawClient["system"]) => ({ ready: Endpoint1_0(raw), version: Endpoint1_1(raw) })
 
-type Endpoint2_0Request = Parameters<RawClient["auth"]["forgotPassword"]>[0]
-type Endpoint2_0Input = {
-  readonly email?: Endpoint2_0Request["payload"]["email"]
-  readonly callbackURL?: Endpoint2_0Request["payload"]["callbackURL"]
+const Endpoint2_0 = (raw: RawClient["auth"]) => () => raw["identityStart"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint2_1Request = Parameters<RawClient["auth"]["identityPoll"]>[0]
+type Endpoint2_1Input = { readonly id: Endpoint2_1Request["payload"]["id"] }
+const Endpoint2_1 = (raw: RawClient["auth"]) => (input: Endpoint2_1Input) =>
+  raw["identityPoll"]({ payload: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint2_2Request = Parameters<RawClient["auth"]["identityCancel"]>[0]
+type Endpoint2_2Input = { readonly id: Endpoint2_2Request["payload"]["id"] }
+const Endpoint2_2 = (raw: RawClient["auth"]) => (input: Endpoint2_2Input) =>
+  raw["identityCancel"]({ payload: { id: input["id"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint2_3Request = Parameters<RawClient["auth"]["forgotPassword"]>[0]
+type Endpoint2_3Input = {
+  readonly email?: Endpoint2_3Request["payload"]["email"]
+  readonly callbackURL?: Endpoint2_3Request["payload"]["callbackURL"]
 }
-const Endpoint2_0 = (raw: RawClient["auth"]) => (input?: Endpoint2_0Input) =>
+const Endpoint2_3 = (raw: RawClient["auth"]) => (input?: Endpoint2_3Input) =>
   raw["forgotPassword"]({ payload: { email: input?.["email"], callbackURL: input?.["callbackURL"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint2_1Request = Parameters<RawClient["auth"]["resetPassword"]>[0]
-type Endpoint2_1Input = {
-  readonly token?: Endpoint2_1Request["payload"]["token"]
-  readonly newPassword?: Endpoint2_1Request["payload"]["newPassword"]
-  readonly confirmPassword?: Endpoint2_1Request["payload"]["confirmPassword"]
+type Endpoint2_4Request = Parameters<RawClient["auth"]["resetPassword"]>[0]
+type Endpoint2_4Input = {
+  readonly token?: Endpoint2_4Request["payload"]["token"]
+  readonly newPassword?: Endpoint2_4Request["payload"]["newPassword"]
+  readonly confirmPassword?: Endpoint2_4Request["payload"]["confirmPassword"]
 }
-const Endpoint2_1 = (raw: RawClient["auth"]) => (input?: Endpoint2_1Input) =>
+const Endpoint2_4 = (raw: RawClient["auth"]) => (input?: Endpoint2_4Input) =>
   raw["resetPassword"]({
     payload: {
       token: input?.["token"],
@@ -41,53 +53,53 @@ const Endpoint2_1 = (raw: RawClient["auth"]) => (input?: Endpoint2_1Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint2_2Request = Parameters<RawClient["auth"]["sendMagicLink"]>[0]
-type Endpoint2_2Input = {
-  readonly email?: Endpoint2_2Request["payload"]["email"]
-  readonly callbackURL?: Endpoint2_2Request["payload"]["callbackURL"]
+type Endpoint2_5Request = Parameters<RawClient["auth"]["sendMagicLink"]>[0]
+type Endpoint2_5Input = {
+  readonly email?: Endpoint2_5Request["payload"]["email"]
+  readonly callbackURL?: Endpoint2_5Request["payload"]["callbackURL"]
 }
-const Endpoint2_2 = (raw: RawClient["auth"]) => (input?: Endpoint2_2Input) =>
+const Endpoint2_5 = (raw: RawClient["auth"]) => (input?: Endpoint2_5Input) =>
   raw["sendMagicLink"]({ payload: { email: input?.["email"], callbackURL: input?.["callbackURL"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint2_3Request = Parameters<RawClient["auth"]["sendVerificationEmail"]>[0]
-type Endpoint2_3Input = {
-  readonly email?: Endpoint2_3Request["payload"]["email"]
-  readonly callbackURL?: Endpoint2_3Request["payload"]["callbackURL"]
+type Endpoint2_6Request = Parameters<RawClient["auth"]["sendVerificationEmail"]>[0]
+type Endpoint2_6Input = {
+  readonly email?: Endpoint2_6Request["payload"]["email"]
+  readonly callbackURL?: Endpoint2_6Request["payload"]["callbackURL"]
 }
-const Endpoint2_3 = (raw: RawClient["auth"]) => (input?: Endpoint2_3Input) =>
+const Endpoint2_6 = (raw: RawClient["auth"]) => (input?: Endpoint2_6Input) =>
   raw["sendVerificationEmail"]({ payload: { email: input?.["email"], callbackURL: input?.["callbackURL"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint2_4Request = Parameters<RawClient["auth"]["verifyEmail"]>[0]
-type Endpoint2_4Input = { readonly token?: Endpoint2_4Request["payload"]["token"] }
-const Endpoint2_4 = (raw: RawClient["auth"]) => (input?: Endpoint2_4Input) =>
+type Endpoint2_7Request = Parameters<RawClient["auth"]["verifyEmail"]>[0]
+type Endpoint2_7Input = { readonly token?: Endpoint2_7Request["payload"]["token"] }
+const Endpoint2_7 = (raw: RawClient["auth"]) => (input?: Endpoint2_7Input) =>
   raw["verifyEmail"]({ payload: { token: input?.["token"] } }).pipe(Effect.mapError(mapClientError))
 
-const Endpoint2_5 = (raw: RawClient["auth"]) => () => raw["signout"]({}).pipe(Effect.mapError(mapClientError))
+const Endpoint2_8 = (raw: RawClient["auth"]) => () => raw["signout"]({}).pipe(Effect.mapError(mapClientError))
 
-const Endpoint2_6 = (raw: RawClient["auth"]) => () => raw["getSession"]({}).pipe(Effect.mapError(mapClientError))
+const Endpoint2_9 = (raw: RawClient["auth"]) => () => raw["getSession"]({}).pipe(Effect.mapError(mapClientError))
 
-type Endpoint2_7Request = Parameters<RawClient["auth"]["signinDirect"]>[0]
-type Endpoint2_7Input = {
-  readonly email?: Endpoint2_7Request["payload"]["email"]
-  readonly password?: Endpoint2_7Request["payload"]["password"]
+type Endpoint2_10Request = Parameters<RawClient["auth"]["signinDirect"]>[0]
+type Endpoint2_10Input = {
+  readonly email?: Endpoint2_10Request["payload"]["email"]
+  readonly password?: Endpoint2_10Request["payload"]["password"]
 }
-const Endpoint2_7 = (raw: RawClient["auth"]) => (input?: Endpoint2_7Input) =>
+const Endpoint2_10 = (raw: RawClient["auth"]) => (input?: Endpoint2_10Input) =>
   raw["signinDirect"]({ payload: { email: input?.["email"], password: input?.["password"] } }).pipe(
     Effect.mapError(mapClientError),
   )
 
-type Endpoint2_8Request = Parameters<RawClient["auth"]["signup"]>[0]
-type Endpoint2_8Input = {
-  readonly email?: Endpoint2_8Request["payload"]["email"]
-  readonly password?: Endpoint2_8Request["payload"]["password"]
-  readonly confirmPassword?: Endpoint2_8Request["payload"]["confirmPassword"]
-  readonly name?: Endpoint2_8Request["payload"]["name"]
+type Endpoint2_11Request = Parameters<RawClient["auth"]["signup"]>[0]
+type Endpoint2_11Input = {
+  readonly email?: Endpoint2_11Request["payload"]["email"]
+  readonly password?: Endpoint2_11Request["payload"]["password"]
+  readonly confirmPassword?: Endpoint2_11Request["payload"]["confirmPassword"]
+  readonly name?: Endpoint2_11Request["payload"]["name"]
 }
-const Endpoint2_8 = (raw: RawClient["auth"]) => (input?: Endpoint2_8Input) =>
+const Endpoint2_11 = (raw: RawClient["auth"]) => (input?: Endpoint2_11Input) =>
   raw["signup"]({
     payload: {
       email: input?.["email"],
@@ -97,37 +109,40 @@ const Endpoint2_8 = (raw: RawClient["auth"]) => (input?: Endpoint2_8Input) =>
     },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint2_9Request = Parameters<RawClient["auth"]["testDirectCreate"]>[0]
-type Endpoint2_9Input = {
-  readonly email?: Endpoint2_9Request["payload"]["email"]
-  readonly password?: Endpoint2_9Request["payload"]["password"]
-  readonly name?: Endpoint2_9Request["payload"]["name"]
+type Endpoint2_12Request = Parameters<RawClient["auth"]["testDirectCreate"]>[0]
+type Endpoint2_12Input = {
+  readonly email?: Endpoint2_12Request["payload"]["email"]
+  readonly password?: Endpoint2_12Request["payload"]["password"]
+  readonly name?: Endpoint2_12Request["payload"]["name"]
 }
-const Endpoint2_9 = (raw: RawClient["auth"]) => (input?: Endpoint2_9Input) =>
+const Endpoint2_12 = (raw: RawClient["auth"]) => (input?: Endpoint2_12Input) =>
   raw["testDirectCreate"]({
     payload: { email: input?.["email"], password: input?.["password"], name: input?.["name"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint2_10Request = Parameters<RawClient["auth"]["verifyMagicLink"]>[0]
-type Endpoint2_10Input = { readonly token?: Endpoint2_10Request["payload"]["token"] }
-const Endpoint2_10 = (raw: RawClient["auth"]) => (input?: Endpoint2_10Input) =>
+type Endpoint2_13Request = Parameters<RawClient["auth"]["verifyMagicLink"]>[0]
+type Endpoint2_13Input = { readonly token?: Endpoint2_13Request["payload"]["token"] }
+const Endpoint2_13 = (raw: RawClient["auth"]) => (input?: Endpoint2_13Input) =>
   raw["verifyMagicLink"]({ payload: { token: input?.["token"] } }).pipe(Effect.mapError(mapClientError))
 
-const Endpoint2_11 = (raw: RawClient["auth"]) => () => raw["registerPasskey"]({}).pipe(Effect.mapError(mapClientError))
+const Endpoint2_14 = (raw: RawClient["auth"]) => () => raw["registerPasskey"]({}).pipe(Effect.mapError(mapClientError))
 
 const adaptGroup2 = (raw: RawClient["auth"]) => ({
-  forgotPassword: Endpoint2_0(raw),
-  resetPassword: Endpoint2_1(raw),
-  sendMagicLink: Endpoint2_2(raw),
-  sendVerificationEmail: Endpoint2_3(raw),
-  verifyEmail: Endpoint2_4(raw),
-  signout: Endpoint2_5(raw),
-  getSession: Endpoint2_6(raw),
-  signinDirect: Endpoint2_7(raw),
-  signup: Endpoint2_8(raw),
-  testDirectCreate: Endpoint2_9(raw),
-  verifyMagicLink: Endpoint2_10(raw),
-  registerPasskey: Endpoint2_11(raw),
+  identityStart: Endpoint2_0(raw),
+  identityPoll: Endpoint2_1(raw),
+  identityCancel: Endpoint2_2(raw),
+  forgotPassword: Endpoint2_3(raw),
+  resetPassword: Endpoint2_4(raw),
+  sendMagicLink: Endpoint2_5(raw),
+  sendVerificationEmail: Endpoint2_6(raw),
+  verifyEmail: Endpoint2_7(raw),
+  signout: Endpoint2_8(raw),
+  getSession: Endpoint2_9(raw),
+  signinDirect: Endpoint2_10(raw),
+  signup: Endpoint2_11(raw),
+  testDirectCreate: Endpoint2_12(raw),
+  verifyMagicLink: Endpoint2_13(raw),
+  registerPasskey: Endpoint2_14(raw),
 })
 
 type Endpoint3_0Request = Parameters<RawClient["waitlist"]["join"]>[0]

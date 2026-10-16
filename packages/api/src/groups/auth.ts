@@ -71,8 +71,19 @@ export const MagicVerifyResponse = HttpApiSchema.WithHeaders(
   SET_COOKIE)
 export const SignoutResponse = HttpApiSchema.WithHeaders(AuthMessage, SET_COOKIE)
 
+export const IdentityTokens = Schema.Struct({ access: Schema.String, refresh: Schema.String, expiresAt: Schema.Number })
+export const IdentityAttempt = Schema.Struct({ id: Schema.String, url: Schema.String, issuer: Schema.String })
+export const IdentityPoll = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("pending") }),
+  Schema.Struct({ status: Schema.Literal("complete"), tokens: IdentityTokens }),
+  Schema.Struct({ status: Schema.Literal("failed"), message: Schema.String }),
+])
+
 export class AuthGroup extends HttpApiGroup.make("auth")
   .add(
+    HttpApiEndpoint.post("identityStart", "/api/auth/identity/start", { success: IdentityAttempt, error: AuthInternal }),
+    HttpApiEndpoint.post("identityPoll", "/api/auth/identity/poll", { payload: Schema.Struct({ id: Schema.String }), success: IdentityPoll, error: AuthBadRequest }),
+    HttpApiEndpoint.post("identityCancel", "/api/auth/identity/cancel", { payload: Schema.Struct({ id: Schema.String }), success: AuthMessage }),
     HttpApiEndpoint.post("forgotPassword", "/api/auth/forgot-password", {
       payload: AuthEmailRequest, success: ForgotPasswordResponse, error: [AuthBadRequest, AuthInternal]
     }),

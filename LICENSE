@@ -2,11 +2,11 @@
 
 ## Copyright Notice
 Copyright © 2025 CAD/CAM FUN (Operated by nikomatt69). All Rights Reserved.
-Website: cadcamfun.xyz
+Website: cadcam.fun
 Primary Code Repository: https://github.com/nikomatt69/cad-cam-app-main-prod
 
 ## Definitions
-- "Service" refers to the CAD/CAM FUN web application accessible at cadcamfun.xyz.
+- "Service" refers to the CAD/CAM FUN web application accessible at cadcam.fun.
 - "Software" refers to the underlying source code, object code, algorithms, designs, documentation, and related materials that power the Service.
 - "Author" refers to nikomatt69 and any other designated copyright holders of the Software.
 - "User" refers to any person or entity accessing or using the Service.
@@ -15,7 +15,7 @@ Primary Code Repository: https://github.com/nikomatt69/cad-cam-app-main-prod
 ## License Terms
 
 1.  **License Grant for Service Use**: 
-    Subject to the User's compliance with the Terms of Service, the Author grants the User a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to access and use the **Service** via its intended web interface at cadcamfun.xyz, solely for the purposes permitted by the Terms of Service.
+    Subject to the User's compliance with the Terms of Service, the Author grants the User a limited, non-exclusive, non-transferable, non-sublicensable, revocable license to access and use the **Service** via its intended web interface at cadcam.fun, solely for the purposes permitted by the Terms of Service.
 
 2.  **No License to Software Code**: 
     This license applies **only** to the use of the deployed Service. No license or right is granted to the User with respect to the underlying **Software** itself. Accessing or viewing the Software's source code (e.g., via the public repository) does **not** grant the User any right or license to copy, modify, distribute, compile, run, use, or create derivative works of the Software.
@@ -46,7 +46,7 @@ Primary Code Repository: https://github.com/nikomatt69/cad-cam-app-main-prod
 ## Ownership Declaration
 This proprietary license and the Author's ownership claim are supported by:
 1.  Control and ownership of the primary code repository: https://github.com/nikomatt69/cad-cam-app-main-prod
-2.  Control and ownership of the primary service domain: cadcamfun.xyz
+2.  Control and ownership of the primary service domain: cadcam.fun
 
 Unauthorized use, reproduction, modification, or distribution of the Software or Service is strictly prohibited and may result in severe civil and criminal penalties, prosecuted to the maximum extent permitted by law.
 

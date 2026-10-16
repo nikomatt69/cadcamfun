@@ -3,7 +3,13 @@ import typography from "@tailwindcss/typography"
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["selector", '[data-theme="dark"]'],
-  content: ["./src/**/*.{astro,html,js,jsx,md,mdx,ts,tsx}"],
+  content: {
+    files: ["./src/**/*.{astro,html,js,jsx,md,mdx,ts,tsx}"],
+    // Embedded mesh arrays contain no utility classes and make Tailwind's extractor stall.
+    transform: {
+      astro: (source) => source.replace(/<DocViewer3D\b[\s\S]*?\/>/g, ""),
+    },
+  },
   theme: {
     extend: {
       fontFamily: {

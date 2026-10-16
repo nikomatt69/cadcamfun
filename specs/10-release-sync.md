@@ -37,7 +37,7 @@ Scripts must fail fast, print each step, and never read `.env*`.
 
 ## 3. Auto-update
 
-- `tauri-plugin-updater` with a static JSON manifest (`latest.json`) hosted on GitHub Releases (no custom server in v6.0; the old `api.cadcamfun.xyz/updates/check` endpoint is dropped unless open question 1 resolves otherwise).
+- `tauri-plugin-updater` with a static JSON manifest (`latest.json`) hosted on GitHub Releases (no custom server in v6.0; the old `api.cadcam.fun/updates/check` endpoint is dropped unless open question 1 resolves otherwise).
 - Signature verification mandatory (Tauri updater key pair); the public key is committed in `tauri.conf.json`, the private key only in CI secrets.
 - Behaviour: check at launch and every 4 hours; show a non-blocking prompt with release notes; download progress events forwarded to the webview; "critical" flag in the manifest forces the prompt and blocks dismissal until applied; never interrupt an unsaved editor session (UI defers install until safe).
 - Rollback: keep the previous installer link in the release notes; the sidecar's migrations are forward-only, so every release states whether a downgrade is safe.

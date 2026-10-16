@@ -94,7 +94,7 @@ Agents in the same wave never touch the same directory, so they can run concurre
 
 ## 7. Open questions (decide before WP9/WP10)
 
-1. Cloud sync backend: reuse the old `cadcamfun.xyz` API, or design a new one? (Affects WP10 only.) Partly answered by `13-vcs-actions-mobile.md`: project history syncs through a per-project GitHub mirror, no custom server.
+1. Cloud sync backend: reuse the old `cadcam.fun` API, or design a new one? (Affects WP10 only.) Partly answered by `13-vcs-actions-mobile.md`: project history syncs through a per-project GitHub mirror, no custom server.
 2. Plugin sandboxing: run plugins in a Bun `Worker` (recommended) vs. separate processes.
 3. ~~Keep Stripe billing at all in v6.x, or drop licensing to a signed license-key check?~~ **Decided: Stripe.** Billing goes through the optional `PaymentProvider` (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_*`); there is no license-key path.
 4. Does the nikcli host (`sdk-next`, ~20 MB, 60 deps) survive `bun build --compile` inside the sidecar, or must it run as a separate process? (Tracked in `08-ai.md` §6; decided by WP8/WP4.)

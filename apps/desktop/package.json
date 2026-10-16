@@ -36,7 +36,8 @@
     "solid-motionone": "^1.0.0",
     "tauri-plugin-liquid-glass-api": "^0.1.6",
     "three": "^0.180.0",
-    "three-csg-ts": "^3.2.0"
+    "three-csg-ts": "^3.2.0",
+    "@cadcamfun/identity": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",

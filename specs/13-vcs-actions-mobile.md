@@ -157,3 +157,8 @@ Phone side (`apps/mobile`):
 - 2026-10-11: aligned the Expo assistant with the nikcli mobile interaction model while retaining CADCAMFUN-specific tools: full-width assistant transcript, inspectable CAD/CAM/VCS/Actions tool cards, steer-during-run composer, project quick actions, and read-only specialist selection through the companion gateway. The gateway still refuses credentials, provider mutation, skills mutation and unrestricted host routes.
 - 2026-10-11: refined the existing Expo migration: optional native loading, pinned async transport and UTF-8/SSE cleanup, typed AI recovery/diagnostics/questions, offline pairing retention, secure-state hydration, cancellable resources, scoped chat sessions, deep-link pairing, notification/review fixes and keyboard/gesture-safe sheets. Replaced obsolete mobile Tauri CI with Expo export and native simulator build/roundtrip. Use the official SDK 57 scene-support plugin for Xcode/iOS 27 instead of naming a nonexistent scene class. Mobile unit tests (48), TypeScript, JavaScript export and real HTTPS companion tests pass; native device build verification is recorded separately.
 - v1: initial design and implementation of WP11/WP12, sidecar integration, API group, assistant tools, mobile scaffold.
+
+
+## Account identity integration (2026-10-16)
+
+Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.

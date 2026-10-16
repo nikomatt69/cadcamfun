@@ -4,15 +4,19 @@ interface Props {
   description: string
 }
 const { title, description } = Astro.props
+const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin)
+const image = new URL("/brand/og-image.png", canonical.origin)
 ---
 
+<link rel="canonical" href={canonical.href} />
+<meta property="og:url" content={canonical.href} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:type" content="website" />
-<meta property="og:image" content="/brand/og-image.png" />
+<meta property="og:image" content={image.href} />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
-<meta name="twitter:image" content="/brand/og-image.png" />
+<meta name="twitter:image" content={image.href} />
 <link rel="icon" href="/favicon.ico" />
 <link rel="apple-touch-icon" href="/brand/icon.png" />

@@ -67,16 +67,16 @@ const navigation: ReadonlyArray<NavItem> = [
     { key: "shell.purchases", href: "/marketplace/purchases", icon: Package }
   ] },
   { key: "shell.plugins", href: "/plugins", icon: Puzzle },
-  { key: "shell.website", href: "https://site.cadcamfun.xyz", icon: Globe },
+  { key: "shell.website", href: "https://cadcam.fun", icon: Globe },
   { key: "shell.pricing", href: "/pricing", icon: DollarSign },
   { key: "shell.ai", href: "/ai", icon: Cpu },
   { key: "shell.analytics", href: "/analytics", icon: BarChart, children: [
     { key: "shell.dashboard", href: "/analytics", icon: BarChart },
     { key: "shell.history", href: "/analytics/history", icon: Activity }
   ] },
-  { key: "shell.docs", href: "https://docs.cadcamfun.xyz", icon: BookOpen, children: [
-    { key: "shell.userGuide", href: "https://docs.cadcamfun.xyz", icon: FileText },
-    { key: "shell.apiPlayground", href: "https://docs.cadcamfun.xyz", icon: Cpu }
+  { key: "shell.docs", href: "https://cadcam.fun/docs", icon: BookOpen, children: [
+    { key: "shell.userGuide", href: "https://cadcam.fun/docs", icon: FileText },
+    { key: "shell.apiPlayground", href: "https://cadcam.fun/docs", icon: Cpu }
   ] },
   { key: "shell.settings", href: "/settings", icon: Settings, children: [
     { key: "shell.profile", href: "/profile", icon: User },
@@ -153,8 +153,8 @@ export function ReferenceNavbar(props: { readonly sidebarOpen: boolean; readonly
               { href: "/profile", key: "shell.myProfile" as const, icon: User },
               { href: "/settings", key: "shell.settings" as const, icon: Settings },
               { href: "/organizations", key: "shell.organizations" as const, icon: Users },
-              { href: "https://site.cadcamfun.xyz", key: "shell.website" as const, icon: Globe },
-              { href: "https://docs.cadcamfun.xyz", key: "shell.documentation" as const, icon: BookOpen }
+              { href: "https://cadcam.fun", key: "shell.website" as const, icon: Globe },
+              { href: "https://cadcam.fun/docs", key: "shell.documentation" as const, icon: BookOpen }
             ]}>{(item) => <ReferenceLink href={item.href} class="reference-profile-link" onNavigate={close}><item.icon size={16} /><span>{t(item.key)}</span></ReferenceLink>}</For>
             <Show when={signedIn()} fallback={<ReferenceLink href="/auth/signin" class="reference-profile-link" onNavigate={close}><LogIn size={16} /><span>{t("shell.signIn")}</span></ReferenceLink>}>
               <button type="button" class="reference-profile-link w-[calc(100%-1rem)] text-left" data-testid="sign-out" onClick={() => void signOut()}><LogOut size={16} /><span>{t("shell.signOut")}</span></button>

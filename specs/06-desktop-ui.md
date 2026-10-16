@@ -178,3 +178,8 @@ CAM editing additionally owns bounded session history: Undo/Redo buttons and Cmd
 Secondary resources follow nikcli ownership: queries accept cancellation through the app Effect runtime, superseded requests and unmounted views interrupt their fibers, and hidden CAD plugin panels do not fetch a registry. AI catalogue resources are loaded when their accessor is first used; connected models are preferred, and providers are sorted by configured status.
 
 - 2026-10-10: compact CAD commands also expose Edit (Duplicate / Copy / Paste), Parametric part, Sketch (Line / Circle / Rectangle) and Solids (Box / Cylinder / Sphere / Cone / Torus), reusing ElementForm and the element clipboard. Creation respects the active layer lock. Remaining Italian user-facing strings in CAD simulation, CAM generator examples/errors, and settings feedback are translated to English.
+
+
+## Account identity integration (2026-10-16)
+
+Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.

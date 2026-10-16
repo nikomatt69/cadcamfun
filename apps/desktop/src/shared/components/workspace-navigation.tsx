@@ -40,7 +40,7 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
     { name: "Organization", href: "/organizations", icon: <Users size={20} />, current: path().startsWith("/organizations") },
     { name: "Plugins", href: "/plugins", icon: <Puzzle size={20} />, current: path().startsWith("/plugins") },
     { name: "Pricing", href: "/pricing", icon: <DollarSign size={20} />, current: path().startsWith("/pricing") },
-    { name: "Website", href: "https://site.cadcamfun.xyz", icon: <Globe size={20} />, current: false },
+    { name: "Website", href: "https://cadcam.fun", icon: <Globe size={20} />, current: false },
     {
       name: "AI", href: "/ai", icon: <Cpu size={20} />, current: path().startsWith("/ai"),
       children: [{ name: "Dashboard", href: "/ai", icon: <BarChart2 size={16} />, current: path() === "/ai" }]
@@ -55,7 +55,7 @@ export default function WorkspaceNavigation(props: { readonly isOpen: boolean })
     {
       name: "Docs", href: "#", icon: <BookOpen size={20} />, current: false,
       children: [
-        { name: "UserGuide", href: "https://docs.cadcamfun.xyz", icon: <FileText size={16} />, current: false },
+        { name: "UserGuide", href: "https://cadcam.fun/docs", icon: <FileText size={16} />, current: false },
         { name: "Api Playground", href: "/graphql", icon: <BrainCircuit size={16} />, current: path() === "/graphql" }
       ]
     },

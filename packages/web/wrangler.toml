@@ -1,6 +1,13 @@
 name = "cadcamfun-web"
+account_id = "eea5a4fefd4206e2ceaba1954557befc"
 main = "./dist/_worker.js"
 compatibility_date = "2025-01-25"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+routes = [
+  { pattern = "cadcam.fun", custom_domain = true },
+]
 
 [assets]
 directory = "./dist"
@@ -20,8 +27,7 @@ DOCS_ASSISTANT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 # diagram) get a stronger model that writes valid CSS and interactive HTML.
 DOCS_ASSISTANT_ARTIFACT_MODEL = "@cf/openai/gpt-oss-20b"
 DOCS_ASSISTANT_RATE_LIMIT = "20"
-# Optional: canonical origin for guide share links.
-# ARTIFACT_PUBLIC_ORIGIN = "https://cadcamfun.example"
+ARTIFACT_PUBLIC_ORIGIN = "https://cadcam.fun"
 # Optional: back the assistant with a real nikcli session instead of a one-shot
 # Workers AI call. Set the server here and the token as a secret
 # (`bunx wrangler secret put CADCAMFUN_DOCS_TOKEN`). Unset = Workers AI.
@@ -34,16 +40,18 @@ DOCS_ASSISTANT_RATE_LIMIT = "20"
 binding = "AI"
 remote = true
 
-# Optional per-IP rate limit for the assistant. Create the namespace once with
-# `bunx wrangler kv namespace create cadcamfun-docs-assistant`, then uncomment
-# with the id it prints. Without it the assistant has no rate limit.
-# [[kv_namespaces]]
-# binding = "SESSIONS"
-# id = "<namespace id>"
+# Wrangler provisions dedicated KV/R2 resources on the first deployment.
+[[kv_namespaces]]
+binding = "SESSION"
+id = "af53cc4a51e54f929e91ce58f205848f"
 
-# Optional shareable guides (/artifact/:id). Create the bucket once with
-# `bunx wrangler r2 bucket create cadcamfun-artifact`, then uncomment.
-# Without it answers stay in the chat and no guide is published.
-# [[r2_buckets]]
-# binding = "ARTIFACTS"
-# bucket_name = "cadcamfun-artifact"
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "06c808b32cb042fb838026077c600954"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "cadcamfun-artifacts"
+
+[observability]
+enabled = true

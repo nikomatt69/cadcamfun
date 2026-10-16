@@ -4,6 +4,7 @@ import mdx from "@astrojs/mdx"
 import tailwind from "@astrojs/tailwind"
 
 export default defineConfig({
+  site: "https://cadcam.fun",
   output: "server",
   // Local dev never opens a remote Cloudflare session: Workers AI (the docs
   // assistant) needs a wrangler login, so in dev the assistant answers 503

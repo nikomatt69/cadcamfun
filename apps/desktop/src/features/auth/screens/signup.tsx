@@ -1,15 +1,4 @@
-/**
- * `/auth/signup` — port of `.reference/src/pages/auth/signup.tsx`.
- *
- * The glass card, the two social buttons, the passkey note, the divider, the name /
- * e-mail / password form, the magic-link block and the sign-in link are the legacy
- * markup class for class.
- *
- * Behaviour: `POST /api/auth/signup`. The legacy form has no confirm-password field
- * (Better Auth did not ask for one) while the v6 handler validates all four fields, so
- * `confirmPassword` mirrors the password the user typed. The social buttons have no v6
- * route and surface the legacy failure copy for their provider.
- */
+/** Local email/password account access and optional magic links. */
 import { Show, createSignal, type JSX } from "solid-js"
 import { A, useNavigate } from "@solidjs/router"
 import { t } from "../../../i18n/index.ts"
@@ -17,7 +6,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { startSession } from "../../../shared/state/session.ts"
 import { describe } from "./auth.tsx"
 
-type LoadingType = "email" | "github" | "google" | "magic-link"
+type LoadingType = "email" | "google" | "magic-link"
 
 export function SignUpScreen(): JSX.Element {
   const app = useApp()
@@ -58,11 +47,6 @@ export function SignUpScreen(): JSX.Element {
       startSession(app.cache, session.body.token)
       navigate("/")
     })
-  }
-
-  const handleGitHubSignUp = (): void => {
-    // Better Auth `signIn.social({ provider: "github" })` has no v6 route.
-    setError(t("signup.githubFailed"))
   }
 
   const handleGoogleSignUp = (): void => {
@@ -106,14 +90,7 @@ export function SignUpScreen(): JSX.Element {
 
           {/* Social Sign Up Buttons */}
           <div class="space-y-3 mb-6">
-            <button
-              type="button"
-              onClick={handleGitHubSignUp}
-              disabled={busy("github")}
-              class="w-full bg-gray-800 text-white py-3 px-4 rounded-xl hover:bg-gray-900 disabled:opacity-50 flex items-center justify-center font-medium transition-colors duration-150"
-            >
-              {busy("github") ? t("signup.connecting") : t("signup.github")}
-            </button>
+
 
             <button
               type="button"

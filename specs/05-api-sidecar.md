@@ -137,3 +137,8 @@ The existing drawing repository owns stock persistence. `configureStock` updates
 Catalogue transport follow-up: `GET /api/ai/models` accepts optional `configuredOnly` query (`true`/`false`), preserving the existing full-list default. HTTP handlers filter the service result; provider/session ownership remains inside the AI service. Optional telemetry SDKs load only when an exporter is configured.
 
 Runtime startup performs no AI SDK prewarm or model metadata download. The first catalogue access owns its seed request, and scope shutdown aborts and joins it. Native IPC logs use one JSON line per Effect event; Rust preserves its level rather than treating all stderr output as a warning.
+
+
+## Account identity integration (2026-10-16)
+
+Owner-requested cross-WP scope and verification are defined in `30-identity.md`. Add dedicated CADCAMFUN OAuth account sign-in to desktop and mobile while retaining scoped companion pairing and local profile access.

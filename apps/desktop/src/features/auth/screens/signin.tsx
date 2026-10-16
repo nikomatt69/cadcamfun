@@ -1,14 +1,4 @@
-/**
- * `/auth/signin` — port of `.reference/src/pages/auth/signin.tsx`.
- *
- * The glass card, the two social buttons, the passkey button, the e-mail/password form,
- * the magic-link block and the sign-up link are the legacy markup class for class.
- *
- * Behaviour: `POST /api/auth/signin-direct` for the form and `POST /api/auth/send-magic-link`
- * for the magic link. The legacy page also drove Better Auth's `signIn.social` (GitHub,
- * Google) and `signInWithPasskey`, for which the v6 contract has no route — those three
- * buttons still render, and they surface the legacy failure copy for their provider.
- */
+/** Local email/password account access and optional magic links. */
 import { Show, createSignal, type JSX } from "solid-js"
 import { A, useNavigate } from "@solidjs/router"
 import { t } from "../../../i18n/index.ts"
@@ -16,7 +6,7 @@ import { useApp } from "../../../shared/state/context.ts"
 import { startSession } from "../../../shared/state/session.ts"
 import { describe } from "./auth.tsx"
 
-type LoadingType = "email" | "github" | "google" | "passkey" | "magic-link"
+type LoadingType = "email" | "google" | "passkey" | "magic-link"
 
 export function SignInScreen(): JSX.Element {
   const app = useApp()
@@ -54,11 +44,6 @@ export function SignInScreen(): JSX.Element {
       startSession(app.cache, result.body.token)
       navigate("/")
     })
-  }
-
-  const handleGitHubSignIn = (): void => {
-    // Better Auth `signIn.social({ provider: "github" })` has no v6 route.
-    setError(t("signin.githubFailed"))
   }
 
   const handleGoogleSignIn = (): void => {
@@ -107,14 +92,7 @@ export function SignInScreen(): JSX.Element {
 
           {/* Social Sign In Buttons */}
           <div class="space-y-3 mb-6">
-            <button
-              type="button"
-              onClick={handleGitHubSignIn}
-              disabled={busy("github")}
-              class="w-full bg-gray-800 text-white py-3 px-4 rounded-xl hover:bg-gray-900 disabled:opacity-50 flex items-center justify-center font-medium transition-colors duration-150"
-            >
-              {busy("github") ? t("signin.busy") : t("signin.github")}
-            </button>
+
 
             <button
               type="button"

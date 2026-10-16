@@ -1,0 +1,30 @@
+{
+  "name": "@cadcamfun/identity",
+  "version": "6.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "bun script/deploy.ts",
+    "migrate:local": "wrangler d1 migrations apply DB --local",
+    "migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "test": "bun test test",
+    "deploy:staging": "bun script/deploy.ts --staging"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "13.3.2",
+    "hono": "4.12.34",
+    "jose": "5.9.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "wrangler": "4.103.0"
+  }
+}

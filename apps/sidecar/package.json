@@ -35,7 +35,9 @@
     "effect": "4.0.0-rc.112",
     "jszip": "^3.10.1",
     "selfsigned": "^5.5.0",
-    "zod": "^4.1.8"
+    "zod": "^4.1.8",
+    "@cadcamfun/identity": "workspace:*",
+    "jose": "5.9.6"
   },
   "devDependencies": {
     "ai": "7.0.127",

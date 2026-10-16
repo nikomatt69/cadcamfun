@@ -107,7 +107,7 @@ curl "$DOCS_ORIGIN/llm?path=/docs/api/projects&format=prompt"`}</DocCode>
   </section>
   <section id="deployment" class="doc-section">
     <h2>Deployment</h2>
-    <p><code>wrangler.toml</code> declares the Worker entry, static asset directory, AI binding, model settings, and commented examples for optional KV and R2 bindings. Configure actual resource IDs and secrets through the target Cloudflare environment. A binding name in a TypeScript interface is not proof the resource exists in the account.</p>
+    <p><code>wrangler.toml</code> declares the Worker entry, static asset directory, custom domains under cadcam.fun, Workers AI, session and assistant-rate-limit KV namespaces, and the R2 artifact bucket. Wrangler provisions dedicated resources and binds them to the deployment. Configure secrets through the target Cloudflare environment. A binding name in a TypeScript interface is not proof the resource exists in the account.</p>
     <p>The deploy script builds Astro, writes <code>dist/.assetsignore</code> so the Worker entry is excluded from static assets, and invokes Wrangler deployment. Deployment is a publishing operation; normal documentation verification should use build and local checks without running it.</p>
     <p>Before publishing, validate static routes and API snapshot freshness, confirm intended bindings, verify assistant failure behavior without its backend, and check artifact capability access if storage is enabled. After publishing, inspect the resulting deployment and configured backend rather than treat a local build as evidence of a live service.</p>
   </section>

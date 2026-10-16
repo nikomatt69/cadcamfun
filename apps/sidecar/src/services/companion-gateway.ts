@@ -108,6 +108,7 @@ interface Rule {
 /** Everything a phone may call. Anything else (credentials, plugins, files, billing, /api/companion itself…) is refused. */
 export const COMPANION_ROUTES: readonly Rule[] = [
   { methods: ["GET"], path: /^\/api\/health$/ },
+  { methods: ["GET"], path: /^\/api\/auth\/get-session$/ },
   // Project list + single-project read so the phone can show a richer header (description, owner, org).
   { methods: ["GET"], path: /^\/api\/projects$/ },
   { methods: ["GET"], path: /^\/api\/projects\/[^/]+$/ },

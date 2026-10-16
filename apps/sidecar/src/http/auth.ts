@@ -7,6 +7,7 @@ import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { SESSION_HEADER } from "./authorization.ts"
 import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
+import { IdentityOAuth } from "../services/identity-oauth.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -23,6 +24,7 @@ const fullUser = (u: { id: string; email: string | null; name: string | null; em
 const COOKIE = "auth-token=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 
 export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function*(handlers) {
+  const oauth = yield* IdentityOAuth
   const repo = yield* AuthRepo
   const tokens = yield* AuthTokens
   const config = yield* AppConfigService
@@ -48,6 +50,9 @@ export const AuthHandlers = HttpApiBuilder.group(Api, "auth", Effect.fn(function
   })
 
   return handlers
+    .handle("identityStart", () => oauth.start())
+    .handle("identityPoll", ({ payload }) => oauth.poll(payload.id))
+    .handle("identityCancel", ({ payload }) => oauth.cancel(payload.id))
     .handle("forgotPassword", ({ payload }) =>
       linkFlow(payload, {
         type: "password-reset", ttl: 30 * 60, callback: "/auth/reset-password",

@@ -1,5 +1,5 @@
 import { Database, DatabaseError, schema } from "@cadcamfun/db"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 
 export interface AuthUserRow {
@@ -10,6 +10,7 @@ export interface AuthUserRow {
 }
 
 export class AuthRepo extends Context.Service<AuthRepo, {
+  identityUser(issuer: string, subject: string, email: string): Effect.Effect<AuthUserRow, DatabaseError>
   findByEmail(email: string): Effect.Effect<AuthUserRow | undefined, DatabaseError>
   findById(id: string): Effect.Effect<AuthUserRow | undefined, DatabaseError>
   /** Sign-in lookup: the stored password hash comes along. */
@@ -26,6 +27,22 @@ export class AuthRepo extends Context.Service<AuthRepo, {
     const T = schema.userTable
     const cols = { id: T.id, email: T.email, name: T.name, emailVerified: T.emailVerified }
     return AuthRepo.of({
+      identityUser: Effect.fn("AuthRepo.identityUser")(function*(issuer, subject, email) {
+        return yield* query("auth.identityUser", (db) => db.transaction((tx) => {
+          const A = schema.accountTable
+          const link = tx.select({ userId: A.userId }).from(A).where(and(eq(A.providerId, issuer), eq(A.accountId, subject))).get()
+          if (link) {
+            const user = tx.select(cols).from(T).where(eq(T.id, link.userId)).get()
+            if (!user) throw new Error("Identity account has no local user")
+            return user
+          }
+          // Email alone never proves ownership of an existing installation account.
+          const emailTaken = tx.select({ id: T.id }).from(T).where(eq(T.email, email)).get()
+          const user = tx.insert(T).values({ email: emailTaken ? null : email, name: email, emailVerified: new Date() }).returning(cols).get()
+          tx.insert(A).values({ userId: user.id, providerId: issuer, accountId: subject }).run()
+          return user
+        }))
+      }),
       findByEmail: Effect.fn("AuthRepo.findByEmail")(function*(email) {
         return (yield* query("auth.findByEmail", (db) => db.select(cols).from(T).where(eq(T.email, email)).limit(1)))[0]
       }),

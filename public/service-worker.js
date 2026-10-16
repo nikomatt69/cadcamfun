@@ -154,7 +154,7 @@ self.addEventListener("push", event => {
     event.waitUntil(
       self.registration.showNotification(data.title, {
         body: data.content,
-        icon: "https://cadcamfun.xyz/favicon.ico",
+        icon: "https://cadcam.fun/favicon.ico",
 
         data: {
           url: data.linkUrl || "/"

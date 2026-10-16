@@ -21,7 +21,7 @@ Tauri v2, Rust 1.96 (installed). Use the Bun-installed CLI: `bunx tauri …` fro
 
 ## 2. Security configuration
 
-- `tauri.conf.json` CSP: `default-src 'self'; connect-src 'self' http://127.0.0.1:* ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:`. **No** `unsafe-eval`, no remote hosts in v6.0 (the old CSP allowed `cadcamfun.xyz` and `unsafe-eval`; do not carry that over).
+- `tauri.conf.json` CSP: `default-src 'self'; connect-src 'self' http://127.0.0.1:* ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:`. **No** `unsafe-eval`, no remote hosts in v6.0 (the old CSP allowed `cadcam.fun` and `unsafe-eval`; do not carry that over).
 - Capabilities (Tauri v2 permissions) granted to the main window only: `core:default`, `shell:allow-spawn` scoped to the sidecar, `dialog:default`, `fs:allow-read/write` scoped to `$APPDATA/**`, `$DOCUMENT/**`, `$DOWNLOAD/**`, plus the custom commands above. No wildcard `fs` scope on `$HOME/**` (the old config used it).
 - The token never touches disk or logs; log redaction for any line containing `Bearer`.
 

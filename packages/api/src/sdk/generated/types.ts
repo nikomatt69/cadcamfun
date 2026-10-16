@@ -4,13 +4,13 @@ export type Unauthorized = { readonly _tag: "Unauthorized"; readonly message: st
 export const isUnauthorized = (value: unknown): value is Unauthorized =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "Unauthorized"
 
-export type AuthBadRequest = { readonly _tag: "AuthBadRequest"; readonly error: string; readonly details: string }
-export const isAuthBadRequest = (value: unknown): value is AuthBadRequest =>
-  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AuthBadRequest"
-
 export type AuthInternal = { readonly _tag: "AuthInternal"; readonly error: string; readonly details: string }
 export const isAuthInternal = (value: unknown): value is AuthInternal =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AuthInternal"
+
+export type AuthBadRequest = { readonly _tag: "AuthBadRequest"; readonly error: string; readonly details: string }
+export const isAuthBadRequest = (value: unknown): value is AuthBadRequest =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "AuthBadRequest"
 
 export type AuthNotFound = { readonly _tag: "AuthNotFound"; readonly error: string; readonly details: string }
 export const isAuthNotFound = (value: unknown): value is AuthNotFound =>
@@ -293,6 +293,10 @@ export type EnvInternal = {
 }
 export const isEnvInternal = (value: unknown): value is EnvInternal =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "EnvInternal"
+
+export type AuthIdentityPollPayload = { readonly id: string }
+
+export type AuthIdentityCancelPayload = { readonly id: string }
 
 export type AuthForgotPasswordPayload = {
   readonly email?: string | undefined
@@ -1610,6 +1614,19 @@ export type HealthCheckOutput = { status: string; timestamp: string }
 export type SystemReadyOutput = { status: string; timestamp: string }
 
 export type SystemVersionOutput = { version: string }
+
+export type AuthIdentityStartOutput = { id: string; url: string; issuer: string }
+
+export type AuthIdentityPollInput = { readonly id: AuthIdentityPollPayload["id"] }
+
+export type AuthIdentityPollOutput =
+  | { status: "pending" }
+  | { status: "complete"; tokens: { access: string; refresh: string; expiresAt: number } }
+  | { status: "failed"; message: string }
+
+export type AuthIdentityCancelInput = { readonly id: AuthIdentityCancelPayload["id"] }
+
+export type AuthIdentityCancelOutput = { success: true; message: string }
 
 export type AuthForgotPasswordInput = {
   readonly email?: AuthForgotPasswordPayload["email"]

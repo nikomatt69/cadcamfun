@@ -37,7 +37,7 @@ const docs = {
       { heading: "2. AI Features", body: "AI features route prompts through the provider you configure (NikCLI by default). Messages you send, attached files and the live drawing context may be transmitted to that provider solely to power the response." },
       { heading: "3. Telemetry", body: "Anonymous crash and usage telemetry may be collected to improve the application. Telemetry can be disabled from the Settings screen." },
       { heading: "4. Your Rights", body: "You can export, delete, or transfer your local data at any time through the project and library screens." },
-      { heading: "5. Contact", body: "For privacy inquiries, reach out to privacy@cadcamfun.xyz." }
+      { heading: "5. Contact", body: "For privacy inquiries, reach out to privacy@cadcam.fun." }
     ]
   },
   thirdParty: {

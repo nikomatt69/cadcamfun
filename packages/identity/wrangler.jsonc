@@ -1,0 +1,80 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cadcamfun-identity",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-24",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "auth.cadcam.fun",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "ISSUER": "https://auth.cadcam.fun",
+    "AUDIENCE": "cadcamfun-api",
+    "EMAIL_SENDER": "auth@cadcam.fun"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cadcamfun-identity",
+      "database_id": "51f8024f-b1c6-42c7-8d34-0e531c8ad10a",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "STATE",
+      "id": "03ee9d3eb92e478c8f62c8feac0d6f40"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "env": {
+    "staging": {
+      "name": "cadcamfun-identity-staging",
+      "routes": [
+        {
+          "pattern": "dev.auth.cadcam.fun",
+          "custom_domain": true
+        }
+      ],
+      "vars": {
+        "ISSUER": "https://dev.auth.cadcam.fun",
+        "AUDIENCE": "cadcamfun-api",
+        "EMAIL_SENDER": "auth@cadcam.fun"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cadcamfun-identity-staging",
+          "migrations_dir": "migrations",
+          "database_id": "026a7dda-6f7b-49c8-8df3-47732bf5bcf1"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "STATE",
+          "id": "fd89731b1f8542b3b13308510cda74be"
+        }
+      ],
+      "send_email": [
+        {
+          "name": "EMAIL"
+        }
+      ]
+    }
+  },
+  "account_id": "eea5a4fefd4206e2ceaba1954557befc"
+}

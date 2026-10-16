@@ -15,4 +15,4 @@ Disallow: /profile/settings
 Disallow: /profile/billing
 
 # Sitemap location
-Sitemap: https://cadcamfun.xyz/sitemap.xml
+Sitemap: https://cadcam.fun/sitemap.xml

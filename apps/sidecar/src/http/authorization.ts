@@ -6,6 +6,7 @@ import { AppConfigService } from "../config.ts"
 import { AuthRepo } from "../repos/auth-repo.ts"
 import { AuthTokens } from "../services/auth-tokens.ts"
 import { BridgeTokens } from "../services/bridge-tokens.ts"
+import { Identity } from "../services/identity.ts"
 import { LocalProfile } from "../services/local-profile.ts"
 
 /** Header carrying the session JWT issued by sign-in / magic-link verification. */
@@ -28,16 +29,20 @@ export const AuthorizationLive = Layer.effect(
   Effect.gen(function*() {
     const config = yield* AppConfigService
     const tokens = yield* AuthTokens
+    const identity = yield* Identity
     const bridge = yield* BridgeTokens
     const repo = yield* AuthRepo
     const { user: local } = yield* LocalProfile
 
     const sessionUser = Effect.fn("Authorization.sessionUser")(function*() {
       const request = yield* HttpServerRequest.HttpServerRequest
+      const accountToken = request.headers["x-identity-token"]
+      if (accountToken) return yield* identity.user(accountToken)
       const token = request.headers[SESSION_HEADER]
       if (!token) return local
       const claims = yield* tokens.verify(token).pipe(Effect.option)
-      if (claims._tag === "None" || claims.value.type !== "session") return local
+      if (claims._tag === "None") return local
+      if (claims.value.type !== "session") return local
       const row = yield* repo.findById(claims.value.userId).pipe(Effect.orElseSucceed(() => undefined))
       return row ? new SessionUser({ id: row.id, email: row.email, name: row.name }) : local
     })

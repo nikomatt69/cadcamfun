@@ -38,7 +38,9 @@ export const providerOAuth = (host: () => Effect.Effect<ProjectHost, AiConfigErr
             if (method < 0) throw new Error("OAuth is unavailable")
             return { method, raw: await target.client.provider.oauthAuthorize({ providerID: provider, method }) }
           },
-          catch: () => error("Could not start provider sign-in. Please try again.")
+          // The host failure is the only clue a person has: keep the sanitized sentence but name the cause
+          // (a busy callback port during a restart, a plugin that refused, a browser-less authorization).
+          catch: (cause) => error(`Could not start provider sign-in. ${cause instanceof Error ? cause.message : String(cause)}`)
         })
         const value = yield* Schema.decodeUnknownEffect(Authorization)(result.raw).pipe(Effect.mapError(() => error("The provider returned an invalid sign-in response.")))
         const secure = yield* Effect.try({ try: () => new URL(value.url).protocol === "https:", catch: () => error("The provider returned an invalid sign-in URL.") })

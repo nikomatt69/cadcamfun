@@ -2,6 +2,11 @@ import type {
   HealthCheckOutput,
   SystemReadyOutput,
   SystemVersionOutput,
+  AuthIdentityStartOutput,
+  AuthIdentityPollInput,
+  AuthIdentityPollOutput,
+  AuthIdentityCancelInput,
+  AuthIdentityCancelOutput,
   AuthForgotPasswordInput,
   AuthForgotPasswordOutput,
   AuthResetPasswordInput,
@@ -685,6 +690,41 @@ export function make(options: ClientOptions) {
         ),
     },
     auth: {
+      identityStart: (requestOptions?: RequestOptions) =>
+        request<AuthIdentityStartOutput>(
+          {
+            method: "POST",
+            path: `/api/auth/identity/start`,
+            successStatus: 200,
+            declaredStatuses: [500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      identityPoll: (input: AuthIdentityPollInput, requestOptions?: RequestOptions) =>
+        request<AuthIdentityPollOutput>(
+          {
+            method: "POST",
+            path: `/api/auth/identity/poll`,
+            body: { id: input["id"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      identityCancel: (input: AuthIdentityCancelInput, requestOptions?: RequestOptions) =>
+        request<AuthIdentityCancelOutput>(
+          {
+            method: "POST",
+            path: `/api/auth/identity/cancel`,
+            body: { id: input["id"] },
+            successStatus: 200,
+            declaredStatuses: [401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       forgotPassword: (input?: AuthForgotPasswordInput, requestOptions?: RequestOptions) =>
         request<AuthForgotPasswordOutput>(
           {

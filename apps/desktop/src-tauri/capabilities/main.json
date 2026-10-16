@@ -11,6 +11,7 @@
     "log:default",
     "window-state:default",
     "os:default",
+    "shell:allow-open",
     {
       "identifier": "fs:allow-read-file",
       "allow": [
