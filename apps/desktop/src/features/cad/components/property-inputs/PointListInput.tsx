@@ -2,6 +2,7 @@ import { For, Show, createSignal, type JSX } from "solid-js"
 import { Motion, Presence } from "solid-motionone"
 import { Edit2, Minus, Move, Plus, X } from "lucide-solid"
 import type { Vector3 } from "./Vector3Input.tsx"
+import { NumberField } from "./NumberField.tsx"
 
 interface PointListInputProps {
   readonly label: string
@@ -49,8 +50,8 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
     else if (selected !== null && selected > index) setCurrent(selected - 1)
   }
 
-  const update = (index: number, axis: "x" | "y" | "z", text: string) =>
-    setPoints(points().map((point, i) => (i === index ? { ...point, [axis]: text === "" ? 0 : parseFloat(text) } : point)))
+  const update = (index: number, axis: "x" | "y" | "z", value: number) =>
+    setPoints(points().map((point, i) => (i === index ? { ...point, [axis]: value } : point)))
 
   return (
     <div class="mb-2">
@@ -106,7 +107,7 @@ export function PointListInput(props: PointListInputProps): JSX.Element {
                         <For each={["x", "y", "z"] as const}>{(axis) =>
                           <div>
                             <label class="block text-xs text-gray-500 dark:text-blue-400 mb-1">{axis.toUpperCase()}</label>
-                            <input type="number" value={points()[index]?.[axis] ?? 0} onInput={(event) => update(index, axis, event.currentTarget.value)} class={COORD} step={0.1} />
+                            <NumberField label={`Point ${index + 1} ${axis.toUpperCase()}`} value={points()[index]?.[axis] ?? 0} onChange={(value) => update(index, axis, value)} class={COORD} step={0.1} />
                           </div>}
                         </For>
                       </div>

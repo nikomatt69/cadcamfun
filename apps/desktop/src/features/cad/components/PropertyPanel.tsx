@@ -1,9 +1,9 @@
-import { For, Match, Show, Switch, createEffect, createMemo, createSignal, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, untrack, type JSX } from "solid-js"
 import { Motion } from "solid-motionone"
 import { Copy, Lock, Trash2 } from "lucide-solid"
 import { useElementsStore } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
-import { getFieldsForElementType, type PropertyField } from "../lib/propertyFields.ts"
+import { getFieldsForElementType, numberRulesFor, type PropertyField } from "../lib/propertyFields.ts"
 import ParametricPanel from "./ParametricPanel.tsx"
 import ExactModelPanel from "./ExactModelPanel.tsx"
 
@@ -12,7 +12,7 @@ const EXACT_TYPES: ReadonlySet<string> = new Set(["brep", "parametric", "cube", 
 import SaveElementToLibrary from "./SaveElementToLibrary.tsx"
 import SurfacingPanel from "./SurfacingPanel.tsx"
 import { canMakeParametric, makeParametric } from "../lib/makeParametric.ts"
-import { ColorListInput, ElementListInput, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
+import { ColorListInput, ElementListInput, NumberField, Point3dInput, PointListInput, Vector3Input } from "./property-inputs/index.ts"
 
 const SOLID_TYPES_FOR_SURFACING = new Set(["box", "cube", "cylinder", "sphere", "cone", "torus", "extrude", "revolve"])
 
@@ -23,24 +23,58 @@ const READONLY = "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm f
 const LABEL = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
 const ORIGIN = { x: 0, y: 0, z: 0 }
 const rise = { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 } }
+const same = (a: unknown, b: unknown) => a === b || (typeof a === "object" && typeof b === "object" && JSON.stringify(a) === JSON.stringify(b))
 
 /** Edits the selected element: per-type fields, complex inputs, layer lock awareness, duplicate / delete / save to library. */
 export default function PropertyPanel(): JSX.Element {
   const elements = useElementsStore()
   const layers = useLayerStore()
   const [properties, setProperties] = createSignal<Props>({})
-  const [editing, setEditing] = createSignal(false)
+  // What the fields were filled from: Apply writes only what differs from it, so an outside change to another field survives.
+  let base: Props = {}
+  const show = (snapshot: Props) => { base = snapshot; setProperties(snapshot) }
+  // The fields are always editable: typing makes the panel dirty, Apply (or Enter) writes the change, Cancel (or Esc) drops it.
+  const [dirty, setDirty] = createSignal(false)
+  // Fields whose text is not a valid value right now ("12,", "abc", below the minimum): Apply refuses while any is left.
+  const [errors, setErrors] = createSignal<Record<string, string>>({})
+  const [tried, setTried] = createSignal(false)
+  // Bumped to remount the fields, so a reset also clears what was half-typed in them.
+  const [revision, setRevision] = createSignal(1)
 
+  const reset = (snapshot: Props) => {
+    show(snapshot)
+    setDirty(false)
+    setErrors({})
+    setTried(false)
+    setRevision((n) => n + 1)
+  }
+
+  // A new selection starts clean; an update of the same element (the viewport, the assistant) refreshes the fields
+  // unless the person is in the middle of changing them.
+  let shown: string | undefined
   createEffect(() => {
     const selected = elements.selectedElement
-    if (selected) { setProperties({ ...selected }); setEditing(false) }
-    else setProperties({})
+    const snapshot: Props = selected ? { ...selected } : {}
+    untrack(() => {
+      if (selected?.id !== shown) { shown = selected?.id; reset(snapshot) }
+      else if (!changed()) show(snapshot)
+    })
   })
 
   const layer = createMemo(() => (elements.selectedElement ? layers.layers.find((candidate) => candidate.id === elements.selectedElement!.layerId) : undefined))
   const locked = () => layer()?.locked ?? false
-  const disabled = () => !editing() || locked()
-  const set = (name: string, value: unknown) => setProperties((previous) => ({ ...previous, [name]: value }))
+  const disabled = () => locked()
+  // Text that is not a value yet ("12,", "abc") is a change too: Esc and Cancel must be able to drop it.
+  const changed = () => dirty() || Object.keys(errors()).length > 0
+  const set = (name: string, value: unknown) => { setProperties((previous) => ({ ...previous, [name]: value })); setDirty(true) }
+  const flag = (key: string, error: string | null) => setErrors((previous) => {
+    if ((previous[key] ?? null) === error) return previous
+    const next = { ...previous }
+    if (error === null) delete next[key]
+    else next[key] = error
+    return next
+  })
+  const cancel = () => { const selected = elements.selectedElement; reset(selected ? { ...selected } : {}) }
 
   // Make the element parametric: its measures become named parameters. The original stays unless the person chooses to replace it.
   const [conversion, setConversion] = createSignal("")
@@ -60,26 +94,45 @@ export default function PropertyPanel(): JSX.Element {
 
   const change = (event: Event & { currentTarget: HTMLInputElement | HTMLSelectElement }) => {
     const target = event.currentTarget as HTMLInputElement
-    if (target.type === "number") set(target.name, target.value === "" ? "" : parseFloat(target.value))
-    else if (target.type === "checkbox") set(target.name, target.checked)
+    if (target.type === "checkbox") set(target.name, target.checked)
     else set(target.name, target.value)
   }
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
     const selected = elements.selectedElement
-    if (selected) { elements.updateElement(selected.id, properties()); setEditing(false) }
+    if (!selected || locked()) return
+    const invalid = Object.keys(errors())
+    if (invalid.length > 0) {
+      setTried(true)
+      const form = event.currentTarget as HTMLFormElement
+      form.querySelector<HTMLInputElement>("[aria-invalid='true']")?.focus()
+      return
+    }
+    // Only what changed: a field the person did not touch keeps whatever the element has now.
+    const changes: Props = {}
+    for (const [key, value] of Object.entries(properties())) if (!same(value, base[key])) changes[key] = value
+    if (Object.keys(changes).length > 0) elements.updateElement(selected.id, changes)
+    setDirty(false)
+    setTried(false)
+    const updated = elements.selectedElement
+    if (updated) show({ ...updated })
   }
 
-  const fields = createMemo(() => getFieldsForElementType(properties().type).filter((field) => !field.showIf || field.showIf(properties())))
+  // Keyed on the type only: a list rebuilt on every keystroke would remount the inputs and take the focus away mid-typing.
+  const elementType = createMemo(() => String(properties().type ?? ""))
+  const fields = createMemo(() => getFieldsForElementType(elementType()))
 
   const control = (field: PropertyField): JSX.Element => (
     <Switch fallback={
-      <input type={field.type} id={field.name} name={field.name} value={properties()[field.name] !== undefined ? properties()[field.name] : ""} onInput={change} min={field.min} max={field.max} step={field.step} disabled={disabled()} class={INPUT} />
+      <input type={field.type} id={field.name} name={field.name} value={properties()[field.name] !== undefined ? properties()[field.name] : ""} onInput={change} disabled={disabled()} class={INPUT} />
     }>
-      <Match when={field.type === "point3d"}><Point3dInput value={properties()[field.name] || ORIGIN} onChange={(value) => set(field.name, value)} disabled={disabled()} step={field.step || 0.1} label={field.label} /></Match>
+      <Match when={field.type === "number"}>
+        <NumberField id={field.name} name={field.name} label={field.label} value={properties()[field.name]} onChange={(value) => set(field.name, value)} onError={(error) => flag(field.name, error)} {...numberRulesFor(field)} step={field.step} disabled={disabled()} showError={tried()} class={INPUT} />
+      </Match>
+      <Match when={field.type === "point3d"}><Point3dInput name={field.name} value={properties()[field.name] || ORIGIN} onChange={(value) => set(field.name, value)} onError={(axis, error) => flag(`${field.name}.${axis}`, error)} disabled={disabled()} step={field.step || 0.1} label={field.label} /></Match>
       <Match when={field.type === "pointList"}><PointListInput value={properties()[field.name] || []} onChange={(value) => set(field.name, value)} disabled={disabled()} minPoints={field.minPoints} maxPoints={field.maxPoints} exactPoints={field.exactPoints} label={field.label} /></Match>
-      <Match when={field.type === "vector3"}><Vector3Input label={field.label} value={properties()[field.name] || ORIGIN} onChange={(value) => set(field.name, value)} disabled={disabled()} step={field.step || 1} unit={field.unit || "°"} /></Match>
+      <Match when={field.type === "vector3"}><Vector3Input name={field.name} label={field.label} value={properties()[field.name] || ORIGIN} onChange={(value) => set(field.name, value)} onError={(axis, error) => flag(`${field.name}.${axis}`, error)} disabled={disabled()} step={field.step || 1} unit={field.unit || "°"} /></Match>
       <Match when={field.type === "list"}><ElementListInput value={properties()[field.name] || []} onChange={(value) => set(field.name, value)} disabled={disabled()} listType={(field.listType as "element") || "element"} label={field.label} /></Match>
       <Match when={field.type === "colorList"}><ColorListInput value={properties()[field.name] || []} onChange={(value) => set(field.name, value)} disabled={disabled()} label={field.label} /></Match>
       <Match when={field.type === "checkbox"}>
@@ -130,7 +183,7 @@ export default function PropertyPanel(): JSX.Element {
           <div class="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm flex items-center"><Lock size={16} class="mr-2" /><span>This element is on a locked layer and cannot be edited</span></div>
         </Show>
 
-        <form onSubmit={submit}>
+        <form onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape" && changed()) { event.preventDefault(); cancel() } }}>
           <div class="space-y-4">
             <Motion.div {...rise}><label for="name" class={LABEL}>Name</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></Motion.div>
             <Motion.div {...rise}><label for="id" class={LABEL}>ID</label><input type="text" id="id" name="id" class={READONLY} value={properties().id || ""} disabled /></Motion.div>
@@ -146,20 +199,24 @@ export default function PropertyPanel(): JSX.Element {
               </div>
             </Motion.div>
 
-            <For each={fields()}>{(field) =>
-              <Motion.div {...rise}>
-                <label for={field.name} class={LABEL}>{field.label}</label>
-                {control(field)}
-              </Motion.div>}
-            </For>
+            <Show when={revision()} keyed>{(_revision: number) =>
+              <For each={fields()}>{(field) =>
+                <Show when={!field.showIf || field.showIf(properties())}>
+                  <Motion.div {...rise}>
+                    <Show when={field.type !== "vector3" && field.type !== "point3d"}><label for={field.name} class={LABEL}>{field.label}</label></Show>
+                    {control(field)}
+                  </Motion.div>
+                </Show>}
+              </For>}
+            </Show>
 
-            <Motion.div class="mt-6 flex justify-end space-x-3" {...rise}>
-              <Show when={editing()} fallback={
-                <Motion.button type="button" onClick={() => setEditing(true)} class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Edit Properties</Motion.button>
-              }>
-                <Motion.button type="button" onClick={() => { setProperties({ ...selected() }); setEditing(false) }} class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-[#F8FBFF] dark:bg-gray-700 dark:text-white dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" hover={{ scale: 1.05 }} press={{ scale: 0.95 }}>Cancel</Motion.button>
-                <Motion.button type="submit" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Apply</Motion.button>
-              </Show>
+            <Show when={tried() && Object.keys(errors()).length > 0}>
+              <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">Fix the highlighted values before applying.</p>
+            </Show>
+            <Motion.div class="mt-6 flex items-center justify-end gap-3" {...rise}>
+              <span class="mr-auto text-xs text-gray-500 dark:text-gray-400">{changed() ? "Enter applies · Esc cancels" : "Type a value: 12,5 · 12.5 · 40/2+3"}</span>
+              <Motion.button type="button" onClick={cancel} disabled={!changed()} class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-[#F8FBFF] dark:bg-gray-700 dark:text-white dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }}>Cancel</Motion.button>
+              <Motion.button type="submit" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked() || !changed()}>Apply</Motion.button>
             </Motion.div>
           </div>
         </form>

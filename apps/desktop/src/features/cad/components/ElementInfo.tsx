@@ -4,6 +4,7 @@ import { useCADStore } from "../store/cadStore.ts"
 import { useElementsStore, type Element as CADElement } from "../store/elementsStore.ts"
 import { useLayerStore } from "../store/layerStore.ts"
 import { useSelectionStore } from "../store/selectorStore.ts"
+import { NumberField } from "./property-inputs/NumberField.tsx"
 
 interface ElementInfoProps { readonly elementId: string; onClose?: () => void }
 type Values = Record<string, any>
@@ -11,6 +12,8 @@ type Values = Record<string, any>
 const ROW = "flex items-center justify-between py-1 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
 const FIELD = "px-2 py-1 border rounded bg-white dark:bg-gray-700 dark:border-gray-600 text-right"
 const formatNumber = (n: number | undefined) => (n === undefined ? "N/A" : Number(n.toFixed(2)).toString())
+// Sizes must stay positive; a line is at least one pixel wide.
+const MINIMUM: Readonly<Record<string, number>> = { width: 0.001, height: 0.001, depth: 0.001, radius: 0.001, linewidth: 1 }
 const SECTION_BUTTON = "w-full flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-t"
 
 /** Read/edit panel for one element: general, position, dimensions, appearance, metadata and component children. */
@@ -21,6 +24,16 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
   const [editMode, setEditMode] = createSignal(false)
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({ general: true, position: true, dimensions: true, appearance: true, metadata: false })
   const [edited, setEdited] = createSignal<Values>({})
+  // Fields whose typed text is not a valid value yet: Save refuses while any is left.
+  const [errors, setErrors] = createSignal<Record<string, string>>({})
+  const [tried, setTried] = createSignal(false)
+  const flag = (field: string, error: string | null) => setErrors((previous) => {
+    if ((previous[field] ?? null) === error) return previous
+    const next = { ...previous }
+    if (error === null) delete next[field]
+    else next[field] = error
+    return next
+  })
 
   const element = () => elements.elements.find((el) => el.id === props.elementId)
   const layer = () => layers.layers.find((l) => l.id === element()?.layerId)
@@ -39,9 +52,10 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
       case "line": Object.assign(values, { x1: el.x1 || 0, y1: el.y1 || 0, z1: el.z1 || 0, x2: el.x2 || 0, y2: el.y2 || 0, z2: el.z2 || 0, linewidth: el.linewidth || 1 }); break
       case "cube": values.width = el.width || 0; values.height = el.height || 0; values.depth = el.depth || 0; break
     }
-    setEdited(values); setEditMode(true)
+    setEdited(values); setErrors({}); setTried(false); setEditMode(true)
   }
   const saveChanges = () => {
+    if (Object.keys(errors()).length > 0) { setTried(true); return }
     const processed: Values = {}
     for (const [key, value] of Object.entries(edited())) {
       processed[key] = typeof value === "string" && !Number.isNaN(Number(value)) && key !== "name" && key !== "color" && key !== "layerId" ? Number(value) : value
@@ -49,7 +63,7 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
     elements.updateElement(props.elementId, processed)
     setEditMode(false)
   }
-  const cancelEditing = () => { setEditMode(false); setEdited({}) }
+  const cancelEditing = () => { setEditMode(false); setEdited({}); setErrors({}) }
 
   const property = (label: string, value: unknown, unit = "") => (
     <div class={ROW}>
@@ -61,10 +75,13 @@ export default function ElementInfo(props: ElementInfoProps): JSX.Element {
     <div class={ROW}>
       <label for={field} class="text-sm text-gray-600 dark:text-gray-300">{label}</label>
       <Show when={type === "select" && options} fallback={
+        <Show when={type === "number"} fallback={
         <Show when={type === "checkbox"} fallback={
           <input id={field} type={type} value={edited()[field] ?? ""} onInput={(e) => set(field, e.currentTarget.value)}
             class={type === "color" ? "w-10 h-8 p-0 border rounded" : `${FIELD} w-24`} />}>
           <input id={field} type="checkbox" checked={!!edited()[field]} onChange={(e) => set(field, e.currentTarget.checked)} class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+        </Show>}>
+          <div class="w-28"><NumberField id={field} label={label} value={edited()[field]} onChange={(value) => set(field, value)} onError={(error) => flag(field, error)} min={MINIMUM[field]} step={field === "linewidth" ? 1 : 0.1} showError={tried()} class={`${FIELD} w-full`} /></div>
         </Show>}>
         <select id={field} value={edited()[field]} onChange={(e) => set(field, e.currentTarget.value)} class={FIELD}>
           <For each={options}>{(option) => <option value={option.value}>{option.label}</option>}</For>

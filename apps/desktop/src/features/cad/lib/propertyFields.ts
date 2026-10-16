@@ -7,6 +7,8 @@ export interface PropertyField {
   min?: number
   max?: number
   unit?: string
+  /** Whole numbers only; defaults to true for counts (segments, sides, teeth...), see `numberRulesFor`. */
+  integer?: boolean
   minPoints?: number
   maxPoints?: number
   exactPoints?: number
@@ -14,6 +16,17 @@ export interface PropertyField {
   options?: { value: string; label: string }[]
   showIf?: (properties: any) => boolean
 }
+
+/** Fields that count things: a typed `32,5` there is an error, not a dimension. */
+const COUNT_FIELDS: ReadonlySet<string> = new Set(["segments", "radialSegments", "tubularSegments", "heightSegments", "widthSegments", "sides", "divisions", "steps", "teeth", "degree", "precision", "count", "copies"])
+
+/** How a number field's typed text is checked: limits, whole numbers for counts, degrees for angles. */
+export const numberRulesFor = (field: PropertyField): { min?: number; max?: number; integer: boolean; degrees: boolean } => ({
+  ...(field.min !== undefined ? { min: field.min } : {}),
+  ...(field.max !== undefined ? { max: field.max } : {}),
+  integer: field.integer ?? COUNT_FIELDS.has(field.name),
+  degrees: field.unit === "°" || /\(°\)|angle/i.test(field.label) || /angle/i.test(field.name)
+})
 
 export const getFieldsForElementType = (type: string): PropertyField[] => {
   switch (type) {
