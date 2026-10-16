@@ -25,7 +25,7 @@ export const ToolpathGeneratorHandlers = HttpApiBuilder.group(Api, "toolpathGene
       guarded("Failed to compute suggestions", () => g.suggestFor(payload.settings, payload.geometry)))
     .handle("parse", ({ payload }) =>
       guarded("Failed to parse G-code", () => g.analyseGcode(payload.gcode, payload.name)).pipe(
-        Effect.map((analysis) => ({ warnings: analysis.warnings, stats: analysis.stats, program: analysis.program }))))
+        Effect.map((analysis) => ({ warnings: analysis.warnings, stats: analysis.stats, program: analysis.program, motion: analysis.motion }))))
     .handle("verify", ({ payload }) =>
       guarded("Failed to verify toolpath", () => cam.verify.verifyToolpath(payload)))
 }))

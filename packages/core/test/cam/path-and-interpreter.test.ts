@@ -92,8 +92,13 @@ describe("reference interpreter", () => {
   })
 
   test("unsupported motion words are reported instead of ignored", () => {
-    expect(interpretGcode("G18\nG1 X1 F10").errors.length).toBe(1)
-    expect(interpretGcode("G18").errors.length).toBe(1)
+    expect(interpretGcode("G71 U2 R0.5\nG1 X1 F10").errors.length).toBe(1)
+    expect(interpretGcode("G76").errors.length).toBe(1)
+    expect(interpretGcode("G76").unsupported).toEqual([{ line: 1, word: "G76" }])
+  })
+
+  test("the lathe plane is replayed, not reported (spec 31 D1)", () => {
+    expect(interpretGcode("G18\nG1 X1 F10").errors).toEqual([])
   })
 })
 

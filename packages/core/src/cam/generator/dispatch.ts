@@ -13,7 +13,7 @@ import { drillPoints, drillPointsOf, drillWarning, elementOperation, type DrillP
 import { circleToolpath, polygonToolpath, rectangleToolpath } from "./basic.ts"
 import { applyOriginOffset, f3 } from "./common.ts"
 import { flattenElements, isContainer, orderForMachining, outsideStock, shiftElement, topOf } from "./elements.ts"
-import type { CadElement, GeometryInput, Stock, ToolpathSettings } from "./schema.ts"
+import { DEFAULT_GEOMETRY, type CadElement, type GeometryInput, type Stock, type ToolpathSettings } from "./schema.ts"
 import { isSolidElement, surfaceProgram } from "./surface.ts"
 import { parametricDrillPoints, parametricOperation } from "./history-features.ts"
 import { splitUnifiedMembers, unifiedGcode } from "./unified-geometry.ts"
@@ -42,6 +42,18 @@ export const originShift = (s: ToolpathSettings, g: GeometryInput): { dx: number
     case "workpiece-corner2": return { dx: -(stock.x - stock.width / 2), dy: -(stock.y - stock.height / 2) }
     case "machine-zero": return { dx: -stock.x + stock.width, dy: -stock.y + stock.height }
     case "custom": return { dx: -stock.x + s.originX, dy: -stock.y + s.originY }
+  }
+}
+
+/**
+ * The stock as a box in the coordinates of the program the generator writes: XY moved by the same `originShift` the
+ * geometry gets, Z unchanged (the stock top stays at `topZ`). The preview draws the stock with it (spec 31 D7).
+ */
+export const stockInWork = (s: ToolpathSettings, stock: Stock): { readonly min: { x: number; y: number; z: number }; readonly max: { x: number; y: number; z: number } } => {
+  const { dx, dy } = originShift(s, { ...DEFAULT_GEOMETRY, stock } as GeometryInput)
+  return {
+    min: { x: stock.x - stock.width / 2 + dx, y: stock.y - stock.height / 2 + dy, z: stock.topZ - stock.depth },
+    max: { x: stock.x + stock.width / 2 + dx, y: stock.y + stock.height / 2 + dy, z: stock.topZ }
   }
 }
 

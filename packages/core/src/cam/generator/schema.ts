@@ -10,6 +10,7 @@
  */
 import { Schema } from "effect"
 import { ProgramSchema } from "../ir.ts"
+import { MotionTrackSchema } from "../viewer/motion-track.ts"
 import { NonNegative, Positive, withDefault } from "../params.ts"
 
 const Num = Schema.Finite
@@ -154,6 +155,29 @@ export const ToolpathSettingsSchema = Schema.Struct({
   spindleDirection: withDefault(Schema.Literals(["cw", "ccw"]), "cw"),
   turningOperation: withDefault(Schema.Literals(["external", "internal", "face"]), "external"),
   applyToolCompensation: withDefault(Schema.Boolean, true),
+  // workholding and machine layout (spec 31 §4.1): how the part is held, as the preview draws it and the checks use it
+  /** Mill: a machine vise, strap clamps, a fixture plate (stock straight on the table) or nothing drawn. */
+  workholding: withDefault(Schema.Literals(["vise", "clamps", "plate", "none"]), "vise"),
+  /** Vise jaws parallel to X (clamping across Y, the usual VMC set-up) or to Y. */
+  viseJawAxis: withDefault(Schema.Literals(["x", "y"]), "x"),
+  /** Height of stock gripped by the jaws, mm; 0 = automatic (a third of the stock, 3..10 mm). */
+  clampDepth: withDefault(NonNegative, 0),
+  viseJawHeight: withDefault(Positive, 40),
+  /** Parallels under the stock, mm (0 = the stock sits on the vise bed). */
+  parallelsHeight: withDefault(NonNegative, 10),
+  /** The workholding was set by the user or the assistant: it is drawn solid and checked; otherwise it is an assumption. */
+  workholdingConfigured: withDefault(Schema.Boolean, false),
+  /** Lathe turret behind the axis (slant bed, +X up in the preview) or in front of it (+X towards the operator). */
+  latheTurret: withDefault(Schema.Literals(["rear", "front"]), "rear"),
+  chuckType: withDefault(Schema.Literals(["3-jaw", "4-jaw", "collet"]), "3-jaw"),
+  /** Stock length inside the chuck jaws, mm. */
+  gripLength: withDefault(Positive, 20),
+  tailstock: withDefault(Schema.Boolean, false),
+  /** Bore of a tube stock, mm (0 = solid bar). */
+  stockBore: withDefault(NonNegative, 0),
+  /** 3D printer motion: what physically moves (the program is the same). */
+  printerKinematics: withDefault(Schema.Literals(["cartesian", "corexy", "bed-slinger", "delta"]), "cartesian"),
+  buildHeight: withDefault(Positive, 250),
   // origin
   originType: withDefault(OriginTypeSchema, "workpiece-center"),
   originX: withDefault(Num, 0),
@@ -353,7 +377,9 @@ export const ParseRequestSchema = Schema.Struct({
 export const ParseResponseSchema = Schema.Struct({
   warnings: Schema.Array(Schema.String),
   stats: GcodeStatsSchema,
-  program: ProgramSchema
+  program: ProgramSchema,
+  /** Machine state per move (spec 31 §4.4); optional so older servers and clients stay compatible. */
+  motion: Schema.optionalKey(MotionTrackSchema)
 })
 
 // ---------------------------------------------------------------- suggestions

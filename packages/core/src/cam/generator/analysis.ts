@@ -9,6 +9,7 @@
 import { interpretGcode, type GSegment } from "../testing/gcode-interpreter.ts"
 import { makeProgram, type Move, type Program, type Toolpath } from "../ir.ts"
 import type { GcodeStats } from "./schema.ts"
+import { motionTrackOf, type MotionTrack } from "../viewer/motion-track.ts"
 
 /** Rapid traverse used for time estimates, mm/min. */
 export const DEFAULT_RAPID_RATE = 5000
@@ -33,10 +34,12 @@ export interface Analysis {
   readonly stats: GcodeStats
   readonly warnings: ReadonlyArray<string>
   readonly program: Program
+  /** Machine state of every move of `program` (spec 31 §4.4). */
+  readonly motion: MotionTrack
 }
 
 export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAULT_RAPID_RATE): Analysis => {
-  const result = interpretGcode(gcode)
+  const result = interpretGcode(gcode, { track: true })
   const moves: Move[] = []
   const min = { x: Infinity, y: Infinity, z: Infinity }
   const max = { x: -Infinity, y: -Infinity, z: -Infinity }
@@ -75,6 +78,7 @@ export const analyseGcode = (gcode: string, name = "Program", rapidRate = DEFAUL
       bounds: empty ? { min: zero, max: zero } : { min, max }
     },
     warnings: result.errors,
-    program: makeProgram(name || "Program", moves.length > 0 ? [toolpath] : [])
+    program: makeProgram(name || "Program", moves.length > 0 ? [toolpath] : []),
+    motion: moves.length > 0 ? motionTrackOf(result.states ?? [], result.unsupported) : { paths: [], unsupported: result.unsupported }
   }
 }

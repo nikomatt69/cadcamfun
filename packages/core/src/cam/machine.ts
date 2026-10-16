@@ -242,3 +242,60 @@ export const checkAxes = (gcode: string, kind: MachineKind): ReadonlyArray<AxisI
   if (kind === "3dprinter" && !homed && gcode.trim() !== "") add("info", "PRINTER_NOT_HOMED", 1, "No G28: the printer does not know where its axes are")
   return issues
 }
+
+// ---------------------------------------------------------------- which machine a program is for
+
+export interface MachineInference {
+  readonly kind: MachineKind
+  /** `strong`: the words of one machine only; `weak`: little evidence or evidence of more than one machine. */
+  readonly confidence: "strong" | "weak"
+  readonly reasons: ReadonlyArray<string>
+}
+
+/**
+ * Reads which machine a program was written for (spec 31 §4.5): an extruder (E words, M104 / M109 / M140 / M190, M82 / M83)
+ * is a printer; the XZ plane without Y, constant surface speed, threading feeds, G7 / G50 S or four-digit turret words are a
+ * lathe; Y motion, tool length offsets or drilling cycles are a mill. `undefined` for a text with no motion.
+ */
+export const inferMachineKind = (gcode: string): MachineInference | undefined => {
+  const score: Record<MachineKind, number> = { mill: 0, lathe: 0, "3dprinter": 0 }
+  const reasons: Record<MachineKind, Set<string>> = { mill: new Set(), lathe: new Set(), "3dprinter": new Set() }
+  const vote = (kind: MachineKind, weight: number, reason: string) => { score[kind] += weight; reasons[kind].add(reason) }
+  let motion = false
+  let yMotion = false
+  let g18 = false
+  for (const raw of gcode.split(/\r?\n/)) {
+    const text = raw.replace(/\([^)]*\)/g, " ").replace(/;.*$/, "").trim()
+    if (text === "") continue
+    const words = [...text.matchAll(WORD)].map((m) => ({ letter: m[1]!.toUpperCase(), value: Number(m[2]) }))
+    const has = (letter: string, value?: number) => words.some((w) => w.letter === letter && (value === undefined || Math.abs(w.value - value) < 1e-9))
+    const moves = has("X") || has("Y") || has("Z")
+    if (moves) motion = true
+    if (has("E") && (moves || has("G", 1) || has("G", 0))) vote("3dprinter", 3, "E (extruder) words on motion blocks")
+    if ([104, 109, 140, 190].some((m) => has("M", m))) vote("3dprinter", 3, "nozzle / bed temperature (M104 M109 M140 M190)")
+    if (has("M", 82) || has("M", 83)) vote("3dprinter", 2, "extruder mode (M82 / M83)")
+    if (has("G", 18)) g18 = true
+    if (has("G", 96)) vote("lathe", 3, "constant surface speed (G96)")
+    if (has("G", 32) || has("G", 33)) vote("lathe", 2, "threading feed (G32)")
+    if (has("G", 7)) vote("lathe", 2, "diameter mode (G7)")
+    if (has("G", 50) && has("S")) vote("lathe", 2, "spindle limit (G50 S)")
+    const t = words.find((w) => w.letter === "T")
+    if (t !== undefined && t.value >= 100 && /T\s*0?\d{4}\b/i.test(text)) vote("lathe", 1, "turret tool and offset words (T0101)")
+    if (has("Y") && (has("G", 0) || has("G", 1) || has("G", 2) || has("G", 3) || moves)) yMotion = true
+    if (has("G", 43)) vote("mill", 2, "tool length offset (G43)")
+    if ([73, 81, 82, 83].some((g) => has("G", g))) vote("mill", 2, "drilling cycles (G81-G83)")
+    if (has("G", 17)) vote("mill", 1, "XY plane (G17)")
+  }
+  if (!motion) return undefined
+  if (g18 && !yMotion) vote("lathe", 3, "XZ plane (G18) and no Y motion")
+  if (yMotion && score["3dprinter"] === 0) vote("mill", 2, "Y motion")
+  const ranked = (Object.keys(score) as MachineKind[]).sort((a, b) => score[b] - score[a])
+  const best = ranked[0]!
+  if (score[best] === 0) return { kind: "mill", confidence: "weak", reasons: ["no machine-specific words: assumed a mill"] }
+  const contested = ranked.slice(1).filter((k) => score[k] > 0)
+  return {
+    kind: best,
+    confidence: contested.length === 0 && score[best] >= 2 ? "strong" : "weak",
+    reasons: [...reasons[best], ...contested.map((k) => `also words of a ${k}: ${[...reasons[k]].join(", ")}`)]
+  }
+}
