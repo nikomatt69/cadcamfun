@@ -80,6 +80,7 @@ const button = (label: string): HTMLButtonElement => {
   if (found === undefined) throw new Error(`No button '${label}'`)
   return found
 }
+const edit = async (): Promise<void> => { button("Edit Properties").click(); await tick() }
 const apply = async (): Promise<void> => {
   document.querySelector<HTMLFormElement>("form")!.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }))
   await tick(60)
@@ -114,14 +115,15 @@ describe("the property panel takes dimensions as typed", () => {
     return id
   }
 
-  test("no Edit step: type a comma decimal with many digits, Apply writes exactly that", async () => {
+  test("read-only until Edit Properties; then a comma decimal with many digits is applied exactly", async () => {
     const id = select({ type: "cylinder", x: 0, y: 0, z: 0, radius: 10, height: 20, segments: 32 })
     const dispose = mountProperties()
     try {
       await tick()
-      expect(field("radius").disabled).toBe(false)
+      expect(field("radius").disabled).toBe(true)
       expect(field("radius").value).toBe("10")
-      expect(button("Apply").disabled).toBe(true)
+      await edit()
+      expect(field("radius").disabled).toBe(false)
       const radius = field("radius")
       await type("radius", "12,")
       await type("radius", "12,3456")
@@ -140,7 +142,9 @@ describe("the property panel takes dimensions as typed", () => {
       expect(element(id)["radius"]).toBe(12.3456)
       expect(element(id)["height"]).toBe(22.5)
       expect(element(id)["segments"]).toBe(32)
-      expect(button("Apply").disabled).toBe(true)
+      // Apply ends the edit: the fields are read-only again.
+      expect(field("radius").disabled).toBe(true)
+      expect(button("Edit Properties").disabled).toBe(false)
     } finally { dispose() }
   })
 
@@ -149,6 +153,7 @@ describe("the property panel takes dimensions as typed", () => {
     const dispose = mountProperties()
     try {
       await tick()
+      await edit()
       await type("radius", "")
       await leave("radius")
       await type("segments", "32,5")
@@ -176,9 +181,11 @@ describe("the property panel takes dimensions as typed", () => {
     const dispose = mountProperties()
     try {
       await tick()
+      await edit()
       await type("rotation-z", "45,5°")
       await apply()
       expect(element(id)["rotation"]).toEqual({ x: 0, y: 0, z: 45.5 })
+      await edit()
       await type("width", "abc")
       await leave("width")
       expect(field("width").value).toBe("abc")
@@ -186,6 +193,7 @@ describe("the property panel takes dimensions as typed", () => {
       await tick(60)
       expect(field("width").value).toBe("10")
       expect(field("width").getAttribute("aria-invalid")).toBe("false")
+      expect(field("width").disabled).toBe(true)
       expect(element(id)["width"]).toBe(10)
     } finally { dispose() }
   })
@@ -195,6 +203,7 @@ describe("the property panel takes dimensions as typed", () => {
     const dispose = mountProperties()
     try {
       await tick()
+      await edit()
       await type("width", "15,25")
       // The viewport moves the part meanwhile.
       useElementsStore.getState().updateElement(id, { x: 100 })

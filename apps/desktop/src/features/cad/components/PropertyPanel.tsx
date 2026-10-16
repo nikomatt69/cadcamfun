@@ -33,7 +33,9 @@ export default function PropertyPanel(): JSX.Element {
   // What the fields were filled from: Apply writes only what differs from it, so an outside change to another field survives.
   let base: Props = {}
   const show = (snapshot: Props) => { base = snapshot; setProperties(snapshot) }
-  // The fields are always editable: typing makes the panel dirty, Apply (or Enter) writes the change, Cancel (or Esc) drops it.
+  // The fields are read-only until Edit Properties; then typing makes the panel dirty, Apply (or Enter) writes the change and
+  // Cancel (or Esc) drops it, both ending the edit.
+  const [editing, setEditing] = createSignal(false)
   const [dirty, setDirty] = createSignal(false)
   // Fields whose text is not a valid value right now ("12,", "abc", below the minimum): Apply refuses while any is left.
   const [errors, setErrors] = createSignal<Record<string, string>>({})
@@ -46,6 +48,7 @@ export default function PropertyPanel(): JSX.Element {
     setDirty(false)
     setErrors({})
     setTried(false)
+    setEditing(false)
     setRevision((n) => n + 1)
   }
 
@@ -63,7 +66,7 @@ export default function PropertyPanel(): JSX.Element {
 
   const layer = createMemo(() => (elements.selectedElement ? layers.layers.find((candidate) => candidate.id === elements.selectedElement!.layerId) : undefined))
   const locked = () => layer()?.locked ?? false
-  const disabled = () => locked()
+  const disabled = () => !editing() || locked()
   // Text that is not a value yet ("12,", "abc") is a change too: Esc and Cancel must be able to drop it.
   const changed = () => dirty() || Object.keys(errors()).length > 0
   const set = (name: string, value: unknown) => { setProperties((previous) => ({ ...previous, [name]: value })); setDirty(true) }
@@ -115,6 +118,7 @@ export default function PropertyPanel(): JSX.Element {
     if (Object.keys(changes).length > 0) elements.updateElement(selected.id, changes)
     setDirty(false)
     setTried(false)
+    setEditing(false)
     const updated = elements.selectedElement
     if (updated) show({ ...updated })
   }
@@ -183,7 +187,7 @@ export default function PropertyPanel(): JSX.Element {
           <div class="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm flex items-center"><Lock size={16} class="mr-2" /><span>This element is on a locked layer and cannot be edited</span></div>
         </Show>
 
-        <form onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape" && changed()) { event.preventDefault(); cancel() } }}>
+        <form onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape" && editing()) { event.preventDefault(); cancel() } }}>
           <div class="space-y-4">
             <Motion.div {...rise}><label for="name" class={LABEL}>Name</label><input type="text" id="name" name="name" class={READONLY} value={properties().name || ""} disabled /></Motion.div>
             <Motion.div {...rise}><label for="id" class={LABEL}>ID</label><input type="text" id="id" name="id" class={READONLY} value={properties().id || ""} disabled /></Motion.div>
@@ -214,9 +218,13 @@ export default function PropertyPanel(): JSX.Element {
               <p class="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="property-errors">Fix the highlighted values before applying.</p>
             </Show>
             <Motion.div class="mt-6 flex items-center justify-end gap-3" {...rise}>
+              <Show when={editing()} fallback={
+                <Motion.button type="button" onClick={() => setEditing(true)} class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Edit Properties</Motion.button>
+              }>
               <span class="mr-auto text-xs text-gray-500 dark:text-gray-400">{changed() ? "Enter applies · Esc cancels" : "Type a value: 12,5 · 12.5 · 40/2+3"}</span>
-              <Motion.button type="button" onClick={cancel} disabled={!changed()} class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-[#F8FBFF] dark:bg-gray-700 dark:text-white dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }}>Cancel</Motion.button>
-              <Motion.button type="submit" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked() || !changed()}>Apply</Motion.button>
+              <Motion.button type="button" onClick={cancel} class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-[#F8FBFF] dark:bg-gray-700 dark:text-white dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }}>Cancel</Motion.button>
+              <Motion.button type="submit" class="px-3 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" hover={{ scale: 1.05 }} press={{ scale: 0.95 }} disabled={locked()}>Apply</Motion.button>
+              </Show>
             </Motion.div>
           </div>
         </form>
